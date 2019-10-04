@@ -30,6 +30,10 @@ var prCmd = &cobra.Command{
 	Short: "Work with pull requests",
 	Long: `Interact with pull requests for this repository.
 `,
+	Run: func(cmd *cobra.Command, args []string) {
+		err := interactiveList()
+		utils.Check(err)
+	},
 }
 
 var prListCmd = &cobra.Command{
@@ -196,6 +200,84 @@ func createPr(...string) {
 	}
 }
 
+func interactiveList() error {
+	currentPr, viewerCreated, reviewRequested, err := pullRequests()
+	if err != nil {
+		return err
+	}
+
+	prs := []graphqlPullRequest{}
+	if currentPr != nil {
+		prs = append(prs, *currentPr)
+	}
+	prs = append(prs, viewerCreated...)
+	prs = append(prs, reviewRequested...)
+
+	const openAction = "open in browser"
+	const checkoutAction = "checkout PR locally"
+	const cancelAction = "cancel"
+
+	prOptions := []string{}
+	seen := map[int]bool{}
+	for _, pr := range prs {
+		if seen[pr.Number] {
+			continue
+		}
+		prOptions = append(prOptions, fmt.Sprintf("[%v] %s", pr.Number, pr.Title))
+		seen[pr.Number] = true
+	}
+
+	// TODO figure out how to visually seperate the PR list
+	qs := []*survey.Question{
+		{
+			Name: "pr",
+			Prompt: &survey.Select{
+				Message: "PRs you might be interested in",
+				Options: prOptions,
+			},
+		},
+		{
+			Name: "action",
+			Prompt: &survey.Select{
+				Message: "What would you like to do?",
+				Options: []string{
+					openAction,
+					checkoutAction,
+					cancelAction,
+				},
+			},
+		},
+	}
+
+	answers := struct {
+		Pr     int
+		Action string
+	}{}
+
+	err = survey.Ask(qs, &answers)
+	if err != nil {
+		return err
+	}
+
+	actions := map[string]func() error{}
+
+	actions[cancelAction] = func() error { return nil }
+	actions[openAction] = func() error {
+		launcher, err := utils.BrowserLauncher()
+		if err != nil {
+			return err
+		}
+		exec.Command(launcher[0], prs[answers.Pr].URL).Run()
+		return nil
+	}
+	actions[checkoutAction] = func() error {
+		pr := prs[answers.Pr]
+		return checkoutPr(fmt.Sprintf("%v", pr.Number))
+	}
+
+	return actions[answers.Action]()
+
+}
 func list() error {
 	currentPr, viewerCreated, reviewRequested, err := pullRequests()
 	if err != nil {
