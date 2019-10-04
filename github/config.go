@@ -334,9 +334,8 @@ func (c *Config) DefaultHost() (host *Host, err error) {
 	if GitHubHostEnv != "" {
 		host, err = c.PromptForHost(GitHubHostEnv)
 	} else if len(c.Hosts) > 0 {
-		host = c.selectHost()
 		// HACK: forces host to inherit GITHUB_TOKEN if applicable
-		host, err = c.PromptForHost(host.Host)
+		host, err = c.PromptForHost(c.Hosts[0].Host)
 	} else {
 		host, err = c.PromptForHost(DefaultGitHubHost())
 	}
