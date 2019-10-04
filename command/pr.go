@@ -48,8 +48,8 @@ var prShowCmd = &cobra.Command{
 When <pr-number> is not given, the pull request that belongs to the current
 branch is opened.
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		show(args...)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return show(args...)
 	},
 }
 
@@ -65,8 +65,8 @@ var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout <pr-number>",
 	Short: "Check out a pull request in git",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		checkoutPr(args[0])
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return checkoutPr(args[0])
 	},
 }
 
@@ -196,8 +196,11 @@ func createPr(...string) {
 	}
 }
 
-func list() {
-	currentPr, viewerCreated, reviewRequested := pullRequests()
+func list() error {
+	currentPr, viewerCreated, reviewRequested, err := pullRequests()
+	if err != nil {
+		return err
+	}
 	currentBranch := currentBranch()
 
 	currentPrOutput := style(currentBranch, `{{- bold "current branch " (cyan "[" . "]")}}`) +
@@ -227,9 +230,10 @@ func list() {
 {{end}}`)
 
 	fmt.Println(currentPrOutput + viewerCreatedOutput + reviewRequestedOutput)
+	return nil
 }
 
-func show(number ...string) {
+func show(number ...string) error {
 	project := project()
 
 	var openURL string
@@ -237,21 +241,20 @@ func show(number ...string) {
 		if prNumber, err := strconv.Atoi(number[0]); err == nil {
 			openURL = project.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
 		} else {
-			utils.Check(fmt.Errorf("invalid pull request number: '%s'", number[0]))
+			return fmt.Errorf("invalid pull request number: '%s'", number[0])
 		}
 	} else {
-		pr := pullRequestForCurrentBranch()
-		if pr != nil {
-			openURL = pr.HtmlUrl
-		} else {
-			panic("There is no PR to open.")
+		pr, err := pullRequestForCurrentBranch()
+		if err != nil {
+			return err
 		}
+		openURL = pr.HtmlUrl
 	}
 
-	openInBrowser(openURL)
+	return openInBrowser(openURL)
 }
 
-func pullRequestForCurrentBranch() *github.PullRequest {
+func pullRequestForCurrentBranch() (*github.PullRequest, error) {
 	project := project()
 	client := github.NewClient(project.Host)
 	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch())
@@ -259,13 +262,13 @@ func pullRequestForCurrentBranch() *github.PullRequest {
 	filterParams := map[string]interface{}{"head": headWithOwner}
 	prs, err := client.FetchPullRequests(&project, filterParams, 10, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	if len(prs) > 0 {
-		return &prs[0]
+	if len(prs) == 0 {
+		return nil, fmt.Errorf("no pull requests found for the current branch")
 	}
 
-	return nil
+	return &prs[0], nil
 }
 
 // TODO: figure out a less ridiculous way to parse GraphQL response
@@ -298,7 +301,7 @@ type graphqlPullRequest struct {
 	URL    string `json:"url"`
 }
 
-func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest) {
+func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
 	project := project()
 	client := github.NewClient(project.Host)
 	owner := project.Owner
@@ -360,12 +363,12 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 
 	response, err := client.GenericAPIRequest("POST", "graphql", data, headers, 0)
 	if err != nil {
-		panic(fmt.Sprintf("GenericAPIRequest failed %+v", err))
+		return nil, nil, nil, err
 	}
 	responseBody := searchBody{}
 	err = response.Unmarshal(&responseBody)
 	if err != nil {
-		panic(fmt.Sprintf("Unmarshal failed %+v", err))
+		return nil, nil, nil, err
 	}
 
 	viewerCreated := []graphqlPullRequest{}
@@ -380,7 +383,7 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 	if len(responseBody.Data.Repository.PullRequests.Edges) > 0 {
 		currentPr = &responseBody.Data.Repository.PullRequests.Edges[0].Node
 	}
-	return currentPr, viewerCreated, reviewRequested
+	return currentPr, viewerCreated, reviewRequested, nil
 }
 
 func currentBranch() string {
@@ -419,11 +422,13 @@ func project() github.Project {
 	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
 }
 
-func openInBrowser(url string) {
+func openInBrowser(url string) error {
 	launcher, err := utils.BrowserLauncher()
-	utils.Check(err)
-	endingArgs := append(launcher[1:], url) // Hub added an empty string at the start of the endingArgs, but this caused OS X to open the finder, so I got rid of it without understanding why exactly hub added it.
-	exec.Command(launcher[0], endingArgs...).Start()
+	if err != nil {
+		return err
+	}
+	endingArgs := append(launcher[1:], url)
+	return exec.Command(launcher[0], endingArgs...).Run()
 }
 
 func currentUsername() string {
@@ -434,20 +439,27 @@ func currentUsername() string {
 	return host.User
 }
 
-func checkoutPr(number string) {
+func checkoutPr(number string) error {
 	_, err := strconv.Atoi(number)
-	utils.Check(err)
+	if err != nil {
+		return err
+	}
 
 	project := project()
 	client := github.NewClient(project.Host)
 	pullRequest, err := client.PullRequest(&project, number)
-	utils.Check(err)
+	if err != nil {
+		return err
+	}
 
 	repo, err := github.LocalRepo()
-	utils.Check(err)
+	if err != nil {
+		return err
+	}
+
 	baseRemote, err := repo.RemoteForRepo(pullRequest.Base.Repo)
 	if err != nil {
-		return
+		return err
 	}
 
 	var headRemote *github.Remote
@@ -498,4 +510,5 @@ func checkoutPr(number string) {
 		utils.Check(git.Run("config", fmt.Sprintf("branch.%s.remote", newBranchName), remote))
 		utils.Check(git.Run("config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef))
 	}
+	return nil
 }
