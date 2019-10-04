@@ -1,0 +1,23 @@
+# github.com/BurntSushi/toml v0.3.1
+github.com/BurntSushi/toml
+# github.com/inconshreveable/mousetrap v1.0.0
+github.com/inconshreveable/mousetrap
+# github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
+github.com/kballard/go-shellquote
+# github.com/mattn/go-colorable v0.1.2
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.9
+github.com/mattn/go-isatty
+# github.com/mitchellh/go-homedir v1.1.0
+github.com/mitchellh/go-homedir
+# github.com/spf13/cobra v0.0.5
+github.com/spf13/cobra
+# github.com/spf13/pflag v1.0.3
+github.com/spf13/pflag
+# golang.org/x/crypto v0.0.0-20190926180335-cea2066c6411
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/yaml.v2 v2.2.2
+gopkg.in/yaml.v2
