@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh/ui"
+	"github.com/github/gh-cli/ui"
 )
 
 var GlobalFlags []string

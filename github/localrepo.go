@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/github/gh/git"
+	"github.com/github/gh-cli/git"
 )
 
 func LocalRepo() (repo *GitHubRepo, err error) {

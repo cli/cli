@@ -3,8 +3,8 @@ package github
 import (
 	"fmt"
 
-	"github.com/github/gh/git"
-	"github.com/github/gh/ui"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/ui"
 )
 
 type PullRequestParams struct {

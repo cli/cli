@@ -12,8 +12,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/github/gh/ui"
-	"github.com/github/gh/utils"
+	"github.com/github/gh-cli/ui"
+	"github.com/github/gh-cli/utils"
 	"github.com/mitchellh/go-homedir"
 	"golang.org/x/crypto/ssh/terminal"
 )

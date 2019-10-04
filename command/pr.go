@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/github/gh/git"
-	"github.com/github/gh/github"
-	"github.com/github/gh/ui"
-	"github.com/github/gh/utils"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/github"
+	"github.com/github/gh-cli/ui"
+	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
 

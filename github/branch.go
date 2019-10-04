@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/github/gh/git"
+	"github.com/github/gh-cli/git"
 )
 
 type Branch struct {
