@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -391,6 +392,18 @@ func currentBranch() string {
 }
 
 func project() github.Project {
+	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
+		repoURL, err := url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
+		if err != nil {
+			panic(err)
+		}
+		project, err := github.NewProjectFromURL(repoURL)
+		if err != nil {
+			panic(err)
+		}
+		return *project
+	}
+
 	remotes, err := github.Remotes()
 	if err != nil {
 		panic(err)
