@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/github/gh/ui"
 )
 
 var GlobalFlags []string
@@ -314,6 +316,9 @@ func Alias(name string) (string, error) {
 
 func Run(args ...string) error {
 	cmd := exec.Command("git", args...)
+	if os.Getenv("HUB_VERBOSE") != "" {
+		ui.Errorln(cmd)
+	}
 	return cmd.Run()
 }
 
