@@ -28,25 +28,26 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Work with pull requests",
-	Long: `This command allows you to
-work with pull requests.`,
-	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pr")
-	},
+	Long: `Interact with pull requests for this repository.
+`,
 }
 
 var prListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List pull requests",
+	Short: "List open pull requests related to you",
 	Run: func(cmd *cobra.Command, args []string) {
 		list()
 	},
 }
 
 var prShowCmd = &cobra.Command{
-	Use:   "show",
-	Short: "Show pull request",
+	Use:   "show [<pr-number>]",
+	Short: "Open a pull request in the browser",
+	Long: `Opens the pull request in the web browser.
+
+When <pr-number> is not given, the pull request that belongs to the current
+branch is opened.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		show(args...)
 	},
@@ -61,7 +62,7 @@ var prCreateCmd = &cobra.Command{
 }
 
 var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout",
+	Use:   "checkout <pr-number>",
 	Short: "Check out a pull request in git",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
