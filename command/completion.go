@@ -1,19 +1,23 @@
 package command
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
+var shellType string
+
 func init() {
 	RootCmd.AddCommand(completionCmd)
+	completionCmd.Flags().StringVarP(&shellType, "shell", "s", "bash", "The type of shell")
 }
 
 var completionCmd = &cobra.Command{
 	Use:    "completion",
 	Hidden: true,
-	Short:  "Generates bash completion script",
+	Short:  "Generates completion scripts",
 	Long: `To enable completion in your shell, run:
 
   eval "$(gh completion)"
@@ -21,7 +25,15 @@ var completionCmd = &cobra.Command{
 You can add that to your '~/.bash_profile' to enable completion whenever you
 start a new shell.
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		RootCmd.GenBashCompletion(os.Stdout)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch shellType {
+		case "bash":
+			RootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			RootCmd.GenZshCompletion(os.Stdout)
+		default:
+			return fmt.Errorf("unsupported shell type: %s", shellType)
+		}
+		return nil
 	},
 }
