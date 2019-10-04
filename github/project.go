@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh/git"
-	"github.com/github/gh/utils"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/utils"
 )
 
 type Project struct {

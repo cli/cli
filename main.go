@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/github/gh/command"
+	"github.com/github/gh-cli/command"
 )
 
 func main() {
