@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/gh/version"
+	"github.com/github/gh-cli/version"
 )
 
 const (

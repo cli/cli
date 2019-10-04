@@ -3,8 +3,8 @@ package command
 import (
 	"fmt"
 
-	"github.com/github/gh/git"
-	"github.com/github/gh/github"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/github"
 	"github.com/spf13/cobra"
 )
 
