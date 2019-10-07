@@ -283,10 +283,9 @@ func list() error {
 	if err != nil {
 		return err
 	}
-	currentBranch := currentBranch()
 
-	currentPrOutput := style(currentBranch, `{{- bold "Current branch "}}`) +
-		style(currentPr, `
+	currentPrOutput :=
+		style(currentPr, `{{- bold "Current branch"}}
 {{if .}}  #{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
 {{else}}  {{gray "There is no pull request associated with this branch"}}
 {{end}}`)
