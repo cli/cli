@@ -165,7 +165,6 @@ func newHttpClient(testHost string, verbose bool, unixSocket string) *http.Clien
 		}
 	} else {
 		httpTransport = &http.Transport{
-			Proxy: proxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
@@ -195,30 +194,6 @@ func cloneRequest(req *http.Request) *http.Request {
 		dup.Header[k] = s
 	}
 	return dup
-}
-
-// An implementation of http.ProxyFromEnvironment that isn't broken
-func proxyFromEnvironment(req *http.Request) (*url.URL, error) {
-	proxy := os.Getenv("http_proxy")
-	if proxy == "" {
-		proxy = os.Getenv("HTTP_PROXY")
-	}
-	if proxy == "" {
-		return nil, nil
-	}
-
-	proxyURL, err := url.Parse(proxy)
-	if err != nil || !strings.HasPrefix(proxyURL.Scheme, "http") {
-		if proxyURL, err := url.Parse("http://" + proxy); err == nil {
-			return proxyURL, nil
-		}
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("invalid proxy address %q: %v", proxy, err)
-	}
-
-	return proxyURL, nil
 }
 
 type simpleClient struct {
@@ -425,10 +400,6 @@ func (c *simpleClient) GetFile(path string, mimeType string) (*simpleResponse, e
 	})
 }
 
-func (c *simpleClient) Delete(path string) (*simpleResponse, error) {
-	return c.performRequest("DELETE", path, nil, nil)
-}
-
 func (c *simpleClient) PostJSON(path string, payload interface{}) (*simpleResponse, error) {
 	return c.jsonRequest("POST", path, payload, nil)
 }
@@ -441,24 +412,6 @@ func (c *simpleClient) PostJSONPreview(path string, payload interface{}, mimeTyp
 
 func (c *simpleClient) PatchJSON(path string, payload interface{}) (*simpleResponse, error) {
 	return c.jsonRequest("PATCH", path, payload, nil)
-}
-
-func (c *simpleClient) PostFile(path, filename string) (*simpleResponse, error) {
-	stat, err := os.Stat(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	return c.performRequest("POST", path, file, func(req *http.Request) {
-		req.ContentLength = stat.Size()
-		req.Header.Set("Content-Type", "application/octet-stream")
-	})
 }
 
 type simpleResponse struct {
