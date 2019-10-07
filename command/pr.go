@@ -482,6 +482,7 @@ func project() github.Project {
 	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
 		repoURL, err := url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
 		if err != nil {
+			panic(err)
 		}
 		project, err := github.NewProjectFromURL(repoURL)
 		if err != nil {
