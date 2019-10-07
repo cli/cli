@@ -18,11 +18,6 @@ func (b *Branch) ShortName() string {
 	return reg.ReplaceAllString(b.Name, "")
 }
 
-func (b *Branch) LongName() string {
-	reg := regexp.MustCompile("^refs/(remotes/)?")
-	return reg.ReplaceAllString(b.Name, "")
-}
-
 func (b *Branch) RemoteName() string {
 	reg := regexp.MustCompile("^refs/remotes/([^/]+)")
 	if reg.MatchString(b.Name) {
@@ -41,11 +36,6 @@ func (b *Branch) Upstream() (u *Branch, err error) {
 	u = &Branch{b.Repo, name}
 
 	return
-}
-
-func (b *Branch) IsMaster() bool {
-	masterName := b.Repo.MasterBranch().ShortName()
-	return b.ShortName() == masterName
 }
 
 func (b *Branch) IsRemote() bool {

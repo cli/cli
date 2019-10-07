@@ -104,14 +104,6 @@ func (r *GitHubRepo) CurrentBranch() (branch *Branch, err error) {
 	return
 }
 
-func (r *GitHubRepo) MasterBranch() *Branch {
-	if remote, err := r.MainRemote(); err == nil {
-		return r.DefaultBranch(remote)
-	} else {
-		return r.DefaultBranch(nil)
-	}
-}
-
 func (r *GitHubRepo) DefaultBranch(remote *Remote) *Branch {
 	var name string
 	if remote != nil {
@@ -189,16 +181,6 @@ func (r *GitHubRepo) RemoteBranchAndProject(owner string, preferUpstream bool) (
 	return
 }
 
-func (r *GitHubRepo) RemoteForBranch(branch *Branch, owner string) *Remote {
-	branchName := branch.ShortName()
-	for _, remote := range r.remotesForPublish(owner) {
-		if git.HasFile("refs", "remotes", remote.Name, branchName) {
-			return &remote
-		}
-	}
-	return nil
-}
-
 func (r *GitHubRepo) RemoteForRepo(repo *Repository) (*Remote, error) {
 	if err := r.loadRemotes(); err != nil {
 		return nil, err
@@ -235,16 +217,6 @@ func (r *GitHubRepo) RemoteForProject(project *Project) (*Remote, error) {
 	return nil, fmt.Errorf("could not find a git remote for '%s'", project)
 }
 
-func (r *GitHubRepo) MainRemote() (*Remote, error) {
-	r.loadRemotes()
-
-	if len(r.remotes) > 0 {
-		return &r.remotes[0], nil
-	} else {
-		return nil, fmt.Errorf("no git remotes found")
-	}
-}
-
 func (r *GitHubRepo) MainProject() (*Project, error) {
 	r.loadRemotes()
 
@@ -254,34 +226,4 @@ func (r *GitHubRepo) MainProject() (*Project, error) {
 		}
 	}
 	return nil, fmt.Errorf("Aborted: could not find any git remote pointing to a GitHub repository")
-}
-
-func (r *GitHubRepo) CurrentProject() (project *Project, err error) {
-	project, err = r.UpstreamProject()
-	if err != nil {
-		project, err = r.MainProject()
-	}
-
-	return
-}
-
-func (r *GitHubRepo) UpstreamProject() (project *Project, err error) {
-	currentBranch, err := r.CurrentBranch()
-	if err != nil {
-		return
-	}
-
-	upstream, err := currentBranch.Upstream()
-	if err != nil {
-		return
-	}
-
-	remote, err := r.RemoteByName(upstream.RemoteName())
-	if err != nil {
-		return
-	}
-
-	project, err = remote.Project()
-
-	return
 }
