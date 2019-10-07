@@ -10,17 +10,6 @@ import (
 	"strings"
 )
 
-var GlobalFlags []string
-
-func Version() (string, error) {
-	versionCmd := exec.Command("git", "version")
-	output, err := versionCmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("error running git version: %s", err)
-	}
-	return firstLine(output), nil
-}
-
 var cachedDir string
 
 func Dir() (string, error) {
@@ -35,30 +24,12 @@ func Dir() (string, error) {
 		return "", fmt.Errorf("Not a git repository (or any of the parent directories): .git")
 	}
 
-	var chdir string
-	for i, flag := range GlobalFlags {
-		if flag == "-C" {
-			dir := GlobalFlags[i+1]
-			if filepath.IsAbs(dir) {
-				chdir = dir
-			} else {
-				chdir = filepath.Join(chdir, dir)
-			}
-		}
-	}
-
 	gitDir := firstLine(output)
-
 	if !filepath.IsAbs(gitDir) {
-		if chdir != "" {
-			gitDir = filepath.Join(chdir, gitDir)
-		}
-
 		gitDir, err = filepath.Abs(gitDir)
 		if err != nil {
 			return "", err
 		}
-
 		gitDir = filepath.Clean(gitDir)
 	}
 
@@ -157,58 +128,6 @@ func SymbolicFullName(name string) (string, error) {
 	return firstLine(output), nil
 }
 
-func Ref(ref string) (string, error) {
-	parseCmd := exec.Command("git", "rev-parse", "-q", ref)
-	parseCmd.Stderr = nil
-	output, err := parseCmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("Unknown revision or path not in the working tree: %s", ref)
-	}
-
-	return firstLine(output), nil
-}
-
-func RefList(a, b string) ([]string, error) {
-	ref := fmt.Sprintf("%s...%s", a, b)
-	listCmd := exec.Command("git", "rev-list", "--cherry-pick", "--right-only", "--no-merges", ref)
-	listCmd.Stderr = nil
-	output, err := listCmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("Can't load rev-list for %s", ref)
-	}
-
-	return outputLines(output), nil
-}
-
-func NewRange(a, b string) (*Range, error) {
-	parseCmd := exec.Command("git", "rev-parse", "-q", a, b)
-	parseCmd.Stderr = nil
-	output, err := parseCmd.Output()
-	if err != nil {
-		return nil, err
-	}
-
-	lines := outputLines(output)
-	if len(lines) != 2 {
-		return nil, fmt.Errorf("Can't parse range %s..%s", a, b)
-	}
-	return &Range{lines[0], lines[1]}, nil
-}
-
-type Range struct {
-	A string
-	B string
-}
-
-func (r *Range) IsIdentical() bool {
-	return strings.EqualFold(r.A, r.B)
-}
-
-func (r *Range) IsAncestor() bool {
-	cmd := exec.Command("git", "merge-base", "--is-ancestor", r.A, r.B)
-	return cmd.Run() != nil
-}
-
 func CommentChar(text string) (string, error) {
 	char, err := Config("core.commentchar")
 	if err != nil {
@@ -261,7 +180,14 @@ func Remotes() ([]string, error) {
 }
 
 func Config(name string) (string, error) {
-	return gitGetConfig(name)
+	configCmd := exec.Command("git", "config", name)
+	output, err := configCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("unknown config key: %s", name)
+	}
+
+	return firstLine(output), nil
+
 }
 
 func ConfigAll(name string) ([]string, error) {
@@ -270,46 +196,12 @@ func ConfigAll(name string) ([]string, error) {
 		mode = "--get-regexp"
 	}
 
-	configCmd := exec.Command("git", gitConfigCommand([]string{mode, name})...)
+	configCmd := exec.Command("git", "config", mode, name)
 	output, err := configCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("Unknown config %s", name)
 	}
 	return outputLines(output), nil
-}
-
-func GlobalConfig(name string) (string, error) {
-	return gitGetConfig("--global", name)
-}
-
-func SetGlobalConfig(name, value string) error {
-	_, err := gitConfig("--global", name, value)
-	return err
-}
-
-func gitGetConfig(args ...string) (string, error) {
-	configCmd := exec.Command("git", gitConfigCommand(args)...)
-	output, err := configCmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("Unknown config %s", args[len(args)-1])
-	}
-
-	return firstLine(output), nil
-}
-
-func gitConfig(args ...string) ([]string, error) {
-	configCmd := exec.Command("git", gitConfigCommand(args)...)
-	output, err := configCmd.Output()
-	return outputLines(output), err
-}
-
-func gitConfigCommand(args []string) []string {
-	cmd := []string{"config"}
-	return append(cmd, args...)
-}
-
-func Alias(name string) (string, error) {
-	return Config(fmt.Sprintf("alias.%s", name))
 }
 
 func Run(args ...string) error {
