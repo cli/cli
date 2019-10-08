@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/github"
 	"github.com/github/gh-cli/ui"
@@ -283,7 +283,10 @@ func list() error {
 	if err != nil {
 		return err
 	}
-	currentBranch := currentBranch()
+	currentBranch, cbErr := context.CurrentBranch()
+	if cbErr != nil {
+		return err
+	}
 
 	currentPrOutput := style(currentBranch, `{{- bold "current branch " (cyan "[" . "]")}}`) +
 		style(currentPr, `
@@ -339,7 +342,11 @@ func show(number ...string) error {
 func pullRequestForCurrentBranch() (*github.PullRequest, error) {
 	project := project()
 	client := github.NewClient(project.Host)
-	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch())
+	currentBranch, err := context.CurrentBranch()
+	if err != nil {
+		return &github.PullRequest{}, err
+	}
+	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch)
 
 	filterParams := map[string]interface{}{"head": headWithOwner}
 	prs, err := client.FetchPullRequests(&project, filterParams, 10, nil)
@@ -388,7 +395,10 @@ func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullReq
 	client := github.NewClient(project.Host)
 	owner := project.Owner
 	repo := project.Name
-	currentBranch := currentBranch()
+	currentBranch, err := context.CurrentBranch()
+	if err != nil {
+		return &graphqlPullRequest{}, []graphqlPullRequest{}, []graphqlPullRequest{}, err
+	}
 
 	var headers map[string]string
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
@@ -466,15 +476,6 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 		currentPr = &responseBody.Data.Repository.PullRequests.Edges[0].Node
 	}
 	return currentPr, viewerCreated, reviewRequested, nil
-}
-
-func currentBranch() string {
-	currentBranch, err := git.Head()
-	if err != nil {
-		panic(err)
-	}
-
-	return strings.Replace(currentBranch, "refs/heads/", "", 1)
 }
 
 func project() github.Project {
