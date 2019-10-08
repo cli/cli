@@ -18,7 +18,7 @@ type graphQLResponse struct {
 }
 
 /*
-GraphQL usage
+graphQL usage
 
 type repoResponse struct {
 	repository struct {
@@ -42,7 +42,7 @@ if err != nil {
 
 fmt.Printf("%+v\n", resp)
 */
-func GraphQL(query string, variables map[string]string, v interface{}) error {
+func graphQL(query string, variables map[string]string, v interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
@@ -108,7 +108,9 @@ func handleHTTPError(resp *http.Response) error {
 	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
 }
 
-// THIS IS A BULLSHIT FUNCTION THAT SHOULD BE REMOVED
+// TODO: THIS IS NO GOOD. I need to figure out if the GraphQL function has direct
+// access to the token, or if we should pass the token into the GraphQL function. For
+// now I'm asuming that this has direct access so I'm simulating that with this function.
 func getToken() string {
 	usr, err := user.Current()
 	if err != nil {
