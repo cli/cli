@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -10,8 +11,17 @@ import (
 	"os/exec"
 )
 
+func randomString(length int) (string, error) {
+	b := make([]byte, length/2)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", b), nil
+}
+
 func main() {
-	state := "TODO" // replace with random unguessable value
+	state, _ := randomString(20)
 
 	clientID := os.Getenv("GH_OAUTH_CLIENT_ID")
 	clientSecret := os.Getenv("GH_OAUTH_CLIENT_SECRET")
@@ -36,12 +46,15 @@ func main() {
 	}
 
 	http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer listener.Close()
 		rq := r.URL.Query()
+		if state != rq.Get("state") {
+			fmt.Fprintf(w, "Error: state mismatch")
+			return
+		}
 		code = rq.Get("code")
-		// TODO: rq.Get("state")
 		w.Header().Add("content-type", "text/html")
 		fmt.Fprintf(w, "<p>You have authenticated <strong>GitHub CLI</strong>. You may now close this page.</p>")
-		defer listener.Close()
 	}))
 
 	resp, err := http.PostForm("https://github.com/login/oauth/access_token",
