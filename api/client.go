@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/user"
 	"regexp"
+
+	"github.com/github/gh-cli/version"
 )
 
 type graphQLResponse struct {
@@ -56,6 +58,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	}
 	req.Header.Set("Authorization", "token "+getToken())
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("User-Agent", "GitHub CLI "+version.Version)
 
 	debugRequest(req, string(reqBody))
 
