@@ -344,7 +344,7 @@ func pullRequestForCurrentBranch() (*github.PullRequest, error) {
 	client := github.NewClient(project.Host)
 	currentBranch, err := context.CurrentBranch()
 	if err != nil {
-		return &github.PullRequest{}, err
+		return nil, err
 	}
 	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch)
 
