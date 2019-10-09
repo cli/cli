@@ -283,11 +283,10 @@ func list() error {
 	if err != nil {
 		return err
 	}
-	currentBranch := currentBranch()
 
-	currentPrOutput := style(currentBranch, `{{- bold "current branch " (cyan "[" . "]")}}`) +
-		style(currentPr, `
-{{if .}}  #{{.Number}} {{.Title}}
+	currentPrOutput :=
+		style(currentPr, `{{- bold "Current branch"}}
+{{if .}}  #{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
 {{else}}  {{gray "There is no pull request associated with this branch"}}
 {{end}}`)
 
@@ -295,7 +294,7 @@ func list() error {
 {{bold "Pull requests created by you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{.Title}}
+	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests open."}}
@@ -305,7 +304,7 @@ func list() error {
 {{bold "Pull requests requesting a code review from you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{.Title}}
+	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests to review."}}
@@ -378,9 +377,10 @@ type pageInfo struct {
 
 // Add entries here when requesting additional fields in the GraphQL query
 type graphqlPullRequest struct {
-	Number int    `json:"number"`
-	Title  string `json:"title"`
-	URL    string `json:"url"`
+	Number      int    `json:"number"`
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	HeadRefName string `json:"headRefName"`
 }
 
 func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
@@ -409,6 +409,7 @@ fragment pr on PullRequest {
 	number
 	title
 	url
+	headRefName
 }
 
 query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
