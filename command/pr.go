@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 
+	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/graphql"
 
 	"github.com/spf13/cobra"
@@ -38,20 +39,20 @@ func ExecutePr() {
 		panic(err)
 	}
 
+	fmt.Printf("Current Pr\n")
 	if prPayload.CurrentPR != nil {
-		fmt.Printf("Current Pr\n")
 		printPr(*prPayload.CurrentPR)
 	}
+	fmt.Printf("Your Prs\n")
 	for _, pr := range prPayload.ViewerCreated {
-		fmt.Printf("Your Prs\n")
 		printPr(pr)
 	}
+	fmt.Printf("Prs you need to review\n")
 	for _, pr := range prPayload.ReviewRequested {
-		fmt.Printf("Prs you need to review\n")
 		printPr(pr)
 	}
 }
 
-func printPr(pr graphql.PullRequest) {
-	fmt.Printf("%d %s [%s]\n", pr.Number, pr.Title, pr.HeadRefName)
+func printPr(pr api.PullRequest) {
+	fmt.Printf("  #%d %s [%s]\n", pr.Number, pr.Title, pr.HeadRefName)
 }
