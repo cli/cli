@@ -31,7 +31,7 @@ func main() {
 	}
 
 	code := ""
-	srv := &http.Server{Addr: fmt.Sprintf(":%d", port)}
+	srv := &http.Server{Addr: fmt.Sprintf("localhost:%d", port)}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		rq := r.URL.Query()
 		code = rq.Get("code")
