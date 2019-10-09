@@ -1,4 +1,4 @@
-package graphql
+package api
 
 import (
 	"bytes"
@@ -54,7 +54,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	if err != nil {
 		panic(err)
 	}
-	debugRequest(req, reqBody)
+	debugRequest(req, string(reqBody))
 
 	req.Header.Set("Authorization", "token "+getToken())
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -135,7 +135,7 @@ func debugRequest(req *http.Request, body string) {
 		return
 	}
 
-	fmt.Printf("DEBUG: GraphQL query to %s:\n %s\n\n", req.URL, body)
+	fmt.Printf("DEBUG: GraphQL request to %s:\n %s\n\n", req.URL, body)
 }
 
 func debugResponse(resp *http.Response, body string) {

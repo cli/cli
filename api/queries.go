@@ -1,4 +1,4 @@
-package graphql
+package api
 
 import (
 	"fmt"
@@ -23,7 +23,9 @@ type PullRequest struct {
 
 func PullRequests() (PullRequestsPayload, error) {
 	type edges struct {
-		Edges    []PullRequest
+		Edges []struct {
+			Node PullRequest
+		}
 		PageInfo struct {
 			HasNextPage bool
 			EndCursor   string
@@ -43,6 +45,7 @@ func PullRequests() (PullRequestsPayload, error) {
 			number
 			title
 			url
+			headRefName
 		}
 
 		query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
@@ -101,18 +104,18 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	var viewerCreated []PullRequest
-	for _, pr := range resp.ViewerCreated.Edges {
-		viewerCreated = append(viewerCreated, pr)
+	for _, edge := range resp.ViewerCreated.Edges {
+		viewerCreated = append(viewerCreated, edge.Node)
 	}
 
 	var reviewRequested []PullRequest
-	for _, pr := range resp.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, pr)
+	for _, edge := range resp.ReviewRequested.Edges {
+		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
 	var currentPR *PullRequest
-	for _, pr := range resp.Repository.PullRequests.Edges {
-		currentPR = &pr
+	for _, edge := range resp.Repository.PullRequests.Edges {
+		currentPR = &edge.Node
 	}
 
 	payload := PullRequestsPayload{
