@@ -17,10 +17,10 @@ import (
 
 const (
 	GitHubHost  string = "github.com"
-	OAuthAppURL string = "https://hub.github.com/"
+	OAuthAppURL string = "https://github.com/github/gh-cli"
 )
 
-var UserAgent = "Hub " + version.Version
+var userAgent = "GitHub CLI " + version.Version
 
 func NewClient(h string) *Client {
 	return NewClientWithHost(&Host{Host: h})
