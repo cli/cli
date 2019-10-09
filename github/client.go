@@ -35,13 +35,13 @@ type Client struct {
 	cachedClient *simpleClient
 }
 
-func (client *Client) FetchPullRequests(project *Project, filterParams map[string]interface{}, limit int, filter func(*PullRequest) bool) (pulls []PullRequest, err error) {
+func (client *Client) FetchPullRequests(owner string, name string, filterParams map[string]interface{}, limit int, filter func(*PullRequest) bool) (pulls []PullRequest, err error) {
 	api, err := client.simpleApi()
 	if err != nil {
 		return
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/pulls?per_page=%d", project.Owner, project.Name, perPage(limit, 100))
+	path := fmt.Sprintf("repos/%s/%s/pulls?per_page=%d", owner, name, perPage(limit, 100))
 	if filterParams != nil {
 		path = addQuery(path, filterParams)
 	}

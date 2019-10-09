@@ -319,17 +319,20 @@ func list() error {
 }
 
 func show(number ...string) error {
-	project := project()
+	ghRepo, err := context.CurrentGitHubRepository()
+	if err != nil {
+		return err
+	}
 
 	var openURL string
 	if len(number) > 0 {
 		if prNumber, err := strconv.Atoi(number[0]); err == nil {
-			openURL = project.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
+			openURL = ghRepo.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
 		} else {
 			return fmt.Errorf("invalid pull request number: '%s'", number[0])
 		}
 	} else {
-		pr, err := pullRequestForCurrentBranch()
+		pr, err := ghRepo.GetPullRequestByCurrentBranch()
 		if err != nil {
 			return err
 		}
@@ -337,27 +340,6 @@ func show(number ...string) error {
 	}
 
 	return openInBrowser(openURL)
-}
-
-func pullRequestForCurrentBranch() (*github.PullRequest, error) {
-	project := project()
-	client := github.NewClient(project.Host)
-	currentBranch, err := context.CurrentBranch()
-	if err != nil {
-		return nil, err
-	}
-	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch)
-
-	filterParams := map[string]interface{}{"head": headWithOwner}
-	prs, err := client.FetchPullRequests(&project, filterParams, 10, nil)
-	if err != nil {
-		return nil, err
-	}
-	if len(prs) == 0 {
-		return nil, fmt.Errorf("no pull requests found for the current branch")
-	}
-
-	return &prs[0], nil
 }
 
 // TODO: figure out a less ridiculous way to parse GraphQL response
@@ -528,6 +510,27 @@ func checkoutPr(number string) error {
 		return err
 	}
 
+	/*
+		  ghRepo, ghrerr := context.CurrentGitHubRepository()
+		  if ghrerr != nil {
+			  return ghrerr
+		  }
+		  pr, prerr := ghRepo.GetPullRequestByNumber(number)
+		  if prerr != nil {
+			  return prerr
+		  }
+
+		  branch, berr := ghRepo.BranchForCheckout(pr)
+		  if berr != nil {
+			  return berr
+		  }
+
+		  err = ghRepo.checkout(branch)
+		  if err != nil {
+			  return err
+		  }
+	*/
+
 	project := project()
 	client := github.NewClient(project.Host)
 	pullRequest, err := client.PullRequest(&project, number)
@@ -545,6 +548,7 @@ func checkoutPr(number string) error {
 		return err
 	}
 
+	// fork check
 	var headRemote *github.Remote
 	if pullRequest.IsSameRepo() {
 		headRemote = baseRemote

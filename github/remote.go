@@ -80,6 +80,22 @@ func Remotes() (remotes []Remote, err error) {
 	return
 }
 
+// GuessRemote attempts to select and return the remote a user likely wants to target when dealing with GitHub Repositories.
+func GuessRemote() (Remote, error) {
+
+	remotes, err := Remotes()
+	if err != nil {
+		return Remote{}, err
+	}
+
+	if len(remotes) == 0 {
+		return Remote{}, fmt.Errorf("unable to guess remote")
+	}
+
+	// lol
+	return remotes[0], nil
+}
+
 func newRemote(name string, urlMap map[string]string) (Remote, error) {
 	r := Remote{}
 

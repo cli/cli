@@ -22,7 +22,7 @@ func (e *GithubHostError) Error() string {
 	return fmt.Sprintf("Invalid GitHub URL: %s", e.url)
 }
 
-func knownGitHubHostsInclude(host string) bool {
+func KnownGitHubHostsInclude(host string) bool {
 	for _, hh := range knownGitHubHosts() {
 		if hh == host {
 			return true

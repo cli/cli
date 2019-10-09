@@ -47,7 +47,7 @@ func (p *Project) GitURL(name, owner string, isSSH bool) string {
 }
 
 func NewProjectFromURL(url *url.URL) (p *Project, err error) {
-	if !knownGitHubHostsInclude(url.Host) {
+	if !KnownGitHubHostsInclude(url.Host) {
 		err = &GithubHostError{url}
 		return
 	}
