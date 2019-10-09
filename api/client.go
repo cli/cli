@@ -49,14 +49,20 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	req.Header.Set("Authorization", "token "+getToken())
+
+	token, err := getToken()
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("User-Agent", "GitHub CLI "+version.Version)
 
@@ -65,7 +71,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -132,18 +138,18 @@ func debugResponse(resp *http.Response, body string) {
 }
 
 // TODO: Everything below this line will be removed when Nate's context work is complete
-func getToken() string {
+func getToken() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	content, err := ioutil.ReadFile(usr.HomeDir + "/.config/hub")
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	r := regexp.MustCompile(`oauth_token: (\w+)`)
 	token := r.FindStringSubmatch(string(content))
-	return token[1]
+	return token[1], nil
 }
