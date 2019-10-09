@@ -9,9 +9,9 @@ import (
 )
 
 type PullRequestsPayload struct {
-	viewerCreated   []PullRequest
-	reviewRequested []PullRequest
-	currentPR       *PullRequest
+	ViewerCreated   []PullRequest
+	ReviewRequested []PullRequest
+	CurrentPR       *PullRequest
 }
 
 type PullRequest struct {

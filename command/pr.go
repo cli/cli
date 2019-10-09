@@ -37,5 +37,21 @@ func ExecutePr() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%+v!\n", prPayload)
+
+	if prPayload.CurrentPR != nil {
+		fmt.Printf("Current Pr\n")
+		printPr(*prPayload.CurrentPR)
+	}
+	for _, pr := range prPayload.ViewerCreated {
+		fmt.Printf("Your Prs\n")
+		printPr(pr)
+	}
+	for _, pr := range prPayload.ReviewRequested {
+		fmt.Printf("Prs you need to review\n")
+		printPr(pr)
+	}
+}
+
+func printPr(pr graphql.PullRequest) {
+	fmt.Printf("%d %s [%s]\n", pr.Number, pr.Title, pr.HeadRefName)
 }

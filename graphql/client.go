@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/user"
 	"regexp"
 )
@@ -53,6 +54,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	if err != nil {
 		panic(err)
 	}
+	debugRequest(req, reqBody)
 
 	req.Header.Set("Authorization", "token "+getToken())
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -64,14 +66,20 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	}
 	defer resp.Body.Close()
 
-	return handleResponse(resp, v)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	debugResponse(resp, string(body))
+	return handleResponse(resp, body, v)
 }
 
-func handleResponse(resp *http.Response, v interface{}) error {
+func handleResponse(resp *http.Response, body []byte, v interface{}) error {
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+
 	if success {
 		gr := &graphQLResponse{Data: v}
-		err := json.NewDecoder(resp.Body).Decode(gr)
+		err := json.Unmarshal(body, &gr)
 		if err != nil {
 			return err
 		}
@@ -85,20 +93,15 @@ func handleResponse(resp *http.Response, v interface{}) error {
 		return nil
 	}
 
-	return handleHTTPError(resp)
+	return handleHTTPError(resp, body)
 }
 
-func handleHTTPError(resp *http.Response) error {
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
+func handleHTTPError(resp *http.Response, body []byte) error {
 	var message string
 	var parsedBody struct {
 		Message string `json:"message"`
 	}
-	err = json.Unmarshal(body, &parsedBody)
+	err := json.Unmarshal(body, &parsedBody)
 	if err != nil {
 		message = string(body)
 	} else {
@@ -125,4 +128,20 @@ func getToken() string {
 	r := regexp.MustCompile(`oauth_token: (\w+)`)
 	token := r.FindStringSubmatch(string(content))
 	return token[1]
+}
+
+func debugRequest(req *http.Request, body string) {
+	if _, ok := os.LookupEnv("DEBUG"); !ok {
+		return
+	}
+
+	fmt.Printf("DEBUG: GraphQL query to %s:\n %s\n\n", req.URL, body)
+}
+
+func debugResponse(resp *http.Response, body string) {
+	if _, ok := os.LookupEnv("DEBUG"); !ok {
+		return
+	}
+
+	fmt.Printf("DEBUG: GraphQL response:\n%+v\n\n%s\n\n", resp, body)
 }
