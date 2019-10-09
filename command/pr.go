@@ -37,7 +37,7 @@ var prListCmd = &cobra.Command{
 func ExecutePr() error {
 	prPayload, err := api.PullRequests()
 	if err != nil {
-		return error
+		return err
 	}
 
 	fmt.Printf("Current Pr\n")
