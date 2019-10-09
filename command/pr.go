@@ -27,14 +27,17 @@ var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List pull requests",
 	Run: func(cmd *cobra.Command, args []string) {
-		ExecutePr()
+		err := ExecutePr()
+		if err != nil {
+			panic(err) // In the future this should handle the error better, but for now panic seems like a valid reaction
+		}
 	},
 }
 
-func ExecutePr() {
+func ExecutePr() error {
 	prPayload, err := api.PullRequests()
 	if err != nil {
-		panic(err)
+		return error
 	}
 
 	fmt.Printf("Current Pr\n")
@@ -49,6 +52,8 @@ func ExecutePr() {
 	for _, pr := range prPayload.ReviewRequested {
 		printPr(pr)
 	}
+
+	return nil
 }
 
 func printPr(pr api.PullRequest) {
