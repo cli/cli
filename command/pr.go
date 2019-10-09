@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/graphql"
-
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +32,7 @@ var prListCmd = &cobra.Command{
 }
 
 func ExecutePr() {
-	prPayload, err := graphql.PullRequests()
+	prPayload, err := api.PullRequests()
 	if err != nil {
 		panic(err)
 	}
