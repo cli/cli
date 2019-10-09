@@ -73,8 +73,8 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	debugResponse(resp, string(body))
 
+	debugResponse(resp, string(body))
 	return handleResponse(resp, body, v)
 }
 
