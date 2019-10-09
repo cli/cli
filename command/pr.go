@@ -397,7 +397,7 @@ func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullReq
 	repo := project.Name
 	currentBranch, err := context.CurrentBranch()
 	if err != nil {
-		return &graphqlPullRequest{}, []graphqlPullRequest{}, []graphqlPullRequest{}, err
+		return nil, nil, nil, err
 	}
 
 	var headers map[string]string
