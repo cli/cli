@@ -22,8 +22,8 @@ type graphQLResponse struct {
 graphQL usage
 
 type repoResponse struct {
-	repository struct {
-		createdAt string
+	Repository struct {
+		CreatedAt string
 	}
 }
 
@@ -54,10 +54,10 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	if err != nil {
 		panic(err)
 	}
-	debugRequest(req, string(reqBody))
-
 	req.Header.Set("Authorization", "token "+getToken())
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	debugRequest(req, string(reqBody))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -71,6 +71,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 		return err
 	}
 	debugResponse(resp, string(body))
+
 	return handleResponse(resp, body, v)
 }
 
@@ -111,25 +112,6 @@ func handleHTTPError(resp *http.Response, body []byte) error {
 	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
 }
 
-// TODO: THIS IS NO GOOD. I need to figure out if the GraphQL function has direct
-// access to the token, or if we should pass the token into the GraphQL function. For
-// now I'm asuming that this has direct access so I'm simulating that with this function.
-func getToken() string {
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-
-	content, err := ioutil.ReadFile(usr.HomeDir + "/.config/hub")
-	if err != nil {
-		panic(err)
-	}
-
-	r := regexp.MustCompile(`oauth_token: (\w+)`)
-	token := r.FindStringSubmatch(string(content))
-	return token[1]
-}
-
 func debugRequest(req *http.Request, body string) {
 	if _, ok := os.LookupEnv("DEBUG"); !ok {
 		return
@@ -144,4 +126,21 @@ func debugResponse(resp *http.Response, body string) {
 	}
 
 	fmt.Printf("DEBUG: GraphQL response:\n%+v\n\n%s\n\n", resp, body)
+}
+
+// TODO: Everything below this line will be removed when Nate's context work is complete
+func getToken() string {
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+
+	content, err := ioutil.ReadFile(usr.HomeDir + "/.config/hub")
+	if err != nil {
+		panic(err)
+	}
+
+	r := regexp.MustCompile(`oauth_token: (\w+)`)
+	token := r.FindStringSubmatch(string(content))
+	return token[1]
 }

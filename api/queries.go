@@ -127,8 +127,7 @@ func PullRequests() (PullRequestsPayload, error) {
 	return payload, nil
 }
 
-// These will be replaced by nate's context stuff
-// 💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥
+// TODO: Everything below this line will be removed when Nate's context work is complete
 func project() github.Project {
 	remotes, error := github.Remotes()
 	if error != nil {
