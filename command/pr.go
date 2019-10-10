@@ -295,6 +295,7 @@ func list() error {
 {{- if . }}
 {{- range .}}
 	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
+{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests open."}}
@@ -381,6 +382,29 @@ type graphqlPullRequest struct {
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	HeadRefName string `json:"headRefName"`
+	Reviews     struct {
+		Nodes []struct {
+			State  string
+			Author struct {
+				Login string
+			}
+		}
+	}
+}
+
+func (pr *graphqlPullRequest) ChangesRequested() bool {
+	reviewMap := map[string]string{}
+	// Reviews will include every review on record, including consecutive ones
+	// from the same actor. Consolidate them into latest state per reviewer.
+	for _, review := range pr.Reviews.Nodes {
+		reviewMap[review.Author.Login] = review.State
+	}
+	for _, state := range reviewMap {
+		if state == "CHANGES_REQUESTED" {
+			return true
+		}
+	}
+	return false
 }
 
 func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
@@ -412,12 +436,25 @@ fragment pr on PullRequest {
 	headRefName
 }
 
+fragment prWithReviews on PullRequest {
+	...pr
+	reviews(last: 20) {
+		nodes {
+			state
+			author {
+				login
+			}
+		}
+	}
+}
+
 query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 	repository(owner: $owner, name: $repo) {
     pullRequests(headRefName: $headRefName, first: 1) {
 			edges {
 				node {
 					...pr
+					...prWithReviews
 				}
 			}
 		}
@@ -426,6 +463,7 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 		edges {
 			node {
 				...pr
+				...prWithReviews
 			}
 		}
 		pageInfo {
