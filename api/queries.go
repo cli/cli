@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/github"
 )
 
 type PullRequestsPayload struct {
@@ -80,9 +79,13 @@ func PullRequests() (PullRequestsPayload, error) {
 		}
 	`
 
-	project := project()
-	owner := project.Owner
-	repo := project.Name
+	ghRepo, rerr := context.CurrentGitHubRepository()
+	if rerr != nil {
+		return PullRequestsPayload{}, nil
+	}
+
+	owner := ghRepo.Owner
+	repo := ghRepo.Name
 	currentBranch, cberr := context.CurrentBranch()
 	if cberr != nil {
 		return PullRequestsPayload{}, cberr
@@ -131,20 +134,4 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	return payload, nil
-}
-
-// TODO: Everything below this line will be removed when Nate's context work is complete
-func project() github.Project {
-	remotes, error := github.Remotes()
-	if error != nil {
-		panic(error)
-	}
-
-	for _, remote := range remotes {
-		if project, error := remote.Project(); error == nil {
-			return *project
-		}
-	}
-
-	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
 }
