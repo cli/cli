@@ -23,14 +23,6 @@ func (remote *Remote) String() string {
 	return remote.Name
 }
 
-func (remote *Remote) Project() (*Project, error) {
-	p, err := NewProjectFromURL(remote.URL)
-	if _, ok := err.(*GithubHostError); ok {
-		return NewProjectFromURL(remote.PushURL)
-	}
-	return p, err
-}
-
 func Remotes() (remotes []Remote, err error) {
 	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
