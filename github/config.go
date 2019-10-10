@@ -344,18 +344,6 @@ func (c *Config) DefaultHost() (host *Host, err error) {
 	return
 }
 
-func (c *Config) DefaultHostNoPrompt() (*Host, error) {
-	if GitHubHostEnv != "" {
-		return c.PromptForHost(GitHubHostEnv)
-	} else if len(c.Hosts) > 0 {
-		host := c.Hosts[0]
-		// HACK: forces host to inherit GITHUB_TOKEN if applicable
-		return c.PromptForHost(host.Host)
-	} else {
-		return c.PromptForHost(GitHubHost)
-	}
-}
-
 // CheckWriteable checks if config file is writeable. This should
 // be called before asking for credentials and only if current
 // operation needs to update the file. See issue #1314 for details.
