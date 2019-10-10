@@ -2,9 +2,8 @@ package api
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/github"
 )
 
@@ -84,10 +83,17 @@ func PullRequests() (PullRequestsPayload, error) {
 	project := project()
 	owner := project.Owner
 	repo := project.Name
-	currentBranch := currentBranch()
+	currentBranch, cberr := context.CurrentBranch()
+	if cberr != nil {
+		return PullRequestsPayload{}, cberr
+	}
+	currentUsername, err := context.CurrentUsername()
+	if err != nil {
+		return PullRequestsPayload{}, err
+	}
 
-	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
-	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername())
+	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
+	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
 
 	variables := map[string]string{
 		"viewerQuery":   viewerQuery,
@@ -98,7 +104,7 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	var resp response
-	err := graphQL(query, variables, &resp)
+	err = graphQL(query, variables, &resp)
 	if err != nil {
 		return PullRequestsPayload{}, err
 	}
@@ -141,21 +147,4 @@ func project() github.Project {
 	}
 
 	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
-}
-
-func currentBranch() string {
-	currentBranch, err := git.Head()
-	if err != nil {
-		panic(err)
-	}
-
-	return strings.Replace(currentBranch, "refs/heads/", "", 1)
-}
-
-func currentUsername() string {
-	host, err := github.CurrentConfig().DefaultHost()
-	if err != nil {
-		panic(err)
-	}
-	return host.User
 }
