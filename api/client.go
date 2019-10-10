@@ -7,9 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/user"
-	"regexp"
 
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/version"
 )
 
@@ -57,7 +56,7 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 		return err
 	}
 
-	token, err := getToken()
+	token, err := context.GetToken()
 	if err != nil {
 		return err
 	}
@@ -135,21 +134,4 @@ func debugResponse(resp *http.Response, body string) {
 	}
 
 	fmt.Printf("DEBUG: GraphQL response:\n%+v\n\n%s\n\n", resp, body)
-}
-
-// TODO: Everything below this line will be removed when Nate's context work is complete
-func getToken() (string, error) {
-	usr, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-
-	content, err := ioutil.ReadFile(usr.HomeDir + "/.config/hub")
-	if err != nil {
-		return "", err
-	}
-
-	r := regexp.MustCompile(`oauth_token: (\w+)`)
-	token := r.FindStringSubmatch(string(content))
-	return token[1], nil
 }
