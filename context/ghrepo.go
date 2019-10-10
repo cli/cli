@@ -26,7 +26,7 @@ func CurrentGitHubRepository() (*GitHubRepository, error) {
 			return nil, err
 		}
 	} else {
-		remote, rerr := github.GuessRemote()
+		remote, rerr := GuessRemote()
 
 		if rerr != nil {
 			return nil, rerr
