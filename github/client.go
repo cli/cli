@@ -35,45 +35,6 @@ type Client struct {
 	cachedClient *simpleClient
 }
 
-func (client *Client) FetchPullRequests(project *Project, filterParams map[string]interface{}, limit int, filter func(*PullRequest) bool) (pulls []PullRequest, err error) {
-	api, err := client.simpleApi()
-	if err != nil {
-		return
-	}
-
-	path := fmt.Sprintf("repos/%s/%s/pulls?per_page=%d", project.Owner, project.Name, perPage(limit, 100))
-	if filterParams != nil {
-		path = addQuery(path, filterParams)
-	}
-
-	pulls = []PullRequest{}
-	var res *simpleResponse
-
-	for path != "" {
-		res, err = api.GetFile(path, draftsType)
-		if err = checkStatus(200, "fetching pull requests", res, err); err != nil {
-			return
-		}
-		path = res.Link("next")
-
-		pullsPage := []PullRequest{}
-		if err = res.Unmarshal(&pullsPage); err != nil {
-			return
-		}
-		for _, pr := range pullsPage {
-			if filter == nil || filter(&pr) {
-				pulls = append(pulls, pr)
-				if limit > 0 && len(pulls) == limit {
-					path = ""
-					break
-				}
-			}
-		}
-	}
-
-	return
-}
-
 func (client *Client) PullRequest(project *Project, id string) (pr *PullRequest, err error) {
 	api, err := client.simpleApi()
 	if err != nil {
