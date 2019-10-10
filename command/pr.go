@@ -296,6 +296,7 @@ func list() error {
 {{- range .}}
 	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
 {{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
+{{- if .HasChecks}} · checks: {{.ChecksStatus}}{{end}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests open."}}
@@ -390,6 +391,20 @@ type graphqlPullRequest struct {
 			}
 		}
 	}
+	Commits struct {
+		Nodes []struct {
+			Commit struct {
+				Status struct {
+					State string
+				}
+				CheckSuites struct {
+					Nodes []struct {
+						Conclusion string
+					}
+				}
+			}
+		}
+	}
 }
 
 func (pr *graphqlPullRequest) ChangesRequested() bool {
@@ -407,6 +422,29 @@ func (pr *graphqlPullRequest) ChangesRequested() bool {
 	return false
 }
 
+func (pr *graphqlPullRequest) HasChecks() bool {
+	return pr.ChecksStatus() != ""
+}
+
+func (pr *graphqlPullRequest) ChecksStatus() string {
+	if len(pr.Commits.Nodes) == 0 {
+		return ""
+	}
+	commit := pr.Commits.Nodes[0].Commit
+	// EXPECTED, ERROR, FAILURE, PENDING, SUCCESS
+	status := commit.Status.State
+	checkConclusion := ""
+	for _, checkSuite := range commit.CheckSuites.Nodes {
+		// ACTION_REQUIRED, TIMED_OUT, CANCELLED, FAILURE, SUCCESS, NEUTRAL
+		checkConclusion = checkSuite.Conclusion
+	}
+	// TODO: resolve "winning" conclusion between Statuses vs. Checks
+	if checkConclusion != "" {
+		return checkConclusion
+	}
+	return status
+}
+
 func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
 	project := project()
 	client := github.NewClient(project.Host)
@@ -414,7 +452,9 @@ func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullReq
 	repo := project.Name
 	currentBranch := currentBranch()
 
-	var headers map[string]string
+	headers := map[string]string{
+		"Accept": "application/vnd.github.antiope-preview+json",
+	}
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername())
 
@@ -434,6 +474,20 @@ fragment pr on PullRequest {
 	title
 	url
 	headRefName
+	commits(last: 1) {
+		nodes {
+			commit {
+				status {
+					state
+				}
+				checkSuites(first: 50) {
+					nodes {
+						conclusion
+					}
+				}
+			}
+		}
+	}
 }
 
 fragment prWithReviews on PullRequest {
@@ -453,7 +507,6 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
     pullRequests(headRefName: $headRefName, first: 1) {
 			edges {
 				node {
-					...pr
 					...prWithReviews
 				}
 			}
@@ -462,7 +515,6 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 	viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
 		edges {
 			node {
-				...pr
 				...prWithReviews
 			}
 		}
