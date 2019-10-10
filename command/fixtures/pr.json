@@ -1,0 +1,30 @@
+{
+  "repository": {
+    "pullRequests": {
+      "edges": [
+        {
+          "node": {
+            "number": 10,
+            "title": "test",
+            "url": "https://github.com/github/gh-cli/pull/10",
+            "headRefName": "test"
+          }
+        }
+      ]
+    }
+  },
+  "viewerCreated": {
+    "edges": [
+      {
+        "node": {
+          "number": 8,
+          "title": "Pull in the GraphQL API functionality",
+          "url": "https://github.com/github/gh-cli/pull/8",
+          "headRefName": "graphql"
+        }
+      }
+    ],
+    "pageInfo": { "hasNextPage": false }
+  },
+  "reviewRequested": { "edges": [], "pageInfo": { "hasNextPage": false } }
+}

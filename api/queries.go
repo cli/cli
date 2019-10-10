@@ -21,6 +21,8 @@ type PullRequest struct {
 	HeadRefName string
 }
 
+var OverriddenQueryFunction func(query string, variables map[string]string, v interface{}) error
+
 func PullRequests() (PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
@@ -98,7 +100,12 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	var resp response
-	err := graphQL(query, variables, &resp)
+	var err error
+	if OverriddenQueryFunction != nil {
+		err = OverriddenQueryFunction(query, variables, &resp)
+	} else {
+		err = graphQL(query, variables, &resp)
+	}
 	if err != nil {
 		return PullRequestsPayload{}, err
 	}
