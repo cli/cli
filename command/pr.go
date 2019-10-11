@@ -68,9 +68,12 @@ var prCreateCmd = &cobra.Command{
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout <pr-number>",
 	Short: "Check out a pull request in git",
-	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return checkoutPr(args[0])
+		prNumber := ""
+		if len(args) > 0 {
+			prNumber = args[0]
+		}
+		return checkoutPr(prNumber)
 	},
 }
 
@@ -469,6 +472,53 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 	return currentPr, viewerCreated, reviewRequested, nil
 }
 
+func openPullRequests() ([]graphqlPullRequest, error) {
+	project := project()
+	client := github.NewClient(project.Host)
+	owner := project.Owner
+	repo := project.Name
+
+	var headers map[string]string
+	variables := map[string]interface{}{
+		"owner":    owner,
+		"repo":     repo,
+		"per_page": 10,
+	}
+
+	data := map[string]interface{}{
+		"variables": variables,
+		"query": `
+query($owner: String!, $repo: String!, $per_page: Int!) {
+	repository(owner: $owner, name: $repo) {
+    pullRequests(first: $per_page, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+			edges {
+				node {
+					number
+					title
+					headRefName
+				}
+			}
+		}
+  }
+}`}
+
+	response, err := client.GenericAPIRequest("POST", "graphql", data, headers, 0)
+	if err != nil {
+		return nil, err
+	}
+	responseBody := searchBody{}
+	err = response.Unmarshal(&responseBody)
+	if err != nil {
+		return nil, err
+	}
+
+	prs := []graphqlPullRequest{}
+	for _, edge := range responseBody.Data.Repository.PullRequests.Edges {
+		prs = append(prs, edge.Node)
+	}
+	return prs, nil
+}
+
 func currentBranch() string {
 	currentBranch, err := git.Head()
 	if err != nil {
@@ -523,6 +573,10 @@ func currentUsername() string {
 }
 
 func checkoutPr(number string) error {
+	if number == "" {
+		return checkoutMenu()
+	}
+
 	_, err := strconv.Atoi(number)
 	if err != nil {
 		return err
@@ -594,4 +648,37 @@ func checkoutPr(number string) error {
 		utils.Check(git.Run("config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef))
 	}
 	return nil
+}
+
+func checkoutMenu() error {
+	prs, err := openPullRequests()
+	if err != nil {
+		return err
+	}
+
+	prOptions := []string{}
+	for _, pr := range prs {
+		prOptions = append(prOptions, fmt.Sprintf("#%d - %s [%s]", pr.Number, pr.Title, pr.HeadRefName))
+	}
+
+	qs := []*survey.Question{
+		{
+			Name: "pr",
+			Prompt: &survey.Select{
+				Message: "Select the pull request to check out",
+				Options: prOptions,
+			},
+		},
+	}
+
+	answers := struct {
+		Pr int
+	}{}
+
+	err = survey.Ask(qs, &answers)
+	if err != nil {
+		return err
+	}
+
+	return checkoutPr(strconv.Itoa(prs[answers.Pr].Number))
 }
