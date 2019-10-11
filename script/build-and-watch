@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+cd "$(dirname "$0")/.."
+
+# check if notifyloop is installed
+if ! command -v notifyloop >/dev/null; then
+  echo "You don't have the notifyloop command installed. Run this brew command to install it:"
+  echo "$ brew install fsevents-tools "
+  exit 1
+fi
+
+notifyloop . ./script/build

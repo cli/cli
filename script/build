@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -e
+
+cd "$(dirname "$0")/.."
+
+GH_PATH=./bin/gh
+
+echo -n -e "\033]0;🚧\007"
+
+if make ; then
+  echo -n -e "\033]0;✳️\007"
+else
+  echo -e "#!/usr/bin/env bash\necho build errors prevented gh from being built" > $GH_PATH
+  echo -n -e "\033]0;🛑\007"
+fi
