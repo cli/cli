@@ -288,7 +288,10 @@ func list() error {
 		style(currentPr, `{{- bold "Current branch"}}
 {{- if .}}
 {{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
-{{else}}  {{gray "There is no pull request associated with this branch"}}
+{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
+{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
+{{else}}
+	{{gray "There is no pull request associated with this branch"}}
 {{end}}`)
 
 	viewerCreatedOutput := style(viewerCreated, `
