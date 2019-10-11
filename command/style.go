@@ -71,5 +71,8 @@ func styles() template.FuncMap {
 			}
 			return s
 		},
+		"humanize": func(s string) string {
+			return strings.ToLower(strings.ReplaceAll(s, "_", " "))
+		},
 	}
 }

@@ -297,7 +297,7 @@ func list() error {
 {{- range .}}
 {{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
 {{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
-{{- if .HasChecks}} · checks: {{.ChecksStatus}}{{end}}
+{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests open."}}
@@ -421,10 +421,6 @@ func (pr *graphqlPullRequest) ChangesRequested() bool {
 		}
 	}
 	return false
-}
-
-func (pr *graphqlPullRequest) HasChecks() bool {
-	return pr.ChecksStatus() != ""
 }
 
 func (pr *graphqlPullRequest) ChecksStatus() string {
