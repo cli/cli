@@ -656,8 +656,12 @@ func checkoutMenu() error {
 		return err
 	}
 
+	currentBranch := currentBranch()
 	prOptions := []string{}
 	for _, pr := range prs {
+		if pr.HeadRefName == currentBranch {
+			continue
+		}
 		prOptions = append(prOptions, fmt.Sprintf("#%d - %s [%s]", pr.Number, pr.Title, pr.HeadRefName))
 	}
 
