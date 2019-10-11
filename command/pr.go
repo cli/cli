@@ -665,6 +665,10 @@ func checkoutMenu() error {
 		prOptions = append(prOptions, fmt.Sprintf("#%d - %s [%s]", pr.Number, pr.Title, pr.HeadRefName))
 	}
 
+	if len(prOptions) == 0 {
+		return fmt.Errorf("no open pull requests found")
+	}
+
 	qs := []*survey.Question{
 		{
 			Name: "pr",
