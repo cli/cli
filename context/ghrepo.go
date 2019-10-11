@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
-	"github.com/github/gh-cli/github"
 )
 
 type GitHubRepository struct {
@@ -21,7 +19,7 @@ func CurrentGitHubRepository() (*GitHubRepository, error) {
 	var repoURL *url.URL
 	var err error
 	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
-		repoURL, err = url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
+		repoURL, err = url.Parse(fmt.Sprintf("https://%s/%s.git", GitHubHostname(), repoFromEnv))
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +33,7 @@ func CurrentGitHubRepository() (*GitHubRepository, error) {
 	}
 
 	urlError := fmt.Errorf("invalid GitHub URL: %s", repoURL)
-	if !github.KnownGitHubHostsInclude(repoURL.Host) {
+	if repoURL.Host != GitHubHostname() && repoURL.Host != fmt.Sprintf("ssh.%s", GitHubHostname()) {
 		return nil, urlError
 	}
 
@@ -64,17 +62,17 @@ func CurrentGitHubRepository() (*GitHubRepository, error) {
 	}
 
 	if host == "" {
-		host = github.DefaultGitHubHost()
+		host = GitHubHostname()
 	}
 	if host == "ssh.github.com" {
-		host = github.GitHubHost
+		host = GitHubHostname()
 	}
 
 	if protocol != "http" && protocol != "https" {
 		protocol = ""
 	}
 	if protocol == "" {
-		h := github.CurrentConfig().Find(host)
+		h := CurrentConfig().Find(host)
 		if h != nil {
 			protocol = h.Protocol
 		}
@@ -84,7 +82,7 @@ func CurrentGitHubRepository() (*GitHubRepository, error) {
 	}
 
 	if owner == "" {
-		h := github.CurrentConfig().Find(host)
+		h := CurrentConfig().Find(host)
 		if h != nil {
 			owner = h.User
 		}

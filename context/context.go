@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/github"
 )
 
 // GetToken returns the authentication token as stored in the config file for the user running gh-cli
@@ -28,7 +27,7 @@ func GetToken() (string, error) {
 }
 
 func CurrentUsername() (string, error) {
-	host, err := github.CurrentConfig().DefaultHost()
+	host, err := CurrentConfig().DefaultHost()
 	if err != nil {
 		return "", nil
 	}
@@ -42,4 +41,8 @@ func CurrentBranch() (string, error) {
 	}
 
 	return strings.Replace(currentBranch, "refs/heads/", "", 1), nil
+}
+
+func GitHubHostname() string {
+	return "github.com"
 }
