@@ -45,7 +45,7 @@ if err != nil {
 
 fmt.Printf("%+v\n", resp)
 */
-func graphQL(query string, variables map[string]string, v interface{}) error {
+func graphQL(query string, variables map[string]string, data interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
@@ -81,17 +81,17 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	}
 
 	debugResponse(resp, string(body))
-	return handleResponse(resp, body, v)
+	return handleResponse(resp, body, data)
 }
 
-func handleResponse(resp *http.Response, body []byte, v interface{}) error {
+func handleResponse(resp *http.Response, body []byte, data interface{}) error {
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 
 	if !success {
 		return handleHTTPError(resp, body)
 	}
 
-	gr := &graphQLResponse{Data: v}
+	gr := &graphQLResponse{Data: data}
 	err := json.Unmarshal(body, &gr)
 	if err != nil {
 		return err
