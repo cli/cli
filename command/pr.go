@@ -26,11 +26,8 @@ work with pull requests.`,
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List pull requests",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := ExecutePr()
-		if err != nil {
-			panic(err) // In the future this should handle the error better, but for now panic seems like a valid reaction
-		}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return ExecutePr()
 	},
 }
 
