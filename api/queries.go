@@ -41,45 +41,45 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	query := `
-		fragment pr on PullRequest {
-			number
-			title
-			url
-			headRefName
-		}
+    fragment pr on PullRequest {
+      number
+      title
+      url
+      headRefName
+    }
 
-		query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-			repository(owner: $owner, name: $repo) {
-				pullRequests(headRefName: $headRefName, first: 1) {
-					edges {
-						node {
-							...pr
-						}
-					}
-				}
-			}
-			viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-				edges {
-					node {
-						...pr
-					}
-				}
-				pageInfo {
-					hasNextPage
-				}
-			}
-			reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-				edges {
-					node {
-						...pr
-					}
-				}
-				pageInfo {
-					hasNextPage
-				}
-			}
-		}
-	`
+    query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+      repository(owner: $owner, name: $repo) {
+        pullRequests(headRefName: $headRefName, first: 1) {
+          edges {
+            node {
+              ...pr
+            }
+          }
+        }
+      }
+      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+        edges {
+          node {
+            ...pr
+          }
+        }
+        pageInfo {
+          hasNextPage
+        }
+      }
+      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+        edges {
+          node {
+            ...pr
+          }
+        }
+        pageInfo {
+          hasNextPage
+        }
+      }
+    }
+  `
 
 	project := project()
 	owner := project.Owner
