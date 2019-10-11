@@ -286,7 +286,8 @@ func list() error {
 
 	currentPrOutput :=
 		style(currentPr, `{{- bold "Current branch"}}
-{{if .}}  #{{.Number}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
+{{- if .}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
 {{else}}  {{gray "There is no pull request associated with this branch"}}
 {{end}}`)
 
@@ -294,7 +295,7 @@ func list() error {
 {{bold "Pull requests created by you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
 {{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
 {{- if .HasChecks}} · checks: {{.ChecksStatus}}{{end}}
 {{- end}}
@@ -306,7 +307,7 @@ func list() error {
 {{bold "Pull requests requesting a code review from you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests to review."}}
