@@ -5,9 +5,9 @@
         {
           "node": {
             "number": 10,
-            "title": "test",
+            "title": "Blueberries are a good fruit",
             "url": "https://github.com/github/gh-cli/pull/10",
-            "headRefName": "test"
+            "headRefName": "[blueberries]"
           }
         }
       ]
@@ -18,13 +18,33 @@
       {
         "node": {
           "number": 8,
-          "title": "Pull in the GraphQL API functionality",
+          "title": "Strawberries are not actually berries",
           "url": "https://github.com/github/gh-cli/pull/8",
-          "headRefName": "graphql"
+          "headRefName": "[strawberries]"
         }
       }
     ],
     "pageInfo": { "hasNextPage": false }
   },
-  "reviewRequested": { "edges": [], "pageInfo": { "hasNextPage": false } }
+  "reviewRequested": {
+    "edges": [
+      {
+        "node": {
+          "number": 9,
+          "title": "Apples are tasty",
+          "url": "https://github.com/github/gh-cli/pull/9",
+          "headRefName": "[apples]"
+        }
+      },
+      {
+        "node": {
+          "number": 11,
+          "title": "Figs are my favorite",
+          "url": "https://github.com/github/gh-cli/pull/1",
+          "headRefName": "[figs]"
+        }
+      }
+    ],
+    "pageInfo": { "hasNextPage": false }
+  }
 }
