@@ -64,5 +64,15 @@ func styles() template.FuncMap {
 		"underline": func(s ...string) string {
 			return aurora.Underline(strings.Join(s, "")).String()
 		},
+
+		"truncate": func(width int, s string) string {
+			if len(s) > width {
+				return s[0:width-3] + "..."
+			}
+			return s
+		},
+		"humanize": func(s string) string {
+			return strings.ToLower(strings.ReplaceAll(s, "_", " "))
+		},
 	}
 }

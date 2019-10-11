@@ -289,15 +289,21 @@ func list() error {
 
 	currentPrOutput :=
 		style(currentPr, `{{- bold "Current branch"}}
-{{if .}}  #{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
-{{else}}  {{gray "There is no pull request associated with this branch"}}
+{{- if .}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
+{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
+{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
+{{else}}
+	{{gray "There is no pull request associated with this branch"}}
 {{end}}`)
 
 	viewerCreatedOutput := style(viewerCreated, `
 {{bold "Pull requests created by you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
+{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
+{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests open."}}
@@ -307,7 +313,7 @@ func list() error {
 {{bold "Pull requests requesting a code review from you"}}
 {{- if . }}
 {{- range .}}
-	#{{.Number}} {{.Title}} {{cyan "[" .HeadRefName "]"}}
+{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
 {{- end}}
 {{else}}
 	{{gray "You have no pull requests to review."}}
@@ -384,6 +390,72 @@ type graphqlPullRequest struct {
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	HeadRefName string `json:"headRefName"`
+	Reviews     struct {
+		Nodes []struct {
+			State  string
+			Author struct {
+				Login string
+			}
+		}
+	}
+	Commits struct {
+		Nodes []struct {
+			Commit struct {
+				Status struct {
+					State string
+				}
+				CheckSuites struct {
+					Nodes []struct {
+						Conclusion string
+					}
+				}
+			}
+		}
+	}
+}
+
+func (pr *graphqlPullRequest) ChangesRequested() bool {
+	reviewMap := map[string]string{}
+	// Reviews will include every review on record, including consecutive ones
+	// from the same actor. Consolidate them into latest state per reviewer.
+	for _, review := range pr.Reviews.Nodes {
+		reviewMap[review.Author.Login] = review.State
+	}
+	for _, state := range reviewMap {
+		if state == "CHANGES_REQUESTED" {
+			return true
+		}
+	}
+	return false
+}
+
+// in the order of severity
+var checksResultMap = map[string]int{
+	"PENDING":         0,
+	"NEUTRAL":         1,
+	"SUCCESS":         2,
+	"EXPECTED":        3,
+	"CANCELLED":       4,
+	"TIMED_OUT":       5,
+	"ERROR":           6,
+	"FAILURE":         7,
+	"ACTION_REQUIRED": 8,
+}
+
+func (pr *graphqlPullRequest) ChecksStatus() string {
+	if len(pr.Commits.Nodes) == 0 {
+		return ""
+	}
+	commit := pr.Commits.Nodes[0].Commit
+	// EXPECTED, ERROR, FAILURE, PENDING, SUCCESS
+	conclusion := commit.Status.State
+	for _, checkSuite := range commit.CheckSuites.Nodes {
+		// ACTION_REQUIRED, TIMED_OUT, CANCELLED, FAILURE, SUCCESS, NEUTRAL
+		if checksResultMap[checkSuite.Conclusion] > checksResultMap[conclusion] {
+			conclusion = checkSuite.Conclusion
+		}
+	}
+	return conclusion
 }
 
 func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
@@ -393,7 +465,9 @@ func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullReq
 	repo := project.Name
 	currentBranch := currentBranch()
 
-	var headers map[string]string
+	headers := map[string]string{
+		"Accept": "application/vnd.github.antiope-preview+json",
+	}
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername())
 
@@ -413,6 +487,32 @@ fragment pr on PullRequest {
 	title
 	url
 	headRefName
+	commits(last: 1) {
+		nodes {
+			commit {
+				status {
+					state
+				}
+				checkSuites(first: 50) {
+					nodes {
+						conclusion
+					}
+				}
+			}
+		}
+	}
+}
+
+fragment prWithReviews on PullRequest {
+	...pr
+	reviews(last: 20) {
+		nodes {
+			state
+			author {
+				login
+			}
+		}
+	}
 }
 
 query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
@@ -420,7 +520,7 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
     pullRequests(headRefName: $headRefName, first: 1) {
 			edges {
 				node {
-					...pr
+					...prWithReviews
 				}
 			}
 		}
@@ -428,7 +528,7 @@ query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: Stri
 	viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
 		edges {
 			node {
-				...pr
+				...prWithReviews
 			}
 		}
 		pageInfo {
