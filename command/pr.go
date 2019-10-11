@@ -423,23 +423,33 @@ func (pr *graphqlPullRequest) ChangesRequested() bool {
 	return false
 }
 
+// in the order of severity
+var checksResultMap = map[string]int{
+	"PENDING":         0,
+	"NEUTRAL":         1,
+	"SUCCESS":         2,
+	"EXPECTED":        3,
+	"CANCELLED":       4,
+	"TIMED_OUT":       5,
+	"ERROR":           6,
+	"FAILURE":         7,
+	"ACTION_REQUIRED": 8,
+}
+
 func (pr *graphqlPullRequest) ChecksStatus() string {
 	if len(pr.Commits.Nodes) == 0 {
 		return ""
 	}
 	commit := pr.Commits.Nodes[0].Commit
 	// EXPECTED, ERROR, FAILURE, PENDING, SUCCESS
-	status := commit.Status.State
-	checkConclusion := ""
+	conclusion := commit.Status.State
 	for _, checkSuite := range commit.CheckSuites.Nodes {
 		// ACTION_REQUIRED, TIMED_OUT, CANCELLED, FAILURE, SUCCESS, NEUTRAL
-		checkConclusion = checkSuite.Conclusion
+		if checksResultMap[checkSuite.Conclusion] > checksResultMap[conclusion] {
+			conclusion = checkSuite.Conclusion
+		}
 	}
-	// TODO: resolve "winning" conclusion between Statuses vs. Checks
-	if checkConclusion != "" {
-		return checkConclusion
-	}
-	return status
+	return conclusion
 }
 
 func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
