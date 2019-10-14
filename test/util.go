@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/github"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,8 @@ type TempGitRepo struct {
 }
 
 func SetupTempGitRepo() *TempGitRepo {
+	github.CreateTestConfigs("mario", "i-love-peach")
+
 	pwd, _ := os.Getwd()
 	oldEnv := make(map[string]string)
 	overrideEnv := func(name, value string) {
@@ -67,12 +70,16 @@ func SetupTempGitRepo() *TempGitRepo {
 	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
 }
 
-func MockGraphQLResponse(fixturePath string) (teardown func()) {
+func MockGraphQLResponse(fixtureName string) (teardown func()) {
+	pwd, _ := os.Getwd()
+	fixturePath := filepath.Join(pwd, "..", "test", "fixtures", fixtureName)
+
 	api.OverriddenQueryFunction = func(query string, variables map[string]string, v interface{}) error {
 		contents, err := ioutil.ReadFile(fixturePath)
 		if err != nil {
 			return err
 		}
+
 		json.Unmarshal(contents, &v)
 		if err != nil {
 			return err
