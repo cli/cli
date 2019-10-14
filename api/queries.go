@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/github/gh-cli/git"
@@ -142,9 +141,6 @@ func project() github.Project {
 		panic(error)
 	}
 	for _, remote := range remotes {
-		p, e := remote.Project()
-		fmt.Fprintf(os.Stderr, "🌭 %+v\n%+v", e, p)
-
 		if project, error := remote.Project(); error == nil {
 			return *project
 		}
