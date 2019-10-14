@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/ui"
@@ -9,8 +10,11 @@ import (
 
 type PullRequestParams struct {
 	// TODO git stuff, maybe, once reliance on localrepo phased out
-	Body  string
-	Title string
+	Body    string
+	Title   string
+	Draft   bool
+	Target  string
+	PrePush bool
 }
 
 func CreatePullRequest(prParams PullRequestParams) error {
@@ -42,11 +46,21 @@ func CreatePullRequest(prParams PullRequestParams) error {
 
 	var (
 		base, head string
+		baseRemote *Remote
 	)
 
-	baseRemote, _ := localRepo.RemoteForProject(baseProject)
-	if base == "" && baseRemote != nil {
-		base = localRepo.DefaultBranch(baseRemote).ShortName()
+	if prParams.Target != "" {
+		split := strings.SplitN(prParams.Target, "/", 2)
+		baseRemote, err = localRepo.RemoteByName(split[0])
+		if err != nil {
+			return err
+		}
+		base = split[1]
+	} else {
+		baseRemote, _ = localRepo.RemoteForProject(baseProject)
+		if base == "" && baseRemote != nil {
+			base = localRepo.DefaultBranch(baseRemote).ShortName()
+		}
 	}
 
 	if head == "" && trackedBranch != nil {
@@ -89,13 +103,12 @@ func CreatePullRequest(prParams PullRequestParams) error {
 		return fmt.Errorf("Can't find remote for %s", head)
 	}
 
-	title := prParams.Title
-	body := prParams.Body
+	if prParams.PrePush {
+		err = git.Run("push", "--set-upstream", remote.Name, fmt.Sprintf("HEAD:%s", head))
 
-	err = git.Run("push", "--set-upstream", remote.Name, fmt.Sprintf("HEAD:%s", head))
-
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	var pullRequestURL string
@@ -104,8 +117,9 @@ func CreatePullRequest(prParams PullRequestParams) error {
 		"head": fullHead,
 	}
 
-	params["title"] = title
-	params["body"] = body
+	params["title"] = prParams.Title
+	params["body"] = prParams.Body
+	params["draft"] = prParams.Draft
 
 	var pr *PullRequest
 	pr, err = client.CreatePullRequest(baseProject, params)

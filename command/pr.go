@@ -17,12 +17,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type prCreateFs struct {
+	Draft          bool
+	Title          string
+	Body           string
+	Noninteractive bool
+	Target         string
+	NoPush         bool
+}
+
+var prCreateFlags prCreateFs
+
 func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prShowCmd)
-	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prCheckoutCmd)
+
+	prCreateFlags = prCreateFs{}
+	prCreateCmd.Flags().BoolVarP(&prCreateFlags.Draft, "draft", "d", false, "Mark PR as draft")
+	prCreateCmd.Flags().StringVarP(&prCreateFlags.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
+	prCreateCmd.Flags().StringVarP(&prCreateFlags.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	prCreateCmd.Flags().StringVarP(&prCreateFlags.Target, "target", "o", "", "Supply a target in the format remote/branch.")
+	prCreateCmd.Flags().BoolVarP(&prCreateFlags.Noninteractive, "noninteractive", "I", false, "Disable prompts and run non-interactively.")
+	prCreateCmd.Flags().BoolVarP(&prCreateFlags.NoPush, "no-push", "P", false, "Disable pre-push to remote.")
+
+	prCmd.AddCommand(prCreateCmd)
 }
 
 var prCmd = &cobra.Command{
@@ -61,7 +81,7 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
 	Run: func(cmd *cobra.Command, args []string) {
-		createPr(args...)
+		utils.Check(createPr(args...))
 	},
 }
 
@@ -136,15 +156,42 @@ func createPrSurvey(inProgress prCreateInput) (prCreateInput, error) {
 	return inProgress, nil
 }
 
-func createPr(...string) {
+func createPr(...string) error {
 	// TODO i wanted some information here:
 	// - whether current branch was pushed yet
 	// - whether PR was already open for this branch
 	// - if working directory was dirty
 	// - what branch is targeted
-	// and also wanted to take some flags:
-	// - --target for a different place to land a PR
-	// - --no-push to disable the initial push
+
+	// TODO for pr create PR:
+	// - do not prompt for individually provided values
+	// - attempt to understand and clean up what is in pull_request.go
+	// - try and port to graphql
+	// - try and get off of localrepo.go
+	// - report on clean/dirty state
+
+	var interactive bool = !prCreateFlags.Noninteractive
+	var draft bool = prCreateFlags.Draft
+	var flagTitle string = prCreateFlags.Title
+	var flagBody string = prCreateFlags.Body
+	var flagTarget string = prCreateFlags.Target
+	var prePush bool = !prCreateFlags.NoPush
+
+	if flagBody != "" && flagTitle != "" {
+		interactive = false
+	}
+
+	if !interactive {
+		prParams := github.PullRequestParams{
+			Title:   flagTitle,
+			Body:    flagBody,
+			Draft:   draft,
+			Target:  flagTarget,
+			PrePush: prePush,
+		}
+
+		return github.CreatePullRequest(prParams)
+	}
 
 	confirmed := false
 
@@ -174,8 +221,7 @@ func createPr(...string) {
 
 		err := survey.Ask(confirmQs, &confirmAnswers)
 		if err != nil {
-			fmt.Fprint(os.Stderr, err.Error())
-			return
+			return err
 		}
 
 		switch confirmAnswers.Confirmation {
@@ -185,22 +231,21 @@ func createPr(...string) {
 			continue
 		case "Cancel and discard":
 			ui.Println("Discarding PR.")
-			return
+			return nil
 		}
 	}
 
 	// TODO this is quite silly for now; but i expect that survey will intake
 	// slightly different data than the CPR API wants sooner than later
 	prParams := github.PullRequestParams{
-		Title: inProgress.Title,
-		Body:  inProgress.Body,
+		Title:   inProgress.Title,
+		Body:    inProgress.Body,
+		Draft:   draft,
+		Target:  flagTarget,
+		PrePush: prePush,
 	}
 
-	err := github.CreatePullRequest(prParams)
-	if err != nil {
-		// I'd like this to go even higher but this works for now
-		utils.Check(err)
-	}
+	return github.CreatePullRequest(prParams)
 }
 
 func interactiveList() error {
