@@ -11,7 +11,7 @@ func TestPRList(t *testing.T) {
 	teardown := test.MockGraphQLResponse("pr.json")
 	defer teardown()
 
-	gitRepo := test.SetupTempGitRepo()
+	gitRepo := test.UseTempGitRepo()
 	defer gitRepo.TearDown()
 
 	output, err := test.RunCommand(RootCmd, "pr list")
