@@ -1,4 +1,4 @@
-package context
+package github
 
 import (
 	"bufio"
@@ -41,7 +41,7 @@ func (c *Config) PromptForHost(host string) (h *Host, err error) {
 	token := c.DetectToken()
 	tokenFromEnv := token != ""
 
-	if host != GitHubHostname() {
+	if host != GitHubHost {
 		if _, e := url.Parse("https://" + host); e != nil {
 			err = fmt.Errorf("invalid hostname: %q", host)
 			return
@@ -338,7 +338,7 @@ func (c *Config) DefaultHost() (host *Host, err error) {
 		// HACK: forces host to inherit GITHUB_TOKEN if applicable
 		host, err = c.PromptForHost(host.Host)
 	} else {
-		host, err = c.PromptForHost(GitHubHostname())
+		host, err = c.PromptForHost(DefaultGitHubHost())
 	}
 
 	return
