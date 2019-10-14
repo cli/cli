@@ -19,7 +19,7 @@ type TempGitRepo struct {
 	TearDown func()
 }
 
-func SetupTempGitRepo() *TempGitRepo {
+func UseTempGitRepo() *TempGitRepo {
 	github.CreateTestConfigs("mario", "i-love-peach")
 
 	pwd, _ := os.Getwd()
