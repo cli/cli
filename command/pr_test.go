@@ -8,7 +8,7 @@ import (
 )
 
 func TestPRList(t *testing.T) {
-	teardown := test.MockGraphQLResponse("fixtures/pr.json")
+	teardown := test.MockGraphQLResponse("pr.json")
 	defer teardown()
 
 	gitRepo := test.SetupTempGitRepo()
