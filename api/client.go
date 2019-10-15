@@ -56,10 +56,11 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 		return err
 	}
 
-	token, err := context.GetToken()
+	ctx, err := context.GetContext()
 	if err != nil {
 		return err
 	}
+	token := ctx.Token
 
 	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
