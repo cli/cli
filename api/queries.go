@@ -79,21 +79,17 @@ func PullRequests() (PullRequestsPayload, error) {
 		}
 	`
 
-	ghRepo, rerr := context.CurrentGitHubRepository()
-	if rerr != nil {
-		return PullRequestsPayload{}, nil
-	}
-
-	owner := ghRepo.Owner
-	repo := ghRepo.Name
-	currentBranch, cberr := context.CurrentBranch()
-	if cberr != nil {
-		return PullRequestsPayload{}, cberr
-	}
-	currentUsername, err := context.CurrentUsername()
+	ctx, err := context.GetContext()
 	if err != nil {
 		return PullRequestsPayload{}, err
 	}
+
+	ghRepo := ctx.GHRepo
+	currentBranch := ctx.Branch
+	currentUsername := ctx.Username
+
+	owner := ghRepo.Owner
+	repo := ghRepo.Name
 
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)

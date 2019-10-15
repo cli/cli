@@ -1,6 +1,7 @@
 package context
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os/user"
 	"regexp"
@@ -9,6 +10,13 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/github"
 )
+
+type Context struct {
+	Token    string
+	Username string
+	Branch   string
+	GHRepo   *GitHubRepository
+}
 
 // GetToken returns the authentication token as stored in the config file for the user running gh-cli
 func GetToken() (string, error) {
@@ -42,4 +50,45 @@ func CurrentBranch() (string, error) {
 	}
 
 	return strings.Replace(currentBranch, "refs/heads/", "", 1), nil
+}
+
+func GetContext() (*Context, error) {
+	errors := []error{}
+	token, terr := GetToken()
+	if terr != nil {
+		errors = append(errors, terr)
+	}
+
+	username, uerr := CurrentUsername()
+	if uerr != nil {
+		errors = append(errors, uerr)
+	}
+
+	branch, berr := CurrentBranch()
+	if berr != nil {
+		errors = append(errors, berr)
+	}
+
+	ghrepo, ghrerr := CurrentGitHubRepository()
+	if ghrerr != nil {
+		errors = append(errors, ghrerr)
+	}
+
+	var err error = nil
+
+	if len(errors) > 0 {
+		errStrings := []string{}
+		for _, e := range errors {
+			errStrings = append(errStrings, e.Error())
+		}
+
+		err = fmt.Errorf(strings.Join(errStrings, ", "))
+	}
+
+	return &Context{
+		Token:    token,
+		Username: username,
+		Branch:   branch,
+		GHRepo:   ghrepo,
+	}, err
 }
