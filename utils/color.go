@@ -37,3 +37,7 @@ func Magenta(a ...interface{}) string {
 func Cyan(a ...interface{}) string {
 	return color.Cyan.Render(a...)
 }
+
+func Bold(a ...interface{}) string {
+	return color.Bold.Render(a...)
+}
