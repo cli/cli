@@ -20,13 +20,13 @@ func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list",
+			Use:   "list k",
 			Short: "List pull requests",
 			RunE:  prList,
 		},
 		&cobra.Command{
 			Use:   "view [pr-number]",
-			Short: "Open the pull request in the browser",
+			Short: "Open a pull request in the browser",
 			RunE:  prView,
 		},
 	)
@@ -89,7 +89,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		prPayload, err := api.PullRequests()
-		if err != nil {
+		if err != nil || prPayload.CurrentPR == nil {
 			branch := currentBranch()
 			return fmt.Errorf("The [%s] branch has no open PRs", branch)
 		}
