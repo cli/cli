@@ -74,7 +74,8 @@ func MockGraphQLResponse(fixtureName string) (teardown func()) {
 	pwd, _ := os.Getwd()
 	fixturePath := filepath.Join(pwd, "..", "test", "fixtures", fixtureName)
 
-	api.OverriddenQueryFunction = func(query string, variables map[string]string, v interface{}) error {
+	originalGraphQL := api.GraphQL
+	api.GraphQL = func(query string, variables map[string]string, v interface{}) error {
 		contents, err := ioutil.ReadFile(fixturePath)
 		if err != nil {
 			return err
@@ -89,7 +90,7 @@ func MockGraphQLResponse(fixtureName string) (teardown func()) {
 	}
 
 	return func() {
-		api.OverriddenQueryFunction = nil
+		api.GraphQL = originalGraphQL
 	}
 }
 
