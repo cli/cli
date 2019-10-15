@@ -90,7 +90,8 @@ func prView(cmd *cobra.Command, args []string) error {
 	} else {
 		prPayload, err := api.PullRequests()
 		if err != nil {
-			return err
+			branch := currentBranch()
+			return fmt.Errorf("The [%s] branch has no open PRs", branch)
 		}
 		openURL = prPayload.CurrentPR.URL
 	}
