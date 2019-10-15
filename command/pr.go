@@ -125,37 +125,6 @@ func determineEditor() string {
 	return "nano"
 }
 
-func createPrSurvey(inProgress prCreateInput) (prCreateInput, error) {
-	editor := determineEditor()
-	qs := []*survey.Question{
-		{
-			Name: "title",
-			Prompt: &survey.Input{
-				Message: "PR Title",
-				Default: inProgress.Title,
-			},
-		},
-		{
-			Name: "body",
-			Prompt: &survey.Editor{
-				Message:       fmt.Sprintf("PR Body (%s)", editor),
-				FileName:      "*.md",
-				Default:       inProgress.Body,
-				AppendDefault: true,
-				Editor:        editor,
-			},
-		},
-	}
-
-	err := survey.Ask(qs, &inProgress)
-	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return inProgress, err
-	}
-
-	return inProgress, nil
-}
-
 func createPr(...string) error {
 	// TODO i wanted some information here:
 	// - whether current branch was pushed yet
@@ -164,7 +133,6 @@ func createPr(...string) error {
 	// - what branch is targeted
 
 	// TODO for pr create PR:
-	// - do not prompt for individually provided values
 	// - attempt to understand and clean up what is in pull_request.go
 	// - try and port to graphql
 	// - try and get off of localrepo.go
@@ -194,12 +162,48 @@ func createPr(...string) error {
 	}
 
 	confirmed := false
-
 	inProgress := prCreateInput{}
-	for !confirmed {
-		inProgress, _ = createPrSurvey(inProgress)
 
-		ui.Println(inProgress.Body)
+	for !confirmed {
+		editor := determineEditor()
+		titleQuestion := &survey.Question{
+			Name: "title",
+			Prompt: &survey.Input{
+				Message: "PR Title",
+				Default: inProgress.Title,
+			},
+		}
+		bodyQuestion := &survey.Question{
+			Name: "body",
+			Prompt: &survey.Editor{
+				Message:       fmt.Sprintf("PR Body (%s)", editor),
+				FileName:      "*.md",
+				Default:       inProgress.Body,
+				AppendDefault: true,
+				Editor:        editor,
+			},
+		}
+
+		qs := []*survey.Question{}
+		if flagTitle == "" {
+			qs = append(qs, titleQuestion)
+		} else {
+			inProgress.Title = flagTitle
+		}
+		if flagBody == "" {
+			qs = append(qs, bodyQuestion)
+		} else {
+			inProgress.Body = flagBody
+		}
+
+		err := survey.Ask(qs, &inProgress)
+		if err != nil {
+			return err
+		}
+
+		if flagBody == "" {
+			ui.Println(inProgress.Body)
+		}
 
 		confirmAnswers := struct {
 			Confirmation string
@@ -219,7 +223,7 @@ func createPr(...string) error {
 			},
 		}
 
-		err := survey.Ask(confirmQs, &confirmAnswers)
+		err = survey.Ask(confirmQs, &confirmAnswers)
 		if err != nil {
 			return err
 		}
