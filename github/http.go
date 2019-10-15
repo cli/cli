@@ -221,7 +221,7 @@ func (c *simpleClient) performRequestUrl(method string, url *url.URL, body io.Re
 	if c.PrepareRequest != nil {
 		c.PrepareRequest(req)
 	}
-	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", apiPayloadVersion)
 
 	if configure != nil {
