@@ -70,7 +70,7 @@ func ExecutePr() error {
 
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
-		fmt.Printf("  #%d %s [%s]\n", pr.Number, truncateTitle(pr.Title), aurora.Cyan(pr.HeadRefName))
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), aurora.Cyan("["+pr.HeadRefName+"]"))
 	}
 }
 
