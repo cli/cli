@@ -2,8 +2,11 @@ package command
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -37,22 +40,62 @@ func ExecutePr() error {
 		return err
 	}
 
-	fmt.Printf("Current Pr\n")
+	printHeader("Current branch")
 	if prPayload.CurrentPR != nil {
-		printPr(*prPayload.CurrentPR)
+		printPrs(*prPayload.CurrentPR)
+	} else {
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch()+"]"))
+		printMessage(message)
 	}
-	fmt.Printf("Your Prs\n")
-	for _, pr := range prPayload.ViewerCreated {
-		printPr(pr)
+	fmt.Println()
+
+	printHeader("Created by you")
+	if len(prPayload.ViewerCreated) > 0 {
+		printPrs(prPayload.ViewerCreated...)
+	} else {
+		printMessage("  You have no open pull requests")
 	}
-	fmt.Printf("Prs you need to review\n")
-	for _, pr := range prPayload.ReviewRequested {
-		printPr(pr)
+	fmt.Println()
+
+	printHeader("Requesting a code review from you")
+	if len(prPayload.ReviewRequested) > 0 {
+		printPrs(prPayload.ReviewRequested...)
+	} else {
+		printMessage("  You have no pull requests to review")
 	}
+	fmt.Println()
 
 	return nil
 }
 
-func printPr(pr api.PullRequest) {
-	fmt.Printf("  #%d %s [%s]\n", pr.Number, pr.Title, pr.HeadRefName)
+func printPrs(prs ...api.PullRequest) {
+	for _, pr := range prs {
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
+	}
+}
+
+func printHeader(s string) {
+	fmt.Println(utils.Bold(s))
+}
+
+func printMessage(s string) {
+	fmt.Println(utils.Gray(s))
+}
+
+func truncateTitle(title string) string {
+	const maxLength = 50
+
+	if len(title) > maxLength {
+		return title[0:maxLength-3] + "..."
+	}
+	return title
+}
+
+func currentBranch() string {
+	currentBranch, err := git.Head()
+	if err != nil {
+		panic(err)
+	}
+
+	return strings.Replace(currentBranch, "refs/heads/", "", 1)
 }
