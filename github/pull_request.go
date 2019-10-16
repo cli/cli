@@ -192,7 +192,6 @@ mutation CreatePullRequest($input: CreatePullRequestInput!) {
 	cresult := createResult{}
 	err = response.Unmarshal(&cresult)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	pullRequestURL := cresult.Data.CreatePullRequest.PullRequest.Url
