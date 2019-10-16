@@ -111,24 +111,91 @@ func CreatePullRequest(prParams PullRequestParams) error {
 		}
 	}
 
-	var pullRequestURL string
-	params := map[string]interface{}{
-		"base": base,
-		"head": fullHead,
+	// TODO use graphql
+	headers := map[string]string{
+		"Accept": "application/vnd.github.shadow-cat-preview+json",
+	}
+	repoIdQuery := `
+query FindRepoID($owner:String!, $name:String!) {
+	repository(owner:$owner, name:$name) {
+		id
+	}
+}`
+	variables := map[string]interface{}{
+		"owner": baseProject.Owner,
+		"name":  baseProject.Name,
+	}
+	data := map[string]interface{}{
+		"variables": variables,
+		"query":     repoIdQuery,
 	}
 
-	params["title"] = prParams.Title
-	params["body"] = prParams.Body
-	params["draft"] = prParams.Draft
-
-	var pr *PullRequest
-	pr, err = client.CreatePullRequest(baseProject, params)
+	response, err := client.GenericAPIRequest("POST", "graphql", data, headers, 0)
 	if err != nil {
 		return err
 	}
 
-	pullRequestURL = pr.HtmlUrl
+	type repoResult struct {
+		Data struct {
+			Repository struct {
+				Id string
+			}
+		}
+	}
 
+	result := repoResult{}
+	err = response.Unmarshal(&result)
+	if err != nil {
+		return err
+	}
+	repoId := result.Data.Repository.Id
+
+	mutation := `
+mutation CreatePullRequest($input: CreatePullRequestInput!) {
+  createPullRequest(input: $input) {
+	  pullRequest {
+	    url
+		}
+	}
+}`
+
+	variables = map[string]interface{}{
+		"input": map[string]interface{}{
+			"repositoryId": repoId,
+			"baseRefName":  base,
+			"headRefName":  fullHead,
+			"title":        prParams.Title,
+			"body":         prParams.Body,
+			"draft":        prParams.Draft,
+		},
+	}
+	data = map[string]interface{}{
+		"variables": variables,
+		"query":     mutation,
+	}
+
+	response, err = client.GenericAPIRequest("POST", "graphql", data, headers, 0)
+	if err != nil {
+		return err
+	}
+
+	type createResult struct {
+		Data struct {
+			CreatePullRequest struct {
+				PullRequest struct {
+					Url string
+				}
+			}
+		}
+	}
+
+	cresult := createResult{}
+	err = response.Unmarshal(&cresult)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	pullRequestURL := cresult.Data.CreatePullRequest.PullRequest.Url
 	ui.Println(pullRequestURL)
 
 	return nil

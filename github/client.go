@@ -91,27 +91,6 @@ func (client *Client) PullRequest(project *Project, id string) (pr *PullRequest,
 	return
 }
 
-func (client *Client) CreatePullRequest(project *Project, params map[string]interface{}) (pr *PullRequest, err error) {
-	api, err := client.simpleApi()
-	if err != nil {
-		return
-	}
-
-	res, err := api.PostJSONPreview(fmt.Sprintf("repos/%s/%s/pulls", project.Owner, project.Name), params, draftsType)
-	if err = checkStatus(201, "creating pull request", res, err); err != nil {
-		if res != nil && res.StatusCode == 404 {
-			projectUrl := strings.SplitN(project.WebURL("", "", ""), "://", 2)[1]
-			err = fmt.Errorf("%s\nAre you sure that %s exists?", err, projectUrl)
-		}
-		return
-	}
-
-	pr = &PullRequest{}
-	err = res.Unmarshal(pr)
-
-	return
-}
-
 func (client *Client) UpdatePullRequest(pr *PullRequest, params map[string]interface{}) (updatedPullRequest *PullRequest, err error) {
 	api, err := client.simpleApi()
 	if err != nil {
