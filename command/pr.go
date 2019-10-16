@@ -38,9 +38,9 @@ func init() {
 	prCreateCmd.Flags().BoolVarP(&prCreateFlags.Draft, "draft", "d", false, "Mark PR as draft")
 	prCreateCmd.Flags().StringVarP(&prCreateFlags.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	prCreateCmd.Flags().StringVarP(&prCreateFlags.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringVarP(&prCreateFlags.Target, "target", "o", "", "Supply a target in the format remote/branch.")
+	prCreateCmd.Flags().StringVarP(&prCreateFlags.Target, "target", "T", "", "The branch you want your PR merged into in the format remote:branch.")
 	prCreateCmd.Flags().BoolVarP(&prCreateFlags.Noninteractive, "noninteractive", "I", false, "Disable prompts and run non-interactively.")
-	prCreateCmd.Flags().BoolVarP(&prCreateFlags.NoPush, "no-push", "P", false, "Disable pre-push to remote.")
+	prCreateCmd.Flags().BoolVarP(&prCreateFlags.NoPush, "no-push", "P", false, "Disable pre-push of current branch to default remote.")
 
 	prCmd.AddCommand(prCreateCmd)
 }

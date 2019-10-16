@@ -50,7 +50,7 @@ func CreatePullRequest(prParams PullRequestParams) error {
 	)
 
 	if prParams.Target != "" {
-		split := strings.SplitN(prParams.Target, "/", 2)
+		split := strings.SplitN(prParams.Target, ":", 2)
 		baseRemote, err = localRepo.RemoteByName(split[0])
 		if err != nil {
 			return err
