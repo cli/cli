@@ -1,0 +1,15 @@
+{
+  "repository": {
+    "pullRequests": {
+      "edges": []
+    }
+  },
+  "viewerCreated": {
+    "edges": [],
+    "pageInfo": { "hasNextPage": false }
+  },
+  "reviewRequested": {
+    "edges": [],
+    "pageInfo": { "hasNextPage": false }
+  }
+}
