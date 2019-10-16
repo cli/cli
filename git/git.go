@@ -10,13 +10,7 @@ import (
 	"strings"
 )
 
-var cachedDir string
-
 func Dir() (string, error) {
-	if cachedDir != "" {
-		return cachedDir, nil
-	}
-
 	dirCmd := exec.Command("git", "rev-parse", "-q", "--git-dir")
 	dirCmd.Stderr = nil
 	output, err := dirCmd.Output()
@@ -33,7 +27,6 @@ func Dir() (string, error) {
 		gitDir = filepath.Clean(gitDir)
 	}
 
-	cachedDir = gitDir
 	return gitDir, nil
 }
 
