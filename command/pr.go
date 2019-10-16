@@ -12,7 +12,6 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/github"
 	"github.com/github/gh-cli/utils"
-	"github.com/logrusorgru/aurora"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +52,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(*prPayload.CurrentPR)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", aurora.Cyan("["+currentBranch()+"]"))
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch()+"]"))
 		printMessage(message)
 	}
 	fmt.Println()
@@ -102,16 +101,16 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
-		fmt.Printf("  #%d %s [%s]\n", pr.Number, truncateTitle(pr.Title), aurora.Cyan(pr.HeadRefName))
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
 	}
 }
 
 func printHeader(s string) {
-	fmt.Println(aurora.Bold(s))
+	fmt.Println(utils.Bold(s))
 }
 
 func printMessage(s string) {
-	fmt.Println(aurora.Gray(8, s))
+	fmt.Println(utils.Gray(s))
 }
 
 func truncateTitle(title string) string {

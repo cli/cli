@@ -98,7 +98,7 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	var resp response
-	err := graphQL(query, variables, &resp)
+	err := GraphQL(query, variables, &resp)
 	if err != nil {
 		return PullRequestsPayload{}, err
 	}
@@ -133,7 +133,6 @@ func project() github.Project {
 	if error != nil {
 		panic(error)
 	}
-
 	for _, remote := range remotes {
 		if project, error := remote.Project(); error == nil {
 			return *project

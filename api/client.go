@@ -21,7 +21,7 @@ type graphQLResponse struct {
 }
 
 /*
-graphQL usage
+GraphQL: Declared as an external variable so it can be mocked in tests
 
 type repoResponse struct {
 	Repository struct {
@@ -45,7 +45,7 @@ if err != nil {
 
 fmt.Printf("%+v\n", resp)
 */
-func graphQL(query string, variables map[string]string, data interface{}) error {
+var GraphQL = func(query string, variables map[string]string, data interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
