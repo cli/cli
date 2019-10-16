@@ -94,7 +94,11 @@ func (c *fsContext) SetBranch(b string) {
 
 func (c *fsContext) Remotes() (Remotes, error) {
 	if c.remotes == nil {
-		rem, err := parseRemotes()
+		gitRemotes, err := git.Remotes()
+		if err != nil {
+			return nil, err
+		}
+		rem, err := parseRemotes(gitRemotes)
 		if err != nil {
 			return nil, err
 		}

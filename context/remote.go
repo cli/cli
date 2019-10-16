@@ -42,13 +42,8 @@ type GitHubRepository struct {
 	Owner string
 }
 
-func parseRemotes() (remotes Remotes, err error) {
+func parseRemotes(gitRemotes []string) (remotes Remotes, err error) {
 	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
-
-	gitRemotes, err := git.Remotes()
-	if err != nil {
-		return
-	}
 
 	remotesMap := make(map[string]map[string]string)
 	for _, r := range gitRemotes {
