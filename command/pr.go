@@ -81,7 +81,7 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
 	Run: func(cmd *cobra.Command, args []string) {
-		utils.Check(createPr(args...))
+		return createPr(args...)
 	},
 }
 
