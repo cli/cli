@@ -96,6 +96,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		openURL = prPayload.CurrentPR.URL
 	}
 
+	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return openInBrowser(openURL)
 }
 
