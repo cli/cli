@@ -20,7 +20,7 @@ func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list k",
+			Use:   "list",
 			Short: "List pull requests",
 			RunE:  prList,
 		},
