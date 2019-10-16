@@ -2,17 +2,33 @@ package command
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/github"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	RootCmd.AddCommand(prCmd)
-	prCmd.AddCommand(prListCmd)
+	prCmd.AddCommand(
+		&cobra.Command{
+			Use:   "list",
+			Short: "List pull requests",
+			RunE:  prList,
+		},
+		&cobra.Command{
+			Use:   "view [pr-number]",
+			Short: "Open a pull request in the browser",
+			RunE:  prView,
+		},
+	)
 }
 
 var prCmd = &cobra.Command{
@@ -21,20 +37,12 @@ var prCmd = &cobra.Command{
 	Long: `This command allows you to
 work with pull requests.`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pr")
-	},
-}
-
-var prListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List pull requests",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return ExecutePr()
+		return fmt.Errorf("%+v is not a valid PR command", args)
 	},
 }
 
-func ExecutePr() error {
+func prList(cmd *cobra.Command, args []string) error {
 	prPayload, err := api.PullRequests()
 	if err != nil {
 		return err
@@ -68,6 +76,29 @@ func ExecutePr() error {
 	return nil
 }
 
+func prView(cmd *cobra.Command, args []string) error {
+	project := project()
+
+	var openURL string
+	if len(args) > 0 {
+		if prNumber, err := strconv.Atoi(args[0]); err == nil {
+			openURL = project.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
+		} else {
+			return fmt.Errorf("invalid pull request number: '%s'", args[0])
+		}
+	} else {
+		prPayload, err := api.PullRequests()
+		if err != nil || prPayload.CurrentPR == nil {
+			branch := currentBranch()
+			return fmt.Errorf("The [%s] branch has no open PRs", branch)
+		}
+		openURL = prPayload.CurrentPR.URL
+	}
+
+	fmt.Printf("Opening %s in your browser.\n", openURL)
+	return openInBrowser(openURL)
+}
+
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
 		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
@@ -91,6 +122,17 @@ func truncateTitle(title string) string {
 	return title
 }
 
+func openInBrowser(url string) error {
+	launcher, err := utils.BrowserLauncher()
+	if err != nil {
+		return err
+	}
+	endingArgs := append(launcher[1:], url)
+	return exec.Command(launcher[0], endingArgs...).Run()
+}
+
+// The functions below should be replaced at some point by the context package
+// 🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨
 func currentBranch() string {
 	currentBranch, err := git.Head()
 	if err != nil {
@@ -98,4 +140,31 @@ func currentBranch() string {
 	}
 
 	return strings.Replace(currentBranch, "refs/heads/", "", 1)
+}
+
+func project() github.Project {
+	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
+		repoURL, err := url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
+		if err != nil {
+			panic(err)
+		}
+		project, err := github.NewProjectFromURL(repoURL)
+		if err != nil {
+			panic(err)
+		}
+		return *project
+	}
+
+	remotes, err := github.Remotes()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, remote := range remotes {
+		if project, err := remote.Project(); err == nil {
+			return *project
+		}
+	}
+
+	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
 }
