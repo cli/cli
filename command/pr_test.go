@@ -9,8 +9,8 @@ import (
 	"github.com/github/gh-cli/test"
 )
 
-func FTestPRList(t *testing.T) {
-	teardown := test.MockGraphQLResponse("test/fixtures/pr.json")
+func TestPRList(t *testing.T) {
+	teardown := test.MockGraphQLResponse("test/fixtures/prList.json")
 	defer teardown()
 
 	gitRepo := test.UseTempGitRepo()
