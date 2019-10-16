@@ -80,7 +80,7 @@ branch is opened.
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		return createPr(args...)
 	},
 }
