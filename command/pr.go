@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -88,7 +87,9 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		prPayload, err := api.PullRequests()
-		if err != nil || prPayload.CurrentPR == nil {
+		if err != nil {
+			return err
+		} else if prPayload.CurrentPR == nil {
 			branch := currentBranch()
 			return fmt.Errorf("The [%s] branch has no open PRs", branch)
 		}
@@ -96,7 +97,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
-	return openInBrowser(openURL)
+	return utils.OpenInBrowser(openURL)
 }
 
 func printPrs(prs ...api.PullRequest) {
@@ -120,15 +121,6 @@ func truncateTitle(title string) string {
 		return title[0:maxLength-3] + "..."
 	}
 	return title
-}
-
-func openInBrowser(url string) error {
-	launcher, err := utils.BrowserLauncher()
-	if err != nil {
-		return err
-	}
-	endingArgs := append(launcher[1:], url)
-	return exec.Command(launcher[0], endingArgs...).Run()
 }
 
 // The functions below should be replaced at some point by the context package
