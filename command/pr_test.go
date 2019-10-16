@@ -42,11 +42,8 @@ func TestPRView(t *testing.T) {
 	gitRepo := test.UseTempGitRepo()
 	defer gitRepo.TearDown()
 
-	openInBrowserCalls := 0
-	utils.OpenInBrowser = func(_ string) error {
-		openInBrowserCalls++
-		return nil
-	}
+	teardown, callCount := mockOpenInBrowser()
+	defer teardown()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
 	if err != nil {
@@ -57,7 +54,60 @@ func TestPRView(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if openInBrowserCalls != 1 {
-		t.Errorf("OpenInBrowser should be called 1 time but was called %d time(s)", openInBrowserCalls)
+	if *callCount != 1 {
+		t.Errorf("OpenInBrowser should be called 1 time but was called %d time(s)", *callCount)
 	}
+}
+
+func TestPRView_NoActiveBranch(t *testing.T) {
+	teardown := test.MockGraphQLResponse("test/fixtures/prView_NoActiveBranch.json")
+	defer teardown()
+
+	gitRepo := test.UseTempGitRepo()
+	defer gitRepo.TearDown()
+
+	teardown, callCount := mockOpenInBrowser()
+	defer teardown()
+
+	output, err := test.RunCommand(RootCmd, "pr view")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if *callCount > 0 {
+		t.Errorf("OpenInBrowser should NOT be called but was called %d time(s)", *callCount)
+	}
+
+	// Now run again but provide a PR number
+	output, err = test.RunCommand(RootCmd, "pr view 23")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if *callCount != 1 {
+		t.Errorf("OpenInBrowser should be called once but was called %d time(s)", *callCount)
+	}
+}
+
+func mockOpenInBrowser() (func(), *int) {
+	callCount := 0
+	originalOpenInBrowser := utils.OpenInBrowser
+	teardown := func() {
+		utils.OpenInBrowser = originalOpenInBrowser
+	}
+
+	utils.OpenInBrowser = func(_ string) error {
+		callCount++
+		return nil
+	}
+
+	return teardown, &callCount
 }
