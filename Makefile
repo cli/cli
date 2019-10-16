@@ -5,3 +5,8 @@ BUILD_FILES = $(shell go list -f '{{range .GoFiles}}{{$$.Dir}}/{{.}}\
 
 bin/gh: $(BUILD_FILES)
 	go build -o "$@"
+
+test:
+	go test ./...
+
+.PHONY: test

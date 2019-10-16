@@ -2,39 +2,56 @@ package context
 
 import (
 	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/git"
 )
 
-var (
-	OriginNamesInLookupOrder = []string{"upstream", "github", "origin"}
-)
+const defaultHostname = "github.com"
 
+// Remotes represents a set of git remotes
+type Remotes []*Remote
+
+// FindByName returns the first Remote whose name matches the list
+func (r Remotes) FindByName(names ...string) (*Remote, error) {
+	for _, name := range names {
+		for _, rem := range r {
+			if rem.Name == name || name == "*" {
+				return rem, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("no GitHub remotes found")
+}
+
+// Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
-	Name    string
-	URL     *url.URL
-	PushURL *url.URL
+	Name  string
+	Owner string
+	Repo  string
 }
 
-func (remote *Remote) String() string {
-	return remote.Name
+func (r *Remote) String() string {
+	return r.Name
 }
 
-func Remotes() (remotes []Remote, err error) {
+// GitHubRepository represents a GitHub respository
+type GitHubRepository struct {
+	Name  string
+	Owner string
+}
+
+func parseRemotes() (remotes Remotes, err error) {
 	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
-	rs, err := git.Remotes()
+	gitRemotes, err := git.Remotes()
 	if err != nil {
-		err = fmt.Errorf("Can't load git remote")
 		return
 	}
 
-	// build the remotes map
 	remotesMap := make(map[string]map[string]string)
-	for _, r := range rs {
+	for _, r := range gitRemotes {
 		if re.MatchString(r) {
 			match := re.FindStringSubmatch(r)
 			name := strings.TrimSpace(match[1])
@@ -49,61 +66,37 @@ func Remotes() (remotes []Remote, err error) {
 		}
 	}
 
-	// construct remotes in priority order
-	names := OriginNamesInLookupOrder
-	for _, name := range names {
-		if u, ok := remotesMap[name]; ok {
-			r, err := newRemote(name, u)
-			if err == nil {
-				remotes = append(remotes, r)
-				delete(remotesMap, name)
-			}
+	for name, urlMap := range remotesMap {
+		repo, err := repoFromURL(urlMap["fetch"])
+		if err != nil {
+			repo, err = repoFromURL(urlMap["push"])
 		}
-	}
-
-	// the rest of the remotes
-	for n, u := range remotesMap {
-		r, err := newRemote(n, u)
 		if err == nil {
-			remotes = append(remotes, r)
+			remotes = append(remotes, &Remote{
+				Name:  name,
+				Owner: repo.Owner,
+				Repo:  repo.Name,
+			})
 		}
 	}
 
 	return
 }
 
-func newRemote(name string, urlMap map[string]string) (Remote, error) {
-	r := Remote{}
-
-	fetchURL, ferr := git.ParseURL(urlMap["fetch"])
-	pushURL, perr := git.ParseURL(urlMap["push"])
-	if ferr != nil && perr != nil {
-		return r, fmt.Errorf("No valid remote URLs")
-	}
-
-	r.Name = name
-	if ferr == nil {
-		r.URL = fetchURL
-	}
-	if perr == nil {
-		r.PushURL = pushURL
-	}
-
-	return r, nil
-}
-
-// GuessRemote attempts to select and return the remote a user likely wants to target when dealing with GitHub repositories.
-func GuessRemote() (Remote, error) {
-
-	remotes, err := Remotes()
+func repoFromURL(u string) (*GitHubRepository, error) {
+	url, err := git.ParseURL(u)
 	if err != nil {
-		return Remote{}, err
+		return nil, err
 	}
-
-	if len(remotes) == 0 {
-		return Remote{}, fmt.Errorf("unable to guess remote")
+	if url.Hostname() != defaultHostname {
+		return nil, fmt.Errorf("invalid hostname: %s", url.Hostname())
 	}
-
-	// lol
-	return remotes[0], nil
+	parts := strings.SplitN(strings.TrimPrefix(url.Path, "/"), "/", 3)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid path: %s", url.Path)
+	}
+	return &GitHubRepository{
+		Owner: parts[0],
+		Name:  strings.TrimSuffix(parts[1], ".git"),
+	}, nil
 }
