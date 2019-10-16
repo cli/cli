@@ -70,9 +70,9 @@ func UseTempGitRepo() *TempGitRepo {
 	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
 }
 
-func MockGraphQLResponse(fixtureName string) (teardown func()) {
+func MockGraphQLResponse(fixturePath string) (teardown func()) {
 	pwd, _ := os.Getwd()
-	fixturePath := filepath.Join(pwd, "..", "test", "fixtures", fixtureName)
+	fixturePath := filepath.Join(pwd, "..", fixturePath)
 
 	originalGraphQL := api.GraphQL
 	api.GraphQL = func(query string, variables map[string]string, v interface{}) error {
