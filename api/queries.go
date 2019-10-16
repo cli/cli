@@ -19,7 +19,7 @@ type PullRequest struct {
 	HeadRefName string
 }
 
-func PullRequests() (PullRequestsPayload, error) {
+func PullRequests() (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
 			Node PullRequest
@@ -79,14 +79,18 @@ func PullRequests() (PullRequestsPayload, error) {
     }
   `
 
-	ctx, err := context.GetContext()
+	ghRepo, err := context.Current().BaseRepo()
 	if err != nil {
-		return PullRequestsPayload{}, err
+		return nil, err
 	}
-
-	ghRepo := ctx.GHRepo
-	currentBranch := ctx.Branch
-	currentUsername := ctx.Username
+	currentBranch, err := context.Current().Branch()
+	if err != nil {
+		return nil, err
+	}
+	currentUsername, err := context.Current().AuthLogin()
+	if err != nil {
+		return nil, err
+	}
 
 	owner := ghRepo.Owner
 	repo := ghRepo.Name
@@ -105,7 +109,7 @@ func PullRequests() (PullRequestsPayload, error) {
 	var resp response
 	err = GraphQL(query, variables, &resp)
 	if err != nil {
-		return PullRequestsPayload{}, err
+		return nil, err
 	}
 
 	var viewerCreated []PullRequest
@@ -129,5 +133,5 @@ func PullRequests() (PullRequestsPayload, error) {
 		currentPR,
 	}
 
-	return payload, nil
+	return &payload, nil
 }

@@ -1,94 +1,135 @@
 package context
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os/user"
-	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/github"
+	"github.com/mitchellh/go-homedir"
 )
 
-type Context struct {
-	Token    string
-	Username string
-	Branch   string
-	GHRepo   *GitHubRepository
+// Context represents the interface for querying information about the current environment
+type Context interface {
+	AuthToken() (string, error)
+	AuthLogin() (string, error)
+	Branch() (string, error)
+	SetBranch(string)
+	Remotes() (Remotes, error)
+	BaseRepo() (*GitHubRepository, error)
+	SetBaseRepo(string)
 }
 
-// GetToken returns the authentication token as stored in the config file for the user running gh-cli
-func GetToken() (string, error) {
-	usr, err := user.Current()
+var currentContext Context
+
+// Current returns the currently initialized Context instance
+func Current() Context {
+	return currentContext
+}
+
+// InitDefaultContext initializes the default filesystem context
+func InitDefaultContext() Context {
+	ctx := &fsContext{}
+	if currentContext == nil {
+		currentContext = ctx
+	}
+	return ctx
+}
+
+// A Context implementation that queries the filesystem
+type fsContext struct {
+	config   *configEntry
+	remotes  Remotes
+	branch   string
+	baseRepo *GitHubRepository
+}
+
+func (c *fsContext) configFile() string {
+	dir, _ := homedir.Expand("~/.config/hub")
+	return dir
+}
+
+func (c *fsContext) getConfig() (*configEntry, error) {
+	if c.config == nil {
+		entry, err := parseConfigFile(c.configFile())
+		if err != nil {
+			return nil, err
+		}
+		c.config = entry
+	}
+	return c.config, nil
+}
+
+func (c *fsContext) AuthToken() (string, error) {
+	config, err := c.getConfig()
 	if err != nil {
 		return "", err
 	}
+	return config.Token, nil
+}
 
-	content, err := ioutil.ReadFile(usr.HomeDir + "/.config/hub")
+func (c *fsContext) AuthLogin() (string, error) {
+	config, err := c.getConfig()
 	if err != nil {
 		return "", err
 	}
-
-	r := regexp.MustCompile(`oauth_token: (\w+)`)
-	token := r.FindStringSubmatch(string(content))
-	return token[1], nil
+	return config.User, nil
 }
 
-func CurrentUsername() (string, error) {
-	host, err := github.CurrentConfig().DefaultHost()
-	if err != nil {
-		return "", nil
+func (c *fsContext) Branch() (string, error) {
+	if c.branch != "" {
+		return c.branch, nil
 	}
-	return host.User, nil
-}
 
-func CurrentBranch() (string, error) {
 	currentBranch, err := git.Head()
 	if err != nil {
 		return "", err
 	}
 
-	return strings.Replace(currentBranch, "refs/heads/", "", 1), nil
+	c.branch = strings.Replace(currentBranch, "refs/heads/", "", 1)
+	return c.branch, nil
 }
 
-func GetContext() (*Context, error) {
-	errors := []error{}
-	token, terr := GetToken()
-	if terr != nil {
-		errors = append(errors, terr)
-	}
+func (c *fsContext) SetBranch(b string) {
+	c.branch = b
+}
 
-	username, uerr := CurrentUsername()
-	if uerr != nil {
-		errors = append(errors, uerr)
-	}
-
-	branch, berr := CurrentBranch()
-	if berr != nil {
-		errors = append(errors, berr)
-	}
-
-	ghrepo, ghrerr := CurrentGitHubRepository()
-	if ghrerr != nil {
-		errors = append(errors, ghrerr)
-	}
-
-	var err error = nil
-
-	if len(errors) > 0 {
-		errStrings := []string{}
-		for _, e := range errors {
-			errStrings = append(errStrings, e.Error())
+func (c *fsContext) Remotes() (Remotes, error) {
+	if c.remotes == nil {
+		rem, err := parseRemotes()
+		if err != nil {
+			return nil, err
 		}
+		c.remotes = rem
+	}
+	return c.remotes, nil
+}
 
-		err = fmt.Errorf(strings.Join(errStrings, ", "))
+func (c *fsContext) BaseRepo() (*GitHubRepository, error) {
+	if c.baseRepo != nil {
+		return c.baseRepo, nil
 	}
 
-	return &Context{
-		Token:    token,
-		Username: username,
-		Branch:   branch,
-		GHRepo:   ghrepo,
-	}, err
+	remotes, err := c.Remotes()
+	if err != nil {
+		return nil, err
+	}
+	rem, err := remotes.FindByName("upstream", "github", "origin", "*")
+	if err != nil {
+		return nil, err
+	}
+
+	c.baseRepo = &GitHubRepository{
+		Owner: rem.Owner,
+		Name:  rem.Repo,
+	}
+	return c.baseRepo, nil
+}
+
+func (c *fsContext) SetBaseRepo(nwo string) {
+	parts := strings.SplitN(nwo, "/", 2)
+	if len(parts) == 2 {
+		c.baseRepo = &GitHubRepository{
+			Owner: parts[0],
+			Name:  parts[1],
+		}
+	}
 }

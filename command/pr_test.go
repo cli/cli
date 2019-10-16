@@ -4,15 +4,17 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/test"
 )
 
 func TestPRList(t *testing.T) {
+	ctx := context.InitBlankContext()
+	ctx.SetBaseRepo("github/FAKE-GITHUB-REPO-NAME")
+	ctx.SetBranch("master")
+
 	teardown := test.MockGraphQLResponse("test/fixtures/pr.json")
 	defer teardown()
-
-	gitRepo := test.UseTempGitRepo()
-	defer gitRepo.TearDown()
 
 	output, err := test.RunCommand(RootCmd, "pr list")
 	if err != nil {
