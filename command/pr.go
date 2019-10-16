@@ -138,115 +138,114 @@ func createPr(...string) error {
 	// - try and get off of localrepo.go
 	// - report on clean/dirty state
 
-	var interactive bool = !prCreateFlags.Noninteractive
-	var draft bool = prCreateFlags.Draft
-	var flagTitle string = prCreateFlags.Title
-	var flagBody string = prCreateFlags.Body
-	var flagTarget string = prCreateFlags.Target
-	var prePush bool = !prCreateFlags.NoPush
+	interactive := !prCreateFlags.Noninteractive
+	draft := prCreateFlags.Draft
+	flagTitle := prCreateFlags.Title
+	flagBody := prCreateFlags.Body
+	flagTarget := prCreateFlags.Target
+	prePush := !prCreateFlags.NoPush
 
 	if flagBody != "" && flagTitle != "" {
 		interactive = false
 	}
 
-	if !interactive {
-		prParams := github.PullRequestParams{
-			Title:   flagTitle,
-			Body:    flagBody,
+	prParams := github.PullRequestParams{
+		Title:   flagTitle,
+		Body:    flagBody,
+		Draft:   draft,
+		Target:  flagTarget,
+		PrePush: prePush,
+	}
+
+	if interactive {
+		confirmed := false
+		inProgress := prCreateInput{}
+
+		for !confirmed {
+			editor := determineEditor()
+			titleQuestion := &survey.Question{
+				Name: "title",
+				Prompt: &survey.Input{
+					Message: "PR Title",
+					Default: inProgress.Title,
+				},
+			}
+			bodyQuestion := &survey.Question{
+				Name: "body",
+				Prompt: &survey.Editor{
+					Message:       fmt.Sprintf("PR Body (%s)", editor),
+					FileName:      "*.md",
+					Default:       inProgress.Body,
+					AppendDefault: true,
+					Editor:        editor,
+				},
+			}
+
+			qs := []*survey.Question{}
+			if flagTitle == "" {
+				qs = append(qs, titleQuestion)
+			} else {
+				inProgress.Title = flagTitle
+			}
+
+			if flagBody == "" {
+				qs = append(qs, bodyQuestion)
+			} else {
+				inProgress.Body = flagBody
+			}
+
+			err := survey.Ask(qs, &inProgress)
+			if err != nil {
+				return err
+			}
+
+			if flagBody == "" {
+				ui.Println(inProgress.Body)
+			}
+
+			confirmAnswers := struct {
+				Confirmation string
+			}{}
+
+			confirmQs := []*survey.Question{
+				{
+					Name: "confirmation",
+					Prompt: &survey.Select{
+						Message: "Submit?",
+						Options: []string{
+							"Yes",
+							"Edit",
+							"Cancel and discard",
+						},
+					},
+				},
+			}
+
+			err = survey.Ask(confirmQs, &confirmAnswers)
+			if err != nil {
+				return err
+			}
+
+			switch confirmAnswers.Confirmation {
+			case "Yes":
+				confirmed = true
+			case "Edit":
+				continue
+			case "Cancel and discard":
+				ui.Println("Discarding PR.")
+				return nil
+			}
+		}
+
+		// TODO this is quite silly for now; but i expect that survey will intake
+		// slightly different data than the CPR API wants sooner than later
+		prParams = github.PullRequestParams{
+			Title:   inProgress.Title,
+			Body:    inProgress.Body,
 			Draft:   draft,
 			Target:  flagTarget,
 			PrePush: prePush,
 		}
-
-		return github.CreatePullRequest(prParams)
-	}
-
-	confirmed := false
-	inProgress := prCreateInput{}
-
-	for !confirmed {
-		editor := determineEditor()
-		titleQuestion := &survey.Question{
-			Name: "title",
-			Prompt: &survey.Input{
-				Message: "PR Title",
-				Default: inProgress.Title,
-			},
-		}
-		bodyQuestion := &survey.Question{
-			Name: "body",
-			Prompt: &survey.Editor{
-				Message:       fmt.Sprintf("PR Body (%s)", editor),
-				FileName:      "*.md",
-				Default:       inProgress.Body,
-				AppendDefault: true,
-				Editor:        editor,
-			},
-		}
-
-		qs := []*survey.Question{}
-		if flagTitle == "" {
-			qs = append(qs, titleQuestion)
-		} else {
-			inProgress.Title = flagTitle
-		}
-		if flagBody == "" {
-			qs = append(qs, bodyQuestion)
-		} else {
-			inProgress.Body = flagBody
-		}
-
-		err := survey.Ask(qs, &inProgress)
-		if err != nil {
-			return err
-		}
-
-		if flagBody == "" {
-			ui.Println(inProgress.Body)
-		}
-
-		confirmAnswers := struct {
-			Confirmation string
-		}{}
-
-		confirmQs := []*survey.Question{
-			{
-				Name: "confirmation",
-				Prompt: &survey.Select{
-					Message: "Submit?",
-					Options: []string{
-						"Yes",
-						"Edit",
-						"Cancel and discard",
-					},
-				},
-			},
-		}
-
-		err = survey.Ask(confirmQs, &confirmAnswers)
-		if err != nil {
-			return err
-		}
-
-		switch confirmAnswers.Confirmation {
-		case "Yes":
-			confirmed = true
-		case "Edit":
-			continue
-		case "Cancel and discard":
-			ui.Println("Discarding PR.")
-			return nil
-		}
-	}
-
-	// TODO this is quite silly for now; but i expect that survey will intake
-	// slightly different data than the CPR API wants sooner than later
-	prParams := github.PullRequestParams{
-		Title:   inProgress.Title,
-		Body:    inProgress.Body,
-		Draft:   draft,
-		Target:  flagTarget,
-		PrePush: prePush,
 	}
 
 	return github.CreatePullRequest(prParams)
