@@ -2,15 +2,36 @@ package context
 
 import (
 	"testing"
+
+	"github.com/github/gh-cli/git"
 )
 
 func Test_repoFromURL(t *testing.T) {
+	git.InitSSHAliasMap(nil)
+
 	r, err := repoFromURL("http://github.com/monalisa/octo-cat.git")
 	eq(t, err, nil)
 	eq(t, r, &GitHubRepository{Owner: "monalisa", Name: "octo-cat"})
 }
 
+func Test_repoFromURL_SSH(t *testing.T) {
+	git.InitSSHAliasMap(map[string]string{
+		"gh":         "github.com",
+		"github.com": "ssh.github.com",
+	})
+
+	r, err := repoFromURL("git@gh:monalisa/octo-cat")
+	eq(t, err, nil)
+	eq(t, r, &GitHubRepository{Owner: "monalisa", Name: "octo-cat"})
+
+	r, err = repoFromURL("git@github.com:monalisa/octo-cat")
+	eq(t, err, nil)
+	eq(t, r, &GitHubRepository{Owner: "monalisa", Name: "octo-cat"})
+}
+
 func Test_parseRemotes(t *testing.T) {
+	git.InitSSHAliasMap(nil)
+
 	remoteList := []string{
 		"mona\tgit@github.com:monalisa/myfork.git (fetch)",
 		"origin\thttps://github.com/monalisa/octo-cat.git (fetch)",
