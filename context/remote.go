@@ -42,7 +42,7 @@ type GitHubRepository struct {
 	Owner string
 }
 
-func parseRemotes(gitRemotes []string) (remotes Remotes, err error) {
+func parseRemotes(gitRemotes []string) (remotes Remotes) {
 	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
 	names := []string{}

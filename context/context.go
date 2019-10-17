@@ -98,11 +98,7 @@ func (c *fsContext) Remotes() (Remotes, error) {
 		if err != nil {
 			return nil, err
 		}
-		rem, err := parseRemotes(gitRemotes)
-		if err != nil {
-			return nil, err
-		}
-		c.remotes = rem
+		c.remotes = parseRemotes(gitRemotes)
 	}
 	return c.remotes, nil
 }
