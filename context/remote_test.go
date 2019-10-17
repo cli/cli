@@ -1,6 +1,7 @@
 package context
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/github/gh-cli/git"
@@ -12,6 +13,16 @@ func Test_repoFromURL(t *testing.T) {
 	r, err := repoFromURL("http://github.com/monalisa/octo-cat.git")
 	eq(t, err, nil)
 	eq(t, r, &GitHubRepository{Owner: "monalisa", Name: "octo-cat"})
+}
+
+func Test_repoFromURL_invalid(t *testing.T) {
+	git.InitSSHAliasMap(nil)
+
+	_, err := repoFromURL("https://example.com/one/two")
+	eq(t, err, errors.New(`invalid hostname: example.com`))
+
+	_, err = repoFromURL("/path/to/disk")
+	eq(t, err, errors.New(`invalid hostname: `))
 }
 
 func Test_repoFromURL_SSH(t *testing.T) {
