@@ -6,15 +6,8 @@ import (
 
 func Test_repoFromURL(t *testing.T) {
 	r, err := repoFromURL("http://github.com/monalisa/octo-cat.git")
-	if err != nil {
-		t.Error(err)
-	}
-	if r.Owner != "monalisa" {
-		t.Errorf("got Owner: %q", r.Owner)
-	}
-	if r.Name != "octo-cat" {
-		t.Errorf("got Name: %q", r.Name)
-	}
+	eq(t, err, nil)
+	eq(t, r, &GitHubRepository{Owner: "monalisa", Name: "octo-cat"})
 }
 
 func Test_parseRemotes(t *testing.T) {
@@ -25,26 +18,10 @@ func Test_parseRemotes(t *testing.T) {
 		"upstream\thttps://example.com/nowhere.git (fetch)",
 		"upstream\thttps://github.com/hubot/tools (push)",
 	}
-	r, err := parseRemotes(remoteList)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(r) != 3 {
-		t.Errorf("found %d remotes", len(r))
-	}
+	r := parseRemotes(remoteList)
+	eq(t, len(r), 3)
 
-	mona := r[0]
-	if mona.Owner != "monalisa" || mona.Repo != "myfork" {
-		t.Errorf("got %s/%s", mona.Owner, mona.Repo)
-	}
-
-	origin := r[1]
-	if origin.Owner != "monalisa" || origin.Repo != "octo-cat" {
-		t.Errorf("got %s/%s", origin.Owner, origin.Repo)
-	}
-
-	upstream := r[2]
-	if upstream.Owner != "hubot" || upstream.Repo != "tools" {
-		t.Errorf("got %s/%s", upstream.Owner, upstream.Repo)
-	}
+	eq(t, r[0], &Remote{Name: "mona", Owner: "monalisa", Repo: "myfork"})
+	eq(t, r[1], &Remote{Name: "origin", Owner: "monalisa", Repo: "octo-cat"})
+	eq(t, r[2], &Remote{Name: "upstream", Owner: "hubot", Repo: "tools"})
 }
