@@ -2,14 +2,14 @@ package command
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/github"
 	"github.com/github/gh-cli/ui"
@@ -19,10 +19,41 @@ import (
 
 func init() {
 	RootCmd.AddCommand(prCmd)
-	prCmd.AddCommand(prListCmd)
-	prCmd.AddCommand(prShowCmd)
-	prCmd.AddCommand(prCreateCmd)
-	prCmd.AddCommand(prCheckoutCmd)
+	prCmd.AddCommand(
+		&cobra.Command{
+			Use:   "list",
+			Short: "List pull requests",
+			RunE:  prList,
+		},
+		&cobra.Command{
+			Use:   "view [pr-number]",
+			Short: "Open a pull request in the browser",
+			Long: `Opens the pull request in the web browser.
+
+When <pr-number> is not given, the pull request that belongs to the current
+branch is opened.
+`,
+			RunE: prView,
+		},
+		&cobra.Command{
+			Use:   "create",
+			Short: "Create a pull request",
+			Run: func(cmd *cobra.Command, args []string) {
+				createPr(args...)
+			},
+		},
+		&cobra.Command{
+			Use:   "checkout <pr-number>",
+			Short: "Check out a pull request in git",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				prNumber := ""
+				if len(args) > 0 {
+					prNumber = args[0]
+				}
+				return checkoutPr(prNumber)
+			},
+		},
+	)
 }
 
 var prCmd = &cobra.Command{
@@ -30,50 +61,8 @@ var prCmd = &cobra.Command{
 	Short: "Work with pull requests",
 	Long: `Interact with pull requests for this repository.
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		err := interactiveList()
-		utils.Check(err)
-	},
-}
-
-var prListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List open pull requests related to you",
-	Run: func(cmd *cobra.Command, args []string) {
-		list()
-	},
-}
-
-var prShowCmd = &cobra.Command{
-	Use:   "show [<pr-number>]",
-	Short: "Open a pull request in the browser",
-	Long: `Opens the pull request in the web browser.
-
-When <pr-number> is not given, the pull request that belongs to the current
-branch is opened.
-`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return show(args...)
-	},
-}
-
-var prCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a pull request",
-	Run: func(cmd *cobra.Command, args []string) {
-		createPr(args...)
-	},
-}
-
-var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout <pr-number>",
-	Short: "Check out a pull request in git",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		prNumber := ""
-		if len(args) > 0 {
-			prNumber = args[0]
-		}
-		return checkoutPr(prNumber)
+		return interactiveList()
 	},
 }
 
@@ -204,17 +193,17 @@ func createPr(...string) {
 }
 
 func interactiveList() error {
-	currentPr, viewerCreated, reviewRequested, err := pullRequests()
+	payload, err := api.PullRequests()
 	if err != nil {
 		return err
 	}
 
-	prs := []graphqlPullRequest{}
-	if currentPr != nil {
-		prs = append(prs, *currentPr)
+	prs := []api.PullRequest{}
+	if payload.CurrentPR != nil {
+		prs = append(prs, *payload.CurrentPR)
 	}
-	prs = append(prs, viewerCreated...)
-	prs = append(prs, reviewRequested...)
+	prs = append(prs, payload.ViewerCreated...)
+	prs = append(prs, payload.ReviewRequested...)
 
 	const openAction = "open in browser"
 	const checkoutAction = "checkout PR locally"
@@ -281,378 +270,100 @@ func interactiveList() error {
 	return actions[answers.Action]()
 
 }
-func list() error {
-	currentPr, viewerCreated, reviewRequested, err := pullRequests()
+
+func prList(cmd *cobra.Command, args []string) error {
+	prPayload, err := api.PullRequests()
 	if err != nil {
 		return err
 	}
 
-	currentPrOutput :=
-		style(currentPr, `{{- bold "Current branch"}}
-{{- if .}}
-{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
-{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
-{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
-{{else}}
-	{{gray "There is no pull request associated with this branch"}}
-{{end}}`)
-
-	viewerCreatedOutput := style(viewerCreated, `
-{{bold "Pull requests created by you"}}
-{{- if . }}
-{{- range .}}
-{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
-{{- if .ChangesRequested}} · {{red "changes requested"}}{{end}}
-{{- if eq .ChecksStatus "ERROR" "FAILURE" "ACTION_REQUIRED" "TIMED_OUT"}} · {{humanize .ChecksStatus | red}}{{end}}
-{{- end}}
-{{else}}
-	{{gray "You have no pull requests open."}}
-{{end}}`)
-
-	reviewRequestedOutput := style(reviewRequested, `
-{{bold "Pull requests requesting a code review from you"}}
-{{- if . }}
-{{- range .}}
-{{printf "#%d" .Number | printf "%8s"}} {{truncate 50 .Title}} {{cyan "[" .HeadRefName "]"}}
-{{- end}}
-{{else}}
-	{{gray "You have no pull requests to review."}}
-{{end}}`)
-
-	fmt.Println(currentPrOutput + viewerCreatedOutput + reviewRequestedOutput)
-	return nil
-}
-
-func show(number ...string) error {
-	project := project()
-
-	var openURL string
-	if len(number) > 0 {
-		if prNumber, err := strconv.Atoi(number[0]); err == nil {
-			openURL = project.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
-		} else {
-			return fmt.Errorf("invalid pull request number: '%s'", number[0])
-		}
+	printHeader("Current branch")
+	if prPayload.CurrentPR != nil {
+		printPrs(*prPayload.CurrentPR)
 	} else {
-		pr, err := pullRequestForCurrentBranch()
+		currentBranch, err := context.Current().Branch()
 		if err != nil {
 			return err
 		}
-		openURL = pr.HtmlUrl
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
+		printMessage(message)
+	}
+	fmt.Println()
+
+	printHeader("Created by you")
+	if len(prPayload.ViewerCreated) > 0 {
+		printPrs(prPayload.ViewerCreated...)
+	} else {
+		printMessage("  You have no open pull requests")
+	}
+	fmt.Println()
+
+	printHeader("Requesting a code review from you")
+	if len(prPayload.ReviewRequested) > 0 {
+		printPrs(prPayload.ReviewRequested...)
+	} else {
+		printMessage("  You have no pull requests to review")
+	}
+	fmt.Println()
+
+	return nil
+}
+
+func prView(cmd *cobra.Command, args []string) error {
+	baseRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return err
+	}
+	var openURL string
+	if len(args) > 0 {
+		if prNumber, err := strconv.Atoi(args[0]); err == nil {
+			// TODO: move URL generation into GitHubRepository
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.Owner, baseRepo.Name, prNumber)
+		} else {
+			return fmt.Errorf("invalid pull request number: '%s'", args[0])
+		}
+	} else {
+		prPayload, err := api.PullRequests()
+		if err != nil || prPayload.CurrentPR == nil {
+			branch, err := context.Current().Branch()
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("The [%s] branch has no open PRs", branch)
+		}
+		openURL = prPayload.CurrentPR.URL
 	}
 
+	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return openInBrowser(openURL)
 }
 
-func pullRequestForCurrentBranch() (*github.PullRequest, error) {
-	project := project()
-	client := github.NewClient(project.Host)
-	headWithOwner := fmt.Sprintf("%s:%s", project.Owner, currentBranch())
-
-	filterParams := map[string]interface{}{"head": headWithOwner}
-	prs, err := client.FetchPullRequests(&project, filterParams, 10, nil)
-	if err != nil {
-		return nil, err
-	}
-	if len(prs) == 0 {
-		return nil, fmt.Errorf("no pull requests found for the current branch")
-	}
-
-	return &prs[0], nil
+// TODO: pullRequests(first: $per_page, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC})
+func openPullRequests() ([]api.PullRequest, error) {
+	return []api.PullRequest{}, nil
 }
 
-// TODO: figure out a less ridiculous way to parse GraphQL response
-type searchBody struct {
-	Data searchData `json:"data"`
-}
-type searchData struct {
-	Repository struct {
-		PullRequests edges `json:"pullRequests"`
-	} `json:"repository"`
-	ViewerCreated   edges `json:"viewerCreated"`
-	ReviewRequested edges `json:"reviewRequested"`
-}
-type edges struct {
-	Edges    []nodes  `json:"edges"`
-	PageInfo pageInfo `json:"pageInfo"`
-}
-type nodes struct {
-	Node graphqlPullRequest `json:"node"`
-}
-type pageInfo struct {
-	HasNextPage bool   `json:"hasNextPage"`
-	EndCursor   string `json:"endCursor"`
-}
-
-// Add entries here when requesting additional fields in the GraphQL query
-type graphqlPullRequest struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	HeadRefName string `json:"headRefName"`
-	Reviews     struct {
-		Nodes []struct {
-			State  string
-			Author struct {
-				Login string
-			}
-		}
-	}
-	Commits struct {
-		Nodes []struct {
-			Commit struct {
-				Status struct {
-					State string
-				}
-				CheckSuites struct {
-					Nodes []struct {
-						Conclusion string
-					}
-				}
-			}
-		}
+func printPrs(prs ...api.PullRequest) {
+	for _, pr := range prs {
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
 	}
 }
 
-func (pr *graphqlPullRequest) ChangesRequested() bool {
-	reviewMap := map[string]string{}
-	// Reviews will include every review on record, including consecutive ones
-	// from the same actor. Consolidate them into latest state per reviewer.
-	for _, review := range pr.Reviews.Nodes {
-		reviewMap[review.Author.Login] = review.State
-	}
-	for _, state := range reviewMap {
-		if state == "CHANGES_REQUESTED" {
-			return true
-		}
-	}
-	return false
+func printHeader(s string) {
+	fmt.Println(utils.Bold(s))
 }
 
-// in the order of severity
-var checksResultMap = map[string]int{
-	"PENDING":         0,
-	"NEUTRAL":         1,
-	"SUCCESS":         2,
-	"EXPECTED":        3,
-	"CANCELLED":       4,
-	"TIMED_OUT":       5,
-	"ERROR":           6,
-	"FAILURE":         7,
-	"ACTION_REQUIRED": 8,
+func printMessage(s string) {
+	fmt.Println(utils.Gray(s))
 }
 
-func (pr *graphqlPullRequest) ChecksStatus() string {
-	if len(pr.Commits.Nodes) == 0 {
-		return ""
-	}
-	commit := pr.Commits.Nodes[0].Commit
-	// EXPECTED, ERROR, FAILURE, PENDING, SUCCESS
-	conclusion := commit.Status.State
-	for _, checkSuite := range commit.CheckSuites.Nodes {
-		// ACTION_REQUIRED, TIMED_OUT, CANCELLED, FAILURE, SUCCESS, NEUTRAL
-		if checksResultMap[checkSuite.Conclusion] > checksResultMap[conclusion] {
-			conclusion = checkSuite.Conclusion
-		}
-	}
-	return conclusion
-}
+func truncateTitle(title string) string {
+	const maxLength = 50
 
-func pullRequests() (*graphqlPullRequest, []graphqlPullRequest, []graphqlPullRequest, error) {
-	project := project()
-	client := github.NewClient(project.Host)
-	owner := project.Owner
-	repo := project.Name
-	currentBranch := currentBranch()
-
-	headers := map[string]string{
-		"Accept": "application/vnd.github.antiope-preview+json",
+	if len(title) > maxLength {
+		return title[0:maxLength-3] + "..."
 	}
-	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
-	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername())
-
-	variables := map[string]interface{}{
-		"viewerQuery":   viewerQuery,
-		"reviewerQuery": reviewerQuery,
-		"owner":         owner,
-		"repo":          repo,
-		"headRefName":   currentBranch,
-	}
-
-	data := map[string]interface{}{
-		"variables": variables,
-		"query": `
-fragment pr on PullRequest {
-	number
-	title
-	url
-	headRefName
-	commits(last: 1) {
-		nodes {
-			commit {
-				status {
-					state
-				}
-				checkSuites(first: 50) {
-					nodes {
-						conclusion
-					}
-				}
-			}
-		}
-	}
-}
-
-fragment prWithReviews on PullRequest {
-	...pr
-	reviews(last: 20) {
-		nodes {
-			state
-			author {
-				login
-			}
-		}
-	}
-}
-
-query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-	repository(owner: $owner, name: $repo) {
-    pullRequests(headRefName: $headRefName, first: 1) {
-			edges {
-				node {
-					...prWithReviews
-				}
-			}
-		}
-  }
-	viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-		edges {
-			node {
-				...prWithReviews
-			}
-		}
-		pageInfo {
-			hasNextPage
-		}
-	}
-	reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-		edges {
-			node {
-				...pr
-			}
-		}
-		pageInfo {
-			hasNextPage
-		}
-	}
-}`}
-
-	response, err := client.GenericAPIRequest("POST", "graphql", data, headers, 0)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	responseBody := searchBody{}
-	err = response.Unmarshal(&responseBody)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	viewerCreated := []graphqlPullRequest{}
-	reviewRequested := []graphqlPullRequest{}
-	for _, edge := range responseBody.Data.ViewerCreated.Edges {
-		viewerCreated = append(viewerCreated, edge.Node)
-	}
-	for _, edge := range responseBody.Data.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, edge.Node)
-	}
-	var currentPr *graphqlPullRequest
-	if len(responseBody.Data.Repository.PullRequests.Edges) > 0 {
-		currentPr = &responseBody.Data.Repository.PullRequests.Edges[0].Node
-	}
-	return currentPr, viewerCreated, reviewRequested, nil
-}
-
-func openPullRequests() ([]graphqlPullRequest, error) {
-	project := project()
-	client := github.NewClient(project.Host)
-	owner := project.Owner
-	repo := project.Name
-
-	var headers map[string]string
-	variables := map[string]interface{}{
-		"owner":    owner,
-		"repo":     repo,
-		"per_page": 10,
-	}
-
-	data := map[string]interface{}{
-		"variables": variables,
-		"query": `
-query($owner: String!, $repo: String!, $per_page: Int!) {
-	repository(owner: $owner, name: $repo) {
-    pullRequests(first: $per_page, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
-			edges {
-				node {
-					number
-					title
-					headRefName
-				}
-			}
-		}
-  }
-}`}
-
-	response, err := client.GenericAPIRequest("POST", "graphql", data, headers, 0)
-	if err != nil {
-		return nil, err
-	}
-	responseBody := searchBody{}
-	err = response.Unmarshal(&responseBody)
-	if err != nil {
-		return nil, err
-	}
-
-	prs := []graphqlPullRequest{}
-	for _, edge := range responseBody.Data.Repository.PullRequests.Edges {
-		prs = append(prs, edge.Node)
-	}
-	return prs, nil
-}
-
-func currentBranch() string {
-	currentBranch, err := git.Head()
-	if err != nil {
-		panic(err)
-	}
-
-	return strings.Replace(currentBranch, "refs/heads/", "", 1)
-}
-
-func project() github.Project {
-	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
-		repoURL, err := url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
-		if err != nil {
-			panic(err)
-		}
-		project, err := github.NewProjectFromURL(repoURL)
-		if err != nil {
-			panic(err)
-		}
-		return *project
-	}
-
-	remotes, err := github.Remotes()
-	if err != nil {
-		panic(err)
-	}
-
-	for _, remote := range remotes {
-		if project, err := remote.Project(); err == nil {
-			return *project
-		}
-	}
-
-	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
+	return title
 }
 
 func openInBrowser(url string) error {
@@ -662,14 +373,6 @@ func openInBrowser(url string) error {
 	}
 	endingArgs := append(launcher[1:], url)
 	return exec.Command(launcher[0], endingArgs...).Run()
-}
-
-func currentUsername() string {
-	host, err := github.CurrentConfig().DefaultHost()
-	if err != nil {
-		panic(err)
-	}
-	return host.User
 }
 
 func checkoutPr(number string) error {
@@ -682,9 +385,12 @@ func checkoutPr(number string) error {
 		return err
 	}
 
-	project := project()
-	client := github.NewClient(project.Host)
-	pullRequest, err := client.PullRequest(&project, number)
+	baseRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return err
+	}
+	client := github.NewClient("github.com")
+	pullRequest, err := client.PullRequest(github.NewProject(baseRepo.Owner, baseRepo.Name, ""), number)
 	if err != nil {
 		return err
 	}
@@ -740,7 +446,7 @@ func checkoutPr(number string) error {
 		mergeRef := ref
 		if pullRequest.MaintainerCanModify && pullRequest.Head.Repo != nil {
 			headRepo := pullRequest.Head.Repo
-			headProject := github.NewProject(headRepo.Owner.Login, headRepo.Name, project.Host)
+			headProject := github.NewProject(headRepo.Owner.Login, headRepo.Name, "")
 			remote = headProject.GitURL("", "", true)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pullRequest.Head.Ref)
 		}
@@ -756,7 +462,10 @@ func checkoutMenu() error {
 		return err
 	}
 
-	currentBranch := currentBranch()
+	currentBranch, err := context.Current().Branch()
+	if err != nil {
+		return err
+	}
 	prOptions := []string{}
 	for _, pr := range prs {
 		if pr.HeadRefName == currentBranch {

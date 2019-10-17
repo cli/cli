@@ -2,6 +2,7 @@ package git
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,13 +11,19 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-const (
-	hostReStr = "(?i)^[ \t]*(host|hostname)[ \t]+(.+)$"
+var (
+	sshHostRE,
+	sshTokenRE *regexp.Regexp
 )
 
-type SSHConfig map[string]string
+func init() {
+	sshHostRE = regexp.MustCompile("(?i)^[ \t]*(host|hostname)[ \t]+(.+)$")
+	sshTokenRE = regexp.MustCompile(`%[%h]`)
+}
 
-func newSSHConfigReader() *SSHConfigReader {
+type sshAliasMap map[string]string
+
+func sshParseFiles() sshAliasMap {
 	configFiles := []string{
 		"/etc/ssh_config",
 		"/etc/ssh/ssh_config",
@@ -25,38 +32,33 @@ func newSSHConfigReader() *SSHConfigReader {
 		userConfig := filepath.Join(homedir, ".ssh", "config")
 		configFiles = append([]string{userConfig}, configFiles...)
 	}
-	return &SSHConfigReader{
-		Files: configFiles,
+
+	openFiles := []io.Reader{}
+	for _, file := range configFiles {
+		f, err := os.Open(file)
+		if err != nil {
+			continue
+		}
+		defer f.Close()
+		openFiles = append(openFiles, f)
 	}
+	return sshParse(openFiles...)
 }
 
-type SSHConfigReader struct {
-	Files []string
-}
-
-func (r *SSHConfigReader) Read() SSHConfig {
-	config := make(SSHConfig)
-	hostRe := regexp.MustCompile(hostReStr)
-
-	for _, filename := range r.Files {
-		r.readFile(config, hostRe, filename)
+func sshParse(r ...io.Reader) sshAliasMap {
+	config := sshAliasMap{}
+	for _, file := range r {
+		sshParseConfig(config, file)
 	}
-
 	return config
 }
 
-func (r *SSHConfigReader) readFile(c SSHConfig, re *regexp.Regexp, f string) error {
-	file, err := os.Open(f)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
+func sshParseConfig(c sshAliasMap, file io.Reader) error {
 	hosts := []string{"*"}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		match := re.FindStringSubmatch(line)
+		match := sshHostRE.FindStringSubmatch(line)
 		if match == nil {
 			continue
 		}
@@ -67,7 +69,7 @@ func (r *SSHConfigReader) readFile(c SSHConfig, re *regexp.Regexp, f string) err
 		} else {
 			for _, host := range hosts {
 				for _, name := range names {
-					c[host] = expandTokens(name, host)
+					c[host] = sshExpandTokens(name, host)
 				}
 			}
 		}
@@ -76,9 +78,8 @@ func (r *SSHConfigReader) readFile(c SSHConfig, re *regexp.Regexp, f string) err
 	return scanner.Err()
 }
 
-func expandTokens(text, host string) string {
-	re := regexp.MustCompile(`%[%h]`)
-	return re.ReplaceAllStringFunc(text, func(match string) string {
+func sshExpandTokens(text, host string) string {
+	return sshTokenRE.ReplaceAllStringFunc(text, func(match string) string {
 		switch match {
 		case "%h":
 			return host

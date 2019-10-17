@@ -7,15 +7,12 @@ import (
 )
 
 var (
-	cachedSSHConfig SSHConfig
+	cachedSSHConfig sshAliasMap
 	protocolRe      = regexp.MustCompile("^[a-zA-Z_+-]+://")
 )
 
-type URLParser struct {
-	SSHConfig SSHConfig
-}
-
-func (p *URLParser) Parse(rawURL string) (u *url.URL, err error) {
+// ParseURL normalizes git remote urls
+func ParseURL(rawURL string) (u *url.URL, err error) {
 	if !protocolRe.MatchString(rawURL) &&
 		strings.Contains(rawURL, ":") &&
 		// not a Windows path
@@ -44,7 +41,10 @@ func (p *URLParser) Parse(rawURL string) (u *url.URL, err error) {
 		u.Host = u.Host[0:idx]
 	}
 
-	sshHost := p.SSHConfig[u.Host]
+	if cachedSSHConfig == nil {
+		return
+	}
+	sshHost := cachedSSHConfig[u.Host]
 	// ignore replacing host that fixes for limited network
 	// https://help.github.com/articles/using-ssh-over-the-https-port
 	ignoredHost := u.Host == "github.com" && sshHost == "ssh.github.com"
@@ -55,12 +55,14 @@ func (p *URLParser) Parse(rawURL string) (u *url.URL, err error) {
 	return
 }
 
-func ParseURL(rawURL string) (u *url.URL, err error) {
-	if cachedSSHConfig == nil {
-		cachedSSHConfig = newSSHConfigReader().Read()
+// InitSSHAliasMap prepares globally cached SSH hostname alias mappings
+func InitSSHAliasMap(m map[string]string) {
+	if m == nil {
+		cachedSSHConfig = sshParseFiles()
+		return
 	}
-
-	p := &URLParser{cachedSSHConfig}
-
-	return p.Parse(rawURL)
+	cachedSSHConfig = sshAliasMap{}
+	for k, v := range m {
+		cachedSSHConfig[k] = v
+	}
 }
