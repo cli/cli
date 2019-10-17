@@ -20,7 +20,7 @@ type graphQLResponse struct {
 }
 
 /*
-graphQL usage
+GraphQL: Declared as an external variable so it can be mocked in tests
 
 type repoResponse struct {
 	Repository struct {
@@ -44,7 +44,7 @@ if err != nil {
 
 fmt.Printf("%+v\n", resp)
 */
-func graphQL(query string, variables map[string]string, v interface{}) error {
+var GraphQL = func(query string, variables map[string]string, data interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
@@ -81,29 +81,31 @@ func graphQL(query string, variables map[string]string, v interface{}) error {
 	}
 
 	debugResponse(resp, string(body))
-	return handleResponse(resp, body, v)
+	return handleResponse(resp, body, data)
 }
 
-func handleResponse(resp *http.Response, body []byte, v interface{}) error {
+func handleResponse(resp *http.Response, body []byte, data interface{}) error {
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 
-	if success {
-		gr := &graphQLResponse{Data: v}
-		err := json.Unmarshal(body, &gr)
-		if err != nil {
-			return err
-		}
-		if len(gr.Errors) > 0 {
-			errorMessages := gr.Errors[0].Message
-			for _, e := range gr.Errors[1:] {
-				errorMessages += ", " + e.Message
-			}
-			return fmt.Errorf("graphql error: '%s'", errorMessages)
-		}
-		return nil
+	if !success {
+		return handleHTTPError(resp, body)
 	}
 
-	return handleHTTPError(resp, body)
+	gr := &graphQLResponse{Data: data}
+	err := json.Unmarshal(body, &gr)
+	if err != nil {
+		return err
+	}
+
+	if len(gr.Errors) > 0 {
+		errorMessages := gr.Errors[0].Message
+		for _, e := range gr.Errors[1:] {
+			errorMessages += ", " + e.Message
+		}
+		return fmt.Errorf("graphql error: '%s'", errorMessages)
+	}
+	return nil
+
 }
 
 func handleHTTPError(resp *http.Response, body []byte) error {
