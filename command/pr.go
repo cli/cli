@@ -126,17 +126,16 @@ func determineEditor() string {
 }
 
 func createPr(...string) error {
-	// TODO i wanted some information here:
-	// - whether current branch was pushed yet
-	// - whether PR was already open for this branch
-	// - if working directory was dirty
-	// - what branch is targeted
-
-	// TODO for pr create PR:
-	// - attempt to understand and clean up what is in pull_request.go
-	// - try and port to graphql
-	// - try and get off of localrepo.go
-	// - report on clean/dirty state
+	ucc, err := git.UncommittedChangeCount()
+	if err != nil {
+		return err
+	}
+	if ucc > 0 {
+		uccOutput := style(struct{ Count string }{fmt.Sprintf("%d", ucc)},
+			`{{red "!!"}} {{.Count | bold}} {{bold "uncommitted changes"}} {{red "!!"}}`)
+		ui.Println(uccOutput)
+		ui.Println()
+	}
 
 	interactive := !prCreateFlags.Noninteractive
 	draft := prCreateFlags.Draft
