@@ -2,14 +2,10 @@ package command
 
 import (
 	"fmt"
-	"net/url"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/github"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +47,11 @@ func prList(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(*prPayload.CurrentPR)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch()+"]"))
+		currentBranch, err := context.Current().Branch()
+		if err != nil {
+			return err
+		}
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
 		printMessage(message)
 	}
 	fmt.Println()
@@ -76,12 +76,16 @@ func prList(cmd *cobra.Command, args []string) error {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	project := project()
+	baseRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return err
+	}
 
 	var openURL string
 	if len(args) > 0 {
 		if prNumber, err := strconv.Atoi(args[0]); err == nil {
-			openURL = project.WebURL("", "", fmt.Sprintf("pull/%d", prNumber))
+			// TODO: move URL generation into GitHubRepository
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.Owner, baseRepo.Name, prNumber)
 		} else {
 			return fmt.Errorf("invalid pull request number: '%s'", args[0])
 		}
@@ -90,7 +94,10 @@ func prView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		} else if prPayload.CurrentPR == nil {
-			branch := currentBranch()
+			branch, err := context.Current().Branch()
+			if err != nil {
+				return err
+			}
 			fmt.Printf("The [%s] branch has no open PRs", branch)
 			return nil
 		}
@@ -122,42 +129,4 @@ func truncateTitle(title string) string {
 		return title[0:maxLength-3] + "..."
 	}
 	return title
-}
-
-// The functions below should be replaced at some point by the context package
-// 🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨🧨
-func currentBranch() string {
-	currentBranch, err := git.Head()
-	if err != nil {
-		panic(err)
-	}
-
-	return strings.Replace(currentBranch, "refs/heads/", "", 1)
-}
-
-func project() github.Project {
-	if repoFromEnv := os.Getenv("GH_REPO"); repoFromEnv != "" {
-		repoURL, err := url.Parse(fmt.Sprintf("https://github.com/%s.git", repoFromEnv))
-		if err != nil {
-			panic(err)
-		}
-		project, err := github.NewProjectFromURL(repoURL)
-		if err != nil {
-			panic(err)
-		}
-		return *project
-	}
-
-	remotes, err := github.Remotes()
-	if err != nil {
-		panic(err)
-	}
-
-	for _, remote := range remotes {
-		if project, err := remote.Project(); err == nil {
-			return *project
-		}
-	}
-
-	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
 }

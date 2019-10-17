@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/github"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +19,6 @@ type TempGitRepo struct {
 }
 
 func UseTempGitRepo() *TempGitRepo {
-	github.CreateTestConfigs("mario", "i-love-peach")
-
 	pwd, _ := os.Getwd()
 	oldEnv := make(map[string]string)
 	overrideEnv := func(name, value string) {
