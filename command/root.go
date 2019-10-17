@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/git"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,7 @@ func initContext() {
 		repo = os.Getenv("GH_REPO")
 	}
 	ctx.SetBaseRepo(repo)
+	git.InitSSHAliasMap(nil)
 }
 
 // RootCmd is the entry point of command-line execution
