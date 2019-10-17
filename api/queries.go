@@ -2,10 +2,8 @@ package api
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/github"
+	"github.com/github/gh-cli/context"
 )
 
 type PullRequestsPayload struct {
@@ -21,7 +19,7 @@ type PullRequest struct {
 	HeadRefName string
 }
 
-func PullRequests() (PullRequestsPayload, error) {
+func PullRequests() (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
 			Node PullRequest
@@ -81,13 +79,24 @@ func PullRequests() (PullRequestsPayload, error) {
     }
   `
 
-	project := project()
-	owner := project.Owner
-	repo := project.Name
-	currentBranch := currentBranch()
+	ghRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+	currentBranch, err := context.Current().Branch()
+	if err != nil {
+		return nil, err
+	}
+	currentUsername, err := context.Current().AuthLogin()
+	if err != nil {
+		return nil, err
+	}
 
-	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername())
-	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername())
+	owner := ghRepo.Owner
+	repo := ghRepo.Name
+
+	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
+	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
 
 	variables := map[string]string{
 		"viewerQuery":   viewerQuery,
@@ -98,9 +107,9 @@ func PullRequests() (PullRequestsPayload, error) {
 	}
 
 	var resp response
-	err := GraphQL(query, variables, &resp)
+	err = GraphQL(query, variables, &resp)
 	if err != nil {
-		return PullRequestsPayload{}, err
+		return nil, err
 	}
 
 	var viewerCreated []PullRequest
@@ -124,37 +133,5 @@ func PullRequests() (PullRequestsPayload, error) {
 		currentPR,
 	}
 
-	return payload, nil
-}
-
-// TODO: Everything below this line will be removed when Nate's context work is complete
-func project() github.Project {
-	remotes, error := github.Remotes()
-	if error != nil {
-		panic(error)
-	}
-	for _, remote := range remotes {
-		if project, error := remote.Project(); error == nil {
-			return *project
-		}
-	}
-
-	panic("Could not get the project. What is a project? I don't know, it's kind of like a git repository I think?")
-}
-
-func currentBranch() string {
-	currentBranch, err := git.Head()
-	if err != nil {
-		panic(err)
-	}
-
-	return strings.Replace(currentBranch, "refs/heads/", "", 1)
-}
-
-func currentUsername() string {
-	host, err := github.CurrentConfig().DefaultHost()
-	if err != nil {
-		panic(err)
-	}
-	return host.User
+	return &payload, nil
 }
