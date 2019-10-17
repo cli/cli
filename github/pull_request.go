@@ -18,6 +18,7 @@ type PullRequestParams struct {
 }
 
 func CreatePullRequest(prParams PullRequestParams) error {
+	// TODO understand head/target stuff
 	localRepo, err := LocalRepo()
 	if err != nil {
 		return err
@@ -43,6 +44,13 @@ func CreatePullRequest(prParams PullRequestParams) error {
 	if headProject == nil {
 		return fmt.Errorf("could not determine project for head branch")
 	}
+
+	fmt.Printf("%+v\n", localRepo)
+	fmt.Printf("%+v\n", host)
+	fmt.Printf("%+v\n", currentBranch)
+	fmt.Printf("%+v\n", baseProject)
+	fmt.Printf("%+v\n", trackedBranch)
+	fmt.Printf("%+v\n", headProject)
 
 	var (
 		base, head string
@@ -103,6 +111,13 @@ func CreatePullRequest(prParams PullRequestParams) error {
 		return fmt.Errorf("Can't find remote for %s", head)
 	}
 
+	fmt.Printf("%+v\n", trackedBranch)
+	fmt.Printf("%+v\n", head)
+	fmt.Printf("%+v\n", headProject)
+	//fmt.Printf("%+v\n", headRepo)
+	fmt.Printf("%+v\n", fullHead)
+	fmt.Printf("%+v\n", remote)
+
 	if prParams.PrePush {
 		err = git.Run("push", "--set-upstream", remote.Name, fmt.Sprintf("HEAD:%s", head))
 
@@ -149,53 +164,54 @@ query FindRepoID($owner:String!, $name:String!) {
 		return err
 	}
 	repoId := result.Data.Repository.Id
+	ui.Println(repoId)
 
-	mutation := `
-mutation CreatePullRequest($input: CreatePullRequestInput!) {
-  createPullRequest(input: $input) {
-	  pullRequest {
-	    url
-		}
-	}
-}`
-
-	variables = map[string]interface{}{
-		"input": map[string]interface{}{
-			"repositoryId": repoId,
-			"baseRefName":  base,
-			"headRefName":  fullHead,
-			"title":        prParams.Title,
-			"body":         prParams.Body,
-			"draft":        prParams.Draft,
-		},
-	}
-	data = map[string]interface{}{
-		"variables": variables,
-		"query":     mutation,
-	}
-
-	response, err = client.GenericAPIRequest("POST", "graphql", data, headers, 0)
-	if err != nil {
-		return err
-	}
-
-	type createResult struct {
-		Data struct {
-			CreatePullRequest struct {
-				PullRequest struct {
-					Url string
-				}
-			}
-		}
-	}
-
-	cresult := createResult{}
-	err = response.Unmarshal(&cresult)
-	if err != nil {
-		return err
-	}
-	pullRequestURL := cresult.Data.CreatePullRequest.PullRequest.Url
-	ui.Println(pullRequestURL)
+	//	mutation := `
+	//	mutation CreatePullRequest($input: CreatePullRequestInput!) {
+	//	  createPullRequest(input: $input) {
+	//		  pullRequest {
+	//		    url
+	//			}
+	//		}
+	//	}`
+	//
+	//	variables = map[string]interface{}{
+	//		"input": map[string]interface{}{
+	//			"repositoryId": repoId,
+	//			"baseRefName":  base,
+	//			"headRefName":  fullHead,
+	//			"title":        prParams.Title,
+	//			"body":         prParams.Body,
+	//			"draft":        prParams.Draft,
+	//		},
+	//	}
+	//	data = map[string]interface{}{
+	//		"variables": variables,
+	//		"query":     mutation,
+	//	}
+	//
+	//	response, err = client.GenericAPIRequest("POST", "graphql", data, headers, 0)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	type createResult struct {
+	//		Data struct {
+	//			CreatePullRequest struct {
+	//				PullRequest struct {
+	//					Url string
+	//				}
+	//			}
+	//		}
+	//	}
+	//
+	//	cresult := createResult{}
+	//	err = response.Unmarshal(&cresult)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	pullRequestURL := cresult.Data.CreatePullRequest.PullRequest.Url
+	//	ui.Println(pullRequestURL)
 
 	return nil
 }
