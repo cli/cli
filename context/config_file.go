@@ -1,6 +1,7 @@
 package context
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -32,11 +33,18 @@ func parseConfig(r io.Reader) (*configEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	var entries []configEntry
-	// TODO: this will panic if the config is malformed
-	err = config.Content[0].Content[1].Decode(&entries)
-	if err != nil {
-		return nil, err
+	if len(config.Content) < 1 {
+		return nil, fmt.Errorf("malformed config")
 	}
-	return &entries[0], nil
+	for i := 0; i < len(config.Content[0].Content)-1; i = i + 2 {
+		if config.Content[0].Content[i].Value == defaultHostname {
+			var entries []configEntry
+			err = config.Content[0].Content[i+1].Decode(&entries)
+			if err != nil {
+				return nil, err
+			}
+			return &entries[0], nil
+		}
+	}
+	return nil, fmt.Errorf("could not find config entry for %q", defaultHostname)
 }
