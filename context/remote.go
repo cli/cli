@@ -45,6 +45,7 @@ type GitHubRepository struct {
 func parseRemotes(gitRemotes []string) (remotes Remotes, err error) {
 	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
+	names := []string{}
 	remotesMap := make(map[string]map[string]string)
 	for _, r := range gitRemotes {
 		if re.MatchString(r) {
@@ -56,12 +57,14 @@ func parseRemotes(gitRemotes []string) (remotes Remotes, err error) {
 			if !ok {
 				utm = make(map[string]string)
 				remotesMap[name] = utm
+				names = append(names, name)
 			}
 			utm[urlType] = url
 		}
 	}
 
-	for name, urlMap := range remotesMap {
+	for _, name := range names {
+		urlMap := remotesMap[name]
 		repo, err := repoFromURL(urlMap["fetch"])
 		if err != nil {
 			repo, err = repoFromURL(urlMap["push"])
