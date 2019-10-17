@@ -17,9 +17,7 @@ var (
 func init() {
 	RootCmd.PersistentFlags().StringVarP(&currentRepo, "repo", "R", "", "current GitHub repository")
 	RootCmd.PersistentFlags().StringVarP(&currentBranch, "current-branch", "B", "", "current git branch")
-}
 
-func initContext() {
 	ctx := context.InitDefaultContext()
 	ctx.SetBranch(currentBranch)
 	repo := currentRepo
@@ -27,6 +25,7 @@ func initContext() {
 		repo = os.Getenv("GH_REPO")
 	}
 	ctx.SetBaseRepo(repo)
+
 	git.InitSSHAliasMap(nil)
 }
 
@@ -36,9 +35,6 @@ var RootCmd = &cobra.Command{
 	Short: "GitHub CLI",
 	Long:  `Do things with GitHub from your terminal`,
 	Args:  cobra.MinimumNArgs(1),
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		initContext()
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("root")
 	},
