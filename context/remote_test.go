@@ -29,27 +29,21 @@ func Test_parseRemotes(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	mona, err := r.FindByName("mona")
-	if err != nil {
-		t.Error(err)
+	if len(r) != 3 {
+		t.Errorf("found %d remotes", len(r))
 	}
+
+	mona := r[0]
 	if mona.Owner != "monalisa" || mona.Repo != "myfork" {
 		t.Errorf("got %s/%s", mona.Owner, mona.Repo)
 	}
 
-	origin, err := r.FindByName("origin")
-	if err != nil {
-		t.Error(err)
-	}
+	origin := r[1]
 	if origin.Owner != "monalisa" || origin.Repo != "octo-cat" {
 		t.Errorf("got %s/%s", origin.Owner, origin.Repo)
 	}
 
-	upstream, err := r.FindByName("upstream")
-	if err != nil {
-		t.Error(err)
-	}
+	upstream := r[2]
 	if upstream.Owner != "hubot" || upstream.Repo != "tools" {
 		t.Errorf("got %s/%s", upstream.Owner, upstream.Repo)
 	}
