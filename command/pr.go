@@ -375,6 +375,11 @@ func openInBrowser(url string) error {
 	return exec.Command(launcher[0], endingArgs...).Run()
 }
 
+// Check out a Pull Request locally. Design goals for the new branch:
+//
+// - `git pull` should pull the latest state of the PR
+// - Allow `git push` back to the PR, if possible
+// - Do not add any new git remotes, but reuse existing ones if applicable
 func checkoutPr(number string) error {
 	if number == "" {
 		return checkoutMenu()
@@ -414,30 +419,39 @@ func checkoutPr(number string) error {
 
 	newBranchName := ""
 	if headRemote != nil {
+		// A git remote that tracks PR head repo already exists.
 		if newBranchName == "" {
 			newBranchName = pullRequest.Head.Ref
 		}
 		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pullRequest.Head.Ref)
 		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pullRequest.Head.Ref, remoteBranch)
 
+		// Fetch PR head branch into `refs/remotes/REMOTE/BRANCH`
 		utils.Check(git.Run("fetch", headRemote.Name, refSpec))
 
 		if git.HasFile("refs", "heads", newBranchName) {
+			// The local branch with the same name already exists; try to fast-forward
 			utils.Check(git.Run("checkout", newBranchName))
 			utils.Check(git.Run("merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)))
 		} else {
+			// Create a new branch that tracks `refs/heads/BRANCH` from REMOTE
 			utils.Check(git.Run("checkout", "-b", newBranchName, "--no-track", remoteBranch))
 			utils.Check(git.Run("config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name))
 			utils.Check(git.Run("config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/"+pullRequest.Head.Ref))
 		}
 	} else {
+		// There is no git remote that tracks PR head repo.
 		if newBranchName == "" {
 			newBranchName = pullRequest.Head.Ref
 			if pullRequest.Head.Repo != nil && newBranchName == pullRequest.Head.Repo.DefaultBranch {
+				// Contributors sometimes submit a PR from a "master" branch on their fork, but we want
+				// to avoid checking the PR out as "master" since that would likely compete with our own
+				// local "master" branch. Instead, have the new branch name be `OWNER-BRANCH`.
 				newBranchName = fmt.Sprintf("%s-%s", pullRequest.Head.Repo.Owner.Login, newBranchName)
 			}
 		}
 
+		// Fetch `pull/NUMBER/head` from the base remote
 		ref := fmt.Sprintf("refs/pull/%d/head", pullRequest.Number)
 		utils.Check(git.Run("fetch", baseRemote.Name, fmt.Sprintf("%s:%s", ref, newBranchName)))
 		utils.Check(git.Run("checkout", newBranchName))
@@ -445,11 +459,13 @@ func checkoutPr(number string) error {
 		remote := baseRemote.Name
 		mergeRef := ref
 		if pullRequest.MaintainerCanModify && pullRequest.Head.Repo != nil {
+			// Enable `git push` back to the PR
 			headRepo := pullRequest.Head.Repo
 			headProject := github.NewProject(headRepo.Owner.Login, headRepo.Name, "")
 			remote = headProject.GitURL("", "", true)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pullRequest.Head.Ref)
 		}
+		// Enable `git pull` from the PR
 		utils.Check(git.Run("config", fmt.Sprintf("branch.%s.remote", newBranchName), remote))
 		utils.Check(git.Run("config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef))
 	}
