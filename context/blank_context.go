@@ -26,6 +26,10 @@ func (c *blankContext) AuthToken() (string, error) {
 	return c.authToken, nil
 }
 
+func (c *blankContext) SetAuthToken(t string) {
+	c.authToken = t
+}
+
 func (c *blankContext) AuthLogin() (string, error) {
 	return c.authLogin, nil
 }
