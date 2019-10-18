@@ -10,6 +10,7 @@ import (
 // Context represents the interface for querying information about the current environment
 type Context interface {
 	AuthToken() (string, error)
+	SetAuthToken(string)
 	AuthLogin() (string, error)
 	Branch() (string, error)
 	SetBranch(string)
@@ -36,10 +37,11 @@ func InitDefaultContext() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config   *configEntry
-	remotes  Remotes
-	branch   string
-	baseRepo *GitHubRepository
+	config    *configEntry
+	remotes   Remotes
+	branch    string
+	baseRepo  *GitHubRepository
+	authToken string
 }
 
 func (c *fsContext) configFile() string {
@@ -54,16 +56,25 @@ func (c *fsContext) getConfig() (*configEntry, error) {
 			return nil, err
 		}
 		c.config = entry
+		c.authToken = ""
 	}
 	return c.config, nil
 }
 
 func (c *fsContext) AuthToken() (string, error) {
+	if c.authToken != "" {
+		return c.authToken, nil
+	}
+
 	config, err := c.getConfig()
 	if err != nil {
 		return "", err
 	}
 	return config.Token, nil
+}
+
+func (c *fsContext) SetAuthToken(t string) {
+	c.authToken = t
 }
 
 func (c *fsContext) AuthLogin() (string, error) {
