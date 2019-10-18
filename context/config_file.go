@@ -1,6 +1,7 @@
 package context
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,9 @@ type configEntry struct {
 func parseConfigFile(fn string) (*configEntry, error) {
 	f, err := os.Open(fn)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return setupConfigFile(fn)
+		}
 		return nil, err
 	}
 	defer f.Close()
