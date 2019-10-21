@@ -57,7 +57,7 @@ func HasPushPermission() (bool, error) {
 	return false, nil
 }
 
-func Orgs() ([]string, error) {
+func Fork() ([]string, error) {
 	var resp struct {
 		Viewer struct {
 			Organizations struct {
