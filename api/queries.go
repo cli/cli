@@ -19,6 +19,44 @@ type PullRequest struct {
 	HeadRefName string
 }
 
+func HasPushPermission() (bool, error) {
+	var resp struct {
+		Repository struct {
+			ViewerPermission string
+		}
+	}
+
+	query := `
+	query($owner: String!, $repoName: String!) {
+		repository(owner: $owner, name: $repoName) {
+			viewerPermission
+		}
+	}
+	`
+
+	ghRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return false, err
+	}
+
+	variables := map[string]string{
+		"owner":    ghRepo.Owner,
+		"repoName": ghRepo.Name,
+	}
+
+	err = GraphQL(query, variables, &resp)
+	if err != nil {
+		return false, err
+	}
+
+	p := resp.Repository.ViewerPermission
+	if p == "ADMIN" || p == "MAINTAIN" || p == "WRITE" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 func PullRequests() (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
