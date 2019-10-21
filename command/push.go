@@ -56,19 +56,7 @@ func push(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed because you don't have permission to push to %s/%s", ghRepo.Owner, ghRepo.Name)
 	}
 
-	m = fmt.Sprintf("Where should we fork desktop?")
-	o, err := api.Orgs()
-	if err != nil {
-		return err
-	}
-
-	var org string
-	err = survey.AskOne(&survey.Select{Message: m, Options: o}, &org)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("🌭 YOU ARE ABOUT TO FORK THIS TO %+v\n", org)
+	fmt.Printf("🌭 ABOUT TO FORK\n")
 
 	return nil
 }
