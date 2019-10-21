@@ -27,12 +27,12 @@ func HasPushPermission() (bool, error) {
 	}
 
 	query := `
-	query($owner: String!, $repoName: String!) {
-		repository(owner: $owner, name: $repoName) {
-			viewerPermission
-		}
-	}
-	`
+    query($owner: String!, $repoName: String!) {
+      repository(owner: $owner, name: $repoName) {
+        viewerPermission
+      }
+    }
+  `
 
 	ghRepo, err := context.Current().BaseRepo()
 	if err != nil {
@@ -55,6 +55,46 @@ func HasPushPermission() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func Orgs() ([]string, error) {
+	var resp struct {
+		Viewer struct {
+			Organizations struct {
+				Edges struct {
+					Node []struct {
+						Login string
+					}
+				}
+			}
+		}
+	}
+
+	query := `
+		query {
+			viewer {
+				organizations(first: 100) {
+					edges {
+						node {
+							login
+						}
+					}
+				}
+			}
+		}
+  `
+
+	err := GraphQL(query, map[string]string{}, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var o []string
+	for _, node := range resp.Viewer.Organizations.Edges.Node {
+		o = append(o, node.Login)
+	}
+
+	return o, nil
 }
 
 func PullRequests() (*PullRequestsPayload, error) {
