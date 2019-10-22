@@ -1,5 +1,7 @@
-# github.com/gookit/color v1.2.0
-github.com/gookit/color
+# github.com/AlecAivazis/survey/v2 v2.0.4
+github.com/AlecAivazis/survey/v2
+github.com/AlecAivazis/survey/v2/core
+github.com/AlecAivazis/survey/v2/terminal
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -8,6 +10,8 @@ github.com/kballard/go-shellquote
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.10
 github.com/mattn/go-isatty
+# github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
+github.com/mgutz/ansi
 # github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
 # github.com/spf13/cobra v0.0.5
