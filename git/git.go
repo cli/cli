@@ -216,6 +216,26 @@ func LocalBranches() ([]string, error) {
 	return branches, nil
 }
 
+func UncommittedChangeCount() (int, error) {
+	// TODO TEST
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	output, err := statusCmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(output), "\n")
+
+	count := 0
+
+	for _, l := range lines {
+		if l != "" {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	if lines == "" {
