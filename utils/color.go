@@ -1,43 +1,20 @@
 package utils
 
-import "github.com/gookit/color"
+import "github.com/mgutz/ansi"
 
-func Black(a ...interface{}) string {
-	return color.Black.Render(a...)
-}
+var Black = ansi.ColorFunc("black")
+var White = ansi.ColorFunc("white")
+var Gray = ansi.ColorFunc("gray")
+var Red = ansi.ColorFunc("red")
+var Green = ansi.ColorFunc("green")
+var Yellow = ansi.ColorFunc("yellow")
+var Blue = ansi.ColorFunc("blue")
+var Magenta = ansi.ColorFunc("magenta")
+var Cyan = ansi.ColorFunc("cyan")
 
-func White(a ...interface{}) string {
-	return color.White.Render(a...)
-}
-
-func Gray(a ...interface{}) string {
-	return color.Gray.Render(a...)
-}
-
-func Red(a ...interface{}) string {
-	return color.Red.Render(a...)
-}
-
-func Green(a ...interface{}) string {
-	return color.Green.Render(a...)
-}
-
-func Yellow(a ...interface{}) string {
-	return color.Yellow.Render(a...)
-}
-
-func Blue(a ...interface{}) string {
-	return color.Blue.Render(a...)
-}
-
-func Magenta(a ...interface{}) string {
-	return color.Magenta.Render(a...)
-}
-
-func Cyan(a ...interface{}) string {
-	return color.Cyan.Render(a...)
-}
-
-func Bold(a ...interface{}) string {
-	return color.Bold.Render(a...)
+func Bold(arg string) string {
+	// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
+	// will not use the default color, resulting in black and probably unreadable text. This forces
+	// the default color before bolding.
+	return ansi.Color(ansi.DefaultFG+arg, "+b")
 }
