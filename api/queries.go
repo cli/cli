@@ -57,44 +57,27 @@ func HasPushPermission() (bool, error) {
 	return false, nil
 }
 
-func Fork() ([]string, error) {
+func Fork() (string, string, string, error) {
 	var resp struct {
-		Viewer struct {
-			Organizations struct {
-				Edges struct {
-					Node []struct {
-						Login string
-					}
-				}
-			}
+		URL      string `json:"html_url"`
+		CloneURL string `json:"clone_url"`
+		Parent   struct {
+			CloneURL string `json:"clone_url"`
 		}
 	}
 
-	query := `
-		query {
-			viewer {
-				organizations(first: 100) {
-					edges {
-						node {
-							login
-						}
-					}
-				}
-			}
-		}
-  `
-
-	err := GraphQL(query, map[string]string{}, &resp)
+	ghRepo, err := context.Current().BaseRepo()
 	if err != nil {
-		return nil, err
+		return "", "", "", err
 	}
 
-	var o []string
-	for _, node := range resp.Viewer.Organizations.Edges.Node {
-		o = append(o, node.Login)
+	path := fmt.Sprintf("/repos/%s/%s/forks", ghRepo.Owner, ghRepo.Name)
+	err = Post(path, map[string]string{}, &resp)
+	if err != nil {
+		return "", "", "", err
 	}
 
-	return o, nil
+	return resp.URL, resp.CloneURL, resp.Parent.CloneURL, nil
 }
 
 func PullRequests() (*PullRequestsPayload, error) {

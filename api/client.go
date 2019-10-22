@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/version"
@@ -51,14 +52,51 @@ var GraphQL = func(query string, variables map[string]string, data interface{}) 
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	body, err := request("POST", url, reqBody)
 	if err != nil {
 		return err
 	}
 
-	token, err := context.Current().AuthToken()
+	return handleGraphQLResponse(body, data)
+}
+
+func Get(path string, variables map[string]string, data interface{}) error {
+	return rest("GET", path, variables, data)
+}
+
+func Post(path string, variables map[string]string, data interface{}) error {
+	return rest("POST", path, variables, data)
+}
+
+func rest(method string, path string, variables map[string]string, data interface{}) error {
+	url := "https://api.github.com/" + strings.TrimLeft(path, "/")
+	reqBody, err := json.Marshal(variables)
 	if err != nil {
 		return err
+	}
+
+	body, err := request(method, url, reqBody)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func request(method string, url string, reqBody []byte) ([]byte, error) {
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := context.Current().AuthToken()
+	if err != nil {
+		return nil, err
 	}
 
 	req.Header.Set("Authorization", "token "+token)
@@ -70,26 +108,27 @@ var GraphQL = func(query string, variables map[string]string, data interface{}) 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	debugResponse(resp, string(body))
-	return handleResponse(resp, body, data)
-}
 
-func handleResponse(resp *http.Response, body []byte, data interface{}) error {
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 
 	if !success {
-		return handleHTTPError(resp, body)
+		return nil, handleHTTPError(resp, body)
 	}
 
+	return body, nil
+}
+
+func handleGraphQLResponse(body []byte, data interface{}) error {
 	gr := &graphQLResponse{Data: data}
 	err := json.Unmarshal(body, &gr)
 	if err != nil {

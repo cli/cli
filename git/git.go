@@ -198,8 +198,21 @@ func ConfigAll(name string) ([]string, error) {
 }
 
 func Run(args ...string) error {
+	_, showDebugOutput := os.LookupEnv("DEBUG")
+	if showDebugOutput {
+		fmt.Printf("DEBUG: running `git %s`\n", strings.Join(args, " "))
+	}
+
 	cmd := exec.Command("git", args...)
-	return cmd.Run()
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if showDebugOutput {
+			fmt.Fprintf(os.Stderr, "DEBUG: %s\n", string(output))
+		}
+		return err
+	}
+	return nil
 }
 
 func LocalBranches() ([]string, error) {
