@@ -52,7 +52,7 @@ func GitHubRepoId() (string, error) {
 	return result.Repository.Id, nil
 }
 
-func CreatePullRequest(title string, body string, draft bool, base string) (string, error) {
+func CreatePullRequest(title string, body string, draft bool, base string, head string) (string, error) {
 	repoId, err := GitHubRepoId()
 	if err != nil {
 		return "", err
@@ -70,13 +70,11 @@ func CreatePullRequest(title string, body string, draft bool, base string) (stri
 		  }
 	  }`
 
-	// TODO determine base/head
-
 	variables := map[string]interface{}{
 		"input": map[string]interface{}{
 			"repositoryId": repoId,
-			"baseRefName":  "TODO",
-			"headRefName":  "TODO",
+			"baseRefName":  base,
+			"headRefName":  head,
 			"title":        title,
 			"body":         body,
 			"draft":        draft,

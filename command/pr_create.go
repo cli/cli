@@ -1,10 +1,10 @@
 package command
 
 import (
-	"github.com/github/gh-cli/api"
-	//	"github.com/github/gh-cli/context"
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -12,10 +12,12 @@ import (
 	"runtime"
 )
 
-var _draftF bool
-var _titleF string
-var _bodyF string
-var _baseF string
+var (
+	_draftF bool
+	_titleF string
+	_bodyF  string
+	_baseF  string
+)
 
 func prCreate() error {
 	ucc, err := git.UncommittedChangeCount()
@@ -35,6 +37,21 @@ func prCreate() error {
 			ucc,
 			noun,
 			utils.Red("!!!"))
+	}
+
+	currentBranch, err := context.Current().Branch()
+	if err != nil {
+		return fmt.Errorf("could not determine current branch: %s", err)
+	}
+
+	remote, err := guessRemote()
+	if err != nil {
+		return err
+	}
+
+	err = git.Run("push", "--set-upstream", remote, fmt.Sprintf("HEAD:%s", currentBranch))
+	if err != nil {
+		return fmt.Errorf("was not able to push to remote '%s': %s", remote, err)
 	}
 
 	interactive := _titleF == "" || _bodyF == ""
@@ -113,10 +130,6 @@ func prCreate() error {
 		}
 	}
 
-	// TODO either use inProgress values or titleF/bodyF as needed to issue gql stuff
-	// decide if i want to split up target negotiation across git/this package; figure out new gql
-	// api stuff; punt on tracked branches
-
 	title := _titleF
 	if title == "" {
 		title = inProgress.Title
@@ -127,10 +140,10 @@ func prCreate() error {
 	}
 	base := _baseF
 	if base == "" {
-		base = "origin:master"
+		base = "master"
 	}
 
-	payload, err := api.CreatePullRequest(title, body, _draftF, base)
+	payload, err := api.CreatePullRequest(title, body, _draftF, base, currentBranch)
 	if err != nil {
 		return fmt.Errorf("failed to create PR: %s", err)
 	}
@@ -140,6 +153,19 @@ func prCreate() error {
 	// TODO do something with payload (print URL)
 
 	return nil
+}
+
+func guessRemote() (string, error) {
+	remotes, err := context.Current().Remotes()
+	if err != nil {
+		return "", fmt.Errorf("could not determine suitable remote: %s", err)
+	}
+	remote, err := remotes.FindByName("origin", "github")
+	if err != nil {
+		return "", fmt.Errorf("could not determine suitable remote: %s", err)
+	}
+
+	return remote.Name, nil
 }
 
 func determineEditor() string {
@@ -171,5 +197,6 @@ func init() {
 	prCreateCmd.Flags().StringVarP(&_bodyF, "body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	prCreateCmd.Flags().StringVarP(&_baseF, "base", "T", "",
-		"The target branch you want your PR merged into in the format remote:branch.")
+		"The branch into which you want your code merged")
+
 }
