@@ -72,7 +72,7 @@ func MockGraphQLResponse(fixturePath string) (teardown func()) {
 	fixturePath = filepath.Join(pwd, "..", fixturePath)
 
 	originalGraphQL := api.GraphQL
-	api.GraphQL = func(query string, variables map[string]string, v interface{}) error {
+	api.GraphQL = func(query string, variables map[string]interface{}, v interface{}) error {
 		contents, err := ioutil.ReadFile(fixturePath)
 		if err != nil {
 			return err
