@@ -4,6 +4,7 @@ import (
 	//	"github.com/github/gh-cli/api"
 	//	"github.com/github/gh-cli/context"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -15,6 +16,11 @@ var draftF bool
 var titleF string
 var bodyF string
 var baseF string
+
+type createSurveyAnswers struct {
+	Body  string
+	Title string
+}
 
 func prCreate() error {
 	ucc, err := git.UncommittedChangeCount()
@@ -35,6 +41,82 @@ func prCreate() error {
 			noun,
 			utils.Red("!!!"))
 	}
+
+	interactive := titleF == "" || bodyF == ""
+
+	if interactive {
+		confirmed := false
+		inProgress := createSurveyAnswers{}
+		editor := determineEditor()
+
+		for !confirmed {
+			titleQuestion := &survey.Question{
+				Name: "title",
+				Prompt: &survey.Input{
+					Message: "PR Title",
+					Default: inProgress.Title,
+				},
+			}
+			bodyQuestion := &survey.Question{
+				Name: "body",
+				Prompt: &survey.Editor{
+					Message:       fmt.Sprintf("PR Body (%s)", editor),
+					FileName:      "*.md",
+					Default:       inProgress.Body,
+					AppendDefault: true,
+					Editor:        editor,
+				},
+			}
+
+			qs := []*survey.Question{}
+			if titleF == "" {
+				qs = append(qs, titleQuestion)
+			}
+			if bodyF == "" {
+				qs = append(qs, bodyQuestion)
+			}
+
+			err := survey.Ask(qs, &inProgress)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %s", err)
+			}
+			confirmAnswers := struct {
+				Confirmation string
+			}{}
+			confirmQs := []*survey.Question{
+				{
+					Name: "confirmation",
+					Prompt: &survey.Select{
+						Message: "Submit?",
+						Options: []string{
+							"Yes",
+							"Edit",
+							"Cancel",
+						},
+					},
+				},
+			}
+
+			err = survey.Ask(confirmQs, &confirmAnswers)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %s", err)
+			}
+
+			switch confirmAnswers.Confirmation {
+			case "Yes":
+				confirmed = true
+			case "Edit":
+				continue
+			case "Cancel":
+				fmt.Println(utils.Red("Discarding PR."))
+				return nil
+			}
+		}
+	}
+
+	// TODO either use inProgress values or titleF/bodyF as needed to issue gql stuff
+	// decide if i want to split up target negotiation across git/this package; figure out new gql
+	// api stuff; punt on tracked branches
 
 	return nil
 }
