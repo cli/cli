@@ -29,10 +29,12 @@ func init() {
 func push(cmd *cobra.Command, args []string) error {
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithSuffix(" transferring your commits to GitHub."))
 	s.Start()
+	defer s.Stop()
+
 	err := git.Run("push")
-	s.Stop()
 
 	if err == nil {
+		s.Stop()
 		fmt.Printf("All commits transferred to GitHub.\n")
 		return nil
 	}
@@ -47,6 +49,7 @@ func push(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	s.Stop()
 	err = fork()
 	if err != nil {
 		return err
