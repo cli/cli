@@ -1,7 +1,7 @@
 package command
 
 import (
-	//	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/api"
 	//	"github.com/github/gh-cli/context"
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
@@ -12,15 +12,10 @@ import (
 	"runtime"
 )
 
-var draftF bool
-var titleF string
-var bodyF string
-var baseF string
-
-type createSurveyAnswers struct {
-	Body  string
-	Title string
-}
+var _draftF bool
+var _titleF string
+var _bodyF string
+var _baseF string
 
 func prCreate() error {
 	ucc, err := git.UncommittedChangeCount()
@@ -42,11 +37,15 @@ func prCreate() error {
 			utils.Red("!!!"))
 	}
 
-	interactive := titleF == "" || bodyF == ""
+	interactive := _titleF == "" || _bodyF == ""
+
+	inProgress := struct {
+		Body  string
+		Title string
+	}{}
 
 	if interactive {
 		confirmed := false
-		inProgress := createSurveyAnswers{}
 		editor := determineEditor()
 
 		for !confirmed {
@@ -69,10 +68,10 @@ func prCreate() error {
 			}
 
 			qs := []*survey.Question{}
-			if titleF == "" {
+			if _titleF == "" {
 				qs = append(qs, titleQuestion)
 			}
-			if bodyF == "" {
+			if _bodyF == "" {
 				qs = append(qs, bodyQuestion)
 			}
 
@@ -118,6 +117,28 @@ func prCreate() error {
 	// decide if i want to split up target negotiation across git/this package; figure out new gql
 	// api stuff; punt on tracked branches
 
+	title := _titleF
+	if title == "" {
+		title = inProgress.Title
+	}
+	body := _bodyF
+	if body == "" {
+		body = inProgress.Body
+	}
+	base := _baseF
+	if base == "" {
+		base = "origin:master"
+	}
+
+	payload, err := api.CreatePullRequest(title, body, _draftF, base)
+	if err != nil {
+		return fmt.Errorf("failed to create PR: %s", err)
+	}
+
+	fmt.Println(payload)
+
+	// TODO do something with payload (print URL)
+
 	return nil
 }
 
@@ -143,12 +164,12 @@ var prCreateCmd = &cobra.Command{
 }
 
 func init() {
-	prCreateCmd.Flags().BoolVarP(&draftF, "draft", "d", false,
+	prCreateCmd.Flags().BoolVarP(&_draftF, "draft", "d", false,
 		"Mark PR as a draft")
-	prCreateCmd.Flags().StringVarP(&titleF, "title", "t", "",
+	prCreateCmd.Flags().StringVarP(&_titleF, "title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringVarP(&bodyF, "body", "b", "",
+	prCreateCmd.Flags().StringVarP(&_bodyF, "body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringVarP(&baseF, "base", "T", "",
+	prCreateCmd.Flags().StringVarP(&_baseF, "base", "T", "",
 		"The target branch you want your PR merged into in the format remote:branch.")
 }

@@ -19,6 +19,84 @@ type PullRequest struct {
 	HeadRefName string
 }
 
+func GitHubRepoId() (string, error) {
+	ghRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return "", fmt.Errorf("could not determine current GH repo: %s", err)
+	}
+
+	owner := ghRepo.Owner
+	repo := ghRepo.Name
+
+	query := `
+    query FindRepoID($owner:String!, $name:String!) {
+			repository(owner:$owner, name:$name) {
+			  id
+			}
+    }`
+	variables := map[string]interface{}{
+		"owner": owner,
+		"name":  repo,
+	}
+
+	result := struct {
+		Repository struct {
+			Id string
+		}
+	}{}
+	err = GraphQL(query, variables, &result)
+	if err != nil {
+		return "", fmt.Errorf("failed to determine GH repo ID: %s", err)
+	}
+
+	return result.Repository.Id, nil
+}
+
+func CreatePullRequest(title string, body string, draft bool, base string) (string, error) {
+	repoId, err := GitHubRepoId()
+	if err != nil {
+		return "", err
+	}
+	if repoId == "" {
+		return "", fmt.Errorf("could not determine GH repo ID")
+	}
+
+	query := `
+    mutation CreatePullRequest($input: CreatePullRequestInput!) {
+		  createPullRequest(input: $input) {
+			  pullRequest {
+				  url
+				}
+		  }
+	  }`
+
+	// TODO determine base/head
+
+	variables := map[string]interface{}{
+		"input": map[string]interface{}{
+			"repositoryId": repoId,
+			"baseRefName":  "TODO",
+			"headRefName":  "TODO",
+			"title":        title,
+			"body":         body,
+			"draft":        draft,
+		},
+	}
+
+	result := struct {
+		CreatePullRequest struct {
+			PullRequest PullRequest
+		}
+	}{}
+
+	err = GraphQL(query, variables, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.CreatePullRequest.PullRequest.URL, nil
+}
+
 func PullRequests() (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
