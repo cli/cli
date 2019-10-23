@@ -44,7 +44,7 @@ if err != nil {
 
 fmt.Printf("%+v\n", resp)
 */
-var GraphQL = func(query string, variables map[string]string, data interface{}) error {
+var GraphQL = func(query string, variables map[string]interface{}, data interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {

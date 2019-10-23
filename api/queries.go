@@ -98,7 +98,7 @@ func PullRequests() (*PullRequestsPayload, error) {
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
 
-	variables := map[string]string{
+	variables := map[string]interface{}{
 		"viewerQuery":   viewerQuery,
 		"reviewerQuery": reviewerQuery,
 		"owner":         owner,
