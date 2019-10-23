@@ -29,11 +29,11 @@ func GitHubRepoId() (string, error) {
 	repo := ghRepo.Name
 
 	query := `
-    query FindRepoID($owner:String!, $name:String!) {
+		query FindRepoID($owner:String!, $name:String!) {
 			repository(owner:$owner, name:$name) {
-			  id
+				id
 			}
-    }`
+	}`
 	variables := map[string]interface{}{
 		"owner": owner,
 		"name":  repo,
@@ -62,13 +62,13 @@ func CreatePullRequest(title string, body string, draft bool, base string, head 
 	}
 
 	query := `
-    mutation CreatePullRequest($input: CreatePullRequestInput!) {
-		  createPullRequest(input: $input) {
-			  pullRequest {
-				  url
+		mutation CreatePullRequest($input: CreatePullRequestInput!) {
+			createPullRequest(input: $input) {
+				pullRequest {
+					url
 				}
-		  }
-	  }`
+			}
+	}`
 
 	variables := map[string]interface{}{
 		"input": map[string]interface{}{
