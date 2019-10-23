@@ -64,6 +64,7 @@ var GraphQL = func(query string, variables map[string]interface{}, data interfac
 	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("User-Agent", "GitHub CLI "+version.Version)
+	req.Header.Set("Accept", "application/vnd.github.shadow-cat-preview+json")
 
 	debugRequest(req, string(reqBody))
 
