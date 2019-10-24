@@ -6,10 +6,8 @@ The #ce-cli team is working on a publicly available CLI tool to reduce the frict
 
 This tool is an endeavor separate from [github/hub](https://github.com/github/hub), which acts as a proxy to `git`, since our aim is to reimagine from scratch the kind of command line interface to GitHub that would serve our users' interests best.
 
-## Process
+# Process
 
-1. For code we want to keep (production-ready), create PRs and merge them into `master`. For prototype code, merge them into the `prototype` branch since the code will most likely be throwaway.
-
-2. Each week we’ll have a tracking issue to coordinate plans and distribute the workload. They look like this https://github.com/github/gh-cli/labels/tracking%20issue.
-
-3. We zoom as a team Tuesday fortnight
+- [Demo planning doc](https://docs.google.com/document/d/18ym-_xjFTSXe0-xzgaBn13Su7MEhWfLE5qSNPJV4M0A/edit)
+- [Weekly tracking issue](https://github.com/github/gh-cli/labels/tracking%20issue)
+- [Weekly sync notes](https://docs.google.com/document/d/1eUo9nIzXbC1DG26Y3dk9hOceLua2yFlwlvFPZ82MwHg/edit)
