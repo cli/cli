@@ -9,6 +9,10 @@ import (
 	"github.com/github/gh-cli/utils"
 )
 
+func TestFail(t *testing.T) {
+	t.Errorf("THIS IS A PROTOTYPE BRANCH, NEVER MERGE IT")
+}
+
 func TestPRList(t *testing.T) {
 	ctx := context.InitBlankContext()
 	ctx.SetBaseRepo("github/FAKE-GITHUB-REPO-NAME")
