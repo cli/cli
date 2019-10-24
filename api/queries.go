@@ -32,6 +32,14 @@ type Issue struct {
 	URL    string
 }
 
+type Repository struct {
+	Name           string
+	Owner          string
+	URL            string
+	CloneURL       string
+	ParentCloneURL string
+}
+
 func HasPushPermission() (bool, error) {
 	var resp struct {
 		Repository struct {
@@ -62,35 +70,46 @@ func HasPushPermission() (bool, error) {
 		return false, err
 	}
 
-	p := resp.Repository.ViewerPermission
-	if p == "ADMIN" || p == "MAINTAIN" || p == "WRITE" {
+	switch resp.Repository.ViewerPermission {
+	case "ADMIN", "MAINTAIN", "WRITE":
 		return true, nil
+	default:
+		return false, nil
 	}
-
-	return false, nil
 }
 
-func Fork() (string, string, string, error) {
+func Fork() (*Repository, error) {
 	var resp struct {
+		Name     string
 		URL      string `json:"html_url"`
 		CloneURL string `json:"clone_url"`
-		Parent   struct {
+		Owner    struct {
+			Login string
+		}
+		Parent struct {
 			CloneURL string `json:"clone_url"`
 		}
 	}
 
 	ghRepo, err := context.Current().BaseRepo()
 	if err != nil {
-		return "", "", "", err
+		return nil, err
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s/forks", ghRepo.Owner, ghRepo.Name)
 	err = Post(path, map[string]string{}, &resp)
 	if err != nil {
-		return "", "", "", err
+		return nil, err
 	}
 
-	return resp.URL, resp.CloneURL, resp.Parent.CloneURL, nil
+	repo := &Repository{
+		Name:           resp.Name,
+		Owner:          resp.Owner.Login,
+		URL:            resp.URL,
+		CloneURL:       resp.CloneURL,
+		ParentCloneURL: resp.Parent.CloneURL,
+	}
+	return repo, nil
 }
 
 func PullRequests() (*PullRequestsPayload, error) {
