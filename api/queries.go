@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/github/gh-cli/context"
 )
@@ -17,6 +18,18 @@ type PullRequest struct {
 	Title       string
 	URL         string
 	HeadRefName string
+}
+
+type IssuesPayload struct {
+	Assigned  []Issue
+	Mentioned []Issue
+	Recent    []Issue
+}
+
+type Issue struct {
+	Number int
+	Title  string
+	URL    string
 }
 
 func HasPushPermission() (bool, error) {
@@ -192,6 +205,109 @@ func PullRequests() (*PullRequestsPayload, error) {
 		viewerCreated,
 		reviewRequested,
 		currentPR,
+	}
+
+	return &payload, nil
+}
+
+func Issues() (*IssuesPayload, error) {
+	type issues struct {
+		Issues struct {
+			Edges []struct {
+				Node Issue
+			}
+		}
+	}
+
+	type response struct {
+		Assigned  issues
+		Mentioned issues
+		Recent    issues
+	}
+
+	query := `
+    fragment issue on Issue {
+      number
+      title
+      url
+    }
+
+    query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
+      assigned: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {assignee: $viewer}, first: $per_page) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+			}
+			mentioned: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {mentioned: $viewer}, first: $per_page) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+			}
+			recent: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {since: $since}, first: $per_page) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+      }
+    }
+  `
+
+	ghRepo, err := context.Current().BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+
+	currentUsername, err := context.Current().AuthLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	owner := ghRepo.Owner
+	repo := ghRepo.Name
+	since := time.Now().UTC().Add(time.Hour * -24).Format("2006-01-02T15:04:05-0700")
+	variables := map[string]string{
+		"owner":  owner,
+		"repo":   repo,
+		"viewer": currentUsername,
+		"since":  since,
+	}
+
+	var resp response
+	err = GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var assigned []Issue
+	for _, edge := range resp.Assigned.Issues.Edges {
+		assigned = append(assigned, edge.Node)
+	}
+
+	var mentioned []Issue
+	for _, edge := range resp.Mentioned.Issues.Edges {
+		mentioned = append(mentioned, edge.Node)
+	}
+
+	var recent []Issue
+	for _, edge := range resp.Recent.Issues.Edges {
+		recent = append(recent, edge.Node)
+	}
+
+	payload := IssuesPayload{
+		assigned,
+		mentioned,
+		recent,
 	}
 
 	return &payload, nil

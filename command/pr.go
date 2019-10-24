@@ -122,11 +122,14 @@ func printMessage(s string) {
 	fmt.Println(utils.Gray(s))
 }
 
-func truncateTitle(title string) string {
-	const maxLength = 50
+func truncateTitle(title string, maxLength ...int) string {
+	l := 50
+	if len(maxLength) > 0 {
+		l = maxLength[0]
+	}
 
-	if len(title) > maxLength {
-		return title[0:maxLength-3] + "..."
+	if len(title) > l {
+		return title[0:l-3] + "..."
 	}
 	return title
 }
