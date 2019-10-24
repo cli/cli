@@ -77,19 +77,19 @@ func fork() error {
 		return fmt.Errorf("failed because you don't have permission to push to %s/%s", ghRepo.Owner, ghRepo.Name)
 	}
 
-	url, cloneURL, upstreamCloneURL, err := api.Fork()
+	repo, err := api.Fork()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("All your future changes will be pushed to your fork at %s.\n", url)
+	fmt.Printf("All your future changes will be pushed to your fork at %s.\n", repo.URL)
 
-	err = git.Run("remote", "set-url", "origin", cloneURL)
+	err = git.Run("remote", "set-url", "origin", repo.CloneURL)
 	if err != nil {
 		return err
 	}
 
 	upstreamName := "gh-cli-upstream"
-	git.Run("remote", "add", upstreamName, upstreamCloneURL) // Ignore this error
+	git.Run("remote", "add", upstreamName, repo.ParentCloneURL) // Ignore this error
 	return nil
 }
