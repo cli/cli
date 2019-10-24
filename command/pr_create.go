@@ -28,18 +28,14 @@ func prCreate() error {
 	if ucc > 0 {
 		noun := "change"
 		if ucc > 1 {
-			noun = "changes"
+			noun = noun + "s"
 		}
 
-		fmt.Printf(
-			"%s %d uncommitted %s %s",
-			utils.Red("!!!"),
-			ucc,
-			noun,
-			utils.Red("!!!"))
+		fmt.Printf("%s %d uncommitted %s %s", utils.Red("!!!"),
+			ucc, noun, utils.Red("!!!"))
 	}
 
-	currentBranch, err := context.Current().Branch()
+	head, err := context.Current().Branch()
 	if err != nil {
 		return fmt.Errorf("could not determine current branch: %s", err)
 	}
@@ -49,7 +45,7 @@ func prCreate() error {
 		return err
 	}
 
-	err = git.Run("push", "--set-upstream", remote, fmt.Sprintf("HEAD:%s", currentBranch))
+	err = git.Run("push", "--set-upstream", remote, fmt.Sprintf("HEAD:%s", head))
 	if err != nil {
 		return fmt.Errorf("was not able to push to remote '%s': %s", remote, err)
 	}
@@ -143,14 +139,12 @@ func prCreate() error {
 		base = "master"
 	}
 
-	payload, err := api.CreatePullRequest(title, body, _draftF, base, currentBranch)
+	payload, err := api.CreatePullRequest(title, body, _draftF, base, head)
 	if err != nil {
 		return fmt.Errorf("failed to create PR: %s", err)
 	}
 
 	fmt.Println(payload)
-
-	// TODO do something with payload (print URL)
 
 	return nil
 }
@@ -160,6 +154,7 @@ func guessRemote() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not determine suitable remote: %s", err)
 	}
+
 	remote, err := remotes.FindByName("origin", "github")
 	if err != nil {
 		return "", fmt.Errorf("could not determine suitable remote: %s", err)
