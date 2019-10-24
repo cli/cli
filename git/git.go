@@ -217,11 +217,10 @@ func LocalBranches() ([]string, error) {
 }
 
 func UncommittedChangeCount() (int, error) {
-	// TODO TEST
 	statusCmd := exec.Command("git", "status", "--porcelain")
 	output, err := statusCmd.Output()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to run git status: %s", err)
 	}
 	lines := strings.Split(string(output), "\n")
 
