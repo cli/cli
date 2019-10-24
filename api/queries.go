@@ -49,12 +49,12 @@ func HasPushPermission() (bool, error) {
 		return false, err
 	}
 
-	p := resp.Repository.ViewerPermission
-	if p == "ADMIN" || p == "MAINTAIN" || p == "WRITE" {
+	switch resp.Repository.ViewerPermission {
+	case "ADMIN", "MAINTAIN", "WRITE":
 		return true, nil
+	default:
+		return false, nil
 	}
-
-	return false, nil
 }
 
 func Fork() (string, string, string, error) {
