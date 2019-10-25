@@ -19,20 +19,8 @@ type Context interface {
 	SetBaseRepo(string)
 }
 
-var currentContext Context
-
-// Current returns the currently initialized Context instance
-func Current() Context {
-	return currentContext
-}
-
-// InitDefaultContext initializes the default filesystem context
-func InitDefaultContext() Context {
-	ctx := &fsContext{}
-	if currentContext == nil {
-		currentContext = ctx
-	}
-	return ctx
+func New() Context {
+	return &blankContext{}
 }
 
 // A Context implementation that queries the filesystem
