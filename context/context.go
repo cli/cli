@@ -109,7 +109,8 @@ func (c *fsContext) Remotes() (Remotes, error) {
 		if err != nil {
 			return nil, err
 		}
-		c.remotes = parseRemotes(gitRemotes)
+		sshTranslate := git.ParseSSHConfig().Translator()
+		c.remotes = translateRemotes(gitRemotes, sshTranslate)
 	}
 	return c.remotes, nil
 }
