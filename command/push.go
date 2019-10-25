@@ -50,7 +50,7 @@ func push(cmd *cobra.Command, args []string) error {
 	}
 
 	s.Stop()
-	err = fork()
+	err = push(cmd, args)
 	if err != nil {
 		return err
 	}

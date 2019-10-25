@@ -80,7 +80,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	if number, err := strconv.Atoi(args[0]); err == nil {
 		// TODO: move URL generation into GitHubRepository
-		openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.Owner, baseRepo.Name, number)
+		openURL = fmt.Sprintf("https://github.com/%s/%s/issues/%d", baseRepo.Owner, baseRepo.Name, number)
 	} else {
 		return fmt.Errorf("invalid issue number: '%s'", args[0])
 	}
