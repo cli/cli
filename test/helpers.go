@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/git"
 	"github.com/spf13/cobra"
 )
 
@@ -124,4 +125,15 @@ func captureOutput(f func()) string {
 	}
 
 	return string(out)
+}
+
+func MockGitPush(result error) (teardown func()) {
+	originalGitPush := git.Push
+	git.Push = func(_ string, _ string) error {
+		return result
+	}
+
+	return func() {
+		git.Push = originalGitPush
+	}
 }

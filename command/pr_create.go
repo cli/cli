@@ -45,8 +45,7 @@ func prCreate() error {
 		return err
 	}
 
-	err = git.Run("push", "--set-upstream", remote, fmt.Sprintf("HEAD:%s", head))
-	if err != nil {
+	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
 		return fmt.Errorf("was not able to push to remote '%s': %s", remote, err)
 	}
 
