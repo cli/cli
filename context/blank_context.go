@@ -5,13 +5,8 @@ import (
 	"strings"
 )
 
-// InitBlankContext initializes a blank context for testing
-func InitBlankContext() Context {
-	currentContext = &blankContext{
-		authToken: "OTOKEN",
-		authLogin: "monalisa",
-	}
-	return currentContext
+func NewBlank() Context {
+	return &blankContext{}
 }
 
 // A Context implementation that queries the filesystem

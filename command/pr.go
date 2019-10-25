@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +37,7 @@ work with pull requests.`,
 }
 
 func prList(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
 	prPayload, err := api.PullRequests()
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(*prPayload.CurrentPR)
 	} else {
-		currentBranch, err := context.Current().Branch()
+		currentBranch, err := ctx.Branch()
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,8 @@ func prList(cmd *cobra.Command, args []string) error {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	baseRepo, err := context.Current().BaseRepo()
+	ctx := contextForCommand(cmd)
+	baseRepo, err := ctx.BaseRepo()
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		} else if prPayload.CurrentPR == nil {
-			branch, err := context.Current().Branch()
+			branch, err := ctx.Branch()
 			if err != nil {
 				return err
 			}
