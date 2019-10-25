@@ -2,7 +2,7 @@ package context
 
 import (
 	"fmt"
-	"regexp"
+	"net/url"
 	"strings"
 
 	"github.com/github/gh-cli/git"
@@ -27,13 +27,9 @@ func (r Remotes) FindByName(names ...string) (*Remote, error) {
 
 // Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
-	Name  string
+	*git.Remote
 	Owner string
 	Repo  string
-}
-
-func (r *Remote) String() string {
-	return r.Name
 }
 
 // GitHubRepository represents a GitHub respository
@@ -42,59 +38,33 @@ type GitHubRepository struct {
 	Owner string
 }
 
-func parseRemotes(gitRemotes []string) (remotes Remotes) {
-	re := regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
-
-	names := []string{}
-	remotesMap := make(map[string]map[string]string)
+// TODO: accept an interface instead of git.RemoteSet
+func translateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
 	for _, r := range gitRemotes {
-		if re.MatchString(r) {
-			match := re.FindStringSubmatch(r)
-			name := strings.TrimSpace(match[1])
-			url := strings.TrimSpace(match[2])
-			urlType := strings.TrimSpace(match[3])
-			utm, ok := remotesMap[name]
-			if !ok {
-				utm = make(map[string]string)
-				remotesMap[name] = utm
-				names = append(names, name)
-			}
-			utm[urlType] = url
+		var owner string
+		var repo string
+		if r.FetchURL != nil {
+			owner, repo, _ = repoFromURL(urlTranslate(r.FetchURL))
 		}
+		if r.PushURL != nil && owner == "" {
+			owner, repo, _ = repoFromURL(urlTranslate(r.PushURL))
+		}
+		remotes = append(remotes, &Remote{
+			Remote: r,
+			Owner:  owner,
+			Repo:   repo,
+		})
 	}
-
-	for _, name := range names {
-		urlMap := remotesMap[name]
-		repo, err := repoFromURL(urlMap["fetch"])
-		if err != nil {
-			repo, err = repoFromURL(urlMap["push"])
-		}
-		if err == nil {
-			remotes = append(remotes, &Remote{
-				Name:  name,
-				Owner: repo.Owner,
-				Repo:  repo.Name,
-			})
-		}
-	}
-
 	return
 }
 
-func repoFromURL(u string) (*GitHubRepository, error) {
-	url, err := git.ParseURL(u)
-	if err != nil {
-		return nil, err
+func repoFromURL(u *url.URL) (string, string, error) {
+	if !strings.EqualFold(u.Hostname(), defaultHostname) {
+		return "", "", fmt.Errorf("unsupported hostname: %s", u.Hostname())
 	}
-	if url.Hostname() != defaultHostname {
-		return nil, fmt.Errorf("invalid hostname: %s", url.Hostname())
-	}
-	parts := strings.SplitN(strings.TrimPrefix(url.Path, "/"), "/", 3)
+	parts := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 3)
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid path: %s", url.Path)
+		return "", "", fmt.Errorf("invalid path: %s", u.Path)
 	}
-	return &GitHubRepository{
-		Owner: parts[0],
-		Name:  strings.TrimSuffix(parts[1], ".git"),
-	}, nil
+	return parts[0], strings.TrimSuffix(parts[1], ".git"), nil
 }

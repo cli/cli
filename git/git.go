@@ -165,7 +165,7 @@ func Log(sha1, sha2 string) (string, error) {
 	return string(outputs), nil
 }
 
-func Remotes() ([]string, error) {
+func listRemotes() ([]string, error) {
 	remoteCmd := exec.Command("git", "remote", "-v")
 	remoteCmd.Stderr = nil
 	output, err := remoteCmd.Output()
