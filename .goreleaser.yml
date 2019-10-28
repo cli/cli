@@ -1,0 +1,17 @@
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: gh
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
