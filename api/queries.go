@@ -2,8 +2,6 @@ package api
 
 import (
 	"fmt"
-
-	"github.com/github/gh-cli/context"
 )
 
 type PullRequestsPayload struct {
@@ -19,7 +17,12 @@ type PullRequest struct {
 	HeadRefName string
 }
 
-func PullRequests() (*PullRequestsPayload, error) {
+type Repo interface {
+	RepoName() string
+	RepoOwner() string
+}
+
+func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
 			Node PullRequest
@@ -48,7 +51,7 @@ func PullRequests() (*PullRequestsPayload, error) {
 
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
       repository(owner: $owner, name: $repo) {
-        pullRequests(headRefName: $headRefName, first: 1) {
+        pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
           edges {
             node {
               ...pr
@@ -79,26 +82,13 @@ func PullRequests() (*PullRequestsPayload, error) {
     }
   `
 
-	ghRepo, err := context.Current().BaseRepo()
-	if err != nil {
-		return nil, err
-	}
-	currentBranch, err := context.Current().Branch()
-	if err != nil {
-		return nil, err
-	}
-	currentUsername, err := context.Current().AuthLogin()
-	if err != nil {
-		return nil, err
-	}
-
-	owner := ghRepo.Owner
-	repo := ghRepo.Name
+	owner := ghRepo.RepoOwner()
+	repo := ghRepo.RepoName()
 
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
 
-	variables := map[string]string{
+	variables := map[string]interface{}{
 		"viewerQuery":   viewerQuery,
 		"reviewerQuery": reviewerQuery,
 		"owner":         owner,
@@ -107,7 +97,7 @@ func PullRequests() (*PullRequestsPayload, error) {
 	}
 
 	var resp response
-	err = GraphQL(query, variables, &resp)
+	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -134,4 +124,50 @@ func PullRequests() (*PullRequestsPayload, error) {
 	}
 
 	return &payload, nil
+}
+
+func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRequest, error) {
+	type response struct {
+		Repository struct {
+			PullRequests struct {
+				Edges []struct {
+					Node PullRequest
+				}
+			}
+		}
+	}
+
+	query := `
+    query($owner: String!, $repo: String!, $headRefName: String!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
+          edges {
+            node {
+				number
+				title
+				url
+            }
+          }
+        }
+      }
+    }`
+
+	variables := map[string]interface{}{
+		"owner":       ghRepo.RepoOwner(),
+		"repo":        ghRepo.RepoName(),
+		"headRefName": branch,
+	}
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	prs := []PullRequest{}
+	for _, edge := range resp.Repository.PullRequests.Edges {
+		prs = append(prs, edge.Node)
+	}
+
+	return prs, nil
 }
