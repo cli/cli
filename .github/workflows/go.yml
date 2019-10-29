@@ -20,8 +20,6 @@ jobs:
       run: go mod verify
 
     - name: Build
-      env:
-        GOFLAGS: -mod=vendor
       run: |
         go test ./...
         go build -v .
