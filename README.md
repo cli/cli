@@ -1,5 +1,3 @@
-<p align=center><i>Find the internal tool that used to live here: https://github.com/github/gh-helper-cli</i></p>
-
 # gh - The GitHub CLI tool
 
 The #ce-cli team is working on a publicly available CLI tool to reduce the friction between GitHub and one's local machine for people who use the command line primarily to interact with Git and GitHub. https://github.com/github/releases/issues/659
