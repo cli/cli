@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// NewBlank initializes a blank Context suitable for testing
 func NewBlank() Context {
 	return &blankContext{}
 }
@@ -14,7 +15,19 @@ type blankContext struct {
 	authToken string
 	authLogin string
 	branch    string
-	baseRepo  *GitHubRepository
+	baseRepo  GitHubRepository
+}
+
+type ghRepo struct {
+	owner string
+	name  string
+}
+
+func (r ghRepo) RepoOwner() string {
+	return r.owner
+}
+func (r ghRepo) RepoName() string {
+	return r.name
 }
 
 func (c *blankContext) AuthToken() (string, error) {
@@ -44,7 +57,7 @@ func (c *blankContext) Remotes() (Remotes, error) {
 	return Remotes{}, nil
 }
 
-func (c *blankContext) BaseRepo() (*GitHubRepository, error) {
+func (c *blankContext) BaseRepo() (GitHubRepository, error) {
 	if c.baseRepo == nil {
 		return nil, fmt.Errorf("base repo was not initialized")
 	}
@@ -54,9 +67,6 @@ func (c *blankContext) BaseRepo() (*GitHubRepository, error) {
 func (c *blankContext) SetBaseRepo(nwo string) {
 	parts := strings.SplitN(nwo, "/", 2)
 	if len(parts) == 2 {
-		c.baseRepo = &GitHubRepository{
-			Owner: parts[0],
-			Name:  parts[1],
-		}
+		c.baseRepo = &ghRepo{parts[0], parts[1]}
 	}
 }

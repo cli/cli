@@ -32,10 +32,14 @@ type Remote struct {
 	Repo  string
 }
 
-// GitHubRepository represents a GitHub respository
-type GitHubRepository struct {
-	Name  string
-	Owner string
+// RepoName is the name of the GitHub repository
+func (r Remote) RepoName() string {
+	return r.Repo
+}
+
+// RepoOwner is the name of the GitHub account that owns the repo
+func (r Remote) RepoOwner() string {
+	return r.Owner
 }
 
 // TODO: accept an interface instead of git.RemoteSet

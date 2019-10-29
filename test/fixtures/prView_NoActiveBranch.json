@@ -1,4 +1,4 @@
-{
+{"data":{
   "repository": {
     "pullRequests": {
       "edges": []
@@ -12,4 +12,4 @@
     "edges": [],
     "pageInfo": { "hasNextPage": false }
   }
-}
+}}

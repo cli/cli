@@ -15,12 +15,19 @@ type Context interface {
 	Branch() (string, error)
 	SetBranch(string)
 	Remotes() (Remotes, error)
-	BaseRepo() (*GitHubRepository, error)
+	BaseRepo() (GitHubRepository, error)
 	SetBaseRepo(string)
 }
 
+// GitHubRepository is anything that can be mapped to an OWNER/REPO pair
+type GitHubRepository interface {
+	RepoOwner() string
+	RepoName() string
+}
+
+// New initializes a Context that reads from the filesystem
 func New() Context {
-	return &blankContext{}
+	return &fsContext{}
 }
 
 // A Context implementation that queries the filesystem
@@ -28,7 +35,7 @@ type fsContext struct {
 	config    *configEntry
 	remotes   Remotes
 	branch    string
-	baseRepo  *GitHubRepository
+	baseRepo  GitHubRepository
 	authToken string
 }
 
@@ -103,7 +110,7 @@ func (c *fsContext) Remotes() (Remotes, error) {
 	return c.remotes, nil
 }
 
-func (c *fsContext) BaseRepo() (*GitHubRepository, error) {
+func (c *fsContext) BaseRepo() (GitHubRepository, error) {
 	if c.baseRepo != nil {
 		return c.baseRepo, nil
 	}
@@ -117,19 +124,13 @@ func (c *fsContext) BaseRepo() (*GitHubRepository, error) {
 		return nil, err
 	}
 
-	c.baseRepo = &GitHubRepository{
-		Owner: rem.Owner,
-		Name:  rem.Repo,
-	}
+	c.baseRepo = rem
 	return c.baseRepo, nil
 }
 
 func (c *fsContext) SetBaseRepo(nwo string) {
 	parts := strings.SplitN(nwo, "/", 2)
 	if len(parts) == 2 {
-		c.baseRepo = &GitHubRepository{
-			Owner: parts[0],
-			Name:  parts[1],
-		}
+		c.baseRepo = &ghRepo{parts[0], parts[1]}
 	}
 }
