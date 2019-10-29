@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/auth"
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +21,7 @@ const (
 )
 
 // TODO: have a conversation about whether this belongs in the "context" package
+// FIXME: make testable
 func setupConfigFile(filename string) (*configEntry, error) {
 	flow := &auth.OAuthFlow{
 		Hostname:     oauthHost,
@@ -38,12 +40,12 @@ func setupConfigFile(filename string) (*configEntry, error) {
 		return nil, err
 	}
 
-	u, err := getViewer(token)
+	userLogin, err := getViewer(token)
 	if err != nil {
 		return nil, err
 	}
 	entry := configEntry{
-		User:  u.Login,
+		User:  userLogin,
 		Token: token,
 	}
 	data := make(map[string][]configEntry)
@@ -72,6 +74,18 @@ func setupConfigFile(filename string) (*configEntry, error) {
 	}
 
 	return &entry, err
+}
+
+func getViewer(token string) (string, error) {
+	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+
+	response := struct {
+		Viewer struct {
+			Login string
+		}
+	}{}
+	err := http.GraphQL("{ viewer { login } }", nil, &response)
+	return response.Viewer.Login, err
 }
 
 func waitForEnter(r io.Reader) error {
