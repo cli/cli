@@ -7,16 +7,22 @@ import (
 	"testing"
 )
 
-var _outputs map[string]string
+type outputSpec struct {
+	Stdout   string
+	ExitCode int
+}
+
+var _outputs map[string]outputSpec
 
 func init() {
-	_outputs = map[string]string{
-		"no changes": "",
-		"one change": ` M poem.txt
-`,
-		"untracked file": ` M poem.txt
+	_outputs = map[string]outputSpec{
+		"no changes": outputSpec{"", 0},
+		"one change": outputSpec{` M poem.txt
+`, 0},
+		"untracked file": outputSpec{` M poem.txt
 ?? new.txt
-`,
+`, 0},
+		"boom": outputSpec{"", 1},
 	}
 }
 
@@ -24,7 +30,6 @@ func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	defer os.Exit(0)
 	args := os.Args
 	for len(args) > 0 {
 		if args[0] == "--" {
@@ -33,7 +38,9 @@ func TestHelperProcess(*testing.T) {
 		}
 		args = args[1:]
 	}
-	fmt.Println(_outputs[args[0]])
+	output := _outputs[args[0]]
+	defer os.Exit(output.ExitCode)
+	fmt.Println(output.Stdout)
 }
 
 func StubGit(desiredOutput string) func(...string) *exec.Cmd {
@@ -57,8 +64,6 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		GitCommand = origGitCommand
 	}()
 
-	// TODO handle git status exiting poorly
-
 	cases := map[string]int{
 		"no changes":     0,
 		"one change":     1,
@@ -72,5 +77,11 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		if ucc != v {
 			t.Errorf("got unexpected ucc value: %d for case %s", ucc, k)
 		}
+	}
+
+	GitCommand = StubGit("boom")
+	_, err := UncommittedChangeCount()
+	if err.Error() != "failed to run git status: exit status 1" {
+		t.Errorf("got unexpected error message: %s", err)
 	}
 }
