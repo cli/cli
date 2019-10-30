@@ -1,21 +1,40 @@
 package command
 
 import (
+	"os"
 	"regexp"
 	"testing"
 
+	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
 )
 
-func TestPRList(t *testing.T) {
-	ctx := context.InitBlankContext()
-	ctx.SetBaseRepo("github/FAKE-GITHUB-REPO-NAME")
-	ctx.SetBranch("master")
+func initBlankContext(repo, branch string) {
+	initContext = func() context.Context {
+		ctx := context.NewBlank()
+		ctx.SetBaseRepo(repo)
+		ctx.SetBranch(branch)
+		return ctx
+	}
+}
 
-	teardown := test.MockGraphQLResponse("test/fixtures/prList.json")
-	defer teardown()
+func initFakeHTTP() *api.FakeHTTP {
+	http := &api.FakeHTTP{}
+	apiClientForContext = func(context.Context) (*api.Client, error) {
+		return api.NewClient(api.ReplaceTripper(http)), nil
+	}
+	return http
+}
+
+func TestPRList(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
 
 	output, err := test.RunCommand(RootCmd, "pr list")
 	if err != nil {
@@ -37,11 +56,12 @@ func TestPRList(t *testing.T) {
 }
 
 func TestPRView(t *testing.T) {
-	teardown := test.MockGraphQLResponse("test/fixtures/prView.json")
-	defer teardown()
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
 
-	gitRepo := test.UseTempGitRepo()
-	defer gitRepo.TearDown()
+	jsonFile, _ := os.Open("../test/fixtures/prView.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
 
 	teardown, callCount := mockOpenInBrowser()
 	defer teardown()
@@ -61,22 +81,19 @@ func TestPRView(t *testing.T) {
 }
 
 func TestPRView_NoActiveBranch(t *testing.T) {
-	teardown := test.MockGraphQLResponse("test/fixtures/prView_NoActiveBranch.json")
-	defer teardown()
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
 
-	gitRepo := test.UseTempGitRepo()
-	defer gitRepo.TearDown()
+	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
 
 	teardown, callCount := mockOpenInBrowser()
 	defer teardown()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
-	if err != nil {
+	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
 		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
 	}
 
 	if *callCount > 0 {
