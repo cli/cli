@@ -7,27 +7,17 @@ import (
 	"testing"
 )
 
-var _cases map[string]string
+var _outputs map[string]string
 
 func init() {
-	_cases = map[string]string{
-		"foobar": `fart
-		bar
-		town`,
+	_outputs = map[string]string{
+		"no changes": "",
+		"one change": ` M poem.txt
+`,
+		"untracked file": ` M poem.txt
+?? new.txt
+`,
 	}
-}
-
-func StubbedGit(args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestHelperProcess", "--", "git"}
-	cs = append(cs, args...)
-	env := []string{
-		"GO_WANT_HELPER_PROCESS=1",
-	}
-
-	cmd := exec.Command(os.Args[0], cs...)
-	cmd.Env = append(env, os.Environ()...)
-	fmt.Printf("%+v", cmd.Env)
-	return cmd
 }
 
 func TestHelperProcess(*testing.T) {
@@ -43,13 +33,12 @@ func TestHelperProcess(*testing.T) {
 		}
 		args = args[1:]
 	}
-	c, args := args[0], args[1:]
-	fmt.Println(_cases[c])
+	fmt.Println(_outputs[args[0]])
 }
 
-func StubGit(c string) func(...string) *exec.Cmd {
+func StubGit(desiredOutput string) func(...string) *exec.Cmd {
 	return func(args ...string) *exec.Cmd {
-		cs := []string{"-test.run=TestHelperProcess", "--", c}
+		cs := []string{"-test.run=TestHelperProcess", "--", desiredOutput}
 		cs = append(cs, args...)
 		env := []string{
 			"GO_WANT_HELPER_PROCESS=1",
@@ -57,7 +46,6 @@ func StubGit(c string) func(...string) *exec.Cmd {
 
 		cmd := exec.Command(os.Args[0], cs...)
 		cmd.Env = append(env, os.Environ()...)
-		fmt.Printf("%+v", cmd.Env)
 		return cmd
 	}
 
@@ -69,15 +57,20 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		GitCommand = origGitCommand
 	}()
 
-	GitCommand = StubGit("foobar")
+	// TODO handle git status exiting poorly
 
-	ucc, err := UncommittedChangeCount()
-	if err != nil {
-		t.Fatalf("failed to run UncommittedChangeCount: %s", err)
+	cases := map[string]int{
+		"no changes":     0,
+		"one change":     1,
+		"untracked file": 2,
 	}
 
-	if ucc != 10 {
-		t.Errorf("got unexpected ucc value: %d", ucc)
-	}
+	for k, v := range cases {
+		GitCommand = StubGit(k)
+		ucc, _ := UncommittedChangeCount()
 
+		if ucc != v {
+			t.Errorf("got unexpected ucc value: %d for case %s", ucc, k)
+		}
+	}
 }
