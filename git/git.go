@@ -216,9 +216,17 @@ func LocalBranches() ([]string, error) {
 	return branches, nil
 }
 
+var GitCommand = func(args ...string) *exec.Cmd {
+	return exec.Command("git", args...)
+}
+
 func UncommittedChangeCount() (int, error) {
-	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd := GitCommand("status", "--porcelain")
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	fmt.Printf("%+v", statusCmd)
 	output, err := statusCmd.Output()
+	fmt.Println(string(output))
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	if err != nil {
 		return 0, fmt.Errorf("failed to run git status: %s", err)
 	}
