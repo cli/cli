@@ -491,3 +491,46 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+func CreatePullRequest(client *Client, ghRepo Repo, title string, body string, draft bool, base string, head string) (string, error) {
+	repoId, err := GitHubRepoId(client, ghRepo)
+	if err != nil {
+		return "", err
+	}
+	if repoId == "" {
+		return "", fmt.Errorf("could not determine GH repo ID")
+	}
+
+	query := `
+		mutation CreatePullRequest($input: CreatePullRequestInput!) {
+			createPullRequest(input: $input) {
+				pullRequest {
+					url
+				}
+			}
+	}`
+
+	variables := map[string]interface{}{
+		"input": map[string]interface{}{
+			"repositoryId": repoId,
+			"baseRefName":  base,
+			"headRefName":  head,
+			"title":        title,
+			"body":         body,
+			"draft":        draft,
+		},
+	}
+
+	result := struct {
+		CreatePullRequest struct {
+			PullRequest PullRequest
+		}
+	}{}
+
+	err = client.GraphQL(query, variables, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.CreatePullRequest.PullRequest.URL, nil
+}

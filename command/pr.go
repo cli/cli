@@ -16,6 +16,7 @@ func init() {
 	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
+	prCmd.AddCommand(prCreateCmd)
 
 	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
