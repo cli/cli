@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh-cli/api"
 	"github.com/spf13/cobra"
 )
 
@@ -65,30 +63,6 @@ func UseTempGitRepo() *TempGitRepo {
 	}
 
 	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
-}
-
-func MockGraphQLResponse(fixturePath string) (teardown func()) {
-	pwd, _ := os.Getwd()
-	fixturePath = filepath.Join(pwd, "..", fixturePath)
-
-	originalGraphQL := api.GraphQL
-	api.GraphQL = func(query string, variables map[string]string, v interface{}) error {
-		contents, err := ioutil.ReadFile(fixturePath)
-		if err != nil {
-			return err
-		}
-
-		json.Unmarshal(contents, &v)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	return func() {
-		api.GraphQL = originalGraphQL
-	}
 }
 
 func RunCommand(root *cobra.Command, s string) (string, error) {

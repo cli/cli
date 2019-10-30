@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,9 +22,32 @@ func init() {
 	sshTokenRE = regexp.MustCompile(`%[%h]`)
 }
 
-type sshAliasMap map[string]string
+// SSHAliasMap encapsulates the translation of SSH hostname aliases
+type SSHAliasMap map[string]string
 
-func sshParseFiles() sshAliasMap {
+// Translator returns a function that applies hostname aliases to URLs
+func (m SSHAliasMap) Translator() func(*url.URL) *url.URL {
+	return func(u *url.URL) *url.URL {
+		if u.Scheme != "ssh" {
+			return u
+		}
+		resolvedHost, ok := m[u.Hostname()]
+		if !ok {
+			return u
+		}
+		// FIXME: cleanup domain logic
+		if strings.EqualFold(u.Hostname(), "github.com") && strings.EqualFold(resolvedHost, "ssh.github.com") {
+			return u
+		}
+		newURL, _ := url.Parse(u.String())
+		newURL.Host = resolvedHost
+		return newURL
+	}
+}
+
+// ParseSSHConfig constructs a map of SSH hostname aliases based on user and
+// system configuration files
+func ParseSSHConfig() SSHAliasMap {
 	configFiles := []string{
 		"/etc/ssh_config",
 		"/etc/ssh/ssh_config",
@@ -45,15 +69,15 @@ func sshParseFiles() sshAliasMap {
 	return sshParse(openFiles...)
 }
 
-func sshParse(r ...io.Reader) sshAliasMap {
-	config := sshAliasMap{}
+func sshParse(r ...io.Reader) SSHAliasMap {
+	config := SSHAliasMap{}
 	for _, file := range r {
 		sshParseConfig(config, file)
 	}
 	return config
 }
 
-func sshParseConfig(c sshAliasMap, file io.Reader) error {
+func sshParseConfig(c SSHAliasMap, file io.Reader) error {
 	hosts := []string{"*"}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

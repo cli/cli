@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +37,26 @@ work with pull requests.`,
 }
 
 func prList(cmd *cobra.Command, args []string) error {
-	prPayload, err := api.PullRequests()
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+	currentBranch, err := ctx.Branch()
+	if err != nil {
+		return err
+	}
+	currentUser, err := ctx.AuthLogin()
+	if err != nil {
+		return err
+	}
+
+	prPayload, err := api.PullRequests(apiClient, baseRepo, currentBranch, currentUser)
 	if err != nil {
 		return err
 	}
@@ -47,10 +65,6 @@ func prList(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(*prPayload.CurrentPR)
 	} else {
-		currentBranch, err := context.Current().Branch()
-		if err != nil {
-			return err
-		}
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
 		printMessage(message)
 	}
@@ -76,7 +90,8 @@ func prList(cmd *cobra.Command, args []string) error {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	baseRepo, err := context.Current().BaseRepo()
+	ctx := contextForCommand(cmd)
+	baseRepo, err := ctx.BaseRepo()
 	if err != nil {
 		return err
 	}
@@ -85,23 +100,27 @@ func prView(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		if prNumber, err := strconv.Atoi(args[0]); err == nil {
 			// TODO: move URL generation into GitHubRepository
-			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.Owner, baseRepo.Name, prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
 		} else {
 			return fmt.Errorf("invalid pull request number: '%s'", args[0])
 		}
 	} else {
-		prPayload, err := api.PullRequests()
+		apiClient, err := apiClientForContext(ctx)
 		if err != nil {
 			return err
-		} else if prPayload.CurrentPR == nil {
-			branch, err := context.Current().Branch()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("The [%s] branch has no open PRs", branch)
-			return nil
 		}
-		openURL = prPayload.CurrentPR.URL
+		currentBranch, err := ctx.Branch()
+		if err != nil {
+			return err
+		}
+
+		prs, err := api.PullRequestsForBranch(apiClient, baseRepo, currentBranch)
+		if err != nil {
+			return err
+		} else if len(prs) < 1 {
+			return fmt.Errorf("the '%s' branch has no open pull requests", currentBranch)
+		}
+		openURL = prs[0].URL
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
