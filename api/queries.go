@@ -22,6 +22,34 @@ type Repo interface {
 	RepoOwner() string
 }
 
+func GitHubRepoId(client *Client, ghRepo Repo) (string, error) {
+	owner := ghRepo.RepoOwner()
+	repo := ghRepo.RepoName()
+
+	query := `
+		query FindRepoID($owner:String!, $name:String!) {
+			repository(owner:$owner, name:$name) {
+				id
+			}
+	}`
+	variables := map[string]interface{}{
+		"owner": owner,
+		"name":  repo,
+	}
+
+	result := struct {
+		Repository struct {
+			Id string
+		}
+	}{}
+	err := client.GraphQL(query, variables, &result)
+	if err != nil {
+		return "", fmt.Errorf("failed to determine GH repo ID: %s", err)
+	}
+
+	return result.Repository.Id, nil
+}
+
 func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
 		Edges []struct {
@@ -170,4 +198,47 @@ func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRe
 	}
 
 	return prs, nil
+}
+
+func CreatePullRequest(client *Client, ghRepo Repo, title string, body string, draft bool, base string, head string) (string, error) {
+	repoId, err := GitHubRepoId(client, ghRepo)
+	if err != nil {
+		return "", err
+	}
+	if repoId == "" {
+		return "", fmt.Errorf("could not determine GH repo ID")
+	}
+
+	query := `
+		mutation CreatePullRequest($input: CreatePullRequestInput!) {
+			createPullRequest(input: $input) {
+				pullRequest {
+					url
+				}
+			}
+	}`
+
+	variables := map[string]interface{}{
+		"input": map[string]interface{}{
+			"repositoryId": repoId,
+			"baseRefName":  base,
+			"headRefName":  head,
+			"title":        title,
+			"body":         body,
+			"draft":        draft,
+		},
+	}
+
+	result := struct {
+		CreatePullRequest struct {
+			PullRequest PullRequest
+		}
+	}{}
+
+	err = client.GraphQL(query, variables, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.CreatePullRequest.PullRequest.URL, nil
 }
