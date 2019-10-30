@@ -22,6 +22,7 @@ func init() {
 			Short: "Open a pull request in the browser",
 			RunE:  prView,
 		},
+		prCreateCmd,
 	)
 }
 
