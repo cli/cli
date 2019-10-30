@@ -7,6 +7,16 @@ import (
 	"testing"
 )
 
+var _cases map[string]string
+
+func init() {
+	_cases = map[string]string{
+		"foobar": `fart
+		bar
+		town`,
+	}
+}
+
 func StubbedGit(args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestHelperProcess", "--", "git"}
 	cs = append(cs, args...)
@@ -33,11 +43,22 @@ func TestHelperProcess(*testing.T) {
 		}
 		args = args[1:]
 	}
-	cmd, args := args[0], args[1:]
-	switch cmd {
-	case "git":
-		fmt.Println("fart")
-		fmt.Println("town")
+	c, args := args[0], args[1:]
+	fmt.Println(_cases[c])
+}
+
+func StubGit(c string) func(...string) *exec.Cmd {
+	return func(args ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", c}
+		cs = append(cs, args...)
+		env := []string{
+			"GO_WANT_HELPER_PROCESS=1",
+		}
+
+		cmd := exec.Command(os.Args[0], cs...)
+		cmd.Env = append(env, os.Environ()...)
+		fmt.Printf("%+v", cmd.Env)
+		return cmd
 	}
 
 }
@@ -48,7 +69,7 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		GitCommand = origGitCommand
 	}()
 
-	GitCommand = StubbedGit
+	GitCommand = StubGit("foobar")
 
 	ucc, err := UncommittedChangeCount()
 	if err != nil {
