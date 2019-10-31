@@ -1,0 +1,36 @@
+{
+  "data": {
+    "repository": {
+      "issues": {
+        "edges": [
+          {
+            "node": {
+              "number": 8,
+              "title": "rabbits eat carrots",
+              "url": "https://github.com/github/gh-cli/pull/10"
+            }
+          },
+          {
+            "node": {
+              "number": 9,
+              "title": "corey thinks squash tastes bad"
+            }
+          },
+          {
+            "node": {
+              "number": 10,
+              "title": "broccoli is a superfood"
+            }
+          },
+          {
+            "node": {
+              "number": 11,
+              "title": "swiss chard is neutral"
+            }
+          }
+        ]
+      }
+    },
+    "pageInfo": { "hasNextPage": false }
+  }
+}
