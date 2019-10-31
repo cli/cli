@@ -6,12 +6,18 @@ import (
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/version"
 
 	"github.com/spf13/cobra"
 )
 
+// Version is dynamically set at build time in the Makefile
+var Version = "DEV"
+
+// BuildDate is dynamically set at build time in the Makefile
+var BuildDate = "YYYY-MM-DD"
+
 func init() {
+	RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "current GitHub repository")
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
@@ -65,7 +71,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	}
 	opts := []api.ClientOption{
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
-		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", version.Version)),
+		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, api.VerboseLog(os.Stderr))
