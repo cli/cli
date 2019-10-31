@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is dynamically set at build time
+// Version is dynamically set at build time in the Makefile
 var Version = "DEV"
 
-// BuildDate is dynamically set at build time
+// BuildDate is dynamically set at build time in the Makefile
 var BuildDate = "YYYY-MM-DD"
 
 func init() {
