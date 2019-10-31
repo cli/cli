@@ -71,6 +71,7 @@ func RunCommand(root *cobra.Command, s string) (string, error) {
 		root.SetArgs(strings.Split(s, " "))
 		_, err = root.ExecuteC()
 	})
+
 	if err != nil {
 		return "", err
 	}
