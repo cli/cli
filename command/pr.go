@@ -22,12 +22,7 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Work with pull requests",
-	Long: `This command allows you to
-work with pull requests.`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("%+v is not a valid PR command", args)
-	},
+	Long:  `Helps you work with pull requests.`,
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
