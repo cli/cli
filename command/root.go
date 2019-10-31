@@ -6,12 +6,18 @@ import (
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/version"
 
 	"github.com/spf13/cobra"
 )
 
+// Version is dynamically set at build time
+var Version = "DEV"
+
+// BuildDate is dynamically set at build time
+var BuildDate = "YYYY-MM-DD"
+
 func init() {
+	RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "current GitHub repository")
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
@@ -23,10 +29,6 @@ var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
 	Long:  `Do things with GitHub from your terminal`,
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("root")
-	},
 }
 
 // overriden in tests
@@ -57,7 +59,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	}
 	opts := []api.ClientOption{
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
-		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", version.Version)),
+		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, api.VerboseLog(os.Stderr))
