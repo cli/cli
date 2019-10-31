@@ -3,14 +3,17 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/github/gh-cli/command"
 )
 
 func main() {
-	if err := command.RootCmd.Execute(); err != nil {
-		if err != command.SilentErr {
-			fmt.Fprintln(os.Stderr, err)
+	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		_, isFlagError := err.(command.FlagError)
+		if isFlagError || strings.HasPrefix(err.Error(), "unknown command ") {
+			fmt.Fprintln(os.Stderr, cmd.UsageString())
 		}
 		os.Exit(1)
 	}

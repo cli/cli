@@ -1,7 +1,6 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -19,13 +18,14 @@ func init() {
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		cmd.Println(err)
-		cmd.Println(cmd.UsageString())
-		return SilentErr
+		return FlagError{err}
 	})
 }
 
-var SilentErr = errors.New("SilentErr")
+// FlagError is the kind of error raised in flag processing
+type FlagError struct {
+	error
+}
 
 // RootCmd is the entry point of command-line execution
 var RootCmd = &cobra.Command{
