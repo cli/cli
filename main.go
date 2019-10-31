@@ -9,7 +9,9 @@ import (
 
 func main() {
 	if err := command.RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		if err != command.SilentErr {
+			fmt.Println(err)
+		}
 		os.Exit(1)
 	}
 }

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -16,17 +17,24 @@ func init() {
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
+
+	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		cmd.Println(err)
+		cmd.Println(cmd.UsageString())
+		return SilentErr
+	})
 }
+
+var SilentErr = errors.New("SilentErr")
 
 // RootCmd is the entry point of command-line execution
 var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
 	Long:  `Do things with GitHub from your terminal`,
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("root")
-	},
+
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 // overriden in tests
