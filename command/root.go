@@ -22,6 +22,15 @@ func init() {
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
+
+	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return FlagError{err}
+	})
+}
+
+// FlagError is the kind of error raised in flag processing
+type FlagError struct {
+	error
 }
 
 // RootCmd is the entry point of command-line execution
@@ -29,6 +38,9 @@ var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
 	Long:  `Do things with GitHub from your terminal`,
+
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 // overriden in tests
