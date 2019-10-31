@@ -11,6 +11,43 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ExecStub struct {
+	Stdout   string
+	ExitCode int
+}
+
+func GetExecStub(outputs map[string]ExecStub) ExecStub {
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	return outputs[args[0]]
+}
+
+func SkipTestHelperProcess() bool {
+	return os.Getenv("GO_WANT_HELPER_PROCESS") != "1"
+}
+
+func StubExecCommand(testHelper string, desiredOutput string) func(...string) *exec.Cmd {
+	return func(args ...string) *exec.Cmd {
+		cs := []string{
+			fmt.Sprintf("-test.run=%s", testHelper),
+			"--", desiredOutput}
+		cs = append(cs, args...)
+		env := []string{
+			"GO_WANT_HELPER_PROCESS=1",
+		}
+
+		cmd := exec.Command(os.Args[0], cs...)
+		cmd.Env = append(env, os.Environ()...)
+		return cmd
+	}
+}
+
 type TempGitRepo struct {
 	Remote   string
 	TearDown func()
