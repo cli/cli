@@ -11,18 +11,12 @@ import (
 
 func init() {
 	RootCmd.AddCommand(prCmd)
-	prCmd.AddCommand(
-		&cobra.Command{
-			Use:   "list",
-			Short: "List pull requests",
-			RunE:  prList,
-		},
-		&cobra.Command{
-			Use:   "view [pr-number]",
-			Short: "Open a pull request in the browser",
-			RunE:  prView,
-		},
-	)
+	prCmd.AddCommand(prListCmd)
+	prCmd.AddCommand(prStatusCmd)
+	prCmd.AddCommand(prViewCmd)
+
+	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "pull request state to filter by")
 }
 
 var prCmd = &cobra.Command{
@@ -35,8 +29,23 @@ work with pull requests.`,
 		return fmt.Errorf("%+v is not a valid PR command", args)
 	},
 }
+var prListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List pull requests",
+	RunE:  prList,
+}
+var prStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show status of relevant pull requests",
+	RunE:  prStatus,
+}
+var prViewCmd = &cobra.Command{
+	Use:   "view [pr-number]",
+	Short: "Open a pull request in the browser",
+	RunE:  prView,
+}
 
-func prList(cmd *cobra.Command, args []string) error {
+func prStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -86,6 +95,55 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
+	return nil
+}
+
+func prList(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+	state, err := cmd.Flags().GetString("state")
+	if err != nil {
+		return err
+	}
+	var graphqlState string
+	switch state {
+	case "open":
+		graphqlState = "OPEN"
+	case "closed":
+		graphqlState = "CLOSED"
+	case "all":
+		graphqlState = "ALL"
+	default:
+		return fmt.Errorf("invalid state: %s", state)
+	}
+
+	params := map[string]interface{}{
+		"owner": baseRepo.RepoOwner(),
+		"repo":  baseRepo.RepoName(),
+		"state": graphqlState,
+	}
+
+	prs, err := api.PullRequestList(apiClient, params, limit)
+	if err != nil {
+		return err
+	}
+
+	for _, pr := range prs {
+		fmt.Printf("#%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadRefName)
+	}
 	return nil
 }
 
