@@ -36,9 +36,9 @@ func TestPRList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "pr list")
+	output, err := test.RunCommand(RootCmd, "pr status")
 	if err != nil {
-		t.Errorf("error running command `pr list`: %v", err)
+		t.Errorf("error running command `pr status`: %v", err)
 	}
 
 	expectedPrs := []*regexp.Regexp{
