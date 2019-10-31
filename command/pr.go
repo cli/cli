@@ -129,7 +129,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
-		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title, 50), utils.Cyan("["+pr.HeadRefName+"]"))
 	}
 }
 
@@ -141,9 +141,7 @@ func printMessage(s string) {
 	fmt.Println(utils.Gray(s))
 }
 
-func truncateTitle(title string) string {
-	const maxLength = 50
-
+func truncateTitle(title string, maxLength int) string {
 	if len(title) > maxLength {
 		return title[0:maxLength-3] + "..."
 	}
