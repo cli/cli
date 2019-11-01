@@ -39,7 +39,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [pr-number]",
+	Use:   "view [<pr-number>]",
 	Short: "Open a pull request in the browser",
 	RunE:  prView,
 }

@@ -9,10 +9,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/test"
-	"github.com/github/gh-cli/utils"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -20,23 +17,6 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
-}
-
-func initBlankContext(repo, branch string) {
-	initContext = func() context.Context {
-		ctx := context.NewBlank()
-		ctx.SetBaseRepo(repo)
-		ctx.SetBranch(branch)
-		return ctx
-	}
-}
-
-func initFakeHTTP() *api.FakeHTTP {
-	http := &api.FakeHTTP{}
-	apiClientForContext = func(context.Context) (*api.Client, error) {
-		return api.NewClient(api.ReplaceTripper(http)), nil
-	}
-	return http
 }
 
 func TestPRStatus(t *testing.T) {
@@ -175,19 +155,4 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	if *callCount != 1 {
 		t.Errorf("OpenInBrowser should be called once but was called %d time(s)", *callCount)
 	}
-}
-
-func mockOpenInBrowser() (func(), *int) {
-	callCount := 0
-	originalOpenInBrowser := utils.OpenInBrowser
-	teardown := func() {
-		utils.OpenInBrowser = originalOpenInBrowser
-	}
-
-	utils.OpenInBrowser = func(_ string) error {
-		callCount++
-		return nil
-	}
-
-	return teardown, &callCount
 }
