@@ -56,7 +56,7 @@ func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload
     }
     query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
       assigned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {assignee: $viewer}, first: $per_page) {
+        issues(filterBy: {assignee: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
@@ -65,7 +65,7 @@ func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload
         }
       }
       mentioned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {mentioned: $viewer}, first: $per_page) {
+        issues(filterBy: {mentioned: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
@@ -74,7 +74,7 @@ func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload
         }
       }
       recent: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {since: $since, orderBy: {field: CREATED_AT, direction: DESC}}, first: $per_page) {
+        issues(filterBy: {since: $since}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
