@@ -239,6 +239,11 @@ func UncommittedChangeCount() (int, error) {
 	return count, nil
 }
 
+func Push(remote string, ref string) error {
+	cmd := GitCommand("push", "--set-upstream", remote, ref)
+	return cmd.Run()
+}
+
 var Push = func(remote string, ref string) error {
 	return Run("push", "--set-upstream", remote, ref)
 }

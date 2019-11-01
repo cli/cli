@@ -16,7 +16,7 @@ type ExecStub struct {
 	ExitCode int
 }
 
-func GetExecStub(outputs map[string]ExecStub) ExecStub {
+func GetTestHelperProcessArgs() []string {
 	args := os.Args
 	for len(args) > 0 {
 		if args[0] == "--" {
@@ -25,6 +25,11 @@ func GetExecStub(outputs map[string]ExecStub) ExecStub {
 		}
 		args = args[1:]
 	}
+	return args
+}
+
+func GetExecStub(outputs map[string]ExecStub) ExecStub {
+	args := GetTestHelperProcessArgs()
 	return outputs[args[0]]
 }
 
