@@ -188,9 +188,24 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 	}
 
 	query := `
-    query($owner: String!, $repo: String!, $limit: Int!, $endCursor: String, $state: [PullRequestState!] = OPEN) {
+    query(
+		$owner: String!,
+		$repo: String!,
+		$limit: Int!,
+		$endCursor: String,
+		$baseBranch: String,
+		$labels: [String!],
+		$state: [PullRequestState!] = OPEN
+	) {
       repository(owner: $owner, name: $repo) {
-        pullRequests(states: $state, first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}) {
+        pullRequests(
+			states: $state,
+			baseRefName: $baseBranch,
+			labels: $labels,
+			first: $limit,
+			after: $endCursor,
+			orderBy: {field: CREATED_AT, direction: DESC}
+		) {
           edges {
             node {
 				number

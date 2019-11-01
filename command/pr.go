@@ -16,7 +16,9 @@ func init() {
 	prCmd.AddCommand(prViewCmd)
 
 	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "pull request state to filter by")
+	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
+	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
 }
 
 var prCmd = &cobra.Command{
@@ -113,6 +115,15 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	baseBranch, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
+	labels, err := cmd.Flags().GetStringArray("label")
+	if err != nil {
+		return err
+	}
+
 	var graphqlState string
 	switch state {
 	case "open":
@@ -129,6 +140,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		"owner": baseRepo.RepoOwner(),
 		"repo":  baseRepo.RepoName(),
 		"state": graphqlState,
+	}
+	if len(labels) > 0 {
+		params["labels"] = labels
+	}
+	if baseBranch != "" {
+		params["baseBranch"] = baseBranch
 	}
 
 	prs, err := api.PullRequestList(apiClient, params, limit)
