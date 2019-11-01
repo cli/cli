@@ -2,6 +2,7 @@ package command
 
 import (
 	"os"
+	"os/exec"
 	"regexp"
 	"testing"
 
@@ -63,8 +64,12 @@ func TestPRView(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	teardown, callCount := mockOpenInBrowser()
-	defer teardown()
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
 	if err != nil {
@@ -75,9 +80,25 @@ func TestPRView(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if *callCount != 1 {
-		t.Errorf("OpenInBrowser should be called 1 time but was called %d time(s)", *callCount)
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
 	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	if url != "https://github.com/OWNER/REPO/pull/10" {
+		t.Errorf("got: %q", url)
+	}
+}
+
+type outputStub struct {
+	contents []byte
+}
+
+func (s outputStub) Output() ([]byte, error) {
+	return s.contents, nil
+}
+
+func (s outputStub) Run() error {
+	return nil
 }
 
 func TestPRView_NoActiveBranch(t *testing.T) {
@@ -88,16 +109,20 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	teardown, callCount := mockOpenInBrowser()
-	defer teardown()
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
 	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if *callCount > 0 {
-		t.Errorf("OpenInBrowser should NOT be called but was called %d time(s)", *callCount)
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
 	}
 
 	// Now run again but provide a PR number
@@ -110,22 +135,11 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if *callCount != 1 {
-		t.Errorf("OpenInBrowser should be called once but was called %d time(s)", *callCount)
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
 	}
-}
-
-func mockOpenInBrowser() (func(), *int) {
-	callCount := 0
-	originalOpenInBrowser := utils.OpenInBrowser
-	teardown := func() {
-		utils.OpenInBrowser = originalOpenInBrowser
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	if url != "https://github.com/OWNER/REPO/pull/23" {
+		t.Errorf("got: %q", url)
 	}
-
-	utils.OpenInBrowser = func(_ string) error {
-		callCount++
-		return nil
-	}
-
-	return teardown, &callCount
 }
