@@ -16,9 +16,9 @@ func TestIssueList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "issue list")
+	output, err := test.RunCommand(RootCmd, "issue status")
 	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
+		t.Errorf("error running command `issue status`: %v", err)
 	}
 
 	expectedIssues := []*regexp.Regexp{
