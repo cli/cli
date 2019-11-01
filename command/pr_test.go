@@ -83,9 +83,9 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, out.String(), `#32	New feature	feature
-#29	Fixed bad bug	bug-fix
-#28	Improve documentation	docs
+	eq(t, out.String(), `32	New feature	feature
+29	Fixed bad bug	bug-fix
+28	Improve documentation	docs
 `)
 }
 
