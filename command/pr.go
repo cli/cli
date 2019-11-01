@@ -154,7 +154,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, pr := range prs {
-		fmt.Printf("#%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadRefName)
+		fmt.Fprintf(cmd.OutOrStdout(), "#%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadRefName)
 	}
 	return nil
 }
