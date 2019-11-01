@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -28,12 +29,15 @@ func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
 	}
 }
 
-// cmdWithStderr augments Output() by adding stderr to the error message
+// cmdWithStderr augments exec.Cmd by adding stderr to the error message
 type cmdWithStderr struct {
 	*exec.Cmd
 }
 
 func (c cmdWithStderr) Output() ([]byte, error) {
+	if os.Getenv("DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+	}
 	errStream := &bytes.Buffer{}
 	c.Cmd.Stderr = errStream
 	out, err := c.Cmd.Output()
@@ -41,6 +45,19 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 		err = &CmdError{errStream, c.Cmd.Args, err}
 	}
 	return out, err
+}
+
+func (c cmdWithStderr) Run() error {
+	if os.Getenv("DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+	}
+	errStream := &bytes.Buffer{}
+	c.Cmd.Stderr = errStream
+	err := c.Cmd.Run()
+	if err != nil {
+		err = &CmdError{errStream, c.Cmd.Args, err}
+	}
+	return err
 }
 
 // CmdError provides more visibility into why an exec.Cmd had failed
