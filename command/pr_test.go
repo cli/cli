@@ -89,18 +89,6 @@ func TestPRView(t *testing.T) {
 	}
 }
 
-type outputStub struct {
-	contents []byte
-}
-
-func (s outputStub) Output() ([]byte, error) {
-	return s.contents, nil
-}
-
-func (s outputStub) Run() error {
-	return nil
-}
-
 func TestPRView_NoActiveBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
