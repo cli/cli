@@ -244,10 +244,6 @@ func Push(remote string, ref string) error {
 	return cmd.Run()
 }
 
-var Push = func(remote string, ref string) error {
-	return Run("push", "--set-upstream", remote, ref)
-}
-
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	if lines == "" {
