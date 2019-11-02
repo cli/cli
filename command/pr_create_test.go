@@ -2,9 +2,12 @@ package command
 
 import (
 	//"regexp"
+	"fmt"
+	"os"
 	"testing"
 
 	//"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/test"
 	//"github.com/github/gh-cli/utils"
 )
@@ -19,10 +22,10 @@ func TestPrCreateHelperProcess(*testing.T) {
 		"dirty": " M git/git.go",
 	}
 
-	args := GetTestHelperProcessArgs()
+	args := test.GetTestHelperProcessArgs()
 	switch args[1] {
 	case "status":
-		fmt.Println(statusOutputs(args[0]))
+		fmt.Println(statusOutputs[args[0]])
 	case "push":
 		fmt.Println()
 	}
