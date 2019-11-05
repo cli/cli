@@ -107,13 +107,13 @@ func TestPRList_filtering(t *testing.T) {
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
 		Variables struct {
-			State  string
+			State  []string
 			Labels []string
 		}
 	}{}
 	json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.State, "ALL")
+	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
 	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
 }
 
