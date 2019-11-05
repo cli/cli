@@ -126,14 +126,16 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var graphqlState string
+	var graphqlState []string
 	switch state {
 	case "open":
-		graphqlState = "OPEN"
+		graphqlState = []string{"OPEN"}
 	case "closed":
-		graphqlState = "CLOSED"
+		graphqlState = []string{"CLOSED"}
+	case "merged":
+		graphqlState = []string{"MERGED"}
 	case "all":
-		graphqlState = "ALL"
+		graphqlState = []string{"OPEN", "CLOSED", "MERGED"}
 	default:
 		return fmt.Errorf("invalid state: %s", state)
 	}
