@@ -13,6 +13,7 @@ type PullRequestsPayload struct {
 type PullRequest struct {
 	Number      int
 	Title       string
+	State       string
 	URL         string
 	HeadRefName string
 }
@@ -210,6 +211,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
             node {
 				number
 				title
+				state
 				url
 				headRefName
             }

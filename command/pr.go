@@ -184,7 +184,15 @@ func prList(cmd *cobra.Command, args []string) error {
 
 	for _, pr := range prs {
 		if tty {
-			prNum := utils.Yellow(fmt.Sprintf("% *s", numWidth, fmt.Sprintf("#%d", pr.Number)))
+			prNum := fmt.Sprintf("% *s", numWidth, fmt.Sprintf("#%d", pr.Number))
+			switch pr.State {
+			case "OPEN":
+				prNum = utils.Green(prNum)
+			case "CLOSED":
+				prNum = utils.Red(prNum)
+			case "MERGED":
+				prNum = utils.Magenta(prNum)
+			}
 			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadRefName))
 			fmt.Fprintf(out, "%s  %-*s  %s\n", prNum, titleWidth, truncate(titleWidth, pr.Title), prBranch)
 		} else {
