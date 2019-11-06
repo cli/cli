@@ -1,43 +1,39 @@
 package utils
 
-import "github.com/gookit/color"
+import (
+	"github.com/mattn/go-isatty"
+	"github.com/mgutz/ansi"
+	"os"
+)
 
-func Black(a ...interface{}) string {
-	return color.Black.Render(a...)
+func makeColorFunc(color string) func(string) string {
+	return func(arg string) string {
+		output := arg
+		if isatty.IsTerminal(os.Stdout.Fd()) {
+			output = ansi.Color(color+arg+ansi.Reset, "")
+		}
+
+		return output
+	}
 }
 
-func White(a ...interface{}) string {
-	return color.White.Render(a...)
-}
+var Black = makeColorFunc(ansi.Black)
+var White = makeColorFunc(ansi.White)
+var Magenta = makeColorFunc(ansi.Magenta)
+var Cyan = makeColorFunc(ansi.Cyan)
+var Red = makeColorFunc(ansi.Red)
+var Yellow = makeColorFunc(ansi.Yellow)
+var Blue = makeColorFunc(ansi.Blue)
+var Green = makeColorFunc(ansi.Green)
+var Gray = makeColorFunc(ansi.LightBlack)
 
-func Gray(a ...interface{}) string {
-	return color.Gray.Render(a...)
-}
-
-func Red(a ...interface{}) string {
-	return color.Red.Render(a...)
-}
-
-func Green(a ...interface{}) string {
-	return color.Green.Render(a...)
-}
-
-func Yellow(a ...interface{}) string {
-	return color.Yellow.Render(a...)
-}
-
-func Blue(a ...interface{}) string {
-	return color.Blue.Render(a...)
-}
-
-func Magenta(a ...interface{}) string {
-	return color.Magenta.Render(a...)
-}
-
-func Cyan(a ...interface{}) string {
-	return color.Cyan.Render(a...)
-}
-
-func Bold(a ...interface{}) string {
-	return color.Bold.Render(a...)
+func Bold(arg string) string {
+	output := arg
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
+		// will not use the default color, resulting in black and probably unreadable text. This forces
+		// the default color before bolding.
+		output = ansi.Color(ansi.DefaultFG+arg+ansi.Reset, "+b")
+	}
+	return output
 }
