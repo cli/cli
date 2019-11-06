@@ -6,7 +6,7 @@
           "node": {
             "number": 10,
             "title": "Blueberries are a good fruit",
-            "url": "https://github.com/github/gh-cli/pull/10",
+            "url": "https://github.com/OWNER/REPO/pull/10",
             "headRefName": "[blueberries]"
           }
         }
@@ -19,7 +19,7 @@
         "node": {
           "number": 8,
           "title": "Strawberries are not actually berries",
-          "url": "https://github.com/github/gh-cli/pull/8",
+          "url": "https://github.com/OWNER/REPO/pull/8",
           "headRefName": "[strawberries]"
         }
       }
@@ -32,7 +32,7 @@
         "node": {
           "number": 9,
           "title": "Apples are tasty",
-          "url": "https://github.com/github/gh-cli/pull/9",
+          "url": "https://github.com/OWNER/REPO/pull/9",
           "headRefName": "[apples]"
         }
       },
@@ -40,7 +40,7 @@
         "node": {
           "number": 11,
           "title": "Figs are my favorite",
-          "url": "https://github.com/github/gh-cli/pull/1",
+          "url": "https://github.com/OWNER/REPO/pull/1",
           "headRefName": "[figs]"
         }
       }

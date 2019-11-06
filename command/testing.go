@@ -3,7 +3,6 @@ package command
 import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/utils"
 )
 
 func initBlankContext(repo, branch string) {
@@ -23,17 +22,15 @@ func initFakeHTTP() *api.FakeHTTP {
 	return http
 }
 
-func mockOpenInBrowser() (func(), *int) {
-	callCount := 0
-	originalOpenInBrowser := utils.OpenInBrowser
-	teardown := func() {
-		utils.OpenInBrowser = originalOpenInBrowser
-	}
+// outputStub implements a simple utils.Runnable
+type outputStub struct {
+	output []byte
+}
 
-	utils.OpenInBrowser = func(_ string) error {
-		callCount++
-		return nil
-	}
+func (s outputStub) Output() ([]byte, error) {
+	return s.output, nil
+}
 
-	return teardown, &callCount
+func (s outputStub) Run() error {
+	return nil
 }
