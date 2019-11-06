@@ -9,5 +9,6 @@ require (
 	github.com/mattn/go-isatty v0.0.9
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v0.0.5
+	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
 	gopkg.in/yaml.v3 v3.0.0-20191010095647-fc94e3f71652
 )
