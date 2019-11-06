@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-cli/test"
+	"github.com/github/gh-cli/utils"
 )
 
 func TestPRList(t *testing.T) {
