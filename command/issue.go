@@ -27,7 +27,7 @@ func init() {
 			RunE:  issueList,
 		},
 		&cobra.Command{
-			Use:   "view issue-number",
+			Use:   "view [issue-number]",
 			Args:  cobra.MinimumNArgs(1),
 			Short: "Open a issue in the browser",
 			RunE:  issueView,
@@ -38,8 +38,6 @@ func init() {
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
-	cmd.SilenceUsage = true
-
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -90,8 +88,6 @@ func issueList(cmd *cobra.Command, args []string) error {
 }
 
 func issueView(cmd *cobra.Command, args []string) error {
-	cmd.SilenceUsage = true
-
 	ctx := contextForCommand(cmd)
 
 	baseRepo, err := ctx.BaseRepo()
