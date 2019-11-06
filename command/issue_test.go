@@ -8,17 +8,17 @@ import (
 	"github.com/github/gh-cli/test"
 )
 
-func TestIssueList(t *testing.T) {
+func TestIssueStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
-	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "issue list")
+	output, err := test.RunCommand(RootCmd, "issue status")
 	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
+		t.Errorf("error running command `issue status`: %v", err)
 	}
 
 	expectedIssues := []*regexp.Regexp{
