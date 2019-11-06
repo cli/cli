@@ -10,11 +10,20 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(issueCmd)
+	var issueCmd = &cobra.Command{
+		Use:   "issue",
+		Short: "Work with GitHub issues",
+		Long:  `This command allows you to work with issues.`,
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fmt.Errorf("%+v is not a valid issue command", args)
+		},
+	}
+
 	issueCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list",
-			Short: "List issues",
+			Use:   "status",
+			Short: "Display issue status",
 			RunE:  issueList,
 		},
 		&cobra.Command{
@@ -24,16 +33,8 @@ func init() {
 			RunE:  issueView,
 		},
 	)
-}
 
-var issueCmd = &cobra.Command{
-	Use:   "issue",
-	Short: "Work with GitHub issues",
-	Long:  `This command allows you to work with issues.`,
-	Args:  cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("%+v is not a valid issue command", args)
-	},
+	RootCmd.AddCommand(issueCmd)
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
