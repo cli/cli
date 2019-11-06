@@ -109,6 +109,6 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 func printIssues(issues ...api.Issue) {
 	for _, issue := range issues {
-		fmt.Printf("  #%d %s\n", issue.Number, truncateTitle(issue.Title, 70))
+		fmt.Printf("  #%d %s\n", issue.Number, truncate(70, issue.Title))
 	}
 }
