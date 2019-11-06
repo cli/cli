@@ -168,15 +168,21 @@ func prList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	numWidth := 8
-	branchWidth := 40
-	titleWidth := ttyWidth - branchWidth - 2 - numWidth - 2
+	numWidth := 0
 	maxTitleWidth := 0
 	for _, pr := range prs {
+		numLen := len(strconv.Itoa(pr.Number)) + 1
+		if numLen > numWidth {
+			numWidth = numLen
+		}
 		if len(pr.Title) > maxTitleWidth {
 			maxTitleWidth = len(pr.Title)
 		}
 	}
+
+	branchWidth := 40
+	titleWidth := ttyWidth - branchWidth - 2 - numWidth - 2
+
 	if maxTitleWidth < titleWidth {
 		branchWidth += titleWidth - maxTitleWidth
 		titleWidth = maxTitleWidth
