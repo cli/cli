@@ -171,3 +171,95 @@ func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRe
 
 	return prs, nil
 }
+
+func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]PullRequest, error) {
+	type response struct {
+		Repository struct {
+			PullRequests struct {
+				Edges []struct {
+					Node PullRequest
+				}
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			}
+		}
+	}
+
+	query := `
+    query(
+		$owner: String!,
+		$repo: String!,
+		$limit: Int!,
+		$endCursor: String,
+		$baseBranch: String,
+		$labels: [String!],
+		$state: [PullRequestState!] = OPEN
+	) {
+      repository(owner: $owner, name: $repo) {
+        pullRequests(
+			states: $state,
+			baseRefName: $baseBranch,
+			labels: $labels,
+			first: $limit,
+			after: $endCursor,
+			orderBy: {field: CREATED_AT, direction: DESC}
+		) {
+          edges {
+            node {
+				number
+				title
+				url
+				headRefName
+            }
+		  }
+		  pageInfo {
+			  hasNextPage
+			  endCursor
+		  }
+        }
+      }
+    }`
+
+	prs := []PullRequest{}
+	pageLimit := min(limit, 100)
+	variables := map[string]interface{}{}
+	for name, val := range vars {
+		variables[name] = val
+	}
+
+	for {
+		variables["limit"] = pageLimit
+		var data response
+		err := client.GraphQL(query, variables, &data)
+		if err != nil {
+			return nil, err
+		}
+		prData := data.Repository.PullRequests
+
+		for _, edge := range prData.Edges {
+			prs = append(prs, edge.Node)
+			if len(prs) == limit {
+				goto done
+			}
+		}
+
+		if prData.PageInfo.HasNextPage {
+			variables["endCursor"] = prData.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(prs))
+			continue
+		}
+	done:
+		break
+	}
+
+	return prs, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

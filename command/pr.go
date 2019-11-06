@@ -2,41 +2,49 @@ package command
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
 	RootCmd.AddCommand(prCmd)
-	prCmd.AddCommand(
-		&cobra.Command{
-			Use:   "list",
-			Short: "List pull requests",
-			RunE:  prList,
-		},
-		&cobra.Command{
-			Use:   "view [pr-number]",
-			Short: "Open a pull request in the browser",
-			RunE:  prView,
-		},
-	)
+	prCmd.AddCommand(prListCmd)
+	prCmd.AddCommand(prStatusCmd)
+	prCmd.AddCommand(prViewCmd)
+
+	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
+	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
 }
 
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Work with pull requests",
-	Long: `This command allows you to
-work with pull requests.`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("%+v is not a valid PR command", args)
-	},
+	Long:  `Helps you work with pull requests.`,
+}
+var prListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List pull requests",
+	RunE:  prList,
+}
+var prStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show status of relevant pull requests",
+	RunE:  prStatus,
+}
+var prViewCmd = &cobra.Command{
+	Use:   "view [pr-number]",
+	Short: "Open a pull request in the browser",
+	RunE:  prView,
 }
 
-func prList(cmd *cobra.Command, args []string) error {
+func prStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -89,6 +97,101 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func prList(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+	state, err := cmd.Flags().GetString("state")
+	if err != nil {
+		return err
+	}
+	baseBranch, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
+	labels, err := cmd.Flags().GetStringArray("label")
+	if err != nil {
+		return err
+	}
+
+	var graphqlState string
+	switch state {
+	case "open":
+		graphqlState = "OPEN"
+	case "closed":
+		graphqlState = "CLOSED"
+	case "all":
+		graphqlState = "ALL"
+	default:
+		return fmt.Errorf("invalid state: %s", state)
+	}
+
+	params := map[string]interface{}{
+		"owner": baseRepo.RepoOwner(),
+		"repo":  baseRepo.RepoName(),
+		"state": graphqlState,
+	}
+	if len(labels) > 0 {
+		params["labels"] = labels
+	}
+	if baseBranch != "" {
+		params["baseBranch"] = baseBranch
+	}
+
+	prs, err := api.PullRequestList(apiClient, params, limit)
+	if err != nil {
+		return err
+	}
+
+	tty := false
+	ttyWidth := 80
+	out := cmd.OutOrStdout()
+	if outFile, isFile := out.(*os.File); isFile {
+		fd := int(outFile.Fd())
+		tty = terminal.IsTerminal(fd)
+		if w, _, err := terminal.GetSize(fd); err == nil {
+			ttyWidth = w
+		}
+	}
+
+	numWidth := 8
+	branchWidth := 40
+	titleWidth := ttyWidth - branchWidth - 2 - numWidth - 2
+	maxTitleWidth := 0
+	for _, pr := range prs {
+		if len(pr.Title) > maxTitleWidth {
+			maxTitleWidth = len(pr.Title)
+		}
+	}
+	if maxTitleWidth < titleWidth {
+		branchWidth += titleWidth - maxTitleWidth
+		titleWidth = maxTitleWidth
+	}
+
+	for _, pr := range prs {
+		if tty {
+			prNum := utils.Yellow(fmt.Sprintf("% *s", numWidth, fmt.Sprintf("#%d", pr.Number)))
+			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadRefName))
+			fmt.Fprintf(out, "%s  %-*s  %s\n", prNum, titleWidth, truncate(titleWidth, pr.Title), prBranch)
+		} else {
+			fmt.Fprintf(out, "%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadRefName)
+		}
+	}
+	return nil
+}
+
 func prView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	baseRepo, err := ctx.BaseRepo()
@@ -129,7 +232,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
-		fmt.Printf("  #%d %s %s\n", pr.Number, truncateTitle(pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
+		fmt.Printf("  #%d %s %s\n", pr.Number, truncate(50, pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
 	}
 }
 
@@ -141,9 +244,7 @@ func printMessage(s string) {
 	fmt.Println(utils.Gray(s))
 }
 
-func truncateTitle(title string) string {
-	const maxLength = 50
-
+func truncate(maxLength int, title string) string {
 	if len(title) > maxLength {
 		return title[0:maxLength-3] + "..."
 	}
