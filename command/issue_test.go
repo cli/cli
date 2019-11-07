@@ -2,17 +2,19 @@ package command
 
 import (
 	"os"
+	"os/exec"
 	"regexp"
 	"testing"
 
 	"github.com/github/gh-cli/test"
+	"github.com/github/gh-cli/utils"
 )
 
-func TestIssueList(t *testing.T) {
+func TestIssueStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
-	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
@@ -43,8 +45,12 @@ func TestIssueView(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	teardown, callCount := mockOpenInBrowser()
-	defer teardown()
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "issue view 8")
 	if err != nil {
@@ -55,7 +61,11 @@ func TestIssueView(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if *callCount != 1 {
-		t.Errorf("OpenInBrowser should be called 1 time but was called %d time(s)", *callCount)
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	if url != "https://github.com/OWNER/REPO/issues/8" {
+		t.Errorf("got: %q", url)
 	}
 }
