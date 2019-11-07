@@ -1,50 +1,38 @@
-{"data":{
-  "repository": {
-    "pullRequests": {
-      "edges": [
-        {
-          "node": {
-            "number": 10,
-            "title": "Blueberries are a good fruit",
-            "url": "https://github.com/github/gh-cli/pull/10",
-            "headRefName": "[blueberries]"
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "edges": [
+          {
+            "node": {
+              "number": 32,
+              "title": "New feature",
+              "url": "https://github.com/monalisa/hello/pull/32",
+              "headRefName": "feature"
+            }
+          },
+          {
+            "node": {
+              "number": 29,
+              "title": "Fixed bad bug",
+              "url": "https://github.com/monalisa/hello/pull/29",
+              "headRefName": "bug-fix"
+            }
+          },
+          {
+            "node": {
+              "number": 28,
+              "title": "Improve documentation",
+              "url": "https://github.com/monalisa/hello/pull/28",
+              "headRefName": "docs"
+            }
           }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": ""
         }
-      ]
+      }
     }
-  },
-  "viewerCreated": {
-    "edges": [
-      {
-        "node": {
-          "number": 8,
-          "title": "Strawberries are not actually berries",
-          "url": "https://github.com/github/gh-cli/pull/8",
-          "headRefName": "[strawberries]"
-        }
-      }
-    ],
-    "pageInfo": { "hasNextPage": false }
-  },
-  "reviewRequested": {
-    "edges": [
-      {
-        "node": {
-          "number": 9,
-          "title": "Apples are tasty",
-          "url": "https://github.com/github/gh-cli/pull/9",
-          "headRefName": "[apples]"
-        }
-      },
-      {
-        "node": {
-          "number": 11,
-          "title": "Figs are my favorite",
-          "url": "https://github.com/github/gh-cli/pull/1",
-          "headRefName": "[figs]"
-        }
-      }
-    ],
-    "pageInfo": { "hasNextPage": false }
   }
-}}
+}

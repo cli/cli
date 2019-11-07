@@ -27,7 +27,7 @@ func ConcatPaths(paths ...string) string {
 	return strings.Join(paths, "/")
 }
 
-var OpenInBrowser = func(url string) error {
+func OpenInBrowser(url string) error {
 	browser := os.Getenv("BROWSER")
 	if browser == "" {
 		browser = searchBrowserLauncher(runtime.GOOS)
@@ -45,7 +45,8 @@ var OpenInBrowser = func(url string) error {
 	}
 
 	endingArgs := append(browserArgs[1:], url)
-	return exec.Command(browserArgs[0], endingArgs...).Run()
+	browseCmd := exec.Command(browserArgs[0], endingArgs...)
+	return PrepareCmd(browseCmd).Run()
 }
 
 func searchBrowserLauncher(goos string) (browser string) {
