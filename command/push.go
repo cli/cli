@@ -102,9 +102,6 @@ func push(cmd *cobra.Command, args []string) error {
 		fmt.Println(utils.Yellow("Now tracking at " + fmt.Sprintf("%s/%s (%s/%s)", remote.Owner, remote.Repo, remote.Name, currentBranch)))
 	}
 
-	// TODO move PR stuff top of status
-	// TODO merge in pr create
-
 	err = git.Run("push")
 	if err != nil {
 		return errors.Wrap(err, "git push failed")

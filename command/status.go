@@ -24,17 +24,6 @@ context on any current PR open on GitHub for the current branch.`,
 }
 
 func status(cmd *cobra.Command, args []string) error {
-	gitCmd := exec.Command("git", os.Args[1:]...)
-	gitCmd.Stdout = os.Stdout
-
-	err := gitCmd.Run()
-
-	if err != nil {
-		return errors.Wrap(err, "git failed")
-	}
-
-	fmt.Println()
-
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -87,6 +76,17 @@ func status(cmd *cobra.Command, args []string) error {
 	} else {
 		message := fmt.Sprintf("There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
 		printMessage(message)
+	}
+
+	fmt.Println()
+
+	gitCmd := exec.Command("git", os.Args[1:]...)
+	gitCmd.Stdout = os.Stdout
+
+	err = gitCmd.Run()
+
+	if err != nil {
+		return errors.Wrap(err, "git failed")
 	}
 
 	return nil
