@@ -112,7 +112,7 @@ func push(cmd *cobra.Command, args []string) error {
 }
 
 func setTrackingBranch(remote *context.Remote, branch string) error {
-	return git.Run("branch",
-		fmt.Sprintf("--set-upstream-to=%s/%s", remote.Name, branch),
+	return git.Run("branch", "-u",
+		fmt.Sprintf("%s/%s", remote.Name, branch),
 		branch)
 }
