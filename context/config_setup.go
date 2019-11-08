@@ -14,6 +14,9 @@ import (
 
 const (
 	oauthHost = "github.com"
+)
+
+var (
 	// The GitHub app that is meant for development
 	oauthClientID = "4d747ba5675d5d66553f"
 	// This value is safe to be embedded in version control
