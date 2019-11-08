@@ -38,5 +38,4 @@ jobs:
           homebrew-tap: github/homebrew-gh
           download-url: ${{ steps.copy.outputs.asset-url }}
         env:
-          GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
