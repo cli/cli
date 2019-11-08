@@ -3915,8 +3915,7 @@ async function createRelease(owner, repo, release) {
         repo,
         tag_name: release.tag_name,
         name: release.name,
-        body: release.body,
-        target_commitish: release.target_commitish,
+        body: '',
         prerelease: release.prerelease,
         draft: false,
     });
