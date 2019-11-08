@@ -258,12 +258,15 @@ func printPrs(prs ...api.PullRequest) {
 		}
 
 		if checks.Total > 0 {
-			ratio := fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
+			var ratio string
 			if checks.Failing > 0 {
+				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
 				ratio = utils.Red(ratio)
 			} else if checks.Pending > 0 {
+				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
 				ratio = utils.Yellow(ratio)
 			} else if checks.Passing == checks.Total {
+				ratio = fmt.Sprintf("%d", checks.Total)
 				ratio = utils.Green(ratio)
 			}
 			fmt.Printf(" - checks: %s", ratio)
