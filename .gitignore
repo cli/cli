@@ -1,3 +1,4 @@
 bin/gh
 /gh-cli
 .envrc
+/dist
