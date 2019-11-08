@@ -248,7 +248,8 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
-		fmt.Printf("  #%d %s %s", pr.Number, truncate(50, pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
+		prNumber := fmt.Sprintf("#%d", pr.Number)
+		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
