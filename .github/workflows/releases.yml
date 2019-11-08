@@ -27,8 +27,7 @@ jobs:
         id: copy
         uses: ./.github/actions/copy-release-to-another-repo
         with:
-          UPLOAD_OWNER_NAME: github
-          UPLOAD_REPO_NAME: homebrew-gh
+          target-repo: github/homebrew-gh
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           UPLOAD_GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
