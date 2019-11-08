@@ -1,6 +1,9 @@
 package command
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -68,4 +71,47 @@ func TestIssueView(t *testing.T) {
 	if url != "https://github.com/OWNER/REPO/issues/8" {
 		t.Errorf("got: %q", url)
 	}
+}
+
+func TestIssueCreate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID"
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+
+	out := bytes.Buffer{}
+	issueCreateCmd.SetOut(&out)
+
+	RootCmd.SetArgs([]string{"issue", "create", "-m", "hello", "-m", "ab", "-m", "cd"})
+	_, err := RootCmd.ExecuteC()
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "hello")
+	eq(t, reqBody.Variables.Input.Body, "ab\n\ncd")
+
+	eq(t, out.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }

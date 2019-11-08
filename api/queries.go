@@ -33,6 +33,7 @@ type IssuesPayload struct {
 type Issue struct {
 	Number int
 	Title  string
+	URL    string
 }
 
 func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {

@@ -2,39 +2,46 @@ package command
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
-	var issueCmd = &cobra.Command{
-		Use:   "issue",
-		Short: "Work with GitHub issues",
-		Long:  `This command allows you to work with issues.`,
-		Args:  cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("%+v is not a valid issue command", args)
-		},
-	}
-
+	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(
 		&cobra.Command{
 			Use:   "status",
-			Short: "Display issue status",
+			Short: "Show status of relevant issues",
 			RunE:  issueList,
 		},
 		&cobra.Command{
-			Use:   "view [issue-number]",
+			Use:   "view <issue-number>",
 			Args:  cobra.MinimumNArgs(1),
-			Short: "Open a issue in the browser",
+			Short: "Open an issue in the browser",
 			RunE:  issueView,
 		},
 	)
+	issueCmd.AddCommand(issueCreateCmd)
+	issueCreateCmd.Flags().StringArrayP("message", "m", nil, "set title and body")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+}
 
-	RootCmd.AddCommand(issueCmd)
+var issueCmd = &cobra.Command{
+	Use:   "issue",
+	Short: "Work with GitHub issues",
+	Long:  `Helps you work with issues.`,
+}
+var issueCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new issue",
+	RunE:  issueCreate,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -105,6 +112,77 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+func issueCreate(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
+		// TODO: move URL generation into GitHubRepository
+		openURL := fmt.Sprintf("https://github.com/%s/%s/issues/new", baseRepo.RepoOwner(), baseRepo.RepoName())
+		// TODO: figure out how to stub this in tests
+		if stat, err := os.Stat(".github/ISSUE_TEMPLATE"); err == nil && stat.IsDir() {
+			openURL += "/choose"
+		}
+		return utils.OpenInBrowser(openURL)
+	}
+
+	var title string
+	var body string
+
+	message, err := cmd.Flags().GetStringArray("message")
+	if err != nil {
+		return err
+	}
+
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(message) > 0 {
+		title = message[0]
+		body = strings.Join(message[1:], "\n\n")
+	} else {
+		// TODO: open the text editor for issue title & body
+		input := os.Stdin
+		if terminal.IsTerminal(int(input.Fd())) {
+			cmd.Println("Enter the issue title and body; press Enter + Ctrl-D when done:")
+		}
+		inputBytes, err := ioutil.ReadAll(input)
+		if err != nil {
+			return err
+		}
+
+		parts := strings.SplitN(string(inputBytes), "\n\n", 2)
+		if len(parts) > 0 {
+			title = parts[0]
+		}
+		if len(parts) > 1 {
+			body = parts[1]
+		}
+	}
+
+	if title == "" {
+		return fmt.Errorf("aborting due to empty title")
+	}
+	params := map[string]interface{}{
+		"title": title,
+		"body":  body,
+	}
+
+	newIssue, err := api.IssueCreate(apiClient, baseRepo, params)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
+	return nil
 }
 
 func printIssues(issues ...api.Issue) {
