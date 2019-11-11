@@ -212,9 +212,9 @@ var GitCommand = func(args ...string) *exec.Cmd {
 
 func UncommittedChangeCount() (int, error) {
 	statusCmd := GitCommand("status", "--porcelain")
-	output, err := statusCmd.Output()
+	output, err := utils.PrepareCmd(statusCmd).Output()
 	if err != nil {
-		return 0, fmt.Errorf("failed to run git status: %s", err)
+		return 0, err
 	}
 	lines := strings.Split(string(output), "\n")
 

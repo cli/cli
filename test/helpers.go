@@ -11,11 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ExecStub struct {
-	Stdout   string
-	ExitCode int
-}
-
 func GetTestHelperProcessArgs() []string {
 	args := os.Args
 	for len(args) > 0 {
@@ -26,11 +21,6 @@ func GetTestHelperProcessArgs() []string {
 		args = args[1:]
 	}
 	return args
-}
-
-func GetExecStub(outputs map[string]ExecStub) ExecStub {
-	args := GetTestHelperProcessArgs()
-	return outputs[args[0]]
 }
 
 func SkipTestHelperProcess() bool {

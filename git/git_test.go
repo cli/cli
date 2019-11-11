@@ -2,27 +2,30 @@ package git
 
 import (
 	"fmt"
-	"github.com/github/gh-cli/test"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/github/gh-cli/test"
 )
 
 func TestGitStatusHelperProcess(*testing.T) {
 	if test.SkipTestHelperProcess() {
 		return
 	}
-	outputs := map[string]test.ExecStub{
-		"no changes": test.ExecStub{"", 0},
-		"one change": test.ExecStub{` M poem.txt
-`, 0},
-		"untracked file": test.ExecStub{` M poem.txt
-?? new.txt
-`, 0},
-		"boom": test.ExecStub{"", 1},
+
+	args := test.GetTestHelperProcessArgs()
+	switch args[0] {
+	case "no changes":
+	case "one change":
+		fmt.Println(" M poem.txt")
+	case "untracked file":
+		fmt.Println(" M poem.txt")
+		fmt.Println("?? new.txt")
+	case "boom":
+		os.Exit(1)
 	}
-	output := test.GetExecStub(outputs)
-	defer os.Exit(output.ExitCode)
-	fmt.Println(output.Stdout)
+	os.Exit(0)
 }
 
 func Test_UncommittedChangeCount(t *testing.T) {
@@ -48,7 +51,7 @@ func Test_UncommittedChangeCount(t *testing.T) {
 
 	GitCommand = test.StubExecCommand("TestGitStatusHelperProcess", "boom")
 	_, err := UncommittedChangeCount()
-	if err.Error() != "failed to run git status: exit status 1" {
+	if !strings.HasSuffix(err.Error(), "git.test: exit status 1") {
 		t.Errorf("got unexpected error message: %s", err)
 	}
 }

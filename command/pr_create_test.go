@@ -18,20 +18,23 @@ func TestPrCreateHelperProcess(*testing.T) {
 		return
 	}
 
-	statusOutputs := map[string]string{
-		"clean": "",
-		"dirty": " M git/git.go",
-	}
-
 	args := test.GetTestHelperProcessArgs()
 	switch args[1] {
 	case "status":
-		fmt.Println(statusOutputs[args[0]])
+		switch args[0] {
+		case "clean":
+		case "dirty":
+			fmt.Println(" M git/git.go")
+		default:
+			fmt.Fprintf(os.Stderr, "unknown scenario: %q", args[0])
+			os.Exit(1)
+		}
 	case "push":
-		fmt.Println()
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %q", args[1])
+		os.Exit(1)
 	}
-
-	defer os.Exit(0)
+	os.Exit(0)
 }
 
 func TestReportsUncommittedChanges(t *testing.T) {
