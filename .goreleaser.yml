@@ -1,0 +1,32 @@
+# Make sure to check the documentation at http://goreleaser.com
+project_name: gh
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: bin/gh
+    ldflags:
+      - -s -w -X github.com/github/gh-cli/command.Version={{.Version}} -X github.com/github/gh-cli/command.BuildDate={{.Date}}
+      - -X github.com/github/gh-cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
+      - -X github.com/github/gh-cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    wrap_in_directory: true
+    replacements:
+      darwin: macOS
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

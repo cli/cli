@@ -1,0 +1,9 @@
+name: 'Copy release to another repo'
+description: 'Copy a release from one repo to another'
+author: 'probablycorey'
+runs:
+  using: 'node12'
+  main: './lib/index.js'
+outputs:
+  asset-url:
+    description: The url of the asset that was copied
