@@ -148,13 +148,20 @@ func prCreate(ctx context.Context) error {
 		return fmt.Errorf("could not determine GitHub repo: %s", err)
 	}
 
-	payload, err := api.CreatePullRequest(client, repo, title, body, _draftF, base, head)
+	params := map[string]interface{}{
+		"title":       title,
+		"body":        body,
+		"draft":       _draftF,
+		"baseRefName": base,
+		"headRefName": head,
+	}
+
+	pr, err := api.CreatePullRequest(client, repo, params)
 	if err != nil {
 		return fmt.Errorf("failed to create PR: %s", err)
 	}
 
-	fmt.Println(payload)
-
+	fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	return nil
 }
 
