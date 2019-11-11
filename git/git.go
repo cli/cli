@@ -8,12 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/github/gh-cli/utils"
 )
 
 func Dir() (string, error) {
 	dirCmd := exec.Command("git", "rev-parse", "-q", "--git-dir")
-	dirCmd.Stderr = nil
-	output, err := dirCmd.Output()
+	output, err := utils.PrepareCmd(dirCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("Not a git repository (or any of the parent directories): .git")
 	}
@@ -33,7 +34,7 @@ func Dir() (string, error) {
 func WorkdirName() (string, error) {
 	toplevelCmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	toplevelCmd.Stderr = nil
-	output, err := toplevelCmd.Output()
+	output, err := utils.PrepareCmd(toplevelCmd).Output()
 	dir := firstLine(output)
 	if dir == "" {
 		return "", fmt.Errorf("unable to determine git working directory")
@@ -44,8 +45,7 @@ func WorkdirName() (string, error) {
 func HasFile(segments ...string) bool {
 	// The blessed way to resolve paths within git dir since Git 2.5.0
 	pathCmd := exec.Command("git", "rev-parse", "-q", "--git-path", filepath.Join(segments...))
-	pathCmd.Stderr = nil
-	if output, err := pathCmd.Output(); err == nil {
+	if output, err := utils.PrepareCmd(pathCmd).Output(); err == nil {
 		if lines := outputLines(output); len(lines) == 1 {
 			if _, err := os.Stat(lines[0]); err == nil {
 				return true
@@ -97,8 +97,7 @@ func BranchAtRef(paths ...string) (name string, err error) {
 
 func Editor() (string, error) {
 	varCmd := exec.Command("git", "var", "GIT_EDITOR")
-	varCmd.Stderr = nil
-	output, err := varCmd.Output()
+	output, err := utils.PrepareCmd(varCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("Can't load git var: GIT_EDITOR")
 	}
@@ -112,8 +111,7 @@ func Head() (string, error) {
 
 func SymbolicFullName(name string) (string, error) {
 	parseCmd := exec.Command("git", "rev-parse", "--symbolic-full-name", name)
-	parseCmd.Stderr = nil
-	output, err := parseCmd.Output()
+	output, err := utils.PrepareCmd(parseCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("Unknown revision or path not in the working tree: %s", name)
 	}
@@ -145,9 +143,7 @@ func CommentChar(text string) (string, error) {
 
 func Show(sha string) (string, error) {
 	cmd := exec.Command("git", "-c", "log.showSignature=false", "show", "-s", "--format=%s%n%+b", sha)
-	cmd.Stderr = nil
-
-	output, err := cmd.Output()
+	output, err := utils.PrepareCmd(cmd).Output()
 	return strings.TrimSpace(string(output)), err
 }
 
@@ -157,7 +153,7 @@ func Log(sha1, sha2 string) (string, error) {
 		"-c", "log.showSignature=false", "log", "--no-color",
 		"--format=%h (%aN, %ar)%n%w(78,3,3)%s%n%+b",
 		"--cherry", shaRange)
-	outputs, err := cmd.Output()
+	outputs, err := utils.PrepareCmd(cmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("Can't load git log %s..%s", sha1, sha2)
 	}
@@ -167,14 +163,13 @@ func Log(sha1, sha2 string) (string, error) {
 
 func listRemotes() ([]string, error) {
 	remoteCmd := exec.Command("git", "remote", "-v")
-	remoteCmd.Stderr = nil
-	output, err := remoteCmd.Output()
+	output, err := utils.PrepareCmd(remoteCmd).Output()
 	return outputLines(output), err
 }
 
 func Config(name string) (string, error) {
 	configCmd := exec.Command("git", "config", name)
-	output, err := configCmd.Output()
+	output, err := utils.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("unknown config key: %s", name)
 	}
@@ -190,21 +185,16 @@ func ConfigAll(name string) ([]string, error) {
 	}
 
 	configCmd := exec.Command("git", "config", mode, name)
-	output, err := configCmd.Output()
+	output, err := utils.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return nil, fmt.Errorf("Unknown config %s", name)
 	}
 	return outputLines(output), nil
 }
 
-func Run(args ...string) error {
-	cmd := exec.Command("git", args...)
-	return cmd.Run()
-}
-
 func LocalBranches() ([]string, error) {
 	branchesCmd := exec.Command("git", "branch", "--list")
-	output, err := branchesCmd.Output()
+	output, err := utils.PrepareCmd(branchesCmd).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -246,9 +236,6 @@ func Push(remote string, ref string) error {
 
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
-	if lines == "" {
-		return []string{}
-	}
 	return strings.Split(lines, "\n")
 
 }

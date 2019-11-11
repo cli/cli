@@ -1,44 +1,37 @@
 package command
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"os"
+	"os/exec"
+	"reflect"
 	"regexp"
 	"testing"
 
-	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
 )
 
-func initBlankContext(repo, branch string) {
-	initContext = func() context.Context {
-		ctx := context.NewBlank()
-		ctx.SetBaseRepo(repo)
-		ctx.SetBranch(branch)
-		return ctx
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
 
-func initFakeHTTP() *api.FakeHTTP {
-	http := &api.FakeHTTP{}
-	apiClientForContext = func(context.Context) (*api.Client, error) {
-		return api.NewClient(api.ReplaceTripper(http)), nil
-	}
-	return http
-}
-
-func TestPRList(t *testing.T) {
+func TestPRStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
-	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "pr list")
+	output, err := test.RunCommand(RootCmd, "pr status")
 	if err != nil {
-		t.Errorf("error running command `pr list`: %v", err)
+		t.Errorf("error running command `pr status`: %v", err)
 	}
 
 	expectedPrs := []*regexp.Regexp{
@@ -55,6 +48,57 @@ func TestPRList(t *testing.T) {
 	}
 }
 
+func TestPRList(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	out := bytes.Buffer{}
+	prListCmd.SetOut(&out)
+
+	RootCmd.SetArgs([]string{"pr", "list"})
+	_, err := RootCmd.ExecuteC()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, out.String(), `32	New feature	feature
+29	Fixed bad bug	bug-fix
+28	Improve documentation	docs
+`)
+}
+
+func TestPRList_filtering(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	prListCmd.SetOut(ioutil.Discard)
+
+	RootCmd.SetArgs([]string{"pr", "list", "-s", "all", "-l", "one", "-l", "two"})
+	_, err := RootCmd.ExecuteC()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables struct {
+			State  []string
+			Labels []string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
+	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
+}
+
 func TestPRView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
@@ -63,8 +107,12 @@ func TestPRView(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	teardown, callCount := mockOpenInBrowser()
-	defer teardown()
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
 	if err != nil {
@@ -75,8 +123,12 @@ func TestPRView(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if *callCount != 1 {
-		t.Errorf("OpenInBrowser should be called 1 time but was called %d time(s)", *callCount)
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	if url != "https://github.com/OWNER/REPO/pull/10" {
+		t.Errorf("got: %q", url)
 	}
 }
 
@@ -88,16 +140,20 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	teardown, callCount := mockOpenInBrowser()
-	defer teardown()
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
 	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if *callCount > 0 {
-		t.Errorf("OpenInBrowser should NOT be called but was called %d time(s)", *callCount)
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
 	}
 
 	// Now run again but provide a PR number
@@ -110,22 +166,11 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 		t.Errorf("command output expected got an empty string")
 	}
 
-	if *callCount != 1 {
-		t.Errorf("OpenInBrowser should be called once but was called %d time(s)", *callCount)
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
 	}
-}
-
-func mockOpenInBrowser() (func(), *int) {
-	callCount := 0
-	originalOpenInBrowser := utils.OpenInBrowser
-	teardown := func() {
-		utils.OpenInBrowser = originalOpenInBrowser
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	if url != "https://github.com/OWNER/REPO/pull/23" {
+		t.Errorf("got: %q", url)
 	}
-
-	utils.OpenInBrowser = func(_ string) error {
-		callCount++
-		return nil
-	}
-
-	return teardown, &callCount
 }

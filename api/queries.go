@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"time"
 )
 
 type PullRequestsPayload struct {
@@ -13,6 +14,7 @@ type PullRequestsPayload struct {
 type PullRequest struct {
 	Number      int
 	Title       string
+	State       string
 	URL         string
 	HeadRefName string
 }
@@ -22,32 +24,107 @@ type Repo interface {
 	RepoOwner() string
 }
 
-func GitHubRepoId(client *Client, ghRepo Repo) (string, error) {
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
+type IssuesPayload struct {
+	Assigned  []Issue
+	Mentioned []Issue
+	Recent    []Issue
+}
+
+type Issue struct {
+	Number int
+	Title  string
+	URL    string
+}
+
+func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
+	type issues struct {
+		Issues struct {
+			Edges []struct {
+				Node Issue
+			}
+		}
+	}
+
+	type response struct {
+		Assigned  issues
+		Mentioned issues
+		Recent    issues
+	}
 
 	query := `
-		query FindRepoID($owner:String!, $name:String!) {
-			repository(owner:$owner, name:$name) {
-				id
-			}
-	}`
+    fragment issue on Issue {
+      number
+      title
+    }
+    query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
+      assigned: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {assignee: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+      }
+      mentioned: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {mentioned: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+      }
+      recent: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {since: $since}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+          edges {
+            node {
+              ...issue
+            }
+          }
+        }
+      }
+    }
+  `
+
+	owner := ghRepo.RepoOwner()
+	repo := ghRepo.RepoName()
+	since := time.Now().UTC().Add(time.Hour * -24).Format("2006-01-02T15:04:05-0700")
 	variables := map[string]interface{}{
-		"owner": owner,
-		"name":  repo,
+		"owner":  owner,
+		"repo":   repo,
+		"viewer": currentUsername,
+		"since":  since,
 	}
 
-	result := struct {
-		Repository struct {
-			Id string
-		}
-	}{}
-	err := client.GraphQL(query, variables, &result)
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to determine GH repo ID: %s", err)
+		return nil, err
 	}
 
-	return result.Repository.Id, nil
+	var assigned []Issue
+	for _, edge := range resp.Assigned.Issues.Edges {
+		assigned = append(assigned, edge.Node)
+	}
+
+	var mentioned []Issue
+	for _, edge := range resp.Mentioned.Issues.Edges {
+		mentioned = append(mentioned, edge.Node)
+	}
+
+	var recent []Issue
+	for _, edge := range resp.Recent.Issues.Edges {
+		recent = append(recent, edge.Node)
+	}
+
+	payload := IssuesPayload{
+		assigned,
+		mentioned,
+		recent,
+	}
+
+	return &payload, nil
 }
 
 func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername string) (*PullRequestsPayload, error) {
@@ -241,4 +318,97 @@ func CreatePullRequest(client *Client, ghRepo Repo, title string, body string, d
 	}
 
 	return result.CreatePullRequest.PullRequest.URL, nil
+}
+
+func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]PullRequest, error) {
+	type response struct {
+		Repository struct {
+			PullRequests struct {
+				Edges []struct {
+					Node PullRequest
+				}
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			}
+		}
+	}
+
+	query := `
+    query(
+		$owner: String!,
+		$repo: String!,
+		$limit: Int!,
+		$endCursor: String,
+		$baseBranch: String,
+		$labels: [String!],
+		$state: [PullRequestState!] = OPEN
+	) {
+      repository(owner: $owner, name: $repo) {
+        pullRequests(
+			states: $state,
+			baseRefName: $baseBranch,
+			labels: $labels,
+			first: $limit,
+			after: $endCursor,
+			orderBy: {field: CREATED_AT, direction: DESC}
+		) {
+          edges {
+            node {
+				number
+				title
+				state
+				url
+				headRefName
+            }
+		  }
+		  pageInfo {
+			  hasNextPage
+			  endCursor
+		  }
+        }
+      }
+    }`
+
+	prs := []PullRequest{}
+	pageLimit := min(limit, 100)
+	variables := map[string]interface{}{}
+	for name, val := range vars {
+		variables[name] = val
+	}
+
+	for {
+		variables["limit"] = pageLimit
+		var data response
+		err := client.GraphQL(query, variables, &data)
+		if err != nil {
+			return nil, err
+		}
+		prData := data.Repository.PullRequests
+
+		for _, edge := range prData.Edges {
+			prs = append(prs, edge.Node)
+			if len(prs) == limit {
+				goto done
+			}
+		}
+
+		if prData.PageInfo.HasNextPage {
+			variables["endCursor"] = prData.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(prs))
+			continue
+		}
+	done:
+		break
+	}
+
+	return prs, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
