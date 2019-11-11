@@ -1,15 +1,16 @@
 package command
 
 import (
-	//"regexp"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 
-	//"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/test"
-	//"github.com/github/gh-cli/utils"
 )
 
 func TestPrCreateHelperProcess(*testing.T) {
@@ -34,14 +35,26 @@ func TestPrCreateHelperProcess(*testing.T) {
 }
 
 func TestReportsUncommittedChanges(t *testing.T) {
-	repoIdFix, _ := os.Open("test/fixtures/repoId.json")
-	defer repoIdFix.Close()
-	createPrFix, _ := os.Open("test/fixtures/createPr.json")
-	defer createPrFix.Close()
-
+	ctx := context.NewBlank()
+	ctx.SetBranch("feature")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
-	http.StubResponse(200, repoIdFix)
-	http.StubResponse(200, createPrFix)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID"
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
 
 	origGitCommand := git.GitCommand
 	defer func() {
@@ -50,14 +63,34 @@ func TestReportsUncommittedChanges(t *testing.T) {
 
 	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "dirty")
 
-	// init blank command and just run prCreate? Or try to use RunCommand?
+	out := bytes.Buffer{}
+	prCreateCmd.SetOut(&out)
 
-	// output, err := test.RunCommand(RootCmd, "pr create -tfoo -bbar")
-	// if err != nil {
-	// 	t.Errorf("error running command `pr create`: %v", err)
-	// }
+	RootCmd.SetArgs([]string{"pr", "create", "-t", "mytitle", "-b", "mybody"})
+	_, err := prCreateCmd.ExecuteC()
+	eq(t, err, nil)
 
-	// if len(output) == 0 {
-	// 	panic("lol")
-	// }
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "mytitle")
+	eq(t, reqBody.Variables.Input.Body, "mybody")
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, out.String(), `Warning: 1 uncommitted change
+https://github.com/OWNER/REPO/pull/12
+`)
 }

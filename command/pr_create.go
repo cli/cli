@@ -2,14 +2,14 @@ package command
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
-	"os"
-	"runtime"
 )
 
 var (
@@ -19,20 +19,21 @@ var (
 	_baseF  string
 )
 
-func prCreate(ctx context.Context) error {
+func prCreate(cmd *cobra.Command, _ []string) error {
+	ctx := contextForCommand(cmd)
+
 	ucc, err := git.UncommittedChangeCount()
 	if err != nil {
-		return fmt.Errorf(
-			"could not determine state of working directory: %v", err)
+		return err
 	}
 	if ucc > 0 {
 		noun := "change"
 		if ucc > 1 {
+			// TODO: use pluralize helper
 			noun = noun + "s"
 		}
 
-		fmt.Printf("%s %d uncommitted %s %s", utils.Red("!!!"),
-			ucc, noun, utils.Red("!!!"))
+		cmd.Printf("Warning: %d uncommitted %s\n", ucc, noun)
 	}
 
 	head, err := ctx.Branch()
@@ -119,7 +120,7 @@ func prCreate(ctx context.Context) error {
 			case "Edit":
 				continue
 			case "Cancel":
-				fmt.Println(utils.Red("Discarding PR."))
+				cmd.Println("Discarding pull request")
 				return nil
 			}
 		}
@@ -171,7 +172,9 @@ func guessRemote(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("could not determine suitable remote: %s", err)
 	}
 
-	remote, err := remotes.FindByName("origin", "github")
+	// TODO: consolidate logic with fsContext.BaseRepo
+	// TODO: check if the GH repo that the remote points to is writeable
+	remote, err := remotes.FindByName("upstream", "github", "origin", "*")
 	if err != nil {
 		return "", fmt.Errorf("could not determine suitable remote: %s", err)
 	}
@@ -195,10 +198,7 @@ func determineEditor() string {
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := contextForCommand(cmd)
-		return prCreate(ctx)
-	},
+	RunE:  prCreate,
 }
 
 func init() {
