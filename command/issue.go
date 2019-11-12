@@ -19,7 +19,7 @@ func init() {
 		&cobra.Command{
 			Use:   "status",
 			Short: "Show status of relevant issues",
-			RunE:  issueList,
+			RunE:  issueStatus,
 		},
 		&cobra.Command{
 			Use:   "view <issue-number>",
@@ -31,6 +31,16 @@ func init() {
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringArrayP("message", "m", nil, "set title and body")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+
+	issueListCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List open issues",
+		RunE:  issueList,
+	}
+	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
+	issueListCmd.Flags().StringP("label", "l", "", "Filter by assignee")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state")
+	issueCmd.AddCommand((issueListCmd))
 }
 
 var issueCmd = &cobra.Command{
@@ -56,12 +66,43 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	state, err := cmd.Flags().GetString("state")
+	if err != nil {
+		return err
+	}
+
+	issues, err := api.IssueList(apiClient, baseRepo, state)
+	if err != nil {
+		return err
+	}
+
+	if len(issues) > 0 {
+		printIssues(issues...)
+	} else {
+		message := fmt.Sprintf("There are no open issues")
+		printMessage(message)
+	}
+	return nil
+}
+
+func issueStatus(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+
 	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
 	}
 
-	issuePayload, err := api.Issues(apiClient, baseRepo, currentUser)
+	issuePayload, err := api.IssueStatus(apiClient, baseRepo, currentUser)
 	if err != nil {
 		return err
 	}
