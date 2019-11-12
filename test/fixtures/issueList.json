@@ -1,47 +1,27 @@
 {
   "data": {
-    "assigned": {
-      "issues": {
-        "edges": [
-          {
-            "node": {
-              "number": 9,
-              "title": "corey thinks squash tastes bad"
-            }
-          },
-          {
-            "node": {
-              "number": 10,
-              "title": "broccoli is a superfood"
-            }
+    "issues": {
+      "edges": [
+        {
+          "node": {
+            "number": 1,
+            "title": "number won"
           }
-        ]
-      }
-    },
-    "mentioned": {
-      "issues": {
-        "edges": [
-          {
-            "node": {
-              "number": 8,
-              "title": "rabbits eat carrots"
-            }
-          },
-          {
-            "node": {
-              "number": 11,
-              "title": "swiss chard is neutral"
-            }
+        },
+        {
+          "node": {
+            "number": 2,
+            "title": "number too"
           }
-        ]
-      }
+        },
+        {
+          "node": {
+            "number": 4,
+            "title": "number fore"
+          }
+        }
+      ]
     },
-    "recent": {
-      "issues": {
-        "edges": []
-      }
-    },
-
     "pageInfo": { "hasNextPage": false }
   }
 }

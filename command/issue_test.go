@@ -40,6 +40,32 @@ func TestIssueStatus(t *testing.T) {
 	}
 }
 
+func TestIssueList(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := test.RunCommand(RootCmd, "issue list")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	expectedIssues := []*regexp.Regexp{
+		regexp.MustCompile(`#1.*won`),
+		regexp.MustCompile(`#2.*too`),
+		regexp.MustCompile(`#4.*fore`),
+	}
+
+	for _, r := range expectedIssues {
+		if !r.MatchString(output) {
+			t.Errorf("output did not match regexp /%s/", r)
+		}
+	}
+}
+
 func TestIssueView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
