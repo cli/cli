@@ -9,3 +9,11 @@ This tool is an endeavor separate from [github/hub](https://github.com/github/hu
 - [Demo planning doc](https://docs.google.com/document/d/18ym-_xjFTSXe0-xzgaBn13Su7MEhWfLE5qSNPJV4M0A/edit)
 - [Weekly tracking issue](https://github.com/github/gh-cli/labels/tracking%20issue)
 - [Weekly sync notes](https://docs.google.com/document/d/1eUo9nIzXbC1DG26Y3dk9hOceLua2yFlwlvFPZ82MwHg/edit)
+
+# How to create a release
+
+This can all be done from your local terminal.
+
+1. `git tag -a vYOUR_VERSION_NUMBER -m 'vYOUR_VERSION_NUMBER'`
+2. `git push origin vYOUR_VERSION_NUMBER`
+3. Go to https://github.com/github/homebrew-gh/releases and look at the release (read https://github.com/github/homebrew-gh for how to install the release via homebrew)
