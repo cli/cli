@@ -12,13 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	_draftF bool
-	_titleF string
-	_bodyF  string
-	_baseF  string
-)
-
 func prCreate(cmd *cobra.Command, _ []string) error {
 	ctx := contextForCommand(cmd)
 
@@ -50,7 +43,16 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("was not able to push to remote '%s': %s", remote, err)
 	}
 
-	interactive := _titleF == "" || _bodyF == ""
+	title, err := cmd.Flags().GetString("title")
+	if err != nil {
+		return err
+	}
+	body, err := cmd.Flags().GetString("body")
+	if err != nil {
+		return err
+	}
+
+	interactive := title == "" || body == ""
 
 	inProgress := struct {
 		Body  string
@@ -81,10 +83,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			}
 
 			qs := []*survey.Question{}
-			if _titleF == "" {
+			if title == "" {
 				qs = append(qs, titleQuestion)
 			}
-			if _bodyF == "" {
+			if body == "" {
 				qs = append(qs, bodyQuestion)
 			}
 
@@ -126,16 +128,18 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	title := _titleF
 	if title == "" {
 		title = inProgress.Title
 	}
-	body := _bodyF
 	if body == "" {
 		body = inProgress.Body
 	}
-	base := _baseF
+	base, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
 	if base == "" {
+		// TODO: use default branch for the repo
 		base = "master"
 	}
 
@@ -149,10 +153,15 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not determine GitHub repo: %s", err)
 	}
 
+	isDraft, err := cmd.Flags().GetBool("draft")
+	if err != nil {
+		return err
+	}
+
 	params := map[string]interface{}{
 		"title":       title,
 		"body":        body,
-		"draft":       _draftF,
+		"draft":       isDraft,
 		"baseRefName": base,
 		"headRefName": head,
 	}
@@ -202,13 +211,12 @@ var prCreateCmd = &cobra.Command{
 }
 
 func init() {
-	prCreateCmd.Flags().BoolVarP(&_draftF, "draft", "d", false,
+	prCreateCmd.Flags().BoolP("draft", "d", false,
 		"Mark PR as a draft")
-	prCreateCmd.Flags().StringVarP(&_titleF, "title", "t", "",
+	prCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringVarP(&_bodyF, "body", "b", "",
+	prCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringVarP(&_baseF, "base", "T", "",
+	prCreateCmd.Flags().StringP("base", "T", "",
 		"The branch into which you want your code merged")
-
 }
