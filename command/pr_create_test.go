@@ -37,7 +37,7 @@ func TestPrCreateHelperProcess(*testing.T) {
 	os.Exit(0)
 }
 
-func TestReportsUncommittedChanges(t *testing.T) {
+func TestPRCreate(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("feature")
 	ctx.SetRemotes(map[string]string{
@@ -60,11 +60,10 @@ func TestReportsUncommittedChanges(t *testing.T) {
 	`))
 
 	origGitCommand := git.GitCommand
+	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
 	defer func() {
 		git.GitCommand = origGitCommand
 	}()
-
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "dirty")
 
 	out := bytes.Buffer{}
 	prCreateCmd.SetOut(&out)
@@ -92,6 +91,44 @@ func TestReportsUncommittedChanges(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Body, "mybody")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, out.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("feature")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID"
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	origGitCommand := git.GitCommand
+	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "dirty")
+	defer func() {
+		git.GitCommand = origGitCommand
+	}()
+
+	out := bytes.Buffer{}
+	prCreateCmd.SetOut(&out)
+
+	RootCmd.SetArgs([]string{"pr", "create", "-t", "mytitle", "-b", "mybody"})
+	_, err := prCreateCmd.ExecuteC()
+	eq(t, err, nil)
 
 	eq(t, out.String(), `Warning: 1 uncommitted change
 https://github.com/OWNER/REPO/pull/12
