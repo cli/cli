@@ -37,9 +37,9 @@ func init() {
 		Short: "List open issues",
 		RunE:  issueList,
 	}
-	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
-	issueListCmd.Flags().StringP("label", "l", "", "Filter by assignee")
-	issueListCmd.Flags().StringP("state", "s", "", "Filter by state")
+	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels ")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open, closed or all)")
 	issueCmd.AddCommand((issueListCmd))
 }
 
@@ -71,7 +71,17 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issues, err := api.IssueList(apiClient, baseRepo, state)
+	labels, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return err
+	}
+
+	assignee, err := cmd.Flags().GetString("assignee")
+	if err != nil {
+		return err
+	}
+
+	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee)
 	if err != nil {
 		return err
 	}
