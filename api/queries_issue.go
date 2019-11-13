@@ -147,7 +147,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	return &payload, nil
 }
 
-func IssueList(client *Client, ghRepo Repo, state string) ([]Issue, error) {
+func IssueList(client *Client, ghRepo Repo, state string, labels []string, assigneeString string) ([]Issue, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -160,14 +160,27 @@ func IssueList(client *Client, ghRepo Repo, state string) ([]Issue, error) {
 		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
+	// If you don't want to filter by lables, graphql requires you need
+	// to send nil instead of an empty array.
+	if len(labels) == 0 {
+		labels = nil
+	}
+
+	var assignee interface{}
+	if len(assigneeString) > 0 {
+		assignee = assigneeString
+	} else {
+		assignee = nil
+	}
+
 	query := `
     fragment issue on Issue {
       number
       title
     }
-    query($owner: String!, $repo: String!, $per_page: Int = 10, $states: [IssueState!] = OPEN) {
+    query($owner: String!, $repo: String!, $per_page: Int = 10, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
-        issues(first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}, states: $states) {
+        issues(first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
           edges {
             node {
               ...issue
@@ -181,9 +194,11 @@ func IssueList(client *Client, ghRepo Repo, state string) ([]Issue, error) {
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
 	variables := map[string]interface{}{
-		"owner":  owner,
-		"repo":   repo,
-		"states": states,
+		"owner":    owner,
+		"repo":     repo,
+		"states":   states,
+		"labels":   labels,
+		"assignee": assignee,
 	}
 
 	var resp struct {
