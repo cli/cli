@@ -17,6 +17,99 @@ type PullRequest struct {
 	State       string
 	URL         string
 	HeadRefName string
+	Reviews     struct {
+		Nodes []struct {
+			State  string
+			Author struct {
+				Login string
+			}
+		}
+	}
+	Commits struct {
+		Nodes []struct {
+			Commit struct {
+				Status struct {
+					Contexts []struct {
+						State string
+					}
+				}
+				CheckSuites struct {
+					Nodes []struct {
+						CheckRuns struct {
+							Nodes []struct {
+								Conclusion string
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+type PullRequestReviewStatus struct {
+	ChangesRequested bool
+	Approved         bool
+}
+
+func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
+	status := PullRequestReviewStatus{}
+	reviewMap := map[string]string{}
+	// Reviews will include every review on record, including consecutive ones
+	// from the same actor. Consolidate them into latest state per reviewer.
+	for _, review := range pr.Reviews.Nodes {
+		reviewMap[review.Author.Login] = review.State
+	}
+	for _, state := range reviewMap {
+		switch state {
+		case "CHANGES_REQUESTED":
+			status.ChangesRequested = true
+		case "APPROVED":
+			status.Approved = true
+		}
+	}
+	return status
+}
+
+type PullRequestChecksStatus struct {
+	Pending int
+	Failing int
+	Passing int
+	Total   int
+}
+
+func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
+	if len(pr.Commits.Nodes) == 0 {
+		return
+	}
+	commit := pr.Commits.Nodes[0].Commit
+	for _, status := range commit.Status.Contexts {
+		switch status.State {
+		case "SUCCESS":
+			summary.Passing++
+		case "EXPECTED", "ERROR", "FAILURE":
+			summary.Failing++
+		case "PENDING":
+			summary.Pending++
+		default:
+			panic(fmt.Errorf("unsupported status: %q", status.State))
+		}
+		summary.Total++
+	}
+	for _, checkSuite := range commit.CheckSuites.Nodes {
+		for _, checkRun := range checkSuite.CheckRuns.Nodes {
+			switch checkRun.Conclusion {
+			case "SUCCESS", "NEUTRAL":
+				summary.Passing++
+			case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
+				summary.Failing++
+			default:
+				panic(fmt.Errorf("unsupported check conclusion: %q", checkRun.Conclusion))
+			}
+			summary.Total++
+		}
+	}
+	return
 }
 
 type Repo interface {
@@ -147,19 +240,50 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 
 	query := `
-    fragment pr on PullRequest {
-      number
-      title
-      url
-      headRefName
-    }
+	fragment pr on PullRequest {
+		number
+		title
+		url
+		headRefName
+		commits(last: 1) {
+			nodes {
+				commit {
+					status {
+						contexts {
+							state
+						}
+					}
+					checkSuites(first: 50) {
+						nodes {
+							checkRuns(first: 50) {
+								nodes {
+									conclusion
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	fragment prWithReviews on PullRequest {
+		...pr
+		reviews(last: 20) {
+			nodes {
+				state
+				author {
+					login
+				}
+			}
+		}
+	}
 
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
       repository(owner: $owner, name: $repo) {
         pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
           edges {
             node {
-              ...pr
+              ...prWithReviews
             }
           }
         }
@@ -167,7 +291,7 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
       viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
         edges {
           node {
-            ...pr
+            ...prWithReviews
           }
         }
         pageInfo {
