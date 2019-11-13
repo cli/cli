@@ -24,7 +24,7 @@ func init() {
 		&cobra.Command{
 			Use:   "view <issue-number>",
 			Args:  cobra.MinimumNArgs(1),
-			Short: "Open an issue in the browser",
+			Short: "View an issue in the browser",
 			RunE:  issueView,
 		},
 	)
