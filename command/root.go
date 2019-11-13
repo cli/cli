@@ -72,7 +72,9 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	opts := []api.ClientOption{
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
-		api.AddHeader("Accept", "application/vnd.github.shadow-cat-preview+json"),
+		// antiope-preview: Checks
+		// shadow-cat-preview: Draft pull requests
+		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json, application/vnd.github.shadow-cat-preview"),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, api.VerboseLog(os.Stderr))

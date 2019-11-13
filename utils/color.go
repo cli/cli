@@ -1,24 +1,39 @@
 package utils
 
-import "github.com/mgutz/ansi"
+import (
+	"github.com/mattn/go-isatty"
+	"github.com/mgutz/ansi"
+	"os"
+)
 
-var Black = ansi.ColorFunc("black")
-var White = ansi.ColorFunc("white")
+func makeColorFunc(color string) func(string) string {
+	return func(arg string) string {
+		output := arg
+		if isatty.IsTerminal(os.Stdout.Fd()) {
+			output = ansi.Color(color+arg+ansi.Reset, "")
+		}
 
-func Gray(arg string) string {
-	return ansi.Color(ansi.LightBlack+arg, "")
+		return output
+	}
 }
 
-var Red = ansi.ColorFunc("red")
-var Green = ansi.ColorFunc("green")
-var Yellow = ansi.ColorFunc("yellow")
-var Blue = ansi.ColorFunc("blue")
-var Magenta = ansi.ColorFunc("magenta")
-var Cyan = ansi.ColorFunc("cyan")
+var Black = makeColorFunc(ansi.Black)
+var White = makeColorFunc(ansi.White)
+var Magenta = makeColorFunc(ansi.Magenta)
+var Cyan = makeColorFunc(ansi.Cyan)
+var Red = makeColorFunc(ansi.Red)
+var Yellow = makeColorFunc(ansi.Yellow)
+var Blue = makeColorFunc(ansi.Blue)
+var Green = makeColorFunc(ansi.Green)
+var Gray = makeColorFunc(ansi.LightBlack)
 
 func Bold(arg string) string {
-	// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
-	// will not use the default color, resulting in black and probably unreadable text. This forces
-	// the default color before bolding.
-	return ansi.Color(ansi.DefaultFG+arg, "+b")
+	output := arg
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
+		// will not use the default color, resulting in black and probably unreadable text. This forces
+		// the default color before bolding.
+		output = ansi.Color(ansi.DefaultFG+arg+ansi.Reset, "+b")
+	}
+	return output
 }
