@@ -9,6 +9,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -31,12 +32,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	head, err := ctx.Branch()
 	if err != nil {
-		return fmt.Errorf("could not determine current branch: %s", err)
+		return errors.Wrap(err, "could not determine current branch")
 	}
 
 	remote, err := guessRemote(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not determine suitable remote")
 	}
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
@@ -45,11 +46,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not parse title")
 	}
 	body, err := cmd.Flags().GetString("body")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not parse body")
 	}
 
 	interactive := title == "" || body == ""
@@ -92,7 +93,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 			err := survey.Ask(qs, &inProgress)
 			if err != nil {
-				return fmt.Errorf("could not prompt: %s", err)
+				return errors.Wrap(err, "could not prompt")
 			}
 			confirmAnswers := struct {
 				Confirmation string
@@ -113,7 +114,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 			err = survey.Ask(confirmQs, &confirmAnswers)
 			if err != nil {
-				return fmt.Errorf("could not prompt: %s", err)
+				return errors.Wrap(err, "could not prompt")
 			}
 
 			switch confirmAnswers.Confirmation {
@@ -136,7 +137,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 	base, err := cmd.Flags().GetString("base")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not parse base")
 	}
 	if base == "" {
 		// TODO: use default branch for the repo
@@ -145,17 +146,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	client, err := apiClientForContext(ctx)
 	if err != nil {
-		return fmt.Errorf("could not initialize api client: %s", err)
+		return errors.Wrap(err, "could not initialize api client")
 	}
 
 	repo, err := ctx.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine GitHub repo: %s", err)
+		return errors.Wrap(err, "could not determine GitHub repo")
 	}
 
 	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not parse draft")
 	}
 
 	params := map[string]interface{}{
@@ -168,7 +169,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	pr, err := api.CreatePullRequest(client, repo, params)
 	if err != nil {
-		return fmt.Errorf("failed to create PR: %s", err)
+		return errors.Wrap(err, "failed to create PR")
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
@@ -178,14 +179,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 func guessRemote(ctx context.Context) (string, error) {
 	remotes, err := ctx.Remotes()
 	if err != nil {
-		return "", fmt.Errorf("could not determine suitable remote: %s", err)
+		return "", errors.Wrap(err, "could not determine suitable remote")
 	}
 
 	// TODO: consolidate logic with fsContext.BaseRepo
 	// TODO: check if the GH repo that the remote points to is writeable
 	remote, err := remotes.FindByName("upstream", "github", "origin", "*")
 	if err != nil {
-		return "", fmt.Errorf("could not determine suitable remote: %s", err)
+		return "", errors.Wrap(err, "could not determine suitable remote")
 	}
 
 	return remote.Name, nil
