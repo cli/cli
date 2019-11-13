@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-isatty v0.0.9
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5
