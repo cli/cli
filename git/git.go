@@ -33,7 +33,6 @@ func Dir() (string, error) {
 
 func WorkdirName() (string, error) {
 	toplevelCmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	toplevelCmd.Stderr = nil
 	output, err := utils.PrepareCmd(toplevelCmd).Output()
 	dir := firstLine(output)
 	if dir == "" {
