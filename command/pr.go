@@ -263,10 +263,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := contextForCommand(cmd)
-	currentBranch, err := ctx.Branch()
-	if err != nil {
-		return err
-	}
+	currentBranch, _ := ctx.Branch()
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
