@@ -37,7 +37,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	remote, err := guessRemote(ctx)
 	if err != nil {
-		return errors.Wrap(err, "could not determine suitable remote")
+		return err
 	}
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
@@ -179,7 +179,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 func guessRemote(ctx context.Context) (string, error) {
 	remotes, err := ctx.Remotes()
 	if err != nil {
-		return "", errors.Wrap(err, "could not determine suitable remote")
+		return "", errors.Wrap(err, "could not read git remotes")
 	}
 
 	// TODO: consolidate logic with fsContext.BaseRepo
