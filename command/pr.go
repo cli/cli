@@ -13,6 +13,7 @@ import (
 
 func init() {
 	RootCmd.AddCommand(prCmd)
+	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
