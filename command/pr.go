@@ -302,7 +302,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
 
 		// local branch already exists
-		if git.HasFile("refs", "heads", newBranchName) {
+		if git.VerifyRef("refs/heads/" + newBranchName) {
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
 			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		} else {
