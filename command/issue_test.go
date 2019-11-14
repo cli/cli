@@ -35,7 +35,8 @@ func TestIssueStatus(t *testing.T) {
 
 	for _, r := range expectedIssues {
 		if !r.MatchString(output) {
-			t.Errorf("output did not match regexp /%s/", r)
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
 		}
 	}
 }
@@ -61,7 +62,8 @@ func TestIssueList(t *testing.T) {
 
 	for _, r := range expectedIssues {
 		if !r.MatchString(output) {
-			t.Errorf("output did not match regexp /%s/", r)
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
 		}
 	}
 }
