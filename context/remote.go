@@ -28,7 +28,7 @@ func (r Remotes) FindByName(names ...string) (*Remote, error) {
 // FindByRepo returns the first Remote that points to a specific GitHub repository
 func (r Remotes) FindByRepo(owner, name string) (*Remote, error) {
 	for _, rem := range r {
-		if strings.EqualFold(rem.Owner, owner) && strings.EqualFold(rem.Name, name) {
+		if strings.EqualFold(rem.RepoOwner(), owner) && strings.EqualFold(rem.RepoName(), name) {
 			return rem, nil
 		}
 	}
