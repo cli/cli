@@ -206,6 +206,34 @@ func LocalBranches() ([]string, error) {
 	return branches, nil
 }
 
+var GitCommand = func(args ...string) *exec.Cmd {
+	return exec.Command("git", args...)
+}
+
+func UncommittedChangeCount() (int, error) {
+	statusCmd := GitCommand("status", "--porcelain")
+	output, err := utils.PrepareCmd(statusCmd).Output()
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(output), "\n")
+
+	count := 0
+
+	for _, l := range lines {
+		if l != "" {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func Push(remote string, ref string) error {
+	cmd := GitCommand("push", "--set-upstream", remote, ref)
+	return cmd.Run()
+}
+
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	return strings.Split(lines, "\n")
