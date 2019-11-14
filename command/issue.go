@@ -37,9 +37,10 @@ func init() {
 		Short: "List open issues",
 		RunE:  issueList,
 	}
-	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels ")
-	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open, closed or all)")
+	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
+	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
+	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch (default ")
 	issueCmd.AddCommand((issueListCmd))
 }
 
@@ -81,7 +82,12 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee)
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+
+	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
 	}
@@ -238,6 +244,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 func printIssues(issues ...api.Issue) {
 	for _, issue := range issues {
-		fmt.Printf("  #%d %s\n", issue.Number, truncate(70, issue.Title))
+		number := utils.Green("#" + strconv.Itoa(issue.Number))
+		var coloredLabels string
+		if len(issue.Labels) > 0 {
+			var ellipse string
+			if issue.TotalLabelCount > len(issue.Labels) {
+				ellipse = "…"
+			}
+			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
+		}
+		fmt.Printf("  %s %s %s\n", number, truncate(70, issue.Title), coloredLabels)
 	}
 }
