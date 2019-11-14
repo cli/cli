@@ -199,10 +199,10 @@ func prList(cmd *cobra.Command, args []string) error {
 			case "MERGED":
 				prNum = utils.Magenta(prNum)
 			}
-			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadRefName))
+			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadLabel()))
 			fmt.Fprintf(out, "%s  %-*s  %s\n", prNum, titleWidth, truncate(titleWidth, pr.Title), prBranch)
 		} else {
-			fmt.Fprintf(out, "%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadRefName)
+			fmt.Fprintf(out, "%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadLabel())
 		}
 	}
 	return nil
@@ -249,7 +249,7 @@ func prView(cmd *cobra.Command, args []string) error {
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadRefName+"]"))
+		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
