@@ -16,7 +16,11 @@
               "number": 29,
               "title": "Fixed bad bug",
               "url": "https://github.com/monalisa/hello/pull/29",
-              "headRefName": "bug-fix"
+              "headRefName": "bug-fix",
+              "isCrossRepository": true,
+              "headRepositoryOwner": {
+                "login": "hubot"
+              }
             }
           },
           {
