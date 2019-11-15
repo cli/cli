@@ -258,7 +258,7 @@ func printPrs(prs ...api.PullRequest) {
 			fmt.Printf("\n  ")
 		}
 
-		if checks.Total > 0 {
+		if checks.Total > 1 {
 			var ratio string
 			if checks.Failing > 0 {
 				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
@@ -271,6 +271,16 @@ func printPrs(prs ...api.PullRequest) {
 				ratio = utils.Green(ratio)
 			}
 			fmt.Printf(" - checks: %s", ratio)
+		} else if checks.Total == 1 {
+			var state string
+			if checks.Failing > 0 {
+				state = utils.Red("failing")
+			} else if checks.Pending > 0 {
+				state = utils.Yellow("pending")
+			} else if checks.Passing == checks.Total {
+				state = utils.Green("success")
+			}
+			fmt.Printf(" - checks: %s", state)
 		}
 
 		if reviews.ChangesRequested {
