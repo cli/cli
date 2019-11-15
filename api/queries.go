@@ -38,6 +38,7 @@ type PullRequest struct {
 			}
 		}
 	}
+
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
@@ -58,6 +59,13 @@ type PullRequest struct {
 			}
 		}
 	}
+}
+
+func (pr PullRequest) HeadLabel() string {
+	if pr.IsCrossRepository {
+		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
+	}
+	return pr.HeadRefName
 }
 
 type PullRequestReviewStatus struct {
@@ -258,6 +266,11 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 		title
 		url
 		headRefName
+		headRefName
+		headRepositoryOwner {
+			login
+		}
+		isCrossRepository
 		commits(last: 1) {
 			nodes {
 				commit {
@@ -536,6 +549,10 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 				state
 				url
 				headRefName
+				headRepositoryOwner {
+					login
+				}
+				isCrossRepository
             }
 		  }
 		  pageInfo {
