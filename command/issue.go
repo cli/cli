@@ -40,7 +40,7 @@ func init() {
 	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
 	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
-	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch (default ")
+	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of issues to fetch")
 	issueCmd.AddCommand((issueListCmd))
 }
 
