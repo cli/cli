@@ -23,14 +23,7 @@ type PullRequest struct {
 		Login string
 	}
 
-	Reviews struct {
-		Nodes []struct {
-			State  string
-			Author struct {
-				Login string
-			}
-		}
-	}
+	ReviewDecision string
 
 	Commits struct {
 		Nodes []struct {
@@ -62,19 +55,11 @@ type PullRequestReviewStatus struct {
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	status := PullRequestReviewStatus{}
-	reviewMap := map[string]string{}
-	// Reviews will include every review on record, including consecutive ones
-	// from the same actor. Consolidate them into latest state per reviewer.
-	for _, review := range pr.Reviews.Nodes {
-		reviewMap[review.Author.Login] = review.State
-	}
-	for _, state := range reviewMap {
-		switch state {
-		case "CHANGES_REQUESTED":
-			status.ChangesRequested = true
-		case "APPROVED":
-			status.Approved = true
-		}
+	switch pr.ReviewDecision {
+	case "CHANGES_REQUESTED":
+		status.ChangesRequested = true
+	case "APPROVED":
+		status.Approved = true
 	}
 	return status
 }
@@ -270,14 +255,7 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 	fragment prWithReviews on PullRequest {
 		...pr
-		reviews(last: 20) {
-			nodes {
-				state
-				author {
-					login
-				}
-			}
-		}
+		reviewDecision
 	}
 
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
