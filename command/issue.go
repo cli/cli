@@ -93,7 +93,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(issues) > 0 {
-		printIssues(issues...)
+		printIssues("", issues...)
 	} else {
 		message := fmt.Sprintf("There are no open issues")
 		printMessage(message)
@@ -125,7 +125,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader("Issues assigned to you")
 	if issuePayload.Assigned != nil {
-		printIssues(issuePayload.Assigned...)
+		printIssues("  ", issuePayload.Assigned...)
 	} else {
 		message := fmt.Sprintf("  There are no issues assgined to you")
 		printMessage(message)
@@ -134,7 +134,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader("Issues mentioning you")
 	if len(issuePayload.Mentioned) > 0 {
-		printIssues(issuePayload.Mentioned...)
+		printIssues("  ", issuePayload.Mentioned...)
 	} else {
 		printMessage("  There are no issues mentioning you")
 	}
@@ -142,7 +142,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader("Recent issues")
 	if len(issuePayload.Recent) > 0 {
-		printIssues(issuePayload.Recent...)
+		printIssues("  ", issuePayload.Recent...)
 	} else {
 		printMessage("  There are no recent issues")
 	}
@@ -242,7 +242,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(issues ...api.Issue) {
+func printIssues(prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
 		var coloredLabels string
@@ -253,6 +253,6 @@ func printIssues(issues ...api.Issue) {
 			}
 			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
 		}
-		fmt.Printf("  %s %s %s\n", number, truncate(70, issue.Title), coloredLabels)
+		fmt.Printf("%s%s %s %s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
 }
