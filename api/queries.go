@@ -51,6 +51,7 @@ func (pr PullRequest) HeadLabel() string {
 type PullRequestReviewStatus struct {
 	ChangesRequested bool
 	Approved         bool
+	ReviewRequired   bool
 }
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
@@ -60,6 +61,8 @@ func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 		status.ChangesRequested = true
 	case "APPROVED":
 		status.Approved = true
+	case "REVIEW_REQUIRED":
+		status.ReviewRequired = true
 	}
 	return status
 }

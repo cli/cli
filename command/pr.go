@@ -275,6 +275,8 @@ func printPrs(prs ...api.PullRequest) {
 
 		if reviews.ChangesRequested {
 			fmt.Printf(" - %s", utils.Red("changes requested"))
+		} else if reviews.ReviewRequired {
+			fmt.Printf(" - %s", utils.Yellow("review required"))
 		} else if reviews.Approved {
 			fmt.Printf(" - %s", utils.Green("approved"))
 		}
