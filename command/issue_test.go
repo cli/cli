@@ -68,6 +68,31 @@ func TestIssueList(t *testing.T) {
 	}
 }
 
+func TestIssueList_withFlags(t *testing.T) {
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`{"data": {}}`)) // Since we are testing that the flags are passed, we don't care about the response
+
+	_, err := test.RunCommand(RootCmd, "issue list -a probablyCher -l web,bug -s open")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables struct {
+			Assignee string
+			Labels   []string
+			States   []string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Assignee, "probablyCher")
+	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
+	eq(t, reqBody.Variables.States, []string{"OPEN"})
+}
+
 func TestIssueView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
