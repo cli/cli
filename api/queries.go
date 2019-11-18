@@ -30,29 +30,16 @@ type PullRequest struct {
 	IsCrossRepository   bool
 	MaintainerCanModify bool
 
-	Reviews struct {
-		Nodes []struct {
-			State  string
-			Author struct {
-				Login string
-			}
-		}
-	}
+	ReviewDecision string
 
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
-				Status struct {
-					Contexts []struct {
-						State string
-					}
-				}
-				CheckSuites struct {
-					Nodes []struct {
-						CheckRuns struct {
-							Nodes []struct {
-								Conclusion string
-							}
+				StatusCheckRollup struct {
+					Contexts struct {
+						Nodes []struct {
+							State      string
+							Conclusion string
 						}
 					}
 				}
@@ -71,23 +58,18 @@ func (pr PullRequest) HeadLabel() string {
 type PullRequestReviewStatus struct {
 	ChangesRequested bool
 	Approved         bool
+	ReviewRequired   bool
 }
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	status := PullRequestReviewStatus{}
-	reviewMap := map[string]string{}
-	// Reviews will include every review on record, including consecutive ones
-	// from the same actor. Consolidate them into latest state per reviewer.
-	for _, review := range pr.Reviews.Nodes {
-		reviewMap[review.Author.Login] = review.State
-	}
-	for _, state := range reviewMap {
-		switch state {
-		case "CHANGES_REQUESTED":
-			status.ChangesRequested = true
-		case "APPROVED":
-			status.Approved = true
-		}
+	switch pr.ReviewDecision {
+	case "CHANGES_REQUESTED":
+		status.ChangesRequested = true
+	case "APPROVED":
+		status.Approved = true
+	case "REVIEW_REQUIRED":
+		status.ReviewRequired = true
 	}
 	return status
 }
@@ -104,31 +86,22 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		return
 	}
 	commit := pr.Commits.Nodes[0].Commit
-	for _, status := range commit.Status.Contexts {
-		switch status.State {
-		case "SUCCESS":
+	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
+		state := c.State
+		if state == "" {
+			state = c.Conclusion
+		}
+		switch state {
+		case "SUCCESS", "NEUTRAL", "SKIPPED":
 			summary.Passing++
-		case "EXPECTED", "ERROR", "FAILURE":
+		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		case "PENDING":
+		case "EXPECTED", "QUEUED", "PENDING", "IN_PROGRESS":
 			summary.Pending++
 		default:
-			panic(fmt.Errorf("unsupported status: %q", status.State))
+			panic(fmt.Errorf("unsupported status: %q", state))
 		}
 		summary.Total++
-	}
-	for _, checkSuite := range commit.CheckSuites.Nodes {
-		for _, checkRun := range checkSuite.CheckRuns.Nodes {
-			switch checkRun.Conclusion {
-			case "SUCCESS", "NEUTRAL":
-				summary.Passing++
-			case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-				summary.Failing++
-			default:
-				panic(fmt.Errorf("unsupported check conclusion: %q", checkRun.Conclusion))
-			}
-			summary.Total++
-		}
 	}
 	return
 }
@@ -274,15 +247,13 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 		commits(last: 1) {
 			nodes {
 				commit {
-					status {
-						contexts {
-							state
-						}
-					}
-					checkSuites(first: 50) {
-						nodes {
-							checkRuns(first: 50) {
-								nodes {
+					statusCheckRollup {
+						contexts(last: 100) {
+							nodes {
+								...on StatusContext {
+									state
+								}
+								...on CheckRun {
 									conclusion
 								}
 							}
@@ -294,14 +265,7 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 	fragment prWithReviews on PullRequest {
 		...pr
-		reviews(last: 20) {
-			nodes {
-				state
-				author {
-					login
-				}
-			}
-		}
+		reviewDecision
 	}
 
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
