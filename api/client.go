@@ -38,7 +38,6 @@ func VerboseLog(out io.Writer) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			fmt.Fprintf(out, "> %s %s\n", req.Method, req.URL.RequestURI())
-			fmt.Fprintf(out, "> BODY %s\n", req.Body)
 			res, err := tr.RoundTrip(req)
 			if err == nil {
 				fmt.Fprintf(out, "< HTTP %s\n", res.Status)
