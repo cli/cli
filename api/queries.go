@@ -18,10 +18,17 @@ type PullRequest struct {
 	URL         string
 	HeadRefName string
 
-	IsCrossRepository   bool
 	HeadRepositoryOwner struct {
 		Login string
 	}
+	HeadRepository struct {
+		Name             string
+		DefaultBranchRef struct {
+			Name string
+		}
+	}
+	IsCrossRepository   bool
+	MaintainerCanModify bool
 
 	Reviews struct {
 		Nodes []struct {
@@ -372,6 +379,48 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 
 	return &payload, nil
+}
+
+func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest, error) {
+	type response struct {
+		Repository struct {
+			PullRequest PullRequest
+		}
+	}
+
+	query := `
+	query($owner: String!, $repo: String!, $pr_number: Int!) {
+		repository(owner: $owner, name: $repo) {
+			pullRequest(number: $pr_number) {
+				headRefName
+				headRepositoryOwner {
+					login
+				}
+				headRepository {
+					name
+					defaultBranchRef {
+						name
+					}
+				}
+				isCrossRepository
+				maintainerCanModify
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{
+		"owner":     ghRepo.RepoOwner(),
+		"repo":      ghRepo.RepoName(),
+		"pr_number": number,
+	}
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Repository.PullRequest, nil
 }
 
 func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRequest, error) {
