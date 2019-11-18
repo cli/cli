@@ -5,6 +5,59 @@ import (
 	"time"
 )
 
+type IssuesPayload struct {
+	Assigned  []Issue
+	Mentioned []Issue
+	Recent    []Issue
+}
+
+type Issue struct {
+	Number          int
+	Title           string
+	URL             string
+	Labels          []string
+	TotalLabelCount int
+}
+
+type apiIssues struct {
+	Issues struct {
+		Edges []struct {
+			Node struct {
+				Number int
+				Title  string
+				URL    string
+				Labels struct {
+					Edges []struct {
+						Node struct {
+							Name string
+						}
+					}
+					TotalCount int
+				}
+			}
+		}
+	}
+}
+
+var fragments string
+
+func init() {
+	fragments = `
+		fragment issue on Issue {
+			number
+			title
+			labels(first: 3) {
+				edges {
+					node {
+						name
+					}
+				}
+				totalCount
+			}
+		}
+	`
+}
+
 func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*Issue, error) {
 	repoID, err := GitHubRepoId(client, ghRepo)
 	if err != nil {
@@ -44,40 +97,6 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 	return &result.CreateIssue.Issue, nil
 }
 
-type IssuesPayload struct {
-	Assigned  []Issue
-	Mentioned []Issue
-	Recent    []Issue
-}
-
-type Issue struct {
-	Number          int
-	Title           string
-	URL             string
-	Labels          []string
-	TotalLabelCount int
-}
-
-type apiIssues struct {
-	Issues struct {
-		Edges []struct {
-			Node struct {
-				Number int
-				Title  string
-				URL    string
-				Labels struct {
-					Edges []struct {
-						Node struct {
-							Name string
-						}
-					}
-					TotalCount int
-				}
-			}
-		}
-	}
-}
-
 func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
 	type response struct {
 		Assigned  apiIssues
@@ -85,11 +104,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 		Recent    apiIssues
 	}
 
-	query := `
-    fragment issue on Issue {
-      number
-      title
-    }
+	query := fragments + `
     query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
       assigned: repository(owner: $owner, name: $repo) {
         issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -176,20 +191,7 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 		assignee = nil
 	}
 
-	query := `
-    fragment issue on Issue {
-      number
-			title
-			labels(first: 3) {
-				edges {
-					node {
-						name
-					}
-				}
-				totalCount
-			}
-		}
-		
+	query := fragments + `
     query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
         issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
