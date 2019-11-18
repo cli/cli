@@ -1,47 +1,61 @@
 {
   "data": {
-    "assigned": {
+    "repository": {
       "issues": {
         "edges": [
           {
             "node": {
-              "number": 9,
-              "title": "corey thinks squash tastes bad"
+              "number": 1,
+              "title": "number won",
+              "url": "https://wow.com",
+              "labels": {
+                "edges": [
+                  {
+                    "node": {
+                      "name": "label"
+                    }
+                  }
+                ],
+                "totalCount": 1
+              }
             }
           },
           {
             "node": {
-              "number": 10,
-              "title": "broccoli is a superfood"
-            }
-          }
-        ]
-      }
-    },
-    "mentioned": {
-      "issues": {
-        "edges": [
-          {
-            "node": {
-              "number": 8,
-              "title": "rabbits eat carrots"
+              "number": 2,
+              "title": "number too",
+              "url": "https://wow.com",
+              "labels": {
+                "edges": [
+                  {
+                    "node": {
+                      "name": "label"
+                    }
+                  }
+                ],
+                "totalCount": 1
+              }
             }
           },
           {
             "node": {
-              "number": 11,
-              "title": "swiss chard is neutral"
+              "number": 4,
+              "title": "number fore",
+              "url": "https://wow.com",
+              "labels": {
+                "edges": [
+                  {
+                    "node": {
+                      "name": "label"
+                    }
+                  }
+                ],
+                "totalCount": 1
+              }
             }
           }
         ]
       }
-    },
-    "recent": {
-      "issues": {
-        "edges": []
-      }
-    },
-
-    "pageInfo": { "hasNextPage": false }
+    }
   }
 }
