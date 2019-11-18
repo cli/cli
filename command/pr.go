@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -243,11 +246,40 @@ func prView(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		pr, err := api.PullRequestForBranch(apiClient, baseRepo, currentBranch)
-		if err != nil {
-			return err
+		branchConfig := git.ReadBranchConfig(currentBranch)
+		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), m[1])
+		} else {
+			branchWithOwner := currentBranch
+			var owner string
+
+			if branchConfig.RemoteURL != nil {
+				if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+					owner = r.RepoOwner()
+				}
+			} else if branchConfig.RemoteName != "" {
+				rem, _ := ctx.Remotes()
+				if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+					owner = r.RepoOwner()
+				}
+			}
+
+			if owner != "" {
+				if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+					branchWithOwner = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
+				}
+				if !strings.EqualFold(owner, baseRepo.RepoOwner()) {
+					branchWithOwner = fmt.Sprintf("%s:%s", owner, branchWithOwner)
+				}
+			}
+
+			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			if err != nil {
+				return err
+			}
+			openURL = pr.URL
 		}
-		openURL = pr.URL
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)

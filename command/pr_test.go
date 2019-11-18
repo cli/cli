@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-cli/test"
@@ -99,7 +100,7 @@ func TestPRList_filtering(t *testing.T) {
 	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
 }
 
-func TestPRView(t *testing.T) {
+func TestPRView_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
@@ -109,8 +110,13 @@ func TestPRView(t *testing.T) {
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &outputStub{}
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &outputStub{}
+		default:
+			seenCmd = cmd
+			return &outputStub{}
+		}
 	})
 	defer restoreCmd()
 
@@ -132,8 +138,8 @@ func TestPRView(t *testing.T) {
 	}
 }
 
-func TestPRView_NoActiveBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+func TestPRView_noResultsForBranch(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
@@ -142,22 +148,44 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &outputStub{}
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &outputStub{}
+		default:
+			seenCmd = cmd
+			return &outputStub{}
+		}
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "pr view")
-	if err == nil || err.Error() != `no open pull requests found for branch "master"` {
+	_, err := test.RunCommand(RootCmd, "pr view")
+	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
 	if seenCmd != nil {
 		t.Fatalf("unexpected command: %v", seenCmd.Args)
 	}
+}
 
-	// Now run again but provide a PR number
-	output, err = test.RunCommand(RootCmd, "pr view 23")
+func TestPRView_numberArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := test.RunCommand(RootCmd, "pr view 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
