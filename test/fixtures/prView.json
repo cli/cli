@@ -1,50 +1,30 @@
-{"data":{
-  "repository": {
-    "pullRequests": {
-      "edges": [
-        {
-          "node": {
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 12,
+            "title": "Blueberries are from a fork",
+            "url": "https://github.com/OWNER/REPO/pull/12",
+            "headRefName": "blueberries",
+            "headRepositoryOwner": {
+              "login": "hubot"
+            },
+            "isCrossRepository": true
+          },
+          {
             "number": 10,
             "title": "Blueberries are a good fruit",
             "url": "https://github.com/OWNER/REPO/pull/10",
-            "headRefName": "[blueberries]"
+            "headRefName": "blueberries",
+            "headRepositoryOwner": {
+              "login": "OWNER"
+            },
+            "isCrossRepository": false
           }
-        }
-      ]
+        ]
+      }
     }
-  },
-  "viewerCreated": {
-    "edges": [
-      {
-        "node": {
-          "number": 8,
-          "title": "Strawberries are not actually berries",
-          "url": "https://github.com/OWNER/REPO/pull/8",
-          "headRefName": "[strawberries]"
-        }
-      }
-    ],
-    "pageInfo": { "hasNextPage": false }
-  },
-  "reviewRequested": {
-    "edges": [
-      {
-        "node": {
-          "number": 9,
-          "title": "Apples are tasty",
-          "url": "https://github.com/OWNER/REPO/pull/9",
-          "headRefName": "[apples]"
-        }
-      },
-      {
-        "node": {
-          "number": 11,
-          "title": "Figs are my favorite",
-          "url": "https://github.com/OWNER/REPO/pull/1",
-          "headRefName": "[figs]"
-        }
-      }
-    ],
-    "pageInfo": { "hasNextPage": false }
   }
-}}
+}

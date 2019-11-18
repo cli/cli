@@ -22,7 +22,7 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func TestPRStatus(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
@@ -100,7 +100,7 @@ func TestPRList_filtering(t *testing.T) {
 }
 
 func TestPRView(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
@@ -148,7 +148,7 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := test.RunCommand(RootCmd, "pr view")
-	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
+	if err == nil || err.Error() != `no open pull requests found for branch "master"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
