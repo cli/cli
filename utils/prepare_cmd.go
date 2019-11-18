@@ -38,6 +38,9 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 	if os.Getenv("DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
 	}
+	if c.Cmd.Stderr != nil {
+		return c.Cmd.Output()
+	}
 	errStream := &bytes.Buffer{}
 	c.Cmd.Stderr = errStream
 	out, err := c.Cmd.Output()
@@ -50,6 +53,9 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 func (c cmdWithStderr) Run() error {
 	if os.Getenv("DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+	}
+	if c.Cmd.Stderr != nil {
+		return c.Cmd.Run()
 	}
 	errStream := &bytes.Buffer{}
 	c.Cmd.Stderr = errStream

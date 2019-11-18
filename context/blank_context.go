@@ -3,10 +3,12 @@ package context
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-cli/git"
 )
 
 // NewBlank initializes a blank Context suitable for testing
-func NewBlank() Context {
+func NewBlank() *blankContext {
 	return &blankContext{}
 }
 
@@ -16,6 +18,7 @@ type blankContext struct {
 	authLogin string
 	branch    string
 	baseRepo  GitHubRepository
+	remotes   Remotes
 }
 
 type ghRepo struct {
@@ -54,14 +57,36 @@ func (c *blankContext) SetBranch(b string) {
 }
 
 func (c *blankContext) Remotes() (Remotes, error) {
-	return Remotes{}, nil
+	if c.remotes == nil {
+		return nil, fmt.Errorf("remotes were not initialized")
+	}
+	return c.remotes, nil
+}
+
+func (c *blankContext) SetRemotes(stubs map[string]string) {
+	c.remotes = Remotes{}
+	for remoteName, repo := range stubs {
+		ownerWithName := strings.SplitN(repo, "/", 2)
+		c.remotes = append(c.remotes, &Remote{
+			Remote: &git.Remote{Name: remoteName},
+			Owner:  ownerWithName[0],
+			Repo:   ownerWithName[1],
+		})
+	}
 }
 
 func (c *blankContext) BaseRepo() (GitHubRepository, error) {
-	if c.baseRepo == nil {
-		return nil, fmt.Errorf("base repo was not initialized")
+	if c.baseRepo != nil {
+		return c.baseRepo, nil
 	}
-	return c.baseRepo, nil
+	remotes, err := c.Remotes()
+	if err != nil {
+		return nil, err
+	}
+	if len(remotes) < 1 {
+		return nil, fmt.Errorf("remotes are empty")
+	}
+	return remotes[0], nil
 }
 
 func (c *blankContext) SetBaseRepo(nwo string) {

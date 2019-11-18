@@ -33,7 +33,6 @@ func Dir() (string, error) {
 
 func WorkdirName() (string, error) {
 	toplevelCmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	toplevelCmd.Stderr = nil
 	output, err := utils.PrepareCmd(toplevelCmd).Output()
 	dir := firstLine(output)
 	if dir == "" {
@@ -42,31 +41,10 @@ func WorkdirName() (string, error) {
 	return dir, err
 }
 
-func HasFile(segments ...string) bool {
-	// The blessed way to resolve paths within git dir since Git 2.5.0
-	pathCmd := exec.Command("git", "rev-parse", "-q", "--git-path", filepath.Join(segments...))
-	if output, err := utils.PrepareCmd(pathCmd).Output(); err == nil {
-		if lines := outputLines(output); len(lines) == 1 {
-			if _, err := os.Stat(lines[0]); err == nil {
-				return true
-			}
-		}
-	}
-
-	// Fallback for older git versions
-	dir, err := Dir()
-	if err != nil {
-		return false
-	}
-
-	s := []string{dir}
-	s = append(s, segments...)
-	path := filepath.Join(s...)
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-
-	return false
+func VerifyRef(ref string) bool {
+	showRef := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
+	err := utils.PrepareCmd(showRef).Run()
+	return err == nil
 }
 
 func BranchAtRef(paths ...string) (name string, err error) {
@@ -204,6 +182,34 @@ func LocalBranches() ([]string, error) {
 		branches = append(branches, branch[2:])
 	}
 	return branches, nil
+}
+
+var GitCommand = func(args ...string) *exec.Cmd {
+	return exec.Command("git", args...)
+}
+
+func UncommittedChangeCount() (int, error) {
+	statusCmd := GitCommand("status", "--porcelain")
+	output, err := utils.PrepareCmd(statusCmd).Output()
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(output), "\n")
+
+	count := 0
+
+	for _, l := range lines {
+		if l != "" {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func Push(remote string, ref string) error {
+	cmd := GitCommand("push", "--set-upstream", remote, ref)
+	return cmd.Run()
 }
 
 func outputLines(output []byte) []string {
