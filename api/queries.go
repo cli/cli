@@ -163,7 +163,6 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 		...pr
 		reviewDecision
 	}
-
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
       repository(owner: $owner, name: $repo) {
         pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
