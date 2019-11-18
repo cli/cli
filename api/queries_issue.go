@@ -92,7 +92,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
     }
     query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
       assigned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {assignee: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+        issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
@@ -101,7 +101,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
         }
       }
       mentioned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {mentioned: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+        issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
@@ -110,7 +110,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
         }
       }
       recent: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {since: $since}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+        issues(filterBy: {since: $since, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           edges {
             node {
               ...issue
