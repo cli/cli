@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 )
 
 type PullRequestsPayload struct {
@@ -141,7 +142,6 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 		title
 		url
 		headRefName
-		headRefName
 		headRepositoryOwner {
 			login
 		}
@@ -172,7 +172,7 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
       repository(owner: $owner, name: $repo) {
-        pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
+        pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
           edges {
             node {
               ...prWithReviews
@@ -209,12 +209,17 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
 
+	branchWithoutOwner := currentBranch
+	if idx := strings.Index(currentBranch, ":"); idx >= 0 {
+		branchWithoutOwner = currentBranch[idx+1:]
+	}
+
 	variables := map[string]interface{}{
 		"viewerQuery":   viewerQuery,
 		"reviewerQuery": reviewerQuery,
 		"owner":         owner,
 		"repo":          repo,
-		"headRefName":   currentBranch,
+		"headRefName":   branchWithoutOwner,
 	}
 
 	var resp response
@@ -235,7 +240,9 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 
 	var currentPR *PullRequest
 	for _, edge := range resp.Repository.PullRequests.Edges {
-		currentPR = &edge.Node
+		if edge.Node.HeadLabel() == currentBranch {
+			currentPR = &edge.Node
+		}
 	}
 
 	payload := PullRequestsPayload{
@@ -289,36 +296,42 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRequest, error) {
+func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
-				Edges []struct {
-					Node PullRequest
-				}
+				Nodes []PullRequest
 			}
 		}
 	}
 
 	query := `
-    query($owner: String!, $repo: String!, $headRefName: String!) {
-      repository(owner: $owner, name: $repo) {
-        pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
-          edges {
-            node {
-				number
-				title
-				url
-            }
-          }
-        }
-      }
-    }`
+	query($owner: String!, $repo: String!, $headRefName: String!) {
+		repository(owner: $owner, name: $repo) {
+			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
+				nodes {
+					number
+					title
+					url
+					headRefName
+					headRepositoryOwner {
+						login
+					}
+					isCrossRepository
+				}
+			}
+		}
+	}`
+
+	branchWithoutOwner := branch
+	if idx := strings.Index(branch, ":"); idx >= 0 {
+		branchWithoutOwner = branch[idx+1:]
+	}
 
 	variables := map[string]interface{}{
 		"owner":       ghRepo.RepoOwner(),
 		"repo":        ghRepo.RepoName(),
-		"headRefName": branch,
+		"headRefName": branchWithoutOwner,
 	}
 
 	var resp response
@@ -327,12 +340,13 @@ func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRe
 		return nil, err
 	}
 
-	prs := []PullRequest{}
-	for _, edge := range resp.Repository.PullRequests.Edges {
-		prs = append(prs, edge.Node)
+	for _, pr := range resp.Repository.PullRequests.Nodes {
+		if pr.HeadLabel() == branch {
+			return &pr, nil
+		}
 	}
 
-	return prs, nil
+	return nil, fmt.Errorf("no open pull requests found for branch %q", branch)
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {

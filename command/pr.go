@@ -243,13 +243,11 @@ func prView(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		prs, err := api.PullRequestsForBranch(apiClient, baseRepo, currentBranch)
+		pr, err := api.PullRequestForBranch(apiClient, baseRepo, currentBranch)
 		if err != nil {
 			return err
-		} else if len(prs) < 1 {
-			return fmt.Errorf("the '%s' branch has no open pull requests", currentBranch)
 		}
-		openURL = prs[0].URL
+		openURL = pr.URL
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
