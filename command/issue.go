@@ -19,7 +19,7 @@ func init() {
 		&cobra.Command{
 			Use:   "status",
 			Short: "Show status of relevant issues",
-			RunE:  issueList,
+			RunE:  issueStatus,
 		},
 		&cobra.Command{
 			Use:   "view <issue-number>",
@@ -31,6 +31,17 @@ func init() {
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringArrayP("message", "m", nil, "set title and body")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+
+	issueListCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List open issues",
+		RunE:  issueList,
+	}
+	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
+	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
+	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of issues to fetch")
+	issueCmd.AddCommand((issueListCmd))
 }
 
 var issueCmd = &cobra.Command{
@@ -56,19 +67,65 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	state, err := cmd.Flags().GetString("state")
+	if err != nil {
+		return err
+	}
+
+	labels, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return err
+	}
+
+	assignee, err := cmd.Flags().GetString("assignee")
+	if err != nil {
+		return err
+	}
+
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+
+	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
+	if err != nil {
+		return err
+	}
+
+	if len(issues) > 0 {
+		printIssues("", issues...)
+	} else {
+		message := fmt.Sprintf("There are no open issues")
+		printMessage(message)
+	}
+	return nil
+}
+
+func issueStatus(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return err
+	}
+
 	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
 	}
 
-	issuePayload, err := api.Issues(apiClient, baseRepo, currentUser)
+	issuePayload, err := api.IssueStatus(apiClient, baseRepo, currentUser)
 	if err != nil {
 		return err
 	}
 
 	printHeader("Issues assigned to you")
 	if issuePayload.Assigned != nil {
-		printIssues(issuePayload.Assigned...)
+		printIssues("  ", issuePayload.Assigned...)
 	} else {
 		message := fmt.Sprintf("  There are no issues assgined to you")
 		printMessage(message)
@@ -77,7 +134,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 	printHeader("Issues mentioning you")
 	if len(issuePayload.Mentioned) > 0 {
-		printIssues(issuePayload.Mentioned...)
+		printIssues("  ", issuePayload.Mentioned...)
 	} else {
 		printMessage("  There are no issues mentioning you")
 	}
@@ -85,7 +142,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 	printHeader("Recent issues")
 	if len(issuePayload.Recent) > 0 {
-		printIssues(issuePayload.Recent...)
+		printIssues("  ", issuePayload.Recent...)
 	} else {
 		printMessage("  There are no recent issues")
 	}
@@ -185,8 +242,17 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(issues ...api.Issue) {
+func printIssues(prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
-		fmt.Printf("  #%d %s\n", issue.Number, truncate(70, issue.Title))
+		number := utils.Green("#" + strconv.Itoa(issue.Number))
+		var coloredLabels string
+		if len(issue.Labels) > 0 {
+			var ellipse string
+			if issue.TotalLabelCount > len(issue.Labels) {
+				ellipse = "…"
+			}
+			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
+		}
+		fmt.Printf("%s%s %s %s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
 }

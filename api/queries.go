@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"time"
 )
 
 type PullRequestsPayload struct {
@@ -18,34 +17,28 @@ type PullRequest struct {
 	URL         string
 	HeadRefName string
 
-	IsCrossRepository   bool
 	HeadRepositoryOwner struct {
 		Login string
 	}
-
-	Reviews struct {
-		Nodes []struct {
-			State  string
-			Author struct {
-				Login string
-			}
+	HeadRepository struct {
+		Name             string
+		DefaultBranchRef struct {
+			Name string
 		}
 	}
+	IsCrossRepository   bool
+	MaintainerCanModify bool
+
+	ReviewDecision string
 
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
-				Status struct {
-					Contexts []struct {
-						State string
-					}
-				}
-				CheckSuites struct {
-					Nodes []struct {
-						CheckRuns struct {
-							Nodes []struct {
-								Conclusion string
-							}
+				StatusCheckRollup struct {
+					Contexts struct {
+						Nodes []struct {
+							State      string
+							Conclusion string
 						}
 					}
 				}
@@ -64,23 +57,18 @@ func (pr PullRequest) HeadLabel() string {
 type PullRequestReviewStatus struct {
 	ChangesRequested bool
 	Approved         bool
+	ReviewRequired   bool
 }
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	status := PullRequestReviewStatus{}
-	reviewMap := map[string]string{}
-	// Reviews will include every review on record, including consecutive ones
-	// from the same actor. Consolidate them into latest state per reviewer.
-	for _, review := range pr.Reviews.Nodes {
-		reviewMap[review.Author.Login] = review.State
-	}
-	for _, state := range reviewMap {
-		switch state {
-		case "CHANGES_REQUESTED":
-			status.ChangesRequested = true
-		case "APPROVED":
-			status.Approved = true
-		}
+	switch pr.ReviewDecision {
+	case "CHANGES_REQUESTED":
+		status.ChangesRequested = true
+	case "APPROVED":
+		status.Approved = true
+	case "REVIEW_REQUIRED":
+		status.ReviewRequired = true
 	}
 	return status
 }
@@ -97,31 +85,22 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		return
 	}
 	commit := pr.Commits.Nodes[0].Commit
-	for _, status := range commit.Status.Contexts {
-		switch status.State {
-		case "SUCCESS":
+	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
+		state := c.State
+		if state == "" {
+			state = c.Conclusion
+		}
+		switch state {
+		case "SUCCESS", "NEUTRAL", "SKIPPED":
 			summary.Passing++
-		case "EXPECTED", "ERROR", "FAILURE":
+		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		case "PENDING":
+		case "EXPECTED", "QUEUED", "PENDING", "IN_PROGRESS":
 			summary.Pending++
 		default:
-			panic(fmt.Errorf("unsupported status: %q", status.State))
+			panic(fmt.Errorf("unsupported status: %q", state))
 		}
 		summary.Total++
-	}
-	for _, checkSuite := range commit.CheckSuites.Nodes {
-		for _, checkRun := range checkSuite.CheckRuns.Nodes {
-			switch checkRun.Conclusion {
-			case "SUCCESS", "NEUTRAL":
-				summary.Passing++
-			case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-				summary.Failing++
-			default:
-				panic(fmt.Errorf("unsupported check conclusion: %q", checkRun.Conclusion))
-			}
-			summary.Total++
-		}
 	}
 	return
 }
@@ -129,109 +108,6 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 type Repo interface {
 	RepoName() string
 	RepoOwner() string
-}
-
-type IssuesPayload struct {
-	Assigned  []Issue
-	Mentioned []Issue
-	Recent    []Issue
-}
-
-type Issue struct {
-	Number int
-	Title  string
-	URL    string
-}
-
-func Issues(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
-	type issues struct {
-		Issues struct {
-			Edges []struct {
-				Node Issue
-			}
-		}
-	}
-
-	type response struct {
-		Assigned  issues
-		Mentioned issues
-		Recent    issues
-	}
-
-	query := `
-    fragment issue on Issue {
-      number
-      title
-    }
-    query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
-      assigned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {assignee: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
-          }
-        }
-      }
-      mentioned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {mentioned: $viewer}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
-          }
-        }
-      }
-      recent: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {since: $since}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
-          }
-        }
-      }
-    }
-  `
-
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
-	since := time.Now().UTC().Add(time.Hour * -24).Format("2006-01-02T15:04:05-0700")
-	variables := map[string]interface{}{
-		"owner":  owner,
-		"repo":   repo,
-		"viewer": currentUsername,
-		"since":  since,
-	}
-
-	var resp response
-	err := client.GraphQL(query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	var assigned []Issue
-	for _, edge := range resp.Assigned.Issues.Edges {
-		assigned = append(assigned, edge.Node)
-	}
-
-	var mentioned []Issue
-	for _, edge := range resp.Mentioned.Issues.Edges {
-		mentioned = append(mentioned, edge.Node)
-	}
-
-	var recent []Issue
-	for _, edge := range resp.Recent.Issues.Edges {
-		recent = append(recent, edge.Node)
-	}
-
-	payload := IssuesPayload{
-		assigned,
-		mentioned,
-		recent,
-	}
-
-	return &payload, nil
 }
 
 func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername string) (*PullRequestsPayload, error) {
@@ -267,15 +143,13 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 		commits(last: 1) {
 			nodes {
 				commit {
-					status {
-						contexts {
-							state
-						}
-					}
-					checkSuites(first: 50) {
-						nodes {
-							checkRuns(first: 50) {
-								nodes {
+					statusCheckRollup {
+						contexts(last: 100) {
+							nodes {
+								...on StatusContext {
+									state
+								}
+								...on CheckRun {
 									conclusion
 								}
 							}
@@ -287,16 +161,8 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 	fragment prWithReviews on PullRequest {
 		...pr
-		reviews(last: 20) {
-			nodes {
-				state
-				author {
-					login
-				}
-			}
-		}
+		reviewDecision
 	}
-
     query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
       repository(owner: $owner, name: $repo) {
         pullRequests(headRefName: $headRefName, states: OPEN, first: 1) {
@@ -372,6 +238,48 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 	}
 
 	return &payload, nil
+}
+
+func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest, error) {
+	type response struct {
+		Repository struct {
+			PullRequest PullRequest
+		}
+	}
+
+	query := `
+	query($owner: String!, $repo: String!, $pr_number: Int!) {
+		repository(owner: $owner, name: $repo) {
+			pullRequest(number: $pr_number) {
+				headRefName
+				headRepositoryOwner {
+					login
+				}
+				headRepository {
+					name
+					defaultBranchRef {
+						name
+					}
+				}
+				isCrossRepository
+				maintainerCanModify
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{
+		"owner":     ghRepo.RepoOwner(),
+		"repo":      ghRepo.RepoName(),
+		"pr_number": number,
+	}
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Repository.PullRequest, nil
 }
 
 func PullRequestsForBranch(client *Client, ghRepo Repo, branch string) ([]PullRequest, error) {
