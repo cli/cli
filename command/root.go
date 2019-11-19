@@ -37,7 +37,7 @@ type FlagError struct {
 var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
-	Long:  `Do things with GitHub from your terminal`,
+	Long:  `Work with GitHub from your terminal`,
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
