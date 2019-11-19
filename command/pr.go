@@ -361,29 +361,20 @@ func printPrs(prs ...api.PullRequest) {
 			fmt.Printf("\n  ")
 		}
 
-		if checks.Total > 1 {
-			var ratio string
+		if checks.Total > 0 {
+			var summary string
 			if checks.Failing > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Red(ratio)
+				if checks.Total > 1 {
+					summary = utils.Red(fmt.Sprintf("%d/%d failing", checks.Failing, checks.Total))
+				} else {
+					summary = utils.Red("failing")
+				}
 			} else if checks.Pending > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Yellow(ratio)
+				summary = utils.Yellow("pending")
 			} else if checks.Passing == checks.Total {
-				ratio = fmt.Sprintf("%d", checks.Total)
-				ratio = utils.Green(ratio)
+				summary = utils.Green("success")
 			}
-			fmt.Printf(" - checks: %s", ratio)
-		} else if checks.Total == 1 {
-			var state string
-			if checks.Failing > 0 {
-				state = utils.Red("failing")
-			} else if checks.Pending > 0 {
-				state = utils.Yellow("pending")
-			} else if checks.Passing == checks.Total {
-				state = utils.Green("success")
-			}
-			fmt.Printf(" - checks: %s", state)
+			fmt.Printf(" - checks: %s", summary)
 		}
 
 		if reviews.ChangesRequested {
