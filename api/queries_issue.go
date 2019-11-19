@@ -39,24 +39,20 @@ type apiIssues struct {
 	}
 }
 
-var fragments string
-
-func init() {
-	fragments = `
-		fragment issue on Issue {
-			number
-			title
-			labels(first: 3) {
-				edges {
-					node {
-						name
-					}
+const fragments = `
+	fragment issue on Issue {
+		number
+		title
+		labels(first: 3) {
+			edges {
+				node {
+					name
 				}
-				totalCount
 			}
+			totalCount
 		}
-	`
-}
+	}
+`
 
 func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*Issue, error) {
 	repoID, err := GitHubRepoId(client, ghRepo)
