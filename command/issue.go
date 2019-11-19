@@ -34,7 +34,7 @@ func init() {
 
 	issueListCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List open issues",
+		Short: "List and filter issues in this repository",
 		RunE:  issueList,
 	}
 	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
@@ -46,8 +46,8 @@ func init() {
 
 var issueCmd = &cobra.Command{
 	Use:   "issue",
-	Short: "Work with GitHub issues",
-	Long:  `Helps you work with issues.`,
+	Short: "Work with issues",
+	Long:  `Work with GitHub issues`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
