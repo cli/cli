@@ -25,6 +25,16 @@ func (r Remotes) FindByName(names ...string) (*Remote, error) {
 	return nil, fmt.Errorf("no GitHub remotes found")
 }
 
+// FindByRepo returns the first Remote that points to a specific GitHub repository
+func (r Remotes) FindByRepo(owner, name string) (*Remote, error) {
+	for _, rem := range r {
+		if strings.EqualFold(rem.RepoOwner(), owner) && strings.EqualFold(rem.RepoName(), name) {
+			return rem, nil
+		}
+	}
+	return nil, fmt.Errorf("no matching remote found")
+}
+
 // Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
 	*git.Remote

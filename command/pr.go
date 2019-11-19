@@ -3,9 +3,11 @@ package command
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -13,6 +15,7 @@ import (
 
 func init() {
 	RootCmd.AddCommand(prCmd)
+	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prStatusCmd)
@@ -28,6 +31,12 @@ var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Work with pull requests",
 	Long:  `Helps you work with pull requests.`,
+}
+var prCheckoutCmd = &cobra.Command{
+	Use:   "checkout <pr-number>",
+	Short: "check out a pull request in git",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  prCheckout,
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
@@ -247,6 +256,100 @@ func prView(cmd *cobra.Command, args []string) error {
 	return utils.OpenInBrowser(openURL)
 }
 
+func prCheckout(cmd *cobra.Command, args []string) error {
+	prNumber, err := strconv.Atoi(args[0])
+	if err != nil {
+		return err
+	}
+
+	ctx := contextForCommand(cmd)
+	currentBranch, _ := ctx.Branch()
+	remotes, err := ctx.Remotes()
+	if err != nil {
+		return err
+	}
+	// FIXME: duplicates logic from fsContext.BaseRepo
+	baseRemote, err := remotes.FindByName("upstream", "github", "origin", "*")
+	if err != nil {
+		return err
+	}
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := api.PullRequestByNumber(apiClient, baseRemote, prNumber)
+	if err != nil {
+		return err
+	}
+
+	headRemote := baseRemote
+	if pr.IsCrossRepository {
+		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+	}
+
+	cmdQueue := [][]string{}
+
+	newBranchName := pr.HeadRefName
+	if headRemote != nil {
+		// there is an existing git remote for PR head
+		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
+		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
+
+		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
+
+		// local branch already exists
+		if git.VerifyRef("refs/heads/" + newBranchName) {
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+		} else {
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
+		}
+	} else {
+		// no git remote for PR head
+
+		// avoid naming the new branch the same as the default branch
+		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
+		}
+
+		ref := fmt.Sprintf("refs/pull/%d/head", prNumber)
+		if newBranchName == currentBranch {
+			// PR head matches currently checked out branch
+			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, ref})
+			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+		} else {
+			// create a new branch
+			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, fmt.Sprintf("%s:%s", ref, newBranchName)})
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+		}
+
+		remote := baseRemote.Name
+		mergeRef := ref
+		if pr.MaintainerCanModify {
+			remote = fmt.Sprintf("https://github.com/%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
+		}
+		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
+		}
+	}
+
+	for _, args := range cmdQueue {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := utils.PrepareCmd(cmd).Run(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func printPrs(prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
@@ -285,6 +388,8 @@ func printPrs(prs ...api.PullRequest) {
 
 		if reviews.ChangesRequested {
 			fmt.Printf(" - %s", utils.Red("changes requested"))
+		} else if reviews.ReviewRequired {
+			fmt.Printf(" - %s", utils.Yellow("review required"))
 		} else if reviews.Approved {
 			fmt.Printf(" - %s", utils.Green("approved"))
 		}
