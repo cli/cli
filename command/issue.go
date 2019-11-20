@@ -2,15 +2,14 @@ package command
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/utils"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
@@ -29,7 +28,10 @@ func init() {
 		},
 	)
 	issueCmd.AddCommand(issueCreateCmd)
-	issueCreateCmd.Flags().StringArrayP("message", "m", nil, "set title and body")
+	issueCreateCmd.Flags().StringP("title", "t", "",
+		"Supply a title. Will prompt for one otherwise.")
+	issueCreateCmd.Flags().StringP("body", "b", "",
+		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
 
 	issueListCmd := &cobra.Command{
@@ -189,44 +191,39 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	var title string
-	var body string
-
-	message, err := cmd.Flags().GetStringArray("message")
-	if err != nil {
-		return err
-	}
-
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	if len(message) > 0 {
-		title = message[0]
-		body = strings.Join(message[1:], "\n\n")
-	} else {
-		// TODO: open the text editor for issue title & body
-		input := os.Stdin
-		if terminal.IsTerminal(int(input.Fd())) {
-			cmd.Println("Enter the issue title and body; press Enter + Ctrl-D when done:")
-		}
-		inputBytes, err := ioutil.ReadAll(input)
-		if err != nil {
-			return err
-		}
-
-		parts := strings.SplitN(string(inputBytes), "\n\n", 2)
-		if len(parts) > 0 {
-			title = parts[0]
-		}
-		if len(parts) > 1 {
-			body = parts[1]
-		}
+	title, err := cmd.Flags().GetString("title")
+	if err != nil {
+		return errors.Wrap(err, "could not parse title")
+	}
+	body, err := cmd.Flags().GetString("body")
+	if err != nil {
+		return errors.Wrap(err, "could not parse body")
 	}
 
-	if title == "" {
-		return fmt.Errorf("aborting due to empty title")
+	interactive := title == "" || body == ""
+
+	if interactive {
+		tb, err := titleBodySurvey(cmd, title, body)
+		if err != nil {
+			return errors.Wrap(err, "could not collect title and/or body")
+		}
+
+		if tb == nil {
+			// editing was canceled, we can just leave
+			return nil
+		}
+
+		if title == "" {
+			title = tb.Title
+		}
+		if body == "" {
+			body = tb.Body
+		}
 	}
 	params := map[string]interface{}{
 		"title": title,
