@@ -9,7 +9,10 @@ import (
 )
 
 func main() {
-	command.CheckForUpdate()
+	handleUpdate := make(chan func())
+	go command.CheckForUpdate(handleUpdate)
+
+	fmt.Printf("🌭 %+v\n", "bang")
 
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -19,4 +22,6 @@ func main() {
 		}
 		os.Exit(1)
 	}
+
+	(<-handleUpdate)()
 }

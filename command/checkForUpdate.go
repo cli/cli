@@ -13,29 +13,32 @@ import (
 
 const nwo = "github/homebrew-gh"
 
-func CheckForUpdate() error {
+func CheckForUpdate(handleUpdate chan func()) {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		return nil
+		handleUpdate <- nil
 	}
 
 	latestVersion, err := getLastestVersion()
 	if err != nil {
-		return err
+		handleUpdate <- nil
 	}
 
 	updateAvailable := latestVersion != Version
+
 	if updateAvailable {
-		fmt.Printf(utils.Cyan(`
-New version of gh is available! %s → %s
+		handleUpdate <- func() {
+			fmt.Printf(utils.Cyan(`
+A new version of gh is available! %s → %s
 Changelog: https://github.com/%s/releases/tag/%[2]s
 Run 'brew upgrade github/gh/gh' to update!`)+"\n\n", Version, latestVersion, nwo)
+		}
+	} else {
+		handleUpdate <- nil
 	}
-
-	return nil
 }
 
 func getLastestVersion() (string, error) {
-	url := fmt.Sprint("https://api.github.com/repos/%s/releases/latest", nwo)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", nwo)
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
