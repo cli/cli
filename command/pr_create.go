@@ -5,7 +5,6 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
@@ -55,86 +54,25 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	interactive := title == "" || body == ""
 
-	inProgress := struct {
-		Body  string
-		Title string
-	}{}
-
 	if interactive {
-		confirmed := false
-		editor := determineEditor()
+		tb, err := titleBodySurvey(cmd, title, body)
+		if err != nil {
+			return errors.Wrap(err, "could not collect title and/or body")
+		}
 
-		for !confirmed {
-			titleQuestion := &survey.Question{
-				Name: "title",
-				Prompt: &survey.Input{
-					Message: "PR Title",
-					Default: inProgress.Title,
-				},
-			}
-			bodyQuestion := &survey.Question{
-				Name: "body",
-				Prompt: &survey.Editor{
-					Message:       fmt.Sprintf("PR Body (%s)", editor),
-					FileName:      "*.md",
-					Default:       inProgress.Body,
-					AppendDefault: true,
-					Editor:        editor,
-				},
-			}
+		if tb == nil {
+			// editing was canceled, we can just leave
+			return nil
+		}
 
-			qs := []*survey.Question{}
-			if title == "" {
-				qs = append(qs, titleQuestion)
-			}
-			if body == "" {
-				qs = append(qs, bodyQuestion)
-			}
-
-			err := survey.Ask(qs, &inProgress)
-			if err != nil {
-				return errors.Wrap(err, "could not prompt")
-			}
-			confirmAnswers := struct {
-				Confirmation string
-			}{}
-			confirmQs := []*survey.Question{
-				{
-					Name: "confirmation",
-					Prompt: &survey.Select{
-						Message: "Submit?",
-						Options: []string{
-							"Yes",
-							"Edit",
-							"Cancel",
-						},
-					},
-				},
-			}
-
-			err = survey.Ask(confirmQs, &confirmAnswers)
-			if err != nil {
-				return errors.Wrap(err, "could not prompt")
-			}
-
-			switch confirmAnswers.Confirmation {
-			case "Yes":
-				confirmed = true
-			case "Edit":
-				continue
-			case "Cancel":
-				cmd.Println("Discarding pull request")
-				return nil
-			}
+		if title == "" {
+			title = tb.Title
+		}
+		if body == "" {
+			body = tb.Body
 		}
 	}
 
-	if title == "" {
-		title = inProgress.Title
-	}
-	if body == "" {
-		body = inProgress.Body
-	}
 	base, err := cmd.Flags().GetString("base")
 	if err != nil {
 		return errors.Wrap(err, "could not parse base")
