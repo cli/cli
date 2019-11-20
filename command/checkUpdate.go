@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/github/gh-cli/utils"
 	"github.com/mattn/go-isatty"
 )
 
@@ -20,7 +21,13 @@ func CheckForUpdate() error {
 		return err
 	}
 
-	fmt.Printf("🌭 %+v %+v\n", latestVersion, Version)
+	updateAvailable := latestVersion != Version
+	if updateAvailable {
+		fmt.Printf(utils.Cyan(`
+New version of gh is available! %s → %s
+Changelog: https://github.com/github/homebrew-gh/releases/tag/%[2]s
+Run 'brew upgrade github/gh/gh' to update!`)+"\n\n", Version, latestVersion)
+	}
 
 	return nil
 }
