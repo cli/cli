@@ -11,6 +11,8 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+const nwo = "github/homebrew-gh"
+
 func CheckForUpdate() error {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		return nil
@@ -25,15 +27,15 @@ func CheckForUpdate() error {
 	if updateAvailable {
 		fmt.Printf(utils.Cyan(`
 New version of gh is available! %s → %s
-Changelog: https://github.com/github/homebrew-gh/releases/tag/%[2]s
-Run 'brew upgrade github/gh/gh' to update!`)+"\n\n", Version, latestVersion)
+Changelog: https://github.com/%s/releases/tag/%[2]s
+Run 'brew upgrade github/gh/gh' to update!`)+"\n\n", Version, latestVersion, nwo)
 	}
 
 	return nil
 }
 
 func getLastestVersion() (string, error) {
-	url := "https://api.github.com/repos/github/homebrew-gh/releases/latest"
+	url := fmt.Sprint("https://api.github.com/repos/%s/releases/latest", nwo)
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
