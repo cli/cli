@@ -50,10 +50,19 @@ func (t *TTYTablePrinter) FitColumns() {
 	numCols := len(t.colWidths)
 	delimWidth := 2
 	availWidth := t.maxWidth - t.colWidths[0] - ((numCols - 1) * delimWidth)
-	// TODO: avoid widening columns that already fit
+	// add extra space from columns that are already narrower than threshold
+	for col := 1; col < len(t.colWidths); col++ {
+		availColWidth := availWidth / (numCols - 1)
+		if extra := availColWidth - t.colWidths[col]; extra > 0 {
+			availWidth += extra
+		}
+	}
 	// TODO: support weighted instead of even redistribution
 	for col := 1; col < len(t.colWidths); col++ {
-		t.colWidths[col] = availWidth / (numCols - 1)
+		availColWidth := availWidth / (numCols - 1)
+		if t.colWidths[col] > availColWidth {
+			t.colWidths[col] = availColWidth
+		}
 	}
 }
 
