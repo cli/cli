@@ -168,30 +168,34 @@ func prList(cmd *cobra.Command, args []string) error {
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
-		table.SetContentWidth(0, len(strconv.Itoa(pr.Number))+1)
-		table.SetContentWidth(1, len(pr.Title))
-		table.SetContentWidth(2, len(pr.HeadLabel()))
-	}
-
-	table.FitColumns()
-	table.SetColorFunc(2, utils.Cyan)
-
-	for _, pr := range prs {
 		prNum := strconv.Itoa(pr.Number)
-		if table.IsTTY {
+		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		switch pr.State {
-		case "OPEN":
-			table.SetColorFunc(0, utils.Green)
-		case "CLOSED":
-			table.SetColorFunc(0, utils.Red)
-		case "MERGED":
-			table.SetColorFunc(0, utils.Magenta)
-		}
-		table.WriteRow(prNum, pr.Title, pr.HeadLabel())
+		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(pr.Title, nil, nil)
+		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		table.EndRow()
 	}
+	err = table.Render()
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func colorFuncForState(state string) func(string) string {
+	switch state {
+	case "OPEN":
+		return utils.Green
+	case "CLOSED":
+		return utils.Red
+	case "MERGED":
+		return utils.Magenta
+	default:
+		return nil
+	}
 }
 
 func prView(cmd *cobra.Command, args []string) error {
