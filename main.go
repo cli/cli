@@ -9,6 +9,8 @@ import (
 )
 
 func main() {
+	command.CheckForUpdate()
+
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		_, isFlagError := err.(command.FlagError)
