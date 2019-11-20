@@ -127,7 +127,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	if issuePayload.Assigned != nil {
 		printIssues("  ", issuePayload.Assigned...)
 	} else {
-		message := fmt.Sprintf("  There are no issues assgined to you")
+		message := fmt.Sprintf("  There are no issues assigned to you")
 		printMessage(message)
 	}
 	fmt.Println()
