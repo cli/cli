@@ -68,14 +68,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			titleQuestion := &survey.Question{
 				Name: "title",
 				Prompt: &survey.Input{
-					Message: "PR Title",
+					Message: "Pull request title",
 					Default: inProgress.Title,
 				},
 			}
 			bodyQuestion := &survey.Question{
 				Name: "body",
 				Prompt: &survey.Editor{
-					Message:       fmt.Sprintf("PR Body (%s)", editor),
+					Message:       fmt.Sprintf("Pull request body (%s)", editor),
 					FileName:      "*.md",
 					Default:       inProgress.Body,
 					AppendDefault: true,

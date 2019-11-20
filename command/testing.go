@@ -1,6 +1,8 @@
 package command
 
 import (
+	"errors"
+
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 )
@@ -33,4 +35,16 @@ func (s outputStub) Output() ([]byte, error) {
 
 func (s outputStub) Run() error {
 	return nil
+}
+
+type errorStub struct {
+	message string
+}
+
+func (s errorStub) Output() ([]byte, error) {
+	return nil, errors.New(s.message)
+}
+
+func (s errorStub) Run() error {
+	return errors.New(s.message)
 }

@@ -37,7 +37,7 @@ type FlagError struct {
 var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
-	Long:  `Do things with GitHub from your terminal`,
+	Long:  `Work with GitHub from your terminal`,
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -75,6 +75,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		// antiope-preview: Checks
 		// shadow-cat-preview: Draft pull requests
 		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json, application/vnd.github.shadow-cat-preview"),
+		api.AddHeader("GraphQL-Features", "pe_mobile"),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, api.VerboseLog(os.Stderr))
