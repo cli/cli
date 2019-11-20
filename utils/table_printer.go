@@ -22,7 +22,7 @@ func NewTablePrinter(w io.Writer) *TTYTablePrinter {
 		out:       w,
 		IsTTY:     tty,
 		maxWidth:  ttyWidth,
-		colWidths: []int{},
+		colWidths: make(map[int]int),
 		colFuncs:  make(map[int]func(string) string),
 	}
 }
@@ -31,14 +31,11 @@ type TTYTablePrinter struct {
 	out       io.Writer
 	IsTTY     bool
 	maxWidth  int
-	colWidths []int
+	colWidths map[int]int
 	colFuncs  map[int]func(string) string
 }
 
 func (t *TTYTablePrinter) SetContentWidth(col, width int) {
-	if col == len(t.colWidths) {
-		t.colWidths = append(t.colWidths, 0)
-	}
 	if width > t.colWidths[col] {
 		t.colWidths[col] = width
 	}
