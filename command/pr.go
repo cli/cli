@@ -364,17 +364,17 @@ func printPrs(prs ...api.PullRequest) {
 		if checks.Total > 0 {
 			var summary string
 			if checks.Failing > 0 {
-				if checks.Total > 1 {
-					summary = utils.Red(fmt.Sprintf("%d/%d failing", checks.Failing, checks.Total))
+				if checks.Failing == checks.Total {
+					summary = utils.Red("All checks failing")
 				} else {
-					summary = utils.Red("failing")
+					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
 				}
 			} else if checks.Pending > 0 {
-				summary = utils.Yellow("pending")
+				summary = utils.Yellow("Checks pending")
 			} else if checks.Passing == checks.Total {
-				summary = utils.Green("success")
+				summary = utils.Green("Checks passing")
 			}
-			fmt.Printf(" - checks: %s", summary)
+			fmt.Printf(" - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
