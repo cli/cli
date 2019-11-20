@@ -38,6 +38,7 @@ type PullRequest struct {
 					Contexts struct {
 						Nodes []struct {
 							State      string
+							Status     string
 							Conclusion string
 						}
 					}
@@ -86,16 +87,21 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	}
 	commit := pr.Commits.Nodes[0].Commit
 	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
-		state := c.State
+		state := c.State // StatusContext
 		if state == "" {
-			state = c.Conclusion
+			// CheckRun
+			if c.Status == "COMPLETED" {
+				state = c.Conclusion
+			} else {
+				state = c.Status
+			}
 		}
 		switch state {
 		case "SUCCESS", "NEUTRAL", "SKIPPED":
 			summary.Passing++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		case "EXPECTED", "QUEUED", "PENDING", "IN_PROGRESS":
+		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS":
 			summary.Pending++
 		default:
 			panic(fmt.Errorf("unsupported status: %q", state))
@@ -150,6 +156,7 @@ func PullRequests(client *Client, ghRepo Repo, currentBranch, currentUsername st
 									state
 								}
 								...on CheckRun {
+									status
 									conclusion
 								}
 							}

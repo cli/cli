@@ -30,17 +30,17 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Work with pull requests",
-	Long:  `Helps you work with pull requests.`,
+	Long:  `Work with GitHub pull requests.`,
 }
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout <pr-number>",
-	Short: "check out a pull request in git",
+	Short: "Check out a pull request in Git",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  prCheckout,
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List pull requests",
+	Short: "List and filter pull requests in this repository",
 	RunE:  prList,
 }
 var prStatusCmd = &cobra.Command{
