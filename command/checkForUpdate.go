@@ -30,7 +30,7 @@ func CheckForUpdate(handleUpdate chan func()) {
 			fmt.Printf(utils.Cyan(`
 A new version of gh is available! %s → %s
 Changelog: https://github.com/%s/releases/tag/%[2]s
-Run 'brew upgrade github/gh/gh' to update!`)+"\n\n", Version, latestVersion, nwo)
+Run 'brew reinstall gh' to update!`)+"\n\n", Version, latestVersion, nwo)
 		}
 	} else {
 		handleUpdate <- nil
@@ -50,10 +50,10 @@ func getLastestVersion() (string, error) {
 		return "", err
 	}
 
-	var j struct {
+	var parsedData struct {
 		LatestVersion string `json:"tag_name"`
 	}
 
-	json.Unmarshal(data, &j)
-	return j.LatestVersion, nil
+	json.Unmarshal(data, &parsedData)
+	return parsedData.LatestVersion, nil
 }
