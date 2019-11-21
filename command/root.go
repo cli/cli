@@ -37,7 +37,7 @@ type FlagError struct {
 var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
-	Long: `Integrate GitHub into your command-line workflow, starting
+	Long: `Work seamlessly with GitHub from your command-line, starting
 	with issues and pull requests.
 	
 	(Note: gh is in a very alpha phase.)`,
