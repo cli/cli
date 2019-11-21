@@ -10,7 +10,6 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
@@ -167,55 +166,36 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tty := false
-	ttyWidth := 80
-	out := cmd.OutOrStdout()
-	if outFile, isFile := out.(*os.File); isFile {
-		fd := int(outFile.Fd())
-		tty = terminal.IsTerminal(fd)
-		if w, _, err := terminal.GetSize(fd); err == nil {
-			ttyWidth = w
-		}
-	}
-
-	numWidth := 0
-	maxTitleWidth := 0
+	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
-		numLen := len(strconv.Itoa(pr.Number)) + 1
-		if numLen > numWidth {
-			numWidth = numLen
+		prNum := strconv.Itoa(pr.Number)
+		if table.IsTTY() {
+			prNum = "#" + prNum
 		}
-		if len(pr.Title) > maxTitleWidth {
-			maxTitleWidth = len(pr.Title)
-		}
+		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(pr.Title, nil, nil)
+		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		table.EndRow()
+	}
+	err = table.Render()
+	if err != nil {
+		return err
 	}
 
-	branchWidth := 40
-	titleWidth := ttyWidth - branchWidth - 2 - numWidth - 2
-
-	if maxTitleWidth < titleWidth {
-		branchWidth += titleWidth - maxTitleWidth
-		titleWidth = maxTitleWidth
-	}
-
-	for _, pr := range prs {
-		if tty {
-			prNum := fmt.Sprintf("% *s", numWidth, fmt.Sprintf("#%d", pr.Number))
-			switch pr.State {
-			case "OPEN":
-				prNum = utils.Green(prNum)
-			case "CLOSED":
-				prNum = utils.Red(prNum)
-			case "MERGED":
-				prNum = utils.Magenta(prNum)
-			}
-			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadLabel()))
-			fmt.Fprintf(out, "%s  %-*s  %s\n", prNum, titleWidth, truncate(titleWidth, pr.Title), prBranch)
-		} else {
-			fmt.Fprintf(out, "%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadLabel())
-		}
-	}
 	return nil
+}
+
+func colorFuncForState(state string) func(string) string {
+	switch state {
+	case "OPEN":
+		return utils.Green
+	case "CLOSED":
+		return utils.Red
+	case "MERGED":
+		return utils.Magenta
+	default:
+		return nil
+	}
 }
 
 func prView(cmd *cobra.Command, args []string) error {
