@@ -342,18 +342,19 @@ func printPrs(prs ...api.PullRequest) {
 		}
 
 		if checks.Total > 0 {
-			var ratio string
+			var summary string
 			if checks.Failing > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Red(ratio)
+				if checks.Failing == checks.Total {
+					summary = utils.Red("All checks failing")
+				} else {
+					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+				}
 			} else if checks.Pending > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Yellow(ratio)
+				summary = utils.Yellow("Checks pending")
 			} else if checks.Passing == checks.Total {
-				ratio = fmt.Sprintf("%d", checks.Total)
-				ratio = utils.Green(ratio)
+				summary = utils.Green("Checks passing")
 			}
-			fmt.Printf(" - checks: %s", ratio)
+			fmt.Printf(" - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
