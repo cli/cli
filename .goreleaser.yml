@@ -29,6 +29,9 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/github/gh-cli
+    bindir: /usr/local
+    dependencies:
+      - git
     formats:
       - deb
 
