@@ -1,6 +1,6 @@
 ---
-name: "\U00002B50 Submit a request or solve a problem"
-about: Surface a problem that you think should be solved
+name: "\U00002B50 Submit a request"
+about: Surface a feature or problem that you think should be solved
 
 ---
 
