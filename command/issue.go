@@ -92,12 +92,28 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(issues) > 0 {
-		printIssues("", issues...)
-	} else {
-		message := fmt.Sprintf("There are no open issues")
-		printMessage(message)
+	if len(issues) == 0 {
+		printMessage("There are no open issues")
+		return nil
 	}
+
+	table := utils.NewTablePrinter(cmd.OutOrStdout())
+	for _, issue := range issues {
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
+		}
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issue.Title, nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.EndRow()
+	}
+	table.Render()
+
 	return nil
 }
 
