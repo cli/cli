@@ -20,13 +20,22 @@ type releaseInfo struct {
 }
 
 func CheckForUpdate(handleUpdate chan func()) {
+	// Only check for updates in production
+	if os.Getenv("APP_ENV") != "production" {
+		handleUpdate <- nil
+		return
+	}
+
+	// Ignore if this stdout is not a tty
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
 		handleUpdate <- nil
+		return
 	}
 
 	latestRelease, err := getLatestRelease()
 	if err != nil {
 		handleUpdate <- nil
+		return
 	}
 
 	updateAvailable := latestRelease.Version != command.Version
