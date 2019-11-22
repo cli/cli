@@ -22,6 +22,7 @@ jobs:
           version: latest
           args: release
         env:
+          APP_ENV: production
           GH_OAUTH_CLIENT_ID: 178c6fc778ccc68e1d6a
           GH_OAUTH_CLIENT_SECRET: ${{secrets.OAUTH_CLIENT_SECRET}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
