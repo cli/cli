@@ -15,6 +15,7 @@ type Issue struct {
 	Number int
 	Title  string
 	URL    string
+	State  string
 
 	Labels struct {
 		Nodes      []IssueLabel
@@ -37,6 +38,7 @@ const fragments = `
 		number
 		title
 		url
+		state
 		labels(first: 3) {
 			nodes {
 				name
