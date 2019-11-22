@@ -1,4 +1,4 @@
-package command
+package update
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/github/gh-cli/command"
 	"github.com/github/gh-cli/utils"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -28,14 +29,14 @@ func CheckForUpdate(handleUpdate chan func()) {
 		handleUpdate <- nil
 	}
 
-	updateAvailable := latestRelease.Version != Version
+	updateAvailable := latestRelease.Version != command.Version
 
 	if updateAvailable {
 		handleUpdate <- func() {
 			fmt.Printf(utils.Cyan(`
 A new version of gh is available! %s → %s
 Changelog: %s
-Run 'brew reinstall gh' to update!`)+"\n\n", Version, latestRelease.Version, latestRelease.URL)
+Run 'brew reinstall gh' to update!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
 		}
 	} else {
 		handleUpdate <- nil
@@ -57,5 +58,5 @@ func getLatestRelease() (*releaseInfo, error) {
 
 	var r releaseInfo
 	json.Unmarshal(data, &r)
-	return r, nil
+	return &r, nil
 }

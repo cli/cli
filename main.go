@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/command"
+	"github.com/github/gh-cli/update"
 )
 
 func main() {
 	printUpdateMessage := make(chan func())
-	go command.CheckForUpdate(printUpdateMessage)
+	go update.CheckForUpdate(printUpdateMessage)
 
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
