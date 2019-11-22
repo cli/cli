@@ -18,7 +18,7 @@ func CheckForUpdate(handleUpdate chan func()) {
 		handleUpdate <- nil
 	}
 
-	latestVersion, err := getLastestVersion()
+	latestVersion, err := getLatestVersion()
 	if err != nil {
 		handleUpdate <- nil
 	}
@@ -37,7 +37,7 @@ Run 'brew reinstall gh' to update!`)+"\n\n", Version, latestVersion, nwo)
 	}
 }
 
-func getLastestVersion() (string, error) {
+func getLatestVersion() (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", nwo)
 	resp, err := http.Get(url)
 	if err != nil {
