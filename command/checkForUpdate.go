@@ -8,13 +8,13 @@ import (
 	"os"
 
 	"github.com/github/gh-cli/utils"
-	"github.com/mattn/go-isatty"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 const nwo = "github/homebrew-gh"
 
 func CheckForUpdate(handleUpdate chan func()) {
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
+	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
 		handleUpdate <- nil
 	}
 

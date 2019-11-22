@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/mattn/go-colorable"
-	"github.com/mattn/go-isatty"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type UI interface {
@@ -69,7 +69,7 @@ func Errorln(a ...interface{}) (n int) {
 }
 
 func IsTerminal(f *os.File) bool {
-	return isatty.IsTerminal(f.Fd())
+	return terminal.IsTerminal(int(f.Fd()))
 }
 
 type Console struct {

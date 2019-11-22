@@ -1,15 +1,16 @@
 package utils
 
 import (
-	"github.com/mattn/go-isatty"
-	"github.com/mgutz/ansi"
 	"os"
+
+	"github.com/mgutz/ansi"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func makeColorFunc(color string) func(string) string {
 	return func(arg string) string {
 		output := arg
-		if isatty.IsTerminal(os.Stdout.Fd()) {
+		if terminal.IsTerminal(int(os.Stdout.Fd())) {
 			output = ansi.Color(color+arg+ansi.Reset, "")
 		}
 
@@ -29,7 +30,7 @@ var Gray = makeColorFunc(ansi.LightBlack)
 
 func Bold(arg string) string {
 	output := arg
-	if isatty.IsTerminal(os.Stdout.Fd()) {
+	if terminal.IsTerminal(int(os.Stdout.Fd())) {
 		// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
 		// will not use the default color, resulting in black and probably unreadable text. This forces
 		// the default color before bolding.
