@@ -22,13 +22,17 @@ _(Uninstall with `sudo apt remove gh`)_
 ## Fedora/Centos Linux
 
 1. Download the latest `.rpm` file from the [releases page](https://github.com/github/gh-cli/releases)
-2. Install it with `sudo rpm -ivh gh_0.2.2_linux_amd64.rpm`, changing version number accordingly
+2. Install it with `sudo yum localinstall gh_0.2.2_linux_amd64.rpm`, changing version number accordingly
+
+_(Uninstall with `sudo yum remove gh`)_
 
 ## Other Linux
 
 1. Download the latest `_linux_amd64.tar.gz` file from the [releases page](https://github.com/github/gh-cli/releases)
 2. `tar -xvf gh_0.2.2_linux_amd64.tar.gz`, changing version number accordingly
 3. Copy the uncompressed `gh` somewhere on your `$PATH` (e.g. `sudo cp gh /usr/local/bin/`)
+
+_(Uninstall with `rm`)_
 
 # Process
 
