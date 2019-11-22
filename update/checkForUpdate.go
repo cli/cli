@@ -36,7 +36,7 @@ func CheckForUpdate(handleUpdate chan func()) {
 			fmt.Printf(utils.Cyan(`
 A new version of gh is available! %s → %s
 Changelog: %s
-Run 'brew reinstall gh' to update!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
+Run 'brew upgrade gh' to update!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
 		}
 	} else {
 		handleUpdate <- nil
