@@ -22,5 +22,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	(<-printUpdateMessage)()
+	printFunc := <-printUpdateMessage
+	if printFunc != nil {
+		printFunc()
+	}
 }
