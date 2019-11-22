@@ -245,14 +245,27 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 func printIssues(prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		var coloredLabels string
-		if len(issue.Labels) > 0 {
-			var ellipse string
-			if issue.TotalLabelCount > len(issue.Labels) {
-				ellipse = "…"
-			}
-			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
+		coloredLabels := labelList(issue)
+		if coloredLabels != "" {
+			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Printf("%s%s %s %s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
+		fmt.Printf("%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
+}
+
+func labelList(issue api.Issue) string {
+	if len(issue.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := []string{}
+	for _, label := range issue.Labels.Nodes {
+		labelNames = append(labelNames, label.Name)
+	}
+
+	list := strings.Join(labelNames, ", ")
+	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
 }

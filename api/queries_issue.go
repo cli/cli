@@ -12,30 +12,23 @@ type IssuesPayload struct {
 }
 
 type Issue struct {
-	Number          int
-	Title           string
-	URL             string
-	Labels          []string
-	TotalLabelCount int
+	Number int
+	Title  string
+	URL    string
+
+	Labels struct {
+		Nodes      []IssueLabel
+		TotalCount int
+	}
+}
+
+type IssueLabel struct {
+	Name string
 }
 
 type apiIssues struct {
 	Issues struct {
-		Edges []struct {
-			Node struct {
-				Number int
-				Title  string
-				URL    string
-				Labels struct {
-					Edges []struct {
-						Node struct {
-							Name string
-						}
-					}
-					TotalCount int
-				}
-			}
-		}
+		Nodes []Issue
 	}
 }
 
@@ -43,11 +36,10 @@ const fragments = `
 	fragment issue on Issue {
 		number
 		title
+		url
 		labels(first: 3) {
-			edges {
-				node {
-					name
-				}
+			nodes {
+				name
 			}
 			totalCount
 		}
@@ -104,28 +96,22 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
     query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
       assigned: repository(owner: $owner, name: $repo) {
         issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
+          nodes {
+		    ...issue
           }
         }
       }
       mentioned: repository(owner: $owner, name: $repo) {
         issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
+          nodes {
+            ...issue
           }
         }
       }
       recent: repository(owner: $owner, name: $repo) {
         issues(filterBy: {since: $since, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          edges {
-            node {
-              ...issue
-            }
+          nodes {
+            ...issue
           }
         }
       }
@@ -148,14 +134,10 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 		return nil, err
 	}
 
-	assigned := convertAPIToIssues(resp.Assigned)
-	mentioned := convertAPIToIssues(resp.Mentioned)
-	recent := convertAPIToIssues(resp.Recent)
-
 	payload := IssuesPayload{
-		assigned,
-		mentioned,
-		recent,
+		Assigned:  resp.Assigned.Issues.Nodes,
+		Mentioned: resp.Mentioned.Issues.Nodes,
+		Recent:    resp.Recent.Issues.Nodes,
 	}
 
 	return &payload, nil
@@ -191,10 +173,8 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
     query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
         issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
-          edges {
-            node {
-              ...issue
-            }
+          nodes {
+            ...issue
           }
         }
       }
@@ -221,27 +201,9 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 		return nil, err
 	}
 
-	issues := convertAPIToIssues(resp.Repository)
-	return issues, nil
-}
-
-func convertAPIToIssues(i apiIssues) []Issue {
-	var issues []Issue
-	for _, edge := range i.Issues.Edges {
-		var labels []string
-		for _, labelEdge := range edge.Node.Labels.Edges {
-			labels = append(labels, labelEdge.Node.Name)
-		}
-
-		issue := Issue{
-			Number:          edge.Node.Number,
-			Title:           edge.Node.Title,
-			URL:             edge.Node.URL,
-			Labels:          labels,
-			TotalLabelCount: edge.Node.Labels.TotalCount,
-		}
+	issues := []Issue{}
+	for _, issue := range resp.Repository.Issues.Nodes {
 		issues = append(issues, issue)
 	}
-
-	return issues
+	return issues, nil
 }

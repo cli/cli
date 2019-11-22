@@ -55,9 +55,9 @@ func TestIssueList(t *testing.T) {
 	}
 
 	expectedIssues := []*regexp.Regexp{
-		regexp.MustCompile(`#1.*won`),
-		regexp.MustCompile(`#2.*too`),
-		regexp.MustCompile(`#4.*fore`),
+		regexp.MustCompile(`(?m)^1\t.*won`),
+		regexp.MustCompile(`(?m)^2\t.*too`),
+		regexp.MustCompile(`(?m)^4\t.*fore`),
 	}
 
 	for _, r := range expectedIssues {
