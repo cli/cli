@@ -12,9 +12,11 @@ type titleBody struct {
 	Title string
 }
 
-const _confirmed = 0
-const _unconfirmed = 1
-const _cancel = 2
+const (
+	_confirmed   = iota
+	_unconfirmed = iota
+	_cancel      = iota
+)
 
 func confirm() (int, error) {
 	confirmAnswers := struct {
