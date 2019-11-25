@@ -28,7 +28,7 @@ func init() {
 
 var prCmd = &cobra.Command{
 	Use:   "pr",
-	Short: "Work with pull requests",
+	Short: "Create, view, and checkout pull requests",
 	Long:  `Work with GitHub pull requests.`,
 }
 var prCheckoutCmd = &cobra.Command{
