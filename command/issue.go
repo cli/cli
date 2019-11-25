@@ -46,7 +46,7 @@ func init() {
 
 var issueCmd = &cobra.Command{
 	Use:   "issue",
-	Short: "Work with issues",
+	Short: "Create and view issues",
 	Long:  `Work with GitHub issues`,
 }
 var issueCreateCmd = &cobra.Command{
