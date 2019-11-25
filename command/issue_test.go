@@ -144,7 +144,7 @@ func TestIssueCreate(t *testing.T) {
 	out := bytes.Buffer{}
 	issueCreateCmd.SetOut(&out)
 
-	RootCmd.SetArgs([]string{"issue", "create", "-m", "hello", "-m", "ab", "-m", "cd"})
+	RootCmd.SetArgs([]string{"issue", "create", "-t", "hello", "-b", "cash rules everything around me"})
 	_, err := RootCmd.ExecuteC()
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
@@ -164,7 +164,7 @@ func TestIssueCreate(t *testing.T) {
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "ab\n\ncd")
+	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
 	eq(t, out.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
