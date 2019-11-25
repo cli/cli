@@ -92,12 +92,28 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(issues) > 0 {
-		printIssues("", issues...)
-	} else {
-		message := fmt.Sprintf("There are no open issues")
-		printMessage(message)
+	if len(issues) == 0 {
+		printMessage("There are no open issues")
+		return nil
 	}
+
+	table := utils.NewTablePrinter(cmd.OutOrStdout())
+	for _, issue := range issues {
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
+		}
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issue.Title, nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.EndRow()
+	}
+	table.Render()
+
 	return nil
 }
 
@@ -245,14 +261,27 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 func printIssues(prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		var coloredLabels string
-		if len(issue.Labels) > 0 {
-			var ellipse string
-			if issue.TotalLabelCount > len(issue.Labels) {
-				ellipse = "…"
-			}
-			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
+		coloredLabels := labelList(issue)
+		if coloredLabels != "" {
+			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Printf("%s%s %s %s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
+		fmt.Printf("%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
+}
+
+func labelList(issue api.Issue) string {
+	if len(issue.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := []string{}
+	for _, label := range issue.Labels.Nodes {
+		labelNames = append(labelNames, label.Name)
+	}
+
+	list := strings.Join(labelNames, ", ")
+	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
 }

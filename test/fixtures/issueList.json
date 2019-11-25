@@ -2,57 +2,45 @@
   "data": {
     "repository": {
       "issues": {
-        "edges": [
+        "nodes": [
           {
-            "node": {
               "number": 1,
               "title": "number won",
               "url": "https://wow.com",
               "labels": {
-                "edges": [
+                "nodes": [
                   {
-                    "node": {
                       "name": "label"
-                    }
                   }
                 ],
                 "totalCount": 1
               }
-            }
           },
           {
-            "node": {
               "number": 2,
               "title": "number too",
               "url": "https://wow.com",
               "labels": {
-                "edges": [
+                "nodes": [
                   {
-                    "node": {
                       "name": "label"
-                    }
                   }
                 ],
                 "totalCount": 1
               }
-            }
           },
           {
-            "node": {
               "number": 4,
               "title": "number fore",
               "url": "https://wow.com",
               "labels": {
-                "edges": [
+                "nodes": [
                   {
-                    "node": {
                       "name": "label"
-                    }
                   }
                 ],
                 "totalCount": 1
               }
-            }
           }
         ]
       }
