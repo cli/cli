@@ -203,9 +203,5 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 		return nil, err
 	}
 
-	issues := []Issue{}
-	for _, issue := range resp.Repository.Issues.Nodes {
-		issues = append(issues, issue)
-	}
-	return issues, nil
+	return resp.Repository.Issues.Nodes, nil
 }
