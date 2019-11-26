@@ -8,7 +8,7 @@ This tool is an endeavor separate from [github/hub](https://github.com/github/hu
 
 _warning, gh is in a very alpha phase_
 
-## OSX
+## macOS
 
 `brew install github/gh/gh`
 
