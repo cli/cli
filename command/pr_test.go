@@ -147,7 +147,7 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "pr view")
+	_, err := test.RunCommand(RootCmd, "pr view")
 	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 	}
 
 	// Now run again but provide a PR number
-	output, err = test.RunCommand(RootCmd, "pr view 23")
+	output, err := test.RunCommand(RootCmd, "pr view 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
