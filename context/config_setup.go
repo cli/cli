@@ -66,6 +66,9 @@ func setupConfigFile(filename string) (*configEntry, error) {
 	defer config.Close()
 
 	yamlData, err := yaml.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
 	n, err := config.Write(yamlData)
 	if err == nil && n < len(yamlData) {
 		err = io.ErrShortWrite
