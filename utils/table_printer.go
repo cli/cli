@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/mattn/go-colorable"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -24,7 +25,7 @@ func NewTablePrinter(w io.Writer) TablePrinter {
 				ttyWidth = w
 			}
 			return &ttyTablePrinter{
-				out:      w,
+				out:      colorable.NewColorable(outFile),
 				maxWidth: ttyWidth,
 			}
 		}
