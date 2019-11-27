@@ -31,7 +31,7 @@ _(Uninstall with `sudo yum remove gh`)_
 
 1. Download the `_linux_amd64.tar.gz` file from the [releases page](https://github.com/github/gh-cli/releases/latest)
 2. `tar -xf gh_*_linux_amd64.tar.gz`
-3. Copy the uncompressed `gh` somewhere on your `$PATH` (e.g. `sudo cp gh /usr/local/bin/`)
+3. Copy the uncompressed `gh` somewhere on your `$PATH` (e.g. `sudo cp gh_*_linux_amd64/bin/gh /usr/local/bin/`)
 
 _(Uninstall with `rm`)_
 
