@@ -466,8 +466,20 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		owner := vars["owner"].(string)
 		repo := vars["repo"].(string)
 		assignee := vars["assignee"].(string)
-		// TODO: support state, base, label filtering
-		variables["q"] = fmt.Sprintf("repo:%s/%s assignee:%s is:pr is:open sort:created-desc", owner, repo, assignee)
+		state := ""
+		states := vars["state"].([]string)
+		if len(states) == 1 {
+			switch states[0] {
+			case "OPEN":
+				state = " state:open"
+			case "CLOSED":
+				state = " state:closed"
+			case "MERGED":
+				state = " is:merged"
+			}
+		}
+		// TODO: support base, label filtering
+		variables["q"] = fmt.Sprintf("repo:%s/%s assignee:%s is:pr%s sort:created-desc", owner, repo, assignee, state)
 	}
 
 	for {
