@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -17,7 +18,7 @@ var Version = "DEV"
 var BuildDate = "YYYY-MM-DD"
 
 func init() {
-	RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
+	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "current GitHub repository")
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
