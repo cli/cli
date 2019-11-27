@@ -158,11 +158,11 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	printHeader("Recent issues")
-	if len(issuePayload.Recent) > 0 {
-		printIssues("  ", issuePayload.Recent...)
+	printHeader("Issues opened by you")
+	if len(issuePayload.Authored) > 0 {
+		printIssues("  ", issuePayload.Authored...)
 	} else {
-		printMessage("  There are no recent issues")
+		printMessage("  There are no issues opened by you")
 	}
 	fmt.Println()
 
