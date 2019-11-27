@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -94,12 +95,15 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	out := cmd.OutOrStdout()
+	colorOut := colorableOut(cmd)
+
 	if len(issues) == 0 {
-		printMessage("There are no open issues")
+		printMessage(colorOut, "There are no open issues")
 		return nil
 	}
 
-	table := utils.NewTablePrinter(cmd.OutOrStdout())
+	table := utils.NewTablePrinter(out)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
@@ -141,30 +145,32 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printHeader("Issues assigned to you")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned != nil {
-		printIssues("  ", issuePayload.Assigned...)
+		printIssues(out, "  ", issuePayload.Assigned...)
 	} else {
 		message := fmt.Sprintf("  There are no issues assgined to you")
-		printMessage(message)
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Issues mentioning you")
+	printHeader(out, "Issues mentioning you")
 	if len(issuePayload.Mentioned) > 0 {
-		printIssues("  ", issuePayload.Mentioned...)
+		printIssues(out, "  ", issuePayload.Mentioned...)
 	} else {
-		printMessage("  There are no issues mentioning you")
+		printMessage(out, "  There are no issues mentioning you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Issues opened by you")
+	printHeader(out, "Issues opened by you")
 	if len(issuePayload.Authored) > 0 {
-		printIssues("  ", issuePayload.Authored...)
+		printIssues(out, "  ", issuePayload.Authored...)
 	} else {
-		printMessage("  There are no issues opened by you")
+		printMessage(out, "  There are no issues opened by you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -255,14 +261,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(prefix string, issues ...api.Issue) {
+func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
 		coloredLabels := labelList(issue)
 		if coloredLabels != "" {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Printf("%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
+		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
 }
 
