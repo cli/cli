@@ -14,23 +14,24 @@ _warning, gh is in a very alpha phase_
 
 ## Debian/Ubuntu Linux
 
-1. Download the latest `.deb` file from the [releases page](https://github.com/github/gh-cli/releases)
-2. Install it with `sudo dpkg -i gh_0.2.2_linux_amd64.deb`, changing version number accordingly
+1. `sudo apt install git` if you don't already have git
+2. Download the `.deb` file from the [releases page](https://github.com/github/gh-cli/releases/latest)
+3. `sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
 
 _(Uninstall with `sudo apt remove gh`)_
 
 ## Fedora/Centos Linux
 
-1. Download the latest `.rpm` file from the [releases page](https://github.com/github/gh-cli/releases)
-2. Install it with `sudo yum localinstall gh_0.2.2_linux_amd64.rpm`, changing version number accordingly
+1. Download the `.rpm` file from the [releases page](https://github.com/github/gh-cli/releases/latest)
+2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
 
 _(Uninstall with `sudo yum remove gh`)_
 
 ## Other Linux
 
-1. Download the latest `_linux_amd64.tar.gz` file from the [releases page](https://github.com/github/gh-cli/releases)
-2. `tar -xvf gh_0.2.2_linux_amd64.tar.gz`, changing version number accordingly
-3. Copy the uncompressed `gh` somewhere on your `$PATH` (e.g. `sudo cp gh /usr/local/bin/`)
+1. Download the `_linux_amd64.tar.gz` file from the [releases page](https://github.com/github/gh-cli/releases/latest)
+2. `tar -xf gh_*_linux_amd64.tar.gz`
+3. Copy the uncompressed `gh` somewhere on your `$PATH` (e.g. `sudo cp gh_*_linux_amd64/bin/gh /usr/local/bin/`)
 
 _(Uninstall with `rm`)_
 
