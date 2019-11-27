@@ -1,15 +1,28 @@
 package utils
 
 import (
+	"os"
+
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
-	"os"
 )
+
+var _isStdoutTerminal = false
+var checkedTerminal = false
+
+func isStdoutTerminal() bool {
+	if !checkedTerminal {
+		fd := os.Stdout.Fd()
+		_isStdoutTerminal = isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
+		checkedTerminal = true
+	}
+	return _isStdoutTerminal
+}
 
 func makeColorFunc(color string) func(string) string {
 	return func(arg string) string {
 		output := arg
-		if isatty.IsTerminal(os.Stdout.Fd()) {
+		if isStdoutTerminal() {
 			output = ansi.Color(color+arg+ansi.Reset, "")
 		}
 
@@ -29,7 +42,7 @@ var Gray = makeColorFunc(ansi.LightBlack)
 
 func Bold(arg string) string {
 	output := arg
-	if isatty.IsTerminal(os.Stdout.Fd()) {
+	if isStdoutTerminal() {
 		// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
 		// will not use the default color, resulting in black and probably unreadable text. This forces
 		// the default color before bolding.
