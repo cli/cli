@@ -1,10 +1,18 @@
 package utils
 
 import (
+	"io"
+	"os"
+
+	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
-	"os"
 )
+
+// NewColorable returns an output stream that handles ANSI color sequences on Windows
+func NewColorable(f *os.File) io.Writer {
+	return colorable.NewColorable(f)
+}
 
 func makeColorFunc(color string) func(string) string {
 	return func(arg string) string {

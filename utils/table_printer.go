@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -37,7 +36,7 @@ func NewTablePrinter(w io.Writer) TablePrinter {
 				}
 			}
 			return &ttyTablePrinter{
-				out:      colorable.NewColorable(outFile),
+				out:      NewColorable(outFile),
 				maxWidth: ttyWidth,
 			}
 		}
