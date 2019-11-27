@@ -24,6 +24,7 @@ func init() {
 	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
 	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
 	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
+	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 }
 
 var prCmd = &cobra.Command{
@@ -134,6 +135,10 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	assignee, err := cmd.Flags().GetString("assignee")
+	if err != nil {
+		return err
+	}
 
 	var graphqlState []string
 	switch state {
@@ -159,6 +164,9 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 	if baseBranch != "" {
 		params["baseBranch"] = baseBranch
+	}
+	if assignee != "" {
+		params["assignee"] = assignee
 	}
 
 	prs, err := api.PullRequestList(apiClient, params, limit)

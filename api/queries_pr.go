@@ -375,21 +375,37 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 }
 
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]PullRequest, error) {
-	type response struct {
-		Repository struct {
-			PullRequests struct {
-				Edges []struct {
-					Node PullRequest
-				}
-				PageInfo struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			}
+	type prBlock struct {
+		Edges []struct {
+			Node PullRequest
+		}
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
 		}
 	}
+	type response struct {
+		Repository struct {
+			PullRequests prBlock
+		}
+		Search prBlock
+	}
 
-	query := `
+	fragment := `
+	fragment pr on PullRequest {
+		number
+		title
+		state
+		url
+		headRefName
+		headRepositoryOwner {
+			login
+		}
+		isCrossRepository
+	}
+	`
+
+	query := fragment + `
     query(
 		$owner: String!,
 		$repo: String!,
@@ -410,15 +426,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		) {
           edges {
             node {
-				number
-				title
-				state
-				url
-				headRefName
-				headRepositoryOwner {
-					login
-				}
-				isCrossRepository
+				...pr
             }
 		  }
 		  pageInfo {
@@ -427,13 +435,39 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		  }
         }
       }
-    }`
+	}`
 
 	prs := []PullRequest{}
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
 	for name, val := range vars {
 		variables[name] = val
+	}
+
+	if _, ok := vars["assignee"]; ok {
+		query = fragment + `
+		query(
+			$q: String!,
+			$limit: Int!,
+			$endCursor: String,
+		) {
+			search(query: $q, type: ISSUE, first: $limit, after: $endCursor) {
+				edges {
+					node {
+						...pr
+					}
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}`
+		owner := vars["owner"].(string)
+		repo := vars["repo"].(string)
+		assignee := vars["assignee"].(string)
+		// TODO: support state, base, label filtering
+		variables["q"] = fmt.Sprintf("repo:%s/%s assignee:%s is:pr is:open sort:created-desc", owner, repo, assignee)
 	}
 
 	for {
@@ -444,6 +478,9 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			return nil, err
 		}
 		prData := data.Repository.PullRequests
+		if _, ok := variables["q"]; ok {
+			prData = data.Search
+		}
 
 		for _, edge := range prData.Edges {
 			prs = append(prs, edge.Node)
