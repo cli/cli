@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
 
 func randomString(length int) (string, error) {
@@ -101,11 +102,14 @@ func openInBrowser(url string) error {
 		args = []string{"open"}
 	case "windows":
 		args = []string{"cmd", "/c", "start"}
+		r := strings.NewReplacer("&", "^&")
+		url = r.Replace(url)
 	default:
 		args = []string{"xdg-open"}
 	}
 
 	args = append(args, url)
 	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
