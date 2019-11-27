@@ -32,17 +32,17 @@ func init() {
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
 
 	issueListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter issues in this repository",
 		RunE:  issueList,
 	}
-	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
-	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open|closed|all)")
+	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueCmd.AddCommand((issueListCmd))
 }
 
