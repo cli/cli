@@ -22,7 +22,7 @@ func init() {
 
 	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
-	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
+	prListCmd.Flags().StringP("base", "B", "", "filter by base branch")
 	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
 }
 
