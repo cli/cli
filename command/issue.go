@@ -14,20 +14,9 @@ import (
 
 func init() {
 	RootCmd.AddCommand(issueCmd)
-	issueCmd.AddCommand(
-		&cobra.Command{
-			Use:   "status",
-			Short: "Show status of relevant issues",
-			RunE:  issueStatus,
-		},
-		&cobra.Command{
-			Use:   "view <issue-number>",
-			Args:  cobra.MinimumNArgs(1),
-			Short: "View an issue in the browser",
-			RunE:  issueView,
-		},
-	)
 	issueCmd.AddCommand(issueCreateCmd)
+	issueCmd.AddCommand(issueStatusCmd)
+	issueCmd.AddCommand(issueViewCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
@@ -55,6 +44,17 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
+}
+var issueStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show status of relevant issues",
+	RunE:  issueStatus,
+}
+var issueViewCmd = &cobra.Command{
+	Use:   "view <issue-number>",
+	Args:  cobra.MinimumNArgs(1),
+	Short: "View an issue in the browser",
+	RunE:  issueView,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
