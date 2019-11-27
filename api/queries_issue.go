@@ -2,13 +2,12 @@ package api
 
 import (
 	"fmt"
-	"time"
 )
 
 type IssuesPayload struct {
 	Assigned  []Issue
 	Mentioned []Issue
-	Recent    []Issue
+	Authored  []Issue
 }
 
 type Issue struct {
@@ -91,11 +90,11 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	type response struct {
 		Assigned  apiIssues
 		Mentioned apiIssues
-		Recent    apiIssues
+		Authored  apiIssues
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $since: DateTime!, $viewer: String!, $per_page: Int = 10) {
+    query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
       assigned: repository(owner: $owner, name: $repo) {
         issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           nodes {
@@ -110,8 +109,8 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
           }
         }
       }
-      recent: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {since: $since, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+      authored: repository(owner: $owner, name: $repo) {
+        issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
           nodes {
             ...issue
           }
@@ -122,12 +121,10 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
-	since := time.Now().UTC().Add(time.Hour * -24).Format("2006-01-02T15:04:05-0700")
 	variables := map[string]interface{}{
 		"owner":  owner,
 		"repo":   repo,
 		"viewer": currentUsername,
-		"since":  since,
 	}
 
 	var resp response
@@ -139,7 +136,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	payload := IssuesPayload{
 		Assigned:  resp.Assigned.Issues.Nodes,
 		Mentioned: resp.Mentioned.Issues.Nodes,
-		Recent:    resp.Recent.Issues.Nodes,
+		Authored:  resp.Authored.Issues.Nodes,
 	}
 
 	return &payload, nil

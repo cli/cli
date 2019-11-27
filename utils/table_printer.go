@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -18,11 +22,19 @@ type TablePrinter interface {
 
 func NewTablePrinter(w io.Writer) TablePrinter {
 	if outFile, isFile := w.(*os.File); isFile {
-		fd := int(outFile.Fd())
-		if terminal.IsTerminal(fd) {
+		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
+		if isatty.IsTerminal(outFile.Fd()) || isCygwin {
 			ttyWidth := 80
-			if w, _, err := terminal.GetSize(fd); err == nil {
+			if w, _, err := terminal.GetSize(int(outFile.Fd())); err == nil {
 				ttyWidth = w
+			} else if isCygwin {
+				tputCmd := exec.Command("tput", "cols")
+				tputCmd.Stdin = os.Stdin
+				if out, err := tputCmd.Output(); err == nil {
+					if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+						ttyWidth = w
+					}
+				}
 			}
 			return &ttyTablePrinter{
 				out:      colorable.NewColorable(outFile),
