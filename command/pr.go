@@ -20,10 +20,10 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
 
-	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
-	prListCmd.Flags().StringP("base", "B", "", "filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
+	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
 }
 
 var prCmd = &cobra.Command{
