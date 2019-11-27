@@ -19,7 +19,6 @@ var BuildDate = "YYYY-MM-DD"
 func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "current GitHub repository")
-	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
@@ -55,9 +54,7 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 	ctx := initContext()
 	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {
 		ctx.SetBaseRepo(repo)
-	}
-	if branch, err := cmd.Flags().GetString("current-branch"); err == nil && branch != "" {
-		ctx.SetBranch(branch)
+		ctx.SetBranch("master")
 	}
 	return ctx
 }
