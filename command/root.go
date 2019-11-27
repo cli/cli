@@ -19,6 +19,8 @@ var BuildDate = "YYYY-MM-DD"
 
 func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
+	RootCmd.AddCommand(versionCmd)
+
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "current GitHub repository")
 	RootCmd.PersistentFlags().StringP("current-branch", "B", "", "current git branch")
 	// TODO:
@@ -38,9 +40,18 @@ type FlagError struct {
 var RootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GitHub CLI",
-	Long: `Work seamlessly with GitHub from the command line`,
+	Long:  `Work seamlessly with GitHub from the command line`,
+
 	SilenceErrors: true,
 	SilenceUsage:  true,
+}
+
+var versionCmd = &cobra.Command{
+	Use:    "version",
+	Hidden: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("gh version %s\n", RootCmd.Version)
+	},
 }
 
 // overriden in tests
