@@ -19,6 +19,8 @@ var BuildDate = "YYYY-MM-DD"
 func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "Current GitHub repository")
+	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
+	RootCmd.Flags().Bool("version", false, "Print gh version")
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
