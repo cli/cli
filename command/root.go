@@ -2,11 +2,13 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -91,4 +93,12 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		opts = append(opts, api.VerboseLog(os.Stderr))
 	}
 	return api.NewClient(opts...), nil
+}
+
+func colorableOut(cmd *cobra.Command) io.Writer {
+	out := cmd.OutOrStdout()
+	if outFile, isFile := out.(*os.File); isFile {
+		return utils.NewColorable(outFile)
+	}
+	return out
 }
