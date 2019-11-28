@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -20,10 +21,10 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
 
-	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
-	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
+	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
 }
 
 var prCmd = &cobra.Command{
@@ -78,30 +79,32 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printHeader("Current branch")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
-		printPrs(*prPayload.CurrentPR)
+		printPrs(out, *prPayload.CurrentPR)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
-		printMessage(message)
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Created by you")
+	printHeader(out, "Created by you")
 	if len(prPayload.ViewerCreated) > 0 {
-		printPrs(prPayload.ViewerCreated...)
+		printPrs(out, prPayload.ViewerCreated...)
 	} else {
-		printMessage("  You have no open pull requests")
+		printMessage(out, "  You have no open pull requests")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Requesting a code review from you")
+	printHeader(out, "Requesting a code review from you")
 	if len(prPayload.ReviewRequested) > 0 {
-		printPrs(prPayload.ReviewRequested...)
+		printPrs(out, prPayload.ReviewRequested...)
 	} else {
-		printMessage("  You have no pull requests to review")
+		printMessage(out, "  You have no pull requests to review")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -330,15 +333,15 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printPrs(prs ...api.PullRequest) {
+func printPrs(w io.Writer, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
 		if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Printf("\n  ")
+			fmt.Fprintf(w, "\n  ")
 		}
 
 		if checks.Total > 0 {
@@ -354,27 +357,27 @@ func printPrs(prs ...api.PullRequest) {
 			} else if checks.Passing == checks.Total {
 				summary = utils.Green("Checks passing")
 			}
-			fmt.Printf(" - %s", summary)
+			fmt.Fprintf(w, " - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Printf(" - %s", utils.Red("changes requested"))
+			fmt.Fprintf(w, " - %s", utils.Red("changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Printf(" - %s", utils.Yellow("review required"))
+			fmt.Fprintf(w, " - %s", utils.Yellow("review required"))
 		} else if reviews.Approved {
-			fmt.Printf(" - %s", utils.Green("approved"))
+			fmt.Fprintf(w, " - %s", utils.Green("approved"))
 		}
 
-		fmt.Printf("\n")
+		fmt.Fprint(w, "\n")
 	}
 }
 
-func printHeader(s string) {
-	fmt.Println(utils.Bold(s))
+func printHeader(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Bold(s))
 }
 
-func printMessage(s string) {
-	fmt.Println(utils.Gray(s))
+func printMessage(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Gray(s))
 }
 
 func truncate(maxLength int, title string) string {
