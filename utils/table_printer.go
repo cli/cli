@@ -36,7 +36,7 @@ func NewTablePrinter(w io.Writer) TablePrinter {
 				}
 			}
 			return &ttyTablePrinter{
-				out:      w,
+				out:      NewColorable(outFile),
 				maxWidth: ttyWidth,
 			}
 		}
