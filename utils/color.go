@@ -36,11 +36,26 @@ func makeColorFunc(color string) func(string) string {
 	}
 }
 
+// Magenta outputs ANSI color if stdout is a tty
 var Magenta = makeColorFunc("magenta")
+
+// Cyan outputs ANSI color if stdout is a tty
 var Cyan = makeColorFunc("cyan")
+
+// Red outputs ANSI color if stdout is a tty
 var Red = makeColorFunc("red")
+
+// Yellow outputs ANSI color if stdout is a tty
 var Yellow = makeColorFunc("yellow")
+
+// Blue outputs ANSI color if stdout is a tty
 var Blue = makeColorFunc("blue")
+
+// Green outputs ANSI color if stdout is a tty
 var Green = makeColorFunc("green")
+
+// Gray outputs ANSI color if stdout is a tty
 var Gray = makeColorFunc("black+h")
+
+// Bold outputs ANSI color if stdout is a tty
 var Bold = makeColorFunc("default+b")
