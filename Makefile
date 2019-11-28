@@ -14,5 +14,15 @@ bin/gh: $(BUILD_FILES)
 
 test:
 	go test ./...
-
 .PHONY: test
+
+site:
+	git worktree add site gh-pages
+
+site-docs: site
+	git -C site rm 'gh*.md' 2>/dev/null || true
+	go run ./cmd/gen-docs site
+	git -C site add 'gh*.md'
+	git -C site commit -m 'update help docs'
+	git -C site push
+.PHONY: site-docs
