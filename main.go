@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	alertMsgChan := make(chan *string)
-	go updateInBackground(alertMsgChan)
+	updateMessageChan := make(chan *string)
+	go updateInBackground(updateMessageChan)
 
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -22,18 +22,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	alertMsg := <-alertMsgChan
-	if alertMsg != nil {
-		fmt.Fprintf(os.Stderr, *alertMsg)
+	updateMessage := <-updateMessageChan
+	if updateMessage != nil {
+		fmt.Fprintf(os.Stderr, *updateMessage)
 	}
 }
 
-func updateInBackground(alertMsgChan chan *string) {
+func updateInBackground(updateMessageChan chan *string) {
 	client, err := command.BasicClient()
 	if err != nil {
-		alertMsgChan <- nil
+		updateMessageChan <- nil
 		return
 	}
 
-	alertMsgChan <- update.UpdateMessage(client)
+	updateMessageChan <- update.UpdateMessage(client)
 }
