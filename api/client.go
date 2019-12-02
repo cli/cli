@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path"
 )
 
 // ClientOption represents an argument to NewClient
@@ -101,11 +100,12 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
-	url := path.Join("https://api.github.com/", p)
+	url := "https://api.github.com/" + p
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 	resp, err := c.http.Do(req)

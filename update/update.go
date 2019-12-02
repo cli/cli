@@ -26,9 +26,9 @@ func UpdateMessage(client *api.Client) *string {
 	updateAvailable := latestRelease.Version != command.Version
 	if updateAvailable {
 		alertMsg := fmt.Sprintf(utils.Cyan(`
-		A new version of gh is available! %s → %s
-		Changelog: %s
-		Run 'brew upgrade gh' to update!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
+A new version of gh is available! %s → %s
+Changelog: %s
+Run 'brew upgrade gh' to upgrade to the latest version!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
 		return &alertMsg
 	}
 
