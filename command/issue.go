@@ -2,57 +2,60 @@ package command
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/utils"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
 	RootCmd.AddCommand(issueCmd)
-	issueCmd.AddCommand(
-		&cobra.Command{
-			Use:   "status",
-			Short: "Show status of relevant issues",
-			RunE:  issueStatus,
-		},
-		&cobra.Command{
-			Use:   "view <issue-number>",
-			Args:  cobra.MinimumNArgs(1),
-			Short: "View an issue in the browser",
-			RunE:  issueView,
-		},
-	)
 	issueCmd.AddCommand(issueCreateCmd)
-	issueCreateCmd.Flags().StringArrayP("message", "m", nil, "set title and body")
-	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+	issueCmd.AddCommand(issueStatusCmd)
+	issueCmd.AddCommand(issueViewCmd)
+	issueCreateCmd.Flags().StringP("title", "t", "",
+		"Supply a title. Will prompt for one otherwise.")
+	issueCreateCmd.Flags().StringP("body", "b", "",
+		"Supply a body. Will prompt for one otherwise.")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
 
 	issueListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter issues in this repository",
 		RunE:  issueList,
 	}
-	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
-	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open|closed|all)")
+	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueCmd.AddCommand((issueListCmd))
 }
 
 var issueCmd = &cobra.Command{
 	Use:   "issue",
-	Short: "Work with issues",
+	Short: "Create and view issues",
 	Long:  `Work with GitHub issues`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
+}
+var issueStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show status of relevant issues",
+	RunE:  issueStatus,
+}
+var issueViewCmd = &cobra.Command{
+	Use:   "view <issue-number>",
+	Args:  cobra.MinimumNArgs(1),
+	Short: "View an issue in the browser",
+	RunE:  issueView,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -92,12 +95,31 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(issues) > 0 {
-		printIssues("", issues...)
-	} else {
-		message := fmt.Sprintf("There are no open issues")
-		printMessage(message)
+	out := cmd.OutOrStdout()
+	colorOut := colorableOut(cmd)
+
+	if len(issues) == 0 {
+		printMessage(colorOut, "There are no open issues")
+		return nil
 	}
+
+	table := utils.NewTablePrinter(out)
+	for _, issue := range issues {
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
+		}
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issue.Title, nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.EndRow()
+	}
+	table.Render()
+
 	return nil
 }
 
@@ -123,30 +145,32 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printHeader("Issues assigned to you")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned != nil {
-		printIssues("  ", issuePayload.Assigned...)
+		printIssues(out, "  ", issuePayload.Assigned...)
 	} else {
-		message := fmt.Sprintf("  There are no issues assigned to you")
-		printMessage(message)
+		message := fmt.Sprintf("  There are no issues assgined to you")
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Issues mentioning you")
+	printHeader(out, "Issues mentioning you")
 	if len(issuePayload.Mentioned) > 0 {
-		printIssues("  ", issuePayload.Mentioned...)
+		printIssues(out, "  ", issuePayload.Mentioned...)
 	} else {
-		printMessage("  There are no issues mentioning you")
+		printMessage(out, "  There are no issues mentioning you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Recent issues")
-	if len(issuePayload.Recent) > 0 {
-		printIssues("  ", issuePayload.Recent...)
+	printHeader(out, "Issues opened by you")
+	if len(issuePayload.Authored) > 0 {
+		printIssues(out, "  ", issuePayload.Authored...)
 	} else {
-		printMessage("  There are no recent issues")
+		printMessage(out, "  There are no issues opened by you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -189,44 +213,39 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	var title string
-	var body string
-
-	message, err := cmd.Flags().GetStringArray("message")
-	if err != nil {
-		return err
-	}
-
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	if len(message) > 0 {
-		title = message[0]
-		body = strings.Join(message[1:], "\n\n")
-	} else {
-		// TODO: open the text editor for issue title & body
-		input := os.Stdin
-		if terminal.IsTerminal(int(input.Fd())) {
-			cmd.Println("Enter the issue title and body; press Enter + Ctrl-D when done:")
-		}
-		inputBytes, err := ioutil.ReadAll(input)
-		if err != nil {
-			return err
-		}
-
-		parts := strings.SplitN(string(inputBytes), "\n\n", 2)
-		if len(parts) > 0 {
-			title = parts[0]
-		}
-		if len(parts) > 1 {
-			body = parts[1]
-		}
+	title, err := cmd.Flags().GetString("title")
+	if err != nil {
+		return errors.Wrap(err, "could not parse title")
+	}
+	body, err := cmd.Flags().GetString("body")
+	if err != nil {
+		return errors.Wrap(err, "could not parse body")
 	}
 
-	if title == "" {
-		return fmt.Errorf("aborting due to empty title")
+	interactive := title == "" || body == ""
+
+	if interactive {
+		tb, err := titleBodySurvey(cmd, title, body)
+		if err != nil {
+			return errors.Wrap(err, "could not collect title and/or body")
+		}
+
+		if tb == nil {
+			// editing was canceled, we can just leave
+			return nil
+		}
+
+		if title == "" {
+			title = tb.Title
+		}
+		if body == "" {
+			body = tb.Body
+		}
 	}
 	params := map[string]interface{}{
 		"title": title,
@@ -242,17 +261,30 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(prefix string, issues ...api.Issue) {
+func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		var coloredLabels string
-		if len(issue.Labels) > 0 {
-			var ellipse string
-			if issue.TotalLabelCount > len(issue.Labels) {
-				ellipse = "…"
-			}
-			coloredLabels = utils.Gray(fmt.Sprintf(" (%s%s)", strings.Join(issue.Labels, ", "), ellipse))
+		coloredLabels := labelList(issue)
+		if coloredLabels != "" {
+			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Printf("%s%s %s %s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
+		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
+}
+
+func labelList(issue api.Issue) string {
+	if len(issue.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := []string{}
+	for _, label := range issue.Labels.Nodes {
+		labelNames = append(labelNames, label.Name)
+	}
+
+	list := strings.Join(labelNames, ", ")
+	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
 }
