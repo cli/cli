@@ -35,6 +35,5 @@ func updateInBackground(alertMsgChan chan *string) {
 		return
 	}
 
-	alertMsg := update.UpdateMessage(client)
-	alertMsgChan <- alertMsg
+	alertMsgChan <- update.UpdateMessage(client)
 }
