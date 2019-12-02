@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 func init() {
@@ -21,15 +21,15 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
 
-	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
-	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
+	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
 }
 
 var prCmd = &cobra.Command{
 	Use:   "pr",
-	Short: "Work with pull requests",
+	Short: "Create, view, and checkout pull requests",
 	Long:  `Work with GitHub pull requests.`,
 }
 var prCheckoutCmd = &cobra.Command{
@@ -79,30 +79,32 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printHeader("Current branch")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
-		printPrs(*prPayload.CurrentPR)
+		printPrs(out, *prPayload.CurrentPR)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
-		printMessage(message)
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Created by you")
+	printHeader(out, "Created by you")
 	if len(prPayload.ViewerCreated) > 0 {
-		printPrs(prPayload.ViewerCreated...)
+		printPrs(out, prPayload.ViewerCreated...)
 	} else {
-		printMessage("  You have no open pull requests")
+		printMessage(out, "  You have no open pull requests")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Requesting a code review from you")
+	printHeader(out, "Requesting a code review from you")
 	if len(prPayload.ReviewRequested) > 0 {
-		printPrs(prPayload.ReviewRequested...)
+		printPrs(out, prPayload.ReviewRequested...)
 	} else {
-		printMessage("  You have no pull requests to review")
+		printMessage(out, "  You have no pull requests to review")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -167,55 +169,36 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tty := false
-	ttyWidth := 80
-	out := cmd.OutOrStdout()
-	if outFile, isFile := out.(*os.File); isFile {
-		fd := int(outFile.Fd())
-		tty = terminal.IsTerminal(fd)
-		if w, _, err := terminal.GetSize(fd); err == nil {
-			ttyWidth = w
-		}
-	}
-
-	numWidth := 0
-	maxTitleWidth := 0
+	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
-		numLen := len(strconv.Itoa(pr.Number)) + 1
-		if numLen > numWidth {
-			numWidth = numLen
+		prNum := strconv.Itoa(pr.Number)
+		if table.IsTTY() {
+			prNum = "#" + prNum
 		}
-		if len(pr.Title) > maxTitleWidth {
-			maxTitleWidth = len(pr.Title)
-		}
+		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(pr.Title, nil, nil)
+		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		table.EndRow()
+	}
+	err = table.Render()
+	if err != nil {
+		return err
 	}
 
-	branchWidth := 40
-	titleWidth := ttyWidth - branchWidth - 2 - numWidth - 2
-
-	if maxTitleWidth < titleWidth {
-		branchWidth += titleWidth - maxTitleWidth
-		titleWidth = maxTitleWidth
-	}
-
-	for _, pr := range prs {
-		if tty {
-			prNum := fmt.Sprintf("% *s", numWidth, fmt.Sprintf("#%d", pr.Number))
-			switch pr.State {
-			case "OPEN":
-				prNum = utils.Green(prNum)
-			case "CLOSED":
-				prNum = utils.Red(prNum)
-			case "MERGED":
-				prNum = utils.Magenta(prNum)
-			}
-			prBranch := utils.Cyan(truncate(branchWidth, pr.HeadLabel()))
-			fmt.Fprintf(out, "%s  %-*s  %s\n", prNum, titleWidth, truncate(titleWidth, pr.Title), prBranch)
-		} else {
-			fmt.Fprintf(out, "%d\t%s\t%s\n", pr.Number, pr.Title, pr.HeadLabel())
-		}
-	}
 	return nil
+}
+
+func colorFuncForState(state string) func(string) string {
+	switch state {
+	case "OPEN":
+		return utils.Green
+	case "CLOSED":
+		return utils.Red
+	case "MERGED":
+		return utils.Magenta
+	default:
+		return nil
+	}
 }
 
 func prView(cmd *cobra.Command, args []string) error {
@@ -350,50 +333,51 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printPrs(prs ...api.PullRequest) {
+func printPrs(w io.Writer, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
 		if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Printf("\n  ")
+			fmt.Fprintf(w, "\n  ")
 		}
 
 		if checks.Total > 0 {
-			var ratio string
+			var summary string
 			if checks.Failing > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Red(ratio)
+				if checks.Failing == checks.Total {
+					summary = utils.Red("All checks failing")
+				} else {
+					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+				}
 			} else if checks.Pending > 0 {
-				ratio = fmt.Sprintf("%d/%d", checks.Passing, checks.Total)
-				ratio = utils.Yellow(ratio)
+				summary = utils.Yellow("Checks pending")
 			} else if checks.Passing == checks.Total {
-				ratio = fmt.Sprintf("%d", checks.Total)
-				ratio = utils.Green(ratio)
+				summary = utils.Green("Checks passing")
 			}
-			fmt.Printf(" - checks: %s", ratio)
+			fmt.Fprintf(w, " - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Printf(" - %s", utils.Red("changes requested"))
+			fmt.Fprintf(w, " - %s", utils.Red("changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Printf(" - %s", utils.Yellow("review required"))
+			fmt.Fprintf(w, " - %s", utils.Yellow("review required"))
 		} else if reviews.Approved {
-			fmt.Printf(" - %s", utils.Green("approved"))
+			fmt.Fprintf(w, " - %s", utils.Green("approved"))
 		}
 
-		fmt.Printf("\n")
+		fmt.Fprint(w, "\n")
 	}
 }
 
-func printHeader(s string) {
-	fmt.Println(utils.Bold(s))
+func printHeader(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Bold(s))
 }
 
-func printMessage(s string) {
-	fmt.Println(utils.Gray(s))
+func printMessage(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Gray(s))
 }
 
 func truncate(maxLength int, title string) string {
