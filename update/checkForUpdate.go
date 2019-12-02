@@ -19,36 +19,44 @@ type releaseInfo struct {
 	URL     string `json:"html_url"`
 }
 
-func CheckForUpdate(handleUpdate chan func()) {
-	// Only check for updates in production
-	if os.Getenv("APP_ENV") != "production" {
-		handleUpdate <- nil
+func RunWhileCheckingForUpdate(isProduction bool, f func()) {
+	if isProduction {
+		f()
 		return
 	}
 
+	newReleaseChan := make(chan *releaseInfo)
+	go checkForUpdate(newReleaseChan)
+	f()
+
+	newRelease := <-newReleaseChan
+	if newRelease != nil {
+		fmt.Printf(utils.Cyan(`
+A new version of gh is available! %s → %s
+Changelog: %s
+Run 'brew upgrade gh' to update!`)+"\n\n", command.Version, newRelease.Version, newRelease.URL)
+	}
+}
+
+func checkForUpdate(newReleaseChan chan *releaseInfo) {
 	// Ignore if this stdout is not a tty
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
-		handleUpdate <- nil
+		newReleaseChan <- nil
 		return
 	}
 
 	latestRelease, err := getLatestRelease()
 	if err != nil {
-		handleUpdate <- nil
+		newReleaseChan <- nil
 		return
 	}
 
 	updateAvailable := latestRelease.Version != command.Version
 
 	if updateAvailable {
-		handleUpdate <- func() {
-			fmt.Printf(utils.Cyan(`
-A new version of gh is available! %s → %s
-Changelog: %s
-Run 'brew upgrade gh' to update!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
-		}
+		newReleaseChan <- latestRelease
 	} else {
-		handleUpdate <- nil
+		newReleaseChan <- nil
 	}
 }
 
