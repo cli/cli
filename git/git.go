@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -31,16 +30,6 @@ func Dir() (string, error) {
 	}
 
 	return gitDir, nil
-}
-
-func WorkdirName() (string, error) {
-	toplevelCmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := utils.PrepareCmd(toplevelCmd).Output()
-	dir := firstLine(output)
-	if dir == "" {
-		return "", fmt.Errorf("unable to determine git working directory")
-	}
-	return dir, err
 }
 
 func VerifyRef(ref string) bool {
@@ -75,70 +64,8 @@ func BranchAtRef(paths ...string) (name string, err error) {
 	return
 }
 
-func Editor() (string, error) {
-	varCmd := exec.Command("git", "var", "GIT_EDITOR")
-	output, err := utils.PrepareCmd(varCmd).Output()
-	if err != nil {
-		return "", fmt.Errorf("Can't load git var: GIT_EDITOR")
-	}
-
-	return os.ExpandEnv(firstLine(output)), nil
-}
-
 func Head() (string, error) {
 	return BranchAtRef("HEAD")
-}
-
-func SymbolicFullName(name string) (string, error) {
-	parseCmd := exec.Command("git", "rev-parse", "--symbolic-full-name", name)
-	output, err := utils.PrepareCmd(parseCmd).Output()
-	if err != nil {
-		return "", fmt.Errorf("Unknown revision or path not in the working tree: %s", name)
-	}
-
-	return firstLine(output), nil
-}
-
-func CommentChar(text string) (string, error) {
-	char, err := Config("core.commentchar")
-	if err != nil {
-		return "#", nil
-	} else if char == "auto" {
-		lines := strings.Split(text, "\n")
-		commentCharCandidates := strings.Split("#;@!$%^&|:", "")
-	candidateLoop:
-		for _, candidate := range commentCharCandidates {
-			for _, line := range lines {
-				if strings.HasPrefix(line, candidate) {
-					continue candidateLoop
-				}
-			}
-			return candidate, nil
-		}
-		return "", fmt.Errorf("unable to select a comment character that is not used in the current message")
-	} else {
-		return char, nil
-	}
-}
-
-func Show(sha string) (string, error) {
-	cmd := exec.Command("git", "-c", "log.showSignature=false", "show", "-s", "--format=%s%n%+b", sha)
-	output, err := utils.PrepareCmd(cmd).Output()
-	return strings.TrimSpace(string(output)), err
-}
-
-func Log(sha1, sha2 string) (string, error) {
-	shaRange := fmt.Sprintf("%s...%s", sha1, sha2)
-	cmd := exec.Command(
-		"-c", "log.showSignature=false", "log", "--no-color",
-		"--format=%h (%aN, %ar)%n%w(78,3,3)%s%n%+b",
-		"--cherry", shaRange)
-	outputs, err := utils.PrepareCmd(cmd).Output()
-	if err != nil {
-		return "", fmt.Errorf("Can't load git log %s..%s", sha1, sha2)
-	}
-
-	return string(outputs), nil
 }
 
 func listRemotes() ([]string, error) {
@@ -156,34 +83,6 @@ func Config(name string) (string, error) {
 
 	return firstLine(output), nil
 
-}
-
-func ConfigAll(name string) ([]string, error) {
-	mode := "--get-all"
-	if strings.Contains(name, "*") {
-		mode = "--get-regexp"
-	}
-
-	configCmd := exec.Command("git", "config", mode, name)
-	output, err := utils.PrepareCmd(configCmd).Output()
-	if err != nil {
-		return nil, fmt.Errorf("Unknown config %s", name)
-	}
-	return outputLines(output), nil
-}
-
-func LocalBranches() ([]string, error) {
-	branchesCmd := exec.Command("git", "branch", "--list")
-	output, err := utils.PrepareCmd(branchesCmd).Output()
-	if err != nil {
-		return nil, err
-	}
-
-	branches := []string{}
-	for _, branch := range outputLines(output) {
-		branches = append(branches, branch[2:])
-	}
-	return branches, nil
 }
 
 var GitCommand = func(args ...string) *exec.Cmd {

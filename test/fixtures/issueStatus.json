@@ -2,43 +2,35 @@
   "data": {
     "assigned": {
       "issues": {
-        "edges": [
+        "nodes": [
           {
-            "node": {
               "number": 9,
               "title": "corey thinks squash tastes bad"
-            }
           },
           {
-            "node": {
               "number": 10,
               "title": "broccoli is a superfood"
-            }
           }
         ]
       }
     },
     "mentioned": {
       "issues": {
-        "edges": [
+        "nodes": [
           {
-            "node": {
               "number": 8,
               "title": "rabbits eat carrots"
-            }
           },
           {
-            "node": {
               "number": 11,
               "title": "swiss chard is neutral"
-            }
           }
         ]
       }
     },
-    "recent": {
+    "authored": {
       "issues": {
-        "edges": []
+        "nodes": []
       }
     },
 
