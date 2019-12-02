@@ -5,9 +5,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -65,7 +68,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	currentBranch, err := ctx.Branch()
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
 	if err != nil {
 		return err
 	}
@@ -74,7 +77,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentBranch, currentUser)
+	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
@@ -85,7 +88,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(out, *prPayload.CurrentPR)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
@@ -217,26 +220,74 @@ func prView(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid pull request number: '%s'", args[0])
 		}
 	} else {
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-		currentBranch, err := ctx.Branch()
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
 		if err != nil {
 			return err
 		}
 
-		prs, err := api.PullRequestsForBranch(apiClient, baseRepo, currentBranch)
-		if err != nil {
-			return err
-		} else if len(prs) < 1 {
-			return fmt.Errorf("the '%s' branch has no open pull requests", currentBranch)
+		if prNumber > 0 {
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+		} else {
+			apiClient, err := apiClientForContext(ctx)
+			if err != nil {
+				return err
+			}
+
+			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			if err != nil {
+				return err
+			}
+			openURL = pr.URL
 		}
-		openURL = prs[0].URL
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return
+	}
+	prHeadRef, err = ctx.Branch()
+	if err != nil {
+		return
+	}
+	branchConfig := git.ReadBranchConfig(prHeadRef)
+
+	// the branch is configured to merge a special PR head ref
+	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+		prNumber, _ = strconv.Atoi(m[1])
+		return
+	}
+
+	var branchOwner string
+	if branchConfig.RemoteURL != nil {
+		// the branch merges from a remote specified by URL
+		if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	} else if branchConfig.RemoteName != "" {
+		// the branch merges from a remote specified by name
+		rem, _ := ctx.Remotes()
+		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	}
+
+	if branchOwner != "" {
+		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
+		}
+		// prepend `OWNER:` if this branch is pushed to a fork
+		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
+			prHeadRef = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+		}
+	}
+
+	return
 }
 
 func prCheckout(cmd *cobra.Command, args []string) error {

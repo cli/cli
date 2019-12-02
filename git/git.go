@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/utils"
@@ -109,6 +111,44 @@ func UncommittedChangeCount() (int, error) {
 func Push(remote string, ref string) error {
 	cmd := GitCommand("push", "--set-upstream", remote, ref)
 	return cmd.Run()
+}
+
+type BranchConfig struct {
+	RemoteName string
+	RemoteURL  *url.URL
+	MergeRef   string
+}
+
+// ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config
+func ReadBranchConfig(branch string) (cfg BranchConfig) {
+	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
+	configCmd := GitCommand("config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix))
+	output, err := utils.PrepareCmd(configCmd).Output()
+	if err != nil {
+		return
+	}
+	for _, line := range outputLines(output) {
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		keys := strings.Split(parts[0], ".")
+		switch keys[len(keys)-1] {
+		case "remote":
+			if strings.Contains(parts[1], ":") {
+				u, err := ParseURL(parts[1])
+				if err != nil {
+					continue
+				}
+				cfg.RemoteURL = u
+			} else {
+				cfg.RemoteName = parts[1]
+			}
+		case "merge":
+			cfg.MergeRef = parts[1]
+		}
+	}
+	return
 }
 
 func outputLines(output []byte) []string {
