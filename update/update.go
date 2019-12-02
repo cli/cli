@@ -38,6 +38,6 @@ func UpdateMessage(client *api.Client) *string {
 func getLatestRelease(client *api.Client) (*releaseInfo, error) {
 	path := fmt.Sprintf("repos/%s/releases/latest", nwo)
 	var r releaseInfo
-	err := client.REST("GET", path, &r)
+	err := client.REST("GET", path, nil, &r)
 	return &r, err
 }

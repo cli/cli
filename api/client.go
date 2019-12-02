@@ -100,9 +100,9 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 }
 
 // REST performs a REST request and parses the response.
-func (c Client) REST(method string, p string, data interface{}) error {
+func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
 	url := path.Join("https://api.github.com/", p)
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
 	}
@@ -119,12 +119,12 @@ func (c Client) REST(method string, p string, data interface{}) error {
 		return handleHTTPError(resp)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	err = json.Unmarshal(body, &data)
+	err = json.Unmarshal(b, &data)
 	if err != nil {
 		return err
 	}
