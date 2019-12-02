@@ -1,39 +1,61 @@
 package utils
 
 import (
+	"io"
+	"os"
+
+	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
-	"os"
 )
 
+var _isStdoutTerminal = false
+var checkedTerminal = false
+
+func isStdoutTerminal() bool {
+	if !checkedTerminal {
+		fd := os.Stdout.Fd()
+		_isStdoutTerminal = isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
+		checkedTerminal = true
+	}
+	return _isStdoutTerminal
+}
+
+// NewColorable returns an output stream that handles ANSI color sequences on Windows
+func NewColorable(f *os.File) io.Writer {
+	return colorable.NewColorable(f)
+}
+
 func makeColorFunc(color string) func(string) string {
+	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
-		output := arg
-		if isatty.IsTerminal(os.Stdout.Fd()) {
-			output = ansi.Color(color+arg+ansi.Reset, "")
+		if isStdoutTerminal() {
+			return cf(arg)
 		}
-
-		return output
+		return arg
 	}
 }
 
-var Black = makeColorFunc(ansi.Black)
-var White = makeColorFunc(ansi.White)
-var Magenta = makeColorFunc(ansi.Magenta)
-var Cyan = makeColorFunc(ansi.Cyan)
-var Red = makeColorFunc(ansi.Red)
-var Yellow = makeColorFunc(ansi.Yellow)
-var Blue = makeColorFunc(ansi.Blue)
-var Green = makeColorFunc(ansi.Green)
-var Gray = makeColorFunc(ansi.LightBlack)
+// Magenta outputs ANSI color if stdout is a tty
+var Magenta = makeColorFunc("magenta")
 
-func Bold(arg string) string {
-	output := arg
-	if isatty.IsTerminal(os.Stdout.Fd()) {
-		// This is really annoying.  If you just define Bold as ColorFunc("+b") it will properly bold but
-		// will not use the default color, resulting in black and probably unreadable text. This forces
-		// the default color before bolding.
-		output = ansi.Color(ansi.DefaultFG+arg+ansi.Reset, "+b")
-	}
-	return output
-}
+// Cyan outputs ANSI color if stdout is a tty
+var Cyan = makeColorFunc("cyan")
+
+// Red outputs ANSI color if stdout is a tty
+var Red = makeColorFunc("red")
+
+// Yellow outputs ANSI color if stdout is a tty
+var Yellow = makeColorFunc("yellow")
+
+// Blue outputs ANSI color if stdout is a tty
+var Blue = makeColorFunc("blue")
+
+// Green outputs ANSI color if stdout is a tty
+var Green = makeColorFunc("green")
+
+// Gray outputs ANSI color if stdout is a tty
+var Gray = makeColorFunc("black+h")
+
+// Bold outputs ANSI color if stdout is a tty
+var Bold = makeColorFunc("default+b")
