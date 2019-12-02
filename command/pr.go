@@ -68,7 +68,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	currentBranch, err := ctx.Branch()
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentBranch, currentUser)
+	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	if prPayload.CurrentPR != nil {
 		printPrs(out, *prPayload.CurrentPR)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
