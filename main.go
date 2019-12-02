@@ -29,6 +29,11 @@ func main() {
 }
 
 func updateInBackground(updateMessageChan chan *string) {
+	if os.Getenv("APP_ENV") != "production" {
+		updateMessageChan <- nil
+		return
+	}
+
 	client, err := command.BasicClient()
 	if err != nil {
 		updateMessageChan <- nil

@@ -1,7 +1,6 @@
 package update
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -24,7 +23,6 @@ func TestRunWhileCheckingForUpdate(t *testing.T) {
 
 	client := api.NewClient(api.ReplaceTripper(http))
 	alertMsg := *UpdateMessage(client)
-	fmt.Printf("🌭 %+v\n", alertMsg)
 
 	if !strings.Contains(alertMsg, command.Version) {
 		t.Errorf("expected: \"%v\" to contain \"%v\"", alertMsg, command.Version)
