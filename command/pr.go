@@ -220,41 +220,17 @@ func prView(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid pull request number: '%s'", args[0])
 		}
 	} else {
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-		currentBranch, err := ctx.Branch()
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
 		if err != nil {
 			return err
 		}
 
-		branchConfig := git.ReadBranchConfig(currentBranch)
-		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), m[1])
+		if prNumber > 0 {
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
 		} else {
-			branchWithOwner := currentBranch
-			var owner string
-
-			if branchConfig.RemoteURL != nil {
-				if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
-					owner = r.RepoOwner()
-				}
-			} else if branchConfig.RemoteName != "" {
-				rem, _ := ctx.Remotes()
-				if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
-					owner = r.RepoOwner()
-				}
-			}
-
-			if owner != "" {
-				if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
-					branchWithOwner = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
-				}
-				if !strings.EqualFold(owner, baseRepo.RepoOwner()) {
-					branchWithOwner = fmt.Sprintf("%s:%s", owner, branchWithOwner)
-				}
+			apiClient, err := apiClientForContext(ctx)
+			if err != nil {
+				return err
 			}
 
 			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
@@ -267,6 +243,51 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return
+	}
+	prHeadRef, err = ctx.Branch()
+	if err != nil {
+		return
+	}
+	branchConfig := git.ReadBranchConfig(prHeadRef)
+
+	// the branch is configured to merge a special PR head ref
+	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+		prNumber, _ = strconv.Atoi(m[1])
+		return
+	}
+
+	var branchOwner string
+	if branchConfig.RemoteURL != nil {
+		// the branch merges from a remote specified by URL
+		if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	} else if branchConfig.RemoteName != "" {
+		// the branch merges from a remote specified by name
+		rem, _ := ctx.Remotes()
+		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	}
+
+	if branchOwner != "" {
+		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
+		}
+		// prepend `OWNER:` if this branch is pushed to a fork
+		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
+			prHeadRef = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+		}
+	}
+
+	return
 }
 
 func prCheckout(cmd *cobra.Command, args []string) error {
