@@ -50,9 +50,9 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
@@ -101,9 +101,9 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
@@ -152,9 +152,9 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch robot-fork +refs/heads/feature:refs/remotes/robot-fork/feature")
@@ -203,9 +203,9 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
@@ -254,9 +254,9 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 2)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
@@ -303,9 +303,9 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 2)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head")
@@ -352,9 +352,9 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	RootCmd.SetArgs([]string{"pr", "checkout", "123"})
-	_, err := prCheckoutCmd.ExecuteC()
+	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
+	eq(t, output, "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")

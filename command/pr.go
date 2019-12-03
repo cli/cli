@@ -249,7 +249,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Opening %s in your browser.\n", openURL)
+	cmd.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
 }
 
