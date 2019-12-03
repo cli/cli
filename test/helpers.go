@@ -6,9 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-
-	"github.com/spf13/cobra"
 )
 
 func GetTestHelperProcessArgs() []string {
@@ -95,40 +92,4 @@ func UseTempGitRepo() *TempGitRepo {
 	}
 
 	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
-}
-
-func RunCommand(root *cobra.Command, s string) (string, error) {
-	var err error
-	output := captureOutput(func() {
-		root.SetArgs(strings.Split(s, " "))
-		_, err = root.ExecuteC()
-	})
-
-	if err != nil {
-		return "", err
-	}
-	return output, nil
-}
-
-func captureOutput(f func()) string {
-	originalStdout := os.Stdout
-	defer func() {
-		os.Stdout = originalStdout
-	}()
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		panic("failed to pipe stdout")
-	}
-	os.Stdout = w
-
-	f()
-
-	w.Close()
-	out, err := ioutil.ReadAll(r)
-	if err != nil {
-		panic("failed to read captured input from stdout")
-	}
-
-	return string(out)
 }

@@ -65,11 +65,7 @@ func TestPRCreate(t *testing.T) {
 		git.GitCommand = origGitCommand
 	}()
 
-	out := bytes.Buffer{}
-	prCreateCmd.SetOut(&out)
-
-	RootCmd.SetArgs([]string{"pr", "create", "-t", "mytitle", "-b", "mybody"})
-	_, err := prCreateCmd.ExecuteC()
+	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
@@ -87,12 +83,12 @@ func TestPRCreate(t *testing.T) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "mytitle")
-	eq(t, reqBody.Variables.Input.Body, "mybody")
+	eq(t, reqBody.Variables.Input.Title, "my title")
+	eq(t, reqBody.Variables.Input.Body, "my body")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
-	eq(t, out.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	eq(t, output, "https://github.com/OWNER/REPO/pull/12\n")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
@@ -123,14 +119,10 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		git.GitCommand = origGitCommand
 	}()
 
-	out := bytes.Buffer{}
-	prCreateCmd.SetOut(&out)
-
-	RootCmd.SetArgs([]string{"pr", "create", "-t", "mytitle", "-b", "mybody"})
-	_, err := prCreateCmd.ExecuteC()
+	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	eq(t, out.String(), `Warning: 1 uncommitted change
+	eq(t, output, `Warning: 1 uncommitted change
 https://github.com/OWNER/REPO/pull/12
 `)
 }
