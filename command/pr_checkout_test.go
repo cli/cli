@@ -23,6 +23,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -61,6 +62,104 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
 
+func TestPRCheckout_urlArg(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO",
+			"defaultBranchRef": {
+				"name": "master"
+			}
+		},
+		"isCrossRepository": false,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify --quiet refs/heads/feature":
+			return &errorStub{"exit status: 1"}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &outputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OWNER/REPO/pull/123/files`)
+	eq(t, err, nil)
+	eq(t, output, "")
+
+	eq(t, len(ranCommands), 4)
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
+}
+
+func TestPRCheckout_branchArg(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "number": 123,
+		  "headRefName": "feature",
+		  "headRepositoryOwner": {
+		  	"login": "hubot"
+		  },
+		  "headRepository": {
+		  	"name": "REPO",
+		  	"defaultBranchRef": {
+		  		"name": "master"
+		  	}
+		  },
+		  "isCrossRepository": true,
+		  "maintainerCanModify": false }
+	] } } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify --quiet refs/heads/feature":
+			return &errorStub{"exit status: 1"}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &outputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prCheckoutCmd, `pr checkout hubot:feature`)
+	eq(t, err, nil)
+	eq(t, output, "")
+
+	eq(t, len(ranCommands), 5)
+	eq(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:feature")
+}
+
 func TestPRCheckout_existingBranch(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
@@ -74,6 +173,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -125,6 +225,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -176,6 +277,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -227,6 +329,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -276,6 +379,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"
@@ -325,6 +429,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
 			"login": "hubot"

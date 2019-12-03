@@ -226,24 +226,11 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	var openURL string
 	if len(args) > 0 {
-		if prNumber, err := strconv.Atoi(args[0]); err == nil {
-			pr, err := api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-			if err != nil {
-				return err
-			}
-			openURL = pr.URL
-		} else {
-			prRE := regexp.MustCompile(`^https://github\.com/[^/]+/[^/]+/pull/\d+`)
-			if m := prRE.FindStringSubmatch(args[0]); m != nil {
-				openURL = m[0]
-			} else {
-				pr, err := api.PullRequestForBranch(apiClient, baseRepo, args[0])
-				if err != nil {
-					return err
-				}
-				openURL = pr.URL
-			}
+		pr, err := prFromArg(apiClient, baseRepo, args[0])
+		if err != nil {
+			return err
 		}
+		openURL = pr.URL
 	} else {
 		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
 		if err != nil {
@@ -263,6 +250,20 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	cmd.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+
+func prFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg string) (*api.PullRequest, error) {
+	if prNumber, err := strconv.Atoi(arg); err == nil {
+		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+	}
+
+	if m := prURLRE.FindStringSubmatch(arg); m != nil {
+		return &api.PullRequest{URL: m[0]}, nil
+	}
+
+	return api.PullRequestForBranch(apiClient, baseRepo, arg)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
@@ -311,11 +312,6 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 }
 
 func prCheckout(cmd *cobra.Command, args []string) error {
-	prNumber, err := strconv.Atoi(args[0])
-	if err != nil {
-		return err
-	}
-
 	ctx := contextForCommand(cmd)
 	currentBranch, _ := ctx.Branch()
 	remotes, err := ctx.Remotes()
@@ -332,9 +328,18 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := api.PullRequestByNumber(apiClient, baseRemote, prNumber)
+	pr, err := prFromArg(apiClient, baseRemote, args[0])
 	if err != nil {
 		return err
+	}
+	if pr.Number == 0 {
+		// hydrate the pr object by fetching extra information from the API
+		m := prURLRE.FindStringSubmatch(pr.URL)
+		prNumber, _ := strconv.Atoi(m[3])
+		pr, err = api.PullRequestByNumber(apiClient, baseRemote, prNumber)
+		if err != nil {
+			return err
+		}
 	}
 
 	headRemote := baseRemote
@@ -369,7 +374,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 
-		ref := fmt.Sprintf("refs/pull/%d/head", prNumber)
+		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 		if newBranchName == currentBranch {
 			// PR head matches currently checked out branch
 			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, ref})
