@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -14,35 +15,24 @@ import (
 
 func init() {
 	RootCmd.AddCommand(issueCmd)
-	issueCmd.AddCommand(
-		&cobra.Command{
-			Use:   "status",
-			Short: "Show status of relevant issues",
-			RunE:  issueStatus,
-		},
-		&cobra.Command{
-			Use:   "view <issue-number>",
-			Args:  cobra.MinimumNArgs(1),
-			Short: "View an issue in the browser",
-			RunE:  issueView,
-		},
-	)
 	issueCmd.AddCommand(issueCreateCmd)
+	issueCmd.AddCommand(issueStatusCmd)
+	issueCmd.AddCommand(issueViewCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	issueCreateCmd.Flags().BoolP("web", "w", false, "open the web browser to create an issue")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
 
 	issueListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter issues in this repository",
 		RunE:  issueList,
 	}
-	issueListCmd.Flags().StringP("assignee", "a", "", "filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "filter by state (open|closed|all)")
-	issueListCmd.Flags().IntP("limit", "L", 30, "maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open|closed|all)")
+	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueCmd.AddCommand((issueListCmd))
 }
 
@@ -55,6 +45,17 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
+}
+var issueStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show status of relevant issues",
+	RunE:  issueStatus,
+}
+var issueViewCmd = &cobra.Command{
+	Use:   "view <issue-number>",
+	Args:  cobra.MinimumNArgs(1),
+	Short: "View an issue in the browser",
+	RunE:  issueView,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -94,12 +95,15 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	out := cmd.OutOrStdout()
+	colorOut := colorableOut(cmd)
+
 	if len(issues) == 0 {
-		printMessage("There are no open issues")
+		printMessage(colorOut, "There are no open issues")
 		return nil
 	}
 
-	table := utils.NewTablePrinter(cmd.OutOrStdout())
+	table := utils.NewTablePrinter(out)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
@@ -141,30 +145,32 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printHeader("Issues assigned to you")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned != nil {
-		printIssues("  ", issuePayload.Assigned...)
+		printIssues(out, "  ", issuePayload.Assigned...)
 	} else {
 		message := fmt.Sprintf("  There are no issues assgined to you")
-		printMessage(message)
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Issues mentioning you")
+	printHeader(out, "Issues mentioning you")
 	if len(issuePayload.Mentioned) > 0 {
-		printIssues("  ", issuePayload.Mentioned...)
+		printIssues(out, "  ", issuePayload.Mentioned...)
 	} else {
-		printMessage("  There are no issues mentioning you")
+		printMessage(out, "  There are no issues mentioning you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Recent issues")
-	if len(issuePayload.Recent) > 0 {
-		printIssues("  ", issuePayload.Recent...)
+	printHeader(out, "Issues opened by you")
+	if len(issuePayload.Authored) > 0 {
+		printIssues(out, "  ", issuePayload.Authored...)
 	} else {
-		printMessage("  There are no recent issues")
+		printMessage(out, "  There are no issues opened by you")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -255,14 +261,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(prefix string, issues ...api.Issue) {
+func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
 		coloredLabels := labelList(issue)
 		if coloredLabels != "" {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Printf("%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
+		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, issue.Title), coloredLabels)
 	}
 }
 
