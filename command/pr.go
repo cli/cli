@@ -219,13 +219,30 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	var openURL string
 	if len(args) > 0 {
 		if prNumber, err := strconv.Atoi(args[0]); err == nil {
-			// TODO: move URL generation into GitHubRepository
-			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+			pr, err := api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+			if err != nil {
+				return err
+			}
+			openURL = pr.URL
 		} else {
-			return fmt.Errorf("invalid pull request number: '%s'", args[0])
+			prRE := regexp.MustCompile(`^https://github\.com/[^/]+/[^/]+/pull/\d+`)
+			if m := prRE.FindStringSubmatch(args[0]); m != nil {
+				openURL = m[0]
+			} else {
+				pr, err := api.PullRequestForBranch(apiClient, baseRepo, args[0])
+				if err != nil {
+					return err
+				}
+				openURL = pr.URL
+			}
 		}
 	} else {
 		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
@@ -236,11 +253,6 @@ func prView(cmd *cobra.Command, args []string) error {
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
 		} else {
-			apiClient, err := apiClientForContext(ctx)
-			if err != nil {
-				return err
-			}
-
 			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
 				return err
