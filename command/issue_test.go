@@ -96,9 +96,12 @@ func TestIssueView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
-	jsonFile, _ := os.Open("../test/fixtures/issueView.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "issue": {
+		"number": 123,
+		"url": "https://github.com/OWNER/REPO/issues/123"
+	} } } }
+	`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -107,7 +110,7 @@ func TestIssueView(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view 8")
+	output, err := RunCommand(issueViewCmd, "issue view 123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -120,9 +123,68 @@ func TestIssueView(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	if url != "https://github.com/OWNER/REPO/issues/8" {
-		t.Errorf("got: %q", url)
+	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+}
+
+func TestIssueView_notFound(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "errors": [
+		{ "message": "Could not resolve to an Issue with the number of 9999." }
+	] }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	_, err := RunCommand(issueViewCmd, "issue view 9999")
+	if err == nil || err.Error() != "graphql error: 'Could not resolve to an Issue with the number of 9999.'" {
+		t.Errorf("error running command `issue view`: %v", err)
 	}
+
+	if seenCmd != nil {
+		t.Fatal("did not expect any command to run")
+	}
+}
+
+func TestIssueView_urlArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "issue": {
+		"number": 123,
+		"url": "https://github.com/OWNER/REPO/issues/123"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(issueViewCmd, "issue view https://github.com/OWNER/REPO/issues/123")
+	if err != nil {
+		t.Errorf("error running command `issue view`: %v", err)
+	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueCreate(t *testing.T) {

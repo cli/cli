@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -183,17 +185,34 @@ func issueView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	var openURL string
-	if number, err := strconv.Atoi(args[0]); err == nil {
-		// TODO: move URL generation into GitHubRepository
-		openURL = fmt.Sprintf("https://github.com/%s/%s/issues/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), number)
-	} else {
-		return fmt.Errorf("invalid issue number: '%s'", args[0])
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
 	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+	openURL := issue.URL
 
 	cmd.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
+
+func issueFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg string) (*api.Issue, error) {
+	if issueNumber, err := strconv.Atoi(arg); err == nil {
+		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
+	}
+
+	if m := issueURLRE.FindStringSubmatch(arg); m != nil {
+		issueNumber, _ := strconv.Atoi(m[3])
+		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
+	}
+
+	return nil, fmt.Errorf("invalid issue format: %q", arg)
 }
 
 func issueCreate(cmd *cobra.Command, args []string) error {
