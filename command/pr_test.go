@@ -11,8 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
+	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -23,6 +24,28 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	}
 }
 
+func RunCommand(cmd *cobra.Command, args string) (string, error) {
+	rootCmd := cmd.Root()
+	argv, err := shlex.Split(args)
+	if err != nil {
+		return "", err
+	}
+	rootCmd.SetArgs(argv)
+
+	outBuf := bytes.Buffer{}
+	cmd.SetOut(&outBuf)
+
+	// Reset flag slice values so they don't leak between tests
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		if v, ok := f.Value.(pflag.SliceValue); ok {
+			v.Replace([]string{})
+		}
+	})
+
+	_, err = rootCmd.ExecuteC()
+	return outBuf.String(), err
+}
+
 func TestPRStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -31,7 +54,7 @@ func TestPRStatus(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "pr status")
+	output, err := RunCommand(prStatusCmd, "pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -58,16 +81,12 @@ func TestPRList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	out := bytes.Buffer{}
-	prListCmd.SetOut(&out)
-
-	RootCmd.SetArgs([]string{"pr", "list"})
-	_, err := RootCmd.ExecuteC()
+	output, err := RunCommand(prListCmd, "pr list")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	eq(t, out.String(), `32	New feature	feature
+	eq(t, output, `32	New feature	feature
 29	Fixed bad bug	hubot:bug-fix
 28	Improve documentation	docs
 `)
@@ -80,10 +99,7 @@ func TestPRList_filtering(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	prListCmd.SetOut(ioutil.Discard)
-
-	RootCmd.SetArgs([]string{"pr", "list", "-s", "all", "-l", "one", "-l", "two"})
-	_, err := RootCmd.ExecuteC()
+	_, err := RunCommand(prListCmd, `pr list -s all -l one,two -l three`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +114,7 @@ func TestPRList_filtering(t *testing.T) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
-	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
+	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
@@ -108,17 +124,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	prListCmd.SetOut(ioutil.Discard)
-	// Reset flag slice values so they don't leak between tests
-	// TODO: generalize this hack
-	prListCmd.Flags().Visit(func(f *pflag.Flag) {
-		if v, ok := f.Value.(pflag.SliceValue); ok {
-			v.Replace([]string{})
-		}
-	})
-
-	RootCmd.SetArgs([]string{"pr", "list", "-s", "merged", "-l", "one two", "-a", "hubot", "-B", "develop"})
-	_, err := RootCmd.ExecuteC()
+	_, err := RunCommand(prListCmd, `pr list -s merged -l "needs tests" -a hubot -B develop`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +137,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	}{}
 	json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"one two" base:"develop"`)
+	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`)
 }
 
 func TestPRView_currentBranch(t *testing.T) {
@@ -154,7 +160,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "pr view")
+	output, err := RunCommand(prViewCmd, "pr view")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -192,7 +198,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	_, err := test.RunCommand(RootCmd, "pr view")
+	_, err := RunCommand(prViewCmd, "pr view")
 	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -219,7 +225,7 @@ func TestPRView_numberArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "pr view 23")
+	output, err := RunCommand(prViewCmd, "pr view 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
