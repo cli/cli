@@ -256,7 +256,13 @@ func TestPRView_numberArg(t *testing.T) {
 
 func TestPRView_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
-	initFakeHTTP()
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
