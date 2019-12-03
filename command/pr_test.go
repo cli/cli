@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
+	"github.com/spf13/pflag"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -98,6 +99,39 @@ func TestPRList_filtering(t *testing.T) {
 
 	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
 	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
+}
+
+func TestPRList_filteringAssignee(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	prListCmd.SetOut(ioutil.Discard)
+	// Reset flag slice values so they don't leak between tests
+	// TODO: generalize this hack
+	prListCmd.Flags().Visit(func(f *pflag.Flag) {
+		if v, ok := f.Value.(pflag.SliceValue); ok {
+			v.Replace([]string{})
+		}
+	})
+
+	RootCmd.SetArgs([]string{"pr", "list", "-s", "merged", "-l", "one two", "-a", "hubot", "-B", "develop"})
+	_, err := RootCmd.ExecuteC()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables struct {
+			Q string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"one two" base:"develop"`)
 }
 
 func TestPRView_currentBranch(t *testing.T) {
