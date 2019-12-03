@@ -409,21 +409,39 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 }
 
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]PullRequest, error) {
-	type response struct {
-		Repository struct {
-			PullRequests struct {
-				Edges []struct {
-					Node PullRequest
-				}
-				PageInfo struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			}
+	type prBlock struct {
+		Edges []struct {
+			Node PullRequest
+		}
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
 		}
 	}
+	type response struct {
+		Repository struct {
+			PullRequests prBlock
+		}
+		Search prBlock
+	}
 
-	query := `
+	fragment := `
+	fragment pr on PullRequest {
+		number
+		title
+		state
+		url
+		headRefName
+		headRepositoryOwner {
+			login
+		}
+		isCrossRepository
+	}
+	`
+
+	// If assignee wasn't specified, use `Repository.pullRequest` for ability to
+	// query by multiple labels
+	query := fragment + `
     query(
 		$owner: String!,
 		$repo: String!,
@@ -444,15 +462,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		) {
           edges {
             node {
-				number
-				title
-				state
-				url
-				headRefName
-				headRepositoryOwner {
-					login
-				}
-				isCrossRepository
+				...pr
             }
 		  }
 		  pageInfo {
@@ -461,13 +471,65 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		  }
         }
       }
-    }`
+	}`
 
 	prs := []PullRequest{}
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
-	for name, val := range vars {
-		variables[name] = val
+
+	// If assignee was specified, use the `search` API rather than
+	// `Repository.pullRequests`, but this mode doesn't support multiple labels
+	if assignee, ok := vars["assignee"].(string); ok {
+		query = fragment + `
+		query(
+			$q: String!,
+			$limit: Int!,
+			$endCursor: String,
+		) {
+			search(query: $q, type: ISSUE, first: $limit, after: $endCursor) {
+				edges {
+					node {
+						...pr
+					}
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}`
+		owner := vars["owner"].(string)
+		repo := vars["repo"].(string)
+		search := []string{
+			fmt.Sprintf("repo:%s/%s", owner, repo),
+			fmt.Sprintf("assignee:%s", assignee),
+			"is:pr",
+			"sort:created-desc",
+		}
+		if states, ok := vars["state"].([]string); ok && len(states) == 1 {
+			switch states[0] {
+			case "OPEN":
+				search = append(search, "state:open")
+			case "CLOSED":
+				search = append(search, "state:closed")
+			case "MERGED":
+				search = append(search, "is:merged")
+			}
+		}
+		if labels, ok := vars["labels"].([]string); ok && len(labels) > 0 {
+			if len(labels) > 1 {
+				return nil, fmt.Errorf("multiple labels with --assignee are not supported")
+			}
+			search = append(search, fmt.Sprintf(`label:"%s"`, labels[0]))
+		}
+		if baseBranch, ok := vars["baseBranch"].(string); ok {
+			search = append(search, fmt.Sprintf(`base:"%s"`, baseBranch))
+		}
+		variables["q"] = strings.Join(search, " ")
+	} else {
+		for name, val := range vars {
+			variables[name] = val
+		}
 	}
 
 	for {
@@ -478,6 +540,9 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			return nil, err
 		}
 		prData := data.Repository.PullRequests
+		if _, ok := variables["q"]; ok {
+			prData = data.Search
+		}
 
 		for _, edge := range prData.Edges {
 			prs = append(prs, edge.Node)

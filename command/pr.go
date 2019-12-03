@@ -27,7 +27,8 @@ func init() {
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
+	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 }
 
 var prCmd = &cobra.Command{
@@ -136,7 +137,11 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	labels, err := cmd.Flags().GetStringArray("label")
+	labels, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return err
+	}
+	assignee, err := cmd.Flags().GetString("assignee")
 	if err != nil {
 		return err
 	}
@@ -165,6 +170,9 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 	if baseBranch != "" {
 		params["baseBranch"] = baseBranch
+	}
+	if assignee != "" {
+		params["assignee"] = assignee
 	}
 
 	prs, err := api.PullRequestList(apiClient, params, limit)
@@ -241,7 +249,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Opening %s in your browser.\n", openURL)
+	cmd.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
 }
 
