@@ -27,7 +27,7 @@ func init() {
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
+	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 }
 
@@ -137,7 +137,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	labels, err := cmd.Flags().GetStringArray("label")
+	labels, err := cmd.Flags().GetStringSlice("label")
 	if err != nil {
 		return err
 	}
