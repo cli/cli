@@ -439,6 +439,8 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 	}
 	`
 
+	// If assignee wasn't specified, use `Repository.pullRequest` for ability to
+	// query by multiple labels
 	query := fragment + `
     query(
 		$owner: String!,
@@ -475,6 +477,8 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
 
+	// If assignee was specified, use the `search` API rather than
+	// `Repository.pullRequests`, but this mode doesn't support multiple labels
 	if assignee, ok := vars["assignee"].(string); ok {
 		query = fragment + `
 		query(
@@ -514,7 +518,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		}
 		if labels, ok := vars["labels"].([]string); ok && len(labels) > 0 {
 			if len(labels) > 1 {
-				return nil, fmt.Errorf("multiple labels with --assignee are not supported: %#v", vars)
+				return nil, fmt.Errorf("multiple labels with --assignee are not supported")
 			}
 			search = append(search, fmt.Sprintf(`label:"%s"`, labels[0]))
 		}
