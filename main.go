@@ -9,6 +9,8 @@ import (
 	"github.com/github/gh-cli/update"
 )
 
+var updaterEnabled = "no"
+
 func main() {
 	updateMessageChan := make(chan *string)
 	go updateInBackground(updateMessageChan)
@@ -29,7 +31,7 @@ func main() {
 }
 
 func updateInBackground(updateMessageChan chan *string) {
-	if os.Getenv("APP_ENV") != "production" {
+	if updaterEnabled != "yes" {
 		updateMessageChan <- nil
 		return
 	}
