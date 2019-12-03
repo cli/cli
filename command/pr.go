@@ -2,11 +2,15 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/github/gh-cli/api"
+	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -20,10 +24,10 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prViewCmd)
 
-	prListCmd.Flags().IntP("limit", "L", 30, "maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "filter by state")
-	prListCmd.Flags().StringP("base", "b", "", "filter by base branch")
-	prListCmd.Flags().StringArrayP("label", "l", nil, "filter by label")
+	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
+	prListCmd.Flags().StringArrayP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 }
 
@@ -65,7 +69,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	currentBranch, err := ctx.Branch()
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
 	if err != nil {
 		return err
 	}
@@ -74,35 +78,37 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentBranch, currentUser)
+	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
 
-	printHeader("Current branch")
+	out := colorableOut(cmd)
+
+	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
-		printPrs(*prPayload.CurrentPR)
+		printPrs(out, *prPayload.CurrentPR)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentBranch+"]"))
-		printMessage(message)
+		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
+		printMessage(out, message)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Created by you")
+	printHeader(out, "Created by you")
 	if len(prPayload.ViewerCreated) > 0 {
-		printPrs(prPayload.ViewerCreated...)
+		printPrs(out, prPayload.ViewerCreated...)
 	} else {
-		printMessage("  You have no open pull requests")
+		printMessage(out, "  You have no open pull requests")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
-	printHeader("Requesting a code review from you")
+	printHeader(out, "Requesting a code review from you")
 	if len(prPayload.ReviewRequested) > 0 {
-		printPrs(prPayload.ReviewRequested...)
+		printPrs(out, prPayload.ReviewRequested...)
 	} else {
-		printMessage("  You have no pull requests to review")
+		printMessage(out, "  You have no pull requests to review")
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	return nil
 }
@@ -222,26 +228,74 @@ func prView(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid pull request number: '%s'", args[0])
 		}
 	} else {
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-		currentBranch, err := ctx.Branch()
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
 		if err != nil {
 			return err
 		}
 
-		prs, err := api.PullRequestsForBranch(apiClient, baseRepo, currentBranch)
-		if err != nil {
-			return err
-		} else if len(prs) < 1 {
-			return fmt.Errorf("the '%s' branch has no open pull requests", currentBranch)
+		if prNumber > 0 {
+			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+		} else {
+			apiClient, err := apiClientForContext(ctx)
+			if err != nil {
+				return err
+			}
+
+			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			if err != nil {
+				return err
+			}
+			openURL = pr.URL
 		}
-		openURL = prs[0].URL
 	}
 
 	fmt.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
+}
+
+func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return
+	}
+	prHeadRef, err = ctx.Branch()
+	if err != nil {
+		return
+	}
+	branchConfig := git.ReadBranchConfig(prHeadRef)
+
+	// the branch is configured to merge a special PR head ref
+	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+		prNumber, _ = strconv.Atoi(m[1])
+		return
+	}
+
+	var branchOwner string
+	if branchConfig.RemoteURL != nil {
+		// the branch merges from a remote specified by URL
+		if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	} else if branchConfig.RemoteName != "" {
+		// the branch merges from a remote specified by name
+		rem, _ := ctx.Remotes()
+		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+			branchOwner = r.RepoOwner()
+		}
+	}
+
+	if branchOwner != "" {
+		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
+		}
+		// prepend `OWNER:` if this branch is pushed to a fork
+		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
+			prHeadRef = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+		}
+	}
+
+	return
 }
 
 func prCheckout(cmd *cobra.Command, args []string) error {
@@ -338,15 +392,15 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printPrs(prs ...api.PullRequest) {
+func printPrs(w io.Writer, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Printf("  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
 		if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Printf("\n  ")
+			fmt.Fprintf(w, "\n  ")
 		}
 
 		if checks.Total > 0 {
@@ -362,27 +416,27 @@ func printPrs(prs ...api.PullRequest) {
 			} else if checks.Passing == checks.Total {
 				summary = utils.Green("Checks passing")
 			}
-			fmt.Printf(" - %s", summary)
+			fmt.Fprintf(w, " - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Printf(" - %s", utils.Red("changes requested"))
+			fmt.Fprintf(w, " - %s", utils.Red("changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Printf(" - %s", utils.Yellow("review required"))
+			fmt.Fprintf(w, " - %s", utils.Yellow("review required"))
 		} else if reviews.Approved {
-			fmt.Printf(" - %s", utils.Green("approved"))
+			fmt.Fprintf(w, " - %s", utils.Green("approved"))
 		}
 
-		fmt.Printf("\n")
+		fmt.Fprint(w, "\n")
 	}
 }
 
-func printHeader(s string) {
-	fmt.Println(utils.Bold(s))
+func printHeader(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Bold(s))
 }
 
-func printMessage(s string) {
-	fmt.Println(utils.Gray(s))
+func printMessage(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Gray(s))
 }
 
 func truncate(maxLength int, title string) string {
