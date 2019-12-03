@@ -140,6 +140,19 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`)
 }
 
+func TestPRList_filteringAssigneeLabels(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	_, err := RunCommand(prListCmd, `pr list -l one,two -a hubot`)
+	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
+		t.Fatal(err)
+	}
+}
+
 func TestPRView_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
