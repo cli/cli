@@ -260,7 +260,8 @@ func prFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg str
 	}
 
 	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		return &api.PullRequest{URL: m[0]}, nil
+		prNumber, _ := strconv.Atoi(m[3])
+		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 
 	return api.PullRequestForBranch(apiClient, baseRepo, arg)
@@ -331,15 +332,6 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	pr, err := prFromArg(apiClient, baseRemote, args[0])
 	if err != nil {
 		return err
-	}
-	if pr.Number == 0 {
-		// hydrate the pr object by fetching extra information from the API
-		m := prURLRE.FindStringSubmatch(pr.URL)
-		prNumber, _ := strconv.Atoi(m[3])
-		pr, err = api.PullRequestByNumber(apiClient, baseRemote, prNumber)
-		if err != nil {
-			return err
-		}
 	}
 
 	headRemote := baseRemote
