@@ -72,6 +72,15 @@ func translateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url
 	return
 }
 
+// RepoFromURL maps a URL to a GitHubRepository
+func RepoFromURL(u *url.URL) (GitHubRepository, error) {
+	owner, repo, err := repoFromURL(u)
+	if err != nil {
+		return nil, err
+	}
+	return ghRepo{owner, repo}, nil
+}
+
 func repoFromURL(u *url.URL) (string, string, error) {
 	if !strings.EqualFold(u.Hostname(), defaultHostname) {
 		return "", "", fmt.Errorf("unsupported hostname: %s", u.Hostname())
