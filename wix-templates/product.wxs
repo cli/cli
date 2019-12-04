@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+
+<?if $(sys.BUILDARCH)="x86"?>
+    <?define Program_Files="ProgramFilesFolder"?>
+<?elseif $(sys.BUILDARCH)="x64"?>
+    <?define Program_Files="ProgramFiles64Folder"?>
+<?else?>
+    <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
+<?endif?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+   <Product Id="*" UpgradeCode="7c0a5736-5b8e-4176-b350-613fa2d8a1b3"
+            Name="GitHub CLI"
+            Version="0.3.1"
+            Manufacturer="GitHub, Inc."
+            Language="1033">
+
+      <Package InstallerVersion="200" Compressed="yes" Comments="Windows Installer Package" InstallScope="perMachine"/>
+
+      <Media Id="1" Cabinet="product.cab" EmbedCab="yes"/>
+
+      <Upgrade Id="7c0a5736-5b8e-4176-b350-613fa2d8a1b3">
+         <UpgradeVersion Minimum="0.3.1" OnlyDetect="yes" Property="NEWERVERSIONDETECTED"/>
+         <UpgradeVersion Minimum="0.0.0" Maximum="0.3.1" IncludeMinimum="yes" IncludeMaximum="no"
+                         Property="OLDERVERSIONBEINGUPGRADED"/>
+      </Upgrade>
+      <Condition Message="A newer version of this software is already installed.">NOT NEWERVERSIONDETECTED</Condition>
+
+      <Directory Id="TARGETDIR" Name="SourceDir">
+
+         <Directory Id="$(var.Program_Files)">
+            <Directory Id="INSTALLDIR" Name="GitHub CLI">
+               
+               <Component Id="ApplicationFiles" Guid="6e6dcb19-3cf6-46d1-ac56-c6fb39485c9d">
+                  
+                    <File Id="ApplicationFile0" Source="..\bin\gh.exe"/>
+                  
+               </Component>
+               
+               
+            </Directory>
+         </Directory>
+
+         
+         <Component Id="ENVS" Guid="94faac3d-4478-431c-8497-fba55dcfb249">
+          
+          <Environment Id="ENV0"
+            Name="PATH"
+            Value="[INSTALLDIR]"
+            Permanent="yes"
+            Part="last"
+            Action="set"
+            System="no" />
+          
+        </Component>
+        
+
+         
+
+      </Directory>
+
+      
+      
+      <InstallExecuteSequence>
+         <RemoveExistingProducts After="InstallValidate"/>
+         
+         
+      </InstallExecuteSequence>
+
+      <Feature Id="DefaultFeature" Level="1">
+         
+         <ComponentRef Id="ENVS"/>
+         
+         
+         <ComponentRef Id="ApplicationFiles"/>
+         
+         
+         
+      </Feature>
+
+      <UI>
+         <!-- Define the installer UI -->
+         <UIRef Id="WixUI_HK" />
+      </UI>
+
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+      <!-- this should help to propagate env var changes -->
+      <CustomActionRef Id="WixBroadcastEnvironmentChange" />
+
+   </Product>
+
+</Wix>
