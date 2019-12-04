@@ -24,7 +24,10 @@ func main() {
 	}
 }
 
-// if ~/.config/gh is a file, convert it to a directory and place the file
+// This is a temporary function that will migrate the config file. It can be removed
+// in January.
+//
+// If ~/.config/gh is a file, convert it to a directory and place the file
 // into ~/.config/gh/config.yml
 func migrateConfig() {
 	p, _ := homedir.Expand("~/.config/gh")
