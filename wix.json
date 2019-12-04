@@ -1,12 +1,12 @@
 {
-  "product": "gh",
-  "company": "github",
+  "product": "GitHub CLI",
+  "company": "GitHub, Inc.",
   "license": "LICENSE",
   "upgrade-code": "7c0a5736-5b8e-4176-b350-613fa2d8a1b3",
   "files": {
     "guid": "6e6dcb19-3cf6-46d1-ac56-c6fb39485c9d",
     "items": [
-      "gh.exe"
+      "bin/gh.exe"
     ]
   },
   "env": {
@@ -15,7 +15,7 @@
       {
         "name": "PATH",
         "value": "[INSTALLDIR]",
-        "permanent": "no",
+        "permanent": "yes",
         "system": "no",
         "action": "set",
         "part": "last"
