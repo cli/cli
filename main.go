@@ -12,7 +12,7 @@ import (
 	"github.com/mgutz/ansi"
 )
 
-var updaterEnabled = "no"
+var updaterEnabled = ""
 
 func main() {
 	currentVersion := command.Version
@@ -42,7 +42,7 @@ Release notes: %s`, currentVersion, newRelease.Version, newRelease.URL)
 
 func shouldCheckForUpdate() bool {
 	errFd := os.Stderr.Fd()
-	return updaterEnabled == "yes" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
+	return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
@@ -55,5 +55,6 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 		return nil, err
 	}
 
-	return update.CheckForUpdate(client, "github/homebrew-gh", currentVersion)
+	repo := updaterEnabled
+	return update.CheckForUpdate(client, repo, currentVersion)
 }
