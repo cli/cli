@@ -7,13 +7,20 @@ import (
 
 	"github.com/github/gh-cli/command"
 	"github.com/github/gh-cli/update"
+	"github.com/github/gh-cli/utils"
+	"github.com/mattn/go-isatty"
+	"github.com/mgutz/ansi"
 )
 
 var updaterEnabled = "no"
 
 func main() {
-	updateMessageChan := make(chan *string)
-	go updateInBackground(updateMessageChan)
+	currentVersion := command.Version
+	updateMessageChan := make(chan *update.ReleaseInfo)
+	go func() {
+		rel, _ := checkForUpdate(currentVersion)
+		updateMessageChan <- rel
+	}()
 
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -24,23 +31,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	updateMessage := <-updateMessageChan
-	if updateMessage != nil {
-		fmt.Fprintf(os.Stderr, *updateMessage)
+	newRelease := <-updateMessageChan
+	if newRelease != nil {
+		msg := fmt.Sprintf(`A new release of gh is available: %s → %s
+Release notes: %s`, currentVersion, newRelease.Version, newRelease.URL)
+		stderr := utils.NewColorable(os.Stderr)
+		fmt.Fprintf(stderr, "\n\n%s\n\n", ansi.Color(msg, "cyan"))
 	}
 }
 
-func updateInBackground(updateMessageChan chan *string) {
-	if updaterEnabled != "yes" {
-		updateMessageChan <- nil
-		return
+func shouldCheckForUpdate() bool {
+	errFd := os.Stderr.Fd()
+	return updaterEnabled == "yes" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
+}
+
+func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
+	if !shouldCheckForUpdate() {
+		return nil, nil
 	}
 
 	client, err := command.BasicClient()
 	if err != nil {
-		updateMessageChan <- nil
-		return
+		return nil, err
 	}
 
-	updateMessageChan <- update.UpdateMessage(client)
+	return update.CheckForUpdate(client, "github/homebrew-gh", currentVersion)
 }

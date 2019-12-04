@@ -2,42 +2,35 @@ package update
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/command"
-	"github.com/github/gh-cli/utils"
+	"github.com/hashicorp/go-version"
 )
 
-const nwo = "github/homebrew-gh"
-
-type releaseInfo struct {
+// ReleaseInfo stores information about a release
+type ReleaseInfo struct {
 	Version string `json:"tag_name"`
 	URL     string `json:"html_url"`
 }
 
-func UpdateMessage(client *api.Client) *string {
-	latestRelease, err := getLatestRelease(client)
+// CheckForUpdate checks whether this software has had a newer relase on GitHub
+func CheckForUpdate(client *api.Client, repo, currentVersion string) (*ReleaseInfo, error) {
+	latestRelease := ReleaseInfo{}
+	err := client.REST("GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%+v", err)
-		return nil
+		return nil, err
 	}
 
-	updateAvailable := latestRelease.Version != command.Version
-	if updateAvailable {
-		alertMsg := fmt.Sprintf(utils.Cyan(`
-A new version of gh is available! %s → %s
-Changelog: %s
-Run 'brew upgrade gh' to upgrade to the latest version!`)+"\n\n", command.Version, latestRelease.Version, latestRelease.URL)
-		return &alertMsg
+	if versionGreaterThan(latestRelease.Version, currentVersion) {
+		return &latestRelease, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
-func getLatestRelease(client *api.Client) (*releaseInfo, error) {
-	path := fmt.Sprintf("repos/%s/releases/latest", nwo)
-	var r releaseInfo
-	err := client.REST("GET", path, nil, &r)
-	return &r, err
+func versionGreaterThan(v, w string) bool {
+	vv, ve := version.NewVersion(v)
+	vw, we := version.NewVersion(w)
+
+	return ve == nil && we == nil && vv.GreaterThan(vw)
 }
