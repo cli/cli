@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,16 +16,28 @@ type configEntry struct {
 	Token string `yaml:"oauth_token"`
 }
 
+func parseOrSetupConfigFile(fn string) (*configEntry, error) {
+	entry, err := parseConfigFile(fn)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		return setupConfigFile(fn)
+	}
+	return entry, err
+}
+
 func parseConfigFile(fn string) (*configEntry, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return setupConfigFile(fn)
-		}
 		return nil, err
 	}
 	defer f.Close()
 	return parseConfig(f)
+}
+
+// ParseDefaultConfig reads the configuration from ~/.config/gh
+func ParseDefaultConfig() (*configEntry, error) {
+	// FIXME: this duplicates fsContext.configFile
+	fn, _ := homedir.Expand("~/.config/gh")
+	return parseConfigFile(fn)
 }
 
 func parseConfig(r io.Reader) (*configEntry, error) {

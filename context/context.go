@@ -46,7 +46,7 @@ func (c *fsContext) configFile() string {
 
 func (c *fsContext) getConfig() (*configEntry, error) {
 	if c.config == nil {
-		entry, err := parseConfigFile(c.configFile())
+		entry, err := parseOrSetupConfigFile(c.configFile())
 		if err != nil {
 			return nil, err
 		}
