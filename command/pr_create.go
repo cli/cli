@@ -8,6 +8,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -29,6 +30,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		cmd.Printf("Warning: %d uncommitted %s\n", ucc, noun)
 	}
 
+	repo, err := ctx.BaseRepo()
+	if err != nil {
+		return errors.Wrap(err, "could not determine GitHub repo")
+	}
+
 	head, err := ctx.Branch()
 	if err != nil {
 		return errors.Wrap(err, "could not determine current branch")
@@ -41,6 +47,16 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
 		return err
+	}
+
+	isWeb, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return errors.Wrap(err, "could not parse web")
+	}
+	if isWeb {
+		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, repo.RepoOwner(), repo.RepoName(), head)
+		cmd.Printf("Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
 	}
 
 	title, err := cmd.Flags().GetString("title")
@@ -85,11 +101,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	client, err := apiClientForContext(ctx)
 	if err != nil {
 		return errors.Wrap(err, "could not initialize api client")
-	}
-
-	repo, err := ctx.BaseRepo()
-	if err != nil {
-		return errors.Wrap(err, "could not determine GitHub repo")
 	}
 
 	isDraft, err := cmd.Flags().GetBool("draft")
@@ -158,4 +169,5 @@ func init() {
 		"Supply a body. Will prompt for one otherwise.")
 	prCreateCmd.Flags().StringP("base", "T", "",
 		"The branch into which you want your code merged")
+	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 }
