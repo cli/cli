@@ -32,8 +32,7 @@ func main() {
 func migrateConfig() {
 	p, _ := homedir.Expand("~/.config/gh")
 	fi, err := os.Stat(p)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migration error: failed to stat %s", p)
+	if err != nil { // This means the file doesn't exist, and that is fine.
 		return
 	}
 	if fi.Mode().IsDir() {
