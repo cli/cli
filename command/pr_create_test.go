@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/test"
+	"github.com/github/gh-cli/utils"
 )
 
 func TestPrCreateHelperProcess(*testing.T) {
@@ -89,6 +92,36 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
 	eq(t, output, "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_web(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("feature")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	initFakeHTTP()
+
+	ranCommands := [][]string{}
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		ranCommands = append(ranCommands, cmd.Args)
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prCreateCmd, `pr create --web`)
+	eq(t, err, nil)
+
+	if output == "" {
+		t.Fatal("expected output")
+	}
+
+	eq(t, len(ranCommands), 3)
+	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
+	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/pull/feature")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {

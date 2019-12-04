@@ -109,8 +109,8 @@ func UncommittedChangeCount() (int, error) {
 }
 
 func Push(remote string, ref string) error {
-	cmd := GitCommand("push", "--set-upstream", remote, ref)
-	return cmd.Run()
+	pushCmd := GitCommand("push", "--set-upstream", remote, ref)
+	return utils.PrepareCmd(pushCmd).Run()
 }
 
 type BranchConfig struct {
