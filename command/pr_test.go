@@ -35,10 +35,15 @@ func RunCommand(cmd *cobra.Command, args string) (string, error) {
 	outBuf := bytes.Buffer{}
 	cmd.SetOut(&outBuf)
 
-	// Reset flag slice values so they don't leak between tests
-	cmd.Flags().Visit(func(f *pflag.Flag) {
-		if v, ok := f.Value.(pflag.SliceValue); ok {
+	// Reset flag values so they don't leak between tests
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		switch v := f.Value.(type) {
+		case pflag.SliceValue:
 			v.Replace([]string{})
+		default:
+			if v.Type() == "bool" {
+				v.Set(f.DefValue)
+			}
 		}
 	})
 
