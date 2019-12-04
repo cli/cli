@@ -285,6 +285,7 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 	query($owner: String!, $repo: String!, $pr_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pr_number) {
+				number
 				headRefName
 				headRepositoryOwner {
 					login

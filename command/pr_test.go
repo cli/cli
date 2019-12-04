@@ -251,7 +251,109 @@ func TestPRView_numberArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	if url != "https://github.com/OWNER/REPO/pull/23" {
-		t.Errorf("got: %q", url)
+	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+}
+
+func TestPRView_urlArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view https://github.com/OWNER/REPO/pull/23/files")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
 	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+}
+
+func TestPRView_branchArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "headRefName": "blueberries",
+		  "isCrossRepository": false,
+		  "url": "https://github.com/OWNER/REPO/pull/23" }
+	] } } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view blueberries")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+}
+
+func TestPRView_branchWithOwnerArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "headRefName": "blueberries",
+		  "isCrossRepository": true,
+		  "headRepositoryOwner": { "login": "hubot" },
+		  "url": "https://github.com/hubot/REPO/pull/23" }
+	] } } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view hubot:blueberries")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	if output == "" {
+		t.Errorf("command output expected got an empty string")
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/hubot/REPO/pull/23")
 }

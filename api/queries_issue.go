@@ -202,3 +202,35 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 
 	return resp.Repository.Issues.Nodes, nil
 }
+
+func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
+	type response struct {
+		Repository struct {
+			Issue Issue
+		}
+	}
+
+	query := `
+	query($owner: String!, $repo: String!, $issue_number: Int!) {
+		repository(owner: $owner, name: $repo) {
+			issue(number: $issue_number) {
+				number
+				url
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{
+		"owner":        ghRepo.RepoOwner(),
+		"repo":         ghRepo.RepoName(),
+		"issue_number": number,
+	}
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Repository.Issue, nil
+}
