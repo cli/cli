@@ -40,7 +40,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
-		return fmt.Errorf("was not able to push to remote '%s': %s", remote, err)
+		return err
 	}
 
 	title, err := cmd.Flags().GetString("title")
