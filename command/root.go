@@ -66,6 +66,21 @@ var initContext = func() context.Context {
 	return ctx
 }
 
+// BasicClient returns an API client that borrows from but does not depend on
+// user configuration
+func BasicClient() (*api.Client, error) {
+	opts := []api.ClientOption{
+		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+	}
+	if c, err := context.ParseDefaultConfig(); err == nil {
+		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", c.Token)))
+	}
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, api.VerboseLog(os.Stderr))
+	}
+	return api.NewClient(opts...), nil
+}
+
 func contextForCommand(cmd *cobra.Command) context.Context {
 	ctx := initContext()
 	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {

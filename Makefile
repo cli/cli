@@ -1,7 +1,7 @@
 BUILD_FILES = $(shell go list -f '{{range .GoFiles}}{{$$.Dir}}/{{.}}\
 {{end}}' ./...)
 
-GH_VERSION = $(shell git describe --tags 2>/dev/null || git rev-parse --short HEAD)
+GH_VERSION ?= $(shell git describe --tags 2>/dev/null || git rev-parse --short HEAD)
 LDFLAGS := -X github.com/github/gh-cli/command.Version=$(GH_VERSION) $(LDFLAGS)
 LDFLAGS := -X github.com/github/gh-cli/command.BuildDate=$(shell date +%Y-%m-%d) $(LDFLAGS)
 ifdef GH_OAUTH_CLIENT_SECRET

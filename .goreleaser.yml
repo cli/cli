@@ -9,6 +9,7 @@ builds:
       - -s -w -X github.com/github/gh-cli/command.Version={{.Version}} -X github.com/github/gh-cli/command.BuildDate={{.Date}}
       - -X github.com/github/gh-cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
       - -X github.com/github/gh-cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
+      - -X main.updaterEnabled=github/homebrew-gh
     goos:
       - linux
       - darwin
