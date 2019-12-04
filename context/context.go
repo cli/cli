@@ -40,7 +40,7 @@ type fsContext struct {
 }
 
 func (c *fsContext) configFile() string {
-	dir, _ := homedir.Expand("~/.config/gh")
+	dir, _ := homedir.Expand("~/.config/gh/config.yml")
 	return dir
 }
 
