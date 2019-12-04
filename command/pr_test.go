@@ -8,10 +8,13 @@ import (
 	"os/exec"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
-	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
+	"github.com/google/shlex"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -21,15 +24,37 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	}
 }
 
+func RunCommand(cmd *cobra.Command, args string) (string, error) {
+	rootCmd := cmd.Root()
+	argv, err := shlex.Split(args)
+	if err != nil {
+		return "", err
+	}
+	rootCmd.SetArgs(argv)
+
+	outBuf := bytes.Buffer{}
+	cmd.SetOut(&outBuf)
+
+	// Reset flag slice values so they don't leak between tests
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		if v, ok := f.Value.(pflag.SliceValue); ok {
+			v.Replace([]string{})
+		}
+	})
+
+	_, err = rootCmd.ExecuteC()
+	return outBuf.String(), err
+}
+
 func TestPRStatus(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "pr status")
+	output, err := RunCommand(prStatusCmd, "pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -56,16 +81,12 @@ func TestPRList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	out := bytes.Buffer{}
-	prListCmd.SetOut(&out)
-
-	RootCmd.SetArgs([]string{"pr", "list"})
-	_, err := RootCmd.ExecuteC()
+	output, err := RunCommand(prListCmd, "pr list")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	eq(t, out.String(), `32	New feature	feature
+	eq(t, output, `32	New feature	feature
 29	Fixed bad bug	hubot:bug-fix
 28	Improve documentation	docs
 `)
@@ -78,10 +99,7 @@ func TestPRList_filtering(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	prListCmd.SetOut(ioutil.Discard)
-
-	RootCmd.SetArgs([]string{"pr", "list", "-s", "all", "-l", "one", "-l", "two"})
-	_, err := RootCmd.ExecuteC()
+	_, err := RunCommand(prListCmd, `pr list -s all -l one,two -l three`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,11 +114,47 @@ func TestPRList_filtering(t *testing.T) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
-	eq(t, reqBody.Variables.Labels, []string{"one", "two"})
+	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
 }
 
-func TestPRView(t *testing.T) {
+func TestPRList_filteringAssignee(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	_, err := RunCommand(prListCmd, `pr list -s merged -l "needs tests" -a hubot -B develop`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables struct {
+			Q string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`)
+}
+
+func TestPRList_filteringAssigneeLabels(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	_, err := RunCommand(prListCmd, `pr list -l one,two -a hubot`)
+	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
+		t.Fatal(err)
+	}
+}
+
+func TestPRView_currentBranch(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
@@ -109,12 +163,17 @@ func TestPRView(t *testing.T) {
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &outputStub{}
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &outputStub{}
+		default:
+			seenCmd = cmd
+			return &outputStub{}
+		}
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "pr view")
+	output, err := RunCommand(prViewCmd, "pr view")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -132,8 +191,8 @@ func TestPRView(t *testing.T) {
 	}
 }
 
-func TestPRView_NoActiveBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+func TestPRView_noResultsForBranch(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
@@ -142,22 +201,44 @@ func TestPRView_NoActiveBranch(t *testing.T) {
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &outputStub{}
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &outputStub{}
+		default:
+			seenCmd = cmd
+			return &outputStub{}
+		}
 	})
 	defer restoreCmd()
 
-	_, err := test.RunCommand(RootCmd, "pr view")
-	if err == nil || err.Error() != "the 'master' branch has no open pull requests" {
+	_, err := RunCommand(prViewCmd, "pr view")
+	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
 	if seenCmd != nil {
 		t.Fatalf("unexpected command: %v", seenCmd.Args)
 	}
+}
 
-	// Now run again but provide a PR number
-	output, err := test.RunCommand(RootCmd, "pr view 23")
+func TestPRView_numberArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}

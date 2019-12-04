@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
 )
 
@@ -21,7 +20,7 @@ func TestIssueStatus(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "issue status")
+	output, err := RunCommand(issueStatusCmd, "issue status")
 	if err != nil {
 		t.Errorf("error running command `issue status`: %v", err)
 	}
@@ -49,7 +48,7 @@ func TestIssueList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := test.RunCommand(RootCmd, "issue list")
+	output, err := RunCommand(issueListCmd, "issue list")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -73,7 +72,7 @@ func TestIssueList_withFlags(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {}}`)) // Since we are testing that the flags are passed, we don't care about the response
 
-	_, err := test.RunCommand(RootCmd, "issue list -a probablyCher -l web,bug -s open")
+	_, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -108,7 +107,7 @@ func TestIssueView(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := test.RunCommand(RootCmd, "issue view 8")
+	output, err := RunCommand(issueViewCmd, "issue view 8")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -141,11 +140,7 @@ func TestIssueCreate(t *testing.T) {
 		} } } }
 	`))
 
-	out := bytes.Buffer{}
-	issueCreateCmd.SetOut(&out)
-
-	RootCmd.SetArgs([]string{"issue", "create", "-t", "hello", "-b", "cash rules everything around me"})
-	_, err := RootCmd.ExecuteC()
+	output, err := RunCommand(issueCreateCmd, `issue create -t hello -b "cash rules everything around me"`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -166,5 +161,5 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
-	eq(t, out.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	eq(t, output, "https://github.com/OWNER/REPO/issues/12\n")
 }

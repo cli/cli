@@ -15,25 +15,21 @@ import (
 
 func init() {
 	RootCmd.AddCommand(issueCmd)
-	issueCmd.AddCommand(issueCreateCmd)
 	issueCmd.AddCommand(issueStatusCmd)
 	issueCmd.AddCommand(issueViewCmd)
+
+	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
 
-	issueListCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List and filter issues in this repository",
-		RunE:  issueList,
-	}
+	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open|closed|all)")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
-	issueCmd.AddCommand((issueListCmd))
 }
 
 var issueCmd = &cobra.Command{
@@ -45,6 +41,11 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
+}
+var issueListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List and filter issues in this repository",
+	RunE:  issueList,
 }
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
@@ -191,7 +192,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid issue number: '%s'", args[0])
 	}
 
-	fmt.Printf("Opening %s in your browser.\n", openURL)
+	cmd.Printf("Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
 }
 
