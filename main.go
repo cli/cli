@@ -33,10 +33,14 @@ func main() {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		msg := fmt.Sprintf(`A new release of gh is available: %s → %s
-Release notes: %s`, currentVersion, newRelease.Version, newRelease.URL)
+		msg := fmt.Sprintf("%s %s → %s\n%s",
+			ansi.Color("A new release of gh is available:", "yellow"),
+			ansi.Color(currentVersion, "cyan"),
+			ansi.Color(newRelease.Version, "cyan"),
+			ansi.Color(newRelease.URL, "yellow"))
+
 		stderr := utils.NewColorable(os.Stderr)
-		fmt.Fprintf(stderr, "\n\n%s\n\n", ansi.Color(msg, "cyan"))
+		fmt.Fprintf(stderr, "\n\n%s\n\n", msg)
 	}
 }
 
