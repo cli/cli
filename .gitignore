@@ -1,4 +1,5 @@
-bin/gh
+/bin
 /gh-cli
 .envrc
 /dist
+/site
