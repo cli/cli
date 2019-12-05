@@ -37,7 +37,7 @@ var prCmd = &cobra.Command{
 	Long:  `Work with GitHub pull requests.`,
 }
 var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout <pr-number>",
+	Use:   "checkout {pr-number | url | branch-name}",
 	Short: "Check out a pull request in Git",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  prCheckout,
@@ -53,7 +53,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [pr-number]",
+	Use:   "view {pr-number | url | branch-name}",
 	Short: "View a pull request in the browser",
 	RunE:  prView,
 }
