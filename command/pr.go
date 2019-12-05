@@ -230,6 +230,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+
 		openURL = pr.URL
 	} else {
 		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
