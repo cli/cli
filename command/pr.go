@@ -180,6 +180,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if len(prs) == 0 {
+		colorOut := colorableOut(cmd)
+		printMessage(colorOut, "There are no open pull requests")
+		return nil
+	}
+
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
 		prNum := strconv.Itoa(pr.Number)
