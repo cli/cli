@@ -25,7 +25,7 @@ func init() {
 	prCmd.AddCommand(prViewCmd)
 
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
