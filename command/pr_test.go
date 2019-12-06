@@ -362,3 +362,10 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/hubot/REPO/pull/23")
 }
+
+func TestReplaceExcessiveWhitespace(t *testing.T) {
+	eq(t, replaceExcessiveWhitespace("hello\ngoodbye"), "hello goodbye")
+	eq(t, replaceExcessiveWhitespace("  hello goodbye  "), "hello goodbye")
+	eq(t, replaceExcessiveWhitespace("hello   goodbye"), "hello goodbye")
+	eq(t, replaceExcessiveWhitespace("   hello \n goodbye   "), "hello goodbye")
+}

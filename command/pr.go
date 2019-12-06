@@ -187,7 +187,7 @@ func prList(cmd *cobra.Command, args []string) error {
 			prNum = "#" + prNum
 		}
 		table.AddField(prNum, nil, colorFuncForState(pr.State))
-		table.AddField(pr.Title, nil, nil)
+		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
 	}
@@ -404,7 +404,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 func printPrs(w io.Writer, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, pr.Title), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -453,4 +453,11 @@ func truncate(maxLength int, title string) string {
 		return title[0:maxLength-3] + "..."
 	}
 	return title
+}
+
+func replaceExcessiveWhitespace(s string) string {
+	s = strings.TrimSpace(s)
+	s = regexp.MustCompile(`\r?\n`).ReplaceAllString(s, " ")
+	s = regexp.MustCompile(`\s{2,}`).ReplaceAllString(s, " ")
+	return s
 }
