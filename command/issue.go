@@ -117,7 +117,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 			labels = fmt.Sprintf("(%s)", labels)
 		}
 		table.AddField(issueNum, nil, colorFuncForState(issue.State))
-		table.AddField(replaceNewlines(issue.Title), nil, nil)
+		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		table.EndRow()
 	}
@@ -288,7 +288,7 @@ func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
 		if coloredLabels != "" {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, replaceNewlines(issue.Title)), coloredLabels)
+		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, replaceExcessiveWhitespace(issue.Title)), coloredLabels)
 	}
 }
 
