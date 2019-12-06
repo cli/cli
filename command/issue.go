@@ -55,7 +55,7 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use:   "view {issue-number | url}",
+	Use:   "view {<number> | <url> | <branch>}",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "View an issue in the browser",
 	RunE:  issueView,
