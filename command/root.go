@@ -117,3 +117,11 @@ func colorableOut(cmd *cobra.Command) io.Writer {
 	}
 	return out
 }
+
+func colorableErr(cmd *cobra.Command) io.Writer {
+	out := cmd.ErrOrStderr()
+	if outFile, isFile := out.(*os.File); isFile {
+		return utils.NewColorable(outFile)
+	}
+	return out
+}
