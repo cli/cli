@@ -119,9 +119,9 @@ func colorableOut(cmd *cobra.Command) io.Writer {
 }
 
 func colorableErr(cmd *cobra.Command) io.Writer {
-	out := cmd.ErrOrStderr()
-	if outFile, isFile := out.(*os.File); isFile {
+	err := cmd.ErrOrStderr()
+	if outFile, isFile := err.(*os.File); isFile {
 		return utils.NewColorable(outFile)
 	}
-	return out
+	return err
 }
