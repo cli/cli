@@ -25,7 +25,7 @@ func init() {
 	prCmd.AddCommand(prViewCmd)
 
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
-	prListCmd.Flags().StringP("state", "s", "open", "Filter by state")
+	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
@@ -34,10 +34,15 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Create, view, and checkout pull requests",
-	Long:  `Work with GitHub pull requests.`,
+	Long: `Work with GitHub pull requests.
+
+A pull request can be supplied as argument in any of the following formats:
+- by number, e.g. "123";
+- by URL, e.g. "https://github.com/<owner>/<repo>/pull/123"; or
+- by the name of its head branch, e.g. "patch-1" or "<owner>:patch-1".`,
 }
 var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout <pr-number>",
+	Use:   "checkout {<number> | <url> | <branch>}",
 	Short: "Check out a pull request in Git",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  prCheckout,
@@ -53,7 +58,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [pr-number]",
+	Use:   "view {<number> | <url> | <branch>}",
 	Short: "View a pull request in the browser",
 	RunE:  prView,
 }
