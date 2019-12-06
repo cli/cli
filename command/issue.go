@@ -37,7 +37,11 @@ func init() {
 var issueCmd = &cobra.Command{
 	Use:   "issue",
 	Short: "Create and view issues",
-	Long:  `Work with GitHub issues`,
+	Long: `Work with GitHub issues.
+
+An issue can be supplied as argument in any of the following formats:
+- by number, e.g. "123"; or
+- by URL, e.g. "https://github.com/<owner>/<repo>/issues/123".`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",

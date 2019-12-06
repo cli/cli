@@ -34,7 +34,12 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Create, view, and checkout pull requests",
-	Long:  `Work with GitHub pull requests.`,
+	Long: `Work with GitHub pull requests.
+
+A pull request can be supplied as argument in any of the following formats:
+- by number, e.g. "123";
+- by URL, e.g. "https://github.com/<owner>/<repo>/pull/123"; or
+- by the name of its head branch, e.g. "patch-1" or "<owner>:patch-1".`,
 }
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
