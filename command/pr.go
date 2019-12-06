@@ -182,7 +182,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // If the user is piping this command we don't want them to process this message as if it were a PR entry
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
 		msg := "There are no open pull requests"
 
 		userSetFlags := false
@@ -190,7 +190,7 @@ func prList(cmd *cobra.Command, args []string) error {
 			userSetFlags = f.Changed || userSetFlags
 		})
 		if userSetFlags {
-			msg = "No pull requests matched your search"
+			msg = "No pull requests match your search"
 		}
 		printMessage(colorErr, msg)
 		return nil

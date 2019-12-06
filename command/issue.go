@@ -13,6 +13,7 @@ import (
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -98,14 +99,22 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	out := cmd.OutOrStdout()
-	colorOut := colorableOut(cmd)
-
 	if len(issues) == 0 {
-		printMessage(colorOut, "There are no open issues")
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is acually an issue
+		msg := "There are no open issues"
+
+		userSetFlags := false
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			userSetFlags = f.Changed || userSetFlags
+		})
+		if userSetFlags {
+			msg = "No issues match your search"
+		}
+		printMessage(colorErr, msg)
 		return nil
 	}
 
+	out := cmd.OutOrStdout()
 	table := utils.NewTablePrinter(out)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
