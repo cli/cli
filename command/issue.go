@@ -30,14 +30,18 @@ func init() {
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "Filter by state (open|closed|all)")
+	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 }
 
 var issueCmd = &cobra.Command{
 	Use:   "issue",
 	Short: "Create and view issues",
-	Long:  `Work with GitHub issues`,
+	Long: `Work with GitHub issues.
+
+An issue can be supplied as argument in any of the following formats:
+- by number, e.g. "123"; or
+- by URL, e.g. "https://github.com/<owner>/<repo>/issues/123".`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -55,7 +59,7 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use:   "view <issue-number>",
+	Use:   "view {<number> | <url> | <branch>}",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "View an issue in the browser",
 	RunE:  issueView,
