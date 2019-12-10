@@ -368,7 +368,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 		}
 	}
 
-	return nil, fmt.Errorf("no open pull requests found for branch %q", branch)
+	return nil, nil
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
