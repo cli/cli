@@ -14,6 +14,7 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -183,6 +184,21 @@ func prList(cmd *cobra.Command, args []string) error {
 	prs, err := api.PullRequestList(apiClient, params, limit)
 	if err != nil {
 		return err
+	}
+
+	if len(prs) == 0 {
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
+		msg := "There are no open pull requests"
+
+		userSetFlags := false
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			userSetFlags = f.Changed || userSetFlags
+		})
+		if userSetFlags {
+			msg = "No pull requests match your search"
+		}
+		printMessage(colorErr, msg)
+		return nil
 	}
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
