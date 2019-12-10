@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -45,8 +46,13 @@ A pull request can be supplied as argument in any of the following formats:
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
 	Short: "Check out a pull request in Git",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  prCheckout,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("requires a PR number as an argument")
+		}
+		return nil
+	},
+	RunE: prCheckout,
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",

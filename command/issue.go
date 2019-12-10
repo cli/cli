@@ -108,7 +108,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		msg := "There are no open issues"
 
 		userSetFlags := false
-		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		cmd.Flags().Visit(func(f *pflag.Flag) {
 			userSetFlags = f.Changed || userSetFlags
 		})
 		if userSetFlags {
