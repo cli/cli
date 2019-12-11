@@ -118,7 +118,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	pr, err := api.CreatePullRequest(client, repo, params)
 	if err != nil {
-		return errors.Wrap(err, "failed to create PR")
+		return errors.Wrap(err, "failed to create pull request")
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
@@ -162,7 +162,7 @@ var prCreateCmd = &cobra.Command{
 
 func init() {
 	prCreateCmd.Flags().BoolP("draft", "d", false,
-		"Mark PR as a draft")
+		"Mark pull request as a draft")
 	prCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
 	prCreateCmd.Flags().StringP("body", "b", "",
