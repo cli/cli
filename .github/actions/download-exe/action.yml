@@ -1,0 +1,8 @@
+name: 'Download EXE'
+description: 'Downloads the gh.exe file that goreleaser created for packaging on windows.'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+outputs:
+  exe:
+    description: The path to downloaded exe
