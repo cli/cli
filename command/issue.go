@@ -114,7 +114,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 		userSetFlags := false
 		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = f.Changed || userSetFlags
+			userSetFlags = true
 		})
 		if userSetFlags {
 			msg = "No issues match your search"

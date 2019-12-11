@@ -197,8 +197,8 @@ func prList(cmd *cobra.Command, args []string) error {
 		msg := "There are no open pull requests"
 
 		userSetFlags := false
-		cmd.Flags().VisitAll(func(f *pflag.Flag) {
-			userSetFlags = f.Changed || userSetFlags
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			userSetFlags = true
 		})
 		if userSetFlags {
 			msg = "No pull requests match your search"
