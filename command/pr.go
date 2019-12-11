@@ -269,16 +269,14 @@ func prView(cmd *cobra.Command, args []string) error {
 		} else {
 			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
-				return err
-			}
-
-			if pr == nil {
-				branch, err := ctx.Branch()
-				if err != nil {
+				switch err.(type) {
+				case *api.NotFoundError:
+					return fmt.Errorf("%s. To open a specific pull request use the pull request's number as an argument", err)
+				default:
 					return err
 				}
-				return fmt.Errorf("no open pull requests found for branch %q. To open a specific pull request use the pull request's number as an argument", branch)
 			}
+
 			openURL = pr.URL
 		}
 	}
