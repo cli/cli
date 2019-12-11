@@ -1,5 +1,8 @@
-# Make sure to check the documentation at http://goreleaser.com
 project_name: gh
+
+release:
+  prerelease: auto
+
 before:
   hooks:
     - go mod tidy
@@ -24,7 +27,7 @@ archives:
     format: tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        format: binary
 
 nfpms:
   - license: MIT
