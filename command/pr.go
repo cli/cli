@@ -277,7 +277,7 @@ func prView(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return err
 				}
-				return fmt.Errorf("no open pull requests found for branch %q. To open a specific PR use a PR number as an argument", branch)
+				return fmt.Errorf("no open pull requests found for branch %q. To open a specific pull request use the pull request's number as an argument", branch)
 			}
 			openURL = pr.URL
 		}
