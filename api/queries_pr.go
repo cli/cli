@@ -50,11 +50,7 @@ type PullRequest struct {
 }
 
 type NotFoundError struct {
-	message string
-}
-
-func (e *NotFoundError) Error() string {
-	return e.message
+	error
 }
 
 func (pr PullRequest) HeadLabel() string {
@@ -376,7 +372,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 		}
 	}
 
-	return nil, &NotFoundError{message: fmt.Sprintf("no open pull requests found for branch %q", branch)}
+	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", branch)}
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
