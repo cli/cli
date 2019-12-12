@@ -8,6 +8,7 @@ import (
 	"github.com/github/gh-cli/command"
 	"github.com/github/gh-cli/update"
 	"github.com/github/gh-cli/utils"
+	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/mitchellh/go-homedir"
 )
@@ -45,9 +46,8 @@ func main() {
 }
 
 func shouldCheckForUpdate() bool {
-	// errFd := os.Stderr.Fd()
-	// return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
-	return true
+	errFd := os.Stderr.Fd()
+	return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
