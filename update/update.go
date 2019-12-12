@@ -89,10 +89,7 @@ func getStateEntry(stateFilePath string) (*StateEntry, error) {
 }
 
 func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
-	data := StateEntry{
-		CheckedForUpdateAt: t,
-		LatestRelease:      r,
-	}
+	data := StateEntry{CheckedForUpdateAt: t, LatestRelease: r}
 	content, err := yaml.Marshal(data)
 	if err != nil {
 		return err
