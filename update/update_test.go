@@ -97,6 +97,5 @@ func tempFilePath() string {
 		log.Fatal(err)
 	}
 	os.Remove(file.Name())
-	fmt.Printf("🌭 %+v\n", file.Name())
 	return file.Name()
 }
