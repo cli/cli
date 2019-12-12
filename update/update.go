@@ -28,7 +28,6 @@ func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion stri
 		return nil, err
 	}
 
-	fmt.Printf("🌭 %+v -> %+v\n", latestRelease.Version, currentVersion)
 	if versionGreaterThan(latestRelease.Version, currentVersion) {
 		return latestRelease, nil
 	}
@@ -52,7 +51,6 @@ func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersio
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("🌭 latestRelease: %+v\n", latestRelease)
 
 	err = setStateEntry(stateFilePath, time.Now(), latestRelease)
 	if err != nil {
