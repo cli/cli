@@ -7,14 +7,13 @@ import (
 
 	"github.com/github/gh-cli/api"
 	"github.com/hashicorp/go-version"
-	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
 // ReleaseInfo stores information about a release
 type ReleaseInfo struct {
-	Version string
-	URL     string
+	Version string `json:"tag_name"`
+	URL     string `json:"html_url"`
 }
 
 type StateEntry struct {
@@ -23,12 +22,13 @@ type StateEntry struct {
 }
 
 // CheckForUpdate checks whether this software has had a newer relase on GitHub
-func CheckForUpdate(client *api.Client, repo, currentVersion string) (*ReleaseInfo, error) {
-	latestRelease, err := getLatestReleaseInfo(client, repo, currentVersion)
+func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+	latestRelease, err := getLatestReleaseInfo(client, stateFilePath, repo, currentVersion)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("🌭 %+v -> %+v\n", latestRelease.Version, currentVersion)
 	if versionGreaterThan(latestRelease.Version, currentVersion) {
 		return latestRelease, nil
 	}
@@ -36,8 +36,8 @@ func CheckForUpdate(client *api.Client, repo, currentVersion string) (*ReleaseIn
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, repo, currentVersion string) (*ReleaseInfo, error) {
-	stateEntry, err := getStateEntry()
+func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+	stateEntry, err := getStateEntry(stateFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +52,9 @@ func getLatestReleaseInfo(client *api.Client, repo, currentVersion string) (*Rel
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("🌭 latestRelease: %+v\n", latestRelease)
 
-	err = setStateEntry(time.Now(), latestRelease)
+	err = setStateEntry(stateFilePath, time.Now(), latestRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -61,17 +62,13 @@ func getLatestReleaseInfo(client *api.Client, repo, currentVersion string) (*Rel
 	return &latestRelease, nil
 }
 
-func stateFileName() string {
-	f, _ := homedir.Expand("~/.config/gh/state.yml")
-	return f
-}
-
-func getStateEntry() (*StateEntry, error) {
-	f := stateFileName()
-	content, err := ioutil.ReadFile(f)
+func getStateEntry(stateFilePath string) (*StateEntry, error) {
+	content, err := ioutil.ReadFile(stateFilePath)
 	if err != nil {
+		// State files doesn't exist, so create one with default values.
+		lastWeek := time.Now().Add(-time.Hour * 24 * 7)
 		data := StateEntry{
-			CheckedForUpdateAt: time.Now(),
+			CheckedForUpdateAt: lastWeek,
 			LatestRelease: ReleaseInfo{
 				Version: "v0.0.0",
 				URL:     "<?>",
@@ -81,7 +78,7 @@ func getStateEntry() (*StateEntry, error) {
 		if err != nil {
 			return nil, err
 		}
-		ioutil.WriteFile(f, content, 0600)
+		ioutil.WriteFile(stateFilePath, content, 0600)
 	}
 
 	var stateEntry StateEntry
@@ -93,7 +90,7 @@ func getStateEntry() (*StateEntry, error) {
 	return &stateEntry, nil
 }
 
-func setStateEntry(t time.Time, r ReleaseInfo) error {
+func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 	data := StateEntry{
 		CheckedForUpdateAt: t,
 		LatestRelease:      r,
@@ -102,7 +99,7 @@ func setStateEntry(t time.Time, r ReleaseInfo) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(stateFileName(), content, 0600)
+	ioutil.WriteFile(stateFilePath, content, 0600)
 
 	return nil
 }
