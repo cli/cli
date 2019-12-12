@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -45,8 +46,13 @@ A pull request can be supplied as argument in any of the following formats:
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
 	Short: "Check out a pull request in Git",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  prCheckout,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("requires a PR number as an argument")
+		}
+		return nil
+	},
+	RunE: prCheckout,
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
@@ -191,8 +197,8 @@ func prList(cmd *cobra.Command, args []string) error {
 		msg := "There are no open pull requests"
 
 		userSetFlags := false
-		cmd.Flags().VisitAll(func(f *pflag.Flag) {
-			userSetFlags = f.Changed || userSetFlags
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			userSetFlags = true
 		})
 		if userSetFlags {
 			msg = "No pull requests match your search"
@@ -263,8 +269,13 @@ func prView(cmd *cobra.Command, args []string) error {
 		} else {
 			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
+				var notFoundErr *api.NotFoundError
+				if errors.As(err, &notFoundErr) {
+					return fmt.Errorf("%s. To open a specific pull request use the pull request's number as an argument", err)
+				}
 				return err
 			}
+
 			openURL = pr.URL
 		}
 	}

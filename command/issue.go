@@ -60,8 +60,13 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use:   "view {<number> | <url> | <branch>}",
-	Args:  cobra.MinimumNArgs(1),
+	Use: "view {<number> | <url> | <branch>}",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("requires an issue number as an argument")
+		}
+		return nil
+	},
 	Short: "View an issue in the browser",
 	RunE:  issueView,
 }
@@ -108,8 +113,8 @@ func issueList(cmd *cobra.Command, args []string) error {
 		msg := "There are no open issues"
 
 		userSetFlags := false
-		cmd.Flags().VisitAll(func(f *pflag.Flag) {
-			userSetFlags = f.Changed || userSetFlags
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			userSetFlags = true
 		})
 		if userSetFlags {
 			msg = "No issues match your search"
