@@ -8,8 +8,8 @@ import (
 	"github.com/github/gh-cli/command"
 	"github.com/github/gh-cli/update"
 	"github.com/github/gh-cli/utils"
-	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
+	"github.com/mitchellh/go-homedir"
 )
 
 var updaterEnabled = ""
@@ -45,8 +45,9 @@ func main() {
 }
 
 func shouldCheckForUpdate() bool {
-	errFd := os.Stderr.Fd()
-	return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
+	// errFd := os.Stderr.Fd()
+	// return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
+	return true
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
@@ -60,5 +61,9 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	}
 
 	repo := updaterEnabled
-	return update.CheckForUpdate(client, repo, currentVersion)
+	stateFilePath, err := homedir.Expand("~/.config/gh/state.yml")
+	if err != nil {
+		return nil, err
+	}
+	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
 }
