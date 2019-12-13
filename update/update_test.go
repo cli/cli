@@ -3,6 +3,9 @@ package update
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/github/gh-cli/api"
@@ -55,7 +58,7 @@ func TestCheckForUpdate(t *testing.T) {
 				"html_url": "%s"
 			}`, s.LatestVersion, s.LatestURL)))
 
-			rel, err := CheckForUpdate(client, "OWNER/REPO", s.CurrentVersion)
+			rel, err := CheckForUpdate(client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -86,4 +89,13 @@ func TestCheckForUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func tempFilePath() string {
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Remove(file.Name())
+	return file.Name()
 }
