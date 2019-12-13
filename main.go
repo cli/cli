@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-cli/utils"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
+	"github.com/mitchellh/go-homedir"
 )
 
 var updaterEnabled = ""
@@ -60,5 +61,9 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	}
 
 	repo := updaterEnabled
-	return update.CheckForUpdate(client, repo, currentVersion)
+	stateFilePath, err := homedir.Expand("~/.config/gh/state.yml")
+	if err != nil {
+		return nil, err
+	}
+	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
 }
