@@ -37,12 +37,7 @@ func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion stri
 
 func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	stateEntry, err := getStateEntry(stateFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	checkedRecently := time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24
-	if checkedRecently {
+	if err == nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
 		return &stateEntry.LatestRelease, nil
 	}
 
@@ -63,20 +58,7 @@ func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersio
 func getStateEntry(stateFilePath string) (*StateEntry, error) {
 	content, err := ioutil.ReadFile(stateFilePath)
 	if err != nil {
-		// State files doesn't exist, so create one with default values.
-		lastWeek := time.Now().Add(-time.Hour * 24 * 7)
-		data := StateEntry{
-			CheckedForUpdateAt: lastWeek,
-			LatestRelease: ReleaseInfo{
-				Version: "v0.0.0",
-				URL:     "<?>",
-			},
-		}
-		content, err = yaml.Marshal(data)
-		if err != nil {
-			return nil, err
-		}
-		ioutil.WriteFile(stateFilePath, content, 0600)
+		return nil, err
 	}
 
 	var stateEntry StateEntry
