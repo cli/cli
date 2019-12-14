@@ -69,8 +69,8 @@ func parseConfig(r io.Reader) (*configEntry, error) {
 // This is a temporary function that will migrate the config file. It can be removed
 // in January.
 //
-// If ~/.config/gh is a file, convert it to a directory and place the file
-// into ~/.config/gh/config.yml
+// If the config dir is a file, convert it to a directory and place the file
+// into a file named config.yml
 func migrateConfigFile() {
 	p := ConfigDir()
 	fi, err := os.Stat(p)
