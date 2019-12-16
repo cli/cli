@@ -92,7 +92,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		case _unconfirmed:
 			continue
 		case _cancel:
-			cmd.Println("Discarding.")
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
 			return nil, nil
 		default:
 			panic("reached unreachable case")

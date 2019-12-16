@@ -33,7 +33,7 @@ func TestIssueStatus(t *testing.T) {
 	}
 
 	for _, r := range expectedIssues {
-		if !r.MatchString(output) {
+		if !r.MatchString(output.String()) {
 			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 			return
 		}
@@ -60,7 +60,7 @@ func TestIssueList(t *testing.T) {
 	}
 
 	for _, r := range expectedIssues {
-		if !r.MatchString(output) {
+		if !r.MatchString(output.String()) {
 			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 			return
 		}
@@ -72,10 +72,13 @@ func TestIssueList_withFlags(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {}}`)) // Since we are testing that the flags are passed, we don't care about the response
 
-	_, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open")
+	output, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "No issues match your search\n")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
@@ -115,9 +118,8 @@ func TestIssueView(t *testing.T) {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -176,9 +178,7 @@ func TestIssueView_urlArg(t *testing.T) {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -223,5 +223,5 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
-	eq(t, output, "https://github.com/OWNER/REPO/issues/12\n")
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
