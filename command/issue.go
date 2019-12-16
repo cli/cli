@@ -248,6 +248,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		if stat, err := os.Stat(".github/ISSUE_TEMPLATE"); err == nil && stat.IsDir() {
 			openURL += "/choose"
 		}
+		cmd.Printf("Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 
