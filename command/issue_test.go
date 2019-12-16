@@ -40,6 +40,38 @@ func TestIssueStatus(t *testing.T) {
 	}
 }
 
+func TestIssueStatus_blankSlate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {
+		"assigned": { "issues": { "nodes": [] } },
+		"mentioned": { "issues": { "nodes": [] } },
+		"authored": { "issues": { "nodes": [] } }
+	} }
+	`))
+
+	output, err := RunCommand(issueStatusCmd, "issue status")
+	if err != nil {
+		t.Errorf("error running command `issue status`: %v", err)
+	}
+
+	expectedOutput := `Issues assigned to you
+  There are no issues assigned to you
+
+Issues mentioning you
+  There are no issues mentioning you
+
+Issues opened by you
+  There are no issues opened by you
+
+`
+	if output != expectedOutput {
+		t.Errorf("expected %q, got %q", expectedOutput, output)
+	}
+}
+
 func TestIssueList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
