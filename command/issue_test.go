@@ -257,3 +257,27 @@ func TestIssueCreate(t *testing.T) {
 
 	eq(t, output, "https://github.com/OWNER/REPO/issues/12\n")
 }
+
+func TestIssueCreate_web(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	initFakeHTTP()
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(issueCreateCmd, `issue create --web`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
+	eq(t, output, "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n")
+}
