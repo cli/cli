@@ -91,7 +91,11 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
-	eq(t, output, "https://github.com/OWNER/REPO/pull/12\n")
+	eq(t, output, `
+Creating pull request for feature in OWNER/REPO
+
+https://github.com/OWNER/REPO/pull/12
+`)
 }
 
 func TestPRCreate_web(t *testing.T) {
@@ -156,6 +160,9 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output, `Warning: 1 uncommitted change
+
+Creating pull request for feature in OWNER/REPO
+
 https://github.com/OWNER/REPO/pull/12
 `)
 }

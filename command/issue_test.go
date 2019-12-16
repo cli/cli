@@ -255,7 +255,11 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
-	eq(t, output, "https://github.com/OWNER/REPO/issues/12\n")
+	eq(t, output, `
+Creating issue in OWNER/REPO
+
+https://github.com/OWNER/REPO/issues/12
+`)
 }
 
 func TestIssueCreate_web(t *testing.T) {
@@ -279,5 +283,9 @@ func TestIssueCreate_web(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
-	eq(t, output, "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n")
+	eq(t, output, `
+Creating issue in OWNER/REPO
+
+Opening https://github.com/OWNER/REPO/issues/new in your browser.
+`)
 }
