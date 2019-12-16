@@ -6,24 +6,24 @@ import (
 )
 
 func TestCompletion_bash(t *testing.T) {
-	outStr, err := RunCommand(completionCmd, `completion`)
+	output, err := RunCommand(completionCmd, `completion`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(outStr, "complete -o default -F __start_gh gh") {
-		t.Errorf("problem in bash completion:\n%s", outStr)
+	if !strings.Contains(output.String(), "complete -o default -F __start_gh gh") {
+		t.Errorf("problem in bash completion:\n%s", output)
 	}
 }
 
 func TestCompletion_zsh(t *testing.T) {
-	outStr, err := RunCommand(completionCmd, `completion -s zsh`)
+	output, err := RunCommand(completionCmd, `completion -s zsh`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(outStr, "#compdef _gh gh") {
-		t.Errorf("problem in zsh completion:\n%s", outStr)
+	if !strings.Contains(output.String(), "#compdef _gh gh") {
+		t.Errorf("problem in zsh completion:\n%s", output)
 	}
 }
 
