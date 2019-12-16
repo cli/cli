@@ -91,7 +91,10 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, output, `32	New feature	feature
+	eq(t, output, `
+Pull requests for OWNER/REPO
+
+32	New feature	feature
 29	Fixed bad bug	hubot:bug-fix
 28	Improve documentation	docs
 `)
