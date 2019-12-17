@@ -2,35 +2,15 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/utils"
 )
-
-func Dir() (string, error) {
-	dirCmd := exec.Command("git", "rev-parse", "-q", "--git-dir")
-	output, err := utils.PrepareCmd(dirCmd).Output()
-	if err != nil {
-		return "", fmt.Errorf("Not a git repository (or any of the parent directories): .git")
-	}
-
-	gitDir := firstLine(output)
-	if !filepath.IsAbs(gitDir) {
-		gitDir, err = filepath.Abs(gitDir)
-		if err != nil {
-			return "", err
-		}
-		gitDir = filepath.Clean(gitDir)
-	}
-
-	return gitDir, nil
-}
 
 func VerifyRef(ref string) bool {
 	showRef := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
@@ -38,34 +18,14 @@ func VerifyRef(ref string) bool {
 	return err == nil
 }
 
-func BranchAtRef(paths ...string) (name string, err error) {
-	dir, err := Dir()
-	if err != nil {
-		return
+func CurrentBranch() (string, error) {
+	branchCmd := exec.Command("git", "branch", "--show-current")
+	output, err := utils.PrepareCmd(branchCmd).Output()
+	branchName := firstLine(output)
+	if err == nil && branchName == "" {
+		return "", errors.New("git: not on any branch")
 	}
-
-	segments := []string{dir}
-	segments = append(segments, paths...)
-	path := filepath.Join(segments...)
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	n := string(b)
-	refPrefix := "ref: "
-	if strings.HasPrefix(n, refPrefix) {
-		name = strings.TrimPrefix(n, refPrefix)
-		name = strings.TrimSpace(name)
-	} else {
-		err = fmt.Errorf("No branch info in %s: %s", path, n)
-	}
-
-	return
-}
-
-func Head() (string, error) {
-	return BranchAtRef("HEAD")
+	return branchName, err
 }
 
 func listRemotes() ([]string, error) {

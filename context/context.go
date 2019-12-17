@@ -90,12 +90,12 @@ func (c *fsContext) Branch() (string, error) {
 		return c.branch, nil
 	}
 
-	currentBranch, err := git.Head()
+	currentBranch, err := git.CurrentBranch()
 	if err != nil {
 		return "", err
 	}
 
-	c.branch = strings.Replace(currentBranch, "refs/heads/", "", 1)
+	c.branch = currentBranch
 	return c.branch, nil
 }
 
