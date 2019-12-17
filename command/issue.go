@@ -169,10 +169,10 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	printHeader(out, "Issues assigned to you")
-	if issuePayload.Assigned != nil {
+	if len(issuePayload.Assigned) > 0 {
 		printIssues(out, "  ", issuePayload.Assigned...)
 	} else {
-		message := fmt.Sprintf("  There are no issues assgined to you")
+		message := fmt.Sprintf("  There are no issues assigned to you")
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
@@ -248,6 +248,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		if stat, err := os.Stat(".github/ISSUE_TEMPLATE"); err == nil && stat.IsDir() {
 			openURL += "/choose"
 		}
+		cmd.Printf("Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 

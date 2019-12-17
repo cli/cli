@@ -40,6 +40,38 @@ func TestIssueStatus(t *testing.T) {
 	}
 }
 
+func TestIssueStatus_blankSlate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {
+		"assigned": { "issues": { "nodes": [] } },
+		"mentioned": { "issues": { "nodes": [] } },
+		"authored": { "issues": { "nodes": [] } }
+	} }
+	`))
+
+	output, err := RunCommand(issueStatusCmd, "issue status")
+	if err != nil {
+		t.Errorf("error running command `issue status`: %v", err)
+	}
+
+	expectedOutput := `Issues assigned to you
+  There are no issues assigned to you
+
+Issues mentioning you
+  There are no issues mentioning you
+
+Issues opened by you
+  There are no issues opened by you
+
+`
+	if output.String() != expectedOutput {
+		t.Errorf("expected %q, got %q", expectedOutput, output)
+	}
+}
+
 func TestIssueList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
@@ -224,4 +256,28 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_web(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	initFakeHTTP()
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(issueCreateCmd, `issue create --web`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
+	eq(t, output.String(), "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n")
 }
