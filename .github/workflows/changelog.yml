@@ -1,0 +1,13 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull request merged
+        if: github.event.pull_request.merged == true
+        run: echo merged
