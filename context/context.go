@@ -1,6 +1,7 @@
 package context
 
 import (
+	"path"
 	"strings"
 
 	"github.com/github/gh-cli/git"
@@ -39,14 +40,18 @@ type fsContext struct {
 	authToken string
 }
 
-func (c *fsContext) configFile() string {
-	dir, _ := homedir.Expand("~/.config/gh/config.yml")
+func ConfigDir() string {
+	dir, _ := homedir.Expand("~/.config/gh")
 	return dir
+}
+
+func configFile() string {
+	return path.Join(ConfigDir(), "config.yml")
 }
 
 func (c *fsContext) getConfig() (*configEntry, error) {
 	if c.config == nil {
-		entry, err := parseOrSetupConfigFile(c.configFile())
+		entry, err := parseOrSetupConfigFile(configFile())
 		if err != nil {
 			return nil, err
 		}

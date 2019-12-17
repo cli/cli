@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,11 +35,9 @@ func parseConfigFile(fn string) (*configEntry, error) {
 	return parseConfig(f)
 }
 
-// ParseDefaultConfig reads the configuration from ~/.config/gh
+// ParseDefaultConfig reads the configuration file
 func ParseDefaultConfig() (*configEntry, error) {
-	// FIXME: this duplicates fsContext.configFile
-	fn, _ := homedir.Expand("~/.config/gh")
-	return parseConfigFile(fn)
+	return parseConfigFile(configFile())
 }
 
 func parseConfig(r io.Reader) (*configEntry, error) {
@@ -72,10 +69,10 @@ func parseConfig(r io.Reader) (*configEntry, error) {
 // This is a temporary function that will migrate the config file. It can be removed
 // in January.
 //
-// If ~/.config/gh is a file, convert it to a directory and place the file
-// into ~/.config/gh/config.yml
+// If the config dir is a file, convert it to a directory and place the file
+// into a file named config.yml
 func migrateConfigFile() {
-	p, _ := homedir.Expand("~/.config/gh")
+	p := ConfigDir()
 	fi, err := os.Stat(p)
 	if err != nil { // This means the file doesn't exist, and that is fine.
 		return

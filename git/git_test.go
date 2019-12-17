@@ -3,7 +3,7 @@ package git
 import (
 	"fmt"
 	"os"
-	"strings"
+	"regexp"
 	"testing"
 
 	"github.com/github/gh-cli/test"
@@ -51,7 +51,8 @@ func Test_UncommittedChangeCount(t *testing.T) {
 
 	GitCommand = test.StubExecCommand("TestGitStatusHelperProcess", "boom")
 	_, err := UncommittedChangeCount()
-	if !strings.HasSuffix(err.Error(), "git.test: exit status 1") {
+	errorRE := regexp.MustCompile(`git\.test(\.exe)?: exit status 1$`)
+	if !errorRE.MatchString(err.Error()) {
 		t.Errorf("got unexpected error message: %s", err)
 	}
 }
