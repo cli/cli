@@ -27,7 +27,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			noun = noun + "s"
 		}
 
-		cmd.Printf("Warning: %d uncommitted %s\n", ucc, noun)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %d uncommitted %s\n", ucc, noun)
 	}
 
 	repo, err := ctx.BaseRepo()
@@ -55,7 +55,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 	if isWeb {
 		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, repo.RepoOwner(), repo.RepoName(), head)
-		cmd.Printf("Opening %s in your browser.\n", openURL)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 
