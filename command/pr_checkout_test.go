@@ -53,7 +53,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
@@ -105,7 +105,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OWNER/REPO/pull/123/files`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
@@ -154,7 +154,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout hubot:feature`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 5)
 	eq(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:feature")
@@ -203,7 +203,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
@@ -255,7 +255,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch robot-fork +refs/heads/feature:refs/remotes/robot-fork/feature")
@@ -307,7 +307,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
@@ -359,7 +359,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 2)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
@@ -409,7 +409,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 2)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head")
@@ -459,7 +459,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 
 	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
 	eq(t, err, nil)
-	eq(t, output, "")
+	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
