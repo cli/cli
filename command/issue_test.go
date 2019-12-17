@@ -109,7 +109,7 @@ func TestIssueList_withFlags(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	eq(t, output.String(), "\nIssues for OWNER/REPO\n\n")
 	eq(t, output.Stderr(), "No issues match your search\n")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
