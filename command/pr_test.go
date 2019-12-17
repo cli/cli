@@ -129,7 +129,7 @@ func TestPRList_filtering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, output.String(), "")
+	eq(t, output.String(), "\nPull requests for OWNER/REPO\n\n")
 	eq(t, output.Stderr(), "No pull requests match your search\n")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)

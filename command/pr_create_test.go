@@ -119,7 +119,7 @@ func TestPRCreate_web(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create --web`)
 	eq(t, err, nil)
 
-	eq(t, output.String(), "")
+	eq(t, output.String(), "\nCreating pull request for feature in OWNER/REPO\n\n")
 	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
