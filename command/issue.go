@@ -216,7 +216,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 	}
 	openURL := issue.URL
 
-	cmd.Printf("Opening %s in your browser.\n", openURL)
+	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 	return utils.OpenInBrowser(openURL)
 }
 

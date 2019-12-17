@@ -91,7 +91,7 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
-	eq(t, output, `
+	eq(t, output.String(), `
 Creating pull request for feature in OWNER/REPO
 
 https://github.com/OWNER/REPO/pull/12
@@ -119,9 +119,8 @@ func TestPRCreate_web(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create --web`)
 	eq(t, err, nil)
 
-	if output == "" {
-		t.Fatal("expected output")
-	}
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
@@ -159,10 +158,10 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	eq(t, output, `Warning: 1 uncommitted change
-
+	eq(t, output.String(), `
 Creating pull request for feature in OWNER/REPO
 
 https://github.com/OWNER/REPO/pull/12
 `)
+	eq(t, output.Stderr(), "Warning: 1 uncommitted change\n")
 }

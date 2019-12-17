@@ -24,16 +24,30 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	}
 }
 
-func RunCommand(cmd *cobra.Command, args string) (string, error) {
+type cmdOut struct {
+	outBuf, errBuf *bytes.Buffer
+}
+
+func (c cmdOut) String() string {
+	return c.outBuf.String()
+}
+
+func (c cmdOut) Stderr() string {
+	return c.errBuf.String()
+}
+
+func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 	rootCmd := cmd.Root()
 	argv, err := shlex.Split(args)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	rootCmd.SetArgs(argv)
 
 	outBuf := bytes.Buffer{}
 	cmd.SetOut(&outBuf)
+	errBuf := bytes.Buffer{}
+	cmd.SetErr(&errBuf)
 
 	// Reset flag values so they don't leak between tests
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -48,7 +62,10 @@ func RunCommand(cmd *cobra.Command, args string) (string, error) {
 	})
 
 	_, err = rootCmd.ExecuteC()
-	return outBuf.String(), err
+	cmd.SetOut(nil)
+	cmd.SetErr(nil)
+
+	return &cmdOut{&outBuf, &errBuf}, err
 }
 
 func TestPRStatus(t *testing.T) {
@@ -72,7 +89,7 @@ func TestPRStatus(t *testing.T) {
 	}
 
 	for _, r := range expectedPrs {
-		if !r.MatchString(output) {
+		if !r.MatchString(output.String()) {
 			t.Errorf("output did not match regexp /%s/", r)
 		}
 	}
@@ -91,7 +108,7 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, output, `
+	eq(t, output.String(), `
 Pull requests for OWNER/REPO
 
 32	New feature	feature
@@ -107,10 +124,13 @@ func TestPRList_filtering(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	_, err := RunCommand(prListCmd, `pr list -s all -l one,two -l three`)
+	output, err := RunCommand(prListCmd, `pr list -s all -l one,two -l three`)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "No pull requests match your search\n")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
@@ -186,9 +206,8 @@ func TestPRView_currentBranch(t *testing.T) {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/10 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -251,9 +270,7 @@ func TestPRView_numberArg(t *testing.T) {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -284,9 +301,7 @@ func TestPRView_urlArg(t *testing.T) {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -319,9 +334,7 @@ func TestPRView_branchArg(t *testing.T) {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -355,9 +368,7 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
-	if output == "" {
-		t.Errorf("command output expected got an empty string")
-	}
+	eq(t, output.String(), "")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
