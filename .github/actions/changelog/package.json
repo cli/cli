@@ -5,7 +5,7 @@
   },
   "dependencies": {
     "@actions/core": "^1.2.0",
-    "@actions/github": "^1.1.0"
+    "@actions/github": "^2.0.0"
   },
   "devDependencies": {
     "@zeit/ncc": "^0.20.5"
