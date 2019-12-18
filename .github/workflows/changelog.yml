@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Pull request merged
-        if: git hub.event.pull_request.merged == true
+        if: github.event.pull_request.merged == true
         uses: ./.github/actions/changelog
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
