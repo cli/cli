@@ -10,6 +10,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v1
+
       - name: Pull request merged
         if: git hub.event.pull_request.merged == true
         uses: ./.github/actions/changelog
