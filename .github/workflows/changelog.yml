@@ -10,4 +10,6 @@ jobs:
     steps:
       - name: Pull request merged
         if: github.event.pull_request.merged == true
-        run: echo merged
+        uses: ./.github/actions/changelog
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
