@@ -151,6 +151,14 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	return
 }
 
+// ToplevelDir returns the top-level directory path of the current repository
+func ToplevelDir() (string, error) {
+	showCmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := utils.PrepareCmd(showCmd).Output()
+	return firstLine(output), err
+
+}
+
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	return strings.Split(lines, "\n")
