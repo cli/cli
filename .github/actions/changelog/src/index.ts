@@ -23,8 +23,8 @@ async function getChangelog() {
   const repo = github.context.repo.repo
   const path = 'changelog.json'
   const response = await octokit.repos.getContents({ owner, repo, path })
-  const data = response.data
-  core.info('content: ' + JSON.stringify(data))
+  const content = Buffer.from(response.data.content, 'base64').toString('utf8')
+  core.info('content: ' + content)
 }
 
 function handleError(err: Error) {
