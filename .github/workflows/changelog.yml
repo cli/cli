@@ -8,8 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v1
       - name: Pull request merged
-        if: github.event.pull_request.merged == true
+        if: git hub.event.pull_request.merged == true
         uses: ./.github/actions/changelog
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
