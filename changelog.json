@@ -1,34 +1,6 @@
 {
-  "draft": [
-    "[New] Warn when committing to a protected branch - #7023",
-    "[New] Warn when committing to a repository you don't have write access to - #8665",
-    "[Added] Adding integration for Xcode as external editor - #8255. Thanks @msztech!",
-    "[Fixed] Update embedded Git to address security vulnerabilities - #8780",
-    "[Fixed] Changed wording to match git autocrlf behavior - #5741. Thanks @jmhammock!",
-    "[Fixed] Don't dismiss dialogs when dragging from the dialog to the backdrop - #8544",
-    "[Fixed] Fix arrow key navigation of Changes and History lists (#6845) - #6845. Thanks @JMcKiern!",
-    "[Fixed] Handle multibyte characters in names - #8534",
-    "[Fixed] Keep PR badge on top of progress bar - #8622",
-    "[Fixed] Prevent application crash when background process spawn fails - #8614",
-    "[Fixed] Show autocomplete suggestions on top of CodeMirror author input - #4084",
-    "[Fixed] Standardize dialogs' button orders - #7186 #2463 #5883",
-    "[Improved] Make no newline indicator in file diffs readable by screenreaders. - #6494. Thanks @jmhammock!"
-  ],
+  "draft": [],
   "releases": {
-    "2.2.4": [
-      "[New] Warn when committing to a protected branch - #7023",
-      "[New] Warn when committing to a repository you don't have write access to - #8665",
-      "[Added] Adding integration for Xcode as external editor - #8255. Thanks @msztech!",
-      "[Fixed] Update embedded Git to address security vulnerabilities - #8780",
-      "[Fixed] Changed wording to match git autocrlf behavior - #5741. Thanks @jmhammock!",
-      "[Fixed] Don't dismiss dialogs when dragging from the dialog to the backdrop - #8544",
-      "[Fixed] Fix arrow key navigation of Changes and History lists (#6845) - #6845. Thanks @JMcKiern!",
-      "[Fixed] Handle multibyte characters in names - #8534",
-      "[Fixed] Keep PR badge on top of progress bar - #8622",
-      "[Fixed] Prevent application crash when background process spawn fails - #8614",
-      "[Fixed] Show autocomplete suggestions on top of CodeMirror author input - #4084",
-      "[Fixed] Standardize dialogs' button orders - #7186 #2463 #5883",
-      "[Improved] Make no newline indicator in file diffs readable by screenreaders. - #6494. Thanks @jmhammock!"
-    ]
+    "0.0.1": ["And so it begins..."]
   }
 }
