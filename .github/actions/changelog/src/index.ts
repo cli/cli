@@ -3,6 +3,11 @@ import * as github from '@actions/github'
 
 const GITHUB_TOKEN = getEnvVar('GITHUB_TOKEN')
 
+interface Changelog {
+  draft: string[]
+  releases: { [tag: string]: string[] }
+}
+
 process.on('unhandledRejection', (reason: any, _: Promise<any>) =>
   handleError(reason)
 )
@@ -14,7 +19,9 @@ async function main() {
     github.context.payload.pull_request &&
     github.context.payload.pull_request.title
   core.info('title: ' + title)
-  await getChangelog()
+  const changelog = await getChangelog()
+  const updatedChangelog = { draft: [title, ...changelog.draft], ...changelog }
+  await commitChangelog(updatedChangelog)
 }
 
 async function getChangelog() {
@@ -25,7 +32,30 @@ async function getChangelog() {
   const response = await octokit.repos.getContents({ owner, repo, path })
   const base64Content = (response.data as any).content
   const content = Buffer.from(base64Content, 'base64').toString('utf8')
-  core.info('content: ' + content)
+  return JSON.parse(content)
+}
+
+async function commitChangelog(changelog: Changelog) {
+  const octokit = new github.GitHub(GITHUB_TOKEN)
+  const owner = github.context.repo.owner
+  const repo = github.context.repo.repo
+  const path = 'changelog.json'
+  const message = 'update changelog'
+  const json = JSON.stringify(changelog, null, 2)
+  const content = Buffer.from(json).toString('base64')
+  const response = await octokit.repos.createOrUpdateFile({
+    owner,
+    repo,
+    path,
+    message,
+    content,
+  })
+
+  if (response.status != 200) {
+    throw new Error(
+      'Failed to commit changelog udpates. ' + JSON.stringify(response.data)
+    )
+  }
 }
 
 function handleError(err: Error) {
