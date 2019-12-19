@@ -46,6 +46,7 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
 		"assigned": { "nodes": [] },
 		"mentioned": { "nodes": [] },
 		"authored": { "nodes": [] }
@@ -102,7 +103,12 @@ func TestIssueList(t *testing.T) {
 func TestIssueList_withFlags(t *testing.T) {
 	http := initFakeHTTP()
 
-	http.StubResponse(200, bytes.NewBufferString(`{"data": {}}`)) // Since we are testing that the flags are passed, we don't care about the response
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {	"repository": {
+		"hasIssuesEnabled": true,
+		"issues": { "nodes": [] }
+	} } }
+	`))
 
 	output, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open")
 	if err != nil {
