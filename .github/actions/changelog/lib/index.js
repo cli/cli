@@ -3810,10 +3810,9 @@ async function main() {
     const title = github.context.payload &&
         github.context.payload.pull_request &&
         github.context.payload.pull_request.title;
-    core.info('title: ' + title);
-    const changelog = await getChangelog();
+    const { changelog, sha } = await getChangelog();
     const updatedChangelog = { draft: [title, ...changelog.draft], ...changelog };
-    await commitChangelog(updatedChangelog);
+    await commitChangelog(updatedChangelog, sha);
 }
 async function getChangelog() {
     const octokit = new github.GitHub(GITHUB_TOKEN);
@@ -3822,10 +3821,11 @@ async function getChangelog() {
     const path = 'changelog.json';
     const response = await octokit.repos.getContents({ owner, repo, path });
     const base64Content = response.data.content;
+    const sha = response.data.sha;
     const content = Buffer.from(base64Content, 'base64').toString('utf8');
-    return JSON.parse(content);
+    return { changelog: JSON.parse(content), sha };
 }
-async function commitChangelog(changelog) {
+async function commitChangelog(changelog, sha) {
     const octokit = new github.GitHub(GITHUB_TOKEN);
     const owner = github.context.repo.owner;
     const repo = github.context.repo.repo;
@@ -3839,6 +3839,7 @@ async function commitChangelog(changelog) {
         path,
         message,
         content,
+        sha,
     });
     if (response.status != 200) {
         throw new Error('Failed to commit changelog udpates. ' + JSON.stringify(response.data));
