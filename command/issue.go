@@ -257,6 +257,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	repo, err := api.GitHubRepo(apiClient, baseRepo)
+	if err != nil {
+		return err
+	}
+	if !repo.HasIssuesEnabled {
+		return fmt.Errorf("the '%s/%s' repository has disabled issues", baseRepo.RepoOwner(), baseRepo.RepoName())
+	}
+
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
 		return errors.Wrap(err, "could not parse title")
@@ -291,7 +299,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		"body":  body,
 	}
 
-	newIssue, err := api.IssueCreate(apiClient, baseRepo, params)
+	newIssue, err := api.IssueCreate(apiClient, repo, params)
 	if err != nil {
 		return err
 	}

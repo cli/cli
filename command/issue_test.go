@@ -45,11 +45,12 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {
-		"assigned": { "issues": { "nodes": [] } },
-		"mentioned": { "issues": { "nodes": [] } },
-		"authored": { "issues": { "nodes": [] } }
-	} }
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"assigned": { "nodes": [] },
+		"mentioned": { "nodes": [] },
+		"authored": { "nodes": [] }
+	} } }
 	`))
 
 	output, err := RunCommand(issueStatusCmd, "issue status")
@@ -69,6 +70,22 @@ Issues opened by you
 `
 	if output.String() != expectedOutput {
 		t.Errorf("expected %q, got %q", expectedOutput, output)
+	}
+}
+
+func TestIssueStatus_disabledIssues(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueStatusCmd, "issue status")
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Errorf("error running command `issue status`: %v", err)
 	}
 }
 
@@ -100,9 +117,15 @@ func TestIssueList(t *testing.T) {
 }
 
 func TestIssueList_withFlags(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
-	http.StubResponse(200, bytes.NewBufferString(`{"data": {}}`)) // Since we are testing that the flags are passed, we don't care about the response
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {	"repository": {
+		"hasIssuesEnabled": true,
+		"issues": { "nodes": [] }
+	} } }
+	`))
 
 	output, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open")
 	if err != nil {
@@ -125,6 +148,22 @@ func TestIssueList_withFlags(t *testing.T) {
 	eq(t, reqBody.Variables.Assignee, "probablyCher")
 	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
 	eq(t, reqBody.Variables.States, []string{"OPEN"})
+}
+
+func TestIssueList_disabledIssues(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {	"repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueListCmd, "issue list")
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
 }
 
 func TestIssueView(t *testing.T) {
@@ -225,7 +264,8 @@ func TestIssueCreate(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
-			"id": "REPOID"
+			"id": "REPOID",
+			"hasIssuesEnabled": true
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -256,6 +296,23 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_disabledIssues(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": false
+		} } }
+	`))
+
+	_, err := RunCommand(issueCreateCmd, `issue create -t heres -b johnny`)
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
 }
 
 func TestIssueCreate_web(t *testing.T) {
