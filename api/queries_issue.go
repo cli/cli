@@ -41,16 +41,8 @@ const fragments = `
 	}
 `
 
-func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*Issue, error) {
-	repo, err := GitHubRepo(client, ghRepo)
-	if err != nil {
-		return nil, err
-	}
-
-	if !repo.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", ghRepo.RepoOwner(), ghRepo.RepoName())
-	}
-
+// IssueCreate creates an issue in a GitHub repository
+func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
 	query := `
 	mutation CreateIssue($input: CreateIssueInput!) {
 		createIssue(input: $input) {
@@ -76,7 +68,7 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 		}
 	}{}
 
-	err = client.GraphQL(query, variables, &result)
+	err := client.GraphQL(query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
