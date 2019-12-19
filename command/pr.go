@@ -436,7 +436,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 func printPrs(w io.Writer, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
