@@ -32,9 +32,6 @@ async function main() {
   }
 
   for (const asset of release.assets) {
-    if (!(asset.name.match(/macOS/) || asset.name.match(/darwin/)) && !asset.name.match(/linux/)) {
-      continue
-    }
     const filePath = await downloadAsset(asset)
     for (const existingAsset of publicRelease.assets) {
       if (existingAsset.name == asset.name) {

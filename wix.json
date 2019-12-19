@@ -1,0 +1,32 @@
+{
+  "product": "GitHub CLI",
+  "company": "GitHub, Inc.",
+  "license": "LICENSE",
+  "upgrade-code": "7c0a5736-5b8e-4176-b350-613fa2d8a1b3",
+  "files": {
+    "guid": "6e6dcb19-3cf6-46d1-ac56-c6fb39485c9d",
+    "items": [
+      "bin/gh.exe"
+    ]
+  },
+  "env": {
+    "guid": "94faac3d-4478-431c-8497-fba55dcfb249",
+    "vars": [
+      {
+        "name": "PATH",
+        "value": "[INSTALLDIR]",
+        "permanent": "yes",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      }
+    ]
+  },
+  "shortcuts": {},
+  "choco": {
+    "description": "Use GitHub from the CLI",
+    "project-url": "https://github.com/github/gh-cli",
+    "tags": "github cli git",
+    "license-url": "https://github.com/github/gh-cli/blob/master/LICENSE"
+  }
+}
