@@ -45,11 +45,11 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {
-		"assigned": { "issues": { "nodes": [] } },
-		"mentioned": { "issues": { "nodes": [] } },
-		"authored": { "issues": { "nodes": [] } }
-	} }
+	{ "data": { "repository": {
+		"assigned": { "nodes": [] },
+		"mentioned": { "nodes": [] },
+		"authored": { "nodes": [] }
+	} } }
 	`))
 
 	output, err := RunCommand(issueStatusCmd, "issue status")
