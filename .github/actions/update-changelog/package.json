@@ -1,0 +1,18 @@
+{
+  "license": "ISC",
+  "scripts": {
+    "build": "rm -rf lib && ncc build -s src/index.ts -o lib"
+  },
+  "dependencies": {
+    "@actions/core": "^1.2.0",
+    "@actions/github": "^2.0.0"
+  },
+  "devDependencies": {
+    "@zeit/ncc": "^0.20.5"
+  },
+  "prettier": {
+    "trailingComma": "es5",
+    "semi": false,
+    "singleQuote": true
+  }
+}
