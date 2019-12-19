@@ -42,9 +42,13 @@ const fragments = `
 `
 
 func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*Issue, error) {
-	repoID, err := GitHubRepoId(client, ghRepo)
+	repo, err := GitHubRepo(client, ghRepo)
 	if err != nil {
 		return nil, err
+	}
+
+	if !repo.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", ghRepo.RepoOwner(), ghRepo.RepoName())
 	}
 
 	query := `
@@ -57,7 +61,7 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 	}`
 
 	inputParams := map[string]interface{}{
-		"repositoryId": repoID,
+		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
 		inputParams[key] = val

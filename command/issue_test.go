@@ -231,7 +231,8 @@ func TestIssueCreate(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
-			"id": "REPOID"
+			"id": "REPOID",
+			"hasIssuesEnabled": true
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
