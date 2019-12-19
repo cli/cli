@@ -26,12 +26,6 @@ type IssueLabel struct {
 	Name string
 }
 
-type apiIssues struct {
-	Issues struct {
-		Nodes []Issue
-	}
-}
-
 const fragments = `
 	fragment issue on Issue {
 		number
@@ -88,36 +82,39 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 
 func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
 	type response struct {
-		Assigned  apiIssues
-		Mentioned apiIssues
-		Authored  apiIssues
+		Repository struct {
+			Assigned struct {
+				Nodes []Issue
+			}
+			Mentioned struct {
+				Nodes []Issue
+			}
+			Authored struct {
+				Nodes []Issue
+			}
+		}
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
-      assigned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-		    ...issue
-          }
-        }
-      }
-      mentioned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-            ...issue
-          }
-        }
-      }
-      authored: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-            ...issue
-          }
-        }
-      }
-    }
-  `
+	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
+		repository(owner: $owner, name: $repo) {
+			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+			mentioned: issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+			authored: issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+		}
+    }`
 
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
@@ -134,9 +131,9 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	}
 
 	payload := IssuesPayload{
-		Assigned:  resp.Assigned.Issues.Nodes,
-		Mentioned: resp.Mentioned.Issues.Nodes,
-		Authored:  resp.Authored.Issues.Nodes,
+		Assigned:  resp.Repository.Assigned.Nodes,
+		Mentioned: resp.Repository.Mentioned.Nodes,
+		Authored:  resp.Repository.Authored.Nodes,
 	}
 
 	return &payload, nil
@@ -192,7 +189,11 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 	}
 
 	var resp struct {
-		Repository apiIssues
+		Repository struct {
+			Issues struct {
+				Nodes []Issue
+			}
+		}
 	}
 
 	err := client.GraphQL(query, variables, &resp)
