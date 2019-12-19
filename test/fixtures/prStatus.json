@@ -27,8 +27,7 @@
           "headRefName": "strawberries"
         }
       }
-    ],
-    "pageInfo": { "hasNextPage": false }
+    ]
   },
   "reviewRequested": {
     "edges": [
@@ -48,7 +47,6 @@
           "headRefName": "figs"
         }
       }
-    ],
-    "pageInfo": { "hasNextPage": false }
+    ]
   }
 }}
