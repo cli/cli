@@ -366,7 +366,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
-	repoID, err := GitHubRepoId(client, ghRepo)
+	repo, err := GitHubRepo(client, ghRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +381,7 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 	}`
 
 	inputParams := map[string]interface{}{
-		"repositoryId": repoID,
+		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
 		inputParams[key] = val
