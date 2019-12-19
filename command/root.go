@@ -23,7 +23,7 @@ func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
 	RootCmd.AddCommand(versionCmd)
 
-	RootCmd.PersistentFlags().StringP("repo", "R", "", "Current GitHub repository")
+	RootCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
 	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
 	RootCmd.Flags().Bool("version", false, "Print gh version")
 	// TODO:
