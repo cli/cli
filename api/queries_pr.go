@@ -126,10 +126,6 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 		Edges []struct {
 			Node PullRequest
 		}
-		PageInfo struct {
-			HasNextPage bool
-			EndCursor   string
-		}
 	}
 
 	type response struct {
@@ -207,18 +203,12 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
             ...prWithReviews
           }
         }
-        pageInfo {
-          hasNextPage
-        }
       }
       reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
         edges {
           node {
             ...pr
           }
-        }
-        pageInfo {
-          hasNextPage
         }
       }
     }
