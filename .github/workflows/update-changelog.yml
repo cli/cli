@@ -11,8 +11,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
-      - name: Pull request merged
+      - name: Update the changelog
         if: github.event.pull_request.merged == true
-        uses: ./.github/actions/changelog
+        uses: ./.github/actions/update-changelog
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
