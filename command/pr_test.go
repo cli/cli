@@ -95,6 +95,34 @@ func TestPRStatus(t *testing.T) {
 	}
 }
 
+func TestPRStatus_blankSlate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {} }
+	`))
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := `Current branch
+  There is no pull request associated with [blueberries]
+
+Created by you
+  You have no open pull requests
+
+Requesting a code review from you
+  You have no pull requests to review
+
+`
+	if output.String() != expected {
+		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
 func TestPRList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
