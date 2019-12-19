@@ -19,7 +19,7 @@ async function main() {
     github.context.payload.pull_request &&
     github.context.payload.pull_request.title
   const { changelog, sha } = await getChangelog()
-  const updatedChangelog = { draft: [title, ...changelog.draft], ...changelog }
+  const updatedChangelog = { ...changelog, draft: [title, ...changelog.draft] }
   await commitChangelog(updatedChangelog, sha)
 }
 
