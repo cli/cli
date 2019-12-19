@@ -92,12 +92,14 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 			Authored struct {
 				Nodes []Issue
 			}
+			HasIssuesEnabled bool
 		}
 	}
 
 	query := fragments + `
 	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
 			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
 				nodes {
 					...issue
@@ -128,6 +130,10 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
 	}
 
 	payload := IssuesPayload{
@@ -168,6 +174,7 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 	query := fragments + `
     query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
+		hasIssuesEnabled
         issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
           nodes {
             ...issue
@@ -193,12 +200,17 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 			Issues struct {
 				Nodes []Issue
 			}
+			HasIssuesEnabled bool
 		}
 	}
 
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
 	}
 
 	return resp.Repository.Issues.Nodes, nil
