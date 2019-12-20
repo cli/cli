@@ -1,7 +1,8 @@
 {
   "data": {
-    "assigned": {
-      "issues": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "assigned": {
         "nodes": [
           {
               "number": 9,
@@ -12,10 +13,8 @@
               "title": "broccoli is a superfood"
           }
         ]
-      }
-    },
-    "mentioned": {
-      "issues": {
+      },
+      "mentioned": {
         "nodes": [
           {
               "number": 8,
@@ -26,14 +25,10 @@
               "title": "swiss chard is neutral"
           }
         ]
-      }
-    },
-    "authored": {
-      "issues": {
+      },
+      "authored": {
         "nodes": []
       }
-    },
-
-    "pageInfo": { "hasNextPage": false }
+    }
   }
 }

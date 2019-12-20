@@ -126,10 +126,6 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 		Edges []struct {
 			Node PullRequest
 		}
-		PageInfo struct {
-			HasNextPage bool
-			EndCursor   string
-		}
 	}
 
 	type response struct {
@@ -207,18 +203,12 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
             ...prWithReviews
           }
         }
-        pageInfo {
-          hasNextPage
-        }
       }
       reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
         edges {
           node {
             ...pr
           }
-        }
-        pageInfo {
-          hasNextPage
         }
       }
     }
@@ -376,7 +366,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
-	repoID, err := GitHubRepoId(client, ghRepo)
+	repo, err := GitHubRepo(client, ghRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +381,7 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 	}`
 
 	inputParams := map[string]interface{}{
-		"repositoryId": repoID,
+		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
 		inputParams[key] = val

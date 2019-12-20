@@ -1,0 +1,93 @@
+{
+  "data":{
+    "repository": {
+      "pullRequests": {
+        "edges": []
+      }
+    },
+    "viewerCreated": {
+      "edges": [
+        {
+          "node": {
+            "number": 8,
+            "title": "Strawberries are not actually berries",
+            "url": "https://github.com/github/gh-cli/pull/8",
+            "headRefName": "strawberries",
+            "reviewDecision": "CHANGES_REQUESTED",
+            "commits": {
+              "nodes": [{
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [{
+                        "state": "SUCCESS"
+                      }]
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 7,
+            "title": "Bananas are berries",
+            "url": "https://github.com/github/gh-cli/pull/7",
+            "headRefName": "banananana",
+            "reviewDecision": "APPROVED",
+            "commits": {
+              "nodes": [{
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [{
+                        "status": "IN_PROGRESS",
+                        "conclusion": ""
+                      }]
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 6,
+            "title": "Avocado is probably not a berry",
+            "url": "https://github.com/github/gh-cli/pull/6",
+            "headRefName": "avo",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "commits": {
+              "nodes": [{
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "status": "IN_PROGRESS",
+                          "conclusion": ""
+                        },
+                        {
+                          "state": "FAILURE"
+                        },
+                        {
+                          "status": "COMPLETED",
+                          "conclusion": "NEUTRAL"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        }
+      ]
+    },
+    "reviewRequested": {
+      "edges": []
+    }
+  }
+}
