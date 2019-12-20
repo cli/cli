@@ -21,6 +21,7 @@ func Find(rootDir string, name string) []string {
 		path.Join(rootDir, "docs"),
 	}
 
+mainLoop:
 	for _, dir := range candidateDirs {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
@@ -40,7 +41,7 @@ func Find(rootDir string, name string) []string {
 					}
 				}
 				if len(results) > 0 {
-					goto done
+					break mainLoop
 				}
 				break
 			}
@@ -54,11 +55,10 @@ func Find(rootDir string, name string) []string {
 			}
 		}
 		if len(results) > 0 {
-			goto done
+			break
 		}
 	}
 
-done:
 	sort.Sort(sort.StringSlice(results))
 	return results
 }
