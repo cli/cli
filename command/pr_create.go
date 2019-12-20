@@ -45,7 +45,15 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableOut(cmd), "\nCreating pull request for %s in %s/%s\n\n", utils.Cyan(head), repo.RepoOwner(), repo.RepoName())
+	target, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
+	if target == "" {
+		target = "master"
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n", utils.Cyan(head), utils.Cyan(target), repo.RepoOwner(), repo.RepoName())
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
 		return err
