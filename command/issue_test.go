@@ -133,7 +133,11 @@ func TestIssueList_withFlags(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "No issues match your search\n")
+	eq(t, output.Stderr(), `
+Issues for OWNER/REPO
+
+No issues match your search
+`)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
