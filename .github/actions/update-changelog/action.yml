@@ -1,0 +1,6 @@
+name: 'Create a changelog'
+description: 'Create a changelog draft based on merged PR titles'
+author: 'probablycorey'
+runs:
+  using: 'node12'
+  main: './lib/index.js'

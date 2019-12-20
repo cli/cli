@@ -1,16 +1,28 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
 
-func GitHubRepoId(client *Client, ghRepo Repo) (string, error) {
+	"github.com/pkg/errors"
+)
+
+// Repository contains information about a GitHub repo
+type Repository struct {
+	ID               string
+	HasIssuesEnabled bool
+}
+
+// GitHubRepo looks up the node ID of a named repository
+func GitHubRepo(client *Client, ghRepo Repo) (*Repository, error) {
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
 
 	query := `
-		query FindRepoID($owner:String!, $name:String!) {
-			repository(owner:$owner, name:$name) {
-				id
-			}
+	query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			id
+			hasIssuesEnabled
+		}
 	}`
 	variables := map[string]interface{}{
 		"owner": owner,
@@ -18,14 +30,17 @@ func GitHubRepoId(client *Client, ghRepo Repo) (string, error) {
 	}
 
 	result := struct {
-		Repository struct {
-			Id string
-		}
+		Repository Repository
 	}{}
 	err := client.GraphQL(query, variables, &result)
-	if err != nil || result.Repository.Id == "" {
-		return "", fmt.Errorf("failed to determine GH repo ID: %s", err)
+
+	if err != nil || result.Repository.ID == "" {
+		newErr := fmt.Errorf("failed to determine repository ID for '%s/%s'", owner, repo)
+		if err != nil {
+			newErr = errors.Wrap(err, newErr.Error())
+		}
+		return nil, newErr
 	}
 
-	return result.Repository.Id, nil
+	return &result.Repository, nil
 }

@@ -1,0 +1,18 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Update the changelog
+        if: github.event.pull_request.merged == true
+        uses: ./.github/actions/update-changelog
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

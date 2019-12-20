@@ -26,12 +26,6 @@ type IssueLabel struct {
 	Name string
 }
 
-type apiIssues struct {
-	Issues struct {
-		Nodes []Issue
-	}
-}
-
 const fragments = `
 	fragment issue on Issue {
 		number
@@ -47,12 +41,8 @@ const fragments = `
 	}
 `
 
-func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*Issue, error) {
-	repoID, err := GitHubRepoId(client, ghRepo)
-	if err != nil {
-		return nil, err
-	}
-
+// IssueCreate creates an issue in a GitHub repository
+func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
 	query := `
 	mutation CreateIssue($input: CreateIssueInput!) {
 		createIssue(input: $input) {
@@ -63,7 +53,7 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 	}`
 
 	inputParams := map[string]interface{}{
-		"repositoryId": repoID,
+		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
 		inputParams[key] = val
@@ -78,7 +68,7 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 		}
 	}{}
 
-	err = client.GraphQL(query, variables, &result)
+	err := client.GraphQL(query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -88,36 +78,41 @@ func IssueCreate(client *Client, ghRepo Repo, params map[string]interface{}) (*I
 
 func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
 	type response struct {
-		Assigned  apiIssues
-		Mentioned apiIssues
-		Authored  apiIssues
+		Repository struct {
+			Assigned struct {
+				Nodes []Issue
+			}
+			Mentioned struct {
+				Nodes []Issue
+			}
+			Authored struct {
+				Nodes []Issue
+			}
+			HasIssuesEnabled bool
+		}
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
-      assigned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-		    ...issue
-          }
-        }
-      }
-      mentioned: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-            ...issue
-          }
-        }
-      }
-      authored: repository(owner: $owner, name: $repo) {
-        issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
-          nodes {
-            ...issue
-          }
-        }
-      }
-    }
-  `
+	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+			mentioned: issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+			authored: issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				nodes {
+					...issue
+				}
+			}
+		}
+    }`
 
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
@@ -133,10 +128,14 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 		return nil, err
 	}
 
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
+	}
+
 	payload := IssuesPayload{
-		Assigned:  resp.Assigned.Issues.Nodes,
-		Mentioned: resp.Mentioned.Issues.Nodes,
-		Authored:  resp.Authored.Issues.Nodes,
+		Assigned:  resp.Repository.Assigned.Nodes,
+		Mentioned: resp.Repository.Mentioned.Nodes,
+		Authored:  resp.Repository.Authored.Nodes,
 	}
 
 	return &payload, nil
@@ -155,22 +154,10 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
-	// If you don't want to filter by lables, graphql requires you need
-	// to send nil instead of an empty array.
-	if len(labels) == 0 {
-		labels = nil
-	}
-
-	var assignee interface{}
-	if len(assigneeString) > 0 {
-		assignee = assigneeString
-	} else {
-		assignee = nil
-	}
-
 	query := fragments + `
     query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
+		hasIssuesEnabled
         issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
           nodes {
             ...issue
@@ -183,21 +170,34 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
 	variables := map[string]interface{}{
-		"limit":    limit,
-		"owner":    owner,
-		"repo":     repo,
-		"states":   states,
-		"labels":   labels,
-		"assignee": assignee,
+		"limit":  limit,
+		"owner":  owner,
+		"repo":   repo,
+		"states": states,
+	}
+	if len(labels) > 0 {
+		variables["labels"] = labels
+	}
+	if assigneeString != "" {
+		variables["assignee"] = assigneeString
 	}
 
 	var resp struct {
-		Repository apiIssues
+		Repository struct {
+			Issues struct {
+				Nodes []Issue
+			}
+			HasIssuesEnabled bool
+		}
 	}
 
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
 	}
 
 	return resp.Repository.Issues.Nodes, nil

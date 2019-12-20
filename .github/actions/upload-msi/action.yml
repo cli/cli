@@ -1,0 +1,5 @@
+name: 'Upload MSI'
+description: 'Upload gh.msi to both homebrew-gh and gh-cli releases'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'

@@ -1,6 +1,7 @@
 {
   "data": {
     "repository": {
+      "hasIssuesEnabled": true,
       "issues": {
         "nodes": [
           {
