@@ -2,7 +2,7 @@ name: Go
 on: [push]
 jobs:
   build-linux:
-    name: Build
+    name: Linux Build
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.13
@@ -22,7 +22,7 @@ jobs:
           go test ./...
           go build -v .
   build-windows:
-    name: Build
+    name: Windows Build
     runs-on: windows-latest
     steps:
       - name: Set up Go 1.13
@@ -42,7 +42,7 @@ jobs:
           go test ./...
           go build -v .
   build-macos:
-    name: Build
+    name: MacOS Build
     runs-on: macos-latest
     steps:
       - name: Set up Go 1.13
