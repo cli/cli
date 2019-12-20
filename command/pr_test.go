@@ -50,12 +50,14 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 	cmd.SetErr(&errBuf)
 
 	// Reset flag values so they don't leak between tests
+	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		switch v := f.Value.(type) {
 		case pflag.SliceValue:
 			v.Replace([]string{})
 		default:
-			if v.Type() == "bool" {
+			switch v.Type() {
+			case "bool", "string":
 				v.Set(f.DefValue)
 			}
 		}
