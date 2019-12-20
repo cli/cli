@@ -154,19 +154,6 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
-	// If you don't want to filter by lables, graphql requires you need
-	// to send nil instead of an empty array.
-	if len(labels) == 0 {
-		labels = nil
-	}
-
-	var assignee interface{}
-	if len(assigneeString) > 0 {
-		assignee = assigneeString
-	} else {
-		assignee = nil
-	}
-
 	query := fragments + `
     query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
@@ -183,12 +170,16 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 	owner := ghRepo.RepoOwner()
 	repo := ghRepo.RepoName()
 	variables := map[string]interface{}{
-		"limit":    limit,
-		"owner":    owner,
-		"repo":     repo,
-		"states":   states,
-		"labels":   labels,
-		"assignee": assignee,
+		"limit":  limit,
+		"owner":  owner,
+		"repo":   repo,
+		"states": states,
+	}
+	if len(labels) > 0 {
+		variables["labels"] = labels
+	}
+	if assigneeString != "" {
+		variables["assignee"] = assigneeString
 	}
 
 	var resp struct {
