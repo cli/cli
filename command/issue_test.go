@@ -150,6 +150,34 @@ func TestIssueList_withFlags(t *testing.T) {
 	eq(t, reqBody.Variables.States, []string{"OPEN"})
 }
 
+func TestIssueList_nullAssigneeLabels(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {	"repository": {
+		"hasIssuesEnabled": true,
+		"issues": { "nodes": [] }
+	} } }
+	`))
+
+	_, err := RunCommand(issueListCmd, "issue list")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables map[string]interface{}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	_, assigneeDeclared := reqBody.Variables["assignee"]
+	_, labelsDeclared := reqBody.Variables["labels"]
+	eq(t, assigneeDeclared, false)
+	eq(t, labelsDeclared, false)
+}
+
 func TestIssueList_disabledIssues(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
