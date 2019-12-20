@@ -137,7 +137,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableOut(cmd), "\nPull requests for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
