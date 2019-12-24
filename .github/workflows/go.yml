@@ -1,4 +1,4 @@
-name: Go
+name: Tests
 on: [push]
 jobs:
   build-linux:
