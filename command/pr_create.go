@@ -8,6 +8,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -71,7 +72,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body)
+		var templateFiles []string
+		if rootDir, err := git.ToplevelDir(); err == nil {
+			// TODO: figure out how to stub this in tests
+			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+		}
+
+		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}

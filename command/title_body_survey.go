@@ -2,7 +2,9 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -44,8 +46,44 @@ func confirm() (int, error) {
 	return confirmAnswers.Confirmation, nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string) (*titleBody, error) {
+func selectTemplate(templatePaths []string) (string, error) {
+	templateResponse := struct {
+		Index int
+	}{}
+	if len(templatePaths) > 1 {
+		templateNames := []string{}
+		for _, p := range templatePaths {
+			templateNames = append(templateNames, githubtemplate.ExtractName(p))
+		}
+
+		selectQs := []*survey.Question{
+			{
+				Name: "index",
+				Prompt: &survey.Select{
+					Message: "Choose a template",
+					Options: templateNames,
+				},
+			},
+		}
+		if err := survey.Ask(selectQs, &templateResponse); err != nil {
+			return "", errors.Wrap(err, "could not prompt")
+		}
+	}
+
+	templateContents := githubtemplate.ExtractContents(templatePaths[templateResponse.Index])
+	return string(templateContents), nil
+}
+
+func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string, templatePaths []string) (*titleBody, error) {
 	inProgress := titleBody{}
+
+	if providedBody == "" && len(templatePaths) > 0 {
+		templateContents, err := selectTemplate(templatePaths)
+		if err != nil {
+			return nil, err
+		}
+		inProgress.Body = templateContents
+	}
 
 	confirmed := false
 	editor := determineEditor()
@@ -64,6 +102,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 				Message:       fmt.Sprintf("Body (%s)", editor),
 				FileName:      "*.md",
 				Default:       inProgress.Body,
+				HideDefault:   true,
 				AppendDefault: true,
 				Editor:        editor,
 			},

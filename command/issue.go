@@ -3,13 +3,14 @@ package command
 import (
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -241,11 +242,16 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	var templateFiles []string
+	if rootDir, err := git.ToplevelDir(); err == nil {
+		// TODO: figure out how to stub this in tests
+		templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/%s/issues/new", baseRepo.RepoOwner(), baseRepo.RepoName())
-		// TODO: figure out how to stub this in tests
-		if stat, err := os.Stat(".github/ISSUE_TEMPLATE"); err == nil && stat.IsDir() {
+		if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
 		cmd.Printf("Opening %s in your browser.\n", openURL)
@@ -277,7 +283,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body)
+		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}
