@@ -1,49 +1,12 @@
 name: Tests
 on: [push]
 jobs:
-  build-linux:
-    name: Linux Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.13
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.13
-        id: go
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-
-      - name: Verify dependencies
-        run: go mod verify
-
-      - name: Build
-        run: |
-          go test ./...
-          go build -v .
-  build-windows:
-    name: Windows Build
-    runs-on: windows-latest
-    steps:
-      - name: Set up Go 1.13
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.13
-        id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-
-      - name: Verify dependencies
-        run: go mod verify
-
-      - name: Build
-        run: |
-          go test ./...
-          go build -v .
-  build-macos:
-    name: MacOS Build
-    runs-on: macos-latest
     steps:
       - name: Set up Go 1.13
         uses: actions/setup-go@v1
