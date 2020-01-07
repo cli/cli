@@ -1,13 +1,35 @@
 package utils
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
 	"runtime"
 
 	"github.com/kballard/go-shellquote"
+	md "github.com/tj/go-termd"
 )
+
+var mdCompiler md.Compiler
+
+func init() {
+	mdCompiler = md.Compiler{
+		Columns: 100,
+		SyntaxHighlighter: md.SyntaxTheme{
+			"keyword": md.Style{Color: "#9196ed"},
+			"comment": md.Style{
+				Color: "#c0c0c2",
+			},
+			"literal": md.Style{
+				Color: "#aaedf7",
+			},
+			"name": md.Style{
+				Color: "#fe8eb5",
+			},
+		},
+	}
+}
 
 func OpenInBrowser(url string) error {
 	browser := os.Getenv("BROWSER")
@@ -50,4 +72,20 @@ func searchBrowserLauncher(goos string) (browser string) {
 	}
 
 	return browser
+}
+
+func normalizeNewlines(d []byte) []byte {
+	// from https://github.com/MichaelMure/go-term-markdown/issues/1#issuecomment-570702862
+	// replace CR LF \r\n (windows) with LF \n (unix)
+	d = bytes.Replace(d, []byte{13, 10}, []byte{10}, -1)
+	// replace CF \r (mac) with LF \n (unix)
+	d = bytes.Replace(d, []byte{13}, []byte{10}, -1)
+	return d
+}
+
+func RenderMarkdown(text string) string {
+	textB := []byte(text)
+	textB = normalizeNewlines(textB)
+
+	return mdCompiler.Compile(string(textB))
 }
