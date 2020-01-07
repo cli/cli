@@ -12,7 +12,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Set up Go 1.13
-        id: go
         uses: actions/setup-go@v1
         with:
           go-version: 1.13
@@ -32,7 +31,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Set up Go 1.13
-        id: go
         uses: actions/setup-go@v1
         with:
           go-version: 1.13
