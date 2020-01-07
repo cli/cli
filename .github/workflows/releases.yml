@@ -49,14 +49,16 @@ jobs:
         with:
           exe: ${{ steps.download_exe.outputs.exe }}
       - name: Obtain signing cert
+        id: obtain_cert
         env:
           DESKTOP_CERT_TOKEN: ${{ secrets.DESKTOP_CERT_TOKEN }}
-        run: .\setup-windows-certificate.ps1
-        shell: powershell
+        run: .\script\setup-windows-certificate.ps1
       - name: Sign MSI
         env:
           GITHUB_CERT_PASSWORD: ${{ secrets.GITHUB_CERT_PASSWORD }}
-        run: .\sign.ps1 -Certificate "windows-certificate.pfx" -Executable "${{ steps.buildmsi.outputs.msi }}"
+        run: |
+          .\script\sign.ps1 -Certificate "${{ steps.obtain_cert.outputs.cert-file }}" `
+            -Executable "${{ steps.buildmsi.outputs.msi }}"
       - name: Upload MSI
         uses: ./.github/actions/upload-msi
         env:
