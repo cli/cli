@@ -31,6 +31,8 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+
+	prViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in termianl")
 }
 
 var prCmd = &cobra.Command{
@@ -251,6 +253,11 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	preview, err := cmd.Flags().GetBool("preview")
+	if err != nil {
+		return err
+	}
+
 	var openURL string
 	if len(args) > 0 {
 		pr, err := prFromArg(apiClient, baseRepo, args[0])
@@ -280,8 +287,12 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-	return utils.OpenInBrowser(openURL)
+	if preview {
+		// TODO need to have actually fetched PR title/body
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+	}
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
