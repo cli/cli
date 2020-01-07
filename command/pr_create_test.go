@@ -116,7 +116,11 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
+	eq(t, output.Stderr(), `
+Creating pull request for feature into master in OWNER/REPO
+
+Opening https://github.com/OWNER/REPO/pull/feature in your browser.
+`)
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
@@ -155,5 +159,9 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
-	eq(t, output.Stderr(), "Warning: 1 uncommitted change\n")
+	eq(t, output.Stderr(), `Warning: 1 uncommitted change
+
+Creating pull request for feature into master in OWNER/REPO
+
+`)
 }
