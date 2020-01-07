@@ -104,6 +104,8 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+
 	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
@@ -241,6 +243,8 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
 
 	var templateFiles []string
 	if rootDir, err := git.ToplevelDir(); err == nil {
