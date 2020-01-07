@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// LOL HI
+
 func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
