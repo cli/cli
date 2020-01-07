@@ -172,8 +172,8 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	printHeader(out, "Issues assigned to you")
-	if len(issuePayload.Assigned) > 0 {
-		printIssues(out, "  ", issuePayload.Assigned...)
+	if issuePayload.Assigned.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := fmt.Sprintf("  There are no issues assigned to you")
 		printMessage(out, message)
@@ -181,16 +181,16 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out)
 
 	printHeader(out, "Issues mentioning you")
-	if len(issuePayload.Mentioned) > 0 {
-		printIssues(out, "  ", issuePayload.Mentioned...)
+	if issuePayload.Mentioned.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
 		printMessage(out, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
 	printHeader(out, "Issues opened by you")
-	if len(issuePayload.Authored) > 0 {
-		printIssues(out, "  ", issuePayload.Authored...)
+	if issuePayload.Authored.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
 		printMessage(out, "  There are no issues opened by you")
 	}
@@ -318,7 +318,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
+func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
 		coloredLabels := labelList(issue)
@@ -326,6 +326,10 @@ func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
 		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, replaceExcessiveWhitespace(issue.Title)), coloredLabels)
+	}
+	remaining := totalCount - len(issues)
+	if remaining > 0 {
+		fmt.Fprintf(w, utils.Gray("%sAnd %d more"), prefix, remaining)
 	}
 }
 

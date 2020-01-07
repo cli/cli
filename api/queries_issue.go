@@ -5,9 +5,14 @@ import (
 )
 
 type IssuesPayload struct {
-	Assigned  []Issue
-	Mentioned []Issue
-	Authored  []Issue
+	Assigned  IssuesAndTotalCount
+	Mentioned IssuesAndTotalCount
+	Authored  IssuesAndTotalCount
+}
+
+type IssuesAndTotalCount struct {
+	Issues     []Issue
+	TotalCount int
 }
 
 type Issue struct {
@@ -80,13 +85,16 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	type response struct {
 		Repository struct {
 			Assigned struct {
-				Nodes []Issue
+				TotalCount int
+				Nodes      []Issue
 			}
 			Mentioned struct {
-				Nodes []Issue
+				TotalCount int
+				Nodes      []Issue
 			}
 			Authored struct {
-				Nodes []Issue
+				TotalCount int
+				Nodes      []Issue
 			}
 			HasIssuesEnabled bool
 		}
@@ -97,16 +105,19 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				totalCount
 				nodes {
 					...issue
 				}
 			}
 			mentioned: issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				totalCount
 				nodes {
 					...issue
 				}
 			}
 			authored: issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+				totalCount
 				nodes {
 					...issue
 				}
@@ -133,9 +144,18 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	}
 
 	payload := IssuesPayload{
-		Assigned:  resp.Repository.Assigned.Nodes,
-		Mentioned: resp.Repository.Mentioned.Nodes,
-		Authored:  resp.Repository.Authored.Nodes,
+		Assigned: IssuesAndTotalCount{
+			Issues:     resp.Repository.Assigned.Nodes,
+			TotalCount: resp.Repository.Assigned.TotalCount,
+		},
+		Mentioned: IssuesAndTotalCount{
+			Issues:     resp.Repository.Mentioned.Nodes,
+			TotalCount: resp.Repository.Mentioned.TotalCount,
+		},
+		Authored: IssuesAndTotalCount{
+			Issues:     resp.Repository.Authored.Nodes,
+			TotalCount: resp.Repository.Authored.TotalCount,
+		},
 	}
 
 	return &payload, nil
