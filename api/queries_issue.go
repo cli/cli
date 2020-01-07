@@ -16,10 +16,17 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Number int
-	Title  string
-	URL    string
-	State  string
+	Number   int
+	Title    string
+	URL      string
+	State    string
+	Body     string
+	Comments struct {
+		TotalCount int
+	}
+	Author struct {
+		Login string
+	}
 
 	Labels struct {
 		Nodes      []IssueLabel
@@ -234,6 +241,19 @@ func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
 	query($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			issue(number: $issue_number) {
+				title
+				body
+				author {
+					login
+				}
+				comments {
+					totalCount
+				}
+				labels(first: 3) {
+					nodes {
+						name
+					}
+				}
 				number
 				url
 			}

@@ -31,6 +31,8 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+
+	prViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in termianl")
 }
 
 var prCmd = &cobra.Command{
@@ -253,9 +255,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	preview, err := cmd.Flags().GetBool("preview")
+	if err != nil {
+		return err
+	}
+
 	var openURL string
+	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err := prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -269,7 +277,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
 		} else {
-			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
 				var notFoundErr *api.NotFoundError
 				if errors.As(err, &notFoundErr) {
@@ -282,8 +290,31 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-	return utils.OpenInBrowser(openURL)
+	if preview {
+		meta := "%s wants to merge %d commit"
+		if pr.Commits.TotalCount == 1 {
+			meta += " "
+		} else {
+			meta += "s "
+		}
+		meta += "into %s from %s"
+		fmt.Println(utils.Bold(pr.Title))
+		fmt.Println(utils.Gray(fmt.Sprintf(meta,
+			pr.Author.Login,
+			pr.Commits.TotalCount,
+			pr.BaseRefName,
+			pr.HeadRefName,
+		)))
+		fmt.Println()
+		fmt.Println(utils.RenderMarkdown(pr.Body))
+		fmt.Println()
+		fmt.Println(utils.Gray(fmt.Sprintf("View this PR on GitHub: %s", openURL)))
+
+		return nil
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+	}
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)

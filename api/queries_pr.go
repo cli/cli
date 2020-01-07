@@ -21,8 +21,13 @@ type PullRequest struct {
 	Title       string
 	State       string
 	URL         string
+	BaseRefName string
 	HeadRefName string
+	Body        string
 
+	Author struct {
+		Login string
+	}
 	HeadRepositoryOwner struct {
 		Login string
 	}
@@ -38,7 +43,8 @@ type PullRequest struct {
 	ReviewDecision string
 
 	Commits struct {
-		Nodes []struct {
+		TotalCount int
+		Nodes      []struct {
 			Commit struct {
 				StatusCheckRollup struct {
 					Contexts struct {
@@ -296,6 +302,15 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 			pullRequest(number: $pr_number) {
 				url
 				number
+				title
+				body
+				author {
+				  login
+				}
+				commits {
+				  totalCount
+				}
+				baseRefName
 				headRefName
 				headRepositoryOwner {
 					login
@@ -343,7 +358,15 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 				nodes {
 					number
 					title
+					body
+					author {
+						login
+					}
+					commits {
+						totalCount
+					}
 					url
+					baseRefName
 					headRefName
 					headRepositoryOwner {
 						login
