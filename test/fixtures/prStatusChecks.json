@@ -1,11 +1,13 @@
 {
-  "data":{
+  "data": {
     "repository": {
       "pullRequests": {
+        "totalCount": 0,
         "edges": []
       }
     },
     "viewerCreated": {
+      "totalCount": 3,
       "edges": [
         {
           "node": {
@@ -15,17 +17,21 @@
             "headRefName": "strawberries",
             "reviewDecision": "CHANGES_REQUESTED",
             "commits": {
-              "nodes": [{
-                "commit": {
-                  "statusCheckRollup": {
-                    "contexts": {
-                      "nodes": [{
-                        "state": "SUCCESS"
-                      }]
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "state": "SUCCESS"
+                          }
+                        ]
+                      }
                     }
                   }
                 }
-              }]
+              ]
             }
           }
         },
@@ -37,18 +43,22 @@
             "headRefName": "banananana",
             "reviewDecision": "APPROVED",
             "commits": {
-              "nodes": [{
-                "commit": {
-                  "statusCheckRollup": {
-                    "contexts": {
-                      "nodes": [{
-                        "status": "IN_PROGRESS",
-                        "conclusion": ""
-                      }]
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "status": "IN_PROGRESS",
+                            "conclusion": ""
+                          }
+                        ]
+                      }
                     }
                   }
                 }
-              }]
+              ]
             }
           }
         },
@@ -60,33 +70,36 @@
             "headRefName": "avo",
             "reviewDecision": "REVIEW_REQUIRED",
             "commits": {
-              "nodes": [{
-                "commit": {
-                  "statusCheckRollup": {
-                    "contexts": {
-                      "nodes": [
-                        {
-                          "status": "IN_PROGRESS",
-                          "conclusion": ""
-                        },
-                        {
-                          "state": "FAILURE"
-                        },
-                        {
-                          "status": "COMPLETED",
-                          "conclusion": "NEUTRAL"
-                        }
-                      ]
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "status": "IN_PROGRESS",
+                            "conclusion": ""
+                          },
+                          {
+                            "state": "FAILURE"
+                          },
+                          {
+                            "status": "COMPLETED",
+                            "conclusion": "NEUTRAL"
+                          }
+                        ]
+                      }
                     }
                   }
                 }
-              }]
+              ]
             }
           }
         }
       ]
     },
     "reviewRequested": {
+      "totalCount": 0,
       "edges": []
     }
   }
