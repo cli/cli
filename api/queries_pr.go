@@ -6,9 +6,14 @@ import (
 )
 
 type PullRequestsPayload struct {
-	ViewerCreated   []PullRequest
-	ReviewRequested []PullRequest
+	ViewerCreated   PullRequestAndTotalCount
+	ReviewRequested PullRequestAndTotalCount
 	CurrentPR       *PullRequest
+}
+
+type PullRequestAndTotalCount struct {
+	TotalCount   int
+	PullRequests []PullRequest
 }
 
 type PullRequest struct {
@@ -123,7 +128,8 @@ type Repo interface {
 
 func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
-		Edges []struct {
+		TotalCount int
+		Edges      []struct {
 			Node PullRequest
 		}
 	}
@@ -177,6 +183,7 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
+				totalCount
 				edges {
 					node {
 						...prWithReviews
@@ -198,6 +205,7 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 
 	query := fragments + queryPrefix + `
       viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+       totalCount: issueCount
         edges {
           node {
             ...prWithReviews
@@ -205,6 +213,7 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
         }
       }
       reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+        totalCount: issueCount
         edges {
           node {
             ...pr
@@ -260,9 +269,15 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	}
 
 	payload := PullRequestsPayload{
-		viewerCreated,
-		reviewRequested,
-		currentPR,
+		ViewerCreated: PullRequestAndTotalCount{
+			PullRequests: viewerCreated,
+			TotalCount:   resp.ViewerCreated.TotalCount,
+		},
+		ReviewRequested: PullRequestAndTotalCount{
+			PullRequests: reviewRequested,
+			TotalCount:   resp.ReviewRequested.TotalCount,
+		},
+		CurrentPR: currentPR,
 	}
 
 	return &payload, nil
