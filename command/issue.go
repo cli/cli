@@ -329,7 +329,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 	}
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("%sAnd %d more"), prefix, remaining)
+		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 
