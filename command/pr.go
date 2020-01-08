@@ -97,6 +97,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 
+	fmt.Printf("🌭 %+v\n", prPayload)
+
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
 		printPrs(out, *prPayload.CurrentPR)
@@ -107,16 +109,16 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out)
 
 	printHeader(out, "Created by you")
-	if len(prPayload.ViewerCreated) > 0 {
-		printPrs(out, prPayload.ViewerCreated...)
+	if prPayload.ViewerCreated.TotalCount > 0 {
+		printPrs(out, prPayload.ViewerCreated.PullRequests...)
 	} else {
 		printMessage(out, "  You have no open pull requests")
 	}
 	fmt.Fprintln(out)
 
 	printHeader(out, "Requesting a code review from you")
-	if len(prPayload.ReviewRequested) > 0 {
-		printPrs(out, prPayload.ReviewRequested...)
+	if prPayload.ReviewRequested.TotalCount > 0 {
+		printPrs(out, prPayload.ReviewRequested.PullRequests...)
 	} else {
 		printMessage(out, "  You have no pull requests to review")
 	}
