@@ -39,10 +39,3 @@ nfpms:
     formats:
       - deb
       - rpm
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
