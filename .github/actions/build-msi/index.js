@@ -42,7 +42,7 @@ async function go_msi(version, exePath) {
   console.log(`moving ${exePath} to bin/gh.exe`);
   fs.renameSync(exePath, path.join(binPath, 'gh.exe'));
 
-  const msiPath = path.join(cwd, 'gh.msi');
+  const msiPath = path.join(cwd, path.basename(exePath, '.exe') + '.msi');
 
   try {
     await exec.exec(
