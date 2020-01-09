@@ -1,9 +1,6 @@
 name: 'Build MSI'
 description: 'Build, sign, and release Windows installers using WiX'
 inputs:
-  version:
-    description: 'what version to use for the built MSI'
-    required: true
   exe:
     description: 'path to exe to wrap in MSI '
     required: true
