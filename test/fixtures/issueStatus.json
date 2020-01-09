@@ -3,30 +3,33 @@
     "repository": {
       "hasIssuesEnabled": true,
       "assigned": {
+        "totalCount": 2,
         "nodes": [
           {
-              "number": 9,
-              "title": "corey thinks squash tastes bad"
+            "number": 9,
+            "title": "corey thinks squash tastes bad"
           },
           {
-              "number": 10,
-              "title": "broccoli is a superfood"
+            "number": 10,
+            "title": "broccoli is a superfood"
           }
         ]
       },
       "mentioned": {
+        "totalCount": 2,
         "nodes": [
           {
-              "number": 8,
-              "title": "rabbits eat carrots"
+            "number": 8,
+            "title": "rabbits eat carrots"
           },
           {
-              "number": 11,
-              "title": "swiss chard is neutral"
+            "number": 11,
+            "title": "swiss chard is neutral"
           }
         ]
       },
       "authored": {
+        "totalCount": 0,
         "nodes": []
       }
     }
