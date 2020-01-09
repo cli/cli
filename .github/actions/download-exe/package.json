@@ -1,17 +1,15 @@
 {
-  "name": "download-exe",
-  "version": "1.0.0",
-  "description": "",
+  "private": true,
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "rm -rf dist && ncc build index.js -o dist"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@actions/core": "^1.2.0",
     "@actions/github": "^2.0.0",
     "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {
+    "@zeit/ncc": "^0.21.0"
   }
 }
