@@ -61,6 +61,8 @@ jobs:
             -Executable "${{ steps.buildmsi.outputs.msi }}"
       - name: Upload MSI
         uses: ./.github/actions/upload-msi
+        with:
+          msi-file: ${{ steps.buildmsi.outputs.msi }}
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
   releases:
