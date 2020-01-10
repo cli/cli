@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"runtime"
 
+	md "github.com/github/gh-cli/markdown"
 	"github.com/kballard/go-shellquote"
-	md "github.com/tj/go-termd"
 )
 
 var mdCompiler md.Compiler
