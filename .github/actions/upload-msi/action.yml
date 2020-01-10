@@ -1,5 +1,9 @@
 name: 'Upload MSI'
-description: 'Upload gh.msi to both homebrew-gh and gh-cli releases'
+description: 'Upload an additional asset to a release'
+inputs:
+  msi-file:
+    description: 'path to the MSI file to attach to a release'
+    required: true
 runs:
   using: 'node12'
   main: 'dist/index.js'
