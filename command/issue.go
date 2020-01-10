@@ -237,15 +237,17 @@ func issueView(cmd *cobra.Command, args []string) error {
 		}
 		meta += coloredLabels
 
-		fmt.Println(utils.Bold(issue.Title))
-		fmt.Println(utils.Gray(fmt.Sprintf(meta,
+		out := colorableOut(cmd)
+
+		fmt.Fprintln(out, utils.Bold(issue.Title))
+		fmt.Fprintln(out, utils.Gray(fmt.Sprintf(meta,
 			issue.Author.Login,
 			issue.Comments.TotalCount,
 		)))
-		fmt.Println()
-		fmt.Println(utils.RenderMarkdown(issue.Body))
-		fmt.Println()
-		fmt.Println(utils.Gray(fmt.Sprintf("View this issue on GitHub: %s", openURL)))
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), openURL)
 		return nil
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
