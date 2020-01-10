@@ -298,17 +298,20 @@ func prView(cmd *cobra.Command, args []string) error {
 			meta += "s "
 		}
 		meta += "into %s from %s"
-		fmt.Println(utils.Bold(pr.Title))
-		fmt.Println(utils.Gray(fmt.Sprintf(meta,
+
+		out := colorableOut(cmd)
+
+		fmt.Fprintln(out, utils.Bold(pr.Title))
+		fmt.Fprintln(out, utils.Gray(fmt.Sprintf(meta,
 			pr.Author.Login,
 			pr.Commits.TotalCount,
 			pr.BaseRefName,
 			pr.HeadRefName,
 		)))
-		fmt.Println()
-		fmt.Println(utils.RenderMarkdown(pr.Body))
-		fmt.Println()
-		fmt.Println(utils.Gray(fmt.Sprintf("View this PR on GitHub: %s", openURL)))
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, utils.Gray("View this PR on GitHub: %s\n"), openURL)
 
 		return nil
 	} else {

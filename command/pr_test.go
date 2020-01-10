@@ -238,6 +238,35 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	}
 }
 
+func TestPRView_preview(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prViewCmd, "pr view -p 12")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`Blueberries are from a fork`),
+		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`blueberries taste good`),
+		regexp.MustCompile(`View this PR on GitHub: https://github.com/OWNER/REPO/pull/12`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestPRView_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
