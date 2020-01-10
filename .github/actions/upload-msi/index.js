@@ -3,9 +3,10 @@ const path = require('path');
 
 const github = require('@actions/github');
 const core = require('@actions/core');
+const Octokit = require('@octokit/rest');
 
 const GITHUB_TOKEN = process.env['GITHUB_TOKEN'];
-const MSI_PATH = 'gh.msi';
+const MSI_PATH = core.getInput('msi-file');
 
 process.on('unhandledRejection', function(reason, _) {
   handleError(reason);
@@ -21,23 +22,33 @@ async function main() {
 
   const owner = github.context.repo.owner;
   const repo = github.context.repo.repo;
+  
+  const octokit = new github.GitHub(GITHUB_TOKEN);
+  const release = await getRelease(octokit, owner, repo, tag);
 
-
-  const release = await getRelease(GITHUB_TOKEN, owner, repo, tag);
-
-  const assetFile = fs.readFileSync(MSI_PATH);
-
-  await uploadAsset(GITHUB_TOKEN, release, assetFile);
+  const assetFile = fs.createReadStream(MSI_PATH);
+  
+  try {
+    await uploadAsset(octokit, release, assetFile);
+    await deleteAsset(octokit, release, owner, repo, path.basename(MSI_PATH, '.msi') + '.exe');
+  } finally {
+    assetFile.close()
+  }
 }
 
-async function getRelease(token, owner, repo, tag) {
-  const octokit = new github.GitHub(token);
+/**
+ * @param {github.GitHub} octokit
+ */
+async function getRelease(octokit, owner, repo, tag) {
   const response = await octokit.repos.getReleaseByTag({ owner, repo, tag });
   return response.data;
 }
 
-async function uploadAsset(token, release, assetFile) {
-  const octokit = new github.GitHub(token);
+/**
+ * @param {github.GitHub} octokit
+ * @param {Octokit.ReposGetReleaseByTagResponse} release
+ */
+async function uploadAsset(octokit, release, assetFile) {
   await octokit.repos.uploadReleaseAsset({
     url: release.upload_url,
     file: assetFile,
@@ -47,6 +58,22 @@ async function uploadAsset(token, release, assetFile) {
       'content-length': fs.statSync(MSI_PATH).size,
     }
   });
+}
+
+/**
+ * @param {github.GitHub} octokit
+ * @param {Octokit.ReposGetReleaseByTagResponse} release
+ */
+async function deleteAsset(octokit, release, owner, repo, assetName) {
+  for (const asset of release.assets) {
+    if (asset.name == assetName) {
+      await octokit.repos.deleteReleaseAsset({
+        owner,
+        repo,
+        asset_id: asset.id
+      })
+    }
+  }
 }
 
 async function handleError(err) {
