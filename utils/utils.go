@@ -11,26 +11,6 @@ import (
 	"github.com/kballard/go-shellquote"
 )
 
-var mdCompiler md.Compiler
-
-func init() {
-	mdCompiler = md.Compiler{
-		Columns: 100,
-		SyntaxHighlighter: md.SyntaxTheme{
-			"keyword": md.Style{Color: "#9196ed"},
-			"comment": md.Style{
-				Color: "#c0c0c2",
-			},
-			"literal": md.Style{
-				Color: "#aaedf7",
-			},
-			"name": md.Style{
-				Color: "#fe8eb5",
-			},
-		},
-	}
-}
-
 func OpenInBrowser(url string) error {
 	browser := os.Getenv("BROWSER")
 	if browser == "" {
@@ -86,6 +66,21 @@ func normalizeNewlines(d []byte) []byte {
 func RenderMarkdown(text string) string {
 	textB := []byte(text)
 	textB = normalizeNewlines(textB)
+	mdCompiler := md.Compiler{
+		Columns: 100,
+		SyntaxHighlighter: md.SyntaxTheme{
+			"keyword": md.Style{Color: "#9196ed"},
+			"comment": md.Style{
+				Color: "#c0c0c2",
+			},
+			"literal": md.Style{
+				Color: "#aaedf7",
+			},
+			"name": md.Style{
+				Color: "#fe8eb5",
+			},
+		},
+	}
 
 	return mdCompiler.Compile(string(textB))
 }
