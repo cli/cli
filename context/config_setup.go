@@ -36,7 +36,7 @@ func setupConfigFile(filename string) (*configEntry, error) {
 	}
 
 	fmt.Fprintln(os.Stderr, "Notice: authentication required")
-	fmt.Fprintf(os.Stderr, "Press Enter to open %s in your web browser... ", flow.Hostname)
+	fmt.Fprintf(os.Stderr, "Press Enter to open %s in your browser... ", flow.Hostname)
 	waitForEnter(os.Stdin)
 	token, err := flow.ObtainAccessToken()
 	if err != nil {
