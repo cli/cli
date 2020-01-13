@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 
 	"github.com/kballard/go-shellquote"
+	md "github.com/vilmibm/go-termd"
 )
 
 func OpenInBrowser(url string) error {
@@ -50,4 +53,40 @@ func searchBrowserLauncher(goos string) (browser string) {
 	}
 
 	return browser
+}
+
+func normalizeNewlines(d []byte) []byte {
+	d = bytes.Replace(d, []byte("\r\n"), []byte("\n"), -1)
+	d = bytes.Replace(d, []byte("\r"), []byte("\n"), -1)
+	return d
+}
+
+func RenderMarkdown(text string) string {
+	textB := []byte(text)
+	textB = normalizeNewlines(textB)
+	mdCompiler := md.Compiler{
+		Columns: 100,
+		SyntaxHighlighter: md.SyntaxTheme{
+			"keyword": md.Style{Color: "#9196ed"},
+			"comment": md.Style{
+				Color: "#c0c0c2",
+			},
+			"literal": md.Style{
+				Color: "#aaedf7",
+			},
+			"name": md.Style{
+				Color: "#fe8eb5",
+			},
+		},
+	}
+
+	return mdCompiler.Compile(string(textB))
+}
+
+func Pluralize(num int, thing string) string {
+	if num == 1 {
+		return fmt.Sprintf("%d %s", num, thing)
+	} else {
+		return fmt.Sprintf("%d %ss", num, thing)
+	}
 }
