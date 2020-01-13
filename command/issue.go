@@ -27,7 +27,7 @@ func init() {
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
