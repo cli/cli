@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -81,8 +82,13 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	if err != nil {
 		return
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("HTTP %d error while obtaining OAuth access token", resp.StatusCode)
+		return
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return
@@ -92,6 +98,9 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		return
 	}
 	accessToken = tokenValues.Get("access_token")
+	if accessToken == "" {
+		err = errors.New("the access token could not be read from HTTP response")
+	}
 	return
 }
 
