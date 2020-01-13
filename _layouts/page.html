@@ -1,10 +1,12 @@
 ---
 layout: default
 ---
-<article class="post">
 
-  <div class="post-content">
+<!doctype html>
+<html lang="en" class="{{page.os}}">
+  {% include head.html %}
+  <body>
+    {% include nav.html %}
     {{ content }}
-  </div>
-
-</article>
+  </body>
+</html>
