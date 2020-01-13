@@ -31,6 +31,8 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+
+	prViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in terminal")
 }
 
 var prCmd = &cobra.Command{
@@ -253,9 +255,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	preview, err := cmd.Flags().GetBool("preview")
+	if err != nil {
+		return err
+	}
+
 	var openURL string
+	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err := prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -268,8 +276,14 @@ func prView(cmd *cobra.Command, args []string) error {
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+			if preview {
+				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+				if err != nil {
+					return err
+				}
+			}
 		} else {
-			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
 				var notFoundErr *api.NotFoundError
 				if errors.As(err, &notFoundErr) {
@@ -282,8 +296,29 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-	return utils.OpenInBrowser(openURL)
+	if preview {
+		out := colorableOut(cmd)
+		printPrPreview(out, pr)
+		return nil
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+	}
+}
+
+func printPrPreview(out io.Writer, pr *api.PullRequest) {
+	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+		"%s wants to merge %s into %s from %s",
+		pr.Author.Login,
+		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		pr.BaseRefName,
+		pr.HeadRefName,
+	)))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, utils.Gray("View this PR on GitHub: %s\n"), pr.URL)
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
