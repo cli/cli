@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/auth"
@@ -26,6 +27,11 @@ var (
 // TODO: have a conversation about whether this belongs in the "context" package
 // FIXME: make testable
 func setupConfigFile(filename string) (*configEntry, error) {
+	var verboseStream io.Writer
+	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
+		verboseStream = os.Stderr
+	}
+
 	flow := &auth.OAuthFlow{
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
@@ -33,6 +39,7 @@ func setupConfigFile(filename string) (*configEntry, error) {
 		WriteSuccessHTML: func(w io.Writer) {
 			fmt.Fprintln(w, oauthSuccessPage)
 		},
+		VerboseStream: verboseStream,
 	}
 
 	fmt.Fprintln(os.Stderr, "Notice: authentication required")
