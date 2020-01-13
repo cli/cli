@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -83,4 +84,12 @@ func RenderMarkdown(text string) string {
 	}
 
 	return mdCompiler.Compile(string(textB))
+}
+
+func Pluralize(num int, thing string) string {
+	if num == 1 {
+		return fmt.Sprintf("%d %s", num, thing)
+	} else {
+		return fmt.Sprintf("%d %ss", num, thing)
+	}
 }

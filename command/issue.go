@@ -35,7 +35,7 @@ func init() {
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 
-	issueViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in termianl")
+	issueViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in terminal")
 }
 
 var issueCmd = &cobra.Command{
@@ -225,35 +225,33 @@ func issueView(cmd *cobra.Command, args []string) error {
 	}
 
 	if preview {
-		coloredLabels := labelList(*issue)
-		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
-		}
-		meta := "opened by %s. %d comment"
-		if issue.Comments.TotalCount != 1 {
-			meta += "s."
-		} else {
-			meta += "."
-		}
-		meta += coloredLabels
-
 		out := colorableOut(cmd)
-
-		fmt.Fprintln(out, utils.Bold(issue.Title))
-		fmt.Fprintln(out, utils.Gray(fmt.Sprintf(meta,
-			issue.Author.Login,
-			issue.Comments.TotalCount,
-		)))
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
-		fmt.Fprintln(out)
-		fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), openURL)
+		printIssuePreview(out, issue)
 		return nil
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 
+}
+
+func printIssuePreview(out io.Writer, issue *api.Issue) {
+	coloredLabels := labelList(*issue)
+	if coloredLabels != "" {
+		coloredLabels = utils.Gray(fmt.Sprintf("(%s)", coloredLabels))
+	}
+
+	fmt.Fprintln(out, utils.Bold(issue.Title))
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+		"opened by %s. %s. %s",
+		issue.Author.Login,
+		utils.Pluralize(issue.Comments.TotalCount, "comment"),
+		coloredLabels,
+	)))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 }
 
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
