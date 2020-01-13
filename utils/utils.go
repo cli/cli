@@ -56,11 +56,8 @@ func searchBrowserLauncher(goos string) (browser string) {
 }
 
 func normalizeNewlines(d []byte) []byte {
-	// from https://github.com/MichaelMure/go-term-markdown/issues/1#issuecomment-570702862
-	// replace CR LF \r\n (windows) with LF \n (unix)
-	d = bytes.Replace(d, []byte{13, 10}, []byte{10}, -1)
-	// replace CF \r (mac) with LF \n (unix)
-	d = bytes.Replace(d, []byte{13}, []byte{10}, -1)
+	d = bytes.Replace(d, []byte("\r\n"), []byte("\n"), -1)
+	d = bytes.Replace(d, []byte("\r"), []byte("\n"), -1)
 	return d
 }
 
