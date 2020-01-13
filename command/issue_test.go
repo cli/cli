@@ -264,7 +264,7 @@ func TestIssueView_preview(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`opened by marseilles. 9 comments.  \(tarot\)`),
+		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
 		regexp.MustCompile(`bold story`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
