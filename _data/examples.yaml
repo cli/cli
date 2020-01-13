@@ -1,0 +1,55 @@
+- url: /gh_pr_create.html
+  content:
+    - "// Create a pull request interactively
+
+~/Projects/my-project$ gh pr create
+
+Creating a pull request in owner/repo
+
+? PR Title My new pull request
+
+? PR Description Lorem ipsum sit dolor.
+
+http://github.com/owner/repo/pull/1
+
+~/Projects/my-project$"
+    - "// Create a pull request with flags
+
+~/Projects/my-project$ gh pr create -t “My new pull request” -d “Lorem ipsum sit dolor.”
+
+http://github.com/owner/repo/pull/2
+
+~/Projects/my-project$"
+- url: /gh_pr_list.html
+  content:
+    - "// View all the open pull requests in a repository
+
+~/Projects/my-project$ gh pr list
+
+#12 Issue name
+
+
+~/Projects/my-project$"
+    - "// View a filtered list of pull requests in a repository
+
+~/Projects/my-project$ gh pr list
+
+
+
+~/Projects/my-project$"
+- url: /sample.html
+  content:
+    - "// Explainer
+
+~/Projects/my-project$ gh pr list
+
+
+
+~/Projects/my-project$"
+    - "// Explainer
+
+~/Projects/my-project$ gh pr list
+
+
+
+~/Projects/my-project$"
