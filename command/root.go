@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/api"
@@ -56,7 +57,7 @@ var versionCmd = &cobra.Command{
 	Use:    "version",
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("gh version %s\n", RootCmd.Version)
+		fmt.Printf("gh version %s\n%s\n", RootCmd.Version, changelogURL(RootCmd.Version))
 	},
 }
 
@@ -127,4 +128,16 @@ func colorableErr(cmd *cobra.Command) io.Writer {
 		return utils.NewColorable(outFile)
 	}
 	return err
+}
+
+func changelogURL(version string) string {
+	path := "https://github.com/github/homebrew-gh"
+	r := regexp.MustCompile(`^v\d+\.\d+.\d+$`)
+	if !r.MatchString(version) {
+		return fmt.Sprintf("%s/releases/latest", path)
+	}
+
+	tag := version
+	url := fmt.Sprintf("%s/releases/tag/%s", path, tag)
+	return url
 }
