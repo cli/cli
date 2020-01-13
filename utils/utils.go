@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"runtime"
 
-	md "github.com/github/gh-cli/markdown"
 	"github.com/kballard/go-shellquote"
+	md "github.com/vilmibm/go-termd"
 )
 
 func OpenInBrowser(url string) error {
