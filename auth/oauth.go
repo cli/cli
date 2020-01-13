@@ -46,7 +46,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 
 	q := url.Values{}
 	q.Set("client_id", oa.ClientID)
-	q.Set("redirect_uri", fmt.Sprintf("http://localhost:%d", port))
+	q.Set("redirect_uri", fmt.Sprintf("http://localhost:%d/callback", port))
 	q.Set("scope", "repo")
 	q.Set("state", state)
 
@@ -57,6 +57,10 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	}
 
 	http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/callback" {
+			w.WriteHeader(404)
+			return
+		}
 		defer listener.Close()
 		rq := r.URL.Query()
 		if state != rq.Get("state") {
