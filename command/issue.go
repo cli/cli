@@ -35,7 +35,7 @@ func init() {
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 
-	issueViewCmd.Flags().BoolP("preview", "p", false, "Preview issue in terminal")
+	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
 
 var issueCmd = &cobra.Command{
