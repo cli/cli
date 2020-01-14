@@ -32,7 +32,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Preview pull request in terminal")
+	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
 }
 
 var prCmd = &cobra.Command{
