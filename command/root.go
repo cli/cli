@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-cli/api"
@@ -19,9 +20,13 @@ var Version = "DEV"
 // BuildDate is dynamically set at build time in the Makefile
 var BuildDate = "YYYY-MM-DD"
 
+var versionOutput = ""
+
 func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
+	versionOutput = fmt.Sprintf("gh version %s\n%s\n", RootCmd.Version, changelogURL(RootCmd.Version))
 	RootCmd.AddCommand(versionCmd)
+	RootCmd.SetVersionTemplate(versionOutput)
 
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
 	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
@@ -56,7 +61,7 @@ var versionCmd = &cobra.Command{
 	Use:    "version",
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("gh version %s\n", RootCmd.Version)
+		fmt.Printf(versionOutput)
 	},
 }
 
@@ -127,4 +132,16 @@ func colorableErr(cmd *cobra.Command) io.Writer {
 		return utils.NewColorable(outFile)
 	}
 	return err
+}
+
+func changelogURL(version string) string {
+	path := "https://github.com/github/homebrew-gh"
+	r := regexp.MustCompile(`^v\d+\.\d+.\d+$`)
+	if !r.MatchString(version) {
+		return fmt.Sprintf("%s/releases/latest", path)
+	}
+
+	tag := version
+	url := fmt.Sprintf("%s/releases/tag/%s", path, tag)
+	return url
 }
