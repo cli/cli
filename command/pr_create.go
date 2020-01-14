@@ -2,8 +2,6 @@ package command
 
 import (
 	"fmt"
-	"os"
-	"runtime"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -156,19 +154,6 @@ func guessRemote(ctx context.Context) (string, error) {
 	}
 
 	return remote.Name, nil
-}
-
-func determineEditor() string {
-	if runtime.GOOS == "windows" {
-		return "notepad"
-	}
-	if v := os.Getenv("VISUAL"); v != "" {
-		return v
-	}
-	if e := os.Getenv("EDITOR"); e != "" {
-		return e
-	}
-	return "nano"
 }
 
 var prCreateCmd = &cobra.Command{

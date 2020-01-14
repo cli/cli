@@ -86,7 +86,6 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 	}
 
 	confirmed := false
-	editor := determineEditor()
 
 	for !confirmed {
 		titleQuestion := &survey.Question{
@@ -98,13 +97,14 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		}
 		bodyQuestion := &survey.Question{
 			Name: "body",
-			Prompt: &survey.Editor{
-				Message:       fmt.Sprintf("Body (%s)", editor),
-				FileName:      "*.md",
-				Default:       inProgress.Body,
-				HideDefault:   true,
-				AppendDefault: true,
-				Editor:        editor,
+			Prompt: &ghEditor{
+				Editor: &survey.Editor{
+					Message:       fmt.Sprintf("Body (%s)", editor),
+					FileName:      "*.md",
+					Default:       inProgress.Body,
+					HideDefault:   true,
+					AppendDefault: true,
+				},
 			},
 		}
 
