@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -49,6 +50,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if target == "" {
+		// TODO use default branch
 		target = "master"
 	}
 
@@ -77,6 +79,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse body")
 	}
 
+	var action Action
+
 	interactive := title == "" || body == ""
 
 	if interactive {
@@ -91,8 +95,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}
 
-		if tb == nil {
-			// editing was canceled, we can just leave
+		action = tb.Action
+
+		if action == CancelAction {
+			// TODO print about discarding
 			return nil
 		}
 
@@ -123,21 +129,42 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse draft")
 	}
 
-	params := map[string]interface{}{
-		"title":       title,
-		"body":        body,
-		"draft":       isDraft,
-		"baseRefName": base,
-		"headRefName": head,
+	if action == SubmitAction {
+		params := map[string]interface{}{
+			"title":       title,
+			"body":        body,
+			"draft":       isDraft,
+			"baseRefName": base,
+			"headRefName": head,
+		}
+
+		pr, err := api.CreatePullRequest(client, repo, params)
+		if err != nil {
+			return errors.Wrap(err, "failed to create pull request")
+		}
+
+		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+	} else if action == PreviewAction {
+		openURL := fmt.Sprintf(
+			"https://github.com/%s/%s/compare/%s...%s?expand=1&title=%s&body=%s",
+			repo.RepoOwner(),
+			repo.RepoName(),
+			target,
+			head,
+			url.QueryEscape(title),
+			url.QueryEscape(body),
+		)
+		// TODO maybe do something about -d being discarded when previewing
+		// TODO could exceed max url length for explorer
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+
+	} else {
+		panic("Unreachable state")
 	}
 
-	pr, err := api.CreatePullRequest(client, repo, params)
-	if err != nil {
-		return errors.Wrap(err, "failed to create pull request")
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	return nil
+
 }
 
 func guessRemote(ctx context.Context) (string, error) {
