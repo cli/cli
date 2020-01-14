@@ -172,6 +172,7 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	return text, nil
 }
 
+// This is straight copypasta from survey to get our overriden prompt called.;
 func (e *ghEditor) Prompt(config *survey.PromptConfig) (interface{}, error) {
 	initialValue := ""
 	if e.Default != "" && e.AppendDefault {
