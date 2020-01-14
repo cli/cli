@@ -318,7 +318,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
 	fmt.Fprintln(out)
-	fmt.Fprintf(out, utils.Gray("View this PR on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
