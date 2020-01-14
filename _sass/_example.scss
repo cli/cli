@@ -1,4 +1,12 @@
 pre.terminal {
   background: black;
   color: white;
+
+  .gray {
+    color: gray !important;
+  }
+
+  .cyan {
+    color: cyan !important;
+  }
 }

@@ -1,49 +1,26 @@
 - url: /gh_pr_create.html
   content:
-    - "<div> // Create a pull request interactively</div>
-    ~/Projects/my-project$ gh pr create</br>
+    - "<span class='gray'> // Create a pull request interactively</span></br>
+    <span class='cyan'>~/Projects/my-project</span>$ gh pr create</br>
     Creating a pull request in owner/repo</br>
     ? PR Title My new pull request</br>
     ? PR Description Lorem ipsum sit dolor.</br>
     http://github.com/owner/repo/pull/1</br>
-    ~/Projects/my-project$"
-    - "// Create a pull request with flags
-
-~/Projects/my-project$ gh pr create -t “My new pull request” -d “Lorem ipsum sit dolor.”
-
-http://github.com/owner/repo/pull/2
-
-~/Projects/my-project$"
-- url: /gh_pr_list.html
+    <span class='cyan'>~/Projects/my-project</span>$"
+    - "<span class='gray'> // Create a pull request with flags</span></br>
+<span class='cyan'>~/Projects/my-project</span>$ gh pr create -t “My new pull request” -d “Lorem ipsum sit dolor.”</br>
+http://github.com/owner/repo/pull/2</br>
+<span class='cyan'>~/Projects/my-project</span>$"
+    - "<span class='gray'> // Create a pull request on the web</span></br>
+<span class='cyan'>~/Projects/my-project</span>$ gh pr create -w</br>
+Opening https://github.com/user/repo/pull/branch in your browser.</br>
+<span class='cyan'>~/Projects/my-project</span>$"
+- url: /gh_issue_list.html
   content:
-    - "// View all the open pull requests in a repository
-
-~/Projects/my-project$ gh pr list
-
-#12 Issue name
-
-
-~/Projects/my-project$"
-    - "// View a filtered list of pull requests in a repository
-
-~/Projects/my-project$ gh pr list
-
-
-
-~/Projects/my-project$"
-- url: /sample.html
-  content:
-    - "// Explainer
-
-~/Projects/my-project$ gh pr list
-
-
-
-~/Projects/my-project$"
-    - "// Explainer
-
-~/Projects/my-project$ gh pr list
-
-
-
-~/Projects/my-project$"
+    - "<span class='gray'> // View all open issues in a repository</span></br>
+<span class='cyan'>~/Projects/my-project</span>$ gh issue list</br>
+#12 Issue title</br>
+#13 Issue title</br>
+#14 Issue title</br>
+#15 Issue title</br>
+<span class='cyan'>~/Projects/my-project</span>$"
