@@ -36,12 +36,25 @@ type ghEditor struct {
 	*survey.Editor
 }
 
+// Templates with Color formatting. See Documentation: https://github.com/mgutz/ansi#style-format
+var EditorQuestionTemplate = `
+{{- if .ShowHelp }}{{- color .Config.Icons.Help.Format }}{{ .Config.Icons.Help.Text }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
+{{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
+{{- color "default+hb"}}{{ .Message }} {{color "reset"}}
+{{- if .ShowAnswer}}
+  {{- color "cyan"}}{{.Answer}}{{color "reset"}}{{"\n"}}
+{{- else }}
+  {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
+  {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
+	{{- color "cyan"}}[e: launch editor][enter: skip for now] {{color "reset"}}
+{{- end}}`
+
 // this is not being called in the embedding case and isn't consulted in the alias case because of
 // the incomplete overriding.
 func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (interface{}, error) {
 	// render the template
 	err := e.Render(
-		survey.EditorQuestionTemplate,
+		EditorQuestionTemplate,
 		survey.EditorTemplateData{
 			Editor: *e.Editor,
 			Config: config,
@@ -65,8 +78,11 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		if err != nil {
 			return "", err
 		}
-		if r == '\r' || r == '\n' {
+		if r == 'e' {
 			break
+		}
+		if r == '\r' || r == '\n' {
+			return "", nil
 		}
 		if r == terminal.KeyInterrupt {
 			return "", terminal.InterruptErr
@@ -76,7 +92,7 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		}
 		if string(r) == config.HelpInput && e.Help != "" {
 			err = e.Render(
-				survey.EditorQuestionTemplate,
+				EditorQuestionTemplate,
 				survey.EditorTemplateData{
 					Editor:   *e.Editor,
 					ShowHelp: true,
