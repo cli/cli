@@ -1,13 +1,19 @@
+PATH
+  remote: .
+  specs:
+    github-website-starter (0.0.1)
+      jekyll (~> 3.3)
+
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (4.2.11.1)
+    activesupport (4.2.10)
       i18n (~> 0.7)
       minitest (~> 5.1)
       thread_safe (~> 0.3, >= 0.3.4)
       tzinfo (~> 1.1)
-    addressable (2.7.0)
-      public_suffix (>= 2.0.2, < 5.0)
+    addressable (2.5.2)
+      public_suffix (>= 2.0.2, < 4.0)
     coffee-script (2.4.1)
       coffee-script-source
       execjs
@@ -15,8 +21,8 @@ GEM
     colorator (1.1.0)
     commonmarker (0.17.13)
       ruby-enum (~> 0.5)
-    concurrent-ruby (1.1.5)
-    dnsruby (1.61.3)
+    concurrent-ruby (1.1.4)
+    dnsruby (1.61.2)
       addressable (~> 2.5)
     em-websocket (0.5.1)
       eventmachine (>= 0.12.9)
@@ -124,6 +130,9 @@ GEM
     jekyll-mentions (1.4.1)
       html-pipeline (~> 2.3)
       jekyll (~> 3.0)
+    jekyll-octicons (8.4.1)
+      jekyll (~> 3.1)
+      octicons (= 8.4.1)
     jekyll-optional-front-matter (0.3.0)
       jekyll (~> 3.0)
     jekyll-paginate (1.1.0)
@@ -244,7 +253,8 @@ PLATFORMS
 
 DEPENDENCIES
   github-pages
-  minima (~> 2.0)
+  github-website-starter!
+  jekyll-octicons
 
 BUNDLED WITH
    2.0.1

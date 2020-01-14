@@ -1,6 +1,24 @@
-title: GitHub CLI
-description: >-
-  Work seamlessly with GitHub on the command line.
+title: Your awesome title
+description: A catchy tagline
 
-markdown: kramdown
-theme: minima
+twitter:
+  username: github
+
+plugins:
+  - jekyll-feed
+  - jekyll-octicons
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+sass:
+  load_paths:
+    - _sass
+    - node_modules
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - bin
+  - vendor
+  - node_modules
