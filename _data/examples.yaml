@@ -1,18 +1,12 @@
 - url: /gh_pr_create.html
   content:
-    - "// Create a pull request interactively
-
-~/Projects/my-project$ gh pr create
-
-Creating a pull request in owner/repo
-
-? PR Title My new pull request
-
-? PR Description Lorem ipsum sit dolor.
-
-http://github.com/owner/repo/pull/1
-
-~/Projects/my-project$"
+    - "<div> // Create a pull request interactively</div>
+    ~/Projects/my-project$ gh pr create</br>
+    Creating a pull request in owner/repo</br>
+    ? PR Title My new pull request</br>
+    ? PR Description Lorem ipsum sit dolor.</br>
+    http://github.com/owner/repo/pull/1</br>
+    ~/Projects/my-project$"
     - "// Create a pull request with flags
 
 ~/Projects/my-project$ gh pr create -t “My new pull request” -d “Lorem ipsum sit dolor.”
