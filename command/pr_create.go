@@ -21,13 +21,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if ucc > 0 {
-		noun := "change"
-		if ucc > 1 {
-			// TODO: use pluralize helper
-			noun = noun + "s"
-		}
-
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %d uncommitted %s\n", ucc, noun)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
 
 	repo, err := ctx.BaseRepo()
