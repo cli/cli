@@ -98,7 +98,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		action = tb.Action
 
 		if action == CancelAction {
-			// TODO print about discarding
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
 			return nil
 		}
 

@@ -323,7 +323,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		// TODO handle tb.Action
 		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
 			return errors.Wrap(err, "could not collect title and/or body")
@@ -332,7 +331,8 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		action = tb.Action
 
 		if tb.Action == CancelAction {
-			// TODO print something
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
+
 			return nil
 		}
 
