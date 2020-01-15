@@ -79,7 +79,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse body")
 	}
 
-	var action Action
+	action := SubmitAction
 
 	interactive := title == "" || body == ""
 
