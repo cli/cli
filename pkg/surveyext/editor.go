@@ -1,7 +1,8 @@
-package command
+package surveyext
 
 // This file extends survey.Editor to give it more flexible behavior. For more context, read
 // https://github.com/github/gh-cli/issues/70
+// To see what we extended, search through for EXTENDED comments.
 
 import (
 	"bytes"
@@ -18,7 +19,7 @@ import (
 
 var (
 	bom    = []byte{0xef, 0xbb, 0xbf}
-	editor = "nano"
+	editor = "nano" // EXTENDED to switch from vim as a default editor
 )
 
 func init() {
@@ -33,11 +34,12 @@ func init() {
 	}
 }
 
-type ghEditor struct {
+// EXTENDED to enable different prompting behavior
+type GhEditor struct {
 	*survey.Editor
 }
 
-// Templates with Color formatting. See Documentation: https://github.com/mgutz/ansi#style-format
+// EXTENDED to change prompt text
 var EditorQuestionTemplate = `
 {{- if .ShowHelp }}{{- color .Config.Icons.Help.Format }}{{ .Config.Icons.Help.Text }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
 {{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
@@ -50,6 +52,7 @@ var EditorQuestionTemplate = `
 	{{- color "cyan"}}[e: launch {{ .EditorName }}][enter: skip for now] {{color "reset"}}
 {{- end}}`
 
+// EXTENDED to pass editor name (to use in prompt)
 type EditorTemplateData struct {
 	survey.Editor
 	EditorName string
@@ -59,12 +62,11 @@ type EditorTemplateData struct {
 	Config     *survey.PromptConfig
 }
 
-// this is not being called in the embedding case and isn't consulted in the alias case because of
-// the incomplete overriding.
-func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (interface{}, error) {
-	// render the template
+// EXTENDED to augment prompt text and keypress handling
+func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (interface{}, error) {
 	err := e.Render(
 		EditorQuestionTemplate,
+		// EXTENDED to support printing editor in prompt
 		EditorTemplateData{
 			Editor:     *e.Editor,
 			EditorName: filepath.Base(editor),
@@ -85,6 +87,7 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	defer cursor.Show()
 
 	for {
+		// EXTENDED to handle the e to edit / enter to skip behavior
 		r, _, err := rr.ReadRune()
 		if err != nil {
 			return "", err
@@ -105,6 +108,7 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 			err = e.Render(
 				EditorQuestionTemplate,
 				EditorTemplateData{
+					// EXTENDED to support printing editor in prompt
 					Editor:     *e.Editor,
 					EditorName: filepath.Base(editor),
 					ShowHelp:   true,
@@ -184,8 +188,8 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	return text, nil
 }
 
-// This is straight copypasta from survey to get our overriden prompt called.;
-func (e *ghEditor) Prompt(config *survey.PromptConfig) (interface{}, error) {
+// EXTENDED This is straight copypasta from survey to get our overriden prompt called.;
+func (e *GhEditor) Prompt(config *survey.PromptConfig) (interface{}, error) {
 	initialValue := ""
 	if e.Default != "" && e.AppendDefault {
 		initialValue = e.Default

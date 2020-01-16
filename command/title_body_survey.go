@@ -3,6 +3,7 @@ package command
 import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/pkg/githubtemplate"
+	"github.com/github/gh-cli/pkg/surveyext"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -95,7 +96,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 	}
 	bodyQuestion := &survey.Question{
 		Name: "body",
-		Prompt: &ghEditor{
+		Prompt: &surveyext.GhEditor{
 			Editor: &survey.Editor{
 				Message:       "Body",
 				FileName:      "*.md",
