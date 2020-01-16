@@ -1,0 +1,17 @@
+// TODO change names
+.lp-contribute-section::after {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: -8%;
+  z-index: -1;
+  width: 100%;
+  height: 95%;
+  margin-top: -15%;
+  content: "";
+  background: url(../assets/images/dots-small.svg);
+
+  @include breakpoint(md) {
+    display: block;
+  }
+}

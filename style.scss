@@ -1,0 +1,20 @@
+---
+---
+
+// Only import parts of primer-core
+@import "@primer/css/support/index.scss";
+@import "@primer/css/base/index.scss";
+@import "@primer/css/buttons/index.scss";
+@import "@primer/css/forms/index.scss";
+@import "@primer/css/layout/index.scss";
+@import "@primer/css/utilities/index.scss";
+@import "@primer/css/tooltips/index.scss";
+@import "@primer/css/labels/index.scss";
+$marketing-font-path: "/assets/fonts/";
+@import "@primer/css/marketing/index.scss";
+
+// Then import custom Sass from `_sass` as needed
+@import "global.scss";
+@import "marketing-nav.scss";
+@import "marketing-site.scss";
+@import "landing.scss";

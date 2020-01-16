@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "dependencies": {
+    "octicons": "^7.3.0",
+    "@primer/css": "^12.3.0"
+  }
+}

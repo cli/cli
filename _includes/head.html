@@ -3,10 +3,9 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <meta http-equiv="content-language" content="en-gb">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-
-  <link rel="stylesheet" type="text/css" href="main.css">
-
-  <link rel="icon" sizes="any" mask href="https://github.githubassets.com/pinned-octocat.svg">
+  <link rel="stylesheet" type="text/css" href={{ "style.css?" | append: site.github.build_revision | absolute_url }} />
   <link rel="icon" type="image/x-icon" href="https://github.githubassets.com/favicon.ico">
-
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700" rel="stylesheet">
+  {% seo %}
+  {% feed_meta %}
 </head>
