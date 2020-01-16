@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -308,6 +309,8 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("the '%s/%s' repository has disabled issues", baseRepo.RepoOwner(), baseRepo.RepoName())
 	}
 
+	action := SubmitAction
+
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
 		return errors.Wrap(err, "could not parse title")
@@ -325,8 +328,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}
 
-		if tb == nil {
-			// editing was canceled, we can just leave
+		action = tb.Action
+
+		if tb.Action == CancelAction {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
+
 			return nil
 		}
 
@@ -337,17 +343,38 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			body = tb.Body
 		}
 	}
-	params := map[string]interface{}{
-		"title": title,
-		"body":  body,
+
+	if action == PreviewAction {
+		openURL := fmt.Sprintf(
+			"https://github.com/%s/%s/issues/new/?title=%s&body=%s",
+			baseRepo.RepoOwner(),
+			baseRepo.RepoName(),
+			url.QueryEscape(title),
+			url.QueryEscape(body),
+		)
+		// TODO could exceed max url length for explorer
+		url, err := url.Parse(openURL)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		return utils.OpenInBrowser(openURL)
+	} else if action == SubmitAction {
+		params := map[string]interface{}{
+			"title": title,
+			"body":  body,
+		}
+
+		newIssue, err := api.IssueCreate(apiClient, repo, params)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
+	} else {
+		panic("Unreachable state")
 	}
 
-	newIssue, err := api.IssueCreate(apiClient, repo, params)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
 	return nil
 }
 
