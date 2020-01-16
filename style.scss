@@ -12,6 +12,7 @@
 @import "@primer/css/labels/index.scss";
 $marketing-font-path: "/assets/fonts/";
 @import "@primer/css/marketing/index.scss";
+@import "@primer/css/markdown/index.scss";
 
 // Then import custom Sass from `_sass` as needed
 @import "global.scss";
@@ -20,4 +21,4 @@ $marketing-font-path: "/assets/fonts/";
 @import "landing.scss";
 @import "docs-nav.scss";
 @import "example.scss";
-@import "manual-content.scss";
+@import "markdown-body.scss";
