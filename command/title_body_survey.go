@@ -18,8 +18,8 @@ type titleBody struct {
 
 const (
 	PreviewAction Action = iota
-	SubmitAction  Action = iota
-	CancelAction  Action = iota
+	SubmitAction
+	CancelAction
 )
 
 func confirm() (Action, error) {
