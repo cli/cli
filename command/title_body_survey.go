@@ -1,8 +1,6 @@
 package command
 
 import (
-	"fmt"
-
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/pkg/errors"
@@ -99,7 +97,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		Name: "body",
 		Prompt: &ghEditor{
 			Editor: &survey.Editor{
-				Message:       fmt.Sprintf("Body (%s)", editor),
+				Message:       "Body",
 				FileName:      "*.md",
 				Default:       inProgress.Body,
 				HideDefault:   true,

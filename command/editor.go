@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -46,8 +47,17 @@ var EditorQuestionTemplate = `
 {{- else }}
   {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
   {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
-	{{- color "cyan"}}[e: launch editor][enter: skip for now] {{color "reset"}}
+	{{- color "cyan"}}[e: launch {{ .EditorName }}][enter: skip for now] {{color "reset"}}
 {{- end}}`
+
+type EditorTemplateData struct {
+	survey.Editor
+	EditorName string
+	Answer     string
+	ShowAnswer bool
+	ShowHelp   bool
+	Config     *survey.PromptConfig
+}
 
 // this is not being called in the embedding case and isn't consulted in the alias case because of
 // the incomplete overriding.
@@ -55,9 +65,10 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	// render the template
 	err := e.Render(
 		EditorQuestionTemplate,
-		survey.EditorTemplateData{
-			Editor: *e.Editor,
-			Config: config,
+		EditorTemplateData{
+			Editor:     *e.Editor,
+			EditorName: filepath.Base(editor),
+			Config:     config,
 		},
 	)
 	if err != nil {
@@ -93,10 +104,11 @@ func (e *ghEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		if string(r) == config.HelpInput && e.Help != "" {
 			err = e.Render(
 				EditorQuestionTemplate,
-				survey.EditorTemplateData{
-					Editor:   *e.Editor,
-					ShowHelp: true,
-					Config:   config,
+				EditorTemplateData{
+					Editor:     *e.Editor,
+					EditorName: filepath.Base(editor),
+					ShowHelp:   true,
+					Config:     config,
 				},
 			)
 			if err != nil {
