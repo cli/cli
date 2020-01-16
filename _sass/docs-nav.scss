@@ -1,14 +1,5 @@
 .docs-nav {
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  position: fixed;
-  left: 0;
-  top: 0;
-  padding: 40px;
-
-  h3 {
-    margin: 10px 0 !important;
-    color: black;
-  }
+  min-width: 260px;
+  height: 100vh;
+  border-right: 1px solid $gray-200;
 }

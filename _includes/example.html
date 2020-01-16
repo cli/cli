@@ -1,7 +1,7 @@
 {% for examples in site.data.examples %}
     {% if examples.url == page.url %}
       <div class="examples">
-        <h2>Examples in use</h2>
+        <h3>Examples in use</h3>
         {% for snippet in examples.content %}
         <pre class="terminal">{{ snippet }}</pre>
         {% endfor %}

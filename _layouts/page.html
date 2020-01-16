@@ -3,10 +3,14 @@
   {% include head.html %}
   <body>
     {% include marketing-nav.html %}
-    {% include docs-nav.html %}
-    <div class="container-lg">
-      {{ content }}
+    <div class="d-flex">
+      {% include docs-nav.html %}
+      <div class="manual-content m-6 pl-6">
+        {{ content }}
+        {% include example.html %}
+      </div>
     </div>
+
     {% include foot.html %}
   </body>
 </html>

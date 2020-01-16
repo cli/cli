@@ -1,0 +1,16 @@
+.manual-content {
+  h2 {
+    font-size: $h1-size;
+    margin-bottom: $spacer-2;
+  }
+
+  h3 {
+    margin: $spacer-4 0 $spacer-2;
+  }
+
+  #see-also,
+  h6,
+  ul {
+    display: none;
+  }
+}

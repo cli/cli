@@ -1,12 +1,17 @@
 pre.terminal {
-  background: black;
-  color: white;
+  background: $black;
+  color: $white;
+  padding: $spacer-3;
+  border-radius: 3px;
+  margin-bottom: $spacer-2;
+  font-size: $h5-size;
+  line-height: 1.7;
 
   .gray {
-    color: gray !important;
+    color: $gray-400 !important;
   }
 
   .cyan {
-    color: cyan !important;
+    color: $blue-300 !important;
   }
 }
