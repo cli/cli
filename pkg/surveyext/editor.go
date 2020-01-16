@@ -49,7 +49,7 @@ var EditorQuestionTemplate = `
 {{- else }}
   {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
   {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
-	{{- color "cyan"}}[e: launch {{ .EditorName }}][enter: skip for now] {{color "reset"}}
+	{{- color "cyan"}}[(e) to launch {{ .EditorName }}, enter to skip] {{color "reset"}}
 {{- end}}`
 
 // EXTENDED to pass editor name (to use in prompt)
