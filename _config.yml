@@ -1,6 +1,5 @@
 title: GitHub CLI
 description: TODO
-markdown: kramdown
 twitter:
   username: github
 
@@ -22,3 +21,8 @@ exclude:
   - bin
   - vendor
   - node_modules
+
+collections:
+  manual:
+    permalink: /manual/:name
+    output: true
