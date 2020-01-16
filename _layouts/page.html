@@ -1,13 +1,12 @@
----
-layout: default
----
-
 <!doctype html>
-<html lang="en" class="{{page.os}}">
+<html>
   {% include head.html %}
   <body>
-    {% include nav.html %}
-    {{ content }}
-    {% include example.html %}
+    {% include marketing-nav.html %}
+    {% include docs-nav.html %}
+    <div class="container-lg">
+      {{ content }}
+    </div>
+    {% include foot.html %}
   </body>
 </html>
