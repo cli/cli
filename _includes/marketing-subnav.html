@@ -1,0 +1,22 @@
+<div class="bg-white border-bottom" style="position: sticky; position: -webkit-sticky; top: 0; z-index: 5;">
+  <nav class="d-flex mx-auto px-3
+    {% if page.url == "/"%}
+      container-xl
+      px-md-4
+    {% endif %}
+    {% if page.url != "/"%}
+      px-md-6
+    {% endif%}">
+    {% if page.url != "/" %}
+    <a class="d-flex flex-items-center" href="/" aria-label="Homepage" data-ga-click="GitHub CLI, go to Homepage, CLI landing page main nav (invertocat logo)">
+      {% octicon mark-github height:32 class:"text-gray-dark" aria-label:github-logo %}
+      <h3 class="pl-2 text-gray-dark">GitHub CLI</h3>
+    </a>
+    {% endif %}
+    <div class="d-flex flex-auto flex-items-center flex-justify-end">
+      <a href="{{ site.baseurl }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Release notes</a>
+      <a href="{{ site.baseurl }}/gh" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Manual</a>
+      <a href="{{ site.baseurl }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 no-underline">Docs</a>
+    </div>
+  </nav>
+</div>
