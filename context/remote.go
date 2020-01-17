@@ -35,6 +35,26 @@ func (r Remotes) FindByRepo(owner, name string) (*Remote, error) {
 	return nil, fmt.Errorf("no matching remote found")
 }
 
+func remoteNameSortScore(name string) int {
+	switch strings.ToLower(name) {
+	case "upstream":
+		return 3
+	case "github":
+		return 2
+	case "origin":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// https://golang.org/pkg/sort/#Interface
+func (r Remotes) Len() int      { return len(r) }
+func (r Remotes) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
+func (r Remotes) Less(i, j int) bool {
+	return remoteNameSortScore(r[i].Name) > remoteNameSortScore(r[j].Name)
+}
+
 // Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
 	*git.Remote
