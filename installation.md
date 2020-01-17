@@ -1,3 +1,8 @@
+---
+layout: page
+title: Installation instructions
+---
+
 ## Install for macOS
 ### Homebrew
 To install:
