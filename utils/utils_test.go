@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// TODO test FuzzyAgo
-
 func TestFuzzyAgo(t *testing.T) {
 
 	cases := map[string]string{
