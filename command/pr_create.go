@@ -3,6 +3,8 @@ package command
 import (
 	"fmt"
 	"net/url"
+	"sort"
+	"strings"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -15,42 +17,62 @@ import (
 
 func prCreate(cmd *cobra.Command, _ []string) error {
 	ctx := contextForCommand(cmd)
-
-	ucc, err := git.UncommittedChangeCount()
+	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
 	}
-	if ucc > 0 {
+
+	client, err := apiClientForContext(ctx)
+	if err != nil {
+		return errors.Wrap(err, "could not initialize API client")
+	}
+
+	baseRepoOverride, _ := cmd.Flags().GetString("repo")
+	repoContext, err := resolveRemotesToRepos(remotes, client, baseRepoOverride)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := repoContext.BaseRepo()
+	if err != nil {
+		return errors.Wrap(err, "could not determine the base repository")
+	}
+
+	headBranch, err := ctx.Branch()
+	if err != nil {
+		return errors.Wrap(err, "could not determine the current branch")
+	}
+
+	baseBranch, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
+	if baseBranch == "" {
+		baseBranch = baseRepo.DefaultBranchRef.Name
+	}
+
+	headRepo, err := repoContext.HeadRepo()
+	if err != nil {
+		// TODO: auto-fork repository and add new git remote
+		return errors.Wrap(err, "could not determine the head repository")
+	}
+
+	if headBranch == baseBranch && isSameRepo(baseRepo, headRepo) {
+		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n", utils.Cyan(headBranch), utils.Cyan(baseBranch), baseRepo.RepoOwner(), baseRepo.RepoName())
+
+	headRemote, err := repoContext.RemoteForRepo(headRepo)
+	if err != nil {
+		return errors.Wrap(err, "")
+	}
+
+	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
-
-	repo, err := ctx.BaseRepo()
-	if err != nil {
-		return errors.Wrap(err, "could not determine GitHub repo")
-	}
-
-	head, err := ctx.Branch()
-	if err != nil {
-		return errors.Wrap(err, "could not determine current branch")
-	}
-
-	remote, err := guessRemote(ctx)
-	if err != nil {
-		return err
-	}
-
-	target, err := cmd.Flags().GetString("base")
-	if err != nil {
-		return err
-	}
-	if target == "" {
-		// TODO use default branch
-		target = "master"
-	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n", utils.Cyan(head), utils.Cyan(target), repo.RepoOwner(), repo.RepoName())
-
-	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
+	// TODO: respect existing upstream configuration of the current branch
+	if err = git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
 		return err
 	}
 
@@ -59,7 +81,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse web")
 	}
 	if isWeb {
-		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, repo.RepoOwner(), repo.RepoName(), head)
+		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, baseRepo.RepoOwner(), baseRepo.RepoName(), headBranch)
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
@@ -104,20 +126,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	base, err := cmd.Flags().GetString("base")
-	if err != nil {
-		return errors.Wrap(err, "could not parse base")
-	}
-	if base == "" {
-		// TODO: use default branch for the repo
-		base = "master"
-	}
-
-	client, err := apiClientForContext(ctx)
-	if err != nil {
-		return errors.Wrap(err, "could not initialize api client")
-	}
-
 	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
 		return errors.Wrap(err, "could not parse draft")
@@ -128,10 +136,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"title":       title,
 			"body":        body,
 			"draft":       isDraft,
-			"baseRefName": base,
-			"headRefName": head,
+			"baseRefName": baseBranch,
+			"headRefName": headBranch,
 		}
 
+		repo := api.Repository{}
 		pr, err := api.CreatePullRequest(client, repo, params)
 		if err != nil {
 			return errors.Wrap(err, "failed to create pull request")
@@ -141,10 +150,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	} else if action == PreviewAction {
 		openURL := fmt.Sprintf(
 			"https://github.com/%s/%s/compare/%s...%s?expand=1&title=%s&body=%s",
-			repo.RepoOwner(),
-			repo.RepoName(),
-			target,
-			head,
+			baseRepo.RepoOwner(),
+			baseRepo.RepoName(),
+			baseBranch,
+			headBranch,
 			url.QueryEscape(title),
 			url.QueryEscape(body),
 		)
@@ -163,22 +172,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 }
 
-func guessRemote(ctx context.Context) (string, error) {
-	remotes, err := ctx.Remotes()
-	if err != nil {
-		return "", errors.Wrap(err, "could not read git remotes")
-	}
-
-	// TODO: consolidate logic with fsContext.BaseRepo
-	// TODO: check if the GH repo that the remote points to is writeable
-	remote, err := remotes.FindByName("upstream", "github", "origin", "*")
-	if err != nil {
-		return "", errors.Wrap(err, "could not determine suitable remote")
-	}
-
-	return remote.Name, nil
-}
-
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
@@ -195,4 +188,118 @@ func init() {
 	prCreateCmd.Flags().StringP("base", "B", "",
 		"The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
+}
+
+const maxRemotesForLookup = 5
+
+func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base string) (resolvedRemotes, error) {
+	sort.Stable(remotes)
+	lenRemotesForLookup := len(remotes)
+	if lenRemotesForLookup > maxRemotesForLookup {
+		lenRemotesForLookup = maxRemotesForLookup
+	}
+
+	hasBaseOverride := base != ""
+	baseOverride := repoFromFullName(base)
+	foundBaseOverride := false
+	repos := []api.Repo{}
+	for _, r := range remotes[:lenRemotesForLookup] {
+		repos = append(repos, r)
+		if isSameRepo(r, baseOverride) {
+			foundBaseOverride = true
+		}
+	}
+	if hasBaseOverride && !foundBaseOverride {
+		repos = append(repos, baseOverride)
+	}
+
+	result := resolvedRemotes{remotes: remotes}
+	if hasBaseOverride {
+		result.baseOverride = baseOverride
+	}
+	networkResult, err := api.RepoNetwork(client, repos)
+	if err != nil {
+		return result, err
+	}
+	result.network = networkResult
+	return result, nil
+}
+
+type resolvedRemotes struct {
+	baseOverride api.Repo
+	remotes      context.Remotes
+	network      api.RepoNetworkResult
+}
+
+// BaseRepo is the first found repository in the "upstream", "github", "origin"
+// git remote order, resolved to the parent repo if the git remote points to a fork
+func (r resolvedRemotes) BaseRepo() (*api.Repository, error) {
+	if r.baseOverride != nil {
+		for _, repo := range r.network.Repositories {
+			if repo != nil && isSameRepo(repo, r.baseOverride) {
+				return repo, nil
+			}
+		}
+		return nil, fmt.Errorf("failed looking up information about the '%s/%s' repository",
+			r.baseOverride.RepoOwner(), r.baseOverride.RepoName())
+	}
+
+	for _, repo := range r.network.Repositories {
+		if repo == nil {
+			continue
+		}
+		if repo.IsFork() {
+			return repo.Parent, nil
+		}
+		return repo, nil
+	}
+
+	return nil, errors.New("not found")
+}
+
+// HeadRepo is the first found repository that has push access
+func (r resolvedRemotes) HeadRepo() (*api.Repository, error) {
+	for _, repo := range r.network.Repositories {
+		if repo != nil && repo.ViewerCanPush() {
+			return repo.Parent, nil
+		}
+	}
+	return nil, errors.New("none of the repositories have push access")
+}
+
+// RemoteForRepo finds the git remote that points to a repository
+func (r resolvedRemotes) RemoteForRepo(repo api.Repo) (*context.Remote, error) {
+	for i, remote := range r.remotes {
+		if isSameRepo(remote, repo) ||
+			// FIXME: express better that this is because of repo renames
+			(r.network.Repositories[i] != nil && isSameRepo(r.network.Repositories[i], repo)) {
+			return remote, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
+
+type ghRepo struct {
+	owner string
+	name  string
+}
+
+func repoFromFullName(nwo string) (r ghRepo) {
+	parts := strings.SplitN(nwo, "/", 2)
+	if len(parts) == 2 {
+		r.owner, r.name = parts[0], parts[1]
+	}
+	return
+}
+
+func (r ghRepo) RepoOwner() string {
+	return r.owner
+}
+func (r ghRepo) RepoName() string {
+	return r.name
+}
+
+func isSameRepo(a, b api.Repo) bool {
+	return strings.EqualFold(a.RepoOwner(), b.RepoOwner()) &&
+		strings.EqualFold(a.RepoName(), b.RepoName())
 }
