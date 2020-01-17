@@ -257,7 +257,7 @@ func TestPRView_preview(t *testing.T) {
 		regexp.MustCompile(`Blueberries are from a fork`),
 		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this PR on GitHub: https://github.com/OWNER/REPO/pull/12`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -291,7 +291,7 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 		regexp.MustCompile(`Blueberries are a good fruit`),
 		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this PR on GitHub: https://github.com/OWNER/REPO/pull/10`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {

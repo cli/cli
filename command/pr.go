@@ -32,7 +32,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Preview PR in terminal")
+	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
 }
 
 var prCmd = &cobra.Command{
@@ -318,7 +318,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
 	fmt.Fprintln(out)
-	fmt.Fprintf(out, utils.Gray("View this PR on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
