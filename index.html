@@ -5,21 +5,19 @@ layout: default
 <main class="">
   <div class="container-xl mx-auto px-3 px-md-4 pt-8">
     <div class="d-flex flex-column flex-justify-center flex-items-center mb-8">
-      <img alt="GitHub Actions" class="d-block mb-3" style="width: 56px;" src="/assets/images/icon-github-cli.svg">
+      <img alt="GitHub Actions" class="d-block mb-3" style="width: 56px;" src="/assets/images/icon-cli.svg">
       <h1 class="text-mono f4 text-normal text-center text-gray-light mb-3">
         GitHub CLI
         <span title="Label: Beta" class="Label Label--outline Label--outline-green">Beta</span>
       </h1>
       <h2 class="h00-mktg text-center lh-condensed mb-3">Take GitHub to the command&nbsp;line</h2>
-      <!-- TODO installation -->
-      <!-- see lfs: there are no directions? -->
       <!-- if mac -->
       <div class="download-mac d-none f4 text-center">
         <div class="d-inline-block">
-          <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f4 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
+          <span class="text-gray mr-2 f5">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
         </div>
         <div class="d-inline-block">
-          <span class="text-gray mx-2">or</span><a class="btn-mktg btn-outline-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+          <span class="text-gray ml-2 f5 mr-3">or</span><a class="btn-mktg btn-outline-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
         </div>
       </div>
 
@@ -27,7 +25,7 @@ layout: default
       <div class="download-windows d-none">
         <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
       </div>
-
+      <!-- TODO -->
       <!-- if linux -->
 
     </div>
@@ -46,8 +44,18 @@ layout: default
     <div class="container-xl mx-auto px-3 px-md-4 mb-12">
       <!-- Terminal -->
       <!-- gh pr status -->
-      <h3 class="text-mono f2 text-normal text-center mb-2"><span class="text-blue-mktg">$</span> gh pr status</h3>
-      <p class="f4 text-gray text-center mb-4">Check on the status of your pull requests.</p>
+      <h3 class="command-header text-mono f2 text-normal text-center mb-2">
+        <span class="text-blue-mktg mr-2">$</span>
+        <!-- gh pr status -->
+        <span class="command command-1 command-header-1 d-none"></span>
+        <span class="command command-2 command-header-2 d-none"></span>
+        <span class="command command-3 command-header-3 d-none"></span>
+        <span class="command command-4 command-header-4 d-none"></span>
+      </h3>
+      <p class="command-1 command-desc-1 d-none f4 text-gray text-center mb-4">Check on the status of your pull requests.</p>
+      <p class="command-2 command-desc-2 d-none f4 text-gray text-center mb-4">View and filter a repository’s open issues.</p>
+      <p class="command-3 command-desc-3 d-none f4 text-gray text-center mb-4">Create a pull request.</p>
+      <p class="command-4 command-desc-4 d-none f4 text-gray text-center mb-4">Check out pull requests locally.</p>
 
       <div class="col-12 col-lg-8 mx-auto bg-blue-dark rounded-2 box-shadow-large position-relative" style="height: 430px;">
         <div class="py-2 px-3 text-center">
@@ -58,13 +66,15 @@ layout: default
           </div>
         </div>
 
-        <pre id="gpr-cli-typed" class="gpr-cli-commands f5 px-5 text-mono text-white js-selected-nav-tab segmented-npm SegmentedContent active">
-          <span class="unselectable text-white-fade" unselectable="on">$ </span><span class="js-package-registry-typed-login"></span> <span class="text-blue-light js-package-registry-typed-params" hidden></span>
-          <span class="unselectable text-white-fade js-package-registry-typed-success-login" unselectable="on" hidden>Successfully logged in.</span>
 
-          <span class="unselectable text-white-fade js-package-registry-typed-publish-start" unselectable="on" hidden>$ </span><span class="js-package-registry-typed-publish" hidden></span>
-          <span class="unselectable text-white-fade js-package-registry-typed-package-published" unselectable="on" class="" hidden>Package published</span>
-        </pre>
+        <div class="f5 px-5 text-white-fade text-mono mt-5">
+          <!-- gh pr status -->
+          <span class="text-white mr-1">$</span>
+          <span class="command-1 command-output-1 d-none"></span>
+          <span class="command-2 command-output-2 d-none"></span>
+          <span class="command-3 command-output-3 d-none"></span>
+          <span class="command-4 command-output-4 d-none"></span>
+        </div>
       </div><!-- /Terminal -->
     </div>
   </div>
@@ -101,7 +111,6 @@ layout: default
         <h2 class="h2-mktg mb-1 pl-md-7">Try GitHub on the command&nbsp;line <span title="Label: Beta" class="Label Label--outline Label--outline-green position-relative bottom-1">Beta</span></h2>
         <p class="text-gray-light f4 pl-md-7 pr-lg-4">GitHub CLI is ready for your terminal. It’s free and open source—getting better with every fork.</p>
 
-        <!-- TODO installation -->
         <!-- if mac -->
         <div class="download-mac d-none f4 text-center text-md-left pl-md-7">
           <div class="d-inline-block">
@@ -117,9 +126,10 @@ layout: default
           <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
         </div>
 
+        <!-- TODO -->
         <!-- if linux -->
 
-        <div class="pl-md-7">
+        <div class="pl-md-7 mt-4">
           <img alt="Windows" class="mr-4" style="width: 32px;" src="/assets/images/icon-windows.svg">
           <img alt="Mac" class="mr-4" style="width: 32px;" src="/assets/images/icon-mac.svg">
           <img alt="Linux" style="width: 32px;" src="/assets/images/icon-linux.svg">
