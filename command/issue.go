@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -385,7 +386,14 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		if coloredLabels != "" {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, replaceExcessiveWhitespace(issue.Title)), coloredLabels)
+
+		now := time.Now()
+		ago := now.Sub(issue.UpdatedAt)
+
+		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
+			truncate(70, replaceExcessiveWhitespace(issue.Title)),
+			coloredLabels,
+			utils.Gray(utils.FuzzyAgo(ago)))
 	}
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
