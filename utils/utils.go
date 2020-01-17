@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/kballard/go-shellquote"
 	md "github.com/vilmibm/go-termd"
@@ -89,4 +90,18 @@ func Pluralize(num int, thing string) string {
 	} else {
 		return fmt.Sprintf("%d %ss", num, thing)
 	}
+}
+
+func FuzzyAgo(ago time.Duration) string {
+	if ago < time.Minute {
+		return "less than a minute ago"
+	}
+	if ago < time.Hour {
+		return fmt.Sprintf("about %s ago", Pluralize(int(ago.Minutes()), "minute"))
+	}
+	if ago < 24*time.Hour {
+		return fmt.Sprintf("about %s ago", Pluralize(int(ago.Hours()), "hour"))
+	}
+
+	return fmt.Sprintf("about %s ago", Pluralize(int(ago.Hours()/24), "day"))
 }
