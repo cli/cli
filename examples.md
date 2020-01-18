@@ -90,6 +90,16 @@ Switched to branch 'patch-2'
 
 You can also use URLs and branch names to checkout pull requests.
 
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Checking out a pull request locally</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh pr checkout branch-name
+Switched to branch 'branch-name'
+Your branch is up to date with 'origin/branch-name'.
+Already up to date.
+
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+
 ### Viewing the status of your relevant work
 
 #### Pull requests
