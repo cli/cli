@@ -92,16 +92,26 @@ func Pluralize(num int, thing string) string {
 	}
 }
 
+func fmtDuration(amount int, unit string) string {
+	return fmt.Sprintf("about %s ago", Pluralize(amount, unit))
+}
+
 func FuzzyAgo(ago time.Duration) string {
 	if ago < time.Minute {
 		return "less than a minute ago"
 	}
 	if ago < time.Hour {
-		return fmt.Sprintf("about %s ago", Pluralize(int(ago.Minutes()), "minute"))
+		return fmtDuration(int(ago.Minutes()), "minute")
 	}
 	if ago < 24*time.Hour {
-		return fmt.Sprintf("about %s ago", Pluralize(int(ago.Hours()), "hour"))
+		return fmtDuration(int(ago.Hours()), "hour")
+	}
+	if ago < 30*24*time.Hour {
+		return fmtDuration(int(ago.Hours())/24, "day")
+	}
+	if ago < 365*24*time.Hour {
+		return fmtDuration(int(ago.Hours())/24/30, "month")
 	}
 
-	return fmt.Sprintf("about %s ago", Pluralize(int(ago.Hours()/24), "day"))
+	return fmtDuration(int(ago.Hours()/24/365), "year")
 }
