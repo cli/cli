@@ -91,6 +91,37 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	return &result.CreateIssue.Issue, nil
 }
 
+func HasIssuesEnabled(client *Client, ghRepo Repo) (bool, error) {
+	type response struct {
+		Repository struct {
+			HasIssuesEnabled bool
+		}
+	}
+
+	query := `
+  query($owner: String!, $repo: String!) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+    }
+	}`
+
+	owner := ghRepo.RepoOwner()
+	repo := ghRepo.RepoName()
+	variables := map[string]interface{}{
+		"owner": owner,
+		"repo":  repo,
+	}
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return false, err
+	}
+
+	return resp.Repository.HasIssuesEnabled, nil
+
+}
+
 func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
 	type response struct {
 		Repository struct {

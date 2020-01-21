@@ -215,6 +215,14 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	issuesEnabled, err := api.HasIssuesEnabled(apiClient, baseRepo)
+	if err != nil {
+		return err
+	}
+	if !issuesEnabled {
+		return fmt.Errorf("the '%s/%s' repository has disabled issues", baseRepo.RepoOwner(), baseRepo.RepoName())
+	}
+
 	issue, err := issueFromArg(apiClient, baseRepo, args[0])
 	if err != nil {
 		return err
