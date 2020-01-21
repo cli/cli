@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"time"
 )
 
 type IssuesPayload struct {
@@ -16,12 +17,13 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Number   int
-	Title    string
-	URL      string
-	State    string
-	Body     string
-	Comments struct {
+	Number    int
+	Title     string
+	URL       string
+	State     string
+	Body      string
+	UpdatedAt time.Time
+	Comments  struct {
 		TotalCount int
 	}
 	Author struct {
@@ -44,6 +46,7 @@ const fragments = `
 		title
 		url
 		state
+		updatedAt
 		labels(first: 3) {
 			nodes {
 				name
@@ -111,19 +114,19 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
-			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
 				totalCount
 				nodes {
 					...issue
 				}
 			}
-			mentioned: issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+			mentioned: issues(filterBy: {mentioned: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
 				totalCount
 				nodes {
 					...issue
 				}
 			}
-			authored: issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: CREATED_AT, direction: DESC}) {
+			authored: issues(filterBy: {createdBy: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
 				totalCount
 				nodes {
 					...issue
