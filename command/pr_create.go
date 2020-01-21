@@ -63,7 +63,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	headRemote, err := repoContext.RemoteForRepo(headRepo)
 	if err != nil {
-		return errors.Wrap(err, "")
+		return errors.Wrap(err, "git remote not found for head repository")
 	}
 
 	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
@@ -79,13 +79,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse web")
 	}
 	if isWeb {
-		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, baseRepo.RepoOwner(), baseRepo.RepoName(), headBranch)
+		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, headRepo.RepoOwner(), headRepo.RepoName(), headBranch)
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 
+	headBranchLabel := headBranch
+	if !isSameRepo(baseRepo, headRepo) {
+		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+	}
 	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n",
-		utils.Cyan(headBranch),
+		utils.Cyan(headBranchLabel),
 		utils.Cyan(baseBranch),
 		baseRepo.RepoOwner(),
 		baseRepo.RepoName())
@@ -156,7 +160,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			baseRepo.RepoOwner(),
 			baseRepo.RepoName(),
 			baseBranch,
-			headBranch,
+			headBranchLabel,
 			url.QueryEscape(title),
 			url.QueryEscape(body),
 		)
