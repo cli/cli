@@ -203,6 +203,13 @@ func TestIssueView(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "issue": {
 		"number": 123,
 		"url": "https://github.com/OWNER/REPO/issues/123"
@@ -234,6 +241,13 @@ func TestIssueView(t *testing.T) {
 func TestIssueView_preview(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "issue": {
@@ -281,6 +295,13 @@ func TestIssueView_notFound(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`
 	{ "errors": [
 		{ "message": "Could not resolve to an Issue with the number of 9999." }
 	] }
@@ -303,9 +324,33 @@ func TestIssueView_notFound(t *testing.T) {
 	}
 }
 
+func TestIssueView_disabledIssues(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": false
+		} } }
+	`))
+
+	_, err := RunCommand(issueViewCmd, `issue view 6666`)
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Errorf("error running command `issue view`: %v", err)
+	}
+}
+
 func TestIssueView_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "issue": {
