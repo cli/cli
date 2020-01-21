@@ -52,8 +52,15 @@ func TestPRCreate(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID"
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -103,7 +110,20 @@ func TestPRCreate_web(t *testing.T) {
 	initContext = func() context.Context {
 		return ctx
 	}
-	initFakeHTTP()
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	ranCommands := [][]string{}
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -116,11 +136,7 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), `
-Creating pull request for feature into master in OWNER/REPO
-
-Opening https://github.com/OWNER/REPO/pull/feature in your browser.
-`)
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
@@ -139,8 +155,15 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID"
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`

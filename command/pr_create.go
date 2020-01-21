@@ -61,8 +61,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n", utils.Cyan(headBranch), utils.Cyan(baseBranch), baseRepo.RepoOwner(), baseRepo.RepoName())
-
 	headRemote, err := repoContext.RemoteForRepo(headRepo)
 	if err != nil {
 		return errors.Wrap(err, "")
@@ -85,6 +83,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n",
+		utils.Cyan(headBranch),
+		utils.Cyan(baseBranch),
+		baseRepo.RepoOwner(),
+		baseRepo.RepoName())
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
@@ -140,8 +144,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranch,
 		}
 
-		repo := api.Repository{}
-		pr, err := api.CreatePullRequest(client, repo, params)
+		pr, err := api.CreatePullRequest(client, baseRepo, params)
 		if err != nil {
 			return errors.Wrap(err, "failed to create pull request")
 		}
@@ -261,7 +264,7 @@ func (r resolvedRemotes) BaseRepo() (*api.Repository, error) {
 func (r resolvedRemotes) HeadRepo() (*api.Repository, error) {
 	for _, repo := range r.network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
-			return repo.Parent, nil
+			return repo, nil
 		}
 	}
 	return nil, errors.New("none of the repositories have push access")
