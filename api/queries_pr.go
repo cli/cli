@@ -404,7 +404,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
-func CreatePullRequest(client *Client, repo Repository, params map[string]interface{}) (*PullRequest, error) {
+func CreatePullRequest(client *Client, repo *Repository, params map[string]interface{}) (*PullRequest, error) {
 	query := `
 		mutation CreatePullRequest($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
