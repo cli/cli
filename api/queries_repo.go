@@ -109,11 +109,6 @@ func RepoNetwork(client *Client, repos []Repo) (RepoNetworkResult, error) {
 		`, i, repo.RepoOwner(), repo.RepoName()))
 	}
 
-	type ViewerOrRepo struct {
-		Login string
-		Repository
-	}
-
 	graphqlResult := map[string]*json.RawMessage{}
 	result := RepoNetworkResult{}
 
