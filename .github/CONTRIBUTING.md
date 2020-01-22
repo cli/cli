@@ -1,7 +1,5 @@
 ## Contributing
 
-[fork]: https://github.com/cli/cli/fork
-[pr]: https://github.com/cli/cli/compare
 [code-of-conduct]: CODE_OF_CONDUCT.md
 
 Hi! Thanks for your interest in contributing to `gh`!
@@ -17,11 +15,10 @@ Please do:
 
 ## Submitting a bug fix
 
-0. [Fork][fork] and clone the repository
+0. Clone this repository
 0. Create a new branch: `git checkout -b my-branch-name`
-0. Make your change, add tests, and make sure the tests still pass
-0. Link your PR to any relevant issue it addresses
-0. Push to your fork and [submit a pull request][pr]
+0. Make your change, add tests, and ensure tests pass
+0. Make a PR: `gh pr create --web`
 
 Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE.md).
 
