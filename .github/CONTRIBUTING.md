@@ -15,11 +15,12 @@ We _do_ encourage opening issues to propose ideas for discussion and are excited
 fixes or documentation updates. Once `gh` is a more established tool with clear usage patterns we
 may change this policy.
 
-Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE.md).
+* **DO** open issues describing bugs
+* **DO** open issues to discuss new features
+* **DO** open PRs fixing bugs
+* **DO NOT** open PRs to add or significantly change existing features
 
-Please note that this project is released with a [Contributor Code of Conduct][code-of-conduct]. By participating in this project you agree to abide by its terms.
-
-## Submitting a pull request
+## Submitting a bug fix
 
 0. [Fork][fork] and clone the repository
 0. Create a new branch: `git checkout -b my-branch-name`
@@ -28,11 +29,9 @@ Please note that this project is released with a [Contributor Code of Conduct][c
 0. Push to your fork and [submit a pull request][pr]
 0. Pat your self on the back and wait for your pull request to be reviewed and merged.
 
-Here are a few things you can do that will increase the likelihood of your pull request being accepted:
+Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE.md).
 
-- Write tests.
-- Keep your change as focused as possible. If there are multiple changes you would like to make that are not dependent upon each other, consider submitting them as separate pull requests.
-- Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+Please note that this project is released with a [Contributor Code of Conduct][code-of-conduct]. By participating in this project you agree to abide by its terms.
 
 ## Resources
 
