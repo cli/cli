@@ -1,36 +1,18 @@
 <nav class="docs-nav d-flex flex-column bg-gray-light p-6">
-  <div class="mb-2">
-    <a href="/gh">
-      <h3 class="text-gray-dark">Overview</h3>
-    </a>
-  </div>
-  <div class="mb-2">
-    <a href="/installation">
-      <h3 class="text-gray-dark">Installation</h3>
-    </a>
-  </div>
-  <div class="mb-2 d-flex flex-column">
-    <a href="/gh_pr">
-      <h3 class="text-gray-dark">pr</h3>
-    </a>
-    <a href="/gh_pr_create">create</a>
-    <a href="/gh_pr_status">status</a>
-    <a href="/gh_pr_list">list</a>
-    <a href="/gh_pr_view">view</a>
-    <a href="/gh_pr_checkout">checkout</a>
-  </div>
-  <div class="mb-2 d-flex flex-column">
-    <a href="/gh_issue">
-      <h3 class="text-gray-dark">issue</h3>
-    </a>
-    <a href="/gh_issue_create">create</a>
-    <a href="/gh_issue_status">status</a>
-    <a href="/gh_issue_list">list</a>
-    <a href="/gh_issue_view">view</a>
-  </div>
-  <div class="mb-2">
-    <a href="/examples">
-      <h3 class="text-gray-dark">Examples in use</h3>
-    </a>
-  </div>
+  <h3 class="mb-2"><a class="text-gray-dark" href="/installation">Installation</a></h3>
+
+  <!-- auto-generate table of contents for manual pages -->
+  {% for gh_page in site.pages | sort: "path" %}
+    {% assign basename = gh_page.path | split: "/" | last | replace: ".md", "" %}
+    {% assign parts = basename | split: "_" %}
+    {% if parts[0] != "gh" %}{% continue %}{% endif %}
+    {% if parts.size == 2 %}<h3 class="mt-2">{% endif %}
+    <a href="{{ gh_page.url }}"
+      {% if parts.size == 2 %}class="text-gray-dark"{% endif %}
+      {% if page.path == gh_page.path %}style="font-weight:bold"{% endif %}
+      >{{ parts.last }}</a>
+    {% if parts.size == 2 %}</h3>{% endif %}
+  {% endfor %}
+  
+  <h3 class="mt-2"><a class="text-gray-dark" href="/examples">Examples in use</a></h3>
 </nav>
