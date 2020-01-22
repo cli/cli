@@ -93,7 +93,6 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 	ctx := initContext()
 	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {
 		ctx.SetBaseRepo(repo)
-		ctx.SetBranch("master")
 	}
 	return ctx
 }
