@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 )
 
 // NewBlank initializes a blank Context suitable for testing
@@ -17,20 +18,8 @@ type blankContext struct {
 	authToken string
 	authLogin string
 	branch    string
-	baseRepo  GitHubRepository
+	baseRepo  ghrepo.Interface
 	remotes   Remotes
-}
-
-type ghRepo struct {
-	owner string
-	name  string
-}
-
-func (r ghRepo) RepoOwner() string {
-	return r.owner
-}
-func (r ghRepo) RepoName() string {
-	return r.name
 }
 
 func (c *blankContext) AuthToken() (string, error) {
@@ -75,7 +64,7 @@ func (c *blankContext) SetRemotes(stubs map[string]string) {
 	}
 }
 
-func (c *blankContext) BaseRepo() (GitHubRepository, error) {
+func (c *blankContext) BaseRepo() (ghrepo.Interface, error) {
 	if c.baseRepo != nil {
 		return c.baseRepo, nil
 	}
@@ -90,8 +79,5 @@ func (c *blankContext) BaseRepo() (GitHubRepository, error) {
 }
 
 func (c *blankContext) SetBaseRepo(nwo string) {
-	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) == 2 {
-		c.baseRepo = &ghRepo{parts[0], parts[1]}
-	}
+	c.baseRepo = ghrepo.FromFullName(nwo)
 }
