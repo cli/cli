@@ -236,13 +236,15 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
 	type response struct {
 		Repository struct {
-			Issue Issue
+			Issue            Issue
+			HasIssuesEnabled bool
 		}
 	}
 
 	query := `
 	query($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
 			issue(number: $issue_number) {
 				title
 				body
@@ -273,6 +275,10 @@ func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", ghRepo.RepoOwner(), ghRepo.RepoName())
 	}
 
 	return &resp.Repository.Issue, nil
