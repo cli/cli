@@ -2,9 +2,9 @@
 
 [code-of-conduct]: CODE_OF_CONDUCT.md
 
-Hi! Thanks for your interest in contributing to `gh`!
+Hi! Thanks for your interest in contributing to the GitHub CLI!
 
-Given the beta status of this work, we're only accepting PRs for bug fixes right now. We'd love to
+Given the beta status of this work, we're only accepting pull requests for bug fixes right now. We'd love to
 hear about ideas for new features as issues, though!
 
 Please do:
