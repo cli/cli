@@ -232,6 +232,8 @@ func init() {
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 }
 
+// cap the number of git remotes looked up, since the user might have an
+// unusally large number of git remotes
 const maxRemotesForLookup = 5
 
 func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base string) (resolvedRemotes, error) {
@@ -252,6 +254,8 @@ func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base str
 		}
 	}
 	if hasBaseOverride && !foundBaseOverride {
+		// additionally, look up the explicitly specified base repo if it's not
+		// already covered by git remotes
 		repos = append(repos, baseOverride)
 	}
 
@@ -313,7 +317,8 @@ func (r resolvedRemotes) HeadRepo() (*api.Repository, error) {
 func (r resolvedRemotes) RemoteForRepo(repo api.Repo) (*context.Remote, error) {
 	for i, remote := range r.remotes {
 		if isSameRepo(remote, repo) ||
-			// FIXME: express better that this is because of repo renames
+			// additionally, look up the resolved repository name in case this
+			// git remote points to this repository via a redirect
 			(r.network.Repositories[i] != nil && isSameRepo(r.network.Repositories[i], repo)) {
 			return remote, nil
 		}

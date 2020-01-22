@@ -112,6 +112,9 @@ func RepoNetwork(client *Client, repos []Repo) (RepoNetworkResult, error) {
 		`, i, repo.RepoOwner(), repo.RepoName()))
 	}
 
+	// Since the query is constructed dynamically, we can't parse a response
+	// format using a static struct. Instead, hold the raw JSON data until we
+	// decide how to parse it manually.
 	graphqlResult := map[string]*json.RawMessage{}
 	result := RepoNetworkResult{}
 
@@ -157,6 +160,8 @@ func RepoNetwork(client *Client, repos []Repo) (RepoNetworkResult, error) {
 	// sort keys to ensure `repo_{N}` entries are processed in order
 	sort.Sort(sort.StringSlice(keys))
 
+	// Iterate over keys of GraphQL response data and, based on its name,
+	// dynamically allocate the target struct an individual message gets decoded to.
 	for _, name := range keys {
 		jsonMessage := graphqlResult[name]
 		if name == "viewer" {
