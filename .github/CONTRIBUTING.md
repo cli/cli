@@ -9,7 +9,7 @@ Hi! Thanks for your interest in contributing to `gh`!
 Given the beta status of this work, we're only accepting PRs for bug fixes right now. We'd love to
 hear about ideas for new features as issues, though!
 
-please do:
+Please do:
 
 * open an issue if things aren't working as expected
 * open an issue to propose a significant change
