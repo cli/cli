@@ -14,9 +14,7 @@ import (
 type Repository struct {
 	ID    string
 	Name  string
-	Owner struct {
-		Login string
-	}
+	Owner RepositoryOwner
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
@@ -29,6 +27,11 @@ type Repository struct {
 	}
 
 	Parent *Repository
+}
+
+// RepositoryOwner is the owner of a GitHub repository
+type RepositoryOwner struct {
+	Login string
 }
 
 // RepoOwner is the login name of the owner
@@ -181,4 +184,33 @@ func RepoNetwork(client *Client, repos []Repo) (RepoNetworkResult, error) {
 		}
 	}
 	return result, nil
+}
+
+// repositoryV3 is the repository result from GitHub API v3
+type repositoryV3 struct {
+	NodeID string
+	Name   string
+	Owner  struct {
+		Login string
+	}
+}
+
+// ForkRepo forks the repository on GitHub and returns the new repository
+func ForkRepo(client *Client, repo Repo) (*Repository, error) {
+	path := fmt.Sprintf("repos/%s/%s/forks", repo.RepoOwner(), repo.RepoName())
+	body := bytes.NewBufferString(`{}`)
+	result := repositoryV3{}
+	err := client.REST("POST", path, body, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		ID:   result.NodeID,
+		Name: result.Name,
+		Owner: RepositoryOwner{
+			Login: result.Owner.Login,
+		},
+		ViewerPermission: "WRITE",
+	}, nil
 }

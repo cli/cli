@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
@@ -51,27 +52,61 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		baseBranch = baseRepo.DefaultBranchRef.Name
 	}
 
+	didForkRepo := false
+	var headRemote *context.Remote
 	headRepo, err := repoContext.HeadRepo()
 	if err != nil {
-		// TODO: auto-fork repository and add new git remote
-		return errors.Wrap(err, "could not determine the head repository")
+		if baseRepo.IsPrivate {
+			return fmt.Errorf("cannot write to private repository '%s/%s'", baseRepo.RepoOwner(), baseRepo.RepoName())
+		}
+		headRepo, err = api.ForkRepo(client, baseRepo)
+		if err != nil {
+			return fmt.Errorf("error forking repo: %w", err)
+		}
+		didForkRepo = true
+		// TODO: support non-HTTPS git remote URLs
+		baseRepoURL := fmt.Sprintf("https://github.com/%s/%s.git", baseRepo.RepoOwner(), baseRepo.RepoName())
+		headRepoURL := fmt.Sprintf("https://github.com/%s/%s.git", headRepo.RepoOwner(), headRepo.RepoName())
+		// TODO: figure out what to name the new git remote
+		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
+		if err != nil {
+			return fmt.Errorf("error adding remote: %w", err)
+		}
+		headRemote = &context.Remote{
+			Remote: gitRemote,
+			Owner:  headRepo.RepoOwner(),
+			Repo:   headRepo.RepoName(),
+		}
 	}
 
 	if headBranch == baseBranch && isSameRepo(baseRepo, headRepo) {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
 	}
 
-	headRemote, err := repoContext.RemoteForRepo(headRepo)
-	if err != nil {
-		return errors.Wrap(err, "git remote not found for head repository")
+	if headRemote == nil {
+		headRemote, err = repoContext.RemoteForRepo(headRepo)
+		if err != nil {
+			return errors.Wrap(err, "git remote not found for head repository")
+		}
 	}
 
 	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
-	// TODO: respect existing upstream configuration of the current branch
-	if err = git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
-		return err
+	pushTries := 0
+	maxPushTries := 3
+	for {
+		// TODO: respect existing upstream configuration of the current branch
+		if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
+			if didForkRepo && pushTries < maxPushTries {
+				pushTries++
+				// first wait 2 seconds after forking, then 4s, then 6s
+				time.Sleep(time.Duration(2*pushTries) * time.Second)
+				continue
+			}
+			return err
+		}
+		break
 	}
 
 	isWeb, err := cmd.Flags().GetBool("web")
