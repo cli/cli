@@ -22,7 +22,6 @@ Please do:
 0. Make your change, add tests, and make sure the tests still pass
 0. Link your PR to any relevant issue it addresses
 0. Push to your fork and [submit a pull request][pr]
-0. Wait for your pull request to be reviewed and merged.
 
 Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE.md).
 
