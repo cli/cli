@@ -8,7 +8,7 @@ Hi there! We're thrilled that you'd like to contribute to this project. Your hel
 
 `gh` is still beta software and the team behind it at GitHub has a lot of work planned. We're still
 building out what we see as key features and plan to test out a lot of hypotheses about how we can
-make working with GitHub from the CLI great. As such, **we will likely not accept PRs that implement
+make working with GitHub from the CLI great. As such, **we are not currently accepting PRs that implement
 large, new features** or make significant changes to existing featues.
 
 We _do_ encourage opening issues to propose ideas for discussion and are excited to take PRs for bug
