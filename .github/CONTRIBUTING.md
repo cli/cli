@@ -1,6 +1,6 @@
 ## Contributing
 
-[code-of-conduct]: CODE_OF_CONDUCT.md
+[code-of-conduct]: CODE-OF-CONDUCT.md
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
