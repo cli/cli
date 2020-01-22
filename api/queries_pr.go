@@ -6,9 +6,14 @@ import (
 )
 
 type PullRequestsPayload struct {
-	ViewerCreated   []PullRequest
-	ReviewRequested []PullRequest
+	ViewerCreated   PullRequestAndTotalCount
+	ReviewRequested PullRequestAndTotalCount
 	CurrentPR       *PullRequest
+}
+
+type PullRequestAndTotalCount struct {
+	TotalCount   int
+	PullRequests []PullRequest
 }
 
 type PullRequest struct {
@@ -16,8 +21,13 @@ type PullRequest struct {
 	Title       string
 	State       string
 	URL         string
+	BaseRefName string
 	HeadRefName string
+	Body        string
 
+	Author struct {
+		Login string
+	}
 	HeadRepositoryOwner struct {
 		Login string
 	}
@@ -33,7 +43,8 @@ type PullRequest struct {
 	ReviewDecision string
 
 	Commits struct {
-		Nodes []struct {
+		TotalCount int
+		Nodes      []struct {
 			Commit struct {
 				StatusCheckRollup struct {
 					Contexts struct {
@@ -123,12 +134,9 @@ type Repo interface {
 
 func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
-		Edges []struct {
+		TotalCount int
+		Edges      []struct {
 			Node PullRequest
-		}
-		PageInfo struct {
-			HasNextPage bool
-			EndCursor   string
 		}
 	}
 
@@ -181,6 +189,7 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
+				totalCount
 				edges {
 					node {
 						...prWithReviews
@@ -202,23 +211,19 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 
 	query := fragments + queryPrefix + `
       viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+       totalCount: issueCount
         edges {
           node {
             ...prWithReviews
           }
         }
-        pageInfo {
-          hasNextPage
-        }
       }
       reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+        totalCount: issueCount
         edges {
           node {
             ...pr
           }
-        }
-        pageInfo {
-          hasNextPage
         }
       }
     }
@@ -270,9 +275,15 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	}
 
 	payload := PullRequestsPayload{
-		viewerCreated,
-		reviewRequested,
-		currentPR,
+		ViewerCreated: PullRequestAndTotalCount{
+			PullRequests: viewerCreated,
+			TotalCount:   resp.ViewerCreated.TotalCount,
+		},
+		ReviewRequested: PullRequestAndTotalCount{
+			PullRequests: reviewRequested,
+			TotalCount:   resp.ReviewRequested.TotalCount,
+		},
+		CurrentPR: currentPR,
 	}
 
 	return &payload, nil
@@ -291,6 +302,15 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 			pullRequest(number: $pr_number) {
 				url
 				number
+				title
+				body
+				author {
+				  login
+				}
+				commits {
+				  totalCount
+				}
+				baseRefName
 				headRefName
 				headRepositoryOwner {
 					login
@@ -338,7 +358,15 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 				nodes {
 					number
 					title
+					body
+					author {
+						login
+					}
+					commits {
+						totalCount
+					}
 					url
+					baseRefName
 					headRefName
 					headRepositoryOwner {
 						login
@@ -376,7 +404,7 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 }
 
 func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
-	repoID, err := GitHubRepoId(client, ghRepo)
+	repo, err := GitHubRepo(client, ghRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +419,7 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 	}`
 
 	inputParams := map[string]interface{}{
-		"repositoryId": repoID,
+		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
 		inputParams[key] = val

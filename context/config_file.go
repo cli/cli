@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 
 	"gopkg.in/yaml.v3"
 )
@@ -25,8 +24,6 @@ func parseOrSetupConfigFile(fn string) (*configEntry, error) {
 }
 
 func parseConfigFile(fn string) (*configEntry, error) {
-	migrateConfigFile()
-
 	f, err := os.Open(fn)
 	if err != nil {
 		return nil, err
@@ -64,45 +61,4 @@ func parseConfig(r io.Reader) (*configEntry, error) {
 		}
 	}
 	return nil, fmt.Errorf("could not find config entry for %q", defaultHostname)
-}
-
-// This is a temporary function that will migrate the config file. It can be removed
-// in January.
-//
-// If the config dir is a file, convert it to a directory and place the file
-// into a file named config.yml
-func migrateConfigFile() {
-	p := ConfigDir()
-	fi, err := os.Stat(p)
-	if err != nil { // This means the file doesn't exist, and that is fine.
-		return
-	}
-	if fi.Mode().IsDir() {
-		return
-	}
-
-	content, err := ioutil.ReadFile(p)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migration error: failed to read config at %s", p)
-		return
-	}
-
-	err = os.Remove(p)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migration error: failed to remove %s", p)
-		return
-	}
-
-	err = os.MkdirAll(p, 0771)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migration error: failed to mkdir %s", p)
-		return
-	}
-
-	newPath := path.Join(p, "config.yml")
-	err = ioutil.WriteFile(newPath, []byte(content), 0771)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migration error: failed write to new config path %s", newPath)
-		return
-	}
 }

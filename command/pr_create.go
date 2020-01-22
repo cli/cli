@@ -2,12 +2,12 @@ package command
 
 import (
 	"fmt"
-	"os"
-	"runtime"
+	"net/url"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -21,13 +21,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if ucc > 0 {
-		noun := "change"
-		if ucc > 1 {
-			// TODO: use pluralize helper
-			noun = noun + "s"
-		}
-
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %d uncommitted %s\n", ucc, noun)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
 
 	repo, err := ctx.BaseRepo()
@@ -44,6 +38,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+
+	target, err := cmd.Flags().GetString("base")
+	if err != nil {
+		return err
+	}
+	if target == "" {
+		// TODO use default branch
+		target = "master"
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n", utils.Cyan(head), utils.Cyan(target), repo.RepoOwner(), repo.RepoName())
 
 	if err = git.Push(remote, fmt.Sprintf("HEAD:%s", head)); err != nil {
 		return err
@@ -68,16 +73,26 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse body")
 	}
 
+	action := SubmitAction
+
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body)
+		var templateFiles []string
+		if rootDir, err := git.ToplevelDir(); err == nil {
+			// TODO: figure out how to stub this in tests
+			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+		}
+
+		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}
 
-		if tb == nil {
-			// editing was canceled, we can just leave
+		action = tb.Action
+
+		if action == CancelAction {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
 			return nil
 		}
 
@@ -108,21 +123,44 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse draft")
 	}
 
-	params := map[string]interface{}{
-		"title":       title,
-		"body":        body,
-		"draft":       isDraft,
-		"baseRefName": base,
-		"headRefName": head,
+	if action == SubmitAction {
+		params := map[string]interface{}{
+			"title":       title,
+			"body":        body,
+			"draft":       isDraft,
+			"baseRefName": base,
+			"headRefName": head,
+		}
+
+		pr, err := api.CreatePullRequest(client, repo, params)
+		if err != nil {
+			return errors.Wrap(err, "failed to create pull request")
+		}
+
+		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+	} else if action == PreviewAction {
+		openURL := fmt.Sprintf(
+			"https://github.com/%s/%s/compare/%s...%s?expand=1&title=%s&body=%s",
+			repo.RepoOwner(),
+			repo.RepoName(),
+			target,
+			head,
+			url.QueryEscape(title),
+			url.QueryEscape(body),
+		)
+		// TODO could exceed max url length for explorer
+		url, err := url.Parse(openURL)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		return utils.OpenInBrowser(openURL)
+	} else {
+		panic("Unreachable state")
 	}
 
-	pr, err := api.CreatePullRequest(client, repo, params)
-	if err != nil {
-		return errors.Wrap(err, "failed to create pull request")
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	return nil
+
 }
 
 func guessRemote(ctx context.Context) (string, error) {
@@ -139,19 +177,6 @@ func guessRemote(ctx context.Context) (string, error) {
 	}
 
 	return remote.Name, nil
-}
-
-func determineEditor() string {
-	if runtime.GOOS == "windows" {
-		return "notepad"
-	}
-	if v := os.Getenv("VISUAL"); v != "" {
-		return v
-	}
-	if e := os.Getenv("EDITOR"); e != "" {
-		return e
-	}
-	return "nano"
 }
 
 var prCreateCmd = &cobra.Command{

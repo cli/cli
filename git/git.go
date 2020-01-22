@@ -18,11 +18,13 @@ func VerifyRef(ref string) bool {
 	return err == nil
 }
 
+// CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	branchCmd := exec.Command("git", "branch", "--show-current")
+	// we avoid using `git branch --show-current` for compatibility with git < 2.22
+	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	output, err := utils.PrepareCmd(branchCmd).Output()
 	branchName := firstLine(output)
-	if err == nil && branchName == "" {
+	if err == nil && branchName == "HEAD" {
 		return "", errors.New("git: not on any branch")
 	}
 	return branchName, err
@@ -109,6 +111,14 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 		}
 	}
 	return
+}
+
+// ToplevelDir returns the top-level directory path of the current repository
+func ToplevelDir() (string, error) {
+	showCmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := utils.PrepareCmd(showCmd).Output()
+	return firstLine(output), err
+
 }
 
 func outputLines(output []byte) []string {

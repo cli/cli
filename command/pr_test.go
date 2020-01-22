@@ -50,12 +50,14 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 	cmd.SetErr(&errBuf)
 
 	// Reset flag values so they don't leak between tests
+	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		switch v := f.Value.(type) {
 		case pflag.SliceValue:
 			v.Replace([]string{})
 		default:
-			if v.Type() == "bool" {
+			switch v.Type() {
+			case "bool", "string":
 				v.Set(f.DefValue)
 			}
 		}
@@ -95,6 +97,60 @@ func TestPRStatus(t *testing.T) {
 	}
 }
 
+func TestPRStatus_reviewsAndChecks(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := []string{
+		"- Checks passing - changes requested",
+		"- Checks pending - approved",
+		"- 1/3 checks failing - review required",
+	}
+
+	for _, line := range expected {
+		if !strings.Contains(output.String(), line) {
+			t.Errorf("output did not contain %q: %q", line, output.String())
+		}
+	}
+}
+
+func TestPRStatus_blankSlate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {} }
+	`))
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := `Current branch
+  There is no pull request associated with [blueberries]
+
+Created by you
+  You have no open pull requests
+
+Requesting a code review from you
+  You have no pull requests to review
+
+`
+	if output.String() != expected {
+		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
 func TestPRList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
@@ -127,7 +183,11 @@ func TestPRList_filtering(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "No pull requests match your search\n")
+	eq(t, output.Stderr(), `
+Pull requests for OWNER/REPO
+
+No pull requests match your search
+`)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
@@ -175,6 +235,69 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	_, err := RunCommand(prListCmd, `pr list -l one,two -a hubot`)
 	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
 		t.Fatal(err)
+	}
+}
+
+func TestPRView_preview(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prViewCmd, "pr view -p 12")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`Blueberries are from a fork`),
+		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`blueberries taste good`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
+func TestPRView_previewCurrentBranch(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prView.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view -p")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`Blueberries are a good fruit`),
+		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`blueberries taste good`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
 	}
 }
 

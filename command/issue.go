@@ -3,13 +3,16 @@ package command
 import (
 	"fmt"
 	"io"
-	"os"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
+	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -26,13 +29,15 @@ func init() {
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
-	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create an issue")
+	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
+
+	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
 
 var issueCmd = &cobra.Command{
@@ -103,6 +108,8 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+
 	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
@@ -169,8 +176,8 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	printHeader(out, "Issues assigned to you")
-	if len(issuePayload.Assigned) > 0 {
-		printIssues(out, "  ", issuePayload.Assigned...)
+	if issuePayload.Assigned.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := fmt.Sprintf("  There are no issues assigned to you")
 		printMessage(out, message)
@@ -178,16 +185,16 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out)
 
 	printHeader(out, "Issues mentioning you")
-	if len(issuePayload.Mentioned) > 0 {
-		printIssues(out, "  ", issuePayload.Mentioned...)
+	if issuePayload.Mentioned.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
 		printMessage(out, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
 	printHeader(out, "Issues opened by you")
-	if len(issuePayload.Authored) > 0 {
-		printIssues(out, "  ", issuePayload.Authored...)
+	if issuePayload.Authored.TotalCount > 0 {
+		printIssues(out, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
 		printMessage(out, "  There are no issues opened by you")
 	}
@@ -214,8 +221,39 @@ func issueView(cmd *cobra.Command, args []string) error {
 	}
 	openURL := issue.URL
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-	return utils.OpenInBrowser(openURL)
+	preview, err := cmd.Flags().GetBool("preview")
+	if err != nil {
+		return err
+	}
+
+	if preview {
+		out := colorableOut(cmd)
+		printIssuePreview(out, issue)
+		return nil
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+	}
+
+}
+
+func printIssuePreview(out io.Writer, issue *api.Issue) {
+	coloredLabels := labelList(*issue)
+	if coloredLabels != "" {
+		coloredLabels = utils.Gray(fmt.Sprintf("(%s)", coloredLabels))
+	}
+
+	fmt.Fprintln(out, utils.Bold(issue.Title))
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+		"opened by %s. %s. %s",
+		issue.Author.Login,
+		utils.Pluralize(issue.Comments.TotalCount, "comment"),
+		coloredLabels,
+	)))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 }
 
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
@@ -241,11 +279,18 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+
+	var templateFiles []string
+	if rootDir, err := git.ToplevelDir(); err == nil {
+		// TODO: figure out how to stub this in tests
+		templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/%s/issues/new", baseRepo.RepoOwner(), baseRepo.RepoName())
-		// TODO: figure out how to stub this in tests
-		if stat, err := os.Stat(".github/ISSUE_TEMPLATE"); err == nil && stat.IsDir() {
+		if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
 		cmd.Printf("Opening %s in your browser.\n", openURL)
@@ -256,6 +301,16 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	repo, err := api.GitHubRepo(apiClient, baseRepo)
+	if err != nil {
+		return err
+	}
+	if !repo.HasIssuesEnabled {
+		return fmt.Errorf("the '%s/%s' repository has disabled issues", baseRepo.RepoOwner(), baseRepo.RepoName())
+	}
+
+	action := SubmitAction
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
@@ -269,13 +324,16 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body)
+		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
 			return errors.Wrap(err, "could not collect title and/or body")
 		}
 
-		if tb == nil {
-			// editing was canceled, we can just leave
+		action = tb.Action
+
+		if tb.Action == CancelAction {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
+
 			return nil
 		}
 
@@ -286,28 +344,60 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			body = tb.Body
 		}
 	}
-	params := map[string]interface{}{
-		"title": title,
-		"body":  body,
+
+	if action == PreviewAction {
+		openURL := fmt.Sprintf(
+			"https://github.com/%s/%s/issues/new/?title=%s&body=%s",
+			baseRepo.RepoOwner(),
+			baseRepo.RepoName(),
+			url.QueryEscape(title),
+			url.QueryEscape(body),
+		)
+		// TODO could exceed max url length for explorer
+		url, err := url.Parse(openURL)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		return utils.OpenInBrowser(openURL)
+	} else if action == SubmitAction {
+		params := map[string]interface{}{
+			"title": title,
+			"body":  body,
+		}
+
+		newIssue, err := api.IssueCreate(apiClient, repo, params)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
+	} else {
+		panic("Unreachable state")
 	}
 
-	newIssue, err := api.IssueCreate(apiClient, baseRepo, params)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
 	return nil
 }
 
-func printIssues(w io.Writer, prefix string, issues ...api.Issue) {
+func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
 	for _, issue := range issues {
 		number := utils.Green("#" + strconv.Itoa(issue.Number))
 		coloredLabels := labelList(issue)
 		if coloredLabels != "" {
 			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
-		fmt.Fprintf(w, "%s%s %s%s\n", prefix, number, truncate(70, replaceExcessiveWhitespace(issue.Title)), coloredLabels)
+
+		now := time.Now()
+		ago := now.Sub(issue.UpdatedAt)
+
+		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
+			truncate(70, replaceExcessiveWhitespace(issue.Title)),
+			coloredLabels,
+			utils.Gray(utils.FuzzyAgo(ago)))
+	}
+	remaining := totalCount - len(issues)
+	if remaining > 0 {
+		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 

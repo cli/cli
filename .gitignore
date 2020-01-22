@@ -3,3 +3,5 @@
 .envrc
 /dist
 /site
+.github/**/node_modules
+/CHANGELOG.md

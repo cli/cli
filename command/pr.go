@@ -31,6 +31,8 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+
+	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
 }
 
 var prCmd = &cobra.Command{
@@ -99,7 +101,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
-		printPrs(out, *prPayload.CurrentPR)
+		printPrs(out, 0, *prPayload.CurrentPR)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
@@ -107,16 +109,16 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out)
 
 	printHeader(out, "Created by you")
-	if len(prPayload.ViewerCreated) > 0 {
-		printPrs(out, prPayload.ViewerCreated...)
+	if prPayload.ViewerCreated.TotalCount > 0 {
+		printPrs(out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
 	} else {
 		printMessage(out, "  You have no open pull requests")
 	}
 	fmt.Fprintln(out)
 
 	printHeader(out, "Requesting a code review from you")
-	if len(prPayload.ReviewRequested) > 0 {
-		printPrs(out, prPayload.ReviewRequested...)
+	if prPayload.ReviewRequested.TotalCount > 0 {
+		printPrs(out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
 	} else {
 		printMessage(out, "  You have no pull requests to review")
 	}
@@ -136,6 +138,8 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -251,9 +255,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	preview, err := cmd.Flags().GetBool("preview")
+	if err != nil {
+		return err
+	}
+
 	var openURL string
+	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err := prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -266,8 +276,14 @@ func prView(cmd *cobra.Command, args []string) error {
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+			if preview {
+				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+				if err != nil {
+					return err
+				}
+			}
 		} else {
-			pr, err := api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
 				var notFoundErr *api.NotFoundError
 				if errors.As(err, &notFoundErr) {
@@ -280,8 +296,29 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-	return utils.OpenInBrowser(openURL)
+	if preview {
+		out := colorableOut(cmd)
+		printPrPreview(out, pr)
+		return nil
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
+	}
+}
+
+func printPrPreview(out io.Writer, pr *api.PullRequest) {
+	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+		"%s wants to merge %s into %s from %s",
+		pr.Author.Login,
+		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		pr.BaseRefName,
+		pr.HeadRefName,
+	)))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
@@ -433,10 +470,10 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printPrs(w io.Writer, prs ...api.PullRequest) {
+func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Yellow(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -469,6 +506,10 @@ func printPrs(w io.Writer, prs ...api.PullRequest) {
 		}
 
 		fmt.Fprint(w, "\n")
+	}
+	remaining := totalCount - len(prs)
+	if remaining > 0 {
+		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
 	}
 }
 
