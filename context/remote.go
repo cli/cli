@@ -6,9 +6,8 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 )
-
-const defaultHostname = "github.com"
 
 // Remotes represents a set of git remotes
 type Remotes []*Remote
@@ -75,39 +74,18 @@ func (r Remote) RepoOwner() string {
 // TODO: accept an interface instead of git.RemoteSet
 func translateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
 	for _, r := range gitRemotes {
-		var owner string
-		var repo string
+		var repo ghrepo.Interface
 		if r.FetchURL != nil {
-			owner, repo, _ = repoFromURL(urlTranslate(r.FetchURL))
+			repo, _ = ghrepo.FromURL(urlTranslate(r.FetchURL))
 		}
-		if r.PushURL != nil && owner == "" {
-			owner, repo, _ = repoFromURL(urlTranslate(r.PushURL))
+		if r.PushURL != nil && repo == nil {
+			repo, _ = ghrepo.FromURL(urlTranslate(r.PushURL))
 		}
 		remotes = append(remotes, &Remote{
 			Remote: r,
-			Owner:  owner,
-			Repo:   repo,
+			Owner:  repo.RepoOwner(),
+			Repo:   repo.RepoName(),
 		})
 	}
 	return
-}
-
-// RepoFromURL maps a URL to a GitHubRepository
-func RepoFromURL(u *url.URL) (GitHubRepository, error) {
-	owner, repo, err := repoFromURL(u)
-	if err != nil {
-		return nil, err
-	}
-	return ghRepo{owner, repo}, nil
-}
-
-func repoFromURL(u *url.URL) (string, string, error) {
-	if !strings.EqualFold(u.Hostname(), defaultHostname) {
-		return "", "", fmt.Errorf("unsupported hostname: %s", u.Hostname())
-	}
-	parts := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 3)
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("invalid path: %s", u.Path)
-	}
-	return parts[0], strings.TrimSuffix(parts[1], ".git"), nil
 }

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/pkg/errors"
 )
 
@@ -60,10 +61,7 @@ func (r Repository) ViewerCanPush() bool {
 }
 
 // GitHubRepo looks up the node ID of a named repository
-func GitHubRepo(client *Client, ghRepo Repo) (*Repository, error) {
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
-
+func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
@@ -72,8 +70,8 @@ func GitHubRepo(client *Client, ghRepo Repo) (*Repository, error) {
 		}
 	}`
 	variables := map[string]interface{}{
-		"owner": owner,
-		"name":  repo,
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
 	}
 
 	result := struct {
@@ -82,7 +80,7 @@ func GitHubRepo(client *Client, ghRepo Repo) (*Repository, error) {
 	err := client.GraphQL(query, variables, &result)
 
 	if err != nil || result.Repository.ID == "" {
-		newErr := fmt.Errorf("failed to determine repository ID for '%s/%s'", owner, repo)
+		newErr := fmt.Errorf("failed to determine repository ID for '%s'", ghrepo.FullName(repo))
 		if err != nil {
 			newErr = errors.Wrap(err, newErr.Error())
 		}
@@ -99,7 +97,7 @@ type RepoNetworkResult struct {
 }
 
 // RepoNetwork inspects the relationship between multiple GitHub repositories
-func RepoNetwork(client *Client, repos []Repo) (RepoNetworkResult, error) {
+func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, error) {
 	queries := []string{}
 	for i, repo := range repos {
 		queries = append(queries, fmt.Sprintf(`
@@ -201,8 +199,8 @@ type repositoryV3 struct {
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo Repo) (*Repository, error) {
-	path := fmt.Sprintf("repos/%s/%s/forks", repo.RepoOwner(), repo.RepoName())
+func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
 	body := bytes.NewBufferString(`{}`)
 	result := repositoryV3{}
 	err := client.REST("POST", path, body, &result)
