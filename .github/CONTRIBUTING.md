@@ -4,21 +4,16 @@
 [pr]: https://github.com/cli/cli/compare
 [code-of-conduct]: CODE_OF_CONDUCT.md
 
-Hi there! We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
+Hi! Thanks for your interest in contributing to `gh`!
 
-`gh` is still beta software and the team behind it at GitHub has a lot of work planned. We're still
-building out what we see as key features and plan to test out a lot of hypotheses about how we can
-make working with GitHub from the CLI great. As such, **we are not currently accepting PRs that implement
-large, new features** or make significant changes to existing featues.
+Given the beta status of this work, we're only accepting PRs for bug fixes right now. We'd love to
+hear about ideas for new features as issues, though!
 
-We _do_ encourage opening issues to propose ideas for discussion and are excited to take PRs for bug
-fixes or documentation updates. Once `gh` is a more established tool with clear usage patterns we
-may change this policy.
+please do:
 
-* **DO** open issues describing bugs
-* **DO** open issues to discuss new features
-* **DO** open PRs fixing bugs
-* **DO NOT** open PRs to add or significantly change existing features
+* open an issue if things aren't working as expected
+* open an issue to propose a significant change
+* open a PR to fix a bug
 
 ## Submitting a bug fix
 
