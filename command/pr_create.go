@@ -149,11 +149,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			url.QueryEscape(body),
 		)
 		// TODO could exceed max url length for explorer
-		url, err := url.Parse(openURL)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else {
 		panic("Unreachable state")
