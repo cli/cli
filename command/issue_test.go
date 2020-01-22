@@ -203,14 +203,7 @@ func TestIssueView(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "issue": {
+	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 		"number": 123,
 		"url": "https://github.com/OWNER/REPO/issues/123"
 	} } } }
@@ -243,14 +236,7 @@ func TestIssueView_preview(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "issue": {
+		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 		"number": 123,
 		"body": "**bold story**",
 		"title": "ix of coins",
@@ -293,13 +279,6 @@ func TestIssueView_preview(t *testing.T) {
 func TestIssueView_notFound(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "errors": [
@@ -346,14 +325,7 @@ func TestIssueView_urlArg(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "issue": {
+	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 		"number": 123,
 		"url": "https://github.com/OWNER/REPO/issues/123"
 	} } } }
