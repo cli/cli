@@ -84,7 +84,7 @@ func BasicClient() (*api.Client, error) {
 		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", c.Token)))
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr))
+		opts = append(opts, api.VerboseLog(os.Stderr, false))
 	}
 	return api.NewClient(opts...), nil
 }
@@ -112,7 +112,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		api.AddHeader("GraphQL-Features", "pe_mobile"),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr))
+		opts = append(opts, api.VerboseLog(os.Stderr, strings.Contains(verbose, "api")))
 	}
 	return api.NewClient(opts...), nil
 }
