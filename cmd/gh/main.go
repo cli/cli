@@ -28,6 +28,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		_, isFlagError := err.(command.FlagError)
 		if isFlagError || strings.HasPrefix(err.Error(), "unknown command ") {
+			if !strings.HasSuffix(err.Error(), "\n") {
+				fmt.Fprintln(os.Stderr)
+			}
 			fmt.Fprintln(os.Stderr, cmd.UsageString())
 		}
 		os.Exit(1)
