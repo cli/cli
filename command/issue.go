@@ -47,7 +47,7 @@ var issueCmd = &cobra.Command{
 
 An issue can be supplied as argument in any of the following formats:
 - by number, e.g. "123"; or
-- by URL, e.g. "https://github.com/<owner>/<repo>/issues/123".`,
+- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -68,7 +68,7 @@ var issueViewCmd = &cobra.Command{
 	Use: "view {<number> | <url> | <branch>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return errors.New("requires an issue number as an argument")
+			return FlagError{errors.New("issue required as argument")}
 		}
 		return nil
 	},
