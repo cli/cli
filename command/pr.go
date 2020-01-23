@@ -67,9 +67,13 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view {<number> | <url> | <branch>}",
+	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	RunE:  prView,
+	Long: `View a pull request specified by the argument in the browser.
+
+Without an argument, the pull request that belongs to the current
+branch is opened.`,
+	RunE: prView,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
