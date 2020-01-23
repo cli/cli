@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-cli/internal/ghrepo"
-	"github.com/pkg/errors"
 )
 
 // Repository contains information about a GitHub repo
@@ -82,7 +81,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	if err != nil || result.Repository.ID == "" {
 		newErr := fmt.Errorf("failed to determine repository ID for '%s'", ghrepo.FullName(repo))
 		if err != nil {
-			newErr = errors.Wrap(err, newErr.Error())
+			newErr = fmt.Errorf("%s: %w", newErr, err)
 		}
 		return nil, newErr
 	}

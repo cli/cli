@@ -1,10 +1,11 @@
 package command
 
 import (
+	"fmt"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/pkg/surveyext"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ func confirm() (Action, error) {
 
 	err := survey.Ask(confirmQs, &confirmAnswers)
 	if err != nil {
-		return -1, errors.Wrap(err, "could not prompt")
+		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
 
 	return Action(confirmAnswers.Confirmation), nil
@@ -68,7 +69,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 			},
 		}
 		if err := survey.Ask(selectQs, &templateResponse); err != nil {
-			return "", errors.Wrap(err, "could not prompt")
+			return "", fmt.Errorf("could not prompt: %w", err)
 		}
 	}
 
@@ -117,12 +118,12 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 
 	err := survey.Ask(qs, &inProgress)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not prompt")
+		return nil, fmt.Errorf("could not prompt: %w", err)
 	}
 
 	confirmA, err := confirm()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to confirm")
+		return nil, fmt.Errorf("unable to confirm: %w", err)
 	}
 
 	inProgress.Action = confirmA

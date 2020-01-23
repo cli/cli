@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -12,7 +13,6 @@ import (
 	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +25,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	client, err := apiClientForContext(ctx)
 	if err != nil {
-		return errors.Wrap(err, "could not initialize API client")
+		return fmt.Errorf("could not initialize API client: %w", err)
 	}
 
 	baseRepoOverride, _ := cmd.Flags().GetString("repo")
@@ -36,12 +36,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	baseRepo, err := repoContext.BaseRepo()
 	if err != nil {
-		return errors.Wrap(err, "could not determine the base repository")
+		return fmt.Errorf("could not determine base repository: %w", err)
 	}
 
 	headBranch, err := ctx.Branch()
 	if err != nil {
-		return errors.Wrap(err, "could not determine the current branch")
+		return fmt.Errorf("could not determine the current branch: %w", err)
 	}
 
 	baseBranch, err := cmd.Flags().GetString("base")
@@ -86,7 +86,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if headRemote == nil {
 		headRemote, err = repoContext.RemoteForRepo(headRepo)
 		if err != nil {
-			return errors.Wrap(err, "git remote not found for head repository")
+			return fmt.Errorf("git remote not found for head repository: %w", err)
 		}
 	}
 
@@ -111,7 +111,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {
-		return errors.Wrap(err, "could not parse web")
+		return fmt.Errorf("could not parse web: %q", err)
 	}
 	if isWeb {
 		openURL := fmt.Sprintf(`https://github.com/%s/pull/%s`, ghrepo.FullName(headRepo), headBranch)
@@ -130,11 +130,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
-		return errors.Wrap(err, "could not parse title")
+		return fmt.Errorf("could not parse title: %w", err)
 	}
 	body, err := cmd.Flags().GetString("body")
 	if err != nil {
-		return errors.Wrap(err, "could not parse body")
+		return fmt.Errorf("could not parse body: %w", err)
 	}
 
 	action := SubmitAction
@@ -150,7 +150,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
-			return errors.Wrap(err, "could not collect title and/or body")
+			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
 
 		action = tb.Action
@@ -170,7 +170,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
-		return errors.Wrap(err, "could not parse draft")
+		return fmt.Errorf("could not parse draft: %w", err)
 	}
 
 	if action == SubmitAction {
@@ -184,7 +184,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
 		if err != nil {
-			return errors.Wrap(err, "failed to create pull request")
+			return fmt.Errorf("failed to create pull request: %w", err)
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
