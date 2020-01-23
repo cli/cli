@@ -42,8 +42,8 @@ var prCmd = &cobra.Command{
 
 A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
-- by URL, e.g. "https://github.com/<owner>/<repo>/pull/123"; or
-- by the name of its head branch, e.g. "patch-1" or "<owner>:patch-1".`,
+- by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
+- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
 }
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
@@ -67,9 +67,13 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view {<number> | <url> | <branch>}",
+	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	RunE:  prView,
+	Long: `View a pull request specified by the argument in the browser.
+
+Without an argument, the pull request that belongs to the current
+branch is opened.`,
+	RunE: prView,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
