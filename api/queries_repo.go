@@ -2,8 +2,6 @@ package api
 
 import (
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 // Repository contains information about a GitHub repo
@@ -37,7 +35,7 @@ func GitHubRepo(client *Client, ghRepo Repo) (*Repository, error) {
 	if err != nil || result.Repository.ID == "" {
 		newErr := fmt.Errorf("failed to determine repository ID for '%s/%s'", owner, repo)
 		if err != nil {
-			newErr = errors.Wrap(err, newErr.Error())
+			newErr = fmt.Errorf("%s: %w", newErr, err)
 		}
 		return nil, newErr
 	}

@@ -9,7 +9,6 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -26,12 +25,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	repo, err := ctx.BaseRepo()
 	if err != nil {
-		return errors.Wrap(err, "could not determine GitHub repo")
+		return fmt.Errorf("could not determine GitHub repo: %w", err)
 	}
 
 	head, err := ctx.Branch()
 	if err != nil {
-		return errors.Wrap(err, "could not determine current branch")
+		return fmt.Errorf("could not determine current branch: %w", err)
 	}
 
 	remote, err := guessRemote(ctx)
@@ -56,7 +55,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {
-		return errors.Wrap(err, "could not parse web")
+		return fmt.Errorf("could not parse web: %q", err)
 	}
 	if isWeb {
 		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, repo.RepoOwner(), repo.RepoName(), head)
@@ -66,11 +65,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
-		return errors.Wrap(err, "could not parse title")
+		return fmt.Errorf("could not parse title: %w", err)
 	}
 	body, err := cmd.Flags().GetString("body")
 	if err != nil {
-		return errors.Wrap(err, "could not parse body")
+		return fmt.Errorf("could not parse body: %w", err)
 	}
 
 	action := SubmitAction
@@ -86,7 +85,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
-			return errors.Wrap(err, "could not collect title and/or body")
+			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
 
 		action = tb.Action
@@ -106,7 +105,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	base, err := cmd.Flags().GetString("base")
 	if err != nil {
-		return errors.Wrap(err, "could not parse base")
+		return fmt.Errorf("could not parse base: %w", err)
 	}
 	if base == "" {
 		// TODO: use default branch for the repo
@@ -115,12 +114,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	client, err := apiClientForContext(ctx)
 	if err != nil {
-		return errors.Wrap(err, "could not initialize api client")
+		return fmt.Errorf("could not initialize API client: %w", err)
 	}
 
 	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
-		return errors.Wrap(err, "could not parse draft")
+		return fmt.Errorf("could not parse draft: %w", err)
 	}
 
 	if action == SubmitAction {
@@ -134,7 +133,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		pr, err := api.CreatePullRequest(client, repo, params)
 		if err != nil {
-			return errors.Wrap(err, "failed to create pull request")
+			return fmt.Errorf("failed to create pull request: %w", err)
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
@@ -166,14 +165,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 func guessRemote(ctx context.Context) (string, error) {
 	remotes, err := ctx.Remotes()
 	if err != nil {
-		return "", errors.Wrap(err, "could not read git remotes")
+		return "", fmt.Errorf("could not read git remotes: %w", err)
 	}
 
 	// TODO: consolidate logic with fsContext.BaseRepo
 	// TODO: check if the GH repo that the remote points to is writeable
 	remote, err := remotes.FindByName("upstream", "github", "origin", "*")
 	if err != nil {
-		return "", errors.Wrap(err, "could not determine suitable remote")
+		return "", fmt.Errorf("could not determine suitable remote: %w", err)
 	}
 
 	return remote.Name, nil
