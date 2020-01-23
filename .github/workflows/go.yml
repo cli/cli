@@ -23,4 +23,4 @@ jobs:
       - name: Build
         run: |
           go test ./...
-          go build -v .
+          go build -v ./cmd/gh
