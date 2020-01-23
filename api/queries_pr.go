@@ -403,12 +403,8 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", branch)}
 }
 
-func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{}) (*PullRequest, error) {
-	repo, err := GitHubRepo(client, ghRepo)
-	if err != nil {
-		return nil, err
-	}
-
+// CreatePullRequest creates a pull request in a GitHub repository
+func CreatePullRequest(client *Client, repo *Repository, params map[string]interface{}) (*PullRequest, error) {
 	query := `
 		mutation CreatePullRequest($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
@@ -434,7 +430,7 @@ func CreatePullRequest(client *Client, ghRepo Repo, params map[string]interface{
 		}
 	}{}
 
-	err = client.GraphQL(query, variables, &result)
+	err := client.GraphQL(query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
