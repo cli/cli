@@ -354,11 +354,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			url.QueryEscape(body),
 		)
 		// TODO could exceed max url length for explorer
-		url, err := url.Parse(openURL)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else if action == SubmitAction {
 		params := map[string]interface{}{
@@ -416,4 +412,12 @@ func labelList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func displayURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+	return u.Hostname() + u.Path
 }
