@@ -8,6 +8,7 @@ before:
     - go mod tidy
 builds:
   - binary: bin/gh
+    main: ./cmd/gh
     ldflags:
       - -s -w -X github.com/github/gh-cli/command.Version={{.Version}} -X github.com/github/gh-cli/command.BuildDate={{time "2006-01-02"}}
       - -X github.com/github/gh-cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}

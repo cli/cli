@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -12,6 +15,7 @@ import (
 	"github.com/github/gh-cli/utils"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
+	"github.com/spf13/cobra"
 )
 
 var updaterEnabled = ""
@@ -24,12 +28,10 @@ func main() {
 		updateMessageChan <- rel
 	}()
 
+	hasDebug := os.Getenv("DEBUG") != ""
+
 	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		_, isFlagError := err.(command.FlagError)
-		if isFlagError || strings.HasPrefix(err.Error(), "unknown command ") {
-			fmt.Fprintln(os.Stderr, cmd.UsageString())
-		}
+		printError(os.Stderr, err, cmd, hasDebug)
 		os.Exit(1)
 	}
 
@@ -43,6 +45,28 @@ func main() {
 
 		stderr := utils.NewColorable(os.Stderr)
 		fmt.Fprintf(stderr, "\n\n%s\n\n", msg)
+	}
+}
+
+func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
+		if debug {
+			fmt.Fprintln(out, dnsError)
+		}
+		fmt.Fprintln(out, "check your internet connection or githubstatus.com")
+		return
+	}
+
+	fmt.Fprintln(out, err)
+
+	var flagError *command.FlagError
+	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
+		if !strings.HasSuffix(err.Error(), "\n") {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out, cmd.UsageString())
 	}
 }
 

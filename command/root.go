@@ -35,13 +35,21 @@ func init() {
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		return FlagError{err}
+		return &FlagError{Err: err}
 	})
 }
 
 // FlagError is the kind of error raised in flag processing
 type FlagError struct {
-	error
+	Err error
+}
+
+func (fe FlagError) Error() string {
+	return fe.Err.Error()
+}
+
+func (fe FlagError) Unwrap() error {
+	return fe.Err
 }
 
 // RootCmd is the entry point of command-line execution
@@ -84,7 +92,7 @@ func BasicClient() (*api.Client, error) {
 		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", c.Token)))
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr))
+		opts = append(opts, api.VerboseLog(os.Stderr, false))
 	}
 	return api.NewClient(opts...), nil
 }
@@ -93,7 +101,6 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 	ctx := initContext()
 	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {
 		ctx.SetBaseRepo(repo)
-		ctx.SetBranch("master")
 	}
 	return ctx
 }
@@ -113,7 +120,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		api.AddHeader("GraphQL-Features", "pe_mobile"),
 	}
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr))
+		opts = append(opts, api.VerboseLog(os.Stderr, strings.Contains(verbose, "api")))
 	}
 	return api.NewClient(opts...), nil
 }

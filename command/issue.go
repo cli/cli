@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
@@ -47,7 +47,7 @@ var issueCmd = &cobra.Command{
 
 An issue can be supplied as argument in any of the following formats:
 - by number, e.g. "123"; or
-- by URL, e.g. "https://github.com/<owner>/<repo>/issues/123".`,
+- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -68,7 +68,7 @@ var issueViewCmd = &cobra.Command{
 	Use: "view {<number> | <url> | <branch>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return errors.New("requires an issue number as an argument")
+			return FlagError{errors.New("issue required as argument")}
 		}
 		return nil
 	},
@@ -108,7 +108,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s\n\n", ghrepo.FullName(baseRepo))
 
 	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
@@ -258,7 +258,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) {
 
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
 
-func issueFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg string) (*api.Issue, error) {
+func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
 	if issueNumber, err := strconv.Atoi(arg); err == nil {
 		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
 	}
@@ -279,7 +279,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
 
 	var templateFiles []string
 	if rootDir, err := git.ToplevelDir(); err == nil {
@@ -289,7 +289,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/%s/issues/new", baseRepo.RepoOwner(), baseRepo.RepoName())
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
 		if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
@@ -307,7 +307,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !repo.HasIssuesEnabled {
-		return fmt.Errorf("the '%s/%s' repository has disabled issues", baseRepo.RepoOwner(), baseRepo.RepoName())
+		return fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(baseRepo))
 	}
 
 	action := SubmitAction
@@ -347,18 +347,13 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if action == PreviewAction {
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/%s/issues/new/?title=%s&body=%s",
-			baseRepo.RepoOwner(),
-			baseRepo.RepoName(),
+			"https://github.com/%s/issues/new/?title=%s&body=%s",
+			ghrepo.FullName(baseRepo),
 			url.QueryEscape(title),
 			url.QueryEscape(body),
 		)
 		// TODO could exceed max url length for explorer
-		url, err := url.Parse(openURL)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s%s in your browser.\n", url.Host, url.Path)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else if action == SubmitAction {
 		params := map[string]interface{}{
@@ -416,4 +411,12 @@ func labelList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func displayURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+	return u.Hostname() + u.Path
 }

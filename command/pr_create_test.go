@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
 )
@@ -52,8 +54,15 @@ func TestPRCreate(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID"
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -103,7 +112,20 @@ func TestPRCreate_web(t *testing.T) {
 	initContext = func() context.Context {
 		return ctx
 	}
-	initFakeHTTP()
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	ranCommands := [][]string{}
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -116,11 +138,7 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), `
-Creating pull request for feature into master in OWNER/REPO
-
-Opening https://github.com/OWNER/REPO/pull/feature in your browser.
-`)
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
@@ -139,8 +157,15 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID"
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -164,4 +189,112 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 Creating pull request for feature into master in OWNER/REPO
 
 `)
+}
+
+func Test_resolvedRemotes_clonedFork(t *testing.T) {
+	resolved := resolvedRemotes{
+		baseOverride: nil,
+		remotes: context.Remotes{
+			&context.Remote{
+				Remote: &git.Remote{Name: "origin"},
+				Owner:  "OWNER",
+				Repo:   "REPO",
+			},
+		},
+		network: api.RepoNetworkResult{
+			Repositories: []*api.Repository{
+				&api.Repository{
+					Name:             "REPO",
+					Owner:            api.RepositoryOwner{Login: "OWNER"},
+					ViewerPermission: "ADMIN",
+					Parent: &api.Repository{
+						Name:             "REPO",
+						Owner:            api.RepositoryOwner{Login: "PARENTOWNER"},
+						ViewerPermission: "READ",
+					},
+				},
+			},
+		},
+	}
+
+	baseRepo, err := resolved.BaseRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	eq(t, ghrepo.FullName(baseRepo), "PARENTOWNER/REPO")
+	baseRemote, err := resolved.RemoteForRepo(baseRepo)
+	if baseRemote != nil || err == nil {
+		t.Error("did not expect any remote for base")
+	}
+
+	headRepo, err := resolved.HeadRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	eq(t, ghrepo.FullName(headRepo), "OWNER/REPO")
+	headRemote, err := resolved.RemoteForRepo(headRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRemote.Name != "origin" {
+		t.Errorf("got remote %q", headRemote.Name)
+	}
+}
+
+func Test_resolvedRemotes_triangularSetup(t *testing.T) {
+	resolved := resolvedRemotes{
+		baseOverride: nil,
+		remotes: context.Remotes{
+			&context.Remote{
+				Remote: &git.Remote{Name: "origin"},
+				Owner:  "OWNER",
+				Repo:   "REPO",
+			},
+			&context.Remote{
+				Remote: &git.Remote{Name: "fork"},
+				Owner:  "MYSELF",
+				Repo:   "REPO",
+			},
+		},
+		network: api.RepoNetworkResult{
+			Repositories: []*api.Repository{
+				&api.Repository{
+					Name:             "NEWNAME",
+					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
+					ViewerPermission: "READ",
+				},
+				&api.Repository{
+					Name:             "REPO",
+					Owner:            api.RepositoryOwner{Login: "MYSELF"},
+					ViewerPermission: "ADMIN",
+				},
+			},
+		},
+	}
+
+	baseRepo, err := resolved.BaseRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	eq(t, ghrepo.FullName(baseRepo), "NEWOWNER/NEWNAME")
+	baseRemote, err := resolved.RemoteForRepo(baseRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if baseRemote.Name != "origin" {
+		t.Errorf("got remote %q", baseRemote.Name)
+	}
+
+	headRepo, err := resolved.HeadRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	eq(t, ghrepo.FullName(headRepo), "MYSELF/REPO")
+	headRemote, err := resolved.RemoteForRepo(headRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRemote.Name != "fork" {
+		t.Errorf("got remote %q", headRemote.Name)
+	}
 }
