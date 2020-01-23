@@ -84,9 +84,27 @@ type Client struct {
 
 type graphQLResponse struct {
 	Data   interface{}
-	Errors []struct {
-		Message string
+	Errors []GraphQLError
+}
+
+// GraphQLError is a single error returned in a GraphQL response
+type GraphQLError struct {
+	Type    string
+	Path    []string
+	Message string
+}
+
+// GraphQLErrorResponse contains errors returned in a GraphQL response
+type GraphQLErrorResponse struct {
+	Errors []GraphQLError
+}
+
+func (gr GraphQLErrorResponse) Error() string {
+	errorMessages := make([]string, 0, len(gr.Errors))
+	for _, e := range gr.Errors {
+		errorMessages = append(errorMessages, e.Message)
 	}
+	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
 }
 
 // GraphQL performs a GraphQL request and parses the response
@@ -166,14 +184,9 @@ func handleResponse(resp *http.Response, data interface{}) error {
 	}
 
 	if len(gr.Errors) > 0 {
-		errorMessages := gr.Errors[0].Message
-		for _, e := range gr.Errors[1:] {
-			errorMessages += ", " + e.Message
-		}
-		return fmt.Errorf("graphql error: '%s'", errorMessages)
+		return &GraphQLErrorResponse{Errors: gr.Errors}
 	}
 	return nil
-
 }
 
 func handleHTTPError(resp *http.Response) error {
