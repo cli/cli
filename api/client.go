@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -35,13 +36,26 @@ func AddHeader(name, value string) ClientOption {
 }
 
 // VerboseLog enables request/response logging within a RoundTripper
-func VerboseLog(out io.Writer) ClientOption {
+func VerboseLog(out io.Writer, logBodies bool) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			fmt.Fprintf(out, "> %s %s\n", req.Method, req.URL.RequestURI())
+			if logBodies && req.Body != nil && inspectableMIMEType(req.Header.Get("Content-type")) {
+				newBody := &bytes.Buffer{}
+				io.Copy(out, io.TeeReader(req.Body, newBody))
+				fmt.Fprintln(out)
+				req.Body = ioutil.NopCloser(newBody)
+			}
 			res, err := tr.RoundTrip(req)
 			if err == nil {
 				fmt.Fprintf(out, "< HTTP %s\n", res.Status)
+				if logBodies && res.Body != nil && inspectableMIMEType(res.Header.Get("Content-type")) {
+					newBody := &bytes.Buffer{}
+					// TODO: pretty-print response JSON
+					io.Copy(out, io.TeeReader(res.Body, newBody))
+					fmt.Fprintln(out)
+					res.Body = ioutil.NopCloser(newBody)
+				}
 			}
 			return res, err
 		}}
@@ -192,4 +206,10 @@ func handleHTTPError(resp *http.Response) error {
 	}
 
 	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
+}
+
+var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
+
+func inspectableMIMEType(t string) bool {
+	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
 }

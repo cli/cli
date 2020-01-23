@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/test"
@@ -187,4 +188,123 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 Creating pull request for feature into master in OWNER/REPO
 
 `)
+}
+
+func Test_resolvedRemotes_clonedFork(t *testing.T) {
+	resolved := resolvedRemotes{
+		baseOverride: nil,
+		remotes: context.Remotes{
+			&context.Remote{
+				Remote: &git.Remote{Name: "origin"},
+				Owner:  "OWNER",
+				Repo:   "REPO",
+			},
+		},
+		network: api.RepoNetworkResult{
+			Repositories: []*api.Repository{
+				&api.Repository{
+					Name:             "REPO",
+					Owner:            api.RepositoryOwner{Login: "OWNER"},
+					ViewerPermission: "ADMIN",
+					Parent: &api.Repository{
+						Name:             "REPO",
+						Owner:            api.RepositoryOwner{Login: "PARENTOWNER"},
+						ViewerPermission: "READ",
+					},
+				},
+			},
+		},
+	}
+
+	baseRepo, err := resolved.BaseRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if baseRepo.RepoOwner() != "PARENTOWNER" {
+		t.Errorf("got owner %q", baseRepo.RepoOwner())
+	}
+	baseRemote, err := resolved.RemoteForRepo(baseRepo)
+	if baseRemote != nil || err == nil {
+		t.Error("did not expect any remote for base")
+	}
+
+	headRepo, err := resolved.HeadRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRepo.RepoOwner() != "OWNER" {
+		t.Errorf("got owner %q", headRepo.RepoOwner())
+	}
+	headRemote, err := resolved.RemoteForRepo(headRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRemote.Name != "origin" {
+		t.Errorf("got remote %q", headRemote.Name)
+	}
+}
+
+func Test_resolvedRemotes_triangularSetup(t *testing.T) {
+	resolved := resolvedRemotes{
+		baseOverride: nil,
+		remotes: context.Remotes{
+			&context.Remote{
+				Remote: &git.Remote{Name: "origin"},
+				Owner:  "OWNER",
+				Repo:   "REPO",
+			},
+			&context.Remote{
+				Remote: &git.Remote{Name: "fork"},
+				Owner:  "MYSELF",
+				Repo:   "REPO",
+			},
+		},
+		network: api.RepoNetworkResult{
+			Repositories: []*api.Repository{
+				&api.Repository{
+					Name:             "NEWNAME",
+					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
+					ViewerPermission: "READ",
+				},
+				&api.Repository{
+					Name:             "REPO",
+					Owner:            api.RepositoryOwner{Login: "MYSELF"},
+					ViewerPermission: "ADMIN",
+				},
+			},
+		},
+	}
+
+	baseRepo, err := resolved.BaseRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if baseRepo.RepoOwner() != "NEWOWNER" {
+		t.Errorf("got owner %q", baseRepo.RepoOwner())
+	}
+	if baseRepo.RepoName() != "NEWNAME" {
+		t.Errorf("got name %q", baseRepo.RepoName())
+	}
+	baseRemote, err := resolved.RemoteForRepo(baseRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if baseRemote.Name != "origin" {
+		t.Errorf("got remote %q", baseRemote.Name)
+	}
+
+	headRepo, err := resolved.HeadRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRepo.RepoOwner() != "MYSELF" {
+		t.Errorf("got owner %q", headRepo.RepoOwner())
+	}
+	headRemote, err := resolved.RemoteForRepo(headRepo)
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	if headRemote.Name != "fork" {
+		t.Errorf("got remote %q", headRemote.Name)
+	}
 }
