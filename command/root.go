@@ -35,13 +35,21 @@ func init() {
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		return FlagError{err}
+		return &FlagError{Err: err}
 	})
 }
 
 // FlagError is the kind of error raised in flag processing
 type FlagError struct {
-	error
+	Err error
+}
+
+func (fe FlagError) Error() string {
+	return fe.Err.Error()
+}
+
+func (fe FlagError) Unwrap() error {
+	return fe.Err
 }
 
 // RootCmd is the entry point of command-line execution
