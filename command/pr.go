@@ -285,10 +285,6 @@ func prView(cmd *cobra.Command, args []string) error {
 		} else {
 			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
-				var notFoundErr *api.NotFoundError
-				if errors.As(err, &notFoundErr) {
-					return fmt.Errorf("%s. To open a specific pull request use the pull request's number as an argument", err)
-				}
 				return err
 			}
 
