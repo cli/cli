@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-cli/internal/ghrepo"
 )
 
 type PullRequestsPayload struct {
@@ -127,12 +129,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-type Repo interface {
-	RepoName() string
-	RepoOwner() string
-}
-
-func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
+func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
 		TotalCount int
 		Edges      []struct {
@@ -229,11 +226,8 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
     }
 	`
 
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
-
-	viewerQuery := fmt.Sprintf("repo:%s/%s state:open is:pr author:%s", owner, repo, currentUsername)
-	reviewerQuery := fmt.Sprintf("repo:%s/%s state:open review-requested:%s", owner, repo, currentUsername)
+	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
+	reviewerQuery := fmt.Sprintf("repo:%s state:open review-requested:%s", ghrepo.FullName(repo), currentUsername)
 
 	branchWithoutOwner := currentPRHeadRef
 	if idx := strings.Index(currentPRHeadRef, ":"); idx >= 0 {
@@ -243,8 +237,8 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	variables := map[string]interface{}{
 		"viewerQuery":   viewerQuery,
 		"reviewerQuery": reviewerQuery,
-		"owner":         owner,
-		"repo":          repo,
+		"owner":         repo.RepoOwner(),
+		"repo":          repo.RepoName(),
 		"headRefName":   branchWithoutOwner,
 		"number":        currentPRNumber,
 	}
@@ -289,7 +283,7 @@ func PullRequests(client *Client, ghRepo Repo, currentPRNumber int, currentPRHea
 	return &payload, nil
 }
 
-func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest, error) {
+func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequest PullRequest
@@ -328,8 +322,8 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 	}`
 
 	variables := map[string]interface{}{
-		"owner":     ghRepo.RepoOwner(),
-		"repo":      ghRepo.RepoName(),
+		"owner":     repo.RepoOwner(),
+		"repo":      repo.RepoName(),
 		"pr_number": number,
 	}
 
@@ -342,7 +336,7 @@ func PullRequestByNumber(client *Client, ghRepo Repo, number int) (*PullRequest,
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequest, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
@@ -383,8 +377,8 @@ func PullRequestForBranch(client *Client, ghRepo Repo, branch string) (*PullRequ
 	}
 
 	variables := map[string]interface{}{
-		"owner":       ghRepo.RepoOwner(),
-		"repo":        ghRepo.RepoName(),
+		"owner":       repo.RepoOwner(),
+		"repo":        repo.RepoName(),
 		"headRefName": branchWithoutOwner,
 	}
 

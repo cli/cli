@@ -13,6 +13,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -143,7 +144,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -279,7 +280,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
 			if preview {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
@@ -323,7 +324,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) {
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
-func prFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg string) (*api.PullRequest, error) {
+func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(arg); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
@@ -357,7 +358,7 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 	var branchOwner string
 	if branchConfig.RemoteURL != nil {
 		// the branch merges from a remote specified by URL
-		if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
 			branchOwner = r.RepoOwner()
 		}
 	} else if branchConfig.RemoteName != "" {

@@ -13,6 +13,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/test"
 	"github.com/github/gh-cli/utils"
 )
@@ -220,9 +221,7 @@ func Test_resolvedRemotes_clonedFork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v", err)
 	}
-	if baseRepo.RepoOwner() != "PARENTOWNER" {
-		t.Errorf("got owner %q", baseRepo.RepoOwner())
-	}
+	eq(t, ghrepo.FullName(baseRepo), "PARENTOWNER/REPO")
 	baseRemote, err := resolved.RemoteForRepo(baseRepo)
 	if baseRemote != nil || err == nil {
 		t.Error("did not expect any remote for base")
@@ -232,9 +231,7 @@ func Test_resolvedRemotes_clonedFork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v", err)
 	}
-	if headRepo.RepoOwner() != "OWNER" {
-		t.Errorf("got owner %q", headRepo.RepoOwner())
-	}
+	eq(t, ghrepo.FullName(headRepo), "OWNER/REPO")
 	headRemote, err := resolved.RemoteForRepo(headRepo)
 	if err != nil {
 		t.Fatalf("got %v", err)
@@ -279,12 +276,7 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v", err)
 	}
-	if baseRepo.RepoOwner() != "NEWOWNER" {
-		t.Errorf("got owner %q", baseRepo.RepoOwner())
-	}
-	if baseRepo.RepoName() != "NEWNAME" {
-		t.Errorf("got name %q", baseRepo.RepoName())
-	}
+	eq(t, ghrepo.FullName(baseRepo), "NEWOWNER/NEWNAME")
 	baseRemote, err := resolved.RemoteForRepo(baseRepo)
 	if err != nil {
 		t.Fatalf("got %v", err)
@@ -297,9 +289,7 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v", err)
 	}
-	if headRepo.RepoOwner() != "MYSELF" {
-		t.Errorf("got owner %q", headRepo.RepoOwner())
-	}
+	eq(t, ghrepo.FullName(headRepo), "MYSELF/REPO")
 	headRemote, err := resolved.RemoteForRepo(headRepo)
 	if err != nil {
 		t.Fatalf("got %v", err)

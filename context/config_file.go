@@ -10,6 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const defaultHostname = "github.com"
+
 type configEntry struct {
 	User  string
 	Token string `yaml:"oauth_token"`
