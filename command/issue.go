@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -14,7 +15,6 @@ import (
 	"github.com/github/gh-cli/git"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -314,11 +314,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
-		return errors.Wrap(err, "could not parse title")
+		return fmt.Errorf("could not parse title: %w", err)
 	}
 	body, err := cmd.Flags().GetString("body")
 	if err != nil {
-		return errors.Wrap(err, "could not parse body")
+		return fmt.Errorf("could not parse body: %w", err)
 	}
 
 	interactive := title == "" || body == ""
@@ -326,7 +326,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if interactive {
 		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
 		if err != nil {
-			return errors.Wrap(err, "could not collect title and/or body")
+			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
 
 		action = tb.Action
