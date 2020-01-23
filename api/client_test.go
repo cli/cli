@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -47,5 +46,7 @@ func TestGraphQLError(t *testing.T) {
 	response := struct{}{}
 	http.StubResponse(200, bytes.NewBufferString(`{"errors":[{"message":"OH NO"}]}`))
 	err := client.GraphQL("", nil, &response)
-	eq(t, err, fmt.Errorf("graphql error: 'OH NO'"))
+	if err == nil || err.Error() != "graphql error: 'OH NO'" {
+		t.Fatalf("got %q", err.Error())
+	}
 }

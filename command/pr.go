@@ -13,6 +13,7 @@ import (
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -42,8 +43,8 @@ var prCmd = &cobra.Command{
 
 A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
-- by URL, e.g. "https://github.com/<owner>/<repo>/pull/123"; or
-- by the name of its head branch, e.g. "patch-1" or "<owner>:patch-1".`,
+- by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
+- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
 }
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
@@ -67,9 +68,13 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view {<number> | <url> | <branch>}",
+	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	RunE:  prView,
+	Long: `View a pull request specified by the argument in the browser.
+
+Without an argument, the pull request that belongs to the current
+branch is opened.`,
+	RunE: prView,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -139,7 +144,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s/%s\n\n", baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -275,7 +280,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
 			if preview {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
@@ -285,10 +290,6 @@ func prView(cmd *cobra.Command, args []string) error {
 		} else {
 			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
-				var notFoundErr *api.NotFoundError
-				if errors.As(err, &notFoundErr) {
-					return fmt.Errorf("%s. To open a specific pull request use the pull request's number as an argument", err)
-				}
 				return err
 			}
 
@@ -323,7 +324,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) {
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
-func prFromArg(apiClient *api.Client, baseRepo context.GitHubRepository, arg string) (*api.PullRequest, error) {
+func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(arg); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
@@ -357,7 +358,7 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 	var branchOwner string
 	if branchConfig.RemoteURL != nil {
 		// the branch merges from a remote specified by URL
-		if r, err := context.RepoFromURL(branchConfig.RemoteURL); err == nil {
+		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
 			branchOwner = r.RepoOwner()
 		}
 	} else if branchConfig.RemoteName != "" {

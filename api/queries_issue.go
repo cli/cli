@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"time"
+
+	"github.com/github/gh-cli/internal/ghrepo"
 )
 
 type IssuesPayload struct {
@@ -91,7 +93,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	return &result.CreateIssue.Issue, nil
 }
 
-func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPayload, error) {
+func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) (*IssuesPayload, error) {
 	type response struct {
 		Repository struct {
 			Assigned struct {
@@ -135,11 +137,9 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 		}
     }`
 
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
 	variables := map[string]interface{}{
-		"owner":  owner,
-		"repo":   repo,
+		"owner":  repo.RepoOwner(),
+		"repo":   repo.RepoName(),
 		"viewer": currentUsername,
 	}
 
@@ -150,7 +150,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	}
 
 	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
+		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 	}
 
 	payload := IssuesPayload{
@@ -171,7 +171,7 @@ func IssueStatus(client *Client, ghRepo Repo, currentUsername string) (*IssuesPa
 	return &payload, nil
 }
 
-func IssueList(client *Client, ghRepo Repo, state string, labels []string, assigneeString string, limit int) ([]Issue, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int) ([]Issue, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -197,12 +197,10 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
     }
   `
 
-	owner := ghRepo.RepoOwner()
-	repo := ghRepo.RepoName()
 	variables := map[string]interface{}{
 		"limit":  limit,
-		"owner":  owner,
-		"repo":   repo,
+		"owner":  repo.RepoOwner(),
+		"repo":   repo.RepoName(),
 		"states": states,
 	}
 	if len(labels) > 0 {
@@ -227,22 +225,24 @@ func IssueList(client *Client, ghRepo Repo, state string, labels []string, assig
 	}
 
 	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has disabled issues", owner, repo)
+		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 	}
 
 	return resp.Repository.Issues.Nodes, nil
 }
 
-func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
+func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
 	type response struct {
 		Repository struct {
-			Issue Issue
+			Issue            Issue
+			HasIssuesEnabled bool
 		}
 	}
 
 	query := `
 	query($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
 			issue(number: $issue_number) {
 				title
 				body
@@ -264,8 +264,8 @@ func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
 	}`
 
 	variables := map[string]interface{}{
-		"owner":        ghRepo.RepoOwner(),
-		"repo":         ghRepo.RepoName(),
+		"owner":        repo.RepoOwner(),
+		"repo":         repo.RepoName(),
 		"issue_number": number,
 	}
 
@@ -273,6 +273,10 @@ func IssueByNumber(client *Client, ghRepo Repo, number int) (*Issue, error) {
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if !resp.Repository.HasIssuesEnabled {
+		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 	}
 
 	return &resp.Repository.Issue, nil

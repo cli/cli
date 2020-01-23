@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 )
 
 // ClientOption represents an argument to NewClient
@@ -34,13 +36,26 @@ func AddHeader(name, value string) ClientOption {
 }
 
 // VerboseLog enables request/response logging within a RoundTripper
-func VerboseLog(out io.Writer) ClientOption {
+func VerboseLog(out io.Writer, logBodies bool) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			fmt.Fprintf(out, "> %s %s\n", req.Method, req.URL.RequestURI())
+			if logBodies && req.Body != nil && inspectableMIMEType(req.Header.Get("Content-type")) {
+				newBody := &bytes.Buffer{}
+				io.Copy(out, io.TeeReader(req.Body, newBody))
+				fmt.Fprintln(out)
+				req.Body = ioutil.NopCloser(newBody)
+			}
 			res, err := tr.RoundTrip(req)
 			if err == nil {
 				fmt.Fprintf(out, "< HTTP %s\n", res.Status)
+				if logBodies && res.Body != nil && inspectableMIMEType(res.Header.Get("Content-type")) {
+					newBody := &bytes.Buffer{}
+					// TODO: pretty-print response JSON
+					io.Copy(out, io.TeeReader(res.Body, newBody))
+					fmt.Fprintln(out)
+					res.Body = ioutil.NopCloser(newBody)
+				}
 			}
 			return res, err
 		}}
@@ -69,9 +84,27 @@ type Client struct {
 
 type graphQLResponse struct {
 	Data   interface{}
-	Errors []struct {
-		Message string
+	Errors []GraphQLError
+}
+
+// GraphQLError is a single error returned in a GraphQL response
+type GraphQLError struct {
+	Type    string
+	Path    []string
+	Message string
+}
+
+// GraphQLErrorResponse contains errors returned in a GraphQL response
+type GraphQLErrorResponse struct {
+	Errors []GraphQLError
+}
+
+func (gr GraphQLErrorResponse) Error() string {
+	errorMessages := make([]string, 0, len(gr.Errors))
+	for _, e := range gr.Errors {
+		errorMessages = append(errorMessages, e.Message)
 	}
+	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
 }
 
 // GraphQL performs a GraphQL request and parses the response
@@ -151,14 +184,9 @@ func handleResponse(resp *http.Response, data interface{}) error {
 	}
 
 	if len(gr.Errors) > 0 {
-		errorMessages := gr.Errors[0].Message
-		for _, e := range gr.Errors[1:] {
-			errorMessages += ", " + e.Message
-		}
-		return fmt.Errorf("graphql error: '%s'", errorMessages)
+		return &GraphQLErrorResponse{Errors: gr.Errors}
 	}
 	return nil
-
 }
 
 func handleHTTPError(resp *http.Response) error {
@@ -178,4 +206,10 @@ func handleHTTPError(resp *http.Response) error {
 	}
 
 	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
+}
+
+var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
+
+func inspectableMIMEType(t string) bool {
+	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
 }

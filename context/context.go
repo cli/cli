@@ -2,9 +2,9 @@ package context
 
 import (
 	"path"
-	"strings"
 
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/mitchellh/go-homedir"
 )
 
@@ -16,14 +16,8 @@ type Context interface {
 	Branch() (string, error)
 	SetBranch(string)
 	Remotes() (Remotes, error)
-	BaseRepo() (GitHubRepository, error)
+	BaseRepo() (ghrepo.Interface, error)
 	SetBaseRepo(string)
-}
-
-// GitHubRepository is anything that can be mapped to an OWNER/REPO pair
-type GitHubRepository interface {
-	RepoOwner() string
-	RepoName() string
 }
 
 // New initializes a Context that reads from the filesystem
@@ -36,7 +30,7 @@ type fsContext struct {
 	config    *configEntry
 	remotes   Remotes
 	branch    string
-	baseRepo  GitHubRepository
+	baseRepo  ghrepo.Interface
 	authToken string
 }
 
@@ -115,7 +109,7 @@ func (c *fsContext) Remotes() (Remotes, error) {
 	return c.remotes, nil
 }
 
-func (c *fsContext) BaseRepo() (GitHubRepository, error) {
+func (c *fsContext) BaseRepo() (ghrepo.Interface, error) {
 	if c.baseRepo != nil {
 		return c.baseRepo, nil
 	}
@@ -134,8 +128,5 @@ func (c *fsContext) BaseRepo() (GitHubRepository, error) {
 }
 
 func (c *fsContext) SetBaseRepo(nwo string) {
-	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) == 2 {
-		c.baseRepo = &ghRepo{parts[0], parts[1]}
-	}
+	c.baseRepo = ghrepo.FromFullName(nwo)
 }
