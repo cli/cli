@@ -2,37 +2,10 @@ package context
 
 import (
 	"errors"
-	"net/url"
 	"testing"
 
 	"github.com/github/gh-cli/git"
 )
-
-func Test_repoFromURL(t *testing.T) {
-	u, _ := url.Parse("http://github.com/monalisa/octo-cat.git")
-	owner, repo, err := repoFromURL(u)
-	eq(t, err, nil)
-	eq(t, owner, "monalisa")
-	eq(t, repo, "octo-cat")
-}
-
-func Test_repoFromURL_invalid(t *testing.T) {
-	cases := [][]string{
-		[]string{
-			"https://example.com/one/two",
-			"unsupported hostname: example.com",
-		},
-		[]string{
-			"/path/to/disk",
-			"unsupported hostname: ",
-		},
-	}
-	for _, c := range cases {
-		u, _ := url.Parse(c[0])
-		_, _, err := repoFromURL(u)
-		eq(t, err, errors.New(c[1]))
-	}
-}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{

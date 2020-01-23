@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/github/gh-cli/api"
 	"github.com/github/gh-cli/context"
 	"github.com/github/gh-cli/git"
+	"github.com/github/gh-cli/internal/ghrepo"
 	"github.com/github/gh-cli/pkg/githubtemplate"
 	"github.com/github/gh-cli/utils"
 	"github.com/pkg/errors"
@@ -57,7 +57,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	headRepo, err := repoContext.HeadRepo()
 	if err != nil {
 		if baseRepo.IsPrivate {
-			return fmt.Errorf("cannot write to private repository '%s/%s'", baseRepo.RepoOwner(), baseRepo.RepoName())
+			return fmt.Errorf("cannot write to private repository '%s'", ghrepo.FullName(baseRepo))
 		}
 		headRepo, err = api.ForkRepo(client, baseRepo)
 		if err != nil {
@@ -65,8 +65,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		didForkRepo = true
 		// TODO: support non-HTTPS git remote URLs
-		baseRepoURL := fmt.Sprintf("https://github.com/%s/%s.git", baseRepo.RepoOwner(), baseRepo.RepoName())
-		headRepoURL := fmt.Sprintf("https://github.com/%s/%s.git", headRepo.RepoOwner(), headRepo.RepoName())
+		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
+		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
 		// TODO: figure out what to name the new git remote
 		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
 		if err != nil {
@@ -79,7 +79,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	if headBranch == baseBranch && isSameRepo(baseRepo, headRepo) {
+	if headBranch == baseBranch && ghrepo.IsSame(baseRepo, headRepo) {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
 	}
 
@@ -114,20 +114,19 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "could not parse web")
 	}
 	if isWeb {
-		openURL := fmt.Sprintf(`https://github.com/%s/%s/pull/%s`, headRepo.RepoOwner(), headRepo.RepoName(), headBranch)
+		openURL := fmt.Sprintf(`https://github.com/%s/pull/%s`, ghrepo.FullName(headRepo), headBranch)
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 
 	headBranchLabel := headBranch
-	if !isSameRepo(baseRepo, headRepo) {
+	if !ghrepo.IsSame(baseRepo, headRepo) {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s/%s\n\n",
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
 		utils.Cyan(headBranchLabel),
 		utils.Cyan(baseBranch),
-		baseRepo.RepoOwner(),
-		baseRepo.RepoName())
+		ghrepo.FullName(baseRepo))
 
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
@@ -191,9 +190,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	} else if action == PreviewAction {
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/%s/compare/%s...%s?expand=1&title=%s&body=%s",
-			baseRepo.RepoOwner(),
-			baseRepo.RepoName(),
+			"https://github.com/%s/compare/%s...%s?expand=1&title=%s&body=%s",
+			ghrepo.FullName(baseRepo),
 			baseBranch,
 			headBranchLabel,
 			url.QueryEscape(title),
@@ -240,12 +238,12 @@ func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base str
 	}
 
 	hasBaseOverride := base != ""
-	baseOverride := repoFromFullName(base)
+	baseOverride := ghrepo.FromFullName(base)
 	foundBaseOverride := false
-	repos := []api.Repo{}
+	repos := []ghrepo.Interface{}
 	for _, r := range remotes[:lenRemotesForLookup] {
 		repos = append(repos, r)
-		if isSameRepo(r, baseOverride) {
+		if ghrepo.IsSame(r, baseOverride) {
 			foundBaseOverride = true
 		}
 	}
@@ -268,7 +266,7 @@ func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base str
 }
 
 type resolvedRemotes struct {
-	baseOverride api.Repo
+	baseOverride ghrepo.Interface
 	remotes      context.Remotes
 	network      api.RepoNetworkResult
 }
@@ -278,12 +276,12 @@ type resolvedRemotes struct {
 func (r resolvedRemotes) BaseRepo() (*api.Repository, error) {
 	if r.baseOverride != nil {
 		for _, repo := range r.network.Repositories {
-			if repo != nil && isSameRepo(repo, r.baseOverride) {
+			if repo != nil && ghrepo.IsSame(repo, r.baseOverride) {
 				return repo, nil
 			}
 		}
-		return nil, fmt.Errorf("failed looking up information about the '%s/%s' repository",
-			r.baseOverride.RepoOwner(), r.baseOverride.RepoName())
+		return nil, fmt.Errorf("failed looking up information about the '%s' repository",
+			ghrepo.FullName(r.baseOverride))
 	}
 
 	for _, repo := range r.network.Repositories {
@@ -310,39 +308,14 @@ func (r resolvedRemotes) HeadRepo() (*api.Repository, error) {
 }
 
 // RemoteForRepo finds the git remote that points to a repository
-func (r resolvedRemotes) RemoteForRepo(repo api.Repo) (*context.Remote, error) {
+func (r resolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*context.Remote, error) {
 	for i, remote := range r.remotes {
-		if isSameRepo(remote, repo) ||
+		if ghrepo.IsSame(remote, repo) ||
 			// additionally, look up the resolved repository name in case this
 			// git remote points to this repository via a redirect
-			(r.network.Repositories[i] != nil && isSameRepo(r.network.Repositories[i], repo)) {
+			(r.network.Repositories[i] != nil && ghrepo.IsSame(r.network.Repositories[i], repo)) {
 			return remote, nil
 		}
 	}
 	return nil, errors.New("not found")
-}
-
-type ghRepo struct {
-	owner string
-	name  string
-}
-
-func repoFromFullName(nwo string) (r ghRepo) {
-	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) == 2 {
-		r.owner, r.name = parts[0], parts[1]
-	}
-	return
-}
-
-func (r ghRepo) RepoOwner() string {
-	return r.owner
-}
-func (r ghRepo) RepoName() string {
-	return r.name
-}
-
-func isSameRepo(a, b api.Repo) bool {
-	return strings.EqualFold(a.RepoOwner(), b.RepoOwner()) &&
-		strings.EqualFold(a.RepoName(), b.RepoName())
 }
