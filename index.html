@@ -12,12 +12,12 @@ layout: default
       </h1>
       <h2 class="h00-mktg text-center lh-condensed mb-3">Take GitHub to the command&nbsp;line</h2>
       <!-- if mac -->
-      <div class="download-mac d-none f4 text-center">
+      <div class="download-mac d-none f5 text-center">
         <div class="d-inline-block">
-          <span class="text-gray mr-2 f5">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
+          <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
         </div>
         <div class="d-inline-block">
-          <span class="text-gray ml-2 f5 mr-3">or</span><a class="btn-mktg btn-outline-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+          <span class="text-gray mx-2 mb-2 d-inline-block">or</span><a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
         </div>
       </div>
 
@@ -25,18 +25,123 @@ layout: default
       <div class="download-windows d-none">
         <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
       </div>
-      <!-- TODO -->
+
       <!-- if linux -->
+      <div class="download-linux d-none">
+
+        <details class="dropdown details-reset details-overlay d-inline-block position-relative">
+          <summary class="btn-mktg" aria-haspopup="true">
+            Download for Linux
+            <svg class="octicon octicon-chevron-down replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></svg>
+
+            <svg class="octicon octicon-chevron-up replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.21967 9.78033C2.92678 9.48744 2.92678 9.01256 3.21967 8.71967L7.46967 4.46967C7.76256 4.17678 8.23744 4.17678 8.53033 4.46967L12.7803 8.71967C13.0732 9.01256 13.0732 9.48744 12.7803 9.78033C12.4874 10.0732 12.0126 10.0732 11.7197 9.78033L8 6.06066L4.28033 9.78033C3.98744 10.0732 3.51256 10.0732 3.21967 9.78033Z"></path></svg>
+          </summary>
+
+          <ul class="dropdown-menu dropdown-menu-se width-full">
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+          </ul>
+        </details>
+      </div>
 
     </div>
   </div>
 
   <div class="position-relative">
-    <div class="bg-gray-light position-absolute bottom-n12 width-full" style="height: 360px;">
+    <div class="bg-gray-light position-absolute bottom-n12 width-full pt-8 overflow-hidden">
       <div class="position-absolute bottom-0 width-full">
         <p class="f4 text-center text-gray">Check out our docs for more info and view all GitHub CLI commands.</p>
         <div class="d-flex flex-justify-center mb-6 px-3">
           <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Read our documentation <span class="Bump-link-symbol">→</span></a>
+        </div>
+      </div>
+
+      <div class="container-xl mx-auto p-responsive">
+        <div class="d-flex gutter-condensed gutter-md-spacious flex-items-center flex-justify-between mb-6">
+
+          <!-- Left column of command-pills -->
+
+          <div class="v-hidden v-md-visible col-1 col-md-2 col-lg-3">
+            <ul class="list-style-none text-center float-right section-actions-events-left target-actions-events-left">
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue status</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr checkout</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr status</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Right column of command-pills -->
+
+          <div class="v-hidden v-md-visible col-sm-1 col-md-2 col-lg-3">
+            <ul class="list-style-none text-center float-left section-actions-events-right target-actions-events-right">
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue status</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr checkout</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr status</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
         </div>
       </div>
     </div>
@@ -57,7 +162,7 @@ layout: default
       <p class="command-3 command-desc-3 d-none f4 text-gray text-center mb-4">Create a pull request.</p>
       <p class="command-4 command-desc-4 d-none f4 text-gray text-center mb-4">Check out pull requests locally.</p>
 
-      <div class="col-12 col-lg-8 mx-auto bg-blue-dark rounded-2 box-shadow-large position-relative" style="height: 430px;">
+      <div class="col-12 col-lg-8 mx-auto bg-blue-dark rounded-2 box-shadow-large position-relative cli-window" style="height: 430px;">
         <div class="py-2 px-3 text-center">
           <div class="position-absolute left-3">
             <div class="d-inline-block circle bg-white mr-1" style="width: 12px; height: 12px; opacity: 0.1;"></div>
@@ -81,7 +186,7 @@ layout: default
 
   <div class="container-xl mx-auto px-3 px-md-4 py-8">
     <div class="d-flex flex-column gutter-spacious text-center flex-items-center"">
-      <h2 class="col-12 col-md-5 h1-mktg lh-condensed mb-6 mb-mb-7">Goodbye, context switching. Hello, terminal.</h2>
+      <h2 class="col-12 col-md-5 h1-mktg lh-condensed mb-6 mb-md-7">Goodbye, context switching. Hello, terminal.</h2>
 
       <div class="col-12 d-flex flex-wrap gutter-spacious">
         <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
@@ -93,7 +198,7 @@ layout: default
         <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
           <img alt="Easy creation icon" class="d-block mb-2" style="width: 56px;" src="/assets/images/icon-cli-status-check.svg">
           <h3 class="h4-mktg mb-1">Quick status&nbsp;checks</h3>
-          <p class="text-gray-light f4 px-lg-4">See the status of open issues and pull requests, and see what’s waiting for&nbsp;review.</p>
+          <p class="text-gray-light f5 px-lg-4">See the status of open issues and pull requests, and see what’s waiting for&nbsp;review.</p>
         </div>
 
         <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
@@ -106,45 +211,62 @@ layout: default
   </div>
 
   <div class="container-xl mx-auto px-3 px-md-4 pt-6 pb-8">
-    <div class="clearfix gutter-spacious text-center text-md-left">
-      <div class="float-left col-12 col-md-6 mb-6 mt-md-6">
-        <h2 class="h2-mktg mb-1 pl-md-7">Try GitHub on the command&nbsp;line <span title="Label: Beta" class="Label Label--outline Label--outline-green position-relative bottom-1">Beta</span></h2>
-        <p class="text-gray-light f4 pl-md-7 pr-lg-4">GitHub CLI is ready for your terminal. It’s free and open source—getting better with every fork.</p>
+    <div class="d-flex flex-justify-between gutter-spacious text-center text-md-left">
+      <div class="col-12 col-md-6 col-lg-5 mb-6 mt-md-3">
+        <div class="pl-lg-7">
+          <span title="Label: Beta" class="Label Label--outline Label--outline-green text-mono position-relative bottom-1">Beta</span>
+          <h2 class="h2-mktg mb-1">Try GitHub on the command&nbsp;line</h2>
+          <p class="text-gray-light f4">GitHub CLI is ready for your terminal. It’s free and open source—getting better with every fork.</p>
 
-        <!-- if mac -->
-        <div class="download-mac d-none f4 text-center text-md-left pl-md-7">
-          <div class="d-inline-block">
-            <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f4 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code><span class="text-gray mx-2">or</span>
+          <!-- if mac -->
+          <div class="download-mac d-none f5 text-center text-md-left">
+            <div class="d-inline-block">
+              <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code><span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+            </div>
+            <a class="btn-mktg p-3" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
           </div>
-          <div class="d-inline-block">
-            <a class="btn-mktg btn-outline-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+
+          <!-- if windows -->
+          <div class="download-windows d-none">
+            <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
           </div>
-        </div>
 
-        <!-- if windows -->
-        <div class="download-windows d-none">
-          <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
-        </div>
+          <!-- if linux -->
+          <div class="download-linux d-none">
+            <details class="dropdown details-reset details-overlay d-inline-block position-relative">
+              <summary class="btn-mktg" aria-haspopup="true">
+                Download for Linux
+                <svg class="octicon octicon-chevron-down replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></svg>
 
-        <!-- TODO -->
-        <!-- if linux -->
+                <svg class="octicon octicon-chevron-up replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.21967 9.78033C2.92678 9.48744 2.92678 9.01256 3.21967 8.71967L7.46967 4.46967C7.76256 4.17678 8.23744 4.17678 8.53033 4.46967L12.7803 8.71967C13.0732 9.01256 13.0732 9.48744 12.7803 9.78033C12.4874 10.0732 12.0126 10.0732 11.7197 9.78033L8 6.06066L4.28033 9.78033C3.98744 10.0732 3.51256 10.0732 3.21967 9.78033Z"></path></svg>
+              </summary>
 
+              <ul class="dropdown-menu dropdown-menu-se width-full">
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+              </ul>
+            </details>
+          </div>
 
-        <a class="mt-2 pl-md-7 d-block f6 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">View installation instructions <span class="Bump-link-symbol">→</span></a>
+          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">View installation instructions <span class="Bump-link-symbol">→</span></a>
 
-        <div class="pl-md-7 mt-4">
-          <img alt="Windows" class="mr-4" style="width: 32px;" src="/assets/images/icon-windows.svg">
-          <img alt="Mac" class="mr-4" style="width: 32px;" src="/assets/images/icon-mac.svg">
-          <img alt="Linux" style="width: 32px;" src="/assets/images/icon-linux.svg">
+          <div class="mt-4">
+            <img alt="Windows" class="mr-4" style="width: 24px;" src="/assets/images/icon-windows.svg">
+            <img alt="Mac" class="mr-4" style="width: 24px;" src="/assets/images/icon-mac.svg">
+            <img alt="Linux" style="width: 24px;" src="/assets/images/icon-linux.svg">
+          </div>
         </div>
       </div>
 
-      <div class="float-left lp-contribute-section position-relative col-12 col-md-4 border rounded-2 p-6 offset-md-1 bg-white">
-        <h3 class="h3-mktg mb-1">Contribute and learn&nbsp;more</h3>
-        <p class="text-gray-light f5">Help us make GitHub CLI fit the way you work by sharing feedback. And find more information about how to use it in our manual and release notes.</p>
-        <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
-        <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Explore the manual <span class="Bump-link-symbol">→</span></a>
-        <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Check out the release notes <span class="Bump-link-symbol">→</span></a>
+      <div class="col-12 col-md-5 col-lg-4">
+        <div class="lp-contribute-section position-relative bg-white border rounded-2 p-6 offset-md-n1">
+          <h3 class="h3-mktg mb-1">Contribute and learn&nbsp;more</h3>
+          <p class="text-gray-light f5">Help us make GitHub CLI fit the way you work by sharing feedback. And find more information about how to use it in our manual and release notes.</p>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Explore the manual <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Check out the release notes <span class="Bump-link-symbol">→</span></a>
+        </div>
       </div>
     </div>
   </div>
