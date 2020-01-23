@@ -10,7 +10,7 @@ ifdef GH_OAUTH_CLIENT_SECRET
 endif
 
 bin/gh: $(BUILD_FILES)
-	@go build -ldflags "$(LDFLAGS)" -o "$@"
+	@go build -ldflags "$(LDFLAGS)" -o "$@" ./cmd/gh
 
 test:
 	go test ./...
