@@ -3,8 +3,8 @@ package context
 import (
 	"path"
 
-	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/internal/ghrepo"
+	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/mitchellh/go-homedir"
 )
 

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/github/gh-cli/api"
+	"github.com/cli/cli/api"
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )

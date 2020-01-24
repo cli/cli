@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/github/gh-cli/git"
-	"github.com/github/gh-cli/internal/ghrepo"
+	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
 )
 
 // NewBlank initializes a blank Context suitable for testing

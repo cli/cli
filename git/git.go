@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/github/gh-cli/utils"
+	"github.com/cli/cli/utils"
 )
 
 func VerifyRef(ref string) bool {

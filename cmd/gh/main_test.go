@@ -7,7 +7,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/github/gh-cli/command"
+	"github.com/cli/cli/command"
 	"github.com/spf13/cobra"
 )
 

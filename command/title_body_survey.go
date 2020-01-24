@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/github/gh-cli/pkg/githubtemplate"
-	"github.com/github/gh-cli/pkg/surveyext"
+	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
 

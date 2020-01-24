@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-cli/utils"
+	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

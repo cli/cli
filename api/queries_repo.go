@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/github/gh-cli/internal/ghrepo"
+	"github.com/cli/cli/internal/ghrepo"
 )
 
 // Repository contains information about a GitHub repo

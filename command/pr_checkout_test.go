@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/utils"
+	"github.com/cli/cli/context"
+	"github.com/cli/cli/utils"
 )
 
 func TestPRCheckout_sameRepo(t *testing.T) {

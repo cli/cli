@@ -25,8 +25,8 @@
   "shortcuts": {},
   "choco": {
     "description": "Use GitHub from the CLI",
-    "project-url": "https://github.com/github/gh-cli",
+    "project-url": "https://github.com/cli/cli",
     "tags": "github cli git",
-    "license-url": "https://github.com/github/gh-cli/blob/master/LICENSE"
+    "license-url": "https://github.com/cli/cli/blob/master/LICENSE"
   }
 }
