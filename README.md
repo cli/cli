@@ -11,6 +11,8 @@ the terminal next to where you are already working with `git` and your code.
 - `gh issue [status, list, view, create]`
 - `gh help`
 
+Check out the [docs][] for more information.
+
 
 ## Comparison with hub
 
@@ -45,5 +47,6 @@ MSI installers are available on the [releases page][].
 There are prebuilt binaries available on the [releases page][].
 
 
- [releases page]: https://github.com/cli/cli/releases/latest
- [hub]: https://github.com/github/hub
+[docs]: https://cli.github.com/manual
+[releases page]: https://github.com/cli/cli/releases/latest
+[hub]: https://github.com/github/hub
