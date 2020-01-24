@@ -6,7 +6,7 @@
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
-Given the beta status of this work, we're only accepting pull requests for bug fixes right now. We'd love to
+Given that this project is very early and still in beta, we're only accepting pull requests for bug fixes right now. We'd love to
 hear about ideas for new features as issues, though!
 
 Please do:
