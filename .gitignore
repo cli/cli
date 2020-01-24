@@ -1,4 +1,9 @@
+bin
+.bundle
+.DS_Store
+github-website-starter.gemspec
+.jekyll-metadata
+node_modules
 /_site/
 .sass-cache
-.jekyll-metadata
-/vendor/gems
+vendor
