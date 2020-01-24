@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/github/gh-cli/test"
+	"github.com/cli/cli/test"
 )
 
 func TestGitStatusHelperProcess(*testing.T) {

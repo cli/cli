@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/github/gh-cli/utils"
+	"github.com/cli/cli/utils"
 )
 
 func TestIssueStatus(t *testing.T) {

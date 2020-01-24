@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/github/gh-cli/internal/ghrepo"
+	"github.com/cli/cli/internal/ghrepo"
 )
 
 type IssuesPayload struct {

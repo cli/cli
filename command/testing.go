@@ -3,8 +3,8 @@ package command
 import (
 	"errors"
 
-	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
 )
 
 func initBlankContext(repo, branch string) {

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/auth"
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/auth"
 	"gopkg.in/yaml.v3"
 )
 

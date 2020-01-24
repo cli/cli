@@ -13,7 +13,7 @@
           "node": {
             "number": 8,
             "title": "Strawberries are not actually berries",
-            "url": "https://github.com/github/gh-cli/pull/8",
+            "url": "https://github.com/cli/cli/pull/8",
             "headRefName": "strawberries",
             "reviewDecision": "CHANGES_REQUESTED",
             "commits": {
@@ -39,7 +39,7 @@
           "node": {
             "number": 7,
             "title": "Bananas are berries",
-            "url": "https://github.com/github/gh-cli/pull/7",
+            "url": "https://github.com/cli/cli/pull/7",
             "headRefName": "banananana",
             "reviewDecision": "APPROVED",
             "commits": {
@@ -66,7 +66,7 @@
           "node": {
             "number": 6,
             "title": "Avocado is probably not a berry",
-            "url": "https://github.com/github/gh-cli/pull/6",
+            "url": "https://github.com/cli/cli/pull/6",
             "headRefName": "avo",
             "reviewDecision": "REVIEW_REQUIRED",
             "commits": {

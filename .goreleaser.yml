@@ -10,9 +10,9 @@ builds:
   - binary: bin/gh
     main: ./cmd/gh
     ldflags:
-      - -s -w -X github.com/github/gh-cli/command.Version={{.Version}} -X github.com/github/gh-cli/command.BuildDate={{time "2006-01-02"}}
-      - -X github.com/github/gh-cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
-      - -X github.com/github/gh-cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
+      - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
+      - -X github.com/cli/cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
+      - -X github.com/cli/cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
       - -X main.updaterEnabled=github/homebrew-gh
     goos:
       - linux
@@ -33,7 +33,7 @@ archives:
 nfpms:
   - license: MIT
     maintainer: GitHub
-    homepage: https://github.com/github/gh-cli
+    homepage: https://github.com/cli/cli
     bindir: /usr/local
     dependencies:
       - git

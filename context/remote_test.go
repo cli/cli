@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/github/gh-cli/git"
+	"github.com/cli/cli/git"
 )
 
 func Test_Remotes_FindByName(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/github/gh-cli
+module github.com/cli/cli
 
 go 1.13
 

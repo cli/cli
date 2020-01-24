@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/github/gh-cli/api"
+	"github.com/cli/cli/api"
 )
 
 func TestCheckForUpdate(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/github/gh-cli/api"
-	"github.com/github/gh-cli/context"
-	"github.com/github/gh-cli/utils"
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
+	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
 )
