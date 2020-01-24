@@ -1,9 +1,8 @@
-bin
-.bundle
+/bin
+/.bundle
 .DS_Store
-github-website-starter.gemspec
 .jekyll-metadata
 node_modules
 /_site/
 .sass-cache
-vendor
+/vendor
