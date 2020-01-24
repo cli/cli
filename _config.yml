@@ -20,7 +20,11 @@ sass:
 exclude:
   - Gemfile
   - Gemfile.lock
+  - Brewfile
   - README.md
   - bin
+  - script
   - vendor
   - node_modules
+  - package.json
+  - package-lock.json
