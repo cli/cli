@@ -249,7 +249,6 @@ PLATFORMS
 DEPENDENCIES
   github-pages
   jekyll-octicons
-  minima (~> 2.0)
 
 BUNDLED WITH
    2.0.2
