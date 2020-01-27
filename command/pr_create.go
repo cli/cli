@@ -174,6 +174,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if action == SubmitAction {
+		if title == "" {
+			return fmt.Errorf("Can't create a PR without a title.")
+		}
+
 		params := map[string]interface{}{
 			"title":       title,
 			"body":        body,
