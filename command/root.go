@@ -59,7 +59,7 @@ var RootCmd = &cobra.Command{
 	Long: `Work seamlessly with GitHub from the command line.
 
 GitHub CLI is in early stages of development, and we'd love to hear your
-feedback at <https://forms.gle/pBt3kujJi7nXZmcM6>`,
+feedback at <https://forms.gle/umxd3h31c7aMQFKG7>`,
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
