@@ -17,7 +17,5 @@ This can all be done from your local terminal.
 
 A local release can be created for testing without creating anything official on the release page.
 
-1. `git tag 'v0.0.1' # some throwaway version number`
-2. `env GH_OAUTH_CLIENT_SECRET=foobar GH_OAUTH_CLIENT_ID=1234 goreleaser --skip-publish --rm-dist`
-3. Check and test files in `dist/`
-4. `git tag -d v0.0.1 # delete the throwaway tag`
+1. `env GH_OAUTH_CLIENT_SECRET= GH_OAUTH_CLIENT_ID= goreleaser --skip-validate --skip-publish --rm-dist`
+2. Check and test files in `dist/`
