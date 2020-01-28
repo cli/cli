@@ -75,17 +75,3 @@ jobs:
         run: bin/hub release edit "${GITHUB_REF#refs/tags/}" -m "" -a "${{ steps.buildmsi.outputs.msi }}"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-  releases:
-    needs: msi
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Copy release
-        id: copy
-        uses: ./.github/actions/copy-release-to-another-repo
-        with:
-          target-repo: github/homebrew-gh
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-          UPLOAD_GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
