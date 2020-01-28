@@ -47,7 +47,7 @@ MSI installers are available on the [releases page][].
 Install a prebuilt binary from the [releases page][] or source compile by running `make` from the
 project directory.
 
-
-[docs]: https://cli.github.io/cli/gh <!-- TODO eventually we'll have https://cli.github.com/manual -->
+<!-- TODO eventually we'll have https://cli.github.com/manual -->
+[docs]: https://cli.github.io/cli/gh
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
