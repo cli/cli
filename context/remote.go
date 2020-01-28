@@ -81,6 +81,9 @@ func translateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url
 		if r.PushURL != nil && repo == nil {
 			repo, _ = ghrepo.FromURL(urlTranslate(r.PushURL))
 		}
+		if repo == nil {
+			continue
+		}
 		remotes = append(remotes, &Remote{
 			Remote: r,
 			Owner:  repo.RepoOwner(),
