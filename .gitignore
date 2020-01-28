@@ -1,3 +1,8 @@
+/bin
+/.bundle
+.DS_Store
+.jekyll-metadata
+node_modules
 /_site/
 .sass-cache
-.jekyll-metadata
+/vendor
