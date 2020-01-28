@@ -3,7 +3,7 @@
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to
 the terminal next to where you are already working with `git` and your code.
 
-![screenshot](https://user-images.githubusercontent.com/98482/73207890-1b7f6180-410b-11ea-9c75-d20c436eba71.png)
+![screenshot](https://user-images.githubusercontent.com/98482/73286699-9f922180-41bd-11ea-87c9-60a2d31fd0ac.png)
 
 ## Usage
 
@@ -47,6 +47,6 @@ MSI installers are available on the [releases page][].
 There are prebuilt binaries available on the [releases page][].
 
 
-[docs]: https://cli.github.com/manual
+[docs]: https://cli.github.io/cli/gh <!-- TODO eventually we'll have https://cli.github.com/manual -->
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
