@@ -13,7 +13,7 @@ builds:
       - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
       - -X github.com/cli/cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
       - -X github.com/cli/cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
-      - -X main.updaterEnabled=github/homebrew-gh
+      - -X main.updaterEnabled=cli/cli
     goos:
       - linux
       - darwin

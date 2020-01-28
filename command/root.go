@@ -142,13 +142,12 @@ func colorableErr(cmd *cobra.Command) io.Writer {
 }
 
 func changelogURL(version string) string {
-	path := "https://github.com/github/homebrew-gh"
-	r := regexp.MustCompile(`^v\d+\.\d+.\d+$`)
+	path := "https://github.com/cli/cli"
+	r := regexp.MustCompile(`^\d+\.\d+.\d+(-[\w.]+)?$`)
 	if !r.MatchString(version) {
 		return fmt.Sprintf("%s/releases/latest", path)
 	}
 
-	tag := version
-	url := fmt.Sprintf("%s/releases/tag/%s", path, tag)
+	url := fmt.Sprintf("%s/releases/tag/v%s", path, version)
 	return url
 }
