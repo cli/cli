@@ -27,9 +27,20 @@ func TestCompletion_zsh(t *testing.T) {
 	}
 }
 
+func TestCompletion_fish(t *testing.T) {
+	output, err := RunCommand(completionCmd, `completion -s fish`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(output.String(), "complete -c gh ") {
+		t.Errorf("problem in fish completion:\n%s", output)
+	}
+}
+
 func TestCompletion_unsupported(t *testing.T) {
-	_, err := RunCommand(completionCmd, `completion -s fish`)
-	if err == nil || err.Error() != "unsupported shell type: fish" {
+	_, err := RunCommand(completionCmd, `completion -s csh`)
+	if err == nil || err.Error() != `unsupported shell type "csh"` {
 		t.Fatal(err)
 	}
 }
