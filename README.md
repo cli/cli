@@ -44,7 +44,8 @@ MSI installers are available on the [releases page][].
 
 ### Other platforms
 
-There are prebuilt binaries available on the [releases page][].
+Install a prebuilt binary from the [releases page][] or source compile by running `make` from the
+project directory.
 
 
 [docs]: https://cli.github.io/cli/gh <!-- TODO eventually we'll have https://cli.github.com/manual -->
