@@ -3,7 +3,7 @@
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to
 the terminal next to where you are already working with `git` and your code.
 
-![screenshot](https://user-images.githubusercontent.com/98482/73284889-d6b30380-41ba-11ea-807d-2667f89cc89b.png)
+![screenshot](https://user-images.githubusercontent.com/98482/73286699-9f922180-41bd-11ea-87c9-60a2d31fd0ac.png)
 
 ## Usage
 
