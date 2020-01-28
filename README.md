@@ -1,9 +1,17 @@
 # gh - The GitHub CLI tool
 
-`gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to
+`gh` is GitHub on the command line, and it's now available in beta. It brings pull requests, issues, and other GitHub concepts to
 the terminal next to where you are already working with `git` and your code.
 
 ![screenshot](https://user-images.githubusercontent.com/98482/73286699-9f922180-41bd-11ea-87c9-60a2d31fd0ac.png)
+
+## We need your feedback
+
+GitHub CLI is currently early in its development, and we're hoping to get feedback from people using it.
+
+We'd love for you to take a short survey here (no more than five minutes): https://forms.gle/umxd3h31c7aMQFKG7
+
+And if you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][]
 
 ## Usage
 
@@ -51,3 +59,4 @@ project directory.
 [docs]: https://cli.github.io/cli/gh
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
+[contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
