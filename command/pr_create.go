@@ -175,7 +175,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	if action == SubmitAction {
 		if title == "" {
-			return fmt.Errorf("Can't create a PR without a title.")
+			return fmt.Errorf("pull request title must not be blank")
 		}
 
 		params := map[string]interface{}{
