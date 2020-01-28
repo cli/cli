@@ -47,6 +47,6 @@ MSI installers are available on the [releases page][].
 There are prebuilt binaries available on the [releases page][].
 
 
-[docs]: https://cli.github.com/manual
+[docs]: https://cli.github.io/cli/gh <!-- TODO eventually we'll have https://cli.github.com/manual -->
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
