@@ -9,7 +9,7 @@ the terminal next to where you are already working with `git` and your code.
 
 GitHub CLI is currently early in its development, and we're hoping to get feedback from people using it.
 
-We'd love for you to take a short survey here (no more than five minutes): https://forms.gle/umxd3h31c7aMQFKG7
+If you've installed and used `gh`, we'd love for you to take a short survey here (no more than five minutes): https://forms.gle/umxd3h31c7aMQFKG7
 
 And if you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][]
 
