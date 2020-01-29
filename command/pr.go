@@ -97,12 +97,19 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	out := colorableOut(cmd)
+
 	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
 
-	out := colorableOut(cmd)
+	repoInfo, err := context.FormattedInfo(ctx, prPayload.ParentRepo)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(out, repoInfo)
 
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {

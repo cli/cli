@@ -8,9 +8,10 @@ import (
 )
 
 type IssuesPayload struct {
-	Assigned  IssuesAndTotalCount
-	Mentioned IssuesAndTotalCount
-	Authored  IssuesAndTotalCount
+	ParentRepo string
+	Assigned   IssuesAndTotalCount
+	Mentioned  IssuesAndTotalCount
+	Authored   IssuesAndTotalCount
 }
 
 type IssuesAndTotalCount struct {
@@ -108,6 +109,9 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 				TotalCount int
 				Nodes      []Issue
 			}
+			Parent struct {
+				NameWithOwner string
+			}
 			HasIssuesEnabled bool
 		}
 	}
@@ -115,6 +119,9 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	query := fragments + `
 	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
+			parent {
+				nameWithOwner
+			}
 			hasIssuesEnabled
 			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
 				totalCount
@@ -154,6 +161,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	}
 
 	payload := IssuesPayload{
+		ParentRepo: resp.Repository.Parent.NameWithOwner,
 		Assigned: IssuesAndTotalCount{
 			Issues:     resp.Repository.Assigned.Nodes,
 			TotalCount: resp.Repository.Assigned.TotalCount,
