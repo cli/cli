@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
@@ -175,13 +174,6 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	out := colorableOut(cmd)
-
-	repoInfo, err := context.FormattedInfo(ctx, issuePayload.ParentRepo)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(out, repoInfo)
 
 	printHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {

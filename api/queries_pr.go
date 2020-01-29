@@ -8,7 +8,6 @@ import (
 )
 
 type PullRequestsPayload struct {
-	ParentRepo      string
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
 	CurrentPR       *PullRequest
@@ -140,9 +139,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 
 	type response struct {
 		Repository struct {
-			Parent struct {
-				NameWithOwner string
-			}
 			PullRequests edges
 			PullRequest  *PullRequest
 		}
@@ -189,9 +185,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			parent {
-				nameWithOwner
-			}
 			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
 				totalCount
 				edges {
@@ -206,9 +199,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		queryPrefix = `
 		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-				parent {
-				  nameWithOwner
-				}
 				pullRequest(number: $number) {
 					...prWithReviews
 				}
@@ -279,7 +269,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	payload := PullRequestsPayload{
-		ParentRepo: resp.Repository.Parent.NameWithOwner,
 		ViewerCreated: PullRequestAndTotalCount{
 			PullRequests: viewerCreated,
 			TotalCount:   resp.ViewerCreated.TotalCount,
