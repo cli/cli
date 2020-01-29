@@ -10,9 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
-	"strings"
+
+	"github.com/cli/cli/pkg/browser"
 )
 
 func randomString(length int) (string, error) {
@@ -123,20 +122,9 @@ func (oa *OAuthFlow) logf(format string, args ...interface{}) {
 }
 
 func openInBrowser(url string) error {
-	var args []string
-	switch runtime.GOOS {
-	case "darwin":
-		args = []string{"open"}
-	case "windows":
-		args = []string{"cmd", "/c", "start"}
-		r := strings.NewReplacer("&", "^&")
-		url = r.Replace(url)
-	default:
-		args = []string{"xdg-open"}
+	cmd, err := browser.Command(url)
+	if err != nil {
+		return err
 	}
-
-	args = append(args, url)
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
