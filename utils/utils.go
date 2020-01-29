@@ -2,58 +2,20 @@ package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"runtime"
 	"time"
 
-	"github.com/kballard/go-shellquote"
+	"github.com/cli/cli/pkg/browser"
 	md "github.com/vilmibm/go-termd"
 )
 
+// OpenInBrowser opens the url in a web browser based on OS and $BROWSER environment variable
 func OpenInBrowser(url string) error {
-	browser := os.Getenv("BROWSER")
-	if browser == "" {
-		browser = searchBrowserLauncher(runtime.GOOS)
-	} else {
-		browser = os.ExpandEnv(browser)
-	}
-
-	if browser == "" {
-		return errors.New("Please set $BROWSER to a web launcher")
-	}
-
-	browserArgs, err := shellquote.Split(browser)
+	browseCmd, err := browser.Command(url)
 	if err != nil {
 		return err
 	}
-
-	endingArgs := append(browserArgs[1:], url)
-	browseCmd := exec.Command(browserArgs[0], endingArgs...)
 	return PrepareCmd(browseCmd).Run()
-}
-
-func searchBrowserLauncher(goos string) (browser string) {
-	switch goos {
-	case "darwin":
-		browser = "open"
-	case "windows":
-		browser = "cmd /c start"
-	default:
-		candidates := []string{"xdg-open", "cygstart", "x-www-browser", "firefox",
-			"opera", "mozilla", "netscape"}
-		for _, b := range candidates {
-			path, err := exec.LookPath(b)
-			if err == nil {
-				browser = path
-				break
-			}
-		}
-	}
-
-	return browser
 }
 
 func normalizeNewlines(d []byte) []byte {
