@@ -24,7 +24,7 @@ var versionOutput = ""
 
 func init() {
 	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
-	versionOutput = fmt.Sprintf("gh version %s\n%s\n", RootCmd.Version, changelogURL(RootCmd.Version))
+	versionOutput = fmt.Sprintf("gh version %s\n%s\n", RootCmd.Version, changelogURL(Version))
 	RootCmd.AddCommand(versionCmd)
 	RootCmd.SetVersionTemplate(versionOutput)
 
@@ -143,11 +143,11 @@ func colorableErr(cmd *cobra.Command) io.Writer {
 
 func changelogURL(version string) string {
 	path := "https://github.com/cli/cli"
-	r := regexp.MustCompile(`^\d+\.\d+.\d+(-[\w.]+)?$`)
+	r := regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[\w.]+)?$`)
 	if !r.MatchString(version) {
 		return fmt.Sprintf("%s/releases/latest", path)
 	}
 
-	url := fmt.Sprintf("%s/releases/tag/v%s", path, version)
+	url := fmt.Sprintf("%s/releases/tag/v%s", path, strings.TrimPrefix(version, "v"))
 	return url
 }
