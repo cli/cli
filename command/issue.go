@@ -175,6 +175,10 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 
+	fmt.Fprint(out, utils.Gray("Relevant issues in "))
+	fmt.Fprint(out, utils.Cyan(ghrepo.FullName(baseRepo)))
+	fmt.Fprintln(out, "")
+
 	printHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
