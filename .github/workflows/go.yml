@@ -15,7 +15,7 @@ jobs:
           go-version: 1.13
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Verify dependencies
         run: go mod verify
