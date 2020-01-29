@@ -42,7 +42,7 @@ When installing with Homebrew, see https://docs.brew.sh/Shell-Completion
 		case "fish":
 			genFishCompletion(RootCmd, cmd.OutOrStdout())
 		default:
-			return fmt.Errorf("unsupported shell type %s", shellType)
+			return fmt.Errorf("unsupported shell type %q", shellType)
 		}
 		return nil
 	},
