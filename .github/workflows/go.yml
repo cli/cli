@@ -21,6 +21,7 @@ jobs:
         run: go mod verify
 
       - name: Build
+        shell: bash
         run: |
           go test ./...
           go build -v ./cmd/gh

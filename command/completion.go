@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 
+	"github.com/cli/cli/internal/cobrafish"
 	"github.com/spf13/cobra"
 )
 
@@ -35,8 +36,10 @@ When installing with Homebrew, see https://docs.brew.sh/Shell-Completion
 			RootCmd.GenBashCompletion(cmd.OutOrStdout())
 		case "zsh":
 			RootCmd.GenZshCompletion(cmd.OutOrStdout())
+		case "fish":
+			cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
 		default:
-			return fmt.Errorf("unsupported shell type: %s", shellType)
+			return fmt.Errorf("unsupported shell type %q", shellType)
 		}
 		return nil
 	},
