@@ -6,29 +6,65 @@ release:
 before:
   hooks:
     - go mod tidy
+
 builds:
-  - binary: bin/gh
-    main: ./cmd/gh
-    ldflags:
-      - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
-      - -X github.com/cli/cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
-      - -X github.com/cli/cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
-      - -X main.updaterEnabled=cli/cli
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
+  - <<: &build_defaults
+      binary: bin/gh
+      main: ./cmd/gh
+      ldflags:
+        - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
+        - -X github.com/cli/cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
+        - -X github.com/cli/cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
+        - -X main.updaterEnabled=cli/cli
+    id: macos
+    goos: [darwin]
+    goarch: [amd64]
+  - <<: *build_defaults
+    id: linux
+    goos: [linux]
+    goarch: [386, amd64]
+  - <<: *build_defaults
+    id: windows
+    goos: [windows]
+    goarch: [386, amd64]
+
 archives:
-  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+  - id: nix
+    builds: [macos, linux]
+    <<: &archive_defaults
+      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: true
     replacements:
       darwin: macOS
     format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: binary
+  - id: windows
+    builds: [windows]
+    <<: *archive_defaults
+    wrap_in_directory: false
+    format: zip
+
+brews:
+  - name: gh
+    ids: [nix]
+    github:
+      owner: github
+      name: homebrew-gh
+    skip_upload: auto
+    description: GitHub CLI
+    homepage: https://github.com/cli/cli
+    custom_block: |
+      head do
+        url "https://github.com/cli/cli.git"
+        depends_on "go"
+      end
+    install: |
+      system "make" if build.head?
+      bin.install "bin/gh"
+      (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
+      (zsh_completion/"_gh").write `#{bin}/gh completion -s zsh`
+    test: |
+      help_text = shell_output("#{bin}/gh --help")
+      assert_includes help_text, "Usage:"
 
 nfpms:
   - license: MIT

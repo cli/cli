@@ -10,13 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       - name: Set up Go 1.13
         uses: actions/setup-go@v1
         with:
           go-version: 1.13
       - name: Generate changelog
-        run: script/changelog | tee CHANGELOG.md
+        run: |
+          git fetch --unshallow
+          script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v1
         with:
@@ -25,29 +27,38 @@ jobs:
         env:
           GH_OAUTH_CLIENT_ID: 178c6fc778ccc68e1d6a
           GH_OAUTH_CLIENT_SECRET: ${{secrets.OAUTH_CLIENT_SECRET}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
   msi:
     needs: goreleaser
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
-      - name: Set up Go 1.13
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.13
+        uses: actions/checkout@v2
       - name: Download gh.exe
-        uses: ./.github/actions/download-exe
         id: download_exe
+        shell: bash
+        run: |
+          curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
+          bin/hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
+          printf "::set-output name=zip::%s\n" *.zip
+          unzip -o *.zip && rm -v *.zip
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install go-msi
         run: choco install -y "go-msi"
+      - name: Prepare PATH
+        shell: bash
+        run: |
+          echo "::add-path::$WIX\\bin"
+          echo "::add-path::C:\\Program Files\\go-msi"
       - name: Build MSI
         id: buildmsi
-        uses: ./.github/actions/build-msi
-        with:
-          exe: ${{ steps.download_exe.outputs.exe }}
+        shell: bash
+        run: |
+          mkdir -p build
+          msi="$(basename "${{ steps.download_exe.outputs.zip }}" ".zip").msi"
+          printf "::set-output name=msi::%s\n" "$msi"
+          go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
       - name: Obtain signing cert
         id: obtain_cert
         env:
@@ -60,31 +71,7 @@ jobs:
           .\script\sign.ps1 -Certificate "${{ steps.obtain_cert.outputs.cert-file }}" `
             -Executable "${{ steps.buildmsi.outputs.msi }}"
       - name: Upload MSI
-        uses: ./.github/actions/upload-msi
-        with:
-          msi-file: ${{ steps.buildmsi.outputs.msi }}
+        shell: bash
+        run: bin/hub release edit "${GITHUB_REF#refs/tags/}" -m "" -a "${{ steps.buildmsi.outputs.msi }}"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-  releases:
-    needs: msi
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-      - name: Copy release
-        id: copy
-        uses: ./.github/actions/copy-release-to-another-repo
-        with:
-          target-repo: github/homebrew-gh
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-          UPLOAD_GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
-      - name: Bump brew formula
-        if: "!contains(github.ref, '-')" # skip prereleases
-        uses: mislav/bump-homebrew-formula-action@v1.4
-        with:
-          formula-name: gh
-          homebrew-tap: github/homebrew-gh
-          download-url: ${{ steps.copy.outputs.asset-url }}
-        env:
-          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
