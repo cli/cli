@@ -104,8 +104,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 
-	fmt.Fprint(out, utils.Gray("Relevant pull requests in "))
-	fmt.Fprint(out, utils.Cyan(ghrepo.FullName(baseRepo)))
+	fmt.Fprintln(out, "")
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")

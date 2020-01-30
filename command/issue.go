@@ -175,8 +175,8 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 
-	fmt.Fprint(out, utils.Gray("Relevant issues in "))
-	fmt.Fprint(out, utils.Cyan(ghrepo.FullName(baseRepo)))
+	fmt.Fprintln(out, "")
+	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Issues assigned to you")

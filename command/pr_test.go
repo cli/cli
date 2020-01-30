@@ -136,7 +136,9 @@ func TestPRStatus_blankSlate(t *testing.T) {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
 
-	expected := `Relevant pull requests in OWNER/REPO
+	expected := `
+Relevant pull requests in OWNER/REPO
+
 Current branch
   There is no pull request associated with [blueberries]
 
