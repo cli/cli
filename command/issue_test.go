@@ -58,7 +58,10 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 		t.Errorf("error running command `issue status`: %v", err)
 	}
 
-	expectedOutput := `Issues assigned to you
+	expectedOutput := `
+Relevant issues in OWNER/REPO
+
+Issues assigned to you
   There are no issues assigned to you
 
 Issues mentioning you

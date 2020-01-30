@@ -104,6 +104,10 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 
+	fmt.Fprintln(out, "")
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintln(out, "")
+
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
 		printPrs(out, 0, *prPayload.CurrentPR)
