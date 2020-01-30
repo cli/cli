@@ -2,6 +2,12 @@
 layout: default
 ---
 
+{% assign asset_mac = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'macOS_amd64.tar'" | first %}
+{% assign asset_windows = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'windows_amd64.msi'" | first %}
+{% assign asset_linux_tar = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.tar'" | first %}
+{% assign asset_linux_deb = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.deb'" | first %}
+{% assign asset_linux_rpm = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.rpm'" | first %}
+
 <main class="">
   <div class="container-xl mx-auto px-3 px-md-4 pt-8">
     <div class="d-flex flex-column flex-justify-center flex-items-center mb-8">
@@ -27,7 +33,7 @@ layout: default
 
       <!-- if windows -->
       <div class="download-windows d-none">
-        <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
+        <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
       </div>
 
       <!-- if linux -->
@@ -42,9 +48,9 @@ layout: default
           </summary>
 
           <ul class="dropdown-menu dropdown-menu-se width-full">
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
           </ul>
         </details>
       </div>
@@ -57,7 +63,7 @@ layout: default
       <div class="position-absolute bottom-0 width-full">
         <p class="f4 text-center text-gray">Check out our docs for more info and view all GitHub CLI commands.</p>
         <div class="d-flex flex-justify-center mb-6 px-3">
-          <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Read our documentation <span class="Bump-link-symbol">→</span></a>
+          <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
         </div>
       </div>
 
@@ -231,12 +237,12 @@ layout: default
               </code>
               <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
             </div>
-            <a class="btn-mktg p-3" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+            <a class="btn-mktg p-3" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
           </div>
 
           <!-- if windows -->
           <div class="download-windows d-none">
-            <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
+            <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
           </div>
 
           <!-- if linux -->
@@ -250,14 +256,14 @@ layout: default
               </summary>
 
               <ul class="dropdown-menu dropdown-menu-se width-full">
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
               </ul>
             </details>
           </div>
 
-          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">View installation instructions <span class="Bump-link-symbol">→</span></a>
+          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#installation">View installation instructions <span class="Bump-link-symbol">→</span></a>
 
           <div class="mt-4">
             <img alt="Windows" class="mr-4" style="width: 24px;" src="/assets/images/icon-windows.svg">
@@ -271,9 +277,9 @@ layout: default
         <div class="lp-contribute-section position-relative bg-white border rounded-2 p-6 offset-md-n1">
           <h3 class="h3-mktg mb-1">Contribute and learn&nbsp;more</h3>
           <p class="text-gray-light f5">Help us make GitHub CLI fit the way you work by sharing feedback. And find more information about how to use it in our manual and release notes.</p>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Explore the manual <span class="Bump-link-symbol">→</span></a>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Check out the release notes <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#we-need-your-feedback">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.latest_release.html_url }}">Check out the release notes <span class="Bump-link-symbol">→</span></a>
         </div>
       </div>
     </div>
