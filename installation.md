@@ -3,53 +3,27 @@ layout: page
 title: Installation instructions
 ---
 
-## Install for macOS
-### Homebrew
-To install:
-```sh
-brew install github/gh/gh
-```
-To upgrade:
-```sh
-brew upgrade gh
-```
+## Installation
 
-### Manual install
-1. Download the `*_macOS_amd64.tar.gz` file from the [releases page](https://github.com/github/homebrew-gh/releases/latest)
-2. `tar -xf gh_*_macOS_amd64.tar.gz`
-3. Copy the uncompressed `gh` somewhere to your PATH (e.g. `cp gh_*_macOS_amd64/bin/gh /usr/local/bin/`)
+### macOS
 
-## Install for Windows
-1. Download the `*.msi` installer from the [releases page](https://github.com/github/homebrew-gh/releases/latest)
-2. Run the installer
+`brew install github/gh/gh`
 
-### Uninstall from Windows
-1. Search for "remove programs" in the start menu
-2. Choose “Add or remove programs”
-3. Find “GitHub CLI” on the list
-4. Click on it and choose “Uninstall”
+### Windows
 
-## Install for Linux
+MSI installers are available on the [releases page](http://github.com/cli/cli/releases/latest).
+
 ### Debian/Ubuntu Linux
 
-1. `sudo apt install git` if you don't already have git
-2. Download the `.deb` file from the [releases page](https://github.com/github/homebrew-gh/releases/latest)
-3. `sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
-
-_(Uninstall with `sudo apt remove gh`)_
+1. Download the `.deb` file from the [releases page](http://github.com/cli/cli/releases/latest)
+2. `sudo apt install git && sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
 
 ### Fedora/Centos Linux
 
-1. Download the `.rpm` file from the [releases page](https://github.com/github/homebrew-gh/releases/latest)
+1. Download the `.rpm` file from the [releases page](http://github.com/cli/cli/releases/latest)
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
 
-_(Uninstall with `sudo yum remove gh`)_
+### Other platforms
 
-### Other Linux
-
-1. Download the `*_linux_amd64.tar.gz` file from the [releases page](https://github.com/github/homebrew-gh/releases/latest)
-2. `tar -xf gh_*_linux_amd64.tar.gz`
-3. Copy the uncompressed `gh` somewhere to your PATH (e.g. `sudo cp gh_*_linux_amd64/bin/gh /usr/local/bin/`)
-
-
-_(Uninstall with `rm`)_
+Install a prebuilt binary from the [releases page](http://github.com/cli/cli/releases/latest) or source compile by running `make` from the
+project directory.
