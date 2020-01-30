@@ -1,0 +1,48 @@
+{% if page.url == '/gh_pr_status.html' or page.url == '/gh_issue_status.html' or  page.url == '/examples.html' %}
+{% if page.url != '/examples.html' %}
+<h3>Examples in use</h3>
+{% endif %}
+{% if page.url == '/examples.html' %}
+<h3 id="checking-status">Viewing the status of your relevant work</h3>
+{% endif %}
+
+<h4>Pull requests</h4>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Viewing the status of your relevant pull requests</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh pr status
+<b>Current branch</b>
+  <span class='green'>#12</span> Remove the test feature <span class='cyan'>[Rexogamer:patch-2]</span>
+   - <span class='red'>All checks failing</span> - <span class='yellow'>review required</span>
+
+<b>Created by you</b>
+  <span class='gray'>You have no open pull requests</span>
+
+<b>Requesting a code review from you</b>
+  <span class='green'>#13</span> Fix tests <span class='cyan'>[branch]</span>
+  - <span class='red'>3/4 checks failing</span> - <span class='yellow'>review required</span>
+  <span class='green'>#15</span> New feature <span class='cyan'>[branch]</span>
+   - <span class='green'>Checks passing</span> - <span class='green'>approved</span>
+
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+
+<h4>Issues</h4>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Viewing issues relevant to you</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh issue status
+<b>Issues assigned to you</b>
+  <span class='green'>#8509</span> [Fork] Improve how Desktop handles forks  <span class='gray'>(epic:fork, meta)</span>
+
+<b>Issues mentioning you</b>
+  <span class='green'>#8938</span> [Fork] Add create fork flow entry point at commit warning  <span class='gray'>(epic:fork)</span>
+  <span class='green'>#8509</span> [Fork] Improve how Desktop handles forks  <span class='gray'>(epic:fork, meta)</span>
+
+<b>Issues opened by you</b>
+  <span class='green'>#8936</span> [Fork] Hide PR number badges on branches that have an upstream PR  <span class='gray'>(epic:fork)</span>
+  <span class='green'>#6386</span> Improve no editor detected state on conflicts modal  <span class='gray'>(enhancement)</span>
+
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+{% endif %}

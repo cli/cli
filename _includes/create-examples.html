@@ -1,5 +1,10 @@
-{% if page.url == '/gh_pr_create.html' %}
+{% if page.url == '/gh_pr_create.html' or page.url == '/gh_issue_create.html' or  page.url == '/examples.html'%}
+{% if page.url != '/examples.html' %}
 <h3>Examples in use</h3>
+{% endif %}
+{% if page.url == '/examples.html' %}
+<h3 id="creating">Creating issues and pull requests</h3>
+{% endif %}
 
 <h4>Interactively</h4>
 
@@ -13,7 +18,7 @@ http://github.com/owner/repo/pull/1
 <span class='magenta'>~/Projects/my-project</span>$</code></pre>
 </div>
 
-#### With flags
+<h4>With flags</h4>
 
 <div class="width-full">
 <pre class="terminal"><code><span class='gray'>// Create an issue using flags</span>
@@ -22,7 +27,7 @@ http://github.com/owner/repo/issue/1
 <span class='magenta'>~/Projects/my-project</span>$</code></pre>
 </div>
 
-#### In the browser
+<h4>In the browser</h4>
 
 <div class="width-full">
 <pre class="terminal"><code><span class='gray'>// Quickly navigate to the pull request creation page</span>
