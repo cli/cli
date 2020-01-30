@@ -62,6 +62,7 @@ brews:
       bin.install "bin/gh"
       (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
       (zsh_completion/"_gh").write `#{bin}/gh completion -s zsh`
+      (fish_completion/"gh.fish").write `#{bin}/gh completion -s fish`
     test: |
       help_text = shell_output("#{bin}/gh --help")
       assert_includes help_text, "Usage:"
