@@ -14,10 +14,14 @@ layout: default
       <!-- if mac -->
       <div class="download-mac d-none f5 text-center">
         <div class="d-inline-block">
-          <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
+          <span class="text-gray mr-2">Run</span>
+          <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+            brew install github/gh/gh
+          </code>
         </div>
         <div class="d-inline-block">
-          <span class="text-gray mx-2 mb-2 d-inline-block">or</span><a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+          <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+          <a class="btn-mktg" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
         </div>
       </div>
 
@@ -212,7 +216,7 @@ layout: default
 
   <div class="container-xl mx-auto px-3 px-md-4 pt-6 pb-8">
     <div class="d-flex flex-justify-between gutter-spacious text-center text-md-left">
-      <div class="col-12 col-md-6 col-lg-5 mb-6 mt-md-3">
+      <div class="col-12 col-md-6 col-lg-6 mb-6 mt-md-3">
         <div class="pl-lg-7">
           <span title="Label: Beta" class="Label Label--outline Label--outline-green text-mono position-relative bottom-1">Beta</span>
           <h2 class="h2-mktg mb-1">Try GitHub on the command&nbsp;line</h2>
@@ -221,7 +225,11 @@ layout: default
           <!-- if mac -->
           <div class="download-mac d-none f5 text-center text-md-left">
             <div class="d-inline-block">
-              <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code><span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+              <span class="text-gray mr-2">Run</span>
+              <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+                brew install github/gh/gh
+              </code>
+              <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
             </div>
             <a class="btn-mktg p-3" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
           </div>
