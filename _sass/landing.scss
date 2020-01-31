@@ -70,3 +70,8 @@
 .command-pill-command {
   color: $gray-400;
 }
+
+.user-select-contain {
+  -ms-user-select: contain;
+  user-select: contain;
+}
