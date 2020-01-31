@@ -21,9 +21,11 @@ site:
 
 site-docs: site
 	git -C site pull
-	git -C site rm 'gh*.md' 2>/dev/null || true
-	go run ./cmd/gen-docs site
-	git -C site add 'gh*.md'
+	git -C site rm 'manual/gh*.md' 2>/dev/null || true
+	go run ./cmd/gen-docs site/manual
+	for f in site/manual/gh*.md; do sed -i.bak -e '/^### SEE ALSO/,$$d' "$$f"; done
+	rm -f site/manual/*.bak
+	git -C site add 'manual/gh*.md'
 	git -C site commit -m 'update help docs'
 	git -C site push
 .PHONY: site-docs

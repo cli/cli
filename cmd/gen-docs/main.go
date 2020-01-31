@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/cli/cli/command"
 	"github.com/spf13/cobra/doc"
@@ -28,13 +29,14 @@ func main() {
 func filePrepender(filename string) string {
 	return `---
 layout: page
+permalink: /:path/:basename
 ---
 
 `
 }
 
 func linkHandler(name string) string {
-	return fmt.Sprintf("{{site.baseurl}}{%% link %s %%}", name)
+	return fmt.Sprintf("./%s", strings.TrimSuffix(name, ".md"))
 }
 
 func fatal(msg interface{}) {
