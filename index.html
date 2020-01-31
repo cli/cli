@@ -2,6 +2,12 @@
 layout: default
 ---
 
+{% assign asset_mac = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'macOS_amd64.tar'" | first %}
+{% assign asset_windows = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'windows_amd64.msi'" | first %}
+{% assign asset_linux_tar = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.tar'" | first %}
+{% assign asset_linux_deb = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.deb'" | first %}
+{% assign asset_linux_rpm = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.rpm'" | first %}
+
 <main class="">
   <div class="container-xl mx-auto px-3 px-md-4 pt-8">
     <div class="d-flex flex-column flex-justify-center flex-items-center mb-8">
@@ -14,16 +20,20 @@ layout: default
       <!-- if mac -->
       <div class="download-mac d-none f5 text-center">
         <div class="d-inline-block">
-          <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code>
+          <span class="text-gray mr-2">Run</span>
+          <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+            brew install github/gh/gh
+          </code>
         </div>
         <div class="d-inline-block">
-          <span class="text-gray mx-2 mb-2 d-inline-block">or</span><a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+          <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+          <a class="btn-mktg" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
         </div>
       </div>
 
       <!-- if windows -->
       <div class="download-windows d-none">
-        <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
+        <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
       </div>
 
       <!-- if linux -->
@@ -38,9 +48,9 @@ layout: default
           </summary>
 
           <ul class="dropdown-menu dropdown-menu-se width-full">
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
-            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
           </ul>
         </details>
       </div>
@@ -53,7 +63,7 @@ layout: default
       <div class="position-absolute bottom-0 width-full">
         <p class="f4 text-center text-gray">Check out our docs for more info and view all GitHub CLI commands.</p>
         <div class="d-flex flex-justify-center mb-6 px-3">
-          <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Read our documentation <span class="Bump-link-symbol">→</span></a>
+          <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
         </div>
       </div>
 
@@ -148,19 +158,17 @@ layout: default
 
     <div class="container-xl mx-auto px-3 px-md-4 mb-12">
       <!-- Terminal -->
-      <!-- gh pr status -->
       <h3 class="command-header text-mono f2 text-normal text-center mb-2">
         <span class="text-blue-mktg mr-2">$</span>
-        <!-- gh pr status -->
-        <span class="command command-1 command-header-1 d-none"></span>
-        <span class="command command-2 command-header-2 d-none"></span>
-        <span class="command command-3 command-header-3 d-none"></span>
-        <span class="command command-4 command-header-4 d-none"></span>
+        <span class="command command-1 type-animate d-none">gh pr status</span>
+        <span class="command command-2 type-animate d-none">gh issue list</span>
+        <span class="command command-3 type-animate d-none">gh pr create</span>
+        <span class="command command-4 type-animate d-none">gh pr checkout</span>
       </h3>
-      <p class="command-1 command-desc-1 d-none f4 text-gray text-center mb-4">Check on the status of your pull requests.</p>
-      <p class="command-2 command-desc-2 d-none f4 text-gray text-center mb-4">View and filter a repository’s open issues.</p>
-      <p class="command-3 command-desc-3 d-none f4 text-gray text-center mb-4">Create a pull request.</p>
-      <p class="command-4 command-desc-4 d-none f4 text-gray text-center mb-4">Check out pull requests locally.</p>
+      <p class="command command-1 d-none f4 text-gray text-center mb-4">Check on the status of your pull requests.</p>
+      <p class="command command-2 d-none f4 text-gray text-center mb-4">View and filter a repository’s open issues.</p>
+      <p class="command command-3 d-none f4 text-gray text-center mb-4">Create a pull request.</p>
+      <p class="command command-4 d-none f4 text-gray text-center mb-4">Check out pull requests locally.</p>
 
       <div class="col-12 col-lg-8 mx-auto bg-blue-dark rounded-2 box-shadow-large position-relative cli-window" style="height: 430px;">
         <div class="py-2 px-3 text-center">
@@ -171,14 +179,30 @@ layout: default
           </div>
         </div>
 
-
         <div class="f5 px-5 text-white-fade text-mono mt-5">
-          <!-- gh pr status -->
           <span class="text-white mr-1">$</span>
-          <span class="command-1 command-output-1 d-none"></span>
-          <span class="command-2 command-output-2 d-none"></span>
-          <span class="command-3 command-output-3 d-none"></span>
-          <span class="command-4 command-output-4 d-none"></span>
+
+          <span class="command command-1 type-animate text-white d-none">gh pr status</span>
+          <div class="command command-1 type-animate-done d-none">
+            <strong class="text-white">Current branch</strong><br>
+            <span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br>
+            <br>
+            <strong class="text-white">Created by you</strong><br>
+            <span class="pl-3">You have no open pull requests</span><br>
+            <br>
+            <strong class="text-white">Requesting a code review from you</strong><br>
+            <span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br>
+            <span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>
+          </div>
+
+          <span class="command command-2 type-animate text-white d-none">gh issue list</span>
+          <div class="command command-2 type-animate-done d-none">TODO list</div>
+
+          <span class="command command-3 type-animate text-white d-none">gh pr create</span>
+          <div class="command command-3 type-animate-done d-none">TODO create</div>
+
+          <span class="command command-4 type-animate text-white d-none">gh pr checkout 123</span>
+          <div class="command command-4 type-animate-done d-none">TODO checkout</div>
         </div>
       </div><!-- /Terminal -->
     </div>
@@ -212,7 +236,7 @@ layout: default
 
   <div class="container-xl mx-auto px-3 px-md-4 pt-6 pb-8">
     <div class="d-flex flex-justify-between gutter-spacious text-center text-md-left">
-      <div class="col-12 col-md-6 col-lg-5 mb-6 mt-md-3">
+      <div class="col-12 col-md-6 col-lg-6 mb-6 mt-md-3">
         <div class="pl-lg-7">
           <span title="Label: Beta" class="Label Label--outline Label--outline-green text-mono position-relative bottom-1">Beta</span>
           <h2 class="h2-mktg mb-1">Try GitHub on the command&nbsp;line</h2>
@@ -221,14 +245,18 @@ layout: default
           <!-- if mac -->
           <div class="download-mac d-none f5 text-center text-md-left">
             <div class="d-inline-block">
-              <span class="text-gray mr-2">Run</span> <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1" style="background-color: #F1F8FF;">brew install github/gh/gh</code><span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+              <span class="text-gray mr-2">Run</span>
+              <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+                brew install github/gh/gh
+              </code>
+              <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
             </div>
-            <a class="btn-mktg p-3" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_macOS_amd64.tar.gz">Download for Mac</a>
+            <a class="btn-mktg p-3" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
           </div>
 
           <!-- if windows -->
           <div class="download-windows d-none">
-            <a class="btn-mktg" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_windows_amd64.msi">Download for Windows</a>
+            <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
           </div>
 
           <!-- if linux -->
@@ -242,14 +270,14 @@ layout: default
               </summary>
 
               <ul class="dropdown-menu dropdown-menu-se width-full">
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.deb">Debian/Ubuntu</a></li>
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.rpm">Fedora/Centos</a></li>
-                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="https://github.com/github/gh-cli/releases/latest/download/gh_{{ site.cli-latest-version }}_linux_amd64.tar.gz">Other</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
               </ul>
             </details>
           </div>
 
-          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">View installation instructions <span class="Bump-link-symbol">→</span></a>
+          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#installation">View installation instructions <span class="Bump-link-symbol">→</span></a>
 
           <div class="mt-4">
             <img alt="Windows" class="mr-4" style="width: 24px;" src="/assets/images/icon-windows.svg">
@@ -263,9 +291,9 @@ layout: default
         <div class="lp-contribute-section position-relative bg-white border rounded-2 p-6 offset-md-n1">
           <h3 class="h3-mktg mb-1">Contribute and learn&nbsp;more</h3>
           <p class="text-gray-light f5">Help us make GitHub CLI fit the way you work by sharing feedback. And find more information about how to use it in our manual and release notes.</p>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Explore the manual <span class="Bump-link-symbol">→</span></a>
-          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="/TODO">Check out the release notes <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#we-need-your-feedback">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.latest_release.html_url }}">Check out the release notes <span class="Bump-link-symbol">→</span></a>
         </div>
       </div>
     </div>

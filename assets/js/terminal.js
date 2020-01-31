@@ -1,83 +1,52 @@
-$( document ).ready(function() {
+var keystrokeDelay = 60  // ms between keystrokes
+var outputDelay = 300    // ms before command output is shown
+var cycleDelay = 8000    // ms between going to next command
 
-  var commands = $('.command-header').find('.command');
-  var activeCommandIndex = 1;
+var numCommands = document.querySelectorAll('.command-header .command').length
 
-  function showCommand (index) {
-    switch(index) {
-      case 1:
-        var typedHeader = new Typed('.command-header-1', {
-          strings: ['gh pr status'],
-          showCursor: false,
-          typeSpeed: 40
-        });
+function showCommand(index) {
+  if (index > numCommands) index = 1
 
-        var typedOutput = new Typed('.command-output-1', {
-          strings: ['<span class="text-white">gh pr status</span>^1000\n `<br><strong class="text-white">Current branch</strong><br><span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br><br><strong class="text-white">Created by you</strong><br><span class="pl-3">You have no open pull requests</span><br><br><strong class="text-white">Requesting a code review from you</strong><br><span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br><span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>`'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        break;
-      case 2:
-        var typedHeader = new Typed('.command-header-2', {
-          strings: ['gh issue list'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        // TODO update this terminal output
-        var typedOutput = new Typed('.command-output-2', {
-          strings: ['<span class="text-white">gh issue list</span>^1000\n `<br><strong class="text-white">Current branch</strong><br><span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br><br><strong class="text-white">Created by you</strong><br><span class="pl-3">You have no open pull requests</span><br><br><strong class="text-white">Requesting a code review from you</strong><br><span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br><span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>`'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        break;
-      case 3:
-        var typedHeader = new Typed('.command-header-3', {
-          strings: ['gh pr create'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        // TODO update this terminal output
-        var typedOutput = new Typed('.command-output-3', {
-          strings: ['<span class="text-white">gh pr create</span>^1000\n `<br><strong class="text-white">Current branch</strong><br><span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br><br><strong class="text-white">Created by you</strong><br><span class="pl-3">You have no open pull requests</span><br><br><strong class="text-white">Requesting a code review from you</strong><br><span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br><span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>`'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        break;
-      case 4:
-        var typedHeader = new Typed('.command-header-4', {
-          strings: ['gh pr checkout'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        // TODO update this terminal output
-        var typedOutput = new Typed('.command-output-4', {
-          strings: ['<span class="text-white">gh pr checkout</span>^1000\n `<br><strong class="text-white">Current branch</strong><br><span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br><br><strong class="text-white">Created by you</strong><br><span class="pl-3">You have no open pull requests</span><br><br><strong class="text-white">Requesting a code review from you</strong><br><span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br><span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>`'],
-          showCursor: false,
-          typeSpeed: 40
-        });
-        break;
+  // hide previous commands
+  Array.from(document.querySelectorAll('.command')).forEach(function(el) {
+    el.classList.add('d-none')
+  })
+
+  // show current command while respecting animated ones
+  Array.from(document.querySelectorAll('.command-'+index)).forEach(function(el) {
+    if (el.classList.contains('type-animate-done')) return
+    if (el.classList.contains('type-animate')) {
+      typeAnimate(el, function() {
+        var doneEl = el.nextElementSibling
+        if (doneEl && doneEl.classList.contains('type-animate-done')) {
+          setTimeout(function() {
+            doneEl.classList.remove('d-none')
+          }, outputDelay)
+        }
+      })
     }
-  }
+    el.classList.remove('d-none')
+  })
 
-  function showNextCommand () {
-    // hide and clear div contents of prev command
-    console.log('clearing', activeCommandIndex - 1);
-    $('.command-' + (activeCommandIndex - 1)).toggleClass('d-none');
-    $('.command-header-' + (activeCommandIndex - 1)).html('');
-    $('.command-output-' + (activeCommandIndex - 1)).html('');
+  // force "layout"
+  document.querySelector('.command-header').clientLeft
 
-    // if at the end of index, then start at 1
-    if (activeCommandIndex == commands.length + 1) {
-      activeCommandIndex = 1;
+  setTimeout(function() { showCommand(index+1) }, cycleDelay)
+}
+
+function typeAnimate(el, callback) {
+  var chars = el.textContent.split('')
+  el.textContent = ''
+
+  var typeIndex = 1
+  var interval = setInterval(function() {
+    el.textContent = chars.slice(0, typeIndex++).join('')
+    if (typeIndex > chars.length) {
+      clearInterval(interval)
+      interval = null
+      callback()
     }
+  }, keystrokeDelay)
+}
 
-    $('.command-' + activeCommandIndex).toggleClass('d-none');
-    showCommand(activeCommandIndex);
-    activeCommandIndex += 1;
-
-    setTimeout(function(){ showNextCommand(); }, 8000);
-  }
-
-  showNextCommand();
-});
+showCommand(1)

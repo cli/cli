@@ -118,10 +118,10 @@
             </ul>
           </nav>
 
-          <div class="d-lg-flex flex-items-center px-3 px-lg-0 text-center text-lg-left">
+          <!--<div class="d-lg-flex flex-items-center px-3 px-lg-0 text-center text-lg-left">
             <a class="HeaderMenu-link no-underline mr-3" href="https://github.com/login?return_to=%2Fjoin%3Fsource%3Dheader-home" data-ga-click="GitHub CLI, go to Sign in, CLI landing page main nav">Sign&nbsp;in</a>
             <a class="HeaderMenu-link d-inline-block no-underline border border-gray-dark rounded-1 px-2 py-1" href="https://github.com/join?source=header-home" data-ga-click="GitHub CLI, go to Sign up, CLI landing page main nav">Sign&nbsp;up</a>
-          </div>
+          </div>-->
         </div>
       </div>
   </header>
@@ -130,9 +130,8 @@
 <div class="bg-white border-bottom" style="position: sticky; position: -webkit-sticky; top: 0; z-index: 5;">
   <nav class="d-flex container-xl mx-auto px-3 px-md-4">
     <div class="d-flex flex-auto flex-items-center flex-justify-end">
-      <a href="{{ site.baseurl }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Release notes</a>
-      <a href="{{ site.baseurl }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Manual</a>
-      <a href="{{ site.baseurl }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 no-underline">Docs</a>
+      <a href="{{ "/manual/" | relative_url }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Manual</a>
+      <a href="{{ site.github.latest_release.html_url }}" class="d-none d-sm-inline-block h5-mktg text-normal link-gray-dark py-3 mr-4 no-underline">Release notes</a>
     </div>
   </nav>
 </div>

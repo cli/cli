@@ -1,8 +1,3 @@
-title: GitHub CLI
-description: TODO
-
-cli-latest-version: 0.4.0
-
 twitter:
   username: github
 
@@ -11,6 +6,7 @@ plugins:
   - jekyll-octicons
   - jekyll-seo-tag
   - jekyll-sitemap
+  - jekyll-github-metadata
 
 sass:
   load_paths:
