@@ -73,7 +73,7 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-// overriden in tests
+// overridden in tests
 var initContext = func() context.Context {
 	ctx := context.New()
 	if repo := os.Getenv("GH_REPO"); repo != "" {
@@ -105,7 +105,7 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 	return ctx
 }
 
-// overriden in tests
+// overridden in tests
 var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	token, err := ctx.AuthToken()
 	if err != nil {
