@@ -1,0 +1,324 @@
+---
+layout: default
+---
+
+{% assign asset_mac = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'macOS_amd64.tar'" | first %}
+{% assign asset_windows = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'windows_amd64.msi'" | first %}
+{% assign asset_linux_tar = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.tar'" | first %}
+{% assign asset_linux_deb = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.deb'" | first %}
+{% assign asset_linux_rpm = site.github.latest_release.assets | where_exp: "asset", "asset.name contains 'linux_amd64.rpm'" | first %}
+
+<main class="">
+  <div class="container-xl mx-auto px-3 px-md-4 pt-8">
+    <div class="d-flex flex-column flex-justify-center flex-items-center mb-8">
+      <img alt="GitHub Actions" class="d-block mb-3" style="width: 56px;" src="/assets/images/icon-cli.svg">
+      <h1 class="text-mono f4 text-normal text-center text-gray-light mb-3">
+        GitHub CLI
+        <span title="Label: Beta" class="Label Label--outline Label--outline-green">Beta</span>
+      </h1>
+      <h2 class="h00-mktg text-center lh-condensed mb-3">Take GitHub to the command&nbsp;line</h2>
+      <!-- if mac -->
+      <div class="download-mac d-none f5 text-center">
+        <div class="d-inline-block">
+          <span class="text-gray mr-2">Run</span>
+          <code class="d-inline-block mb-2 text-blue-mktg f5 p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+            brew install github/gh/gh
+          </code>
+        </div>
+        <div class="d-inline-block">
+          <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+          <a class="btn-mktg" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
+        </div>
+      </div>
+
+      <!-- if windows -->
+      <div class="download-windows d-none">
+        <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
+      </div>
+
+      <!-- if linux -->
+      <div class="download-linux d-none">
+
+        <details class="dropdown details-reset details-overlay d-inline-block position-relative">
+          <summary class="btn-mktg" aria-haspopup="true">
+            Download for Linux
+            <svg class="octicon octicon-chevron-down replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></svg>
+
+            <svg class="octicon octicon-chevron-up replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.21967 9.78033C2.92678 9.48744 2.92678 9.01256 3.21967 8.71967L7.46967 4.46967C7.76256 4.17678 8.23744 4.17678 8.53033 4.46967L12.7803 8.71967C13.0732 9.01256 13.0732 9.48744 12.7803 9.78033C12.4874 10.0732 12.0126 10.0732 11.7197 9.78033L8 6.06066L4.28033 9.78033C3.98744 10.0732 3.51256 10.0732 3.21967 9.78033Z"></path></svg>
+          </summary>
+
+          <ul class="dropdown-menu dropdown-menu-se width-full">
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+            <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
+          </ul>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="position-relative">
+    <div class="bg-gray-light position-absolute bottom-n12 width-full pt-8 overflow-hidden">
+      <div class="position-absolute bottom-0 width-full">
+        <p class="f4 text-center text-gray">Check out our docs for more info and view all GitHub CLI commands.</p>
+        <div class="d-flex flex-justify-center mb-6 px-3">
+          <a class="h4-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
+        </div>
+      </div>
+
+      <div class="container-xl mx-auto p-responsive">
+        <div class="d-flex gutter-condensed gutter-md-spacious flex-items-center flex-justify-between mb-6">
+
+          <!-- Left column of command-pills -->
+
+          <div class="v-hidden v-md-visible col-1 col-md-2 col-lg-3">
+            <ul class="list-style-none text-center float-right section-actions-events-left target-actions-events-left">
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue status</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr checkout</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr status</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Right column of command-pills -->
+
+          <div class="v-hidden v-md-visible col-sm-1 col-md-2 col-lg-3">
+            <ul class="list-style-none text-center float-left section-actions-events-right target-actions-events-right">
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue status</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue create</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr checkout</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue list</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh issue view</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr view</span></div></li>
+                </ul>
+              </li>
+              <li class="d-block mb-3">
+                <ul class="list-style-none no-wrap">
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr status</span></div></li>
+                  <li class="d-inline-block"><div class="d-inline-block border no-wrap text-mono command-pill mr-2"><span class="command-pill-command">gh pr create</span></div></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="container-xl mx-auto px-3 px-md-4 mb-12">
+      <!-- Terminal -->
+      <h3 class="command-header text-mono f2 text-normal text-center mb-2">
+        <span class="text-blue-mktg mr-2">$</span>
+        <span class="command command-1 type-animate d-none">gh pr status</span>
+        <span class="command command-2 type-animate d-none">gh issue list</span>
+        <span class="command command-3 type-animate d-none">gh pr create</span>
+        <span class="command command-4 type-animate d-none">gh pr checkout</span>
+      </h3>
+      <p class="command command-1 d-none f4 text-gray text-center mb-4">Check on the status of your pull requests.</p>
+      <p class="command command-2 d-none f4 text-gray text-center mb-4">View and filter a repository’s open issues.</p>
+      <p class="command command-3 d-none f4 text-gray text-center mb-4">Create a pull request.</p>
+      <p class="command command-4 d-none f4 text-gray text-center mb-4">Check out pull requests locally.</p>
+
+      <div class="col-12 col-lg-8 mx-auto bg-blue-dark rounded-2 box-shadow-large position-relative cli-window" style="height: 430px;">
+        <div class="py-2 px-3 text-center">
+          <div class="position-absolute left-3">
+            <div class="d-inline-block circle bg-white mr-1" style="width: 12px; height: 12px; opacity: 0.1;"></div>
+            <div class="d-inline-block circle bg-white mr-1" style="width: 12px; height: 12px; opacity: 0.1;"></div>
+            <div class="d-inline-block circle bg-white mr-1" style="width: 12px; height: 12px; opacity: 0.1;"></div>
+          </div>
+        </div>
+
+        <div class="f5 px-5 text-white-fade text-mono mt-5">
+          <span class="text-white mr-1">$</span>
+
+          <span class="command command-1 type-animate text-white d-none">gh pr status</span>
+          <div class="command command-1 type-animate-done d-none">
+            <strong class="text-white">Current branch</strong><br>
+            <span class="pl-3">There is no pull request associated with <span class="text-blue-light">[fix-homepage-bug]</span></span><br>
+            <br>
+            <strong class="text-white">Created by you</strong><br>
+            <span class="pl-3">You have no open pull requests</span><br>
+            <br>
+            <strong class="text-white">Requesting a code review from you</strong><br>
+            <span class="pl-3"><span style="color: yellow;">#100</span>  <span class="text-white">Fix footer on homepage</span> <span class="text-blue-light">[fix-homepage-footer]</span></span><br>
+            <span class="pl-5">- <span style="color: chartreuse;">Checks passing</span> - Approved</span>
+          </div>
+
+          <span class="command command-2 type-animate text-white d-none">gh issue list</span>
+          <div class="command command-2 type-animate-done d-none">
+            <strong class="text-white">Issues for owner/repo</strong><br><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#16</span> <span class="text-white">Improving interactions with protected branches</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#14</span> <span class="text-white">PR commands on a detached head</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#13</span> <span class="text-white">Support for GitHub Enterprise</span> (enhancement)</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#8</span> <span class="text-white">Add an easier upgrade command</span> (bug)</span>
+          </div>
+
+          <span class="command command-3 type-animate text-white d-none">gh pr create</span>
+          <div class="command command-3 type-animate-done d-none">
+            <strong class="text-white">Creating pull request for <span class="text-blue-light">feature-branch</span> into master in <span class="text-blue-light">ampinsk/test</span></strong><br>
+            <span class="pl-3 text-white"><strong>? Title</strong> My new pull request</span><br>
+            <span class="pl-3 text-white"><strong>? Body</strong></span> [(e) to launch nano, enter to skip]<br>
+            <span class="pl-3 text-white">http://github.com/owner/repo/pull/1
+          </div>
+
+          <span class="command command-4 type-animate text-white d-none">gh pr checkout 12</span>
+          <div class="command command-4 type-animate-done d-none">
+            <span class="text-white">
+              remote: Enumerating objects: 66, done.<br>
+              remote: Counting objects: 100% (66/66), done.<br>
+              remote: Total 83 (delta 66), reused 66 (delta 66), pack-reused 17<br>
+              Unpacking objects: 100% (83/83), done.<br>
+              From https://github.com/owner/repo<br>
+              * [new ref]             refs/pull/8896/head -> patch-2<br>
+              M       README.md<br>
+              Switched to branch 'patch-2'
+            </span>
+          </div>
+        </div>
+      </div><!-- /Terminal -->
+    </div>
+  </div>
+
+  <div class="container-xl mx-auto px-3 px-md-4 py-8">
+    <div class="d-flex flex-column gutter-spacious text-center flex-items-center"">
+      <h2 class="col-12 col-md-5 h1-mktg lh-condensed mb-6 mb-md-7">Goodbye, context switching. Hello, terminal.</h2>
+
+      <div class="col-12 d-flex flex-wrap gutter-spacious">
+        <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
+          <img alt="Easy creation icon" class="d-block mb-2" style="width: 56px;" src="/assets/images/icon-cli-easy-creation.svg">
+          <h3 class="h4-mktg mb-1">Easy creation</h3>
+          <p class="text-gray-light f4 px-lg-4">Create pull requests and issues without leaving the command&nbsp;line.</p>
+        </div>
+
+        <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
+          <img alt="Easy creation icon" class="d-block mb-2" style="width: 56px;" src="/assets/images/icon-cli-status-check.svg">
+          <h3 class="h4-mktg mb-1">Quick status&nbsp;checks</h3>
+          <p class="text-gray-light f5 px-lg-4">See the status of open issues and pull requests, and see what’s waiting for&nbsp;review.</p>
+        </div>
+
+        <div class="col-12 col-md-4 text-center mb-6 d-flex flex-column flex-items-center">
+          <img alt="Easy creation icon" class="d-block mb-2" style="width: 56px;" src="/assets/images/icon-cli-seamless-navigation.svg">
+          <h3 class="h4-mktg mb-1">Seamless navigation</h3>
+          <p class="text-gray-light f4 px-lg-4">Filter issues and pull requests, and open them in your&nbsp;browser.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-xl mx-auto px-3 px-md-4 pt-6 pb-8">
+    <div class="d-flex flex-justify-between gutter-spacious text-center text-md-left">
+      <div class="col-12 col-md-6 col-lg-6 mb-6 mt-md-3">
+        <div class="pl-lg-7">
+          <span title="Label: Beta" class="Label Label--outline Label--outline-green text-mono position-relative bottom-1">Beta</span>
+          <h2 class="h2-mktg mb-1">Try GitHub on the command&nbsp;line</h2>
+          <p class="text-gray-light f4">GitHub CLI is ready for your terminal. It’s free and open source—getting better with every fork.</p>
+
+          <!-- if mac -->
+          <div class="download-mac d-none f5 text-center text-md-left">
+            <div class="d-inline-block">
+              <span class="text-gray mr-2">Run</span>
+              <code class="d-inline-block mb-2 text-blue-mktg p-3 rounded-1 user-select-contain" style="background-color: #F1F8FF;">
+                brew install github/gh/gh
+              </code>
+              <span class="text-gray mx-2 mb-2 d-inline-block">or</span>
+            </div>
+            <a class="btn-mktg p-3" href="{{ asset_mac.browser_download_url }}">Download for Mac</a>
+          </div>
+
+          <!-- if windows -->
+          <div class="download-windows d-none">
+            <a class="btn-mktg" href="{{ asset_windows.browser_download_url }}">Download for Windows</a>
+          </div>
+
+          <!-- if linux -->
+          <div class="download-linux d-none">
+            <details class="dropdown details-reset details-overlay d-inline-block position-relative">
+              <summary class="btn-mktg" aria-haspopup="true">
+                Download for Linux
+                <svg class="octicon octicon-chevron-down replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></svg>
+
+                <svg class="octicon octicon-chevron-up replaced ml-1" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.21967 9.78033C2.92678 9.48744 2.92678 9.01256 3.21967 8.71967L7.46967 4.46967C7.76256 4.17678 8.23744 4.17678 8.53033 4.46967L12.7803 8.71967C13.0732 9.01256 13.0732 9.48744 12.7803 9.78033C12.4874 10.0732 12.0126 10.0732 11.7197 9.78033L8 6.06066L4.28033 9.78033C3.98744 10.0732 3.51256 10.0732 3.21967 9.78033Z"></path></svg>
+              </summary>
+
+              <ul class="dropdown-menu dropdown-menu-se width-full">
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_deb.browser_download_url }}">Debian/Ubuntu</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_rpm.browser_download_url }}">Fedora/Centos</a></li>
+                <li><a class="dropdown-item d-block pt-2 pb-2 px-4 text-semibold" href="{{ asset_linux_tar.browser_download_url }}">Other</a></li>
+              </ul>
+            </details>
+          </div>
+
+          <a class="mt-2 d-block f5 text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#installation">View installation instructions <span class="Bump-link-symbol">→</span></a>
+
+          <div class="mt-4">
+            <img alt="Windows" class="mr-4" style="width: 24px;" src="/assets/images/icon-windows.svg">
+            <img alt="Mac" class="mr-4" style="width: 24px;" src="/assets/images/icon-mac.svg">
+            <img alt="Linux" style="width: 24px;" src="/assets/images/icon-linux.svg">
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-5 col-lg-4">
+        <div class="lp-contribute-section position-relative bg-white border rounded-2 p-6 offset-md-n1">
+          <h3 class="h3-mktg mb-1">Contribute and learn&nbsp;more</h3>
+          <p class="text-gray-light f5">Help us make GitHub CLI fit the way you work by sharing feedback. And find more information about how to use it in our manual and release notes.</p>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.repository_url }}#we-need-your-feedback">Share your feedback in our repository <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ "/manual/" | relative_url }}">Read the manual <span class="Bump-link-symbol">→</span></a>
+          <a class="d-block h5-mktg text-blue-mktg Bump-link mx-auto mx-lg-0 no-underline" href="{{ site.github.latest_release.html_url }}">Check out the release notes <span class="Bump-link-symbol">→</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>

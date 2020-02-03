@@ -1,0 +1,340 @@
+// CSS from github/github
+
+$transition-time: 0.4s;
+
+//
+// Header wrapper
+//
+
+.Header {
+  z-index: 32;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  color: $white-fade-70;
+  background-color: $bg-gray-dark;
+
+  .server-stats + & {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.075);
+  }
+
+  .header-search-scope {
+    font-size: inherit;
+    line-height: 28px;
+    color: $white-fade-70;
+    border-right-color: lighten($bg-gray-dark, 2%);
+  }
+
+  .header-search-wrapper {
+    min-height: 30px;
+    font-size: inherit;
+    color: $white;
+    background-color: rgba(255, 255, 255, 0.125);
+    border: 0;
+    box-shadow: none;
+
+    .truncate-repo-scope {
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &.focus {
+      background-color: rgba(255, 255, 255, 0.175);
+      box-shadow: none;
+
+      .header-search-scope {
+        color: $white;
+        background-color: rgba(255, 255, 255, 0.075);
+        border-right-color: lighten($bg-gray-dark, 2%);
+      }
+    }
+  }
+
+  .header-search-input {
+    min-height: 30px;
+    font-size: $h4-size;
+    color: $text-gray-dark;
+
+    @include breakpoint(lg) {
+      font-size: inherit;
+      color: inherit;
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.75);
+    }
+  }
+
+  .dropdown-menu {
+    width: 300px;
+  }
+
+  .notification-indicator {
+    &:hover {
+      &::after {
+        content: none;
+        @include breakpoint(lg) {
+          content: attr(aria-label);
+        }
+      }
+    }
+  }
+}
+
+.HeaderMenu {
+  // !! This scope is intended to be deprecated. These styles should eventually be global to this object.
+  .page-responsive & {
+    display: none;
+    clear: both;
+
+    @include breakpoint(lg) {
+      display: block;
+      clear: none;
+    }
+
+    .header-search {
+      float: none;
+      width: auto;
+      max-width: none;
+      padding-top: $spacer-3;
+      padding-bottom: $spacer-3;
+      margin-right: 0;
+      border-top: $border-width $border-style $gray-700;
+
+      @include breakpoint(lg) {
+        float: left;
+        width: 300px;
+        padding-top: $spacer-1;
+        padding-bottom: $spacer-1;
+        border-top: 0;
+      }
+    }
+  }
+
+  .open & {
+    display: block;
+  }
+
+  .header-search {
+    width: 300px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    font-size: 13px;
+    transition: 0.2s ease-in-out;
+    transition-property: width, padding-bottom, padding-top;
+
+    &:focus-within {
+      @include breakpoint(md) {
+        float: left;
+        width: 470px;
+        border-top: 0;
+      }
+    }
+  }
+}
+
+//
+// Logged out Header
+//
+
+.HeaderMenu--logged-out {
+  .dropdown-menu {
+    border: 0;
+    box-shadow: 0 3px 12px $black-fade-15, 0 0 1px rgba($black, 0.2);
+
+    &::before,
+    &::after {
+      display: none;
+    }
+  }
+
+  .header-search {
+    width: 240px;
+  }
+
+  .jump-to-suggestions {
+    top: 100%; // Pushes the suggestions down since the search input is slightly larger
+  }
+
+  .HeaderMenu-details[open] {
+    > summary::before {
+      position: absolute;
+      bottom: -$spacer-2;
+      display: block;
+    }
+  }
+
+  .header-search-input {
+    padding-top: $spacer-2;
+    padding-bottom: $spacer-2;
+    font-size: $h5-size;
+    -webkit-appearance: none;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.75) !important;
+    }
+  }
+}
+
+// This class fixes a bug in Edge that gets applied to lists that are hidden by default giving them extra spacing around. It's to be applied to <li> elements
+.edge-item-fix {
+  list-style-image: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+}
+
+// Responsive pages only
+.page-responsive {
+  .HeaderMenu--logged-out {
+    z-index: 100; //needs to be >21 so as not to interfere with `.site-subheader-sticky`\
+    width: 300px;
+    overflow: auto;
+    background-color: $bg-white;
+    box-shadow: 0 10px 50px $black-fade-15;
+
+    @include breakpoint(lg) {
+      width: auto;
+      overflow: visible;
+      background-color: transparent;
+      box-shadow: none;
+    }
+
+    .dropdown-menu {
+      position: static;
+      width: auto;
+      border: 0 solid transparent;
+      box-shadow: none;
+
+      @include breakpoint(lg) {
+        position: absolute;
+        width: 300px;
+        border: 0;
+        box-shadow: 0 3px 12px $black-fade-15, 0 0 1px rgba($black, 0.2);
+
+        &::before,
+        &::after {
+          content: "";
+        }
+      }
+    }
+
+    .dropdown-menu-s {
+      transform: none;
+
+      @include breakpoint(lg) {
+        transform: translateX(50%);
+      }
+    }
+
+    .header-search {
+      width: auto;
+      border-top: 0;
+      @include breakpoint(lg) {
+        width: 240px;
+      }
+    }
+
+    .header-search-wrapper {
+      border: $border-width $border-style $border-gray-light;
+      @include breakpoint(lg) {
+        border: 0;
+      }
+    }
+
+    .header-search-input {
+      padding-top: $spacer-2;
+      padding-bottom: $spacer-2;
+      -webkit-appearance: none;
+
+      &::placeholder {
+        color: $text-gray !important;
+
+        @include breakpoint(lg) {
+          color: rgba(255, 255, 255, 0.75) !important;
+        }
+      }
+    }
+  }
+
+  .HeaderMenu-link {
+    color: $gray-700;
+    background: transparent;
+
+    &:hover {
+      color: $gray-900;
+    }
+
+    @include breakpoint(lg) {
+      color: $white;
+      transition: $transition-time;
+
+      &:hover {
+        color: rgba($white, 0.75) !important;
+      }
+    }
+
+    .icon-chevon-down-mktg {
+      top: $spacer-4;
+      right: 0;
+      width: 14px;
+      stroke: $gray-900;
+      transition: stroke $transition-time;
+
+      @include breakpoint(lg) {
+        top: -2px;
+        width: 12px;
+        stroke: rgba($white, 0.5);
+        background: transparent;
+      }
+
+    }
+  }
+
+  .HeaderMenu-details[open] {
+    > summary::before {
+      display: none;
+      @include breakpoint(lg) {
+        position: absolute;
+        bottom: -$spacer-2;
+        display: block;
+      }
+    }
+
+    .HeaderMenu-link {
+      color: $gray-900;
+
+      @include breakpoint(lg) {
+        color: rgba($white, 0.75);
+      }
+    }
+
+    .dropdown-menu {
+      animation: none;
+      @include breakpoint(lg) {
+        animation: dropdown-display $transition-time cubic-bezier(0.73, 0.005, 0.22, 1);
+      }
+    }
+
+    .icon-chevon-down-mktg {
+      stroke: $gray-900;
+      @include breakpoint(lg) {
+        stroke: $white;
+      }
+    }
+  }
+}
+
+.HeaderMenu-summary::-webkit-details-marker {
+  display: none;
+}
+
+@keyframes dropdown-display {
+  0% {
+    opacity: 0;
+    transform: scale(0.98) translateY(-0.6em);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

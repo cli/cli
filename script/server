@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -e
+
+DISABLE_WHITELIST=1 bundle exec jekyll serve --watch --incremental 

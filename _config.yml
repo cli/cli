@@ -1,6 +1,26 @@
-title: GitHub CLI
-description: >-
-  Work seamlessly with GitHub on the command line.
+twitter:
+  username: github
 
-markdown: kramdown
-theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-octicons
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-github-metadata
+
+sass:
+  load_paths:
+    - _sass
+    - node_modules
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - Brewfile
+  - README.md
+  - bin
+  - script
+  - vendor
+  - node_modules
+  - package.json
+  - package-lock.json

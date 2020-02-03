@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  brew bundle check >/dev/null 2>&1  || {
+    echo "==> Installing Homebrew dependencies…"
+    brew bundle
+  }
+
+  rbenv version-name &>/dev/null || {
+    echo "==> Installing Ruby…"
+    brew bootstrap-rbenv-ruby
+  }
+fi
+
+bundle check --path vendor/gems &>/dev/null || {
+  echo "==> Installing gem dependencies…"
+  bundle install --binstubs bin --path vendor/gems
+}
+
+echo "==> Installing node dependencies…"
+npm install

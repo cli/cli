@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg  viewBox="0 0 56 56" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 61.2 (89653) - https://sketch.com -->
+    <title>CLI seamless navigation</title>
+    <desc>Created with Sketch.</desc>
+    <g id="light" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g  id="Titles" opacity="0.597353981" transform="translate(-359.000000, -1751.000000)"></g>
+        <g  id="Slides" transform="translate(-342.000000, -1817.000000)"></g>
+        <g  id="CLI-seamless-navigation" transform="translate(5.000000, 5.000000)">
+            <path d="M32,40 L13,40 C11.772073,40 11,39.1599711 11,38 L11,11 C11,9.84002892 11.772073,9 13,9 C23.3294271,9 33.6588542,9 43.9882813,9 C45.0923423,9.00130251 45.987562,9.89593962 45.9895833,10.9999996 L46,27 L46,27"  id="Path" stroke="#79B8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M7,34 L2,34 C0.772073016,34 0,33.1599711 0,32 L0,2 C0,0.840028925 0.772073016,0 2,0 C12.6643211,0 23.3286422,0 33.9929633,0 C35.0957026,2.41519275e-16 35.9903732,0.892576177 35.9929578,1.99531251 L36,5 L36,5"  id="Path" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle  id="Oval" fill="#79B8FF" cx="5" cy="5" r="1"></circle>
+            <circle  id="Oval" fill="#79B8FF" cx="8" cy="5" r="1"></circle>
+            <circle  id="Oval" fill="#79B8FF" cx="11" cy="5" r="1"></circle>
+            <line x1="24" y1="19" x2="39" y2="19"  id="Stroke-13" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <rect  id="Rectangle-18" stroke="#2088FF" stroke-width="2" x="16" y="19" width="3" height="3" rx="0.78948"></rect>
+            <line x1="11" y1="14" x2="46" y2="14"  id="Stroke-13" stroke="#79B8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <line x1="24" y1="32" x2="32" y2="32"  id="Stroke-13" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <rect  id="Rectangle-18" stroke="#2088FF" stroke-width="2" x="16" y="32" width="3" height="3" rx="0.78948"></rect>
+            <line x1="24" y1="36" x2="29" y2="36"  id="Stroke-15" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <line x1="24" y1="23" x2="29" y2="23"  id="Stroke-15" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <line x1="11" y1="27" x2="46" y2="27"  id="Stroke-23" stroke="#79B8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <path d="M46,33 L46,46 L46,46 L41,44 L36,46 L36,33 C36,31.8954305 36.8954305,31 38,31 L44,31 C45.1045695,31 46,31.8954305 46,33 Z"  id="Stroke-9" stroke="#2088FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </g>
+    </g>
+</svg>

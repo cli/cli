@@ -1,0 +1,77 @@
+.v-md-visible {
+  @include breakpoint(md) {
+    visibility: visible !important;
+  }
+}
+
+.dropdown {
+  .octicon-chevron-up {
+    display: none;
+  }
+  .octicon-chevron-down {
+    display: inline-block;
+  }
+  &[open] {
+    .octicon-chevron-up {
+      display: inline-block;
+    }
+    .octicon-chevron-down {
+      display: none;
+    }
+  }
+}
+
+// TODO change names
+.lp-contribute-section::after {
+  display: none;
+  position: absolute;
+  top: 48%;
+  right: -9%;
+  z-index: -1;
+  width: 99%;
+  height: 95%;
+  margin-top: -15%;
+  content: "";
+  background: url(../assets/images/dots-small.svg);
+
+  @include breakpoint(md) {
+    display: block;
+  }
+}
+
+.cli-window {
+  &::before {
+    position: absolute;
+    top: 15%;
+    left: -100px;
+    z-index: -1;
+    display: none !important;
+    width: 30%;
+    height: 85%;
+    // stylelint-disable-next-line primer/spacing
+    margin-top: -15%;
+    content: "";
+    // stylelint-disable-next-line primer/colors
+    background: url(../assets/images/dots-small.svg);
+
+    @include breakpoint(md) {
+      display: block !important;
+    }
+  }
+}
+
+.command-pill {
+  padding: $spacer-2 $spacer-3;
+  border-color: rgba($gray-500, 0.15) !important;
+  border-radius: 30px;
+  color: $gray-200;
+}
+
+.command-pill-command {
+  color: $gray-400;
+}
+
+.user-select-contain {
+  -ms-user-select: contain;
+  user-select: contain;
+}
