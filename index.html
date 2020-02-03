@@ -196,13 +196,35 @@ layout: default
           </div>
 
           <span class="command command-2 type-animate text-white d-none">gh issue list</span>
-          <div class="command command-2 type-animate-done d-none">TODO list</div>
+          <div class="command command-2 type-animate-done d-none">
+            <strong class="text-white">Issues for owner/repo</strong><br><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#16</span> <span class="text-white">Improving interactions with protected branches</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#14</span> <span class="text-white">PR commands on a detached head</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#13</span> <span class="text-white">Support for GitHub Enterprise</span> (enhancement)</span><br>
+            <span class="pl-3"><span class="d-inline-block" style="color: yellow; width: 30px;">#8</span> <span class="text-white">Add an easier upgrade command</span> (bug)</span>
+          </div>
 
           <span class="command command-3 type-animate text-white d-none">gh pr create</span>
-          <div class="command command-3 type-animate-done d-none">TODO create</div>
+          <div class="command command-3 type-animate-done d-none">
+            <strong class="text-white">Creating pull request for <span class="text-blue-light">feature-branch</span> into master in <span class="text-blue-light">ampinsk/test</span></strong><br>
+            <span class="pl-3 text-white"><strong>? Title</strong> My new pull request</span><br>
+            <span class="pl-3 text-white"><strong>? Body</strong></span> [(e) to launch nano, enter to skip]<br>
+            <span class="pl-3 text-white">http://github.com/owner/repo/pull/1
+          </div>
 
-          <span class="command command-4 type-animate text-white d-none">gh pr checkout 123</span>
-          <div class="command command-4 type-animate-done d-none">TODO checkout</div>
+          <span class="command command-4 type-animate text-white d-none">gh pr checkout 12</span>
+          <div class="command command-4 type-animate-done d-none">
+            <span class="text-white">
+              remote: Enumerating objects: 66, done.<br>
+              remote: Counting objects: 100% (66/66), done.<br>
+              remote: Total 83 (delta 66), reused 66 (delta 66), pack-reused 17<br>
+              Unpacking objects: 100% (83/83), done.<br>
+              From https://github.com/owner/repo<br>
+              * [new ref]             refs/pull/8896/head -> patch-2<br>
+              M       README.md<br>
+              Switched to branch 'patch-2'
+            </span>
+          </div>
         </div>
       </div><!-- /Terminal -->
     </div>
