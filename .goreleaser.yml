@@ -77,3 +77,14 @@ nfpms:
     formats:
       - deb
       - rpm
+
+scoop:
+  bucket:
+    owner: cli
+    name: scoop-gh
+  commit_author:
+    name: vilmibm
+    email: vilmibm@github.com
+  homepage: https://github.com/cli/cli
+  description: GitHub CLI
+  license: MIT
