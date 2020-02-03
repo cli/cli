@@ -116,7 +116,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(issues) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is acually an issue
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is actually an issue
 		msg := "There are no open issues"
 
 		userSetFlags := false
