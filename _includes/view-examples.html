@@ -1,0 +1,38 @@
+{% if page.url == '/manual/gh_pr_view' or page.url == '/manual/gh_issue_view' or  page.url == '/examples.html' %}
+{% if page.url != '/examples.html' %}
+<h3>Examples in use</h3>
+{% endif %}
+{% if page.url == '/examples.html' %}
+<h3 id="viewing-an-item">Viewing a pull request or issue</h3>
+{% endif %}
+
+<h4>In the browser</h4>
+
+<p>Quickly open a pull request or issue in the browser.</p>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Viewing a pull request in the browser</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh pr view 21
+Opening https://github.com/owner/repo/pull/21 in your browser.
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+
+<h4>In terminal</h4>
+
+<p>Use `--preview` or `-p` to view a preview of the title and body.</p>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Viewing an issue in terminal</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh issue view 21 --preview
+<b>[Fork] Hide PR number badges on branches that have an upstream PR</b>
+<span class='gray'>opened by ampinsk. 0 comments. (epic:fork)</span>
+
+  While we're in a state where we're not displaying upstream pull requests in the PR list, we should
+  hide the `#XX` badge to avoid confusion.
+
+  cc @outofambit
+
+<span class='gray'>View this issue on GitHub: https://github.com/owner/repo/issues/21</span>
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+{% endif %}

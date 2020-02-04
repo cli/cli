@@ -1,13 +1,24 @@
-<div class="bg-white" style="position: sticky; position: -webkit-sticky; top: 0; z-index: 5;">
+<div class="bg-white
+{% if page.url != "/" %}
+  border-bottom
+{% endif %}
+">
   <header>
-    <nav class="d-flex flex-content-center flex-justify-between container-xl mx-auto px-3 px-md-4">
+    <nav class="d-flex flex-content-center flex-justify-between  mx-auto px-3
+    {% if page.url == "/" %}
+      container-xl px-md-4
+    {% endif %}
+    {% if page.url != "/" %}
+      px-md-6
+    {% endif %}
+    ">
       <a class="d-flex mr-4 text-gray-dark flex-items-center h4-mktg no-underline" href="/" aria-label="Homepage" data-ga-click="GitHub CLI, CLI landing page main nav (invertocat logo)">
         {% octicon mark-github height:32 class:"text-gray-dark mr-2" aria-label:github-logo %}
         CLI
       </a>
 
       <div class="d-flex flex-auto flex-items-center flex-justify-end">
-        <a href="{{ "/manual/" | relative_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline">Manual</a>
+        <a href="{{ "/manual/gh" | relative_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline">Manual</a>
         <a href="{{ site.github.latest_release.html_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline">Release notes</a>
       </div>
     </nav>

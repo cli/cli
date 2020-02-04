@@ -13,9 +13,13 @@
 @import "@primer/css/dropdown/index.scss";
 $marketing-font-path: "/assets/fonts/";
 @import "@primer/css/marketing/index.scss";
+@import "@primer/css/markdown/index.scss";
 
 // Then import custom Sass from `_sass` as needed
 @import "global.scss";
 @import "marketing-nav.scss";
 @import "marketing-site.scss";
 @import "landing.scss";
+@import "docs-nav.scss";
+@import "example.scss";
+@import "markdown-body.scss";

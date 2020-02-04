@@ -1,0 +1,23 @@
+<nav class="docs-nav d-flex flex-column bg-gray-light p-6">
+  <h3 class="mb-2"><a class="text-gray-dark" href="/installation">Installation</a></h3>
+
+  <!-- auto-generate table of contents for manual pages -->
+  {% for gh_page in site.pages | sort: "path" %}
+    {% assign basename = gh_page.path | split: "/" | last | replace: ".md", "" %}
+    {% assign parts = basename | split: "_" %}
+    {% if parts[0] != "gh" %}{% continue %}{% endif %}
+    {% if parts.size == 2 %}<h3 class="mt-2">{% endif %}
+    <a href="{{ gh_page.url }}"
+      {% if parts.size == 2 %}class="text-gray-dark"{% endif %}
+      {% if page.path == gh_page.path %}style="font-weight:bold"{% endif %}
+      >{{ parts.last }}</a>
+    {% if parts.size == 2 %}</h3>{% endif %}
+  {% endfor %}
+
+  <h3 class="mt-2"><a class="text-gray-dark" href="/examples">Examples in use</a></h3>
+  <a href="/examples#checking-out">Checking out</a>
+  <a href="/examples#creating">Creating</a>
+  <a href="/examples#using-lists">Using lists</a>
+  <a href="/examples#checking-status">Checking status</a>
+  <a href="/examples#viewing-an-item">Viewing an item</a>
+</nav>

@@ -1,0 +1,41 @@
+{% if page.url == '/manual/gh_pr_checkout' or  page.url == '/examples.html' %}
+{% if page.url != '/examples.html' %}
+<h3>Examples in use</h3>
+{% endif %}
+{% if page.url == '/examples.html' %}
+<h3 id="checking-out">Checking out a pull request locally</h3>
+{% endif %}
+
+<h4>Using pull request number</h4>
+
+<p>You can check out any pull request, including from forks, in a repository using its pull request number</p>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Checking out a pull request locally</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh pr checkout 12
+remote: Enumerating objects: 66, done.
+remote: Counting objects: 100% (66/66), done.
+remote: Total 83 (delta 66), reused 66 (delta 66), pack-reused 17
+Unpacking objects: 100% (83/83), done.
+From https://github.com/owner/repo
+ * [new ref]             refs/pull/8896/head -> patch-2
+M       README.md
+Switched to branch 'patch-2'
+
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+
+<h4>Using other selectors</h4>
+
+<p>You can also use URLs and branch names to checkout pull requests.</p>
+
+<div class="width-full">
+<pre class="terminal"><code><span class='gray'>// Checking out a pull request locally</span>
+<span class='magenta'>~/Projects/my-project</span>$ gh pr checkout branch-name
+Switched to branch 'branch-name'
+Your branch is up to date with 'origin/branch-name'.
+Already up to date.
+
+<span class='magenta'>~/Projects/my-project</span>$</code></pre>
+</div>
+{% endif %}
