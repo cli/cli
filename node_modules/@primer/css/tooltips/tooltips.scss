@@ -1,0 +1,279 @@
+.tooltipped {
+  position: relative;
+}
+
+// This is the tooltip bubble
+.tooltipped::after {
+  position: absolute;
+  z-index: 1000000;
+  display: none;
+  padding: $em-spacer-5 $em-spacer-6;
+  font: normal normal 11px/1.5 $body-font;
+  -webkit-font-smoothing: subpixel-antialiased;
+  color: $tooltip-text-color;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: none;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: break-word;
+  white-space: pre;
+  pointer-events: none;
+  content: attr(aria-label);
+  background: $tooltip-background-color;
+  border-radius: $border-radius;
+  opacity: 0;
+}
+
+// This is the tooltip arrow
+.tooltipped::before {
+  position: absolute;
+  z-index: 1000001;
+  display: none;
+  width: 0;
+  height: 0;
+  color: $tooltip-background-color;
+  pointer-events: none;
+  content: "";
+  border: 6px $border-style transparent;
+  opacity: 0;
+}
+
+// delay animation for tooltip
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+// This will indicate when we'll activate the tooltip
+.tooltipped:hover,
+.tooltipped:active,
+.tooltipped:focus {
+  &::before,
+  &::after {
+    display: inline-block;
+    text-decoration: none;
+    animation-name: tooltip-appear;
+    animation-duration: $tooltip-duration;
+    animation-fill-mode: forwards;
+    animation-timing-function: ease-in;
+    animation-delay: $tooltip-delay;
+  }
+}
+
+.tooltipped-no-delay:hover,
+.tooltipped-no-delay:active,
+.tooltipped-no-delay:focus {
+  &::before,
+  &::after {
+    animation-delay: 0s;
+  }
+}
+
+.tooltipped-multiline:hover,
+.tooltipped-multiline:active,
+.tooltipped-multiline:focus {
+  &::after {
+    display: table-cell;
+  }
+}
+
+// Tooltipped south
+.tooltipped-s,
+.tooltipped-se,
+.tooltipped-sw {
+  &::after {
+    top: 100%;
+    right: 50%;
+    margin-top: 6px;
+  }
+
+  &::before {
+    top: auto;
+    right: 50%;
+    bottom: -7px;
+    margin-right: -6px;
+    border-bottom-color: $tooltip-background-color;
+  }
+}
+
+.tooltipped-se {
+  &::after {
+    right: auto;
+    left: 50%;
+    margin-left: -$spacer-3;
+  }
+}
+
+.tooltipped-sw::after {
+  margin-right: -$spacer-3;
+}
+
+// Tooltips above the object
+.tooltipped-n,
+.tooltipped-ne,
+.tooltipped-nw {
+  &::after {
+    right: 50%;
+    bottom: 100%;
+    margin-bottom: 6px;
+  }
+
+  &::before {
+    top: -7px;
+    right: 50%;
+    bottom: auto;
+    margin-right: -6px;
+    border-top-color: $tooltip-background-color;
+  }
+}
+
+.tooltipped-ne {
+  &::after {
+    right: auto;
+    left: 50%;
+    margin-left: -$spacer-3;
+  }
+}
+
+.tooltipped-nw::after {
+  margin-right: -$spacer-3;
+}
+
+// Move the tooltip body to the center of the object.
+.tooltipped-s::after,
+.tooltipped-n::after {
+  transform: translateX(50%);
+}
+
+// Tooltipped to the left
+.tooltipped-w {
+  &::after {
+    right: 100%;
+    bottom: 50%;
+    margin-right: 6px;
+    transform: translateY(50%);
+  }
+
+  &::before {
+    top: 50%;
+    bottom: 50%;
+    left: -7px;
+    margin-top: -6px;
+    border-left-color: $tooltip-background-color;
+  }
+}
+
+// tooltipped to the right
+.tooltipped-e {
+  &::after {
+    bottom: 50%;
+    left: 100%;
+    margin-left: 6px;
+    transform: translateY(50%);
+  }
+
+  &::before {
+    top: 50%;
+    right: -7px;
+    bottom: 50%;
+    margin-top: -6px;
+    border-right-color: $tooltip-background-color;
+  }
+}
+
+// Tooltip align right and left
+.tooltipped-align-right-1,
+.tooltipped-align-right-2 {
+  &::after {
+    right: 0;
+    margin-right: 0;
+  }
+}
+
+.tooltipped-align-right-1 {
+  &::before {
+    right: 10px;
+  }
+}
+
+.tooltipped-align-right-2 {
+  &::before {
+    right: 15px;
+  }
+}
+
+.tooltipped-align-left-1,
+.tooltipped-align-left-2, {
+  &::after {
+    left: 0;
+    margin-left: 0;
+  }
+}
+
+.tooltipped-align-left-1 {
+  &::before {
+    left: 5px;
+  }
+}
+
+.tooltipped-align-left-2 {
+  &::before {
+    left: 10px;
+  }
+}
+
+// Multiline tooltips
+//
+// `.tooltipped-multiline` Add this class when you have long content.
+// The downside is you cannot preformat the text with newlines and `[w,e]`
+// are always `$tooltip-max-width` wide.
+.tooltipped-multiline {
+  &::after {
+    width: max-content;
+    max-width: $tooltip-max-width;
+    word-wrap: break-word;
+    white-space: pre-line;
+    border-collapse: separate;
+  }
+
+  &.tooltipped-s::after,
+  &.tooltipped-n::after {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  &.tooltipped-w::after,
+  &.tooltipped-e::after {
+    right: 100%;
+  }
+}
+
+@media screen and (min-width: 0\0) {
+  // IE11
+  .tooltipped-multiline::after {
+    width: $tooltip-max-width;
+  }
+}
+
+// Sticky tooltips
+//
+// Always show the tooltip.
+.tooltipped-sticky {
+  &::before,
+  &::after {
+    display: inline-block;
+  }
+
+  &.tooltipped-multiline {
+    &::after {
+      display: table-cell;
+    }
+  }
+}

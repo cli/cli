@@ -1,0 +1,86 @@
+// Headings
+// --------------------------------------------------
+// stylelint-disable selector-max-type
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+h1 { @include h1; }
+h2 { @include h2; }
+h3 { @include h3; }
+h4 { @include h4; }
+h5 { @include h5; }
+h6 { @include h6; }
+
+// Body text
+// --------------------------------------------------
+
+p {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+small {
+  font-size: 90%;
+}
+
+blockquote {
+  margin: 0;
+}
+
+// Lists
+// --------------------------------------------------
+
+ul,
+ol {
+  padding-left: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+ol ol,
+ul ol {
+  list-style-type: lower-roman;
+}
+
+ul ul ol,
+ul ol ol,
+ol ul ol,
+ol ol ol {
+  list-style-type: lower-alpha;
+}
+
+dd {
+  margin-left: 0;
+}
+
+// Code
+// --------------------------------------------------
+
+tt,
+code {
+  font-family: $mono-font;
+  font-size: $font-size-small;
+}
+
+pre {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-family: $mono-font;
+  font-size: $font-size-small;
+}
+
+// Octicons
+// --------------------------------------------------
+
+// Move this over here as a temporary override to the octicons source repo
+// instead of updating that upstream.
+.octicon {
+  vertical-align: text-bottom;
+}

@@ -1,0 +1,243 @@
+//
+//
+// -------- Grays --------
+$gray-000:        #fafbfc !default;
+$gray-100:        #f6f8fa !default;
+$gray-200:        #e1e4e8 !default;
+$gray-300:        #d1d5da !default;
+$gray-400:        #959da5 !default;
+$gray-500:        #6a737d !default;
+$gray-600:        #586069 !default;
+$gray-700:        #444d56 !default;
+$gray-800:        #2f363d !default;
+$gray-900:        #24292e !default; // body font color
+
+// -------- Blue --------
+$blue-000:        #f1f8ff !default;
+$blue-100:        #dbedff !default;
+$blue-200:        #c8e1ff !default;
+$blue-300:        #79b8ff !default;
+$blue-400:        #2188ff !default;
+$blue-500:        #0366d6 !default; // Default: Passes AA with #fff
+$blue-600:        #005cc5 !default;
+$blue-700:        #044289 !default;
+$blue-800:        #032f62 !default;
+$blue-900:        #05264c !default; // Passes with 1/2/300 blues
+
+// -------- Green --------
+$green-000:       #f0fff4 !default;
+$green-100:       #dcffe4 !default;
+$green-200:       #bef5cb !default;
+$green-300:       #85e89d !default;
+$green-400:       #34d058 !default;
+$green-500:       #28a745 !default; // Default. passes AA Large
+$green-600:       #22863a !default; // Text green, passes AA on #fff
+$green-700:       #176f2c !default;
+$green-800:       #165c26 !default;
+$green-900:       #144620 !default;
+
+// -------- Yellow --------
+$yellow-000:      #fffdef !default;
+$yellow-100:      #fffbdd !default;
+$yellow-200:      #fff5b1 !default;
+$yellow-300:      #ffea7f !default;
+$yellow-400:      #ffdf5d !default;
+$yellow-500:      #ffd33d !default;
+$yellow-600:      #f9c513 !default;
+$yellow-700:      #dbab09 !default;
+$yellow-800:      #b08800 !default;
+$yellow-900:      #735c0f !default;
+
+// -------- Orange --------
+$orange-000:      #fff8f2 !default;
+$orange-100:      #ffebda !default;
+$orange-200:      #ffd1ac !default;
+$orange-300:      #ffab70 !default;
+$orange-400:      #fb8532 !default;
+$orange-500:      #f66a0a !default; // Default. passes AA Large with #fff
+$orange-600:      #e36209 !default;
+$orange-700:      #d15704 !default;
+$orange-800:      #c24e00 !default;
+$orange-900:      #a04100 !default;
+
+// -------- Red --------
+$red-000:         #ffeef0 !default;
+$red-100:         #ffdce0 !default;
+$red-200:         #fdaeb7 !default;
+$red-300:         #f97583 !default;
+$red-400:         #ea4a5a !default;
+$red-500:         #d73a49 !default; // Default. passes AA
+$red-600:         #cb2431 !default;
+$red-700:         #b31d28 !default;
+$red-800:         #9e1c23 !default;
+$red-900:         #86181d !default;
+
+// -------- Purple --------
+$purple-000:      #f5f0ff !default;
+$purple-100:      #e6dcfd !default;
+$purple-200:      #d1bcf9 !default;
+$purple-300:      #b392f0 !default;
+$purple-400:      #8a63d2 !default;
+$purple-500:      #6f42c1 !default; // passes AA with #fff
+$purple-600:      #5a32a3 !default;
+$purple-700:      #4c2889 !default;
+$purple-800:      #3a1d6e !default;
+$purple-900:      #29134e !default;
+
+// -------- Pink --------
+$pink-000:      #ffeef8 !default;
+$pink-100:      #fedbf0 !default;
+$pink-200:      #f9b3dd !default;
+$pink-300:      #f692ce !default;
+$pink-400:      #ec6cb9 !default;
+$pink-500:      #ea4aaa !default;
+$pink-600:      #d03592 !default;
+$pink-700:      #b93a86 !default;
+$pink-800:      #99306f !default;
+$pink-900:      #6d224f !default;
+
+// -------- Fades --------
+// Black based on same hue as $gray-900
+$black: #1b1f23 !default;
+$white: #fff !default;
+
+$black-fade-15:      rgba($black, 0.15) !default;
+$black-fade-30:      rgba($black, 0.3) !default;
+$black-fade-50:      rgba($black, 0.5) !default;
+$black-fade-70:      rgba($black, 0.7) !default;
+$black-fade-85:      rgba($black, 0.85) !default;
+
+$white-fade-15:      rgba($white, 0.15) !default;
+$white-fade-30:      rgba($white, 0.3) !default;
+$white-fade-50:      rgba($white, 0.5) !default;
+$white-fade-70:      rgba($white, 0.7) !default;
+$white-fade-85:      rgba($white, 0.85) !default;
+
+// -------- Color defaults --------
+$red:         $red-500 !default;
+$purple:      $purple-500 !default;
+$blue:        $blue-500 !default;
+$green:       $green-500 !default;
+$yellow:      $yellow-500 !default;
+$orange:      $orange-500 !default;
+
+$gray-dark:   $gray-900 !default;
+$gray-light:  $gray-400 !default;
+$gray:        $gray-500 !default;
+
+// -------- Color gradient maps --------
+
+$grays: (
+  0: $gray-000,
+  1: $gray-100,
+  2: $gray-200,
+  3: $gray-300,
+  4: $gray-400,
+  5: $gray-500,
+  6: $gray-600,
+  7: $gray-700,
+  8: $gray-800,
+  9: $gray-900,
+) !default;
+
+$blues: (
+  0: $blue-000,
+  1: $blue-100,
+  2: $blue-200,
+  3: $blue-300,
+  4: $blue-400,
+  5: $blue-500,
+  6: $blue-600,
+  7: $blue-700,
+  8: $blue-800,
+  9: $blue-900,
+) !default;
+
+$greens: (
+  0: $green-000,
+  1: $green-100,
+  2: $green-200,
+  3: $green-300,
+  4: $green-400,
+  5: $green-500,
+  6: $green-600,
+  7: $green-700,
+  8: $green-800,
+  9: $green-900,
+) !default;
+
+$yellows: (
+  0: $yellow-000,
+  1: $yellow-100,
+  2: $yellow-200,
+  3: $yellow-300,
+  4: $yellow-400,
+  5: $yellow-500,
+  6: $yellow-600,
+  7: $yellow-700,
+  8: $yellow-800,
+  9: $yellow-900,
+) !default;
+
+$oranges: (
+  0: $orange-000,
+  1: $orange-100,
+  2: $orange-200,
+  3: $orange-300,
+  4: $orange-400,
+  5: $orange-500,
+  6: $orange-600,
+  7: $orange-700,
+  8: $orange-800,
+  9: $orange-900,
+) !default;
+
+$reds: (
+  0: $red-000,
+  1: $red-100,
+  2: $red-200,
+  3: $red-300,
+  4: $red-400,
+  5: $red-500,
+  6: $red-600,
+  7: $red-700,
+  8: $red-800,
+  9: $red-900,
+) !default;
+
+$purples: (
+  0: $purple-000,
+  1: $purple-100,
+  2: $purple-200,
+  3: $purple-300,
+  4: $purple-400,
+  5: $purple-500,
+  6: $purple-600,
+  7: $purple-700,
+  8: $purple-800,
+  9: $purple-900,
+) !default;
+
+$pinks: (
+  0: $pink-000,
+  1: $pink-100,
+  2: $pink-200,
+  3: $pink-300,
+  4: $pink-400,
+  5: $pink-500,
+  6: $pink-600,
+  7: $pink-700,
+  8: $pink-800,
+  9: $pink-900,
+) !default;
+
+$hue-maps: (
+  "gray": $grays,
+  "blue": $blues,
+  "green": $greens,
+  "yellow": $yellows,
+  "orange": $oranges,
+  "red": $reds,
+  "purple": $purples,
+  "pink": $pinks,
+) !default;

@@ -1,0 +1,27 @@
+// Truncate
+//
+// css-truncate will shorten text with an ellipsis.
+
+.css-truncate {
+  // Truncate double target
+  //
+  // css-truncate will shorten text with an ellipsis. The maximum width
+  // of the truncated text can be changed by overriding the max-width
+  // of the .css-truncate-target
+  &.css-truncate-target,
+  .css-truncate-target {
+    display: inline-block;
+    max-width: 125px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: top;
+  }
+
+  &.expandable.zeroclipboard-is-hover .css-truncate-target,
+  &.expandable.zeroclipboard-is-hover.css-truncate-target,
+  &.expandable:hover .css-truncate-target,
+  &.expandable:hover.css-truncate-target {
+    max-width: 10000px !important;
+  }
+}

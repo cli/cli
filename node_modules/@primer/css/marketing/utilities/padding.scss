@@ -1,0 +1,28 @@
+// Padding spacer utilities for marketing
+// stylelint-disable block-opening-brace-space-before, declaration-colon-space-before
+// stylelint-disable comment-empty-line-before
+
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    @each $scale, $size in $marketing-spacers {
+
+      /* Set a #{$size} padding for all sides */
+      .p#{$variant}-#{$scale}  { padding: #{$size} !important; }
+
+      /* Set a #{$size} padding to the top */
+      .pt#{$variant}-#{$scale}  { padding-top: #{$size} !important; }
+      /* Set a #{$size} padding to the right */
+      .pr#{$variant}-#{$scale}  { padding-right: #{$size} !important; }
+      /* Set a #{$size} padding to the bottom */
+      .pb#{$variant}-#{$scale}  { padding-bottom: #{$size} !important; }
+      /* Set a #{$size} padding to the left */
+      .pl#{$variant}-#{$scale}  { padding-left: #{$size} !important; }
+
+      /* Set a #{$size} padding to the top & bottom */
+      .py#{$variant}-#{$scale} {
+        padding-top: #{$size} !important;
+        padding-bottom: #{$size} !important;
+      }
+    }
+  }
+}

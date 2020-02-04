@@ -1,0 +1,39 @@
+// Subhead styles
+.Subhead {
+  display: flex;
+  padding-bottom: $spacer-2;
+  margin-bottom: $spacer-3;
+  border-bottom: $border;
+  flex-flow: row wrap;
+}
+
+// Modifier class to give a lot of breathing room between sections of content.
+.Subhead--spacious {
+  margin-top: $spacer-6;
+}
+
+// <h2> sized heading with normal font weight
+.Subhead-heading {
+  font-size: $h2-size;
+  font-weight: normal;
+  flex: 1 1 auto;
+}
+
+// Make the text bold and red for dangerous content
+.Subhead-heading--danger {
+  font-weight: $font-weight-bold;
+  color: $text-red;
+}
+
+// One-liner of supporting text
+.Subhead-description {
+  font-size: $body-font-size;
+  color: $text-gray;
+  flex: 1 100%;
+}
+
+// Add 1 or 2 buttons to the right of the heading
+.Subhead-actions {
+  align-self: center;
+  justify-content: flex-end;
+}

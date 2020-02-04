@@ -1,0 +1,215 @@
+// Form groups
+//
+// Typical form groups - `<dl.form-group>` with a `<dt>` containing the label and
+// `<dd> containing the form elements.
+// stylelint-disable selector-max-compound-selectors
+// stylelint-disable selector-max-type
+.form-group {
+  margin: 15px 0;
+
+  // Text fields
+  .form-control {
+    width: 440px;
+    max-width: 100%;
+    margin-right: 5px;
+    background-color: $bg-gray-light;
+
+    &:focus {
+      background-color: $bg-white;
+    }
+
+    &.shorter { width: 130px; }
+
+    &.short { width: 250px; }
+
+    &.long { width: 100%; }
+  }
+
+  // Textarea
+  // stylelint-disable selector-no-qualifying-type
+  textarea.form-control {
+    width: 100%;
+    height: 200px;
+    min-height: 200px;
+
+    &.short {
+      height: 50px;
+      min-height: 50px;
+    }
+  }
+  // stylelint-enable selector-no-qualifying-type
+
+  // The Label
+  dt {
+    margin: 0 0 6px;
+  }
+
+  label {
+    position: relative;
+  }
+
+  &.flattened dt {
+    float: left;
+    margin: 0;
+    line-height: 32px;
+  }
+
+  &.flattened dd {
+    line-height: 32px;
+  }
+
+  //
+  // Form Elements
+  //
+  // stylelint-disable selector-no-qualifying-type
+  dd {
+    h4 {
+      margin: $spacer-1 0 0;
+
+      &.is-error { color: $text-red; }
+
+      &.is-success { color: $text-green; }
+
+      + .note {
+        margin-top: 0;
+      }
+    }
+  }
+  // stylelint-enable selector-no-qualifying-type
+
+  //
+  // Variants
+  //
+
+  &.required {
+    dt label::after {
+      padding-left: 5px;
+      color: $text-red;
+      content: "*";
+    }
+  }
+
+  // Form AJAX states
+  //
+  // Form fields that need feedback for AJAX loading, success
+  // states and errored states.
+  .success,
+  .error,
+  .indicator {
+    display: none;
+    font-size: $font-size-small;
+    font-weight: $font-weight-bold;
+  }
+
+  &.loading {
+    opacity: 0.5;
+
+    .indicator {
+      display: inline;
+    }
+
+    .spinner {
+      display: inline-block;
+      vertical-align: middle;
+    }
+  }
+
+  &.successful {
+    .success {
+      display: inline;
+      color: $text-green;
+    }
+  }
+
+  // Form validation
+  //
+  // Our inline errors
+
+  &.warn,
+  &.errored {
+    .warning,
+    .error {
+      position: absolute;
+      z-index: 10;
+      display: block; // Show up in errored/warn state
+      max-width: 450px; // Keep our long errors readable
+      padding: 5px $spacer-2;
+      margin: $spacer-1 0 0;
+      font-size: 13px;
+      font-weight: $font-weight-normal;
+      border-style: solid;
+      border-width: 1px;
+      border-radius: 3px;
+
+      &::after,
+      &::before {
+        position: absolute;
+        bottom: 100%;
+        left: 10px;
+        z-index: 15;
+        width: 0;
+        height: 0;
+        pointer-events: none;
+        content: " ";
+        border: solid transparent;
+      }
+
+      &::after {
+        border-width: 5px;
+      }
+
+      &::before {
+        margin-left: -1px;
+        border-width: 6px;
+      }
+    }
+  }
+
+  &.warn {
+    .warning {
+      color: $yellow-900;
+      background-color: $yellow-100;
+      border-color: $border-yellow;
+
+      &::after {
+        border-bottom-color: $yellow-100;
+      }
+
+      &::before {
+        border-bottom-color: $border-yellow;
+      }
+    }
+  }
+
+  &.errored {
+    label {
+      color: $text-red;
+    }
+
+    .error {
+      color: $red-900;
+      background-color: $bg-red-light;
+      border-color: $border-red-light;
+
+      &::after {
+        border-bottom-color: $bg-red-light;
+      }
+
+      &::before {
+        border-bottom-color: $border-red-light;
+      }
+    }
+  }
+}
+
+.note {
+  min-height: 17px;
+  margin: $spacer-1 0 2px;
+  font-size: $font-size-small;
+  color: $text-gray;
+
+  .spinner {
+    margin-right: 3px;
+    vertical-align: middle;
+  }
+}

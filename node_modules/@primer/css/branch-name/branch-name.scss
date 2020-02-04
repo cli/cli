@@ -1,0 +1,20 @@
+// A nice way to display branch names inside the UI. Can be a link or not.
+// stylelint-disable selector-max-type
+.branch-name {
+  display: inline-block;
+  padding: 2px 6px;
+  font: 12px $mono-font;
+  color: rgba($black, 0.6);
+  background-color: lighten($blue-100, 3%);
+  border-radius: 3px;
+
+  .octicon {
+    margin: 1px -2px 0 0;
+    color: desaturate($blue-300, 70%);
+  }
+}
+
+// When a branch name is a link
+// stylelint-disable selector-no-qualifying-type
+a.branch-name { color: $text-blue; }
+// stylelint-enable selector-no-qualifying-type

@@ -1,0 +1,84 @@
+// Text hiding for image based text replacement.
+// Higher performance than -9999px because it only renders
+// the size of the actual text, not a full 9999px box.
+@mixin hide-text() {
+  overflow: hidden;
+  text-indent: 100%;
+  white-space: nowrap;
+}
+
+// Heading mixins for use within components
+// These match heading utilities in utilities/typography
+@mixin h1 {
+  font-size: $h1-size;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h2 {
+  font-size: $h2-size;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h3 {
+  font-size: $h3-size;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h4 {
+  font-size: $h4-size;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h5 {
+  font-size: $h5-size;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h6 {
+  font-size: $h6-size;
+  font-weight: $font-weight-bold;
+}
+
+// Responsive heading mixins
+// There are no responsive mixins for h4-h6 because they are small
+// and don't need to be smaller on mobile.
+@mixin f1-responsive {
+  font-size: $h1-size-mobile;
+
+  // 32px on desktop
+  @include breakpoint(md) { font-size: $h1-size; }
+
+}
+
+@mixin f2-responsive {
+  font-size: $h2-size-mobile;
+
+  // 24px on desktop
+  @include breakpoint(md) { font-size: $h2-size; }
+}
+
+@mixin f3-responsive {
+  font-size: $h3-size-mobile;
+
+  // 20px on desktop
+  @include breakpoint(md) { font-size: $h3-size; }
+
+}
+
+// These use the mixins from above for responsive heading sizes.
+// The following mixins can be used where it's convenient or necessary to
+// couple the responsive font-size with the font-weight.
+@mixin h1-responsive {
+  @include f1-responsive;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h2-responsive {
+  @include f2-responsive;
+  font-weight: $font-weight-bold;
+}
+
+@mixin h3-responsive {
+  @include f3-responsive;
+  font-weight: $font-weight-bold;
+}

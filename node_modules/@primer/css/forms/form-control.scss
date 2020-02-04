@@ -1,0 +1,235 @@
+// Needs refactoring
+// stylelint-disable selector-no-qualifying-type, selector-max-compound-selectors
+// stylelint-disable selector-max-type
+// Base form controls
+//
+// Overrides for common inputs for easier styling.
+
+fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+label {
+  font-weight: $font-weight-bold;
+}
+
+.form-control,
+.form-select {
+  min-height: 34px;
+  padding: 6px $spacer-2;
+  font-size: $h4-size;
+  line-height: 20px;
+  color: $text-gray-dark;
+  vertical-align: middle;
+  background-color: $bg-white;
+  background-repeat: no-repeat; // Repeat and position set for form states (success, error, etc)
+  background-position: right 8px center; // For form validation. This keeps images 8px from right and centered vertically.
+  border: 1px solid $border-gray-dark;
+  border-radius: 3px;
+  outline: none;
+  box-shadow: $form-control-shadow;
+
+  &.focus,
+  &:focus {
+    border-color: $blue-400;
+    outline: none;
+    box-shadow: $form-control-shadow, $btn-input-focus-shadow;
+  }
+
+  // Ensures inputs don't zoom on mobile but are body-font size on desktop
+  @include breakpoint(md) {
+    font-size: $body-font-size;
+  }
+}
+
+// Inputs with contrast for easy light gray backgrounds against white.
+.input-contrast {
+  background-color: $bg-gray-light;
+
+  &:focus { background-color: $bg-white; }
+}
+
+// Inputs to be used against dark backgrounds.
+.input-dark {
+  color: $text-white;
+  background-color: $white-fade-15;
+  border-color: transparent;
+
+  &::placeholder {
+    color: inherit;
+    opacity: 0.6; // inceases contrast ratio to 4.52
+  }
+
+  &.focus,
+  &:focus {
+    border-color: $black-fade-30;
+    box-shadow: 0 0 0 0.2em rgba($blue-300, 0.4);
+  }
+}
+
+// Custom styling for HTML5 validation bubbles (WebKit only)
+::placeholder {
+  color: $text-gray-light;
+}
+
+// Mini inputs, to match .minibutton
+.input-sm {
+  min-height: 28px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  font-size: $font-size-small;
+  line-height: 20px;
+}
+
+// Large inputs
+.input-lg {
+  padding: $spacer-1 10px;
+  font-size: $h4-size;
+}
+
+// Full-width inputs
+.input-block {
+  display: block;
+  width: 100%;
+}
+
+// Inputs with monospace text
+.input-monospace {
+  font-family: $mono-font;
+}
+
+// Hide the icon that tries to autofill contact info in webkit
+.input-hide-webkit-autofill {
+  &::-webkit-contacts-auto-fill-button {
+    position: absolute;
+    right: 0;
+    display: none !important;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+// Checkboxes and Radiobuttons
+//
+// For checkboxes and radio button selections.
+.form-checkbox {
+  padding-left: 20px;
+  margin: 15px 0;
+  vertical-align: middle;
+
+  label {
+    em.highlight {
+      position: relative;
+      left: -$spacer-1;
+      padding: 2px $spacer-1;
+      font-style: normal;
+      background: $yellow-100;
+      border-radius: 3px;
+    }
+  }
+
+  input[type=checkbox],
+  input[type=radio] {
+    float: left;
+    margin: 5px 0 0 -20px;
+    vertical-align: middle;
+  }
+
+  .note {
+    display: block;
+    margin: 0;
+    font-size: $font-size-small;
+    font-weight: $font-weight-normal;
+    color: $gray-600;
+  }
+}
+
+.form-checkbox-details {
+  display: none;
+}
+
+.form-checkbox-details-trigger {
+  &:checked {
+    // child of sibling or sibling
+    ~ * .form-checkbox-details,
+    ~ .form-checkbox-details { // eslint-disable selector-combinator-space-before
+      display: block;
+    }
+  }
+}
+
+// Field groups
+//
+// Wrap field groups in `<div.hfields>` to lay them out horizontally - great for
+// the top of pages with autosave.
+.hfields {
+  margin: 15px 0;
+  @include clearfix;
+
+  .form-group {
+    float: left;
+    margin: 0 30px 0 0;
+
+    dt {
+      label {
+        display: inline-block;
+        margin: 5px 0 0;
+        color: $gray-600;
+      }
+
+      img {
+        position: relative;
+        top: -2px;
+      }
+    }
+  }
+
+  .btn {
+    float: left;
+    margin: 28px 25px 0 -20px;
+  }
+
+  .form-select { margin-top: 5px; }
+}
+
+// Hide the up/down buttons in <input type="number"> in the login form, the
+// input is used for two-factor auth codes, type="number" makes it more usable
+// on phones
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+// Input groups
+
+.form-actions {
+  @include clearfix;
+
+  .btn {
+    float: right;
+
+    + .btn {
+      margin-right: 5px;
+    }
+  }
+}
+
+.form-warning {
+  padding: $spacer-2 10px;
+  margin: 10px 0;
+  font-size: $h5-size;
+  color: $yellow-900;
+  background: $yellow-100;
+  border: 1px solid $border-yellow;
+  border-radius: 3px;
+
+  p {
+    margin: 0;
+    line-height: $lh-default;
+  }
+
+  a { font-weight: $font-weight-bold; }
+}

@@ -1,0 +1,25 @@
+// Counters are rounded-corner badges for numbers
+.Counter {
+  display: inline-block;
+  padding: 2px 5px;
+  font-size: $font-size-small;
+  font-weight: $font-weight-bold;
+  line-height: $lh-condensed-ultra;
+  color: $gray-600;
+  background-color: rgba($black, 0.08);
+  border-radius: 20px;
+
+  &:empty {
+    visibility: hidden;
+  }
+}
+
+.Counter--gray-light {
+  color: $text-gray-dark;
+  background-color: $black-fade-15;
+}
+
+.Counter--gray {
+  color: $white;
+  background-color: $gray;
+}

@@ -1,0 +1,51 @@
+// Margin spacer utilities
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-before, declaration-colon-space-before, comment-empty-line-before
+
+// Loop through the breakpoint values
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    // Loop through the spacer values
+    @each $scale, $size in $spacer-map {
+      /* Set a $size margin to all sides at $breakpoint */
+      .m#{$variant}-#{$scale}  { margin: $size !important; }
+      /* Set a $size margin on the top at $breakpoint */
+      .mt#{$variant}-#{$scale} { margin-top: $size !important; }
+      /* Set a $size margin on the right at $breakpoint */
+      .mr#{$variant}-#{$scale} { margin-right: $size !important; }
+      /* Set a $size margin on the bottom at $breakpoint */
+      .mb#{$variant}-#{$scale} { margin-bottom: $size !important; }
+      /* Set a $size margin on the left at $breakpoint */
+      .ml#{$variant}-#{$scale} { margin-left: $size !important; }
+
+      @if ($size != 0) {
+        /* Set a negative $size margin on top at $breakpoint */
+        .mt#{$variant}-n#{$scale} { margin-top   : -$size !important; }
+        /* Set a negative $size margin on the right at $breakpoint */
+        .mr#{$variant}-n#{$scale} { margin-right : -$size !important; }
+        /* Set a negative $size margin on the bottom at $breakpoint */
+        .mb#{$variant}-n#{$scale} { margin-bottom: -$size !important; }
+        /* Set a negative $size margin on the left at $breakpoint */
+        .ml#{$variant}-n#{$scale} { margin-left  : -$size !important; }
+      }
+
+      /* Set a $size margin on the left & right at $breakpoint */
+      .mx#{$variant}-#{$scale} {
+        margin-right: $size !important;
+        margin-left: $size !important;
+      }
+
+      /* Set a $size margin on the top & bottom at $breakpoint */
+      .my#{$variant}-#{$scale} {
+        margin-top: $size !important;
+        margin-bottom: $size !important;
+      }
+    }
+
+    /* responsive horizontal auto margins */
+    .mx#{$variant}-auto {
+      margin-right: auto !important;
+      margin-left: auto !important;
+    }
+  }
+}

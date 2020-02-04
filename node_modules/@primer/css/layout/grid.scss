@@ -1,0 +1,64 @@
+// GRID
+
+// Columns
+.col-1 { width: (1 / 12 * 100%); }
+.col-2 { width: (2 / 12 * 100%); }
+.col-3 { width: (3 / 12 * 100%); }
+.col-4 { width: (4 / 12 * 100%); }
+.col-5 { width: (5 / 12 * 100%); }
+.col-6 { width: (6 / 12 * 100%); }
+.col-7 { width: (7 / 12 * 100%); }
+.col-8 { width: (8 / 12 * 100%); }
+.col-9 { width: (9 / 12 * 100%); }
+.col-10 { width: (10 / 12 * 100%); }
+.col-11 { width: (11 / 12 * 100%); }
+.col-12 { width: 100%; }
+
+@each $breakpoint in map-keys($breakpoints) {
+  @include breakpoint($breakpoint) {
+    .col-#{$breakpoint}-1 { width: ( 1 / 12 * 100%); }
+    .col-#{$breakpoint}-2 { width: ( 2 / 12 * 100%); }
+    .col-#{$breakpoint}-3 { width: ( 3 / 12 * 100%); }
+    .col-#{$breakpoint}-4 { width: ( 4 / 12 * 100%); }
+    .col-#{$breakpoint}-5 { width: ( 5 / 12 * 100%); }
+    .col-#{$breakpoint}-6 { width: ( 6 / 12 * 100%); }
+    .col-#{$breakpoint}-7 { width: ( 7 / 12 * 100%); }
+    .col-#{$breakpoint}-8 { width: ( 8 / 12 * 100%); }
+    .col-#{$breakpoint}-9 { width: ( 9 / 12 * 100%); }
+    .col-#{$breakpoint}-10 { width: ( 10 / 12 * 100%); }
+    .col-#{$breakpoint}-11 { width: ( 11 / 12 * 100%); }
+    .col-#{$breakpoint}-12 { width: 100%; }
+  }
+}
+
+// Gutters
+// Apply padding and a negative margin to the outside of the container
+@mixin gutters ($gutter-width: $spacer-3) {
+  margin-right: -$gutter-width;
+  margin-left: -$gutter-width;
+
+  > [class*="col-"] {
+    padding-right: $gutter-width !important;
+    padding-left: $gutter-width !important;
+  }
+}
+
+.gutter {
+  @include gutters($spacer-3);
+}
+
+.gutter-condensed {
+  @include gutters($spacer-2);
+}
+
+.gutter-spacious {
+  @include gutters($spacer-4);
+}
+
+@each $breakpoint in map-keys($breakpoints) {
+  @include breakpoint($breakpoint) {
+    .gutter-#{$breakpoint} { @include gutters($spacer-3); }
+    .gutter-#{$breakpoint}-condensed { @include gutters($spacer-2); }
+    .gutter-#{$breakpoint}-spacious { @include gutters($spacer-4); }
+  }
+}

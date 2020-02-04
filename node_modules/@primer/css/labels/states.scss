@@ -1,0 +1,36 @@
+// A rounded corner box containing a label "open" or "closed"
+// The default state is gray.
+//
+// open     - $green background
+// reopened - $green background
+// closed   - $red background
+// merged   - $purple background
+
+// .state to be deprecated in replace of .State
+.state,
+.State {
+  display: inline-block;
+  padding: $spacer-1 $spacer-2;
+  font-weight: $font-weight-bold;
+  line-height: 20px;
+  color: $text-white;
+  text-align: center;
+  white-space: nowrap;
+  background-color: $gray-500;
+  border-radius: 3px;
+}
+
+.State--green { background-color: darken($green-400, 5%); }
+
+.State--purple { background-color: $bg-purple; }
+
+.State--red { background-color: $red-600; }
+
+.State--small {
+  padding: $em-spacer-2 $spacer-1;
+  font-size: $h6-size;
+
+  .octicon {
+    width: 1em; // Ensures different icons don't change State indicator width
+  }
+}

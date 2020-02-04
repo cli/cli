@@ -1,0 +1,29 @@
+// Generate a two-color caret for any element.
+@mixin double-caret($foreground: $text-white, $background: lighten($gray-300, 5%)) {
+  &::after,
+  &::before {
+    position: absolute;
+    top: 11px;
+    right: 100%;
+    left: -16px;
+    display: block;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    content: " ";
+    border-color: transparent;
+    border-style: solid solid outset;
+  }
+
+  &::after {
+    margin-top: 1px;
+    margin-left: 2px;
+    border-width: 7px;
+    border-right-color: $foreground;
+  }
+
+  &::before {
+    border-width: 8px;
+    border-right-color: $background;
+  }
+}

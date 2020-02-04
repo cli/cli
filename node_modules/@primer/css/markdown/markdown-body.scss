@@ -1,0 +1,107 @@
+// All of our block level items should have the same margin
+// stylelint-disable selector-max-type
+
+// This is styling for generic markdownized text. Anything you put in a
+// container with .markdown-body on it should render generally well. It also
+// includes some GitHub Flavored Markdown specific styling (like @mentions)
+.markdown-body {
+  font-family: $body-font;
+  font-size: $h4-size;
+  line-height: $body-line-height;
+  word-wrap: break-word;
+
+  // Clearfix on the markdown body
+  &::before {
+    display: table;
+    content: "";
+  }
+
+  &::after {
+    display: table;
+    clear: both;
+    content: "";
+  }
+
+  > *:first-child {
+    margin-top: 0 !important;
+  }
+
+  > *:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  // Anchors like <a name="examples">. These sometimes end up wrapped around
+  // text when users mistakenly forget to close the tag or use self-closing tag
+  // syntax. We don't want them to appear like links.
+  // FIXME: a:not(:link):not(:visited) would be a little clearer here (and
+  // possibly faster to match), but it breaks styling of <a href> elements due
+  // to https://bugs.webkit.org/show_bug.cgi?id=142737.
+  a:not([href]) {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  // Link Colors
+  .absent {
+    color: $red-600;
+  }
+
+  .anchor {
+    float: left;
+    padding-right: $spacer-1;
+    margin-left: -20px;
+    line-height: $lh-condensed-ultra;
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  p,
+  blockquote,
+  ul,
+  ol,
+  dl,
+  table,
+  pre,
+  details {
+    margin-top: 0;
+    margin-bottom: $spacer-3;
+  }
+
+  hr {
+    height: $em-spacer-3;
+    padding: 0;
+    margin: $spacer-4 0;
+    background-color: $gray-200;
+    border: 0;
+  }
+
+  blockquote {
+    padding: 0 1em;
+    color: $gray-500;
+    border-left: 0.25em solid lighten($gray-300, 5%);
+
+    > :first-child {
+      margin-top: 0;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 3px 5px;
+    font-size: 11px;
+    line-height: 10px;
+    color: $gray-700;
+    vertical-align: middle;
+    background-color: $gray-000;
+    border: solid 1px darken($gray-300, 4%);
+    border-bottom-color: $gray-400;
+    border-radius: 3px;
+    box-shadow: inset 0 -1px 0 $gray-400;
+  }
+}

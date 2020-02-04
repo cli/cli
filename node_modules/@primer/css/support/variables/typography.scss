@@ -1,0 +1,43 @@
+// Typography variables
+// stylelint-disable declaration-bang-space-before
+
+// Heading sizes - mobile
+// h4-h6 remain the same size on both mobile & desktop
+$h00-size-mobile: 40px !default;
+$h0-size-mobile: 32px !default;
+$h1-size-mobile: 26px !default;
+$h2-size-mobile: 22px !default;
+$h3-size-mobile: 18px !default;
+
+// Heading sizes - desktop
+$h00-size: 48px !default;
+$h0-size: 40px !default;
+$h1-size: 32px !default;
+$h2-size: 24px !default;
+$h3-size: 20px !default;
+$h4-size: 16px !default;
+$h5-size: 14px !default;
+$h6-size: 12px !default;
+
+$font-size-small: 12px !default;
+
+// Font weights
+$font-weight-bold: 600 !default;
+$font-weight-semibold: 500 !default;
+$font-weight-normal: 400 !default;
+$font-weight-light: 300 !default;
+
+// Line heights
+$lh-condensed-ultra: 1 !default;
+$lh-condensed: 1.25 !default;
+$lh-default: 1.5 !default;
+
+// Font stacks
+$body-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol" !default;
+
+// Monospace font stack
+$mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace !default;
+
+// The base body size
+$body-font-size: 14px !default;
+$body-line-height: $lh-default !default;

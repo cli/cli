@@ -1,0 +1,327 @@
+.dropdown {
+  position: relative;
+
+  &.active {
+    .dropdown-menu-content {
+      display: block;
+      pointer-events: all;
+    }
+  }
+}
+
+.dropdown-caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: middle;
+  content: "";
+  border-style: solid;
+  border-width: $spacer-1 $spacer-1 0;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+
+// Requires a positioning class (e.g., `.dropdown-menu-w`) to determine which
+// way the menu should render from the element triggering it.
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  width: 160px;
+  padding-top: $spacer-1;
+  padding-bottom: $spacer-1;
+  margin-top: 2px;
+  list-style: none;
+  background-color: $bg-white;
+  background-clip: padding-box;
+  border: $border-width $border-style $black-fade-15;
+  border-radius: $spacer-1;
+  box-shadow: $box-shadow-large;
+
+  &::before,
+  &::after {
+    position: absolute;
+    display: inline-block;
+    content: "";
+  }
+
+  &::before {
+    border: $spacer-2 solid transparent;
+    border-bottom-color: $black-fade-15;
+  }
+
+  &::after {
+    border: 7px solid transparent;
+    border-bottom-color: $white;
+  }
+
+  // stylelint-disable-next-line selector-max-type
+  > ul {
+    list-style: none;
+  }
+}
+
+.dropdown-menu-no-overflow {
+  width: auto;
+
+  .dropdown-item {
+    padding: $spacer-1 $spacer-3;
+    overflow: visible;
+    text-overflow: inherit;
+  }
+}
+
+// Dropdown items (can be links or buttons)
+.dropdown-item {
+  display: block;
+  padding: $spacer-1 $spacer-2 $spacer-1 $spacer-3;
+  overflow: hidden;
+  color: $text-gray-dark;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:focus,
+  &:hover {
+    color: $text-white;
+    text-decoration: none;
+    background-color: $bg-blue;
+    outline: none;
+
+    > .octicon {
+      color: inherit;
+      opacity: 1;
+    }
+  }
+
+  &.btn-link {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+.dropdown-signout {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+
+.dropdown-divider {
+  display: block;
+  height: 0;
+  margin: $spacer-2 0;
+  border-top: $border;
+}
+
+.dropdown-header {
+  padding: $spacer-1 $spacer-3;
+  font-size: $h6-size;
+  color: $text-gray;
+}
+
+.dropdown-menu-content {
+  display: none;
+
+  // stylelint-disable-next-line primer/no-override
+  &.anim-scale-in {
+    position: relative;
+    z-index: 100;
+    pointer-events: none;
+  }
+}
+
+.dropdown-item[aria-checked="false"] .octicon-check {
+  display: none;
+}
+
+// Directional classes
+//
+// Move the menu and the caret attached to it. Requires at least one of these on
+// the `.dropdown-menu` element.
+
+.dropdown-menu-w {
+  top: 0;
+  right: 100%;
+  left: auto;
+  width: auto;
+  margin-top: 0;
+  margin-right: $spacer-2;
+
+  &::before {
+    top: 10px;
+    right: -$spacer-3;
+    left: auto;
+    border-color: transparent;
+    border-left-color: $black-fade-15;
+  }
+
+  &::after {
+    top: 11px;
+    right: -14px;
+    left: auto;
+    border-color: transparent;
+    border-left-color: $white;
+  }
+}
+
+.dropdown-menu-e {
+  top: 0;
+  left: 100%;
+  width: auto;
+  margin-top: 0;
+  margin-left: $spacer-2;
+
+  &::before {
+    top: $spacer-2;
+    left: -$spacer-3;
+    border-color: transparent;
+    border-right-color: $black-fade-15;
+  }
+
+  &::after {
+    top: 11px;
+    left: -14px;
+    border-color: transparent;
+    border-right-color: $white;
+  }
+}
+
+.dropdown-menu-ne {
+  top: auto;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 3px;
+
+  &::before,
+  &::after {
+    top: auto;
+    right: auto;
+  }
+
+  &::before {
+    bottom: -$spacer-2;
+    left: 9px;
+    border-top: $spacer-2 solid $black-fade-15;
+    border-right: $spacer-2 solid transparent;
+    border-bottom: 0;
+    border-left: $spacer-2 solid transparent;
+  }
+
+  &::after {
+    bottom: -7px;
+    left: 10px;
+    border-top: 7px solid $white;
+    border-right: 7px solid transparent;
+    border-bottom: 0;
+    border-left: 7px solid transparent;
+  }
+}
+
+.dropdown-menu-s {
+  right: 50%;
+  left: auto;
+  transform: translateX(50%);
+
+  &::before {
+    top: -$spacer-3;
+    right: 50%;
+    transform: translateX(50%);
+  }
+
+  &::after {
+    top: -14px;
+    right: 50%;
+    transform: translateX(50%);
+  }
+}
+
+.dropdown-menu-sw {
+  right: 0;
+  left: auto;
+
+  &::before {
+    top: -$spacer-3;
+    right: 9px;
+    left: auto;
+  }
+
+  &::after {
+    top: -14px;
+    right: 10px;
+    left: auto;
+  }
+}
+
+.dropdown-menu-se {
+  &::before {
+    top: -$spacer-3;
+    left: 9px;
+  }
+
+  &::after {
+    top: -14px;
+    left: 10px;
+  }
+}
+
+// Dark dropdowns
+.dropdown-menu-dark {
+  color: $white;
+  background: $gray-800;
+  border-color: $gray-700;
+  box-shadow: $box-shadow-large;
+
+  &::before {
+    border-bottom-color: $gray-700;
+  }
+
+  &::after {
+    border-bottom-color: $gray-800;
+  }
+
+  .dropdown-header {
+    color: $gray-300;
+  }
+
+  .dropdown-divider {
+    border-top-color: $border-gray-darker;
+  }
+
+  .dropdown-item {
+    color: inherit;
+  }
+
+  // Directional classes
+
+  &.dropdown-menu-w {
+    &::before {
+      border-color: transparent transparent transparent $gray-700;
+    }
+
+    &::after {
+      border-color: transparent transparent transparent $gray-800;
+    }
+  }
+
+  &.dropdown-menu-e {
+    &::before {
+      border-color: transparent $gray-700 transparent transparent;
+    }
+
+    &::after {
+      border-color: transparent $gray-800 transparent transparent;
+    }
+  }
+
+  &.dropdown-menu-ne {
+    &::before {
+      border-color: $gray-700 transparent transparent transparent;
+    }
+
+    &::after {
+      border-color: $gray-800 transparent transparent transparent;
+    }
+  }
+}

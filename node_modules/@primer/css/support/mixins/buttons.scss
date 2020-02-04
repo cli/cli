@@ -1,0 +1,160 @@
+// stylelint-disable block-closing-brace-newline-after
+
+// Button color generator for primary and themed buttons
+
+// New button hotness
+@mixin btn-solid($color, $bg, $bg2) {
+  color: $color;
+  background-color: $bg2;
+  background-image: linear-gradient(-180deg, $bg 0%, $bg2 90%);
+
+  @if $bg == $gray-000 {
+    &:focus,
+    &.focus {
+      box-shadow: $btn-input-focus-shadow;
+    }
+
+    &:hover,
+    &.hover {
+      background-color: darken($bg2, 3%);
+      background-image: linear-gradient(-180deg, darken($bg, 3%) 0%, darken($bg2, 3%) 90%);
+      background-position: 0 -$em-spacer-5;
+      border-color: rgba($black, 0.35);
+    }
+
+    &:active,
+    &.selected,
+    [open] > & {
+      background-color: darken(desaturate($bg, 10%), 6%);
+      background-image: none;
+      border-color: rgba($black, 0.35); // repeat to avoid shift on click-drag off of button
+      box-shadow: $btn-active-shadow;
+    }
+
+    &:disabled,
+    &.disabled {
+      color: rgba($color, 0.4);
+      background-color: $bg2;
+      background-image: none;
+      border-color: transparentize($black, 0.8); // back to default .btn
+      box-shadow: none;
+    }
+
+  } @else {
+    &:focus,
+    &.focus {
+      box-shadow: 0 0 0 0.2em rgba($bg, 0.4);
+    }
+
+    &:hover,
+    &.hover {
+      background-color: darken($bg2, 2%);
+      background-image: linear-gradient(-180deg, darken($bg, 2%) 0%, darken($bg2, 2%) 90%);
+      background-position: 0 -$em-spacer-5;
+      border-color: $black-fade-50;
+    }
+
+    &:active,
+    &.selected,
+    [open] > & {
+      background-color: darken(mix($bg, $bg2, 50%), 7%);
+      background-image: none;
+      border-color: $black-fade-50; // repeat to avoid shift on click-drag off of button
+      box-shadow: $btn-active-shadow;
+    }
+
+    &:disabled,
+    &.disabled {
+      color: rgba($color, 0.75);
+      background-color: mix($bg2, $white, 50%);
+      background-image: none;
+      border-color: transparentize($black, 0.8); // repeat .btn default to avoid shift on click-drag off of button
+      box-shadow: none;
+    }
+
+    .Counter {
+      color: darken($bg, 8%);
+      background-color: $white;
+    }
+  }
+}
+
+// Inverse button hover style
+@mixin btn-inverse($color, $bg, $bg2) {
+  color: $color;
+  background-color: $bg;
+  background-image: linear-gradient(-180deg, $bg 0%, $bg2 90%);
+
+  &:focus {
+    box-shadow: 0 0 0 0.2em rgba($color, 0.4);
+  }
+
+  &:hover {
+    color: $text-white;
+    background-color: $color;
+    background-image: linear-gradient(-180deg, lighten($color, 10%) 0%, $color 90%);
+    border-color: $black-fade-50;
+
+    .Counter {
+      color: $text-white;
+    }
+  }
+
+  &:active,
+  &.selected,
+  [open] > & {
+    color: $text-white;
+    background-color: darken($color, 5%);
+    background-image: none;
+    border-color: $black-fade-50;
+    box-shadow: $btn-active-shadow;
+  }
+
+  &:disabled,
+  &.disabled {
+    color: rgba($color, 0.4);
+    background-color: $bg2;
+    background-image: none;
+    border-color: transparentize($black, 0.8); // back to default .btn
+    box-shadow: none;
+  }
+}
+
+// Outline color generator for btn-outline to make the hover state inverse the text and bg colors.
+@mixin btn-outline($text-color: $text-blue, $bg-color: $bg-white) {
+  color: $text-color;
+  background-color: $bg-color;
+  background-image: none;
+
+  .Counter {
+    background-color: rgba($black, 0.07);
+  }
+
+  &:hover,
+  &:active,
+  &.selected,
+  [open] > & {
+    color: $bg-color;
+    background-color: $text-color;
+    background-image: none;
+    border-color: $text-color;
+
+    .Counter {
+      color: $text-color;
+      background-color: $bg-color;
+    }
+  }
+
+  &:focus {
+    border-color: $text-color;
+    box-shadow: 0 0 0 0.2em rgba($text-color, 0.4);
+  }
+
+  &:disabled,
+  &.disabled {
+    color: $black-fade-30;
+    background-color: $bg-white;
+    border-color: $black-fade-15;
+    box-shadow: none;
+  }
+}

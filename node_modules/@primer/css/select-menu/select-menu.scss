@@ -1,0 +1,419 @@
+// stylelint-disable selector-max-type
+
+// selector-max-type is needed for body:not(.intent-mouse) to target keyboard only styles.
+// TODO: Introduce an additional .intent-keyboard class
+
+// Select Menu
+//
+// A more advanced menu with support for navigation, filtering, and more.
+
+.SelectMenu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 99;
+  display: flex;
+  padding: $spacer-3;
+  pointer-events: none;
+  flex-direction: column;
+
+  @include breakpoint(sm) {
+    position: absolute;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    padding: 0;
+  }
+}
+
+// Backdrop
+//
+// Adds a dark, semi transparent "cover" underneat the modal. Only visible for xs.
+
+.SelectMenu::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  content: "";
+  background-color: $black-fade-50;
+
+  @include breakpoint(sm) {
+    display: none;
+  }
+}
+
+// Modal
+//
+// The main "box" that contains the content
+
+.SelectMenu-modal {
+  position: relative;
+  z-index: 99; // Needs to be higher than .details-overlay's z-index: 80.
+  display: flex;
+  max-height: 66%;
+  margin: auto 0;
+  overflow: hidden; // Enables border radius on scrollable child elements
+  pointer-events: auto;
+  flex-direction: column;
+  background-color: $gray-100;
+  border-radius: $border-radius * 2;
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.4);
+  animation: SelectMenu-modal-animation 0.12s cubic-bezier(0, 0.1, 0.1, 1) backwards;
+
+  @keyframes SelectMenu-modal-animation {
+    0% {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+  }
+
+  @keyframes SelectMenu-modal-animation--sm {
+    0% {
+      opacity: 0;
+      transform: translateY(-$spacer-3);
+    }
+  }
+
+  @include breakpoint(sm) {
+    width: 300px;
+    height: auto;
+    max-height: 350px;
+    margin: $spacer-1 0 $spacer-3 0;
+    font-size: $font-size-small;
+    border: $border-width $border-style $border-gray-dark;
+    border-radius: $border-radius;
+    box-shadow: $box-shadow-medium;
+    animation-name: SelectMenu-modal-animation--sm;
+  }
+}
+
+// Header
+//
+// Used for showing a title and the close button. Close button is only visible for xs.
+
+.SelectMenu-header {
+  display: flex;
+  flex: none; // fixes header from getting squeezed in Safari iOS
+  padding: $spacer-3;
+
+  @include breakpoint(sm) {
+    padding-top: $spacer-2;
+    padding-bottom: $spacer-2;
+  }
+}
+
+.SelectMenu-title {
+  flex: auto;
+  font-size: $body-font-size;
+  font-weight: $font-weight-bold;
+
+  @include breakpoint(sm) {
+    font-size: inherit;
+  }
+}
+
+.SelectMenu-closeButton {
+  padding: $spacer-3;
+  margin: -$spacer-3;
+  color: $text-gray-light;
+  background-color: transparent;
+  border: 0;
+
+  @include breakpoint(sm) {
+    display: none;
+  }
+}
+
+// Filter
+//
+// An input to filter a large list
+
+.SelectMenu-filter {
+  padding: $spacer-3;
+  margin: 0;
+  border-top: $border;
+
+  @include breakpoint(sm) {
+    padding: $spacer-2;
+  }
+}
+
+.SelectMenu-input {
+  display: block;
+  width: 100%;
+
+  @include breakpoint(sm) {
+    font-size: $h5-size;
+  }
+}
+
+// List
+//
+// The container that holds all the list items. Starts scrolling when the list gets too long.
+
+.SelectMenu-list {
+  position: relative;
+  padding: 0;
+  margin: 0;
+  flex: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: $bg-white;
+  border-top: $border;
+  -webkit-overflow-scrolling: touch; // Adds momentum + bouncy scrolling
+}
+
+// List Item
+//
+// The interactive element used to make a selection
+
+.SelectMenu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: $spacer-3;
+  overflow: hidden;
+  color: $text-gray;
+  text-align: left;
+  cursor: pointer;
+  background-color: $bg-white;
+  border: 0;
+
+  & + & {
+    // Add a top border only if the above element also is a list item
+    border-top: $border-width $border-style lighten($gray-200, 3%);
+  }
+
+  @include breakpoint(sm) {
+    padding-top: $spacer-2;
+    padding-bottom: $spacer-2;
+  }
+}
+
+// Icon
+//
+// The icon shown on the left of a list item. Typically a check icon.
+
+.SelectMenu-icon {
+  width: $spacer-3; // fixed width to make sure following content aligns
+  margin-right: $spacer-2;
+  visibility: hidden;
+  transition: transform 0.12s cubic-bezier(0.5, 0.1, 1, 0.5), visibility 0s 0.12s linear;
+  transform: scale(0);
+}
+
+// Tabs
+//
+// Allows switching between multiple lists
+
+.SelectMenu-tabs {
+  display: flex;
+  flex-shrink: 0;
+  margin-bottom: -$border-width; // hide border of element below
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: $border;
+  -webkit-overflow-scrolling: touch;
+
+  // Hide scrollbar so it doesn't cover the text
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @include breakpoint(sm) {
+    padding: 0 $spacer-2;
+    border-top: 0;
+  }
+}
+
+.SelectMenu-tab {
+  flex: 1;
+  padding: $spacer-2 $spacer-3;
+  font-size: $font-size-small;
+  font-weight: $font-weight-semibold;
+  color: $text-gray-light;
+  text-align: center;
+  background-color: transparent;
+  border: 0;
+  box-shadow: inset 0 -1px 0 $border-color;
+
+  @include breakpoint(sm) {
+    flex: none;
+    padding: $spacer-1 $spacer-3;
+    border-top-left-radius: $border-radius;
+    border-top-right-radius: $border-radius;
+  }
+
+  &[aria-selected="true"] {
+    z-index: 1; // Keeps box-shadow visible when hovering
+    color: $text-gray-dark;
+    background-color: $bg-white;
+    box-shadow: 0 0 0 1px $border-color;
+
+    @include breakpoint(sm) {
+      border: $border;
+      border-bottom-width: 0;
+      box-shadow: none;
+    }
+  }
+}
+
+// Message, Blankslate and Loading
+//
+// A container used to show different kinds of content. Like a message, a blankslate or the loading animation.
+
+.SelectMenu-message,
+.SelectMenu-blankslate,
+.SelectMenu-loading {
+  padding: $spacer-4 $spacer-3;
+  text-align: center;
+  background-color: $bg-white;
+}
+
+// Divider
+//
+// Can be used to divide the list into multiple groups
+
+.SelectMenu-divider {
+  padding: $spacer-1 $spacer-3;
+  margin: 0;
+  font-size: $font-size-small;
+  font-weight: $font-weight-bold;
+  color: $text-gray-light;
+  background-color: $gray-100;
+  border-top: $border;
+  border-bottom: $border;
+
+  &:first-child {
+    border-top: 0;
+  }
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+// Footer
+//
+// A container at the bottom.
+
+.SelectMenu-footer {
+  padding: $spacer-2 $spacer-3;
+  font-size: $font-size-small;
+  color: $text-gray-light;
+  text-align: center;
+  border-top: $border;
+
+  @include breakpoint(sm) {
+    padding: $spacer-1 $spacer-2;
+  }
+}
+
+// Has Filter (modifier)
+//
+// Makes sure that the filter input keeps a fixed position at the top while typing. Only visible for xs.
+
+.SelectMenu--hasFilter {
+  .SelectMenu-modal {
+    height: 80%;
+    max-height: none;
+    margin-top: 0;
+
+    @include breakpoint(sm) {
+      height: auto;
+      max-height: 350px;
+      margin-top: $spacer-1;
+    }
+  }
+
+  // Show bottom "border" for the last item when the list doesn't take up the whole height
+  .SelectMenu-item:last-child {
+    box-shadow: 0 $border-width 0 lighten($gray-200, 3%);
+  }
+}
+
+// States
+//
+// Different states
+
+// Reset outlines
+.SelectMenu-tab:focus,
+.SelectMenu-item:focus {
+  outline: none;
+}
+
+// Reset <a> elements
+.SelectMenu-item:hover {
+  text-decoration: none;
+}
+
+// Selected
+//
+// Visible when a used clicks/taps on a list item
+
+.SelectMenu-item[aria-checked="true"] {
+  font-weight: $font-weight-semibold;
+  color: $text-gray-dark;
+
+  .SelectMenu-icon {
+    visibility: visible;
+    transition: transform 0.12s cubic-bezier(0, 0, 0.2, 1), visibility 0s linear;
+    transform: scale(1);
+  }
+}
+
+// Can hover states
+//
+// For mouse/keyboard input
+
+@media (hover: hover) {
+  body:not(.intent-mouse) .SelectMenu-item:focus,
+  .SelectMenu-item:hover {
+    color: $text-white;
+    background-color: $blue-500;
+  }
+
+  .SelectMenu-item:active {
+    color: $text-white;
+    background-color: $blue-400;
+  }
+
+  body:not(.intent-mouse) .SelectMenu-tab:focus {
+    background-color: $blue-100;
+  }
+
+  .SelectMenu-tab:not([aria-checked="true"]):hover {
+    color: $text-gray-dark;
+    background-color: $gray-200;
+  }
+
+  .SelectMenu-tab:not([aria-checked="true"]):active {
+    color: $text-gray-dark;
+    background-color: $gray-100;
+  }
+}
+
+// Can not hover states
+//
+// For touch input
+
+@media (hover: none) {
+  // Android
+  .SelectMenu-item:focus,
+  .SelectMenu-item:active {
+    background-color: $gray-000;
+  }
+
+  // iOS Safari
+  // :active would work if ontouchstart is added to the button
+  // Instead this tweaks the "native" highlight color
+  .SelectMenu-item {
+    -webkit-tap-highlight-color: rgba($gray-300, 0.5);
+  }
+}

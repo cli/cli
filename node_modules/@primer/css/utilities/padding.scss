@@ -1,0 +1,50 @@
+// Padding spacer utilities
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-before, declaration-colon-space-before, comment-empty-line-before
+
+// Responsive padding spacer utilities
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    // Loop through the spacer values
+    @each $scale, $size in $spacer-map {
+      /* Set a $size padding to all sides at $breakpoint */
+      .p#{$variant}-#{$scale}  { padding: $size !important; }
+      /* Set a $size padding to the top at $breakpoint */
+      .pt#{$variant}-#{$scale} { padding-top: $size !important; }
+      /* Set a $size padding to the right at $breakpoint */
+      .pr#{$variant}-#{$scale} { padding-right: $size !important; }
+      /* Set a $size padding to the bottom at $breakpoint */
+      .pb#{$variant}-#{$scale} { padding-bottom: $size !important; }
+      /* Set a $size padding to the left at $breakpoint */
+      .pl#{$variant}-#{$scale} { padding-left: $size !important; }
+
+      /* Set a $size padding to the left & right at $breakpoint */
+      .px#{$variant}-#{$scale} {
+        padding-right: $size !important;
+        padding-left: $size !important;
+      }
+
+      /* Set a $size padding to the top & bottom at $breakpoint */
+      .py#{$variant}-#{$scale} {
+        padding-top: $size !important;
+        padding-bottom: $size !important;
+      }
+    }
+  }
+}
+
+// responsive padding for containers
+.p-responsive {
+  padding-right: $spacer-3 !important;
+  padding-left: $spacer-3 !important;
+
+  @include breakpoint(sm) {
+    padding-right: $spacer-6 !important;
+    padding-left: $spacer-6 !important;
+  }
+
+  @include breakpoint(lg) {
+    padding-right: $spacer-3 !important;
+    padding-left: $spacer-3 !important;
+  }
+}

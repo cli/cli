@@ -1,0 +1,18 @@
+// Margin spacer utilities for marketing
+// Utilities only added for y-direction margin (i.e. top & bottom)
+// stylelint-disable block-opening-brace-space-before, declaration-colon-space-before, primer/selector-no-utility, comment-empty-line-before
+
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    @each $scale, $size in $marketing-spacers {
+
+      .mt#{$variant}-#{$scale} { margin-top: $size !important; }
+      .mb#{$variant}-#{$scale} { margin-bottom: $size !important; }
+
+      .my#{$variant}-#{$scale} {
+        margin-top: $size !important;
+        margin-bottom: $size !important;
+      }
+    }
+  }
+}

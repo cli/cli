@@ -1,0 +1,3 @@
+.Header{z-index:32;display:flex;padding:16px;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.7);background-color:#24292e;align-items:center;flex-wrap:nowrap}.Header-item{display:flex;margin-right:16px;align-self:stretch;align-items:center;flex-wrap:nowrap}.Header-item--full{flex:auto}.Header-link{font-weight:600;color:#fff;white-space:nowrap}.Header-link:hover,.Header-link:focus{color:rgba(255,255,255,0.7);text-decoration:none}
+
+/*# sourceMappingURL=header.css.map */

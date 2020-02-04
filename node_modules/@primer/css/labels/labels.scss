@@ -1,0 +1,63 @@
+// Needs refactoring
+// stylelint-disable selector-no-qualifying-type
+// stylelint-disable selector-max-type
+// Labels
+//
+// Use labels to add keyword tags or phrases to issues and pull requests. These
+// are used within a list of issues/PRs, on individual issues/PRs, and within
+// the select menus that manage them.
+
+// Provide a wrapper to ensure labels stick together
+.labels {
+  position: relative;
+}
+
+// Each label gets common styles
+// .label will be deprecated for .Label
+.label,
+.Label {
+  display: inline-block;
+  padding: 3px $spacer-1;
+  font-size: $font-size-small;
+  font-weight: $font-weight-bold;
+  line-height: $lh-condensed-ultra; // prevent inheritance from changing proportions
+  color: $text-white;
+  border-radius: 2px;
+  box-shadow: inset 0 -1px 0 rgba($black, 0.12);
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+// Custom GitHub labels (not for issues/PRs/etc)
+//
+// Commonly used across the site to indicate a particular role. For example,
+// "repo owner" within code comments or role in organizations.
+.Label--gray {
+  color: $gray-600;
+  background-color: lighten($gray-200, 3%);
+}
+
+.Label--outline {
+  margin-top: -1px; // offsets the 1px border
+  margin-bottom: -1px; // offsets the 1px border
+  font-weight: $font-weight-normal;
+  color: $text-gray;
+  background-color: transparent;
+  border: 1px solid $black-fade-15;
+  box-shadow: none;
+}
+
+.Label--outline-green {
+  color: $text-green;
+  border: 1px solid $border-green;
+}
+
+.Label--gray-darker {
+  background-color: $gray;
+}
+
+.Label--orange {
+  background-color: $bg-orange;
+}

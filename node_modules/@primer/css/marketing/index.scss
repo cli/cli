@@ -1,0 +1,19 @@
+/*!
+ * Primer-marketing
+ * http://primer.github.io
+ *
+ * Released under MIT license. Copyright (c) 2019 GitHub Inc.
+ */
+
+// Primer master file
+//
+// Imports all Primer files in their intended order for easy mass-inclusion.
+// Should you need specific files, you can easily use separate `@import`s.
+
+// Global requirements
+@import "./support/index.scss";
+
+// marketing specific css modules
+@import "./type/index.scss";
+@import "./buttons/index.scss";
+@import "./utilities/index.scss";
