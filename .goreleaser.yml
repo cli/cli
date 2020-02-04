@@ -52,6 +52,7 @@ brews:
     skip_upload: auto
     description: GitHub CLI
     homepage: https://github.com/cli/cli
+    folder: Formula
     custom_block: |
       head do
         url "https://github.com/cli/cli.git"
