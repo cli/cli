@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Installation instructions
+permalink: /:path/:basename
 ---
 
 ## Installation
