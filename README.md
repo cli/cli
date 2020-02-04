@@ -30,22 +30,38 @@ tools bring GitHub to the terminal, `hub` behaves as a proxy to `git` and `gh` i
 tool.
 
 
-## Installation
+## Installation and Upgrading
 
 ### macOS
 
-`brew install github/gh/gh`
+Install: `brew install github/gh/gh`
+Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
 
-MSI installers are available on the [releases page][].
+`gh` is available via [scoop][]:
+
+Install:
+
+```
+scoop bucket add github-gh https://github.com/cli/scoop-gh.git
+scoop installl gh
+```
+
+Upgrade: `scoop update gh`
+
+Signed MSI installers are also available on the [releases page][].
 
 ### Debian/Ubuntu Linux
+
+Install and upgrade:
 
 1. Download the `.deb` file from the [releases page][]
 2. `sudo apt install git && sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
 
 ### Fedora/Centos Linux
+
+Install and upgrade:
 
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
@@ -57,6 +73,7 @@ project directory.
 
 <!-- TODO eventually we'll have https://cli.github.com/manual -->
 [docs]: https://cli.github.io/cli/gh
+[scoop]: https://scoop.sh
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
