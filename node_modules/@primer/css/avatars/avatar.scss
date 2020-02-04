@@ -1,0 +1,20 @@
+.avatar {
+  display: inline-block;
+  overflow: hidden; // Ensure page layout in Firefox should images fail to load
+  line-height: $lh-condensed-ultra;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+.avatar-small { border-radius: 2px; }
+
+.avatar-link {
+  float: left;
+  line-height: $lh-condensed-ultra;
+}
+
+// User for example on /stars and /user for grids of avatars
+.avatar-group-item {
+  display: inline-block;
+  margin-bottom: 3px;
+}

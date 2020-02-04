@@ -1,0 +1,40 @@
+// Miscellaneous variables
+// stylelint-disable declaration-bang-space-before
+
+// Border size
+$border-width: 1px !default;
+$border-color: $border-gray !default;
+$border-style: solid !default;
+$border: $border-width $border-color $border-style !default;
+$border-radius: 3px !default;
+
+// Custom explore grid border
+$exploregrid-item-border-radius: 4px;
+
+// Box shadow
+$box-shadow: 0 1px 1px rgba($black, 0.1) !default;
+$box-shadow-medium: 0 1px 5px $black-fade-15 !default;
+$box-shadow-large: 0 1px 15px $black-fade-15 !default;
+$box-shadow-extra-large: 0 10px 50px rgba($black, 0.07) !default;
+
+// Tooltips
+$tooltip-max-width: 250px !default;
+$tooltip-background-color: $black;
+$tooltip-text-color: $white !default;
+$tooltip-delay: 0.4s !default;
+$tooltip-duration: 0.1s !default;
+
+// Should be moved into custom github css
+$stats-switcher-py: 10px;
+// Future proof this `height` value by finding the computed line-height, then
+// adding the total value of the vertical padding. This var is used to toggle
+// between the stats bar and language breakdown.
+$stats-viewport-height: ($body-font-size * $body-line-height) + ($stats-switcher-py * 2);
+
+$min_tab_size: 1;
+$max_tab_size: 12;
+
+// Button and form variables
+$form-control-shadow: inset 0 1px 2px rgba($black, 0.075);
+$btn-input-focus-shadow: 0 0 0 0.2em rgba($blue, 0.3);
+$btn-active-shadow: inset 0 0.15em 0.3em $black-fade-15;

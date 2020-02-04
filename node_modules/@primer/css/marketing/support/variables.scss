@@ -1,0 +1,71 @@
+$marketing-font-path: "/fonts/" !default;
+
+// Type
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: $font-weight-normal;
+  src: local("Inter"), local("Inter-Regular"), url("#{$marketing-font-path}Inter-Regular.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: $font-weight-semibold;
+  src: local("Inter Medium"), local("Inter-Medium"), url("#{$marketing-font-path}Inter-Medium.woff") format("woff");
+  font-display: swap;
+}
+
+$font-mktg: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol" !default;
+
+// Builds upon primer-support/variables/typography.scss
+$h000-size: 64px !default;
+$h000-size-mobile: 48px !default;
+
+// Colors
+$green-mktg: mix($green-500, $green-400, 50%);
+$blue-mktg: mix($blue-400, $blue-500, 42%);
+
+// Animations
+$transition-time: 0.4s;
+
+// Increases primer-core scale first by 8px for spacer-7 then by 16px step increments for spacer-8 to spacer-12
+// i.e. After 40px, we have 48, 64, 80, 96, etc.
+$spacer-7:  $spacer * 6 !default;  // 48px
+$spacer-8:  $spacer * 8 !default;  // 64px
+$spacer-9:  $spacer * 10 !default; // 80px
+$spacer-10: $spacer * 12 !default; // 96px
+$spacer-11: $spacer * 14 !default; // 112px
+$spacer-12: $spacer * 16 !default; // 128px
+
+$marketingSpacers: $spacer-7, $spacer-8, $spacer-9, $spacer-10, $spacer-11, $spacer-12;
+$allSpacers: $spacer-1, $spacer-2, $spacer-3, $spacer-4, $spacer-5, $spacer-6, $spacer-7, $spacer-8, $spacer-9, $spacer-10, $spacer-11, $spacer-12;
+
+$marketing-spacers: (
+  7: $spacer-7,
+  8: $spacer-8,
+  9: $spacer-9,
+  10: $spacer-10,
+  11: $spacer-11,
+  12: $spacer-12,
+) !default;
+
+$marketing-all-spacers: map-merge(
+  (
+    0: 0,
+    1: $spacer-1,
+    2: $spacer-2,
+    3: $spacer-3,
+    4: $spacer-4,
+    5: $spacer-5,
+    6: $spacer-6,
+  ),
+  $marketing-spacers,
+) !default;
+
+$marketing-position-variants: (
+  "": "",
+  md: "-md",
+  lg: "-lg",
+) !default;

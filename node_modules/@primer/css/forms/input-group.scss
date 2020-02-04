@@ -1,0 +1,51 @@
+.input-group {
+  display: table;
+
+  .form-control {
+    position: relative;
+    width: 100%;
+
+    &:focus {
+      z-index: 2;
+    }
+
+    + .btn {
+      margin-left: 0;
+    }
+  }
+
+  // For when you want the input group to behave like inline-block.
+  &.inline {
+    display: inline-table;
+  }
+}
+
+.input-group .form-control,
+.input-group-button {
+  display: table-cell;
+}
+
+.input-group-button {
+  width: 1%;
+  vertical-align: middle; // Match the inputs
+}
+
+.input-group .form-control:first-child,
+.input-group-button:first-child .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.input-group-button:first-child .btn {
+  margin-right: -1px;
+}
+
+.input-group .form-control:last-child,
+.input-group-button:last-child .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.input-group-button:last-child .btn {
+  margin-left: -1px;
+}

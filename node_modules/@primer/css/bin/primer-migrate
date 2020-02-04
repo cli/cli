@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+
+/**
+ * XXX: we use Node.js native modules only here to avoid
+ * requiring any runtime dependencies when folks install
+ * @primer/css
+ */
+
+const fs = require('fs')
+const {promisify} = require('util')
+const readFile = promisify(fs.readFile)
+const writeFile = promisify(fs.writeFile)
+const {dirname, join} = require('path')
+
+const IMPORT_PATTERN = /\@import\s+['"]([^'"]+)['"]/g
+const replacements = [
+  [/primer-marketing-(\w+)(\/lib)?/, '@primer/css/marketing/$1'],
+  [/primer-(\w+)(\/lib)?/, '@primer/css/$1'],
+  [/primer\b/, '@primer/css']
+]
+
+const paths = process.argv.slice(2)
+const warn = (...args) => console.warn(...args)
+
+if (paths.length) {
+  Promise.all(
+    paths.map(path => {
+      return migrate(path).then(reps => report(reps, path))
+    })
+  ).catch(die)
+} else {
+  readFile('/dev/stdin', 'utf8')
+    .then(input => {
+      const [output, reps] = replace(input)
+      report(reps, 'stdin')
+      process.stdout.write(output)
+    })
+    .catch(die)
+}
+
+function migrate(path) {
+  return readFile(path, 'utf8').then(input => {
+    if (!IMPORT_PATTERN.test(input)) {
+      warn(`No SCSS imports found in ${path}`)
+      return false
+    }
+
+    const [output, reps] = replace(input)
+    if (reps.length) {
+      return writeFile(path, output, 'utf8').then(() => reps)
+    } else {
+      return false
+    }
+  })
+}
+
+function replace(input) {
+  const reps = []
+  const output = input.replace(IMPORT_PATTERN, (str, path) => {
+    for (const [from, to] of replacements) {
+      if (from.test(path)) {
+        const replaced = str.replace(from, to)
+        reps.push([path, path.replace(from, to)])
+        return replaced
+      }
+    }
+    return str
+  })
+  return [output, reps]
+}
+
+function report(reps, path) {
+  if (reps.length) {
+    warn(`Replaced ${reps.length} imports in ${path}:`)
+    for (const [i, [from, to]] of Object.entries(reps)) {
+      warn(`  ${Number(i) + 1}. (${from}) -> (${to})`)
+    }
+  } else {
+    warn(`No legacy imports found in ${path}`)
+  }
+}
+
+function die(error) {
+  console.error(error)
+  process.exitCode = 1
+}

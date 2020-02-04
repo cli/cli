@@ -1,0 +1,3 @@
+.breadcrumb-item{display:inline-block;margin-left:-0.35em;white-space:nowrap;list-style:none}.breadcrumb-item::after{padding-right:.5em;padding-left:.5em;color:#e1e4e8;content:"/"}.breadcrumb-item:first-child{margin-left:0}.breadcrumb-item-selected::after{content:none}
+
+/*# sourceMappingURL=breadcrumb.css.map */

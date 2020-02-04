@@ -1,0 +1,56 @@
+// Grid system
+//
+// Create rows with `.columns` to clear the floated columns and outdent the
+// padding on `.column`s with negative margin for alignment.
+
+@warn ".columns, .column, .one-third, .two-thirds, .one-fourth, .one-half, .three-fourths, .one-fifth, .four-fifths, .centered will be deprecated in 12.0.0 please migrate to grid.scss";
+
+.columns {
+  margin-right: -$grid-gutter;
+  margin-left: -$grid-gutter;
+  @include clearfix;
+}
+
+// Base class for every column (requires a column width from below)
+.column {
+  float: left;
+  padding-right: $grid-gutter;
+  padding-left: $grid-gutter;
+}
+
+// Column widths
+.one-third {
+  width: 33.333333%;
+}
+
+.two-thirds {
+  width: 66.666667%;
+}
+
+.one-fourth {
+  width: 25%;
+}
+
+.one-half {
+  width: 50%;
+}
+
+.three-fourths {
+  width: 75%;
+}
+
+.one-fifth {
+  width: 20%;
+}
+
+.four-fifths {
+  width: 80%;
+}
+
+// Centers content horizontally. Can be used inside or outside the grid.
+.centered {
+  display: block;
+  float: none;
+  margin-right: auto;
+  margin-left: auto;
+}

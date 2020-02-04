@@ -1,0 +1,84 @@
+// stylelint-disable selector-max-type
+* {
+  box-sizing: border-box;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+body {
+  font-family: $body-font;
+  font-size: $body-font-size;
+  line-height: $body-line-height;
+  color: $text-gray-dark;
+  background-color: $bg-white;
+}
+
+a {
+  color: $text-blue;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+b,
+strong {
+  font-weight: $font-weight-bold;
+}
+
+// Horizontal lines
+//
+// TODO-MDO: Remove `.rule` from everywhere and replace with `<hr>`s
+hr,
+.rule {
+  height: 0;
+  margin: 15px 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid lighten($gray-300, 5%);
+  @include clearfix();
+}
+
+//
+// Remove most spacing between table cells.
+//
+
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+td,
+th {
+  padding: 0;
+}
+
+button {
+  cursor: pointer;
+  // Remove border radius added by Chrome macOS
+  border-radius: 0;
+}
+
+// increase the selector specificity for [hidden]
+// so that it always overrides utility classes (.d-block, etc.)
+[hidden][hidden] {
+  display: none !important;
+}
+
+details {
+  summary { cursor: pointer; }
+
+  &:not([open]) {
+    // Set details content hidden by default for browsers that don't do this
+    > *:not(summary) { display: none !important; }
+  }
+}

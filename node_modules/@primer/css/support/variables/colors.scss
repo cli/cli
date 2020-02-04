@@ -1,0 +1,70 @@
+@import "color-system.scss";
+// Color variables
+// stylelint-disable declaration-bang-space-before
+
+// State indicators.
+$status-pending:    desaturate($yellow-700, 15%) !default;
+
+// Repository type colors
+// Should be able to deprecate these in future
+$repo-private-text: $black-fade-70 !default;
+$repo-private-bg:   $yellow-000 !default;
+$repo-private-icon: transparentize($yellow-900, 0.5) !default;
+
+// Highlight used for things like search
+$highlight-yellow: rgba(255, 247, 140, 0.5);
+
+// Border colors
+$border-black-fade:  $black-fade-15 !default;
+$border-white-fade:  $white-fade-15 !default;
+
+$border-blue:        $blue-500 !default;
+$border-blue-light:  $blue-200 !default;
+
+$border-green:       $green-400 !default;
+$border-green-light: desaturate($green-300, 40%) !default;
+
+$border-purple:      $purple !default;
+
+$border-red:         $red !default;
+$border-red-light:   desaturate($red-300, 60%) !default;
+
+$border-yellow:      desaturate($yellow-300, 60%) !default;
+
+$border-gray-dark:   $gray-300 !default;
+$border-gray-darker: $gray-700 !default;
+$border-gray-light:  lighten($gray-200, 3%) !default;
+$border-gray:        $gray-200 !default;
+
+// Background colors
+$bg-blue-light:     $blue-000 !default;
+$bg-blue:           $blue-500 !default;
+$bg-gray-dark:      $gray-900 !default;
+$bg-gray-light:     $gray-000 !default;
+$bg-gray:           $gray-100 !default;
+$bg-green:          $green-500 !default;
+$bg-green-light:    $green-100 !default;
+$bg-orange:         $orange-700 !default;
+$bg-purple:         $purple-500 !default;
+$bg-purple-light:   $purple-000 !default;
+$bg-pink:           $pink-500 !default;
+$bg-red:            $red-500 !default;
+$bg-red-light:      $red-100 !default;
+$bg-white:          $white !default;
+$bg-yellow:         $yellow-500 !default;
+$bg-yellow-light:   $yellow-200 !default;
+$bg-yellow-dark:    $yellow-700 !default;
+
+// Text colors
+$text-blue:         $blue-500 !default;
+$text-gray-dark:    $gray-900 !default;
+$text-gray-light:   $gray-500 !default;
+$text-gray:         $gray-600 !default;
+$text-green:        $green-500 !default;
+$text-orange:       $orange-900 !default;
+$text-orange-light: $orange-600 !default;
+$text-purple:       $purple !default;
+$text-pink:         $pink-500 !default;
+$text-red:          $red-600 !default;
+$text-white:        $white !default;
+$text-yellow:       $yellow-800 !default;

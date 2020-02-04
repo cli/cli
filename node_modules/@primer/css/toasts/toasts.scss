@@ -1,0 +1,102 @@
+// Toast
+
+.Toast {
+  display: flex;
+  margin: $spacer-2;
+  color: $black;
+  background-color: $bg-white;
+  border-radius: $border-radius;
+  box-shadow: inset 0 0 0 1px $border-gray-dark, $box-shadow-medium;
+
+  @include breakpoint(sm) {
+    width: max-content;
+    max-width: 450px;
+    margin: $spacer-3;
+  }
+}
+
+.Toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $spacer-3 * 3;
+  flex-shrink: 0;
+  color: $text-white;
+  background-color: $blue-500;
+  border-top-left-radius: inherit;
+  border-bottom-left-radius: inherit;
+}
+
+.Toast-content {
+  padding: $spacer-3;
+}
+
+.Toast-dismissButton {
+  max-height: 54px; // keeps button aligned to the top
+  padding: $spacer-3;
+  background-color: transparent;
+  border: 0;
+
+  &:focus,
+  &:hover {
+    color: $text-gray;
+    outline: none;
+  }
+
+  &:active {
+    color: $gray-400;
+  }
+}
+
+// Modifier
+
+.Toast--error .Toast-icon {
+  background-color: $red-500;
+}
+
+.Toast--warning .Toast-icon {
+  color: $gray-900;
+  background-color: $yellow-600;
+}
+
+.Toast--success .Toast-icon {
+  background-color: $green-500;
+}
+
+.Toast--loading .Toast-icon {
+  background-color: $gray-600;
+}
+
+// Animations
+
+.Toast--animateIn {
+  animation: Toast--animateIn 0.18s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+@keyframes Toast--animateIn {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+.Toast--animateOut {
+  animation: Toast--animateOut 0.18s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+@keyframes Toast--animateOut {
+  100% {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+.Toast--spinner {
+  animation: Toast--spinner 1000ms linear infinite;
+}
+
+@keyframes Toast--spinner {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

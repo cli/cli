@@ -1,0 +1,54 @@
+// Circle badge icon with drop shadow for icons and logos
+
+.CircleBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: $white;
+  border-radius: 50%;
+  box-shadow: $box-shadow-medium;
+}
+
+.CircleBadge-icon {
+  max-width: 60% !important;
+  height: auto !important;
+  max-height: 55% !important;
+}
+
+// Small badge
+.CircleBadge--small {
+  width: 56px;
+  height: 56px;
+}
+
+// Medium badge
+.CircleBadge--medium {
+  width: 96px;
+  height: 96px;
+}
+
+// Large badge
+.CircleBadge--large {
+  width: 128px;
+  height: 128px;
+}
+
+// Dashed line that connects badges..
+// Wrap around 2 or more badges to create a horizonal line:
+
+.DashedConnection {
+  position: relative;
+
+  &::before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    content: "";
+    border-bottom: 2px dashed $border-gray;
+  }
+
+  .CircleBadge {
+    position: relative;
+  }
+}

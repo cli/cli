@@ -1,0 +1,88 @@
+// Layout
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-after, block-opening-brace-space-before, comment-empty-line-before
+
+// Loop through the breakpoint values
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    @each $position in $responsive-positions {
+      .position#{$variant}-#{$position} {
+        position: $position !important;
+      }
+    }
+  }
+}
+
+/* Set top 0 */
+.top-0    { top: 0 !important; }
+/* Set right 0 */
+.right-0  { right: 0 !important; }
+/* Set bottom 0 */
+.bottom-0 { bottom: 0 !important; }
+/* Set left 0 */
+.left-0   { left: 0 !important; }
+
+/* Vertical align middle */
+.v-align-middle      { vertical-align: middle !important; }
+/* Vertical align top */
+.v-align-top         { vertical-align: top !important; }
+/* Vertical align bottom */
+.v-align-bottom      { vertical-align: bottom !important; }
+/* Vertical align to the top of the text */
+.v-align-text-top    { vertical-align: text-top !important; }
+/* Vertical align to the bottom of the text */
+.v-align-text-bottom { vertical-align: text-bottom !important; }
+/* Vertical align to the parent's baseline */
+.v-align-baseline    { vertical-align: baseline !important; }
+
+// Overflow utilities
+@each $overflow in (visible, hidden, auto, scroll) {
+  .overflow-#{$overflow} { overflow: $overflow !important; }
+  .overflow-x-#{$overflow} { overflow-x: $overflow !important; }
+  .overflow-y-#{$overflow} { overflow-y: $overflow !important; }
+}
+
+// Clear floats
+/* Clear floats around the element */
+.clearfix {
+  @include clearfix;
+}
+
+// Floats
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    /* Float to the left */
+    .float#{$variant}-left  { float: left !important; }
+    /* Float to the right */
+    .float#{$variant}-right  { float: right !important; }
+    /* No float */
+    .float#{$variant}-none { float: none !important; }
+  }
+}
+
+// Width and height utilities, helpful in combination
+// with display-table utilities and images
+/* Max width 100% */
+.width-fit   { max-width: 100% !important; }
+/* Set the width to 100% */
+.width-full  { width: 100% !important; }
+/* Max height 100% */
+.height-fit  { max-height: 100% !important; }
+/* Set the height to 100% */
+.height-full { height: 100% !important; }
+
+/* Remove min-width from element */
+.min-width-0 { min-width: 0 !important; }
+
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+
+    // Auto varients
+    .width#{$variant}-auto { width: auto !important; }
+
+    /* Set the direction to rtl */
+    .direction#{$variant}-rtl { direction: rtl !important; }
+    /* Set the direction to ltr */
+    .direction#{$variant}-ltr { direction: ltr !important; }
+  }
+}

@@ -1,0 +1,87 @@
+// Visibility and display utilities
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-after, block-opening-brace-space-before, comment-empty-line-before
+
+$display-values: (
+  block,
+  flex,
+  inline,
+  inline-block,
+  inline-flex,
+  none,
+  table,
+  table-cell
+);
+
+// Responsive display utilities
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    @each $display in $display-values {
+      .d#{$variant}-#{$display} { display: $display !important; }
+    }
+  }
+}
+
+.v-hidden { visibility: hidden !important; }
+.v-visible { visibility: visible !important; }
+
+// Hide utilities for each breakpoint
+// Each hide utility only applies to one breakpoint range.
+@media (max-width: $width-sm - 1px) {
+  .hide-sm {
+    display: none !important;
+  }
+}
+
+@media (min-width: $width-sm) and (max-width: $width-md - 1px) {
+  .hide-md {
+    display: none !important;
+  }
+}
+
+@media (min-width: $width-md) and (max-width: $width-lg - 1px) {
+  .hide-lg {
+    display: none !important;
+  }
+}
+
+@media (min-width: $width-lg) {
+  .hide-xl {
+    display: none !important;
+  }
+}
+
+/* Set the table-layout to fixed */
+.table-fixed { table-layout: fixed !important; }
+
+// Only display content to screen readers
+//
+// See: http://a11yproject.com/posts/how-to-hide-content/
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=1241631
+  word-wrap: normal;
+  border: 0;
+}
+
+// Only display content on focus
+.show-on-focus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+
+  &:focus {
+    z-index: 20;
+    width: auto;
+    height: auto;
+    clip: auto;
+  }
+}

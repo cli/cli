@@ -1,0 +1,57 @@
+// Flex utility classes
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-after, block-opening-brace-space-before, comment-empty-line-before
+
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    // Flexbox classes
+    // Container
+    .flex#{$variant}-row         { flex-direction: row !important; }
+    .flex#{$variant}-row-reverse { flex-direction: row-reverse !important; }
+    .flex#{$variant}-column      { flex-direction: column !important; }
+
+    .flex#{$variant}-wrap     { flex-wrap: wrap !important; }
+    .flex#{$variant}-nowrap   { flex-wrap: nowrap !important; }
+
+    .flex#{$variant}-justify-start    { justify-content: flex-start !important; }
+    .flex#{$variant}-justify-end      { justify-content: flex-end !important; }
+    .flex#{$variant}-justify-center   { justify-content: center !important; }
+    .flex#{$variant}-justify-between  { justify-content: space-between !important; }
+    .flex#{$variant}-justify-around   { justify-content: space-around !important; }
+
+    .flex#{$variant}-items-start      { align-items: flex-start !important; }
+    .flex#{$variant}-items-end        { align-items: flex-end !important; }
+    .flex#{$variant}-items-center     { align-items: center !important; }
+    .flex#{$variant}-items-baseline   { align-items: baseline !important; }
+    .flex#{$variant}-items-stretch    { align-items: stretch !important; }
+
+    .flex#{$variant}-content-start    { align-content: flex-start !important; }
+    .flex#{$variant}-content-end      { align-content: flex-end !important; }
+    .flex#{$variant}-content-center   { align-content: center !important; }
+    .flex#{$variant}-content-between  { align-content: space-between !important; }
+    .flex#{$variant}-content-around   { align-content: space-around !important; }
+    .flex#{$variant}-content-stretch  { align-content: stretch !important; }
+
+    // Item
+    .flex#{$variant}-auto { flex: 1 1 auto !important; }
+    .flex#{$variant}-grow-0 { flex-grow: 0 !important; }
+    .flex#{$variant}-shrink-0 { flex-shrink: 0 !important; }
+
+    .flex#{$variant}-self-auto        { align-self: auto !important; }
+    .flex#{$variant}-self-start       { align-self: flex-start !important; }
+    .flex#{$variant}-self-end         { align-self: flex-end !important; }
+    .flex#{$variant}-self-center      { align-self: center !important; }
+    .flex#{$variant}-self-baseline    { align-self: baseline !important; }
+    .flex#{$variant}-self-stretch     { align-self: stretch !important; }
+
+    // Shorthand for equal width and height cols
+    .flex#{$variant}-item-equal {
+      flex-grow: 1;
+      flex-basis: 0;
+    }
+
+    .flex#{$variant}-order-1 { order: 1 !important; }
+    .flex#{$variant}-order-2 { order: 2 !important; }
+    .flex#{$variant}-order-none { order: inherit !important; }
+  }
+}

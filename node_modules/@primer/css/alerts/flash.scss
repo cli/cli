@@ -1,0 +1,81 @@
+// Default flash
+// stylelint-disable selector-max-type
+.flash {
+  position: relative;
+  padding: $spacer-3;
+  color: $blue-800;
+  background-color: $blue-100;
+  border: 1px solid $border-black-fade;
+  border-radius: 3px;
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+
+// Contain the flash messages
+.flash-messages {
+  margin-bottom: $spacer-4;
+}
+
+// Close button
+.flash-close {
+  float: right;
+  padding: $spacer-3;
+  margin: -$spacer-3;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  // Undo `<button>` styles
+  background: none;
+  border: 0;
+  appearance: none;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Action button
+.flash-action {
+  float: right;
+  margin-top: -3px;
+  margin-left: $spacer-4;
+}
+
+//
+// Variations
+//
+
+.flash-warn {
+  color: $yellow-900;
+  background-color: $yellow-100;
+  border-color: $black-fade-15;
+}
+
+.flash-error {
+  color: $red-900;
+  background-color: $red-100;
+  border-color: $black-fade-15;
+}
+
+.flash-success {
+  color: $green-800;
+  background-color: $green-100;
+  border-color: $black-fade-15;
+}
+
+.flash-full {
+  margin-top: -1px;
+  border-width: 1px 0;
+  border-radius: 0;
+}
+
+// FIXME deprecate this
+.warning {
+  padding: $em-spacer-5;
+  margin-bottom: 0.8em;
+  font-weight: $font-weight-bold;
+  background-color: $yellow-100;
+}

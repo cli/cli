@@ -1,0 +1,184 @@
+// This file contains reusable animations for github.
+// stylelint-disable primer/selector-no-utility
+
+/* Fade in an element */
+.anim-fade-in {
+  animation-name: fade-in;
+  animation-duration: 1s;
+  animation-timing-function: ease-in-out;
+
+  &.fast {
+    animation-duration: 300ms;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Fade out an element */
+.anim-fade-out {
+  animation-name: fade-out;
+  animation-duration: 1s;
+  animation-timing-function: ease-out;
+
+  &.fast {
+    animation-duration: 0.3s;
+  }
+}
+
+@keyframes fade-out {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Fade in and slide up an element */
+.anim-fade-up {
+  opacity: 0;
+  animation-name: fade-up;
+  animation-duration: 0.3s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-out;
+  animation-delay: 1s;
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0.8;
+    transform: translateY(100%);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade an element out and slide down */
+.anim-fade-down {
+  animation-name: fade-down;
+  animation-duration: 0.3s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-in;
+}
+
+@keyframes fade-down {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0.5;
+    transform: translateY(100%);
+  }
+}
+
+/* Grow an element width from 0 to 100% */
+.anim-grow-x {
+  width: 0%;
+  animation-name: grow-x;
+  animation-duration: 0.3s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease;
+  animation-delay: 0.5s;
+}
+
+@keyframes grow-x {
+  to { width: 100%; }
+}
+
+/* Shrink an element from 100% to 0% */
+.anim-shrink-x {
+  animation-name: shrink-x;
+  animation-duration: 0.3s;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-in-out;
+  animation-delay: 0.5s;
+}
+
+@keyframes shrink-x {
+  to { width: 0%; }
+}
+
+/* Fade in an element and scale it fast */
+.anim-scale-in {
+  animation-name: scale-in;
+  animation-duration: 0.15s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0.13, 1.5);
+}
+
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Pulse an element's opacity */
+.anim-pulse {
+  animation-name: pulse;
+  animation-duration: 2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.3;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.3;
+  }
+}
+
+/* Pulse in an element */
+.anim-pulse-in {
+  animation-name: pulse-in;
+  animation-duration: 0.5s;
+}
+
+@keyframes pulse-in {
+  0% {
+    transform: scale3d(1, 1, 1);
+  }
+
+  50% {
+    transform: scale3d(1.1, 1.1, 1.1);
+  }
+
+  100% {
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+/* Increase scale of an element on hover */
+.hover-grow {
+  transition: transform 0.3s;
+  backface-visibility: hidden;
+
+  &:hover {
+    transform: scale(1.025);
+  }
+}

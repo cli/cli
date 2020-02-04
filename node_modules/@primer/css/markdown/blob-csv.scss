@@ -1,0 +1,27 @@
+// stylelint-disable selector-max-type
+.markdown-body .csv-data {
+  td,
+  th {
+    padding: 5px;
+    overflow: hidden;
+    font-size: $font-size-small;
+    line-height: $lh-condensed-ultra;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .blob-num {
+    padding: 10px $spacer-2 9px;
+    text-align: right;
+    background: $bg-white;
+    border: 0;
+  }
+
+  tr { border-top: 0; }
+
+  th {
+    font-weight: $font-weight-bold;
+    background: $gray-100;
+    border-top: 0;
+  }
+}

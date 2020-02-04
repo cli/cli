@@ -1,0 +1,75 @@
+// Outer wrapper
+// stylelint-disable selector-max-type
+.tabnav {
+  margin-top: 0;
+  margin-bottom: 15px;
+  border-bottom: 1px solid $gray-300;
+
+  .Counter {
+    margin-left: 5px;
+  }
+}
+
+.tabnav-tabs {
+  margin-bottom: -1px;
+}
+
+.tabnav-tab {
+  display: inline-block;
+  padding: $spacer-2 12px;
+  font-size: $h5-size;
+  line-height: 20px;
+  color: $gray-600;
+  text-decoration: none;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+
+  &[aria-selected=true],
+  &.selected {
+    color: $text-gray-dark;
+    background-color: $bg-white;
+    border-color: $gray-300;
+    border-radius: 3px 3px 0 0;
+  }
+
+  &:hover,
+  &:focus {
+    color: $text-gray-dark;
+    text-decoration: none;
+  }
+}
+
+// Tabnav extras
+//
+// Tabnav extras are non-tab elements that sit in the tabnav. Usually they're
+// inline text or links.
+
+.tabnav-extra {
+  display: inline-block;
+  padding-top: 10px;
+  margin-left: 10px;
+  font-size: $font-size-small;
+  color: $gray-600;
+
+  > .octicon {
+    margin-right: 2px;
+  }
+}
+
+// When tabnav-extra are anchors
+// stylelint-disable selector-no-qualifying-type
+a.tabnav-extra:hover {
+  color: $text-blue;
+  text-decoration: none;
+}
+// stylelint-enable selector-no-qualifying-type
+
+// Tabnav buttons
+//
+// For when there are multiple buttons, space them out appropriately. Requires
+// the buttons to be floated or inline-block.
+
+.tabnav-btn {
+  margin-left: 10px;
+}

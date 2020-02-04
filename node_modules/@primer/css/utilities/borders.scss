@@ -1,0 +1,119 @@
+// Core border utilities
+// stylelint-disable primer/selector-no-utility
+// stylelint-disable block-opening-brace-space-before, comment-empty-line-before
+
+/* Add a gray border to the left and right */
+.border-x {
+  border-right: $border !important;
+  border-left: $border !important;
+}
+
+/* Add a gray border to the top and bottom */
+.border-y {
+  border-top: $border !important;
+  border-bottom: $border !important;
+}
+
+$edges: (
+  top: (top-left, top-right),
+  right: (top-right, bottom-right),
+  bottom: (bottom-right, bottom-left),
+  left: (bottom-left, top-left)
+);
+
+/* Responsive gray borders */
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    /* Add a gray border on all sides at/above this breakpoint */
+    .border#{$variant}        { border: $border !important; }
+    /* Set the border width to 0 on all sides at/above this breakpoint */
+    .border#{$variant}-0      { border: 0 !important; }
+
+    /* Add a gray border to the top */
+    .border#{$variant}-top    { border-top: $border !important; }
+    /* Add a gray border to the right */
+    .border#{$variant}-right  { border-right: $border !important; }
+    /* Add a gray border to the bottom */
+    .border#{$variant}-bottom { border-bottom: $border !important; }
+    /* Add a gray border to the left */
+    .border#{$variant}-left   { border-left: $border !important; }
+
+    /* Remove the top border */
+    .border#{$variant}-top-0    { border-top: 0 !important; }
+    /* Remove the right border */
+    .border#{$variant}-right-0  { border-right: 0 !important; }
+    /* Remove the bottom border */
+    .border#{$variant}-bottom-0 { border-bottom: 0 !important; }
+    /* Remove the left border */
+    .border#{$variant}-left-0   { border-left: 0 !important; }
+
+    // Rounded corners
+    /* Remove the border-radius */
+    .rounded#{$variant}-0 { border-radius: 0 !important; }
+    /* Add a border-radius to all corners */
+    .rounded#{$variant}-1 { border-radius: $border-radius !important; }
+    /* Add a 2x border-radius to all corners */
+    .rounded#{$variant}-2 { border-radius: $border-radius * 2 !important; }
+
+    @each $edge, $corners in $edges {
+      .rounded#{$variant}-#{$edge}-0 {
+        @each $corner in $corners {
+          border-#{$corner}-radius: 0 !important;
+        }
+      }
+
+      .rounded#{$variant}-#{$edge}-1 {
+        @each $corner in $corners {
+          border-#{$corner}-radius: $border-radius !important;
+        }
+      }
+
+      .rounded#{$variant}-#{$edge}-2 {
+        @each $corner in $corners {
+          border-#{$corner}-radius: $border-radius * 2 !important;
+        }
+      }
+    }
+  }
+}
+
+/* Add a 50% border-radius to make something into a circle */
+.circle { border-radius: 50% !important; }
+
+/* Change the border style to dashed, in conjunction with another utility */
+.border-dashed {
+  border-style: dashed !important;
+}
+
+/* Use with .border to turn the border blue */
+.border-blue        { border-color: $border-blue !important; }
+/* Use with .border to turn the border blue-light */
+.border-blue-light  { border-color: $border-blue-light !important; }
+/* Use with .border to turn the border green */
+.border-green       { border-color: $border-green !important; }
+/* Use with .border to turn the border green light */
+.border-green-light { border-color: $border-green-light !important; }
+/* Use with .border to turn the border red */
+.border-red         { border-color: $border-red !important; }
+/* Use with .border to turn the border red-light */
+.border-red-light   { border-color: $border-red-light !important; }
+/* Use with .border to turn the border purple */
+.border-purple      { border-color: $border-purple !important; }
+/* Use with .border to turn the border yellow */
+.border-yellow      { border-color: $border-yellow !important; }
+/* Use with .border to turn the border gray-light */
+.border-gray-light  { border-color: $border-gray-light !important; }
+/* Use with .border to turn the border gray-dark */
+.border-gray-dark   { border-color: $border-gray-dark !important; }
+
+/* Use with .border to turn the border rgba black 0.15 */
+.border-black-fade  { border-color: $border-black-fade !important; }
+/* Use with .border to turn the border rgba white 0.15 */
+.border-white-fade  { border-color: $border-white-fade !important; }
+
+/* Use with .border to turn the border white w/varying transparency */
+.border-white-fade-15 { border-color: $white-fade-15 !important; }
+.border-white-fade-30 { border-color: $white-fade-30 !important; }
+.border-white-fade-50 { border-color: $white-fade-50 !important; }
+.border-white-fade-70 { border-color: $white-fade-70 !important; }
+.border-white-fade-85 { border-color: $white-fade-85 !important; }

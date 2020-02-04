@@ -1,0 +1,180 @@
+.Popover {
+  position: absolute;
+  z-index: 100;
+}
+
+.Popover-message {
+  position: relative;
+  width: 232px;
+  margin-right: auto;
+  margin-left: auto;
+
+  // Carets
+  &::before,
+  &::after {
+    position: absolute;
+    left: 50%;
+    display: inline-block;
+    content: "";
+  }
+
+  &::before {
+    top: -$spacer-3;
+    margin-left: -9px;
+    border: $spacer-2 $border-style transparent;
+    border-bottom-color: $border-black-fade;
+  }
+
+  &::after {
+    top: -14px;
+    margin-left: -$spacer-2;
+    border: 7px $border-style transparent;
+    border-bottom-color: $bg-white;
+  }
+}
+
+// Bottom-oriented carets
+.Popover-message--bottom,
+.Popover-message--bottom-right,
+.Popover-message--bottom-left {
+  &::before,
+  &::after {
+    top: auto;
+    border-bottom-color: transparent;
+  }
+
+  &::before {
+    bottom: -$spacer-3;
+    border-top-color: $border-black-fade;
+  }
+
+  &::after {
+    bottom: -14px;
+    border-top-color: $bg-white;
+  }
+}
+
+// Top & Bottom: Right-oriented carets
+.Popover-message--top-right,
+.Popover-message--bottom-right {
+  right: -9px;
+  margin-right: 0;
+
+  &::before,
+  &::after {
+    left: auto;
+    margin-left: 0;
+  }
+
+  &::before {
+    right: 20px;
+  }
+
+  &::after {
+    right: 21px;
+  }
+}
+
+// Top & Bottom: Left-oriented carets
+.Popover-message--top-left,
+.Popover-message--bottom-left {
+  left: -9px;
+  margin-left: 0;
+
+  &::before,
+  &::after {
+    left: $spacer-4;
+    margin-left: 0;
+  }
+
+  &::after {
+    left: $spacer-4 + 1;
+  }
+}
+
+// Right- & Left-oriented carets
+.Popover-message--right,
+.Popover-message--right-top,
+.Popover-message--right-bottom,
+.Popover-message--left,
+.Popover-message--left-top,
+.Popover-message--left-bottom {
+  &::before,
+  &::after {
+    top: 50%;
+    left: auto;
+    margin-left: 0;
+    border-bottom-color: transparent;
+  }
+
+  &::before {
+    margin-top: -($spacer-2 + 1);
+  }
+
+  &::after {
+    margin-top: -$spacer-2;
+  }
+}
+
+// Right-oriented carets
+.Popover-message--right,
+.Popover-message--right-top,
+.Popover-message--right-bottom {
+  &::before {
+    right: -$spacer-3;
+    border-left-color: $border-black-fade;
+  }
+
+  &::after {
+    right: -14px;
+    border-left-color: $bg-white;
+  }
+}
+
+// Left-oriented carets
+.Popover-message--left,
+.Popover-message--left-top,
+.Popover-message--left-bottom {
+  &::before {
+    left: -$spacer-3;
+    border-right-color: $border-black-fade;
+  }
+
+  &::after {
+    left: -14px;
+    border-right-color: $bg-white;
+  }
+}
+
+// Right & Left: Top-oriented carets
+.Popover-message--right-top,
+.Popover-message--left-top {
+  &::before,
+  &::after {
+    top: $spacer-4;
+  }
+}
+
+// Right & Left: Bottom-oriented carets
+.Popover-message--right-bottom,
+.Popover-message--left-bottom {
+  &::before,
+  &::after {
+    top: auto;
+  }
+
+  &::before {
+    bottom: $spacer-3;
+  }
+
+  &::after {
+    bottom: $spacer-3 + 1;
+  }
+}
+
+.Popover-message--large {
+
+  @include breakpoint(sm) {
+    min-width: 320px;
+  }
+}

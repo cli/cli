@@ -1,0 +1,74 @@
+// Needs refactoring
+// stylelint-disable selector-max-type
+.pagination {
+  @include clearfix;
+
+  a,
+  span,
+  em {
+    position: relative;
+    float: left;
+    padding: 7px 12px;
+    margin-left: -1px;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: $font-weight-bold;
+    color: $text-blue;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    user-select: none;
+    background: $bg-white; // Reset default gradient backgrounds and colors
+    border: $border-width $border-style $border-gray;
+
+    &:first-child {
+      margin-left: 0;
+      border-top-left-radius: $border-radius;
+      border-bottom-left-radius: $border-radius;
+    }
+
+    &:last-child {
+      border-top-right-radius: $border-radius;
+      border-bottom-right-radius: $border-radius;
+    }
+
+    // Bring any button into forefront for proper borders given negative margin below
+    &:hover,
+    &:focus {
+      z-index: 2;
+      text-decoration: none;
+      background-color: darken($gray-100, 2%);
+      border-color: $border-gray;
+    }
+  }
+
+  .selected { z-index: 3; }
+
+  .current,
+  .current:hover {
+    z-index: 3;
+    color: $text-white;
+    background-color: $bg-blue;
+    border-color: $border-blue;
+  }
+
+  .gap,
+  .disabled,
+  .gap:hover,
+  .disabled:hover {
+    color: $gray-300;
+    cursor: default;
+    background-color: $bg-gray-light;
+  }
+}
+
+// Unified centered pagination across the site
+.paginate-container {
+  margin-top: 20px;
+  margin-bottom: 15px;
+  text-align: center;
+
+  .pagination {
+    display: inline-block;
+  }
+}

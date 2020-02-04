@@ -1,0 +1,64 @@
+// stylelint-disable selector-max-type
+.blankslate {
+  position: relative;
+  padding: $spacer-5;
+  text-align: center;
+
+  code {
+    padding: 2px 5px 3px;
+    font-size: $h5-size;
+    background: $bg-white;
+    border: 1px solid $border-gray-light;
+    border-radius: 3px;
+  }
+
+  img {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+.blankslate-icon {
+  margin-right: $spacer-1;
+  margin-bottom: $spacer-2;
+  margin-left: $spacer-1;
+  color: lighten($gray-400, 5%);
+}
+
+.blankslate-capped {
+  border-radius: 0 0 3px 3px;
+}
+
+.blankslate-spacious {
+  padding: ($spacer-6 * 2) $spacer-6;
+}
+
+.blankslate-narrow {
+  max-width: 485px;
+  margin: 0 auto;
+}
+
+// was .large-format
+// QUESTION: should we deprecate this?
+.blankslate-large {
+  img {
+    width: 80px;
+    height: 80px;
+  }
+
+  h3 {
+    margin: $spacer-3 0;
+    //font-size: $h3-size; // This doesn't actually make the text larger. Should this be $h2-size?
+    font-size: $h2-size;
+  }
+
+  p {
+    font-size: $h4-size;
+  }
+}
+
+// was .clean-background
+// TO DO: deprecate this and use utility instead
+.blankslate-clean-background {
+  border: 0;
+}

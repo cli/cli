@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "plugin:github/es6",
+    "plugin:github/recommended"
+  ],
+  "env": {
+    "es6": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2017
+  }
+}

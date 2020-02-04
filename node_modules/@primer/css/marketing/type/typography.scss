@@ -1,0 +1,103 @@
+// Headings
+
+.h000-mktg,
+.h00-mktg,
+.h0-mktg,
+.h1-mktg,
+.h2-mktg,
+.h3-mktg,
+.h4-mktg,
+.h5-mktg,
+.h6-mktg,
+.lead-mktg {
+  font-family: $font-mktg;
+  font-weight: $font-weight-semibold;
+}
+
+@mixin h000-mktg {
+  font-size: $h000-size-mobile !important;
+  @include breakpoint(md) { font-size: $h000-size !important; }
+}
+
+.h000-mktg { @include h000-mktg; }
+
+@mixin h00-mktg {
+  font-size: $h00-size-mobile !important;
+  @include breakpoint(md) { font-size: $h00-size !important; }
+}
+
+.h00-mktg { @include h00-mktg; }
+
+@mixin h0-mktg {
+  font-size: $h0-size-mobile !important;
+  @include breakpoint(md) { font-size: $h0-size !important; }
+}
+
+.h0-mktg { @include h0-mktg; }
+
+@mixin h1-mktg {
+  font-size: $h1-size-mobile !important;
+  @include breakpoint(md) { font-size: $h1-size !important; }
+}
+
+.h1-mktg { @include h1-mktg; }
+
+@mixin h2-mktg {
+  font-size: $h2-size-mobile !important;
+  @include breakpoint(md) { font-size: $h2-size !important; }
+}
+
+.h2-mktg { @include h2-mktg; }
+
+@mixin h3-mktg {
+  font-size: $h3-size-mobile !important;
+  @include breakpoint(md) { font-size: $h3-size !important; }
+}
+
+.h3-mktg { @include h3-mktg; }
+
+.h4-mktg {
+  font-size: $h4-size !important;
+}
+
+.h5-mktg {
+  font-size: $h5-size !important;
+}
+
+.h6-mktg {
+  font-size: $h6-size !important;
+}
+
+// Big opening paragraphs
+@mixin lead-mktg {
+  font-size: $h3-size;
+  font-weight: $font-weight-normal;
+}
+
+.lead-mktg { @include lead-mktg; }
+
+// Pullquote
+
+@mixin pullquote {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: $spacer;
+  margin-bottom: $spacer-4;
+  font-family: $mono-font;
+  font-size: $h4-size;
+  line-height: 1.4;
+  color: $text-gray;
+  border-left: 3px solid $border-color;
+
+  @include breakpoint(md) {
+    padding-left: $spacer * 1.5;
+    margin-bottom: $spacer-5;
+    margin-left: (-$spacer * 1.5) - 3px;
+    font-size: 18px;
+    line-height: $lh-default;
+  }
+}
+
+.pullquote {
+  @include pullquote;
+}

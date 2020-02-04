@@ -1,0 +1,135 @@
+// Stacked avatars can be used to show who is participating in thread when
+// there is limited space available.
+
+.AvatarStack {
+  position: relative;
+  min-width: 26px;
+  height: 20px;
+
+  .AvatarStack-body {
+    position: absolute;
+  }
+
+  &.AvatarStack--two {
+    min-width: 36px;
+  }
+
+  &.AvatarStack--three-plus {
+    min-width: 46px;
+  }
+}
+
+.AvatarStack-body {
+  display: flex;
+  background: $bg-white;
+
+  .avatar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    width: 20px;
+    height: 20px;
+    box-sizing: content-box;
+    margin-right: -11px;
+    background-color: $bg-white;
+    border-right: $border-width $border-style $white;
+    border-radius: 2px;
+    transition: margin 0.1s ease-in-out;
+
+    &:first-child {
+      z-index: 3;
+    }
+
+    &:last-child {
+      z-index: 1;
+      border-right: 0;
+    }
+
+    // stylelint-disable selector-max-type
+    img {
+      border-radius: 2px;
+    }
+    // stylelint-enable selector-max-type
+
+    // Account for 4+ avatars
+    &:nth-child(n+4) {
+      display: none;
+      opacity: 0;
+    }
+  }
+
+  &:hover {
+    .avatar {
+      margin-right: 3px;
+    }
+
+    .avatar:nth-child(n+4) {
+      display: flex;
+      opacity: 1;
+    }
+
+    .avatar-more {
+      display: none !important;
+    }
+  }
+}
+
+.avatar.avatar-more {
+  z-index: 1;
+  margin-right: 0;
+  background: $gray-100;
+
+  &::before,
+  &::after {
+    position: absolute;
+    display: block;
+    height: 20px;
+    content: "";
+    border-radius: 2px;
+    outline: $border-width $border-style $white;
+  }
+
+  &::before {
+    width: 17px;
+    background: $gray-200;
+  }
+
+  &::after {
+    width: 14px;
+    background: $gray-300;
+  }
+}
+
+// Right aligned variation
+
+.AvatarStack--right {
+  .AvatarStack-body {
+    right: 0;
+    flex-direction: row-reverse;
+
+    &:hover .avatar {
+      margin-right: 0;
+      margin-left: 3px;
+    }
+  }
+
+  .avatar.avatar-more {
+    background: $gray-300;
+
+    &::before {
+      width: 5px;
+    }
+
+    &::after {
+      width: 2px;
+      background: $gray-100;
+    }
+  }
+
+  .avatar {
+    margin-right: 0;
+    margin-left: -11px;
+    border-right: 0;
+    border-left: $border-width $border-style $white;
+  }
+}

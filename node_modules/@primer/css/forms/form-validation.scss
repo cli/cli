@@ -1,0 +1,341 @@
+// Needs refactoring
+// stylelint-disable selector-no-qualifying-type, selector-max-type
+dl.form-group > dd {
+  .form-control {
+    &.is-autocheck-loading,
+    &.is-autocheck-successful,
+    &.is-autocheck-errored {
+      padding-right: 30px; // Leave some space for our validation icons
+    }
+
+    &.is-autocheck-loading {
+      background-image: url("/images/spinners/octocat-spinner-16px.gif");
+    }
+
+    &.is-autocheck-successful {
+      background-image: url("/images/modules/ajax/success.png");
+    }
+
+    &.is-autocheck-errored {
+      background-image: url("/images/modules/ajax/error.png");
+    }
+  }
+}
+
+// Retinization of form validation icons that aren't octicons yet
+@include retina-media-query {
+  dl.form-group > dd {
+    .form-control {
+      &.is-autocheck-loading,
+      &.is-autocheck-successful,
+      &.is-autocheck-errored {
+        background-size: 16px 16px;
+      }
+
+      &.is-autocheck-loading {
+        background-image: url("/images/spinners/octocat-spinner-32.gif");
+      }
+
+      &.is-autocheck-successful {
+        background-image: url("/images/modules/ajax/success@2x.png");
+      }
+
+      &.is-autocheck-errored {
+        background-image: url("/images/modules/ajax/error@2x.png");
+      }
+    }
+  }
+}
+
+// Inline verification
+// This overrides primer's inline form stuff
+.status-indicator {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: 5px;
+
+  .octicon {
+    display: none;
+  }
+}
+
+.status-indicator-success {
+  // Override primer
+  &::before {
+    content: "";
+  }
+
+  .octicon-check {
+    display: inline-block;
+    color: $green;
+    fill: $green;
+  }
+
+  .octicon-x {
+    display: none;
+  }
+}
+
+.status-indicator-failed {
+  // Override primer
+  &::before {
+    content: "";
+  }
+
+  .octicon-check {
+    display: none;
+  }
+
+  .octicon-x {
+    display: inline-block;
+    color: $text-red;
+    fill: $red;
+  }
+}
+
+.status-indicator-loading {
+  width: 16px;
+  background: url("/images/spinners/octocat-spinner-32-EAF2F5.gif") 0 0 no-repeat;
+  background-size: 16px;
+}
+
+.inline-form {
+  display: inline-block;
+
+  .btn-plain {
+    background-color: transparent;
+    border: 0;
+  }
+}
+
+// Drag and drop
+//
+// Previously part of `_forms.scss` in Primer. Needs accounting for.
+
+.drag-and-drop {
+  padding: 7px 10px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  color: $text-gray;
+  background-color: $gray-000;
+  border: 1px solid darken($gray-300, 5%);
+  border-top: 0;
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+
+  .default,
+  .loading,
+  .error {
+    display: none;
+  }
+
+  .error {
+    color: $text-red;
+  }
+
+  // Spinner
+  img {
+    vertical-align: top;
+  }
+}
+
+.is-default .drag-and-drop .default {
+  display: inline-block;
+}
+
+.is-uploading .drag-and-drop .loading {
+  display: inline-block;
+}
+
+.is-bad-file .drag-and-drop .bad-file {
+  display: inline-block;
+}
+
+.is-duplicate-filename .drag-and-drop .duplicate-filename {
+  display: inline-block;
+}
+
+.is-too-big .drag-and-drop .too-big {
+  display: inline-block;
+}
+
+.is-hidden-file .drag-and-drop .hidden-file {
+  display: inline-block;
+}
+
+.is-empty .drag-and-drop .empty {
+  display: inline-block;
+}
+
+.is-bad-permissions .drag-and-drop .bad-permissions {
+  display: inline-block;
+}
+
+.is-repository-required .drag-and-drop .repository-required {
+  display: inline-block;
+}
+
+.drag-and-drop-error-info {
+  font-weight: $font-weight-normal;
+  color: $text-gray;
+
+  a {
+    color: $text-blue;
+  }
+}
+
+.is-failed .drag-and-drop .failed-request {
+  display: inline-block;
+}
+
+.manual-file-chooser {
+  position: absolute;
+  width: 240px;
+  padding: 5px;
+  margin-left: -80px;
+  cursor: pointer;
+  opacity: 0.0001;
+}
+
+.manual-file-chooser:hover + .manual-file-chooser-text {
+  text-decoration: underline;
+}
+
+.btn {
+  // align manual-file-chooser inside a button
+  .manual-file-chooser {
+    top: 0;
+    padding: 0;
+    line-height: 34px;
+  }
+}
+
+// Focused Textarea styles
+.upload-enabled {
+  textarea {
+    display: block;
+    border-bottom: 1px dashed lighten($gray-300, 5%);
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  &.focused {
+    border-radius: 3px;
+    box-shadow: $form-control-shadow, $btn-input-focus-shadow;
+
+    .form-control {
+      box-shadow: none;
+    }
+
+    .drag-and-drop {
+      border-color: lighten($blue-400, 8%);
+    }
+  }
+}
+
+// Dropping a file on top
+.dragover textarea,
+.dragover .drag-and-drop {
+  box-shadow: rgba(#c9ff00, 1) 0 0 3px;
+}
+
+.write-content {
+  position: relative;
+}
+
+// Form style with a write and a preview tab
+.previewable-comment-form {
+  position: relative;
+
+  .tabnav {
+    position: relative;
+    padding: $spacer-2 $spacer-2 0;
+  }
+
+  .comment {
+    border: 1px solid darken($gray-300, 5%);
+  }
+
+  .comment-form-error { margin-bottom: $spacer-2; }
+
+  .write-content,
+  .preview-content {
+    display: none;
+    margin: 0 $spacer-2 $spacer-2;
+  }
+
+  &.write-selected .write-content,
+  &.preview-selected .preview-content {
+    display: block;
+  }
+
+  textarea {
+    display: block;
+    width: 100%;
+    min-height: 100px;
+    max-height: 500px;
+    padding: $spacer-2;
+    resize: vertical;
+  }
+}
+
+// Used in our boxed-group-less form styles. Give the sumbit button enough space
+// to breathe without the need for the extra hr.
+.form-action-spacious {
+  margin-top: 10px;
+}
+
+// A two column form, with a .main and a .sidebar column
+//
+// Override some `.timeline-comment-wrapper` defaults.
+// The `div` is needed to be more specific than the other class.
+div.composer {
+  margin-top: 0;
+  border: 0;
+}
+
+// Override the previewable comment form defaults
+.composer .comment-form-textarea {
+  height: 200px;
+  min-height: 200px;
+}
+
+.composer .tabnav { margin: 0 0 10px; }
+
+// Misc CSS
+//
+// Previously part of `_forms.scss` in Primer. Needs accounting for.
+
+h2.account {
+  margin: 15px 0 0;
+  font-size: 18px;
+  font-weight: $font-weight-normal;
+  color: $gray-600;
+}
+
+p.explain {
+  position: relative;
+  font-size: $font-size-small;
+  color: $gray-600;
+
+  strong {
+    color: $text-gray-dark;
+  }
+
+  .octicon {
+    margin-right: 5px;
+    color: $gray-400;
+  }
+
+  .minibutton {
+    top: -4px;
+    float: right;
+  }
+}
+
+// fix for chrome bug, see https://github.com/github/github/issues/53931
+.form-group label {
+  position: static;
+}

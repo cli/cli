@@ -1,0 +1,20 @@
+// TableObject is a module for creating dynamically resizable elements that
+// always sit on the same horizontal line (e.g., they never wrap). Using
+// tables means it's cross browser friendly.
+
+.TableObject {
+  display: table;
+}
+
+// Place this on every "cell"
+.TableObject-item {
+  display: table-cell;
+  width: 1%;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+// Place this on the largest or most important "cell"
+.TableObject-item--primary {
+  width: 99%;
+}

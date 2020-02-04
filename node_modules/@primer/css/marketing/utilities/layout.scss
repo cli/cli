@@ -1,0 +1,29 @@
+// Layout utilities
+// stylelint-disable block-opening-brace-space-before, primer/selector-no-utility, comment-empty-line-before
+
+// Responsive utilities to position content
+// No utilities for sm and xl breakpoints
+@each $breakpoint, $variant in $marketing-position-variants {
+  @include breakpoint($breakpoint) {
+    @each $scale, $size in $marketing-all-spacers {
+      .top#{$variant}-#{$scale}     { top: $size !important; }
+      .right#{$variant}-#{$scale}   { right: $size !important; }
+      .bottom#{$variant}-#{$scale}  { bottom: $size !important; }
+      .left#{$variant}-#{$scale}    { left: $size !important; }
+
+      .top#{$variant}-n#{$scale}     { top: -$size !important; }
+      .right#{$variant}-n#{$scale}   { right: -$size !important; }
+      .bottom#{$variant}-n#{$scale}  { bottom: -$size !important; }
+      .left#{$variant}-n#{$scale}    { left: -$size !important; }
+    }
+  }
+}
+
+// Negative offset columns
+@each $breakpoint, $variant in $responsive-variants {
+  @include breakpoint($breakpoint) {
+    @for $offset from 1 through 7 {
+      .offset#{$variant}-n#{$offset} { margin-left: -($offset / 12 * 100%); }
+    }
+  }
+}

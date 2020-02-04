@@ -1,0 +1,213 @@
+// stylelint-disable selector-max-type, block-opening-brace-space-before, no-duplicate-selectors
+
+// Base button styles
+.btn {
+  position: relative;
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: $body-font-size;
+  font-weight: $font-weight-bold;
+  line-height: 20px; // Specifically not inherit our `<body>` default
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  background-repeat: repeat-x;
+  background-position: -1px -1px;
+  background-size: 110% 110%;
+  border: 1px solid transparentize($black, 0.8);
+  border-radius: 0.25em;
+  appearance: none; // Corrects inability to style clickable `input` types in iOS.
+
+  i {
+    font-style: normal;
+    font-weight: $font-weight-semibold;
+    opacity: 0.75;
+  }
+
+  .octicon {
+    vertical-align: text-top;
+  }
+
+  // Darken for just a tad more contrast against the button background
+  .Counter {
+    color: $gray-600;
+    text-shadow: none;
+    background-color: rgba($black, 0.1);
+  }
+
+  &:hover {
+    text-decoration: none;
+    background-repeat: repeat-x;
+  }
+
+  &:focus {
+    outline: 0;
+  }
+
+  &:disabled,
+  &.disabled {
+    cursor: default;
+    // Repeat `background-position` because `:hover`
+    background-position: 0 0;
+  }
+
+  &:active,
+  &.selected {
+    background-image: none;
+  }
+}
+
+.btn         { @include btn-solid($text-gray-dark, $gray-000, darken($gray-100, 2%)); }
+.btn-primary { @include btn-solid($text-white, $green-400, $green-500); }
+@warn ".btn-purple will be removed in 13.0.0. Please don't make buttons purple.";
+.btn-purple  { @include btn-solid($text-white, lighten($purple-500, 5%), darken($purple-500, 5%)); }
+.btn-blue    { @include btn-solid($text-white, lighten($blue-500, 8%), darken($blue-500, 2%)); }
+.btn-danger  { @include btn-inverse($red-600, $gray-000, darken($gray-100, 2%)); }
+
+// Outline button
+//
+// For when we need a linky-action that's not too heavy in busier
+// areas like conversation timelines.
+.btn-outline {
+  @include btn-outline($text-blue);
+}
+
+// Social button count
+.btn-with-count {
+  float: left;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+// Minibutton overrides
+//
+// Tweak `line-height` to make them smaller.
+.btn-sm {
+  padding: 3px 10px;
+  font-size: $font-size-small;
+  line-height: 20px;
+}
+
+// Large button adds more padding around text. Use font-size utils to increase font-size.. e.g, <p class="text-gamma"><button class="btn btn-large btn-primary" type="button">Big green button</button></p>
+.btn-large {
+  padding: $em-spacer-6 1.25em;
+  font-size: inherit;
+  border-radius: 6px;
+}
+
+// Hidden text button
+//
+// Use `.hidden-text-expander` to indicate and expand hidden text.
+.hidden-text-expander {
+  display: block;
+
+  &.inline {
+    position: relative;
+    top: -1px;
+    display: inline-block;
+    margin-left: 5px;
+    line-height: 0;
+  }
+}
+
+.hidden-text-expander a,
+.ellipsis-expander {
+  display: inline-block;
+  height: 12px;
+  padding: 0 5px 5px;
+  font-size: $font-size-small;
+  font-weight: $font-weight-bold;
+  line-height: 6px;
+  color: $gray-700;
+  text-decoration: none;
+  vertical-align: middle;
+  background: lighten($gray-300, 5%);
+  border: 0;
+  border-radius: 1px;
+
+  &:hover {
+    text-decoration: none;
+    background-color: darken($gray-300, 4%);
+  }
+
+  &:active {
+    color: $text-white;
+    background-color: $blue-400;
+  }
+}
+
+// Social count bubble
+//
+// A container that is used for social bubbles counts.
+.social-count {
+  float: left;
+  padding: 3px 10px;
+  font-size: $font-size-small;
+  font-weight: $font-weight-bold;
+  line-height: 20px;
+  color: $text-gray-dark;
+  vertical-align: middle;
+  background-color: $bg-white;
+  border: 1px solid transparentize($black, 0.8); // match with .btn
+  border-left: 0;
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+
+  &:hover,
+  &:active {
+    text-decoration: none;
+  }
+
+  &:hover {
+    color: $text-blue;
+    cursor: pointer;
+  }
+}
+
+// Full-width button
+//
+// These buttons expand to the full width of their parent container
+.btn-block {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+// Link-like buttons
+//
+// This class is for styling <button> and <input> elements to look like links
+.btn-link {
+  display: inline-block;
+  padding: 0;
+  font-size: inherit;
+  color: $text-blue;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  background-color: transparent;
+  border: 0;
+  appearance: none; // Corrects inability to style clickable `input` types in iOS.
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    &,
+    &:hover {
+      color: rgba($gray-600, 0.5);
+      cursor: default;
+    }
+  }
+}
+
+.details-reset {
+  // Remove marker added by the display: list-item browser default
+  > summary { list-style: none; }
+  // Remove marker added by details polyfill
+  > summary::before { display: none; }
+  // Remove marker added by Chrome
+  > summary::-webkit-details-marker { display: none; }
+}

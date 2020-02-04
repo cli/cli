@@ -1,0 +1,108 @@
+// Side Nav
+//
+// A vertical list of navigational links, typically used on the left side of a page.
+
+.SideNav {
+  background-color: $bg-gray-light;
+}
+
+.SideNav-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: $spacer-3;
+  color: $text-gray;
+  text-align: left;
+  background-color: transparent;
+  border: 0;
+  border-top: $border;
+
+  &:first-child {
+    border-top: 0;
+  }
+
+  &:last-child {
+    // makes sure there is a "bottom border" in case the list is not long enough
+    box-shadow: 0 $border-width 0 $border-color;
+  }
+
+  // Bar on the left
+  &::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 3px;
+    pointer-events: none;
+    content: "";
+  }
+}
+
+// States
+
+.SideNav-item:hover,
+.SideNav-item:focus {
+  color: $text-gray-dark;
+  text-decoration: none;
+  background-color: $gray-100;
+  outline: none;
+
+  // Bar on the left
+  &::before {
+    background-color: $gray-300;
+  }
+}
+
+.SideNav-item:active {
+  background-color: $bg-white;
+}
+
+.SideNav-item[aria-current="page"],
+.SideNav-item[aria-selected="true"] {
+  font-weight: $font-weight-semibold;
+  color: $text-gray-dark;
+  background-color: $bg-white;
+
+  // Bar on the left
+  &::before {
+    background-color: $orange-600;
+  }
+}
+
+// Icon
+//
+// Makes sure multiple icons are vertically aligned
+
+.SideNav-icon {
+  width: 16px;
+  color: $text-gray-light;
+}
+
+// Sub Nav
+//
+// A more lightweight version, suited as a sub nav
+
+.SideNav-subItem {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: $spacer-1 0;
+  color: $blue-500;
+  text-align: left;
+  background-color: transparent;
+  border: 0;
+}
+
+.SideNav-subItem:hover,
+.SideNav-subItem:focus {
+  color: $text-gray-dark;
+  text-decoration: none;
+  outline: none;
+}
+
+.SideNav-subItem[aria-current="page"],
+.SideNav-subItem[aria-selected="true"] {
+  font-weight: $font-weight-semibold;
+  color: $text-gray-dark;
+}

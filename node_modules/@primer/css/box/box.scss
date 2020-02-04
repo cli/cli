@@ -1,0 +1,284 @@
+// Box
+// Intended to replace simple-box, boxed-group, and table-list
+
+.Box {
+  background-color: $white;
+  border: $border-width $border-style $border-gray-dark;
+  border-radius: $border-radius;
+}
+
+// Box padding density options
+.Box--condensed {
+  line-height: $lh-condensed;
+
+  .Box-header {
+    padding: $spacer-2 $spacer-3;
+  }
+
+  .Box-body {
+    padding: $spacer-2 $spacer-3;
+  }
+
+  .Box-footer {
+    padding: $spacer-2 $spacer-3;
+  }
+
+  .Box-btn-octicon {
+    &.btn-octicon {
+      padding: $spacer-2 $spacer-3;
+      margin: (-$spacer-2) (-$spacer-3);
+      line-height: $lh-condensed;
+    }
+  }
+
+  .Box-row {
+    padding: $spacer-2 $spacer-3;
+  }
+
+}
+
+.Box--spacious {
+  .Box-header {
+    padding: $spacer-4;
+    line-height: $lh-condensed;
+  }
+
+  .Box-title {
+    font-size: $h3-size;
+  }
+
+  .Box-body {
+    padding: $spacer-4;
+  }
+
+  .Box-footer {
+    padding: $spacer-4;
+  }
+
+  .Box-btn-octicon {
+    &.btn-octicon {
+      padding: $spacer-4;
+      margin: (-$spacer-4) (-$spacer-4);
+    }
+  }
+
+  .Box-row {
+    padding: $spacer-4;
+  }
+
+}
+
+.Box-header {
+  padding: $spacer-3;
+  margin: (-$border-width) (-$border-width) 0;
+  background-color: $bg-gray;
+  border-color: $border-gray-dark;
+  border-style: $border-style;
+  border-width: $border-width;
+  border-top-left-radius: $border-radius;
+  border-top-right-radius: $border-radius;
+}
+
+.Box-title {
+  font-size: $body-font-size;
+  font-weight: $font-weight-bold;
+}
+
+.Box-body {
+  padding: $spacer-3;
+  border-bottom: $border-width $border-style $border-gray;
+
+  // Ensures bottom-border doesn't poke out when .Box-body used without box-footer
+  &:last-of-type {
+    margin-bottom: -$border-width;
+    border-bottom-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+  }
+}
+
+// Box rows
+.Box-row {
+  padding: $spacer-3;
+  margin-top: -1px;
+  list-style-type: none; // To account for applying Box component to a list
+  border-top: $border-width $border-style $border-gray;
+
+  &:first-of-type {
+    border-top-color: transparent;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+  }
+
+  &:last-of-type {
+    border-bottom-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+  }
+
+  // Adds a blue vertical line to the left of the row
+  // For indicating a row item is unread
+  &.Box-row--unread,
+  // .unread to be deprecated with .Box-row-unread
+  &.unread {
+    box-shadow: 2px 0 0 $blue inset;
+  }
+
+  &.navigation-focus {
+    // Focus styles for when drag icon
+    .Box-row--drag-button {
+      color: $text-blue;
+      cursor: grab;
+      opacity: 100;
+    }
+
+    // Grabbing while row is dragged
+    &.is-dragging .Box-row--drag-button {
+      cursor: grabbing;
+    }
+
+    // Row dragging styles
+    &.sortable-chosen {
+      background-color: $bg-gray-light;
+    }
+
+    // Makes dragging row background gray
+    &.sortable-ghost {
+      background-color: $bg-gray;
+
+      // Hides contents of row while dragging so row looks solid gray
+      .Box-row--drag-hide {
+        opacity: 0;
+      }
+    }
+
+  }
+}
+
+.Box-row--focus-gray {
+  &.navigation-focus {
+    background-color: $bg-gray;
+  }
+}
+
+.Box-row--focus-blue {
+  &.navigation-focus {
+    background-color: $bg-blue-light;
+  }
+}
+
+.Box-row--hover-gray {
+  &:hover {
+    background-color: $bg-gray;
+  }
+}
+
+.Box-row--hover-blue {
+  &:hover {
+    background-color: $bg-blue-light;
+  }
+}
+
+// Optional link style
+// Makes links on mobile blue since they don't have hover state,
+// and links are dark-gray with blue hover on desktop.
+.Box-row-link {
+  @include breakpoint(md) {
+
+    color: $text-gray-dark;
+    text-decoration: none;
+
+    &:hover {
+      color: $text-blue;
+      text-decoration: none;
+    }
+
+  }
+}
+
+// Optional drag icon styles for reordering items
+// Focus styles included in .Box-row above
+.Box-row--drag-button {
+  opacity: 0;
+}
+
+.Box-footer {
+  padding: $spacer-3;
+  margin-top: -1px; // prevents double border when used with .Box-body
+  border-top: $border-width $border-style $border-gray;
+}
+
+// Option for a box with scrolling content
+.Box--scrollable {
+  max-height: 324px;
+  overflow: scroll;
+}
+
+// Box themes
+
+.Box--blue {
+  border-color: $border-blue-light;
+
+  .Box-header {
+    background-color: $bg-blue-light;
+    border-color: $border-blue-light;
+  }
+
+  .Box-body {
+    border-color: $border-blue-light;
+  }
+
+  .Box-row {
+    border-color: $border-blue-light;
+  }
+
+  .Box-footer {
+    border-color: $border-blue-light;
+  }
+}
+
+// Applies and red border to the outside of the box,
+// but not to the border separating rows.
+.Box--danger {
+  border-color: $border-red;
+
+  .Box-row {
+    &:first-of-type {
+      border-color: $border-red;
+    }
+  }
+
+  .Box-body {
+    &:last-of-type {
+      border-color: $border-red;
+    }
+  }
+}
+
+.Box-header--blue {
+  background-color: $bg-blue-light;
+  border-color: $border-blue-light;
+}
+
+// Box row highlight themes
+
+.Box-row--yellow {
+  background-color: $yellow-100;
+}
+
+.Box-row--blue {
+  background-color: $bg-blue-light;
+}
+
+.Box-row--gray {
+  background-color: $bg-gray;
+}
+
+//Box with btn-octicon
+.Box-btn-octicon {
+
+  // Increase specificity when btn-octicon is used because comes after .Box in the cascade
+  &.btn-octicon {
+    padding: $spacer-3 $spacer-3;
+    margin: (-$spacer-3) (-$spacer-3);
+    line-height: $lh-default; // override btn-octicon line-height
+  }
+}

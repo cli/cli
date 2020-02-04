@@ -1,0 +1,112 @@
+// Side menu
+//
+// A menu on the side of a page, defaults to left side. e.g. github.com/about
+
+.menu {
+  margin-bottom: 15px;
+  list-style: none;
+  background-color: $bg-white;
+  border: 1px solid $gray-300;
+  border-radius: 3px;
+}
+
+.menu-item {
+  position: relative;
+  display: block;
+  padding: $spacer-2 10px;
+  border-bottom: 1px solid $gray-200;
+
+  &:first-child {
+    border-top: 0;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+
+    &::before { border-top-left-radius: 2px; }
+  }
+
+  &:last-child {
+    border-bottom: 0;
+    border-bottom-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+
+    &::before { border-bottom-left-radius: 2px; }
+  }
+
+  &:hover {
+    text-decoration: none;
+    background-color: $gray-100;
+  }
+
+  &.selected {
+    font-weight: $font-weight-bold;
+    color: $text-gray-dark;
+    cursor: default;
+    background-color: $bg-white;
+
+    &::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 2px;
+      content: "";
+      background-color: $orange-600;
+    }
+  }
+
+  .octicon {
+    width: 16px;
+    margin-right: 5px;
+    color: $text-gray-dark;
+    text-align: center;
+  }
+
+  .Counter {
+    float: right;
+    margin-left: 5px;
+  }
+
+  .menu-warning {
+    float: right;
+    color: $red-900;
+  }
+
+  .avatar {
+    float: left;
+    margin-right: 5px;
+  }
+
+  &.alert {
+    .Counter {
+      color: $text-red;
+    }
+  }
+}
+
+.menu-heading {
+  display: block;
+  padding: $spacer-2 10px;
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 13px;
+  font-weight: $font-weight-bold;
+  line-height: 20px;
+  color: $gray-600;
+  background-color: darken($gray-100, 1%);
+  border-bottom: 1px solid $gray-200;
+
+  &:hover {
+    text-decoration: none;
+  }
+
+  &:first-child {
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+  }
+
+  &:last-child {
+    border-bottom: 0;
+    border-bottom-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+  }
+}

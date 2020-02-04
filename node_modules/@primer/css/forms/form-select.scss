@@ -1,0 +1,34 @@
+// Custom select
+//
+// Apply `.select` to any `<select>` element for custom styles.
+.form-select {
+  display: inline-block;
+  max-width: 100%;
+  height: 34px;
+  padding-right: $spacer-4;
+  background: $bg-white url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAMAAACzvE1FAAAADFBMVEUzMzMzMzMzMzMzMzMKAG/3AAAAA3RSTlMAf4C/aSLHAAAAPElEQVR42q3NMQ4AIAgEQTn//2cLdRKppSGzBYwzVXvznNWs8C58CiussPJj8h6NwgorrKRdTvuV9v16Afn0AYFOB7aYAAAAAElFTkSuQmCC") no-repeat right 8px center;
+  background-size: 8px 10px;
+  appearance: none;
+
+  // Hides the default caret in IE11
+  &::-ms-expand {
+    opacity: 0;
+  }
+
+  &[multiple] {
+    height: auto;
+  }
+}
+
+.select-sm {
+  height: 28px;
+  min-height: 28px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  font-size: $font-size-small;
+
+  &[multiple] {
+    height: auto;
+    min-height: 0;
+  }
+}

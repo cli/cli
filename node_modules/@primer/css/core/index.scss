@@ -1,0 +1,33 @@
+/*!
+ * Primer-core
+ * http://primer.github.io
+ *
+ * Released under MIT license. Copyright (c) 2019 GitHub Inc.
+ */
+
+// Include .octicon base styles
+@import "@primer/octicons/index.scss";
+
+// Primer master file
+//
+// Imports all Primer files in their intended order for easy mass-inclusion.
+// Should you need specific files, you can easily use separate `@import`s.
+
+// Global requirements
+@import "../support/index.scss";
+
+// Core modules
+@import "../base/index.scss";
+@import "../box/index.scss";
+@import "../breadcrumb/index.scss";
+@import "../buttons/index.scss";
+@import "../table-object/index.scss";
+@import "../forms/index.scss";
+@import "../layout/index.scss";
+@import "../navigation/index.scss";
+@import "../pagination/index.scss";
+@import "../tooltips/index.scss";
+@import "../truncate/index.scss";
+
+// Utilities always go last so that they can override components
+@import "../utilities/index.scss";

@@ -1,0 +1,76 @@
+// Base styles
+// stylelint-disable selector-no-qualifying-type
+// stylelint-disable selector-max-type
+.markdown-body {
+
+  // Lists, Blockquotes & Such
+  ul,
+  ol {
+    padding-left: 2em;
+
+    &.no-list {
+      padding: 0;
+      list-style-type: none;
+    }
+  }
+
+  // Did someone complain about list spacing? Encourage them
+  // to create the spacing with their markdown formatting.
+  // List behavior should be controled by the markup, not the css.
+  //
+  // For lists with padding between items, use blank
+  // lines between items. This will generate paragraphs with
+  // padding to space things out.
+  //
+  // - item
+  //
+  // - item
+  //
+  // - item
+  //
+  // For list without padding, don't use blank lines.
+  //
+  // - item
+  // - item
+  // - item
+  //
+  // Modifying the css to emulate these behaviors merely brakes
+  // one case in the process of solving another. Don't change
+  // this unless it's really really a bug.
+  ul ul,
+  ul ol,
+  ol ol,
+  ol ul {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  li {
+    word-wrap: break-all;
+  }
+
+  li > p {
+    margin-top: $spacer-3;
+  }
+
+  li + li {
+    margin-top: $em-spacer-3;
+  }
+
+  dl {
+    padding: 0;
+
+    dt {
+      padding: 0;
+      margin-top: $spacer-3;
+      font-size: 1em;
+      font-style: italic;
+      font-weight: $font-weight-bold;
+    }
+
+    dd {
+      padding: 0 $spacer-3;
+      margin-bottom: $spacer-3;
+    }
+  }
+}

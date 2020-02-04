@@ -1,0 +1,3 @@
+.Subhead{display:flex;padding-bottom:8px;margin-bottom:16px;border-bottom:1px #e1e4e8 solid;flex-flow:row wrap}.Subhead--spacious{margin-top:40px}.Subhead-heading{font-size:24px;font-weight:normal;flex:1 1 auto}.Subhead-heading--danger{font-weight:600;color:#cb2431}.Subhead-description{font-size:14px;color:#586069;flex:1 100%}.Subhead-actions{align-self:center;justify-content:flex-end}
+
+/*# sourceMappingURL=subhead.css.map */

@@ -1,0 +1,1 @@
+module.exports = {cssstats: require('./stats/layout.json')}

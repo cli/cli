@@ -1,0 +1,109 @@
+// Layout variables
+// stylelint-disable declaration-bang-space-before
+
+// These are our margin and padding utility spacers. The default step size we
+// use is 8px. This gives us a key of:
+//    0 => 0px
+//    1 => 4px
+//    2 => 8px
+//    3 => 16px
+//    4 => 24px
+//    5 => 32px
+//    6 => 40px
+$spacer: 8px !default;
+
+// Our spacing scale
+$spacer-0: 0 !default;                  // 0
+$spacer-1: round($spacer / 2) !default; // 4px
+$spacer-2: $spacer !default;            // 8px
+$spacer-3: $spacer * 2 !default;        // 16px
+$spacer-4: $spacer * 3 !default;        // 24px
+$spacer-5: $spacer * 4 !default;        // 32px
+$spacer-6: $spacer * 5 !default;        // 40px
+
+// The list of spacer values
+$spacers: (
+  $spacer-0,
+  $spacer-1,
+  $spacer-2,
+  $spacer-3,
+  $spacer-4,
+  $spacer-5,
+  $spacer-6,
+) !default;
+
+// And the map of spacers, for easier looping:
+// @each $scale, $length in $spacer-map { ... }
+$spacer-map: (
+  0: $spacer-0,
+  1: $spacer-1,
+  2: $spacer-2,
+  3: $spacer-3,
+  4: $spacer-4,
+  5: $spacer-5,
+  6: $spacer-6,
+) !default;
+
+// Em spacer variables
+$em-spacer-1: 0.0625em !default; // 1/16
+$em-spacer-2: 0.125em !default;  // 1/8
+$em-spacer-3: 0.25em !default;   // 1/4
+$em-spacer-4: 0.375em !default;  // 3/8
+$em-spacer-5: 0.5em !default;    // 1/2
+$em-spacer-6: 0.75em !default;   // 3/4
+
+// Fixed-width container variables
+$container-width: 980px !default;
+$grid-gutter:     10px !default;
+
+// Breakpoint widths
+$width-xs: 0 !default;
+// Small screen / phone
+$width-sm: 544px !default;
+// Medium screen / tablet
+$width-md: 768px !default;
+// Large screen / desktop (980 + (16 * 2)) <= container + gutters
+$width-lg: 1012px !default;
+// Extra large screen / wide desktop
+$width-xl: 1280px !default;
+
+// Responsive container widths
+$container-sm: $width-sm !default;
+$container-md: $width-md !default;
+$container-lg: $width-lg !default;
+$container-xl: $width-xl !default;
+
+// Breakpoints in the form (name: length)
+$breakpoints: (
+  sm: $width-sm,
+  md: $width-md,
+  lg: $width-lg,
+  xl: $width-xl
+) !default;
+
+// This map in the form (breakpoint: variant) is used to iterate over
+// breakpoints and create both responsive and non-responsive classes in one
+// loop:
+//
+// ```scss
+// @each $breakpoint, $variant of $responsive-variants {
+//   @include breakpoint($breakpoint) {
+//     .foo#{$variant}-bar { foo: bar !important; }
+//   }
+// }
+// ```
+$responsive-variants: (
+  "": "",
+  sm: "-sm",
+  md: "-md",
+  lg: "-lg",
+  xl: "-xl",
+) !default;
+
+// responive utility position values
+$responsive-positions: (
+  static,
+  relative,
+  absolute,
+  fixed
+) !default;

@@ -1,0 +1,120 @@
+// Needs refactoring
+// Sub nav
+.subnav {
+  margin-bottom: 20px;
+
+  @include clearfix();
+}
+
+.subnav-bordered {
+  padding-bottom: 20px;
+  border-bottom: 1px solid lighten($gray-200, 3%);
+}
+
+.subnav-flush {
+  margin-bottom: 0;
+}
+
+.subnav-item {
+  position: relative;
+  float: left;
+  padding: 6px 14px;
+  font-weight: $font-weight-bold;
+  line-height: 20px;
+  color: $gray-600;
+  border: 1px solid $gray-200;
+
+  + .subnav-item {
+    margin-left: -1px;
+  }
+
+  &:hover,
+  &:focus {
+    text-decoration: none;
+    background-color: $gray-100;
+  }
+
+  &.selected,
+  &.selected:hover,
+  &.selected:focus {
+    z-index: 2;
+    color: $text-white;
+    background-color: $bg-blue;
+    border-color: $blue;
+  }
+
+  &:first-child {
+    border-top-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+  }
+
+  &:last-child {
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+  }
+}
+
+.subnav-search {
+  position: relative;
+  margin-left: 10px;
+}
+
+.subnav-search-input {
+  width: 320px;
+  padding-left: 30px;
+  color: $text-gray;
+}
+
+.subnav-search-input-wide {
+  width: 500px;
+}
+
+.subnav-search-icon {
+  position: absolute;
+  top: 9px;
+  left: 8px;
+  display: block;
+  color: darken($gray-300, 4%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.subnav-search-context {
+  .btn {
+    color: $gray-700;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+
+    &:hover,
+    &:focus,
+    &:active,
+    &.selected {
+      z-index: 2;
+    }
+  }
+
+  + .subnav-search {
+    margin-left: -1px;
+
+    .subnav-search-input {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+  }
+
+  .select-menu-modal-holder {
+    z-index: 30;
+  }
+
+  .select-menu-modal {
+    width: 220px;
+  }
+
+  .select-menu-item-icon {
+    color: inherit;
+  }
+}
+
+.subnav-spacer-right {
+  padding-right: 10px;
+}
