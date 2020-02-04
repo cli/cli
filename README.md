@@ -35,6 +35,7 @@ tool.
 ### macOS
 
 Install: `brew install github/gh/gh`
+
 Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
