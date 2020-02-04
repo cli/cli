@@ -46,7 +46,7 @@ Install:
 
 ```
 scoop bucket add github-gh https://github.com/cli/scoop-gh.git
-scoop installl gh
+scoop install gh
 ```
 
 Upgrade: `scoop update gh`
