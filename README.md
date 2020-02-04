@@ -69,8 +69,9 @@ Install and upgrade:
 
 ### Other platforms
 
-Install a prebuilt binary from the [releases page][] or source compile by running `make` from the
-project directory.
+Install a prebuilt binary from the [releases page][]
+
+### [Build from source](/source.md)
 
 <!-- TODO eventually we'll have https://cli.github.com/manual -->
 [docs]: https://cli.github.io/cli/gh
