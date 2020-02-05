@@ -19,7 +19,7 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 - `gh issue [status, list, view, create]`
 - `gh help`
 
-Check out the [docs][] for more information.
+Check out the [docs][https://cli.github.io/cli/] for more information.
 
 
 ## Comparison with hub
