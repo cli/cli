@@ -1,5 +1,5 @@
-<h3 class="mt-2"><a class="text-gray-dark" href="/manual/">Overview</a></h3>
-<h3 class="mt-2"><a class="text-gray-dark" href="/manual/installation">Installation</a></h3>
+<h3 class="mt-2"><a class="text-gray-dark" href="{{ site.baseurl }}/manual/">Overview</a></h3>
+<h3 class="mt-2"><a class="text-gray-dark" href="{{ site.baseurl }}/manual/installation">Installation</a></h3>
 
 <!-- auto-generate table of contents for manual pages -->
 {% for gh_page in site.pages | sort: "path" %}
@@ -8,7 +8,7 @@
   {% if parts[0] != "gh" %}{% continue %}{% endif %}
   {% if parts.size == 1 %}{% continue %}{% endif %}
   {% if parts.size == 2 %}<h3 class="mt-2">{% endif %}
-  <a href="{{ gh_page.url }}"
+  <a href="{{ site.baseurl }}{{ gh_page.url }}"
     {% if parts.size == 2 %}class="text-gray-dark"{% endif %}
     {% if page.path == gh_page.path %}style="font-weight:bold"{% endif %}
     >{{ parts.last }}</a>
@@ -16,8 +16,8 @@
 {% endfor %}
 
 <h3 class="mt-2"><a class="text-gray-dark" href="/manual/examples">Examples in use</a></h3>
-<a href="/manual/examples#checking-out">Checking out</a>
-<a href="/manual/examples#creating">Creating</a>
-<a href="/manual/examples#using-lists">Using lists</a>
-<a href="/manual/examples#checking-status">Checking status</a>
-<a href="/manual/examples#viewing-an-item">Viewing an item</a>
+<a href="{{ site.baseurl }}/manual/examples#checking-out">Checking out</a>
+<a href="{{ site.baseurl }}/manual/examples#creating">Creating</a>
+<a href="{{ site.baseurl }}/manual/examples#using-lists">Using lists</a>
+<a href="{{ site.baseurl }}/manual/examples#checking-status">Checking status</a>
+<a href="{{ site.baseurl }}/manual/examples#viewing-an-item">Viewing an item</a>
