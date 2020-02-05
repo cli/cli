@@ -1,26 +1,5 @@
 <nav class="DocsNav d-none d-lg-flex flex-column bg-gray-light p-6">
-  <h3 class="mb-2"><a class="text-gray-dark" href="/manual/">Overview</a></h3>
-  <h3 class="mb-2"><a class="text-gray-dark" href="/manual/installation">Installation</a></h3>
-
-  <!-- auto-generate table of contents for manual pages -->
-  {% for gh_page in site.pages | sort: "path" %}
-    {% assign basename = gh_page.path | split: "/" | last | replace: ".md", "" %}
-    {% assign parts = basename | split: "_" %}
-    {% if parts[0] != "gh" %}{% continue %}{% endif %}
-    {% if parts.size == 2 %}<h3 class="mt-2">{% endif %}
-    <a href="{{ gh_page.url }}"
-      {% if parts.size == 2 %}class="text-gray-dark"{% endif %}
-      {% if page.path == gh_page.path %}style="font-weight:bold"{% endif %}
-      >{{ parts.last }}</a>
-    {% if parts.size == 2 %}</h3>{% endif %}
-  {% endfor %}
-
-  <h3 class="mt-2"><a class="text-gray-dark" href="/manual/examples">Examples in use</a></h3>
-  <a href="/manual/examples#checking-out">Checking out</a>
-  <a href="/manual/examples#creating">Creating</a>
-  <a href="/manual/examples#using-lists">Using lists</a>
-  <a href="/manual/examples#checking-status">Checking status</a>
-  <a href="/manual/examples#viewing-an-item">Viewing an item</a>
+  {% include docs-nav-content.html %}
 </nav>
 
 <div class="d-flex d-lg-none position-fixed bottom-0 width-full border-top bg-white p-3 box-shadow-large" style="z-index: 35;">
@@ -33,27 +12,7 @@
 
      <details-menu class="width-full position-absolute top-0" style="z-index: 100">
        <nav class="d-flex flex-column px-0 py-5">
-         <h3 class="mb-2"><a class="text-gray-dark" href="/manual/installation">Installation</a></h3>
-
-         <!-- auto-generate table of contents for manual pages -->
-         {% for gh_page in site.pages | sort: "path" %}
-           {% assign basename = gh_page.path | split: "/" | last | replace: ".md", "" %}
-           {% assign parts = basename | split: "_" %}
-           {% if parts[0] != "gh" %}{% continue %}{% endif %}
-           {% if parts.size == 2 %}<h3 class="mt-2">{% endif %}
-           <a href="{{ gh_page.url }}"
-             {% if parts.size == 2 %}class="text-gray-dark"{% endif %}
-             {% if page.path == gh_page.path %}style="font-weight:bold"{% endif %}
-             >{{ parts.last }}</a>
-           {% if parts.size == 2 %}</h3>{% endif %}
-         {% endfor %}
-
-         <h3 class="mt-2"><a class="text-gray-dark" href="/manual/examples">Examples in use</a></h3>
-         <a href="/manual/examples#checking-out">Checking out</a>
-         <a href="/manual/examples#creating">Creating</a>
-         <a href="/manual/examples#using-lists">Using lists</a>
-         <a href="/manual/examples#checking-status">Checking status</a>
-         <a href="/manual/examples#viewing-an-item">Viewing an item</a>
+         {% include docs-nav-content.html %}
        </nav>
      </details-menu>
    </details>
