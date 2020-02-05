@@ -74,7 +74,7 @@ Install a prebuilt binary from the [releases page][]
 ### [Build from source](/source.md)
 
 <!-- TODO eventually we'll have https://cli.github.com/manual -->
-[docs]: https://cli.github.io/cli/gh
+[docs]: https://cli.github.io/cli/manual/gh
 [scoop]: https://scoop.sh
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
