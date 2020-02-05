@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: manual
 title: Manual
 permalink: /:path/:basename
 ---
