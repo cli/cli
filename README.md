@@ -19,7 +19,7 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 - `gh issue [status, list, view, create]`
 - `gh help`
 
-Check out the [docs][https://cli.github.io/cli/manual/gh] for more information.
+Check out the [docs][] for more information.
 
 
 ## Comparison with hub
@@ -74,7 +74,7 @@ Install a prebuilt binary from the [releases page][]
 ### [Build from source](/source.md)
 
 <!-- TODO eventually we'll have https://cli.github.com/manual -->
-[docs]: https://cli.github.io/cli/gh
+[docs]: https://cli.github.io/cli/manual/gh
 [scoop]: https://scoop.sh
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
