@@ -36,4 +36,9 @@ http://github.com/owner/repo/issue/1
 Opening https://github.com/owner/repo/pull/branch in your browser.
 <span class='magenta'>~/Projects/my-project</span>$</code></pre>
 </div>
+
+{% if page.url == '/manual/gh_pr_create' or  page.url == '/manual/examples.html'%}
+<h4>Working with forks</h4>
+This command will automatically create a fork for you if you're in a repository that you don't have permission to push to.
+{% endif %}
 {% endif %}
