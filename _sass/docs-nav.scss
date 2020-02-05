@@ -1,5 +1,13 @@
-.docs-nav {
+.DocsNav {
   min-width: 260px;
   height: 100vh;
   border-right: 1px solid $gray-200;
+}
+
+.DocsNav--mobile[open] {
+  height: 100vh;
+
+  summary {
+    position: absolute;
+  }
 }
