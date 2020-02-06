@@ -87,5 +87,6 @@ scoop:
     name: vilmibm
     email: vilmibm@github.com
   homepage: https://github.com/cli/cli
+  skip_upload: auto
   description: GitHub CLI
   license: MIT
