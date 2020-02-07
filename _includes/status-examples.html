@@ -1,8 +1,9 @@
-{% if page.url == '/manual/gh_pr_status' or page.url == '/manual/gh_issue_status' or  page.url == '/examples.html' %}
-{% if page.url != '/examples.html' %}
+{% if page.url == '/manual/gh_pr_status' or page.url == '/manual/gh_issue_status' or  page.url == '/manual/examples.html' %}
+{% if page.url != '/manual/examples.html' %}
 <h3>Examples in use</h3>
+<p>Since interacting with pull requests and issues works the same, usage is showing examples using both.</p>
 {% endif %}
-{% if page.url == '/examples.html' %}
+{% if page.url == '/manual/examples.html' %}
 <h3 id="checking-status">Viewing the status of your relevant work</h3>
 {% endif %}
 

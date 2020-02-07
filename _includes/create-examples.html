@@ -1,8 +1,9 @@
-{% if page.url == '/manual/gh_pr_create' or page.url == '/manual/gh_issue_create' or  page.url == '/examples.html'%}
-{% if page.url != '/examples.html' %}
+{% if page.url == '/manual/gh_pr_create' or page.url == '/manual/gh_issue_create' or  page.url == '/manual/examples.html'%}
+{% if page.url != '/manual/examples.html' %}
 <h3>Examples in use</h3>
+<p>Since interacting with pull requests and issues works the same, usage is showing examples using both.</p>
 {% endif %}
-{% if page.url == '/examples.html' %}
+{% if page.url == '/manual/examples.html' %}
 <h3 id="creating">Creating issues and pull requests</h3>
 {% endif %}
 
@@ -35,4 +36,9 @@ http://github.com/owner/repo/issue/1
 Opening https://github.com/owner/repo/pull/branch in your browser.
 <span class='magenta'>~/Projects/my-project</span>$</code></pre>
 </div>
+
+{% if page.url == '/manual/gh_pr_create' or  page.url == '/manual/examples.html'%}
+<h4>Working with forks</h4>
+This command will automatically create a fork for you if you're in a repository that you don't have permission to push to.
+{% endif %}
 {% endif %}
