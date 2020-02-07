@@ -12,14 +12,14 @@
       px-md-6
     {% endif %}
     ">
-      <a class="d-flex mr-4 text-gray-dark flex-items-center h4-mktg no-underline" href="/" aria-label="Homepage" data-ga-click="GitHub CLI, CLI landing page main nav (invertocat logo)">
+      <a class="d-flex mr-4 text-gray-dark flex-items-center h4-mktg no-underline" href="/" aria-label="Homepage" data-ga-click="CLI (invertocat), click, text:Nav_CLI">
         {% octicon mark-github height:32 class:"text-gray-dark mr-2" aria-label:github-logo %}
         CLI
       </a>
 
       <div class="d-flex flex-auto flex-items-center flex-justify-end">
-        <a href="{{ "/manual/gh" | relative_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline">Manual</a>
-        <a href="{{ site.github.latest_release.html_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline">Release notes</a>
+        <a href="{{ "/manual/gh" | relative_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline" data-ga-click="Manual, click, text:Nav_Manual">Manual</a>
+        <a href="{{ site.github.latest_release.html_url }}" class="d-inline-block h5-mktg text-normal link-gray-dark py-4 mr-4 no-underline" data-ga-click="Release notes, click, text:Nav_Release_Notes">Release notes</a>
       </div>
     </nav>
   </header>
