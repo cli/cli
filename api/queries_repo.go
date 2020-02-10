@@ -216,3 +216,33 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		ViewerPermission: "WRITE",
 	}, nil
 }
+
+// CreateRepo creates the repository on GitHub and returns the new repository
+func CreateRepo(client *Client, organization string, request map[string]string) (*Repository, error) {
+	path := "user/repos"
+	if len(organization) > 0 {
+		path = fmt.Sprintf("orgs/%s/repos", organization)
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyBuf := bytes.NewBufferString(string(body))
+	result := repositoryV3{}
+
+	err = client.REST("POST", path, bodyBuf, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		ID:   result.NodeID,
+		Name: result.Name,
+		Owner: RepositoryOwner{
+			Login: result.Owner.Login,
+		},
+		ViewerPermission: "WRITE",
+	}, nil
+}
