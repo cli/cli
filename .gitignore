@@ -5,3 +5,9 @@
 /site
 .github/**/node_modules
 /CHANGELOG.md
+
+# VS Code
+.vscode
+
+# macOS
+.DS_Store
