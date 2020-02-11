@@ -400,11 +400,11 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Fprintf(w, " - %s", utils.Red("changes requested"))
+			fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Fprintf(w, " - %s", utils.Yellow("review required"))
+			fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
 		} else if reviews.Approved {
-			fmt.Fprintf(w, " - %s", utils.Green("approved"))
+			fmt.Fprintf(w, " - %s", utils.Green("Approved"))
 		}
 
 		fmt.Fprint(w, "\n")
