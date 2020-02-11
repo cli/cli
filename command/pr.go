@@ -32,8 +32,12 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	prListCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 
 	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prViewCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
+
+	prStatusCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 }
 
 var prCmd = &cobra.Command{
@@ -84,7 +88,12 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
+	referSelf, _ := cmd.Flags().GetBool("self")
+	if referSelf == false {
+		ctx = context.ExpandOnline(ctx, apiClient)
+	}
+
+	baseRepo, err := context.DetermineRepo(ctx, referSelf)
 	if err != nil {
 		return err
 	}
@@ -143,7 +152,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
+	referSelf, _ := cmd.Flags().GetBool("self")
+	if referSelf == false {
+		ctx = context.ExpandOnline(ctx, apiClient)
+	}
+
+	baseRepo, err := context.DetermineRepo(ctx, referSelf)
 	if err != nil {
 		return err
 	}
@@ -254,12 +268,18 @@ func colorFuncForState(state string) func(string) string {
 
 func prView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := ctx.BaseRepo()
+
+	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	apiClient, err := apiClientForContext(ctx)
+	referSelf, _ := cmd.Flags().GetBool("self")
+	if referSelf == false {
+		ctx = context.ExpandOnline(ctx, apiClient)
+	}
+
+	baseRepo, err := context.DetermineRepo(ctx, referSelf)
 	if err != nil {
 		return err
 	}
