@@ -1,10 +1,8 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
-	"sort"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -29,7 +27,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	baseRepoOverride, _ := cmd.Flags().GetString("repo")
-	repoContext, err := resolveRemotesToRepos(remotes, client, baseRepoOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, client, baseRepoOverride)
 	if err != nil {
 		return err
 	}
@@ -228,98 +226,4 @@ func init() {
 	prCreateCmd.Flags().StringP("base", "B", "",
 		"The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
-}
-
-// cap the number of git remotes looked up, since the user might have an
-// unusally large number of git remotes
-const maxRemotesForLookup = 5
-
-func resolveRemotesToRepos(remotes context.Remotes, client *api.Client, base string) (resolvedRemotes, error) {
-	sort.Stable(remotes)
-	lenRemotesForLookup := len(remotes)
-	if lenRemotesForLookup > maxRemotesForLookup {
-		lenRemotesForLookup = maxRemotesForLookup
-	}
-
-	hasBaseOverride := base != ""
-	baseOverride := ghrepo.FromFullName(base)
-	foundBaseOverride := false
-	repos := []ghrepo.Interface{}
-	for _, r := range remotes[:lenRemotesForLookup] {
-		repos = append(repos, r)
-		if ghrepo.IsSame(r, baseOverride) {
-			foundBaseOverride = true
-		}
-	}
-	if hasBaseOverride && !foundBaseOverride {
-		// additionally, look up the explicitly specified base repo if it's not
-		// already covered by git remotes
-		repos = append(repos, baseOverride)
-	}
-
-	result := resolvedRemotes{remotes: remotes}
-	if hasBaseOverride {
-		result.baseOverride = baseOverride
-	}
-	networkResult, err := api.RepoNetwork(client, repos)
-	if err != nil {
-		return result, err
-	}
-	result.network = networkResult
-	return result, nil
-}
-
-type resolvedRemotes struct {
-	baseOverride ghrepo.Interface
-	remotes      context.Remotes
-	network      api.RepoNetworkResult
-}
-
-// BaseRepo is the first found repository in the "upstream", "github", "origin"
-// git remote order, resolved to the parent repo if the git remote points to a fork
-func (r resolvedRemotes) BaseRepo() (*api.Repository, error) {
-	if r.baseOverride != nil {
-		for _, repo := range r.network.Repositories {
-			if repo != nil && ghrepo.IsSame(repo, r.baseOverride) {
-				return repo, nil
-			}
-		}
-		return nil, fmt.Errorf("failed looking up information about the '%s' repository",
-			ghrepo.FullName(r.baseOverride))
-	}
-
-	for _, repo := range r.network.Repositories {
-		if repo == nil {
-			continue
-		}
-		if repo.IsFork() {
-			return repo.Parent, nil
-		}
-		return repo, nil
-	}
-
-	return nil, errors.New("not found")
-}
-
-// HeadRepo is the first found repository that has push access
-func (r resolvedRemotes) HeadRepo() (*api.Repository, error) {
-	for _, repo := range r.network.Repositories {
-		if repo != nil && repo.ViewerCanPush() {
-			return repo, nil
-		}
-	}
-	return nil, errors.New("none of the repositories have push access")
-}
-
-// RemoteForRepo finds the git remote that points to a repository
-func (r resolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*context.Remote, error) {
-	for i, remote := range r.remotes {
-		if ghrepo.IsSame(remote, repo) ||
-			// additionally, look up the resolved repository name in case this
-			// git remote points to this repository via a redirect
-			(r.network.Repositories[i] != nil && ghrepo.IsSame(r.network.Repositories[i], repo)) {
-			return remote, nil
-		}
-	}
-	return nil, errors.New("not found")
 }
