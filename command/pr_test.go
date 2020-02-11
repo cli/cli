@@ -111,9 +111,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"- Checks passing - changes requested",
-		"- Checks pending - approved",
-		"- 1/3 checks failing - review required",
+		"- Checks passing - Changes requested",
+		"- Checks pending - Approved",
+		"- 1/3 checks failing - Review required",
 	}
 
 	for _, line := range expected {
