@@ -341,6 +341,66 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
+func PullRequestBySha(client *Client, vars map[string]interface{}) (*PullRequest, error) {
+	type prBlock struct {
+		Edges []struct {
+			Node PullRequest
+		}
+		PageInfo struct {
+			HasNextPage bool
+			EndCursor   string
+		}
+	}
+	type response struct {
+		Search prBlock
+	}
+
+	fragment := `
+	fragment pr on PullRequest {
+		url
+		number
+		title
+		body
+	}
+	`
+
+	query := fragment + `
+	query($q: String!) {
+		search(query: $q, type: ISSUE, first: 1) {
+			edges {
+				node {
+					...pr
+          		}
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{}
+	owner := vars["owner"].(string)
+	repo := vars["repo"].(string)
+	sha := vars["sha"].(string)
+	search := []string{
+		fmt.Sprintf("repo:%s/%s", owner, repo),
+		sha,
+		"is:pr",
+		"is:merged",
+		"sort:created-asc",
+	}
+	variables["q"] = strings.Join(search, " ")
+
+	var resp response
+	err := client.GraphQL(query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, edge := range resp.Search.Edges {
+		return &edge.Node, nil
+	}
+
+	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for sha %q", sha)}
+}
+
 func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {

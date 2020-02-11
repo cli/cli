@@ -586,6 +586,36 @@ func TestPRView_urlArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
+func TestPRView_shaArg(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prView_Sha.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view -s 9b5a719a3d76ac9dc2fa635d9b1f34fd73994c06")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/monalisa/hello/pull/32")
+}
+
 func TestPRView_branchArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()

@@ -32,6 +32,7 @@ func init() {
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
 	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prViewCmd.Flags().StringP("sha", "s", "", "Commit sha hash of pull request")
 }
 
 var prCmd = &cobra.Command{
@@ -266,10 +267,20 @@ func prView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	sha, err := cmd.Flags().GetString("sha")
+	if err != nil {
+		return err
+	}
 
 	var openURL string
 	var pr *api.PullRequest
-	if len(args) > 0 {
+	if sha != "" {
+		pr, err = prFromSha(apiClient, baseRepo, sha)
+		if err != nil {
+			return err
+		}
+		openURL = pr.URL
+	} else if len(args) > 0 {
 		pr, err = prFromArg(apiClient, baseRepo, args[0])
 		if err != nil {
 			return err
@@ -344,6 +355,15 @@ func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*a
 	}
 
 	return api.PullRequestForBranch(apiClient, baseRepo, arg)
+}
+
+func prFromSha(apiClient *api.Client, baseRepo ghrepo.Interface, sha string) (*api.PullRequest, error) {
+	params := map[string]interface{}{
+		"owner": baseRepo.RepoOwner(),
+		"repo":  baseRepo.RepoName(),
+		"sha":   sha,
+	}
+	return api.PullRequestBySha(apiClient, params)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {

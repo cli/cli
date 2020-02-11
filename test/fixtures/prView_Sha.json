@@ -1,0 +1,20 @@
+{
+  "data": {
+    "search": {
+      "edges": [
+        {
+          "node": {
+            "number": 32,
+            "title": "New feature",
+            "url": "https://github.com/monalisa/hello/pull/32",
+            "headRefName": "feature"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": ""
+      }
+    }
+  }
+}
