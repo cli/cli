@@ -29,12 +29,8 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	prListCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 
 	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
-	prViewCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
-
-	prStatusCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 }
 
 var prCmd = &cobra.Command{

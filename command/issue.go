@@ -30,19 +30,14 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
-	issueCreateCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
-	issueListCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
-	issueViewCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
-
-	issueStatusCmd.Flags().BoolP("self", "S", false, "Query current repository instead of forked parent")
 }
 
 var issueCmd = &cobra.Command{
