@@ -258,8 +258,28 @@ No issues match your search
 }
 
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {	"repository": {
@@ -456,8 +476,28 @@ func TestIssueView_urlArg(t *testing.T) {
 }
 
 func TestIssueCreate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -496,8 +536,28 @@ func TestIssueCreate(t *testing.T) {
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -513,8 +573,28 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 }
 
 func TestIssueCreate_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	initFakeHTTP()
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
