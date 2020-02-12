@@ -94,6 +94,11 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 			return nil, err
 		}
 
+		// TODO given remotes:
+		// [upstream] cli/cli
+		// [origin] vilmibm/cli
+		// we're picking the wrong thing. i think preferSelf needs to be threaded through to
+		// ResolveRemotesToRepos in the same way as baseOverride.
 		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
 		if err != nil {
 			return nil, err
