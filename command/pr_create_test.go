@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
@@ -41,28 +40,9 @@ func TestPrCreateHelperProcess(*testing.T) {
 }
 
 func TestPRCreate(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -102,28 +82,9 @@ func TestPRCreate(t *testing.T) {
 }
 
 func TestPRCreate_web(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	ranCommands := [][]string{}
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -144,28 +105,10 @@ func TestPRCreate_web(t *testing.T) {
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
