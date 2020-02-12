@@ -69,10 +69,10 @@ Install and upgrade:
 
 ### Arch Linux
 
-Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/gh/
+Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
 
 ```bash
-$ yay -S gh
+$ yay -S github-cli
 ```
 
 ### Other platforms
