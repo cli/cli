@@ -287,10 +287,17 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(*baseRepo))
 
+	baseOverride, err := cmd.Flags().GetString("repo")
+	if err != nil {
+		return err
+	}
+
 	var templateFiles []string
-	if rootDir, err := git.ToplevelDir(); err == nil {
-		// TODO: figure out how to stub this in tests
-		templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+	if baseOverride == "" {
+		if rootDir, err := git.ToplevelDir(); err == nil {
+			// TODO: figure out how to stub this in tests
+			templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+		}
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
