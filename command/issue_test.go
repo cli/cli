@@ -15,6 +15,7 @@ import (
 func TestIssueStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
@@ -43,6 +44,7 @@ func TestIssueStatus(t *testing.T) {
 func TestIssueStatus_blankSlate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -79,6 +81,7 @@ Issues opened by you
 func TestIssueStatus_disabledIssues(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -95,6 +98,7 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 func TestIssueList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
 	defer jsonFile.Close()
@@ -122,6 +126,7 @@ func TestIssueList(t *testing.T) {
 func TestIssueList_withFlags(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {	"repository": {
@@ -142,7 +147,7 @@ Issues for OWNER/REPO
 No issues match your search
 `)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Assignee string
@@ -160,6 +165,7 @@ No issues match your search
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {	"repository": {
@@ -173,7 +179,7 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables map[string]interface{}
 	}{}
@@ -188,6 +194,7 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 func TestIssueList_disabledIssues(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {	"repository": {
@@ -204,6 +211,7 @@ func TestIssueList_disabledIssues(t *testing.T) {
 func TestIssueView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
@@ -237,6 +245,7 @@ func TestIssueView(t *testing.T) {
 func TestIssueView_preview(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
@@ -309,6 +318,7 @@ func TestIssueView_notFound(t *testing.T) {
 func TestIssueView_disabledIssues(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -326,6 +336,7 @@ func TestIssueView_disabledIssues(t *testing.T) {
 func TestIssueView_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
@@ -358,6 +369,7 @@ func TestIssueView_urlArg(t *testing.T) {
 func TestIssueCreate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -376,7 +388,7 @@ func TestIssueCreate(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -398,6 +410,7 @@ func TestIssueCreate(t *testing.T) {
 func TestIssueCreate_disabledIssues(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -414,7 +427,8 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 
 func TestIssueCreate_web(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
-	initFakeHTTP()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {

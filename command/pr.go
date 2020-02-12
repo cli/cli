@@ -70,10 +70,6 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
-	if err != nil {
-		return err
-	}
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
 	if err != nil {
 		return err
@@ -83,7 +79,12 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	prPayload, err := api.PullRequests(apiClient, *baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(*baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
@@ -129,12 +130,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(*baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -172,8 +173,8 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	params := map[string]interface{}{
-		"owner": baseRepo.RepoOwner(),
-		"repo":  baseRepo.RepoName(),
+		"owner": (*baseRepo).RepoOwner(),
+		"repo":  (*baseRepo).RepoName(),
 		"state": graphqlState,
 	}
 	if len(labels) > 0 {
@@ -240,12 +241,13 @@ func colorFuncForState(state string) func(string) string {
 
 func prView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := ctx.BaseRepo()
+
+	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	apiClient, err := apiClientForContext(ctx)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -258,7 +260,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, *baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -270,15 +272,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(*baseRepo), prNumber)
 			if preview {
-				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+				pr, err = api.PullRequestByNumber(apiClient, *baseRepo, prNumber)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, *baseRepo, branchWithOwner)
 			if err != nil {
 				return err
 			}
