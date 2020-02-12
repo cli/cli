@@ -176,12 +176,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("pull request title must not be blank")
 		}
 
+		headRefName := headBranch
+		if !ghrepo.IsSame(headRemote, baseRepo) {
+			headRefName = fmt.Sprintf("%s:%s", headRemote.RepoOwner(), headBranch)
+		}
+
 		params := map[string]interface{}{
 			"title":       title,
 			"body":        body,
 			"draft":       isDraft,
 			"baseRefName": baseBranch,
-			"headRefName": headBranch,
+			"headRefName": headRefName,
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
