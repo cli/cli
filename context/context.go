@@ -118,43 +118,9 @@ func (r ResolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*Remote, error) {
 	return nil, errors.New("not found")
 }
 
-type OnlineContext interface {
-	Context
-	ParentRepos() ([]ghrepo.Interface, error)
-}
-
 // New initializes a Context that reads from the filesystem
 func New() Context {
 	return &fsContext{}
-}
-
-func ExpandOnline(ctx Context, apiClient *api.Client) OnlineContext {
-	return &apiContext{
-		Context:   ctx,
-		apiClient: *apiClient,
-	}
-}
-
-func DetermineRepo(ctx Context, self bool) (ghrepo.Interface, error) {
-	if self == true {
-		return ctx.BaseRepo()
-	}
-
-	onlineCtx, isOnline := ctx.(OnlineContext)
-	if !isOnline {
-		return nil, errors.New("context not online")
-	}
-
-	repos, err := onlineCtx.ParentRepos()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(repos) < 1 {
-		return ctx.BaseRepo()
-	}
-
-	return repos[0], nil
 }
 
 // A Context implementation that queries the filesystem
@@ -261,36 +227,4 @@ func (c *fsContext) BaseRepo() (ghrepo.Interface, error) {
 
 func (c *fsContext) SetBaseRepo(nwo string) {
 	c.baseRepo = ghrepo.FromFullName(nwo)
-}
-
-type apiContext struct {
-	Context
-	apiClient api.Client
-}
-
-func (c *apiContext) ParentRepos() ([]ghrepo.Interface, error) {
-	baseRepo, err := c.BaseRepo()
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := api.RepoNetwork(&c.apiClient, []ghrepo.Interface{baseRepo})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(result.Repositories) < 1 {
-		return nil, errors.New("network request returned 0 repositories")
-	}
-
-	var repos []ghrepo.Interface
-
-	var repo api.Repository = *result.Repositories[0]
-
-	for repo.IsFork() {
-		repo = *repo.Parent
-		repos = append(repos, repo)
-	}
-
-	return repos, nil
 }
