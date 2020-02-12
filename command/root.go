@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
@@ -150,4 +151,48 @@ func changelogURL(version string) string {
 
 	url := fmt.Sprintf("%s/releases/tag/v%s", path, strings.TrimPrefix(version, "v"))
 	return url
+}
+
+func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interface, error) {
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	baseOverride, err := cmd.Flags().GetString("repo")
+	if err != nil {
+		return nil, err
+	}
+
+	baseRepo, err := ctx.BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+
+	preferSelf, err := cmd.Flags().GetBool("self")
+	if err != nil {
+		return nil, err
+	}
+
+	if preferSelf == false {
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO given remotes:
+		// [upstream] cli/cli
+		// [origin] vilmibm/cli
+		// we're picking the wrong thing. i think preferSelf needs to be threaded through to
+		// ResolveRemotesToRepos in the same way as baseOverride.
+		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+		if err != nil {
+			return nil, err
+		}
+		baseRepo, err = repoContext.BaseRepo()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &baseRepo, nil
 }
