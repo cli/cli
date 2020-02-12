@@ -51,38 +51,38 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 		repos = append(repos, baseOverride)
 	}
 
-	result := ResolvedRemotes{remotes: remotes}
+	result := ResolvedRemotes{Remotes: remotes}
 	if hasBaseOverride {
-		result.baseOverride = baseOverride
+		result.BaseOverride = baseOverride
 	}
 	networkResult, err := api.RepoNetwork(client, repos)
 	if err != nil {
 		return result, err
 	}
-	result.network = networkResult
+	result.Network = networkResult
 	return result, nil
 }
 
 type ResolvedRemotes struct {
-	baseOverride ghrepo.Interface
-	remotes      Remotes
-	network      api.RepoNetworkResult
+	BaseOverride ghrepo.Interface
+	Remotes      Remotes
+	Network      api.RepoNetworkResult
 }
 
 // BaseRepo is the first found repository in the "upstream", "github", "origin"
 // git remote order, resolved to the parent repo if the git remote points to a fork
 func (r ResolvedRemotes) BaseRepo() (*api.Repository, error) {
-	if r.baseOverride != nil {
-		for _, repo := range r.network.Repositories {
-			if repo != nil && ghrepo.IsSame(repo, r.baseOverride) {
+	if r.BaseOverride != nil {
+		for _, repo := range r.Network.Repositories {
+			if repo != nil && ghrepo.IsSame(repo, r.BaseOverride) {
 				return repo, nil
 			}
 		}
 		return nil, fmt.Errorf("failed looking up information about the '%s' repository",
-			ghrepo.FullName(r.baseOverride))
+			ghrepo.FullName(r.BaseOverride))
 	}
 
-	for _, repo := range r.network.Repositories {
+	for _, repo := range r.Network.Repositories {
 		if repo == nil {
 			continue
 		}
@@ -97,7 +97,7 @@ func (r ResolvedRemotes) BaseRepo() (*api.Repository, error) {
 
 // HeadRepo is the first found repository that has push access
 func (r ResolvedRemotes) HeadRepo() (*api.Repository, error) {
-	for _, repo := range r.network.Repositories {
+	for _, repo := range r.Network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
 			return repo, nil
 		}
@@ -107,11 +107,11 @@ func (r ResolvedRemotes) HeadRepo() (*api.Repository, error) {
 
 // RemoteForRepo finds the git remote that points to a repository
 func (r ResolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*Remote, error) {
-	for i, remote := range r.remotes {
+	for i, remote := range r.Remotes {
 		if ghrepo.IsSame(remote, repo) ||
 			// additionally, look up the resolved repository name in case this
 			// git remote points to this repository via a redirect
-			(r.network.Repositories[i] != nil && ghrepo.IsSame(r.network.Repositories[i], repo)) {
+			(r.Network.Repositories[i] != nil && ghrepo.IsSame(r.Network.Repositories[i], repo)) {
 			return remote, nil
 		}
 	}

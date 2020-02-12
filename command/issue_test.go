@@ -9,13 +9,33 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/utils"
 )
 
 func TestIssueStatus(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
 
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
@@ -41,8 +61,28 @@ func TestIssueStatus(t *testing.T) {
 }
 
 func TestIssueStatus_blankSlate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -77,8 +117,28 @@ Issues opened by you
 }
 
 func TestIssueStatus_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -93,8 +153,28 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
 	defer jsonFile.Close()
@@ -120,8 +200,28 @@ func TestIssueList(t *testing.T) {
 }
 
 func TestIssueList_withFlags(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
 	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {	"repository": {
