@@ -173,6 +173,7 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 	if err != nil {
 		return nil, err
 	}
+
 	var baseRepo ghrepo.Interface
 	baseRepo, err = repoContext.BaseRepo()
 	if err != nil {

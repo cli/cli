@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -72,28 +71,9 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 }
 
 func TestPRStatus(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
 	defer jsonFile.Close()
@@ -119,28 +99,9 @@ func TestPRStatus(t *testing.T) {
 }
 
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
 	defer jsonFile.Close()
@@ -165,28 +126,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 }
 
 func TestPRStatus_blankSlate(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {} }
@@ -216,28 +158,9 @@ Requesting a code review from you
 }
 
 func TestPRList(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prList.json")
 	defer jsonFile.Close()
@@ -255,28 +178,9 @@ func TestPRList(t *testing.T) {
 }
 
 func TestPRList_filtering(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -293,7 +197,7 @@ Pull requests for OWNER/REPO
 No pull requests match your search
 `)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			State  []string
@@ -307,28 +211,9 @@ No pull requests match your search
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -338,7 +223,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Q string
@@ -352,6 +237,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -363,28 +249,9 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 }
 
 func TestPRView_preview(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
 	defer jsonFile.Close()
@@ -412,28 +279,9 @@ func TestPRView_preview(t *testing.T) {
 }
 
 func TestPRView_previewCurrentBranch(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
 	defer jsonFile.Close()
@@ -466,28 +314,9 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 }
 
 func TestPRView_currentBranch(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
 	defer jsonFile.Close()
@@ -523,28 +352,9 @@ func TestPRView_currentBranch(t *testing.T) {
 }
 
 func TestPRView_noResultsForBranch(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("blueberries")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
 	defer jsonFile.Close()
@@ -573,28 +383,9 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 }
 
 func TestPRView_numberArg(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -624,28 +415,9 @@ func TestPRView_numberArg(t *testing.T) {
 }
 
 func TestPRView_urlArg(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -675,28 +447,9 @@ func TestPRView_urlArg(t *testing.T) {
 }
 
 func TestPRView_branchArg(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -728,28 +481,9 @@ func TestPRView_branchArg(t *testing.T) {
 }
 
 func TestPRView_branchWithOwnerArg(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [

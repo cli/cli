@@ -12,6 +12,9 @@ func initBlankContext(repo, branch string) {
 		ctx := context.NewBlank()
 		ctx.SetBaseRepo(repo)
 		ctx.SetBranch(branch)
+		ctx.SetRemotes(map[string]string{
+			"origin": "OWNER/REPO",
+		})
 		return ctx
 	}
 }
