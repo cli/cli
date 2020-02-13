@@ -29,3 +29,8 @@ $ cd ~/.githubcli && make
 
 4. Restart your shell so that PATH changes take effect.
 
+## If you have Go installed
+
+```
+go get github.com/cli/cli/cmd/gh
+```
