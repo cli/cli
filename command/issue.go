@@ -255,9 +255,11 @@ func printIssuePreview(out io.Writer, issue *api.Issue) {
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
 		coloredLabels,
 	)))
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
-	fmt.Fprintln(out)
+	if issue.Body != "" {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
+		fmt.Fprintln(out)
+	}
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 }
 
