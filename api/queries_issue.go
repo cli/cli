@@ -279,5 +279,10 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 	}
 
-	return &resp.Repository.Issue, nil
+	issue := resp.Repository.Issue
+	if issue.Body == "" {
+		issue.Body = "_No description provided._"
+	}
+
+	return &issue, nil
 }
