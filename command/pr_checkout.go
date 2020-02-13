@@ -40,8 +40,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	cmdQueue := [][]string{}
 
-	// namespace PR checkout branches to avoid local branch name collisions
-	newBranchName := fmt.Sprintf("pr/%d/%s", pr.Number, pr.HeadRefName)
+	newBranchName := pr.HeadRefName
 	if headRemote != nil {
 		// there is an existing git remote for PR head
 		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
