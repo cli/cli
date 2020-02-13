@@ -32,9 +32,9 @@ tool.
 
 ## Installation and Upgrading
 
-### macOS
+### macOS and Linux via Homebrew
 
-Install: `brew install github/gh/gh`
+Install: `brew install gh`
 
 Upgrade: `brew update && brew upgrade gh`
 
