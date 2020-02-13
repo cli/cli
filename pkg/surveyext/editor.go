@@ -25,14 +25,11 @@ var (
 func init() {
 	if runtime.GOOS == "windows" {
 		editor = "notepad"
-	}
-	if g := os.Getenv("GIT_EDITOR"); g != "" {
+	} else if g := os.Getenv("GIT_EDITOR"); g != "" {
 		editor = g
-	}
-	if v := os.Getenv("VISUAL"); v != "" {
+	} else if v := os.Getenv("VISUAL"); v != "" {
 		editor = v
-	}
-	if e := os.Getenv("EDITOR"); e != "" {
+	} else if e := os.Getenv("EDITOR"); e != "" {
 		editor = e
 	}
 }
