@@ -91,7 +91,7 @@ func AddRemote(name, initURL, finalURL string) (*Remote, error) {
 		}
 	}
 
-	finalURLParsed, err := url.Parse(initURL)
+	finalURLParsed, err := url.Parse(finalURL)
 	if err != nil {
 		return nil, err
 	}
