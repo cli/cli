@@ -5,6 +5,10 @@ the terminal next to where you are already working with `git` and your code.
 
 ![screenshot](https://user-images.githubusercontent.com/98482/73286699-9f922180-41bd-11ea-87c9-60a2d31fd0ac.png)
 
+## Availability
+
+While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It does not currently support repositories hosted on GitHub Enterprise Server or other hosting providers.
+
 ## We need your feedback
 
 GitHub CLI is currently early in its development, and we're hoping to get feedback from people using it.
