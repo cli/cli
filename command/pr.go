@@ -308,9 +308,11 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) {
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
-	fmt.Fprintln(out)
+	if pr.Body != "" {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
+		fmt.Fprintln(out)
+	}
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 }
 

@@ -313,6 +313,40 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 	}
 }
 
+func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prView_EmptyBody.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view -p")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`Blueberries are a good fruit`),
+		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestPRView_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()

@@ -288,6 +288,51 @@ func TestIssueView_preview(t *testing.T) {
 	}
 }
 
+func TestIssueView_previewWithEmptyBody(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+		"number": 123,
+		"body": "",
+		"title": "ix of coins",
+		"author": {
+			"login": "marseilles"
+		},
+		"labels": {
+			"nodes": [
+				{"name": "tarot"}
+			]
+		},
+		"comments": {
+		  "totalCount": 9
+		},
+		"url": "https://github.com/OWNER/REPO/issues/123"
+	} } } }
+	`))
+
+	output, err := RunCommand(issueViewCmd, "issue view -p 123")
+	if err != nil {
+		t.Errorf("error running command `issue view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`ix of coins`),
+		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
+		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestIssueView_notFound(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
