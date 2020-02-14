@@ -39,10 +39,6 @@ SCENARIOS TO TEST:
 */
 
 func prCheckout(cmd *cobra.Command, args []string) error {
-	// TOMORROW: think through if using determineBaseRepo would help here. Understand how this is
-	// working in all of my test cases and see what's broken (if anything). Decide if adding remotes
-	// is the smart thing to do.
-	// after all that, work on the duplicate branch name detection.
 	ctx := contextForCommand(cmd)
 	currentBranch, _ := ctx.Branch()
 	configRemotes, err := ctx.Remotes()
