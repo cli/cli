@@ -153,7 +153,7 @@ func changelogURL(version string) string {
 	return url
 }
 
-func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interface, error) {
+func resolveRemotesForCommand(cmd *cobra.Command, ctx context.Context) (*context.ResolvedRemotes, error) {
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return nil, err
@@ -170,6 +170,15 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 	}
 
 	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	return &repoContext, nil
+}
+
+func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interface, error) {
+	repoContext, err := resolveRemotesForCommand(cmd, ctx)
 	if err != nil {
 		return nil, err
 	}

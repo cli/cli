@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -27,44 +28,66 @@ SCENARIOS TO TEST:
  B4. cloned parent as origin, my fork added as fork (pr create setup)
  B5. cloned parent as origin, my fork added as something else entirely
  B6. -R specified
+
+ A1 fails. We're not noticing that origin is a fork of something else and looking for a PR there.
+ A2 succeeds. We set the remote for the branch appropriately and find the PR in upstream.
+ A3 "fails" but, like, in that it tries to use the weird upstream and can't find PR. this is a weird case anyway.
+ A4 works
+ A5 works
+ A6 works, but interestingly fails in a different way than A1. It's the graphql could not find PR instead of 'not found.' clearly, error wrapping needs to be improved.
 */
 
 func prCheckout(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	currentBranch, _ := ctx.Branch()
-	remotes, err := ctx.Remotes()
 	// TOMORROW: think through if using determineBaseRepo would help here. Understand how this is
 	// working in all of my test cases and see what's broken (if anything). Decide if adding remotes
 	// is the smart thing to do.
 	// after all that, work on the duplicate branch name detection.
+	ctx := contextForCommand(cmd)
+	currentBranch, _ := ctx.Branch()
+	configRemotes, err := ctx.Remotes()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read git config: %w", err)
 	}
-	// FIXME: duplicates logic from fsContext.BaseRepo
-	baseRemote, err := remotes.FindByName("upstream", "github", "origin", "*")
+	resolvedRemotes, err := resolveRemotesForCommand(cmd, ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve local remotes to github repos: %w", err)
 	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initiate API client: %w", err)
 	}
 
-	pr, err := prFromArg(apiClient, baseRemote, args[0])
+	baseRepo, err := resolvedRemotes.BaseRepo()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
+	baseRemote, err := resolvedRemotes.RemoteForRepo(baseRepo)
+	if err != nil {
+		return fmt.Errorf("failed to find remote for base repo %s: %w", ghrepo.FullName(baseRepo), err)
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to fetch pull request: %w", err)
+	}
+
+	// We have a PR and a baseRepo. Need to determine where the PR's branch lives as it might not live
+	// in baseRepo (where the PR resides).
 	headRemote := baseRemote
 	if pr.IsCrossRepository {
-		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+		headRemote, _ = configRemotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
 	cmdQueue := [][]string{}
 
 	newBranchName := pr.HeadRefName
+	// BUG we are not negotiating default branch detetction when cross repo and named remote
 	if headRemote != nil {
 		// there is an existing git remote for PR head
+		// TODO refSpec use is confusing here; what is wrong with just a `git fetch name` and letting
+		// git decide the refspec?
 		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
 		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
 
@@ -72,9 +95,13 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 		// local branch already exists
 		if git.VerifyRef("refs/heads/" + newBranchName) {
+			// TODO dedupe branch name and warn user potentially
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
 			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			// TERMINUS we fetched a named remote, switched branches, merged local branch with remote
+			// branch
 		} else {
+			// TODO why not let git write the config values with --track?
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
@@ -84,6 +111,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 		// avoid naming the new branch the same as the default branch
 		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+			// TODO warn the user that we did this in case they want to git push
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 
@@ -94,6 +122,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
 		} else {
 			// create a new branch
+			// TODO again with the refspecs?
 			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, fmt.Sprintf("%s:%s", ref, newBranchName)})
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
 		}
