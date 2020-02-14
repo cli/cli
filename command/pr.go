@@ -206,6 +206,9 @@ func prList(cmd *cobra.Command, args []string) error {
 		printMessage(colorErr, msg)
 		return nil
 	}
+	
+	prCountMsg := fmt.Sprintf("%d pull requests match your search\n", len(prs))
+	printMessage(colorableErr(cmd), prCountMsg)
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
