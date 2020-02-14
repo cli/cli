@@ -11,3 +11,7 @@
 
 # macOS
 .DS_Store
+
+# bazel
+.ijwb
+bazel-*

@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/cli/cli/cmd/gh",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//command:go_default_library",
+        "//context:go_default_library",
+        "//update:go_default_library",
+        "//utils:go_default_library",
+        "@com_github_mattn_go_isatty//:go_default_library",
+        "@com_github_mgutz_ansi//:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "gh",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["main_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//command:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+    ],
+)

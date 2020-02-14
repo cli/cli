@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["update.go"],
+    importpath = "github.com/cli/cli/update",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api:go_default_library",
+        "@com_github_hashicorp_go_version//:go_default_library",
+        "@in_gopkg_yaml_v3//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["update_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//api:go_default_library"],
+)

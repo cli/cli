@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "blank_context.go",
+        "config_file.go",
+        "config_setup.go",
+        "config_success.go",
+        "context.go",
+        "remote.go",
+    ],
+    importpath = "github.com/cli/cli/context",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api:go_default_library",
+        "//auth:go_default_library",
+        "//git:go_default_library",
+        "//internal/ghrepo:go_default_library",
+        "@com_github_mitchellh_go_homedir//:go_default_library",
+        "@in_gopkg_yaml_v3//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "config_file_test.go",
+        "remote_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//api:go_default_library",
+        "//git:go_default_library",
+        "//internal/ghrepo:go_default_library",
+    ],
+)

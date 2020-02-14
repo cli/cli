@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "client.go",
+        "fake_http.go",
+        "queries_issue.go",
+        "queries_pr.go",
+        "queries_repo.go",
+    ],
+    importpath = "github.com/cli/cli/api",
+    visibility = ["//visibility:public"],
+    deps = ["//internal/ghrepo:go_default_library"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "client_test.go",
+        "pull_request_test.go",
+    ],
+    embed = [":go_default_library"],
+)

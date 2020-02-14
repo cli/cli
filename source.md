@@ -1,3 +1,5 @@
+### [Build with Bazel](/bazel.md)
+
 # Installation from source
 
 1. Clone cli into `~/.githubcli`

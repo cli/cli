@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "git.go",
+        "remote.go",
+        "ssh_config.go",
+        "url.go",
+    ],
+    importpath = "github.com/cli/cli/git",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils:go_default_library",
+        "@com_github_mitchellh_go_homedir//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "git_test.go",
+        "remote_test.go",
+        "ssh_config_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["//test:go_default_library"],
+)

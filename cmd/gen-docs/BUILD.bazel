@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/cli/cli/cmd/gen-docs",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//command:go_default_library",
+        "@com_github_spf13_cobra//doc:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "gen-docs",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

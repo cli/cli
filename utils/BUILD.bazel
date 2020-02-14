@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "color.go",
+        "prepare_cmd.go",
+        "table_printer.go",
+        "utils.go",
+    ],
+    importpath = "github.com/cli/cli/utils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/browser:go_default_library",
+        "@com_github_mattn_go_colorable//:go_default_library",
+        "@com_github_mattn_go_isatty//:go_default_library",
+        "@com_github_mgutz_ansi//:go_default_library",
+        "@com_github_vilmibm_go_termd//:go_default_library",
+        "@org_golang_x_crypto//ssh/terminal:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["utils_test.go"],
+    embed = [":go_default_library"],
+)

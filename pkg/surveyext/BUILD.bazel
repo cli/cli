@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["editor.go"],
+    importpath = "github.com/cli/cli/pkg/surveyext",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_alecaivazis_survey_v2//:go_default_library",
+        "@com_github_alecaivazis_survey_v2//terminal:go_default_library",
+        "@com_github_kballard_go_shellquote//:go_default_library",
+    ],
+)

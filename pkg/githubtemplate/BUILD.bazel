@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["github_template.go"],
+    importpath = "github.com/cli/cli/pkg/githubtemplate",
+    visibility = ["//visibility:public"],
+    deps = ["@in_gopkg_yaml_v3//:go_default_library"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["github_template_test.go"],
+    embed = [":go_default_library"],
+)

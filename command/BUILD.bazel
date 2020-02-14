@@ -1,0 +1,52 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "completion.go",
+        "issue.go",
+        "pr.go",
+        "pr_checkout.go",
+        "pr_create.go",
+        "root.go",
+        "testing.go",
+        "title_body_survey.go",
+    ],
+    importpath = "github.com/cli/cli/command",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api:go_default_library",
+        "//context:go_default_library",
+        "//git:go_default_library",
+        "//internal/cobrafish:go_default_library",
+        "//internal/ghrepo:go_default_library",
+        "//pkg/githubtemplate:go_default_library",
+        "//pkg/surveyext:go_default_library",
+        "//utils:go_default_library",
+        "@com_github_alecaivazis_survey_v2//:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+        "@com_github_spf13_pflag//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "completion_test.go",
+        "issue_test.go",
+        "pr_checkout_test.go",
+        "pr_create_test.go",
+        "pr_test.go",
+        "root_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//context:go_default_library",
+        "//git:go_default_library",
+        "//test:go_default_library",
+        "//utils:go_default_library",
+        "@com_github_google_shlex//:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+        "@com_github_spf13_pflag//:go_default_library",
+    ],
+)

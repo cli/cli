@@ -1,0 +1,15 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
+
+# gazelle:prefix github.com/cli/cli
+gazelle(name = "gazelle")
+
+buildifier(
+    name = "buildifier-lint-fix",
+    lint_mode = "fix",
+)
+
+buildifier(
+    name = "buildifier-lint-warn",
+    lint_mode = "warn",
+)
