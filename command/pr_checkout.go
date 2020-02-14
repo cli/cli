@@ -71,7 +71,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	baseRemote, err = resolvedRemotes.RemoteForRepo(baseRepo)
 	remoteNotFound := err != nil
 	if remoteNotFound {
-		fmt.Fprintf(out, "Adding remote for %s at %s", utils.Cyan(ghrepo.FullName(baseRepo)), utils.Cyan("upstream"))
+		fmt.Fprintf(out, "Adding remote for %s at %s\n", utils.Cyan(ghrepo.FullName(baseRepo)), utils.Cyan("upstream"))
 		// TODO handle ssh
 		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
 		gitRemote, err := git.AddRemote("upstream", baseRepoURL, "")
