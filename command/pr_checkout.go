@@ -11,10 +11,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/*
+SCENARIOS TO TEST:
+ A. never checked out PR
+ A1. cloned my fork of parent, never added parent
+ A2. cloned my fork of parent, parent added as upstream
+ A3. cloned my fork of parent, parent not added, but upstream remote present (for some reason)
+ A4. cloned parent as origin, my fork added as fork (pr create setup)
+ A5. cloned parent as origin, my fork added as something else entirely
+ A6. -R specified
+ B. have checked out PR already
+ B1. cloned my fork of parent, never added parent
+ B2. cloned my fork of parent, parent added as upstream
+ B3. cloned my fork of parent, parent not added, but upstream remote present (for some reason)
+ B4. cloned parent as origin, my fork added as fork (pr create setup)
+ B5. cloned parent as origin, my fork added as something else entirely
+ B6. -R specified
+*/
+
 func prCheckout(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	currentBranch, _ := ctx.Branch()
 	remotes, err := ctx.Remotes()
+	// TOMORROW: think through if using determineBaseRepo would help here. Understand how this is
+	// working in all of my test cases and see what's broken (if anything). Decide if adding remotes
+	// is the smart thing to do.
+	// after all that, work on the duplicate branch name detection.
 	if err != nil {
 		return err
 	}
