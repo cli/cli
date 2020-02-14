@@ -125,6 +125,24 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	cmdQueue := [][]string{}
 
 	newBranchName := pr.HeadRefName
+
+	// Things to do:
+	// 1. detect and handle when newBranchName exists but is for a different branch
+	// 2. detect and handle when newBranchName is the same as default branch name
+	// 3. detect and handle when pr can be modified by maintainer (POSSIBLY NO-OP)
+
+	// TODO why is this checking head repo? aren't we concerned about base repo's default branch?
+	// additionally, won't we catch this if we just dedupe?
+	if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+		// TODO warn the user that we did this in case they want to git push
+		newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
+	}
+	branchExists := git.VerifyRef("refs/heads/" + newBranchName)
+	if branchExists {
+		// TODO figure out how to tell if the existing branch /is/ a prior checkout of the PR's branch
+		// vs. an unrelated branch of the same name.
+	}
+
 	// BUG we are not negotiating default branch detetction when cross repo and named remote
 	if headRemote != nil {
 		// there is an existing git remote for PR head
@@ -143,6 +161,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 			// TERMINUS we fetched a named remote, switched branches, merged local branch with remote
 			// branch
 		} else {
+			// TODO THIS IS NOW DEAD CODE
 			// TODO why not let git write the config values with --track?
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
