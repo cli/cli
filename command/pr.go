@@ -66,6 +66,12 @@ branch is opened.`,
 
 func prStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -96,28 +102,28 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	printHeader(out, "Current branch")
+	printHeader(out, palette, "Current branch")
 	if prPayload.CurrentPRs != nil {
-		printPrs(out, 0, prPayload.CurrentPRs...)
+		printPrs(out, palette, 0, prPayload.CurrentPRs...)
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
-		printMessage(out, message)
+		message := fmt.Sprintf("  There is no pull request associated with %s", palette.Cyan("["+currentPRHeadRef+"]"))
+		printMessage(out, palette, message)
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Created by you")
+	printHeader(out, palette, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
+		printPrs(out, palette, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
 	} else {
-		printMessage(out, "  You have no open pull requests")
+		printMessage(out, palette, "  You have no open pull requests")
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Requesting a code review from you")
+	printHeader(out, palette, "Requesting a code review from you")
 	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
+		printPrs(out, palette, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
 	} else {
-		printMessage(out, "  You have no pull requests to review")
+		printMessage(out, palette, "  You have no pull requests to review")
 	}
 	fmt.Fprintln(out)
 
@@ -126,6 +132,12 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 func prList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -204,7 +216,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if userSetFlags {
 			msg = "No pull requests match your search"
 		}
-		printMessage(colorErr, msg)
+		printMessage(colorErr, palette, msg)
 		return nil
 	}
 
@@ -214,9 +226,9 @@ func prList(cmd *cobra.Command, args []string) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForPR(pr))
+		table.AddField(prNum, nil, colorFuncForPR(pr, palette))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
-		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		table.AddField(pr.HeadLabel(), nil, palette.Cyan)
 		table.EndRow()
 	}
 	err = table.Render()
@@ -227,22 +239,22 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func colorFuncForPR(pr api.PullRequest) func(string) string {
+func colorFuncForPR(pr api.PullRequest, palette *utils.Palette) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
-		return utils.Gray
+		return palette.Gray
 	} else {
-		return colorFuncForState(pr.State)
+		return colorFuncForState(pr.State, palette)
 	}
 }
 
-func colorFuncForState(state string) func(string) string {
+func colorFuncForState(state string, palette *utils.Palette) func(string) string {
 	switch state {
 	case "OPEN":
-		return utils.Green
+		return palette.Green
 	case "CLOSED":
-		return utils.Red
+		return palette.Red
 	case "MERGED":
-		return utils.Magenta
+		return palette.Magenta
 	default:
 		return nil
 	}
@@ -250,6 +262,11 @@ func colorFuncForState(state string) func(string) string {
 
 func prView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
 
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -300,16 +317,16 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	if preview {
 		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
+		return printPrPreview(out, palette, pr)
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 }
 
-func printPrPreview(out io.Writer, pr *api.PullRequest) error {
-	fmt.Fprintln(out, utils.Bold(pr.Title))
-	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+func printPrPreview(out io.Writer, palette *utils.Palette, pr *api.PullRequest) error {
+	fmt.Fprintln(out, palette.Bold(pr.Title))
+	fmt.Fprintln(out, palette.Gray(fmt.Sprintf(
 		"%s wants to merge %s into %s from %s",
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
@@ -325,8 +342,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		fmt.Fprintln(out, md)
 		fmt.Fprintln(out)
 	}
-
-	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, palette.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
 }
 
@@ -390,20 +406,20 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 	return
 }
 
-func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
+func printPrs(w io.Writer, palette *utils.Palette, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prNumberColorFunc := utils.Green
+		prNumberColorFunc := palette.Green
 		if pr.IsDraft {
-			prNumberColorFunc = utils.Gray
+			prNumberColorFunc = palette.Gray
 		} else if pr.State == "MERGED" {
-			prNumberColorFunc = utils.Magenta
+			prNumberColorFunc = palette.Magenta
 		} else if pr.State == "CLOSED" {
-			prNumberColorFunc = utils.Red
+			prNumberColorFunc = palette.Red
 		}
 
-		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), palette.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -415,40 +431,40 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			var summary string
 			if checks.Failing > 0 {
 				if checks.Failing == checks.Total {
-					summary = utils.Red("All checks failing")
+					summary = palette.Red("All checks failing")
 				} else {
-					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+					summary = palette.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
 				}
 			} else if checks.Pending > 0 {
-				summary = utils.Yellow("Checks pending")
+				summary = palette.Yellow("Checks pending")
 			} else if checks.Passing == checks.Total {
-				summary = utils.Green("Checks passing")
+				summary = palette.Green("Checks passing")
 			}
 			fmt.Fprintf(w, " - %s", summary)
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
+			fmt.Fprintf(w, " - %s", palette.Red("Changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
+			fmt.Fprintf(w, " - %s", palette.Yellow("Review required"))
 		} else if reviews.Approved {
-			fmt.Fprintf(w, " - %s", utils.Green("Approved"))
+			fmt.Fprintf(w, " - %s", palette.Green("Approved"))
 		}
 
 		fmt.Fprint(w, "\n")
 	}
 	remaining := totalCount - len(prs)
 	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
+		fmt.Fprintf(w, palette.Gray("  And %d more\n"), remaining)
 	}
 }
 
-func printHeader(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Bold(s))
+func printHeader(w io.Writer, palette *utils.Palette, s string) {
+	fmt.Fprintln(w, palette.Bold(s))
 }
 
-func printMessage(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Gray(s))
+func printMessage(w io.Writer, palette *utils.Palette, s string) {
+	fmt.Fprintln(w, palette.Gray(s))
 }
 
 func replaceExcessiveWhitespace(s string) string {

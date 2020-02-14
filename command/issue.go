@@ -79,6 +79,11 @@ var issueViewCmd = &cobra.Command{
 
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -127,7 +132,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if userSetFlags {
 			msg = "No issues match your search"
 		}
-		printMessage(colorErr, msg)
+		printMessage(colorErr, palette, msg)
 		return nil
 	}
 
@@ -142,9 +147,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if labels != "" && table.IsTTY() {
 			labels = fmt.Sprintf("(%s)", labels)
 		}
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issueNum, nil, colorFuncForState(issue.State, palette))
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, utils.Gray)
+		table.AddField(labels, nil, palette.Gray)
 		table.EndRow()
 	}
 	table.Render()
@@ -154,6 +159,11 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 func issueStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -180,28 +190,28 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	printHeader(out, "Issues assigned to you")
+	printHeader(out, palette, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
-		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
+		printIssues(out, palette, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := fmt.Sprintf("  There are no issues assigned to you")
-		printMessage(out, message)
+		printMessage(out, palette, message)
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues mentioning you")
+	printHeader(out, palette, "Issues mentioning you")
 	if issuePayload.Mentioned.TotalCount > 0 {
-		printIssues(out, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
+		printIssues(out, palette, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
-		printMessage(out, "  There are no issues mentioning you")
+		printMessage(out, palette, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues opened by you")
+	printHeader(out, palette, "Issues opened by you")
 	if issuePayload.Authored.TotalCount > 0 {
-		printIssues(out, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
+		printIssues(out, palette, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
-		printMessage(out, "  There are no issues opened by you")
+		printMessage(out, palette, "  There are no issues opened by you")
 	}
 	fmt.Fprintln(out)
 
@@ -210,6 +220,10 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 
 func issueView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
 
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -234,7 +248,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 	if preview {
 		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
+		return printIssuePreview(out, palette, issue)
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
@@ -242,14 +256,14 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
+func printIssuePreview(out io.Writer, palette *utils.Palette, issue *api.Issue) error {
 	coloredLabels := labelList(*issue)
 	if coloredLabels != "" {
-		coloredLabels = utils.Gray(fmt.Sprintf("(%s)", coloredLabels))
+		coloredLabels = palette.Gray(fmt.Sprintf("(%s)", coloredLabels))
 	}
 
-	fmt.Fprintln(out, utils.Bold(issue.Title))
-	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+	fmt.Fprintln(out, palette.Bold(issue.Title))
+	fmt.Fprintln(out, palette.Gray(fmt.Sprintf(
 		"opened by %s. %s. %s",
 		issue.Author.Login,
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
@@ -265,8 +279,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 		fmt.Fprintln(out, md)
 		fmt.Fprintln(out)
 	}
-
-	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	fmt.Fprintf(out, palette.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
 }
 
@@ -402,12 +415,12 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
+func printIssues(w io.Writer, palette *utils.Palette, prefix string, totalCount int, issues []api.Issue) {
 	for _, issue := range issues {
-		number := utils.Green("#" + strconv.Itoa(issue.Number))
+		number := palette.Green("#" + strconv.Itoa(issue.Number))
 		coloredLabels := labelList(issue)
 		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
+			coloredLabels = palette.Gray(fmt.Sprintf("  (%s)", coloredLabels))
 		}
 
 		now := time.Now()
@@ -416,11 +429,11 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
 			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
 			coloredLabels,
-			utils.Gray(utils.FuzzyAgo(ago)))
+			palette.Gray(utils.FuzzyAgo(ago)))
 	}
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)
+		fmt.Fprintf(w, palette.Gray("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 

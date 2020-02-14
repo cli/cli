@@ -16,6 +16,12 @@ import (
 
 func prCreate(cmd *cobra.Command, _ []string) error {
 	ctx := contextForCommand(cmd)
+
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
@@ -134,8 +140,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
-		utils.Cyan(headBranchLabel),
-		utils.Cyan(baseBranch),
+		palette.Cyan(headBranchLabel),
+		palette.Cyan(baseBranch),
 		ghrepo.FullName(baseRepo))
 
 	action := SubmitAction

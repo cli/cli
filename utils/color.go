@@ -1,16 +1,38 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
+	"github.com/spf13/cobra"
 )
 
 var _isStdoutTerminal = false
 var checkedTerminal = false
+
+type ColorStrategy int
+
+const (
+	NeverColor ColorStrategy = iota + 1
+	AlwaysColor
+	AutoColor
+)
+
+func parseColorStrategy(strategy string) (ColorStrategy, error) {
+	switch strategy {
+	case "never":
+		return NeverColor, nil
+	case "always":
+		return AlwaysColor, nil
+	case "auto":
+		return AutoColor, nil
+	}
+	return AutoColor, fmt.Errorf("Couldnt parse color strategy \"%s\"", strategy)
+}
 
 func isStdoutTerminal() bool {
 	if !checkedTerminal {
@@ -30,36 +52,61 @@ func NewColorable(f *os.File) io.Writer {
 	return colorable.NewColorable(f)
 }
 
-func makeColorFunc(color string) func(string) string {
+func makeColorFunc(color string, colorStrategy ColorStrategy) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
-		if isStdoutTerminal() {
+		switch colorStrategy {
+		case AlwaysColor:
 			return cf(arg)
+		case NeverColor:
+			return arg
+		case AutoColor:
+			if isStdoutTerminal() {
+				return cf(arg)
+			} else {
+				return arg
+			}
+		default: // Unreachable
+			return arg
 		}
-		return arg
 	}
 }
 
-// Magenta outputs ANSI color if stdout is a tty
-var Magenta = makeColorFunc("magenta")
+type Palette struct {
+	Magenta func(string) string
+	Cyan    func(string) string
+	Red     func(string) string
+	Yellow  func(string) string
+	Blue    func(string) string
+	Green   func(string) string
+	Gray    func(string) string
+	Bold    func(string) string
+}
 
-// Cyan outputs ANSI color if stdout is a tty
-var Cyan = makeColorFunc("cyan")
+func NewPalette(cmd *cobra.Command) (*Palette, error) {
+	noColorFlag, err := cmd.Flags().GetBool("no-color")
+	if err != nil {
+		return nil, fmt.Errorf("could not parse no-color: %w", err)
+	}
 
-// Red outputs ANSI color if stdout is a tty
-var Red = makeColorFunc("red")
+	colorStrategyFlag, _ := cmd.Flags().GetString("color")
+	colorStrategy, err := parseColorStrategy(colorStrategyFlag)
+	if err != nil {
+		return nil, err
+	}
 
-// Yellow outputs ANSI color if stdout is a tty
-var Yellow = makeColorFunc("yellow")
+	if noColorFlag {
+		colorStrategy = NeverColor
+	}
 
-// Blue outputs ANSI color if stdout is a tty
-var Blue = makeColorFunc("blue")
-
-// Green outputs ANSI color if stdout is a tty
-var Green = makeColorFunc("green")
-
-// Gray outputs ANSI color if stdout is a tty
-var Gray = makeColorFunc("black+h")
-
-// Bold outputs ANSI color if stdout is a tty
-var Bold = makeColorFunc("default+b")
+	return &Palette{
+		Magenta: makeColorFunc("magenta", colorStrategy),
+		Cyan:    makeColorFunc("cyan", colorStrategy),
+		Red:     makeColorFunc("red", colorStrategy),
+		Yellow:  makeColorFunc("yellow", colorStrategy),
+		Blue:    makeColorFunc("blue", colorStrategy),
+		Green:   makeColorFunc("green", colorStrategy),
+		Gray:    makeColorFunc("black+h", colorStrategy),
+		Bold:    makeColorFunc("default+b", colorStrategy),
+	}, nil
+}

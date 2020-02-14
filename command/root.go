@@ -41,6 +41,8 @@ func init() {
 	RootCmd.SetVersionTemplate(versionOutput)
 
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+	RootCmd.PersistentFlags().StringP("color", "c", "auto", "Colorize the output. `WHEN` can be \"always\", \"auto\", or \"never\"")
+	RootCmd.PersistentFlags().Bool("no-color", false, "Force no colorization of output, equivalent to --color=never")
 	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
 	RootCmd.Flags().Bool("version", false, "Show gh version")
 	// TODO:
@@ -121,6 +123,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	token, err := ctx.AuthToken()
 	if err != nil {
 		return nil, err
+
 	}
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
