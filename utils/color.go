@@ -3,10 +3,12 @@ package utils
 import (
 	"io"
 	"os"
+	"fmt"
 
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
+	"github.com/spf13/cobra"
 )
 
 var _isStdoutTerminal = false
@@ -26,36 +28,41 @@ func NewColorable(f *os.File) io.Writer {
 	return colorable.NewColorable(f)
 }
 
-func makeColorFunc(color string) func(string) string {
+func makeColorFunc(color string, forceColor bool) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
-		if isStdoutTerminal() {
+		if isStdoutTerminal() || forceColor {
 			return cf(arg)
 		}
 		return arg
 	}
 }
 
-// Magenta outputs ANSI color if stdout is a tty
-var Magenta = makeColorFunc("magenta")
+type Palette struct {
+	Magenta func(string) string
+	Cyan func(string) string
+	Red func(string) string
+	Yellow func(string) string
+	Blue func(string) string
+	Green func(string) string
+	Gray func(string) string
+	Bold func(string) string
+}
 
-// Cyan outputs ANSI color if stdout is a tty
-var Cyan = makeColorFunc("cyan")
+func NewPalette(cmd *cobra.Command) (*Palette, error) {
+	forceColor, err := cmd.Flags().GetBool("force-color")
+	if err != nil {
+		return nil, fmt.Errorf("could not parse force-color: %w", err)
+	}
 
-// Red outputs ANSI color if stdout is a tty
-var Red = makeColorFunc("red")
-
-// Yellow outputs ANSI color if stdout is a tty
-var Yellow = makeColorFunc("yellow")
-
-// Blue outputs ANSI color if stdout is a tty
-var Blue = makeColorFunc("blue")
-
-// Green outputs ANSI color if stdout is a tty
-var Green = makeColorFunc("green")
-
-// Gray outputs ANSI color if stdout is a tty
-var Gray = makeColorFunc("black+h")
-
-// Bold outputs ANSI color if stdout is a tty
-var Bold = makeColorFunc("default+b")
+	return &Palette{
+		Magenta: makeColorFunc("magenta", forceColor),
+		Cyan: makeColorFunc("cyan", forceColor),
+		Red: makeColorFunc("red", forceColor),
+		Yellow: makeColorFunc("yellow", forceColor),
+		Blue: makeColorFunc("blue", forceColor),
+		Green: makeColorFunc("green", forceColor),
+		Gray: makeColorFunc("black+h", forceColor),
+		Bold: makeColorFunc("default+b", forceColor),
+	}, nil
+}

@@ -16,6 +16,12 @@ import (
 
 func prCreate(cmd *cobra.Command, _ []string) error {
 	ctx := contextForCommand(cmd)
+
+	palette, err := utils.NewPalette(cmd)
+	if err != nil {
+		return err
+	}
+
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
@@ -122,8 +128,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
-		utils.Cyan(headBranchLabel),
-		utils.Cyan(baseBranch),
+		palette.Cyan(headBranchLabel),
+		palette.Cyan(baseBranch),
 		ghrepo.FullName(baseRepo))
 
 	title, err := cmd.Flags().GetString("title")
