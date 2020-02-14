@@ -281,3 +281,69 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 
 	return &resp.Repository.Issue, nil
 }
+
+// IssueID retrieves the ID of an issue in a GitHub repository
+func IssueID(client *Client, repo ghrepo.Interface, issueNumber int) (string, error) {
+	query := `
+	query($owner: String!, $name: String!, $number: Int!) {
+		repository(owner: $owner, name: $name) {
+			issue(number: $number) {
+				id
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{
+		"owner":  repo.RepoOwner(),
+		"name":   repo.RepoName(),
+		"number": issueNumber,
+	}
+
+	result := struct {
+		Repository struct {
+			Issue struct {
+				ID string
+			}
+		}
+	}{}
+
+	err := client.GraphQL(query, variables, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.Repository.Issue.ID, nil
+}
+
+// IssueClose closes an issue in a GitHub repository
+func IssueClose(client *Client, params map[string]interface{}) error {
+	query := `
+	mutation CloseIssue($input: CloseIssueInput!) {
+		closeIssue(input: $input) {
+			issue {
+				url
+			}
+		}
+	}`
+
+	inputParams := make(map[string]interface{})
+	for key, val := range params {
+		inputParams[key] = val
+	}
+	variables := map[string]interface{}{
+		"input": inputParams,
+	}
+
+	result := struct {
+		CloseIssue struct {
+			Issue Issue
+		}
+	}{}
+
+	err := client.GraphQL(query, variables, &result)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -38,6 +39,8 @@ func init() {
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
+
+	issueCmd.AddCommand(issueCloseCmd)
 }
 
 var issueCmd = &cobra.Command{
@@ -74,6 +77,18 @@ var issueViewCmd = &cobra.Command{
 	},
 	Short: "View an issue in the browser",
 	RunE:  issueView,
+}
+
+var issueCloseCmd = &cobra.Command{
+	Use: "close {<number> | <url> | <branch>}",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return FlagError{errors.New("issue required as argument")}
+		}
+		return nil
+	},
+	Short: "Close an issue",
+	RunE:  issueClose,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -224,6 +239,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	log.Println(issue)
 	openURL := issue.URL
 
 	preview, err := cmd.Flags().GetBool("preview")
@@ -385,6 +401,43 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	} else {
 		panic("Unreachable state")
 	}
+
+	return nil
+}
+
+func issueClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issue, err := issueFromArg(apiClient, *baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	issueID, err := api.IssueID(apiClient, *baseRepo, issue.Number)
+	if err != nil {
+		return err
+	}
+
+	params := map[string]interface{}{
+		"issueId": issueID,
+	}
+
+	err = api.IssueClose(apiClient, params)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "Closing issue %s.\n", issue.URL)
 
 	return nil
 }
