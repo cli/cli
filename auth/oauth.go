@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -20,7 +21,7 @@ func randomString(length int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", b), nil
+	return hex.EncodeToString(b), nil
 }
 
 // OAuthFlow represents the setup for authenticating with GitHub
