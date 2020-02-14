@@ -30,3 +30,37 @@ bazel-bin/cmd/gh/darwin_amd64_stripped/gh
 bazel test //...
 bazel test //api:go_default_test
 ```
+
+# Add or update BUILD files
+
+Go is a language with first-class support from Bazel and there is an official tool available which enables automated generation of BUILD files. To add new BUILD files (when adding or source files), invoke the following:
+
+```
+bazel run //:gazelle
+```
+
+This will create or update BUILD files as needed to compile, run, and test the project.
+
+# Update packages
+
+During development, if dependencies have changed you'll want to run `gazelle` to update the WORKSPACE with the changes to `go.mod`. That can be done with the following:
+
+```
+bazel run //:gazelle -- update-repos -from_file=go.mod
+```
+
+# Lint BUILD files
+
+In the event that you need to manually edit BUILD files or have made changes to the WORKSPACE, there are targets available to lint these files.
+
+To view linter errors:
+
+```
+bazel run //:buildifier-lint-warn
+```
+
+To fix all lint issues silently:
+
+```
+bazel run //:buildifier-lint-fix
+```
