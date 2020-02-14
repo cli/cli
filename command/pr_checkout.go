@@ -90,12 +90,37 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to fetch pull request: %w", err)
 	}
 
+	// baseRemote: where the PR lives
+	// headRemote: where the branch (headRefName) attached to the PR lives
+
 	// We have a PR and a baseRepo. Need to determine where the PR's branch lives as it might not live
 	// in baseRepo (where the PR resides).
 	headRemote := baseRemote
 	if pr.IsCrossRepository {
-		headRemote, _ = configRemotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+		headRemote, err = configRemotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+		headRemoteNotFound := err != nil
+		if headRemoteNotFound {
+			// The pr originates from a repo we don't have in remotes yet. Let's add one.
+			headRepoOwner := pr.HeadRepositoryOwner.Login
+			headRepoName := pr.HeadRepository.Name
+			headRepoFullName := fmt.Sprintf("%s/%s", headRepoOwner, headRepoName)
+			headRepoURL := fmt.Sprintf("https://github.com/%s.git", headRepoFullName)
+			fmt.Fprintf(out, "Adding remote for %s at %s\n", utils.Cyan(headRepoFullName), utils.Cyan(headRepoOwner))
+			gitRemote, err := git.AddRemote(headRepoOwner, headRepoURL, "")
+			if err != nil {
+				return fmt.Errorf("error adding remote: %w", err)
+			}
+			headRemote = &context.Remote{
+				Remote: gitRemote,
+				Owner:  headRepoOwner,
+				Repo:   headRepoName,
+			}
+		}
 	}
+
+	// TODO delete
+	fmt.Printf("BASE REMOTE: %s\n", ghrepo.FullName(baseRemote))
+	fmt.Printf("HEAD REMOTE: %s\n", ghrepo.FullName(headRemote))
 
 	cmdQueue := [][]string{}
 
