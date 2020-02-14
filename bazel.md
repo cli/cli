@@ -1,10 +1,10 @@
 # Building with Bazel
 
-Bazel enables a nice developer experience as well as correct, reproducable release builds.
+Bazel enables a nice developer experience as well as fast, correct, reproducible release builds.
 
 # Status
 
-Currently Bazel functionality in this project is limited to local dev & test. Release build support will be added later if there's any interest in merging Bazel capabilites into the project.
+Currently Bazel functionality in this project is limited to local dev & test. Release build support will be added later if there's any interest in merging Bazel capabilities into the project.
 
 # Setup
 
