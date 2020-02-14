@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
@@ -45,6 +46,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	currentBranch, _ := ctx.Branch()
 	configRemotes, err := ctx.Remotes()
+	out := colorableOut(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to read git config: %w", err)
 	}
@@ -63,9 +65,24 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	baseRemote, err := resolvedRemotes.RemoteForRepo(baseRepo)
-	if err != nil {
-		return fmt.Errorf("failed to find remote for base repo %s: %w", ghrepo.FullName(baseRepo), err)
+	fmt.Fprintf(out, "Querying %s for PR %s\n", utils.Cyan(ghrepo.FullName(baseRepo)), utils.Cyan(args[0]))
+
+	var baseRemote *context.Remote
+	baseRemote, err = resolvedRemotes.RemoteForRepo(baseRepo)
+	remoteNotFound := err != nil
+	if remoteNotFound {
+		fmt.Fprintf(out, "Adding remote for %s at %s", utils.Cyan(ghrepo.FullName(baseRepo)), utils.Cyan("upstream"))
+		// TODO handle ssh
+		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
+		gitRemote, err := git.AddRemote("upstream", baseRepoURL, "")
+		if err != nil {
+			return fmt.Errorf("error adding remote: %w", err)
+		}
+		baseRemote = &context.Remote{
+			Remote: gitRemote,
+			Owner:  baseRepo.RepoOwner(),
+			Repo:   baseRepo.RepoName(),
+		}
 	}
 
 	pr, err := prFromArg(apiClient, baseRepo, args[0])
