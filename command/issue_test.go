@@ -109,6 +109,11 @@ func TestIssueList(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
+	eq(t, output.Stderr(), `
+3 issues in OWNER/REPO
+
+`)
+
 	expectedIssues := []*regexp.Regexp{
 		regexp.MustCompile(`(?m)^1\t.*won`),
 		regexp.MustCompile(`(?m)^2\t.*too`),

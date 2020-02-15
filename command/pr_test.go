@@ -171,6 +171,10 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	eq(t, output.Stderr(), `
+3 pull requests in OWNER/REPO
+
+`)
 	eq(t, output.String(), `32	New feature	feature
 29	Fixed bad bug	hubot:bug-fix
 28	Improve documentation	docs
