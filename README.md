@@ -85,8 +85,8 @@ Install a prebuilt binary from the [releases page][]
 
 ### [Build from source](/source.md)
 
-[docs]: https://cli.github.com/manual
-[scoop]: https://scoop.sh
-[releases page]: https://github.com/cli/cli/releases/latest
-[hub]: https://github.com/github/hub
-[contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
+- [docs](https://cli.github.com/manual)
+- [scoop](https://scoop.sh)
+- [releases page](https://github.com/cli/cli/releases/latest)
+- [hub](https://github.com/github/hub)
+- [contributing page](https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md)
