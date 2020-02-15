@@ -10,6 +10,8 @@ $ git clone https://github.com/cli/cli.git ~/.githubcli
 $ cd ~/.githubcli && make
 ```
 
+_Note: it requires Go 1.13+_ 
+
 3. Add `~/.githubcli/bin` to your $PATH for access to the gh command-line utility.
 
   * For **bash**:
