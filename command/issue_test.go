@@ -142,9 +142,8 @@ func TestIssueList_withFlags(t *testing.T) {
 
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), `
-Issues for OWNER/REPO
+No issues match your search in OWNER/REPO
 
-No issues match your search
 `)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)

@@ -192,9 +192,8 @@ func TestPRList_filtering(t *testing.T) {
 
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), `
-Pull requests for OWNER/REPO
+No pull requests match your search in OWNER/REPO
 
-No pull requests match your search
 `)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)

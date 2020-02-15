@@ -135,7 +135,6 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(*baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -192,6 +191,8 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	title := fmt.Sprintf("\n%s in %s\n\n", "%s", ghrepo.FullName(*baseRepo))
+
 	if len(prs) == 0 {
 		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
 		msg := "There are no open pull requests"
@@ -203,13 +204,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		if userSetFlags {
 			msg = "No pull requests match your search"
 		}
-		printMessage(colorErr, msg)
+		fmt.Fprintf(colorErr, title, msg)
 		return nil
 	}
-	
-	prCountMsg := fmt.Sprintf("%d pull requests match your search\n", len(prs))
-	printMessage(colorableErr(cmd), prCountMsg)
 
+	fmt.Fprintf(colorableErr(cmd), title, utils.Pluralize(len(prs), "pull request"))
+	
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
 		prNum := strconv.Itoa(pr.Number)

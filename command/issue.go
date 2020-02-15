@@ -108,12 +108,12 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s\n\n", ghrepo.FullName(*baseRepo))
-
 	issues, err := api.IssueList(apiClient, *baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
 	}
+
+	title := fmt.Sprintf("\n%s in %s\n\n", "%s", ghrepo.FullName(*baseRepo))
 
 	if len(issues) == 0 {
 		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is actually an issue
@@ -126,9 +126,11 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if userSetFlags {
 			msg = "No issues match your search"
 		}
-		printMessage(colorErr, msg)
+		fmt.Fprintf(colorErr, title, msg)
 		return nil
 	}
+
+	fmt.Fprintf(colorableErr(cmd), title, utils.Pluralize(len(issues), "issue"))
 
 	out := cmd.OutOrStdout()
 	table := utils.NewTablePrinter(out)
