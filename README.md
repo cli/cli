@@ -44,7 +44,9 @@ Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][]:
+`gh` is available via [scoop][], [Chocolatey][], and as signed MSI's:
+
+#### scoop
 
 Install:
 
@@ -54,6 +56,22 @@ scoop install gh
 ```
 
 Upgrade: `scoop update gh`
+
+#### Chocolatey
+
+Install:
+
+```
+choco install gh
+```
+
+Upgrade:
+
+```
+choco upgrade gh
+```
+
+#### Signed MSI
 
 Signed MSI installers are also available on the [releases page][].
 
@@ -87,6 +105,7 @@ Install a prebuilt binary from the [releases page][]
 
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
+[Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
