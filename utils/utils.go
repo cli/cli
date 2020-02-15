@@ -3,6 +3,8 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/pkg/browser"
@@ -76,4 +78,12 @@ func FuzzyAgo(ago time.Duration) string {
 	}
 
 	return fmtDuration(int(ago.Hours()/24/365), "year")
+}
+
+//Compact to trim alls spaces in a string, mainly useful for comparing the test responses
+func Compact(a string) string {
+	w := regexp.MustCompile(`\s+`)
+	sF := w.ReplaceAllString(a, "")
+	sF = strings.Replace(sF, "\\u0026", "&", -1)
+	return sF
 }

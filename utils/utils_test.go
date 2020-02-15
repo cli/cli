@@ -36,3 +36,30 @@ func TestFuzzyAgo(t *testing.T) {
 		}
 	}
 }
+
+func TestCompact(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  string
+		want string
+	}{
+		{
+			name: "string with space in b/w",
+			arg:  "This is an input string with spaces",
+			want: "Thisisaninputstringwithspaces",
+		},
+		{
+			name: "string with new lines",
+			arg: `First line
+			Second line`,
+			want: "FirstlineSecondline",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Compact(tt.arg); got != tt.want {
+				t.Errorf("Compact() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

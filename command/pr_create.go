@@ -107,16 +107,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		break
 	}
 
-	isWeb, err := cmd.Flags().GetBool("web")
-	if err != nil {
-		return fmt.Errorf("could not parse web: %q", err)
-	}
-	if isWeb {
-		openURL := fmt.Sprintf(`https://github.com/%s/pull/%s`, ghrepo.FullName(headRepo), headBranch)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-		return utils.OpenInBrowser(openURL)
-	}
-
 	headBranchLabel := headBranch
 	if !ghrepo.IsSame(baseRepo, headRepo) {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
@@ -139,7 +129,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	interactive := title == "" || body == ""
 
-	if interactive {
+	isWeb, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return fmt.Errorf("could not parse web: %q", err)
+	}
+
+	if isWeb {
+		action = PreviewAction
+	} else if interactive {
 		var templateFiles []string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
@@ -196,8 +193,15 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	} else if action == PreviewAction {
+		var title, body string
+		if title != "" {
+			title = fmt.Sprintf("&title=%s", url.QueryEscape(title))
+		}
+		if body != "" {
+			body = fmt.Sprintf("&body=%s", url.QueryEscape(body))
+		}
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/compare/%s...%s?expand=1&title=%s&body=%s",
+			"https://github.com/%s/compare/%s...%s?expand=1%s%s",
 			ghrepo.FullName(baseRepo),
 			baseBranch,
 			headBranchLabel,
