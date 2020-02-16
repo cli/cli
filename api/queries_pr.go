@@ -383,7 +383,6 @@ func PullRequestBySha(client *Client, vars map[string]interface{}) (*PullRequest
 		fmt.Sprintf("repo:%s/%s", owner, repo),
 		sha,
 		"is:pr",
-		"is:merged",
 		"sort:created-asc",
 	}
 	variables["q"] = strings.Join(search, " ")
