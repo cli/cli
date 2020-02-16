@@ -22,6 +22,7 @@ gh pr view [{<number> | <url> | <branch>}] [flags]
 
 ```
   -p, --preview   Display preview of pull request content
+  -s, --sha       Commit sha hash of pull request
 ```
 
 ### Options inherited from parent commands
