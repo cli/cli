@@ -70,8 +70,15 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
+	baseOverride, err := cmd.Flags().GetString("repo")
 	if err != nil {
+		return err
+	}
+	hasBaseOverride := baseOverride != ""
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
+	// Ignore error if has baseRepo is specified
+	// https://github.com/cli/cli/issues/339
+	if !hasBaseOverride && err != nil {
 		return err
 	}
 	currentUser, err := ctx.AuthLogin()

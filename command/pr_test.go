@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -96,6 +97,37 @@ func TestPRStatus(t *testing.T) {
 			t.Errorf("output did not match regexp /%s/", r)
 		}
 	}
+}
+
+func TestPRStatus_externalRepo(t *testing.T) {
+	initContext = func() context.Context {
+		ctx := context.NewBlank()
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status -R OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedPrs := []*regexp.Regexp{
+		regexp.MustCompile(`#8.*\[strawberries\]`),
+		regexp.MustCompile(`#9.*\[apples\]`),
+		regexp.MustCompile(`#11.*\[figs\]`),
+	}
+
+	for _, r := range expectedPrs {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/", r)
+		}
+	}
+
 }
 
 func TestPRStatus_reviewsAndChecks(t *testing.T) {

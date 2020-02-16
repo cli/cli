@@ -163,9 +163,12 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 	if err != nil {
 		return nil, err
 	}
+	hasBaseOverride := baseOverride != ""
 
 	remotes, err := ctx.Remotes()
-	if err != nil {
+	// Ignore error for remotes if has baseRepo is specified
+	// https://github.com/cli/cli/issues/339
+	if !hasBaseOverride && err != nil {
 		return nil, err
 	}
 
