@@ -1,5 +1,11 @@
 # Installation from source
 
+0. Verify that you have Go 1.13+ installed
+```
+$ go version
+go version go1.13.7
+```
+
 1. Clone cli into `~/.githubcli`
 ```
 $ git clone https://github.com/cli/cli.git ~/.githubcli
@@ -9,8 +15,6 @@ $ git clone https://github.com/cli/cli.git ~/.githubcli
 ```
 $ cd ~/.githubcli && make
 ```
-
-_Note: it requires Go 1.13+_ 
 
 3. Add `~/.githubcli/bin` to your $PATH for access to the gh command-line utility.
 
