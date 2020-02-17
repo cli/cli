@@ -44,7 +44,7 @@ Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][], [Chocolatey][], and as signed MSI's:
+`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
 
 #### scoop
 
@@ -73,7 +73,7 @@ choco upgrade gh
 
 #### Signed MSI
 
-Signed MSI installers are also available on the [releases page][].
+MSI installers are available for download on the [releases page][].
 
 ### Debian/Ubuntu Linux
 
