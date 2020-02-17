@@ -1,6 +1,9 @@
 ---
-name: "\U00002B50 Submit a request"
+name: "⭐ Submit a request"
 about: Surface a feature or problem that you think should be solved
+title: ''
+labels: enhancement
+assignees: ''
 
 ---
 
