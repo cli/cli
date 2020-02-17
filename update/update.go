@@ -21,7 +21,7 @@ type StateEntry struct {
 	LatestRelease      ReleaseInfo `yaml:"latest_release"`
 }
 
-// CheckForUpdate checks whether this software has had a newer relase on GitHub
+// CheckForUpdate checks whether this software has had a newer release on GitHub
 func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	latestRelease, err := getLatestReleaseInfo(client, stateFilePath, repo, currentVersion)
 	if err != nil {
