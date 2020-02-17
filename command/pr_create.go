@@ -107,20 +107,27 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		break
 	}
 
+	headBranchLabel := headBranch
+	if !ghrepo.IsSame(baseRepo, headRepo) {
+		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+	}
+
+	compareURL := fmt.Sprintf(
+		"https://github.com/%s/compare/%s...%s?expand=1",
+		ghrepo.FullName(baseRepo),
+		baseBranch,
+		headBranchLabel,
+	)
+
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return fmt.Errorf("could not parse web: %q", err)
 	}
 	if isWeb {
-		openURL := fmt.Sprintf(`https://github.com/%s/pull/%s`, ghrepo.FullName(headRepo), headBranch)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-		return utils.OpenInBrowser(openURL)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
+		return utils.OpenInBrowser(compareURL)
 	}
 
-	headBranchLabel := headBranch
-	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
-	}
 	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
 		utils.Cyan(headBranchLabel),
 		utils.Cyan(baseBranch),
@@ -197,10 +204,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	} else if action == PreviewAction {
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/compare/%s...%s?expand=1&title=%s&body=%s",
-			ghrepo.FullName(baseRepo),
-			baseBranch,
-			headBranchLabel,
+			"%s&title=%s&body=%s",
+			compareURL,
 			url.QueryEscape(title),
 			url.QueryEscape(body),
 		)

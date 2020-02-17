@@ -98,11 +98,11 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/feature in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
-	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/pull/feature")
+	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
