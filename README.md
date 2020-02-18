@@ -89,6 +89,13 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
 
+### openSUSE/SUSE Linux
+
+Install and upgrade:
+
+1. Download the `.rpm` file from the [releases page][]
+2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
+
 ### Arch Linux
 
 Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
