@@ -5,25 +5,37 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
 )
 
-// Version is dynamically set at build time in the Makefile
+// Version is dynamically set by the toolchain or overriden by the Makefile.
 var Version = "DEV"
 
-// BuildDate is dynamically set at build time in the Makefile
-var BuildDate = "YYYY-MM-DD"
+// BuildDate is dynamically set at build time in the Makefile.
+var BuildDate = "" // YYYY-MM-DD
 
 var versionOutput = ""
 
 func init() {
-	RootCmd.Version = fmt.Sprintf("%s (%s)", strings.TrimPrefix(Version, "v"), BuildDate)
+	if Version == "DEV" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "(devel)" {
+			Version = info.Main.Version
+		}
+	}
+	Version = strings.TrimPrefix(Version, "v")
+	if BuildDate == "" {
+		RootCmd.Version = Version
+	} else {
+		RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
+	}
 	versionOutput = fmt.Sprintf("gh version %s\n%s\n", RootCmd.Version, changelogURL(Version))
 	RootCmd.AddCommand(versionCmd)
 	RootCmd.SetVersionTemplate(versionOutput)
@@ -150,4 +162,34 @@ func changelogURL(version string) string {
 
 	url := fmt.Sprintf("%s/releases/tag/v%s", path, strings.TrimPrefix(version, "v"))
 	return url
+}
+
+func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interface, error) {
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	baseOverride, err := cmd.Flags().GetString("repo")
+	if err != nil {
+		return nil, err
+	}
+
+	remotes, err := ctx.Remotes()
+	if err != nil {
+		return nil, err
+	}
+
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	var baseRepo ghrepo.Interface
+	baseRepo, err = repoContext.BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+
+	return &baseRepo, nil
 }

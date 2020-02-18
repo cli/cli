@@ -18,10 +18,10 @@ const (
 )
 
 var (
-	// The GitHub app that is meant for development
-	oauthClientID = "4d747ba5675d5d66553f"
+	// The "GitHub CLI" OAuth app
+	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
-	oauthClientSecret = "d4fee7b3f9c2ef4284a5ca7be0ee200cf15b6f8d"
+	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
 
 // TODO: have a conversation about whether this belongs in the "context" package

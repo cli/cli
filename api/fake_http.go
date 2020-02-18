@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,4 +35,24 @@ func (f *FakeHTTP) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp.Request = req
 	f.Requests = append(f.Requests, req)
 	return resp, nil
+}
+
+func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
+	body := bytes.NewBufferString(fmt.Sprintf(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "%s",
+			"owner": {"login": "%s"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "WRITE"
+		} } }
+	`, repo, owner))
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       ioutil.NopCloser(body),
+	}
+	f.responseStubs = append(f.responseStubs, resp)
 }

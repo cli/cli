@@ -5,6 +5,10 @@ the terminal next to where you are already working with `git` and your code.
 
 ![screenshot](https://user-images.githubusercontent.com/98482/73286699-9f922180-41bd-11ea-87c9-60a2d31fd0ac.png)
 
+## Availability
+
+While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It does not currently support repositories hosted on GitHub Enterprise Server or other hosting providers.
+
 ## We need your feedback
 
 GitHub CLI is currently early in its development, and we're hoping to get feedback from people using it.
@@ -40,7 +44,9 @@ Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][]:
+`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+
+#### scoop
 
 Install:
 
@@ -51,7 +57,23 @@ scoop install gh
 
 Upgrade: `scoop update gh`
 
-Signed MSI installers are also available on the [releases page][].
+#### Chocolatey
+
+Install:
+
+```
+choco install gh
+```
+
+Upgrade:
+
+```
+choco upgrade gh
+```
+
+#### Signed MSI
+
+MSI installers are available for download on the [releases page][].
 
 ### Debian/Ubuntu Linux
 
@@ -67,15 +89,30 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
 
+### openSUSE/SUSE Linux
+
+Install and upgrade:
+
+1. Download the `.rpm` file from the [releases page][]
+2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
+
+### Arch Linux
+
+Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
+
+```bash
+$ yay -S github-cli
+```
+
 ### Other platforms
 
 Install a prebuilt binary from the [releases page][]
 
 ### [Build from source](/source.md)
 
-<!-- TODO eventually we'll have https://cli.github.com/manual -->
-[docs]: https://cli.github.io/cli/gh
+[docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
+[Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md

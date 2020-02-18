@@ -73,6 +73,7 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 func TestPRStatus(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
 	defer jsonFile.Close()
@@ -100,6 +101,7 @@ func TestPRStatus(t *testing.T) {
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
 	defer jsonFile.Close()
@@ -111,9 +113,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"- Checks passing - changes requested",
-		"- Checks pending - approved",
-		"- 1/3 checks failing - review required",
+		"- Checks passing - Changes requested",
+		"- Checks pending - Approved",
+		"- 1/3 checks failing - Review required",
 	}
 
 	for _, line := range expected {
@@ -126,6 +128,7 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {} }
@@ -157,6 +160,7 @@ Requesting a code review from you
 func TestPRList(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prList.json")
 	defer jsonFile.Close()
@@ -176,6 +180,7 @@ func TestPRList(t *testing.T) {
 func TestPRList_filtering(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -192,7 +197,7 @@ Pull requests for OWNER/REPO
 No pull requests match your search
 `)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			State  []string
@@ -208,6 +213,7 @@ No pull requests match your search
 func TestPRList_filteringAssignee(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -217,7 +223,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Q string
@@ -231,6 +237,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
@@ -244,6 +251,7 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 func TestPRView_preview(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
 	defer jsonFile.Close()
@@ -273,6 +281,7 @@ func TestPRView_preview(t *testing.T) {
 func TestPRView_previewCurrentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
 	defer jsonFile.Close()
@@ -304,9 +313,44 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 	}
 }
 
+func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prView_EmptyBody.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view -p")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`Blueberries are a good fruit`),
+		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestPRView_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
 	defer jsonFile.Close()
@@ -344,6 +388,7 @@ func TestPRView_currentBranch(t *testing.T) {
 func TestPRView_noResultsForBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
 	defer jsonFile.Close()
@@ -374,6 +419,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 func TestPRView_numberArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -405,6 +451,7 @@ func TestPRView_numberArg(t *testing.T) {
 func TestPRView_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -436,6 +483,7 @@ func TestPRView_urlArg(t *testing.T) {
 func TestPRView_branchArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -469,6 +517,7 @@ func TestPRView_branchArg(t *testing.T) {
 func TestPRView_branchWithOwnerArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [

@@ -1,11 +1,8 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,17 +43,6 @@ A pull request can be supplied as argument in any of the following formats:
 - by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
 - by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
 }
-var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout {<number> | <url> | <branch>}",
-	Short: "Check out a pull request in Git",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("requires a PR number as an argument")
-		}
-		return nil
-	},
-	RunE: prCheckout,
-}
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
@@ -84,10 +70,6 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
-	if err != nil {
-		return err
-	}
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
 	if err != nil {
 		return err
@@ -97,7 +79,12 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	prPayload, err := api.PullRequests(apiClient, *baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
@@ -105,7 +92,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(*baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
@@ -143,12 +130,12 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := ctx.BaseRepo()
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(*baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -186,8 +173,8 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	params := map[string]interface{}{
-		"owner": baseRepo.RepoOwner(),
-		"repo":  baseRepo.RepoName(),
+		"owner": (*baseRepo).RepoOwner(),
+		"repo":  (*baseRepo).RepoName(),
 		"state": graphqlState,
 	}
 	if len(labels) > 0 {
@@ -206,7 +193,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
 		msg := "There are no open pull requests"
 
 		userSetFlags := false
@@ -254,12 +241,13 @@ func colorFuncForState(state string) func(string) string {
 
 func prView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := ctx.BaseRepo()
+
+	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	apiClient, err := apiClientForContext(ctx)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -272,7 +260,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, *baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -284,15 +272,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(*baseRepo), prNumber)
 			if preview {
-				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+				pr, err = api.PullRequestByNumber(apiClient, *baseRepo, prNumber)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, *baseRepo, branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -319,13 +307,16 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
-	fmt.Fprintln(out)
-	md, err := utils.RenderMarkdown(pr.Body)
-	if err != nil {
-		return err
+	if pr.Body != "" {
+		fmt.Fprintln(out)
+	  md, err := utils.RenderMarkdown(pr.Body)
+	  if err != nil {
+	  	return err
+	  }
+  	fmt.Fprintln(out, md)
+	  fmt.Fprintln(out)
 	}
-	fmt.Fprintln(out, md)
-	fmt.Fprintln(out)
+
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
 }
@@ -390,95 +381,6 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 	return
 }
 
-func prCheckout(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	currentBranch, _ := ctx.Branch()
-	remotes, err := ctx.Remotes()
-	if err != nil {
-		return err
-	}
-	// FIXME: duplicates logic from fsContext.BaseRepo
-	baseRemote, err := remotes.FindByName("upstream", "github", "origin", "*")
-	if err != nil {
-		return err
-	}
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	pr, err := prFromArg(apiClient, baseRemote, args[0])
-	if err != nil {
-		return err
-	}
-
-	headRemote := baseRemote
-	if pr.IsCrossRepository {
-		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
-	}
-
-	cmdQueue := [][]string{}
-
-	newBranchName := pr.HeadRefName
-	if headRemote != nil {
-		// there is an existing git remote for PR head
-		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
-		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
-
-		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
-
-		// local branch already exists
-		if git.VerifyRef("refs/heads/" + newBranchName) {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
-		} else {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
-		}
-	} else {
-		// no git remote for PR head
-
-		// avoid naming the new branch the same as the default branch
-		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
-			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
-		}
-
-		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
-		if newBranchName == currentBranch {
-			// PR head matches currently checked out branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, ref})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
-		} else {
-			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, fmt.Sprintf("%s:%s", ref, newBranchName)})
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-		}
-
-		remote := baseRemote.Name
-		mergeRef := ref
-		if pr.MaintainerCanModify {
-			remote = fmt.Sprintf("https://github.com/%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
-			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
-		}
-		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
-		}
-	}
-
-	for _, args := range cmdQueue {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := utils.PrepareCmd(cmd).Run(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
@@ -507,11 +409,11 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		}
 
 		if reviews.ChangesRequested {
-			fmt.Fprintf(w, " - %s", utils.Red("changes requested"))
+			fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
 		} else if reviews.ReviewRequired {
-			fmt.Fprintf(w, " - %s", utils.Yellow("review required"))
+			fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
 		} else if reviews.Approved {
-			fmt.Fprintf(w, " - %s", utils.Green("approved"))
+			fmt.Fprintf(w, " - %s", utils.Green("Approved"))
 		}
 
 		fmt.Fprint(w, "\n")

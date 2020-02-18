@@ -176,7 +176,10 @@ func (t *tsvTablePrinter) Render() error {
 
 func truncate(maxLength int, title string) string {
 	if len(title) > maxLength {
-		return title[0:maxLength-3] + "..."
+		if maxLength > 3 {
+			return title[0:maxLength-3] + "..."
+		}
+		return title[0:maxLength]
 	}
 	return title
 }

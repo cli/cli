@@ -13,8 +13,6 @@ builds:
       main: ./cmd/gh
       ldflags:
         - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
-        - -X github.com/cli/cli/context.oauthClientID={{.Env.GH_OAUTH_CLIENT_ID}}
-        - -X github.com/cli/cli/context.oauthClientSecret={{.Env.GH_OAUTH_CLIENT_SECRET}}
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
@@ -87,5 +85,6 @@ scoop:
     name: vilmibm
     email: vilmibm@github.com
   homepage: https://github.com/cli/cli
+  skip_upload: auto
   description: GitHub CLI
   license: MIT

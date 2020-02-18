@@ -10,10 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
@@ -43,28 +41,9 @@ func TestPrCreateHelperProcess(*testing.T) {
 }
 
 func TestPRCreate(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -104,28 +83,9 @@ func TestPRCreate(t *testing.T) {
 }
 
 func TestPRCreate_web(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 
 	ranCommands := [][]string{}
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -146,28 +106,10 @@ func TestPRCreate_web(t *testing.T) {
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "REPO",
-			"owner": {"login": "OWNER"},
-			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
-			},
-			"viewerPermission": "WRITE"
-		} } }
-	`))
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -190,111 +132,85 @@ Creating pull request for feature into master in OWNER/REPO
 
 `)
 }
+func TestPRCreate_cross_repo_same_branch(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("default")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+		"fork":   "MYSELF/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repo_000": {
+									"id": "REPOID0",
+									"name": "REPO",
+									"owner": {"login": "OWNER"},
+									"defaultBranchRef": {
+										"name": "default",
+										"target": {"oid": "deadbeef"}
+									},
+									"viewerPermission": "READ"
+								},
+								"repo_001" : {
+									"parent": {
+										"id": "REPOID0",
+										"name": "REPO",
+										"owner": {"login": "OWNER"},
+										"defaultBranchRef": {
+											"name": "default",
+											"target": {"oid": "deadbeef"}
+										},
+										"viewerPermission": "READ"
+									},
+									"id": "REPOID1",
+									"name": "REPO",
+									"owner": {"login": "MYSELF"},
+									"defaultBranchRef": {
+										"name": "default",
+										"target": {"oid": "deadbeef"}
+									},
+									"viewerPermission": "WRITE"
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
 
-func Test_resolvedRemotes_clonedFork(t *testing.T) {
-	resolved := resolvedRemotes{
-		baseOverride: nil,
-		remotes: context.Remotes{
-			&context.Remote{
-				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
-			},
-		},
-		network: api.RepoNetworkResult{
-			Repositories: []*api.Repository{
-				&api.Repository{
-					Name:             "REPO",
-					Owner:            api.RepositoryOwner{Login: "OWNER"},
-					ViewerPermission: "ADMIN",
-					Parent: &api.Repository{
-						Name:             "REPO",
-						Owner:            api.RepositoryOwner{Login: "PARENTOWNER"},
-						ViewerPermission: "READ",
-					},
-				},
-			},
-		},
-	}
+	origGitCommand := git.GitCommand
+	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
+	defer func() {
+		git.GitCommand = origGitCommand
+	}()
 
-	baseRepo, err := resolved.BaseRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(baseRepo), "PARENTOWNER/REPO")
-	baseRemote, err := resolved.RemoteForRepo(baseRepo)
-	if baseRemote != nil || err == nil {
-		t.Error("did not expect any remote for base")
-	}
+	output, err := RunCommand(prCreateCmd, `pr create -t "cross repo" -b "same branch"`)
+	eq(t, err, nil)
 
-	headRepo, err := resolved.HeadRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(headRepo), "OWNER/REPO")
-	headRemote, err := resolved.RemoteForRepo(headRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if headRemote.Name != "origin" {
-		t.Errorf("got remote %q", headRemote.Name)
-	}
-}
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
 
-func Test_resolvedRemotes_triangularSetup(t *testing.T) {
-	resolved := resolvedRemotes{
-		baseOverride: nil,
-		remotes: context.Remotes{
-			&context.Remote{
-				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
-			},
-			&context.Remote{
-				Remote: &git.Remote{Name: "fork"},
-				Owner:  "MYSELF",
-				Repo:   "REPO",
-			},
-		},
-		network: api.RepoNetworkResult{
-			Repositories: []*api.Repository{
-				&api.Repository{
-					Name:             "NEWNAME",
-					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
-					ViewerPermission: "READ",
-				},
-				&api.Repository{
-					Name:             "REPO",
-					Owner:            api.RepositoryOwner{Login: "MYSELF"},
-					ViewerPermission: "ADMIN",
-				},
-			},
-		},
-	}
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID0")
+	eq(t, reqBody.Variables.Input.Title, "cross repo")
+	eq(t, reqBody.Variables.Input.Body, "same branch")
+	eq(t, reqBody.Variables.Input.BaseRefName, "default")
+	eq(t, reqBody.Variables.Input.HeadRefName, "MYSELF:default")
 
-	baseRepo, err := resolved.BaseRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(baseRepo), "NEWOWNER/NEWNAME")
-	baseRemote, err := resolved.RemoteForRepo(baseRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if baseRemote.Name != "origin" {
-		t.Errorf("got remote %q", baseRemote.Name)
-	}
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 
-	headRepo, err := resolved.HeadRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(headRepo), "MYSELF/REPO")
-	headRemote, err := resolved.RemoteForRepo(headRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if headRemote.Name != "fork" {
-		t.Errorf("got remote %q", headRemote.Name)
-	}
+	// goal: only care that gql is formatted properly
 }
