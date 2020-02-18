@@ -22,27 +22,37 @@ type Context interface {
 	Remotes() (Remotes, error)
 	BaseRepo() (ghrepo.Interface, error)
 	SetBaseRepo(string)
+	DefaultRepoConfig() (string, error)
 }
 
 // cap the number of git remotes looked up, since the user might have an
 // unusally large number of git remotes
 const maxRemotesForLookup = 5
 
-func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
+func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base, cfgDefault string) (ResolvedRemotes, error) {
 	sort.Stable(remotes)
 	lenRemotesForLookup := len(remotes)
 	if lenRemotesForLookup > maxRemotesForLookup {
 		lenRemotesForLookup = maxRemotesForLookup
 	}
 
+	// TODO dry this somehow
+	hasConfigDefault := cfgDefault != ""
+	configDefault := ghrepo.FromFullName(cfgDefault)
+	foundConfigDefault := false
+
 	hasBaseOverride := base != ""
 	baseOverride := ghrepo.FromFullName(base)
 	foundBaseOverride := false
+
 	repos := []ghrepo.Interface{}
 	for _, r := range remotes[:lenRemotesForLookup] {
 		repos = append(repos, r)
 		if ghrepo.IsSame(r, baseOverride) {
 			foundBaseOverride = true
+		}
+		if ghrepo.IsSame(r, configDefault) {
+			foundConfigDefault = true
 		}
 	}
 	if hasBaseOverride && !foundBaseOverride {
@@ -50,10 +60,16 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 		// already covered by git remotes
 		repos = append(repos, baseOverride)
 	}
+	if hasConfigDefault && !foundConfigDefault {
+		repos = append(repos, configDefault)
+	}
 
 	result := ResolvedRemotes{Remotes: remotes}
 	if hasBaseOverride {
 		result.BaseOverride = baseOverride
+	}
+	if hasConfigDefault {
+		result.ConfigDefault = configDefault
 	}
 	networkResult, err := api.RepoNetwork(client, repos)
 	if err != nil {
@@ -64,9 +80,10 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 }
 
 type ResolvedRemotes struct {
-	BaseOverride ghrepo.Interface
-	Remotes      Remotes
-	Network      api.RepoNetworkResult
+	ConfigDefault ghrepo.Interface
+	BaseOverride  ghrepo.Interface
+	Remotes       Remotes
+	Network       api.RepoNetworkResult
 }
 
 // BaseRepo is the first found repository in the "upstream", "github", "origin"
@@ -80,6 +97,16 @@ func (r ResolvedRemotes) BaseRepo() (*api.Repository, error) {
 		}
 		return nil, fmt.Errorf("failed looking up information about the '%s' repository",
 			ghrepo.FullName(r.BaseOverride))
+	}
+
+	if r.ConfigDefault != nil {
+		for _, repo := range r.Network.Repositories {
+			if repo != nil && ghrepo.IsSame(repo, r.ConfigDefault) {
+				return repo, nil
+			}
+		}
+		return nil, fmt.Errorf("failed looking up information about the '%s' repository",
+			ghrepo.FullName(r.ConfigDefault))
 	}
 
 	for _, repo := range r.Network.Repositories {

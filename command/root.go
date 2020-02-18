@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 
@@ -170,6 +171,8 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 		return nil, err
 	}
 
+	configDefault, _ := git.Config("gh.defaultRepo")
+
 	baseOverride, err := cmd.Flags().GetString("repo")
 	if err != nil {
 		return nil, err
@@ -180,7 +183,10 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	// TODO now to actually get the user to populate the config.
+	// TODO fix other uses of ResolveRemotesToRepos
+
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride, configDefault)
 	if err != nil {
 		return nil, err
 	}
