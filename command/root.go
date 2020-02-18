@@ -17,12 +17,7 @@ import (
 )
 
 // Version is dynamically set by the toolchain or overriden by the Makefile.
-var Version = func(info *debug.BuildInfo, ok bool) string {
-	if !ok {
-		return "(devel)"
-	}
-	return info.Main.Version
-}(debug.ReadBuildInfo())
+var Version = "DEV"
 
 // BuildDate is dynamically set at build time in the Makefile.
 var BuildDate = "" // YYYY-MM-DD
@@ -30,7 +25,12 @@ var BuildDate = "" // YYYY-MM-DD
 var versionOutput = ""
 
 func init() {
-	Version = strings.TrimPrefix(info.Main.Version, "v")
+	if Version == "DEV" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "(devel)" {
+			Version = info.Main.Version
+		}
+	}
+	Version = strings.TrimPrefix(Version, "v")
 	if BuildDate == "" {
 		RootCmd.Version = Version
 	} else {
