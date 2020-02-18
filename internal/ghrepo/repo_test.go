@@ -6,7 +6,7 @@ import (
 )
 
 func Test_repoFromURL(t *testing.T) {
-	u, _ := url.Parse("http://github.com/monalisa/octo-cat.git")
+	u, _ := url.Parse("http://" + defaultHostname + "/monalisa/octo-cat.git")
 	repo, err := FromURL(u)
 	if err != nil {
 		t.Fatalf("got error %q", err)

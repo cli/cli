@@ -7,10 +7,11 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/cli/cli/internal"
 	"gopkg.in/yaml.v3"
 )
 
-const defaultHostname = "github.com"
+const defaultHostname = internal.Host
 
 type configEntry struct {
 	User  string

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/cli/cli/internal"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -16,7 +18,7 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 
 func Test_parseConfig(t *testing.T) {
 	c := strings.NewReader(`---
-github.com:
+` + internal.Host + `:
 - user: monalisa
   oauth_token: OTOKEN
   protocol: https
@@ -34,7 +36,7 @@ func Test_parseConfig_multipleHosts(t *testing.T) {
 example.com:
 - user: wronguser
   oauth_token: NOTTHIS
-github.com:
+` + internal.Host + `:
 - user: monalisa
   oauth_token: OTOKEN
 `)
@@ -51,5 +53,5 @@ example.com:
   oauth_token: NOTTHIS
 `)
 	_, err := parseConfig(c)
-	eq(t, err, errors.New(`could not find config entry for "github.com"`))
+	eq(t, err, errors.New(`could not find config entry for "`+internal.Host+`"`))
 }

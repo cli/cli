@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/utils"
 )
 
@@ -216,7 +217,7 @@ func TestIssueView(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
+		"url": "https://`+internal.Host+`/OWNER/REPO/issues/123"
 	} } } }
 	`))
 
@@ -233,13 +234,13 @@ func TestIssueView(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n")
+	eq(t, output.Stderr(), "Opening https://"+internal.Host+"/OWNER/REPO/issues/123 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_preview(t *testing.T) {
@@ -263,7 +264,7 @@ func TestIssueView_preview(t *testing.T) {
 		"comments": {
 		  "totalCount": 9
 		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
+		"url": "https://`+internal.Host+`/OWNER/REPO/issues/123"
 	} } } }
 	`))
 
@@ -278,7 +279,7 @@ func TestIssueView_preview(t *testing.T) {
 		regexp.MustCompile(`ix of coins`),
 		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
 		regexp.MustCompile(`bold story`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+		regexp.MustCompile(`View this issue on GitHub: https://` + internal.Host + `/OWNER/REPO/issues/123`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -309,7 +310,7 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 		"comments": {
 		  "totalCount": 9
 		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
+		"url": "https://`+internal.Host+`/OWNER/REPO/issues/123"
 	} } } }
 	`))
 
@@ -323,7 +324,7 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
 		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+		regexp.MustCompile(`View this issue on GitHub: https://` + internal.Host + `/OWNER/REPO/issues/123`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -386,7 +387,7 @@ func TestIssueView_urlArg(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
+		"url": "https://`+internal.Host+`/OWNER/REPO/issues/123"
 	} } } }
 	`))
 
@@ -397,7 +398,7 @@ func TestIssueView_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view https://github.com/OWNER/REPO/issues/123")
+	output, err := RunCommand(issueViewCmd, "issue view https://"+internal.Host+"/OWNER/REPO/issues/123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -408,7 +409,7 @@ func TestIssueView_urlArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/issues/123")
 }
 
 func TestIssueCreate(t *testing.T) {
@@ -424,7 +425,7 @@ func TestIssueCreate(t *testing.T) {
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createIssue": { "issue": {
-			"URL": "https://github.com/OWNER/REPO/issues/12"
+			"URL": "https://`+internal.Host+`/OWNER/REPO/issues/12"
 		} } } }
 	`))
 
@@ -449,7 +450,7 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	eq(t, output.String(), "https://"+internal.Host+"/OWNER/REPO/issues/12\n")
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
@@ -491,6 +492,6 @@ func TestIssueCreate_web(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
-	eq(t, output.String(), "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/issues/new")
+	eq(t, output.String(), "Opening https://"+internal.Host+"/OWNER/REPO/issues/new in your browser.\n")
 }

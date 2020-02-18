@@ -11,10 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/cli/cli/internal"
+	"github.com/cli/cli/utils"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -268,7 +269,7 @@ func TestPRView_preview(t *testing.T) {
 		regexp.MustCompile(`Blueberries are from a fork`),
 		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+		regexp.MustCompile(`View this pull request on GitHub: https://` + internal.Host + `/OWNER/REPO/pull/12`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -303,7 +304,7 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 		regexp.MustCompile(`Blueberries are a good fruit`),
 		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+		regexp.MustCompile(`View this pull request on GitHub: https://` + internal.Host + `/OWNER/REPO/pull/10`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -337,7 +338,7 @@ func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are a good fruit`),
 		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+		regexp.MustCompile(`View this pull request on GitHub: https://` + internal.Host + `/OWNER/REPO/pull/10`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -374,13 +375,13 @@ func TestPRView_currentBranch(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/10 in your browser.\n")
+	eq(t, output.Stderr(), "Opening https://"+internal.Host+"/OWNER/REPO/pull/10 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	if url != "https://github.com/OWNER/REPO/pull/10" {
+	if url != "https://"+internal.Host+"/OWNER/REPO/pull/10" {
 		t.Errorf("got: %q", url)
 	}
 }
@@ -423,7 +424,7 @@ func TestPRView_numberArg(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
+		"url": "https://`+internal.Host+`/OWNER/REPO/pull/23"
 	} } } }
 	`))
 
@@ -445,7 +446,7 @@ func TestPRView_numberArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/pull/23")
 }
 
 func TestPRView_urlArg(t *testing.T) {
@@ -455,7 +456,7 @@ func TestPRView_urlArg(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
+		"url": "https://`+internal.Host+`/OWNER/REPO/pull/23"
 	} } } }
 	`))
 
@@ -466,7 +467,7 @@ func TestPRView_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view https://github.com/OWNER/REPO/pull/23/files")
+	output, err := RunCommand(prViewCmd, "pr view https://"+internal.Host+"/OWNER/REPO/pull/23/files")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -477,7 +478,7 @@ func TestPRView_urlArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/pull/23")
 }
 
 func TestPRView_branchArg(t *testing.T) {
@@ -489,7 +490,7 @@ func TestPRView_branchArg(t *testing.T) {
 	{ "data": { "repository": { "pullRequests": { "nodes": [
 		{ "headRefName": "blueberries",
 		  "isCrossRepository": false,
-		  "url": "https://github.com/OWNER/REPO/pull/23" }
+		  "url": "https://`+internal.Host+`/OWNER/REPO/pull/23" }
 	] } } } }
 	`))
 
@@ -511,7 +512,7 @@ func TestPRView_branchArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+	eq(t, url, "https://"+internal.Host+"/OWNER/REPO/pull/23")
 }
 
 func TestPRView_branchWithOwnerArg(t *testing.T) {
@@ -524,7 +525,7 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 		{ "headRefName": "blueberries",
 		  "isCrossRepository": true,
 		  "headRepositoryOwner": { "login": "hubot" },
-		  "url": "https://github.com/hubot/REPO/pull/23" }
+		  "url": "https://`+internal.Host+`/hubot/REPO/pull/23" }
 	] } } } }
 	`))
 
@@ -546,7 +547,7 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/hubot/REPO/pull/23")
+	eq(t, url, "https://"+internal.Host+"/hubot/REPO/pull/23")
 }
 
 func TestReplaceExcessiveWhitespace(t *testing.T) {

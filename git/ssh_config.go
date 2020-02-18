@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/cli/cli/internal"
 )
 
 var (
@@ -36,7 +37,7 @@ func (m SSHAliasMap) Translator() func(*url.URL) *url.URL {
 			return u
 		}
 		// FIXME: cleanup domain logic
-		if strings.EqualFold(u.Hostname(), "github.com") && strings.EqualFold(resolvedHost, "ssh.github.com") {
+		if strings.EqualFold(u.Hostname(), internal.Host) && strings.EqualFold(resolvedHost, internal.SSH) {
 			return u
 		}
 		newURL, _ := url.Parse(u.String())

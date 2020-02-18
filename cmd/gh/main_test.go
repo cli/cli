@@ -7,8 +7,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/cli/cli/command"
 	"github.com/spf13/cobra"
+	"github.com/cli/cli/command"
+	"github.com/cli/cli/internal"
 )
 
 func Test_printError(t *testing.T) {
@@ -37,12 +38,12 @@ func Test_printError(t *testing.T) {
 			name: "DNS error",
 			args: args{
 				err: fmt.Errorf("DNS oopsie: %w", &net.DNSError{
-					Name: "api.github.com",
+					Name: internal.Host,
 				}),
 				cmd:   nil,
 				debug: false,
 			},
-			wantOut: `error connecting to api.github.com
+			wantOut: `error connecting to ` + internal.Host + `
 check your internet connection or githubstatus.com
 `,
 		},

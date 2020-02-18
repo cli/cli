@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/internal/ghrepo"
 )
 
@@ -30,7 +31,7 @@ func Test_Remotes_FindByName(t *testing.T) {
 }
 
 func Test_translateRemotes(t *testing.T) {
-	publicURL, _ := url.Parse("https://github.com/monalisa/hello")
+	publicURL, _ := url.Parse("https://" + internal.Host + "/monalisa/hello")
 	originURL, _ := url.Parse("http://example.com/repo")
 
 	gitRemotes := git.RemoteSet{

@@ -10,13 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -47,7 +48,7 @@ var issueCmd = &cobra.Command{
 
 An issue can be supplied as argument in any of the following formats:
 - by number, e.g. "123"; or
-- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`,
+- by URL, e.g. "https://` + internal.Host + `/OWNER/REPO/issues/123".`,
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
@@ -269,7 +270,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
+var issueURLRE = regexp.MustCompile(`^https://` + internal.HostRegexp + `/([^/]+)/([^/]+)/issues/(\d+)`)
 
 func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
 	if issueNumber, err := strconv.Atoi(arg); err == nil {
@@ -310,7 +311,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(*baseRepo))
+		openURL := fmt.Sprintf("https://"+internal.Host+"/%s/issues/new", ghrepo.FullName(*baseRepo))
 		if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
@@ -368,7 +369,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if action == PreviewAction {
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/issues/new/?title=%s&body=%s",
+			"https://"+internal.Host+"/%s/issues/new/?title=%s&body=%s",
 			ghrepo.FullName(*baseRepo),
 			url.QueryEscape(title),
 			url.QueryEscape(body),

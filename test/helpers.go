@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/cli/cli/internal"
 )
 
 func GetTestHelperProcessArgs() []string {
@@ -74,7 +76,7 @@ func UseTempGitRepo() *TempGitRepo {
 	}
 
 	// Our libs expect the origin to be a github url
-	cmd = exec.Command("git", "remote", "set-url", "origin", "https://github.com/github/FAKE-GITHUB-REPO-NAME")
+	cmd = exec.Command("git", "remote", "set-url", "origin", "https://"+internal.Host+"/github/FAKE-GITHUB-REPO-NAME")
 	if output, err := cmd.Output(); err != nil {
 		panic(fmt.Errorf("error running %s\n%s\n%s", cmd, err, output))
 	}

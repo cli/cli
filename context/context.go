@@ -6,10 +6,10 @@ import (
 	"path"
 	"sort"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/mitchellh/go-homedir"
 )
 
 // Context represents the interface for querying information about the current environment

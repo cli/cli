@@ -6,9 +6,10 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
+	"github.com/cli/cli/utils"
 )
 
 func prCheckout(cmd *cobra.Command, args []string) error {
@@ -79,7 +80,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseRemote.Name
 		mergeRef := ref
 		if pr.MaintainerCanModify {
-			remote = fmt.Sprintf("https://github.com/%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+			remote = fmt.Sprintf("https://%s/%s/%s.git", internal.Host, pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
 		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {

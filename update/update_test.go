@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/api"
@@ -67,7 +68,7 @@ func TestCheckForUpdate(t *testing.T) {
 				t.Fatalf("expected 1 HTTP request, got %d", len(http.Requests))
 			}
 			requestPath := http.Requests[0].URL.Path
-			if requestPath != "/repos/OWNER/REPO/releases/latest" {
+			if !strings.HasSuffix(requestPath, "/repos/OWNER/REPO/releases/latest") {
 				t.Errorf("HTTP path: %q", requestPath)
 			}
 

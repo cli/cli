@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
@@ -46,7 +47,7 @@ func TestPRCreate(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
+			"URL": "https://`+internal.Host+`/OWNER/REPO/pull/12"
 		} } } }
 	`))
 
@@ -79,7 +80,7 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	eq(t, output.String(), "https://"+internal.Host+"/OWNER/REPO/pull/12\n")
 }
 
 func TestPRCreate_web(t *testing.T) {
@@ -98,11 +99,11 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
+	eq(t, output.Stderr(), "Opening "+internal.Host+"/OWNER/REPO/compare/master...feature in your browser.\n")
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
-	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://"+internal.Host+"/OWNER/REPO/compare/master...feature?expand=1")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
@@ -112,7 +113,7 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
+			"URL": "https://`+internal.Host+`/OWNER/REPO/pull/12"
 		} } } }
 	`))
 
@@ -125,7 +126,7 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	eq(t, output.String(), "https://"+internal.Host+"/OWNER/REPO/pull/12\n")
 	eq(t, output.Stderr(), `Warning: 1 uncommitted change
 
 Creating pull request for feature into master in OWNER/REPO
@@ -177,7 +178,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
+			"URL": "https://`+internal.Host+`/OWNER/REPO/pull/12"
 		} } } }
 	`))
 
@@ -210,7 +211,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	eq(t, reqBody.Variables.Input.BaseRefName, "default")
 	eq(t, reqBody.Variables.Input.HeadRefName, "MYSELF:default")
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	eq(t, output.String(), "https://"+internal.Host+"/OWNER/REPO/pull/12\n")
 
 	// goal: only care that gql is formatted properly
 }

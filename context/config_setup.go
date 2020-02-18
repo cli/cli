@@ -10,12 +10,11 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
+	"github.com/cli/cli/internal"
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	oauthHost = "github.com"
-)
+const oauthHost = internal.Host
 
 var (
 	// The "GitHub CLI" OAuth app

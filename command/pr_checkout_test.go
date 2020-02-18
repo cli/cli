@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/utils"
 )
 
@@ -103,7 +104,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OWNER/REPO/pull/123/files`)
+	output, err := RunCommand(prCheckoutCmd, `pr checkout https://`+internal.Host+`/OWNER/REPO/pull/123/files`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -464,6 +465,6 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://"+internal.Host+"/hubot/REPO.git")
 	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }

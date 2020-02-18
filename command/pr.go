@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -40,7 +41,7 @@ var prCmd = &cobra.Command{
 
 A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
-- by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
+- by URL, e.g. "https://` + internal.Host + `/OWNER/REPO/pull/123"; or
 - by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
 }
 var prListCmd = &cobra.Command{
@@ -272,7 +273,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(*baseRepo), prNumber)
+			openURL = fmt.Sprintf("https://"+internal.Host+"/%s/pull/%d", ghrepo.FullName(*baseRepo), prNumber)
 			if preview {
 				pr, err = api.PullRequestByNumber(apiClient, *baseRepo, prNumber)
 				if err != nil {
@@ -321,7 +322,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	return nil
 }
 
-var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+var prURLRE = regexp.MustCompile(`^https://` + internal.HostRegexp + `/([^/]+)/([^/]+)/pull/(\d+)`)
 
 func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(arg); err == nil {

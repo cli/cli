@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/cli/cli/internal"
 )
 
-const defaultHostname = "github.com"
+const defaultHostname = internal.SSH
 
 type Interface interface {
 	RepoName() string

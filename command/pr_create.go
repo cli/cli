@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
@@ -63,8 +64,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		didForkRepo = true
 		// TODO: support non-HTTPS git remote URLs
-		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
-		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
+		baseRepoURL := fmt.Sprintf("https://%s/%s.git", internal.Host, ghrepo.FullName(baseRepo))
+		headRepoURL := fmt.Sprintf("https://%s/%s.git", internal.Host, ghrepo.FullName(headRepo))
 		// TODO: figure out what to name the new git remote
 		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
 		if err != nil {
@@ -113,7 +114,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	compareURL := fmt.Sprintf(
-		"https://github.com/%s/compare/%s...%s?expand=1",
+		"https://"+internal.Host+"/%s/compare/%s...%s?expand=1",
 		ghrepo.FullName(baseRepo),
 		baseBranch,
 		headBranchLabel,

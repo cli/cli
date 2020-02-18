@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/cli/cli/internal"
 )
 
 // TODO: extract assertion helpers into a shared package
@@ -30,14 +32,14 @@ func Test_sshParse(t *testing.T) {
 
 func Test_Translator(t *testing.T) {
 	m := SSHAliasMap{
-		"gh":         "github.com",
-		"github.com": "ssh.github.com",
+		"gh":          internal.Host,
+		internal.Host: internal.SSH,
 	}
 	tr := m.Translator()
 
 	cases := [][]string{
-		[]string{"ssh://gh/o/r", "ssh://github.com/o/r"},
-		[]string{"ssh://github.com/o/r", "ssh://github.com/o/r"},
+		[]string{"ssh://gh/o/r", "ssh://" + internal.Host + "/o/r"},
+		[]string{"ssh://" + internal.Host + "/o/r", "ssh://" + internal.Host + "/o/r"},
 		[]string{"https://gh/o/r", "https://gh/o/r"},
 	}
 	for _, c := range cases {

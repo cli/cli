@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/cli/cli/internal"
 )
 
 // ClientOption represents an argument to NewClient
@@ -109,7 +111,7 @@ func (gr GraphQLErrorResponse) Error() string {
 
 // GraphQL performs a GraphQL request and parses the response
 func (c Client) GraphQL(query string, variables map[string]interface{}, data interface{}) error {
-	url := "https://api.github.com/graphql"
+	url := "https://" + internal.APIv4
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
 		return err
@@ -133,7 +135,7 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
-	url := "https://api.github.com/" + p
+	url := "https://" + internal.APIv3 + "/" + p
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
