@@ -79,9 +79,11 @@ func selectTemplate(templatePaths []string) (string, error) {
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string, templatePaths []string) (*titleBody, error) {
 	inProgress := titleBody{}
+	templateContents := ""
 
 	if providedBody == "" && len(templatePaths) > 0 {
-		templateContents, err := selectTemplate(templatePaths)
+		var err error
+		templateContents, err = selectTemplate(templatePaths)
 		if err != nil {
 			return nil, err
 		}
@@ -119,6 +121,10 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 	err := survey.Ask(qs, &inProgress)
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
+	}
+
+	if inProgress.Body == "" {
+		inProgress.Body = templateContents
 	}
 
 	confirmA, err := confirm()
