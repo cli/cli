@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -108,31 +107,15 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issues, err := api.IssueList(apiClient, *baseRepo, state, labels, assignee, limit)
+	issuesData, err := api.IssueList(apiClient, *baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
 	}
+	issues := issuesData.Issues
+	issueCount := issuesData.TotalCount
 
-	title := func (msg string) string {
-		return fmt.Sprintf("\n%s in %s\n\n", msg, ghrepo.FullName(*baseRepo))
-	}
-
-	if len(issues) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is actually an issue
-		msg := "There are no open issues"
-
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No issues match your search"
-		}
-		fmt.Fprintf(colorErr, title(msg))
-		return nil
-	}
-
-	fmt.Fprintf(colorableErr(cmd), title(utils.Pluralize(len(issues), "issue")))
+	title := utils.GetTitle(cmd, "issue", limit, issueCount, baseRepo)
+	fmt.Fprintf(colorableErr(cmd), title)
 
 	out := cmd.OutOrStdout()
 	table := utils.NewTablePrinter(out)

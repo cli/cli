@@ -171,7 +171,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	return &payload, nil
 }
 
-func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int) ([]Issue, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int) (*IssuesAndTotalCount, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -189,7 +189,8 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
       repository(owner: $owner, name: $repo) {
 		hasIssuesEnabled
         issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
-          nodes {
+					totalCount
+					nodes {
             ...issue
           }
         }
@@ -213,7 +214,8 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	var resp struct {
 		Repository struct {
 			Issues struct {
-				Nodes []Issue
+				Nodes      []Issue
+				TotalCount int
 			}
 			HasIssuesEnabled bool
 		}
@@ -228,7 +230,8 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 	}
 
-	return resp.Repository.Issues.Nodes, nil
+	res := IssuesAndTotalCount{Issues: resp.Repository.Issues.Nodes, TotalCount: resp.Repository.Issues.TotalCount}
+	return &res, nil
 }
 
 func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {

@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -135,7 +134,6 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
 		return err
@@ -186,32 +184,17 @@ func prList(cmd *cobra.Command, args []string) error {
 		params["assignee"] = assignee
 	}
 
-	prs, err := api.PullRequestList(apiClient, params, limit)
+	prsData, err := api.PullRequestList(apiClient, params, limit)
 	if err != nil {
 		return err
 	}
 
-	title := func (msg string) string {
-		return fmt.Sprintf("\n%s in %s\n\n", msg, ghrepo.FullName(*baseRepo))
-	}
+	prs := prsData.PullRequests
+	prCount := prsData.TotalCount
 
-	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
-		msg := "There are no open pull requests"
+	title := utils.GetTitle(cmd, "pull request", limit, prCount, baseRepo)
+	fmt.Fprintf(colorableErr(cmd), title)
 
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No pull requests match your search"
-		}
-		fmt.Fprintf(colorErr, title(msg))
-		return nil
-	}
-
-	fmt.Fprintf(colorableErr(cmd), title(utils.Pluralize(len(prs), "pull request")))
-	
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
 	for _, pr := range prs {
 		prNum := strconv.Itoa(pr.Number)
