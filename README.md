@@ -44,7 +44,9 @@ Upgrade: `brew update && brew upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][]:
+`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+
+#### scoop
 
 Install:
 
@@ -55,7 +57,23 @@ scoop install gh
 
 Upgrade: `scoop update gh`
 
-Signed MSI installers are also available on the [releases page][].
+#### Chocolatey
+
+Install:
+
+```
+choco install gh
+```
+
+Upgrade:
+
+```
+choco upgrade gh
+```
+
+#### Signed MSI
+
+MSI installers are available for download on the [releases page][].
 
 ### Debian/Ubuntu Linux
 
@@ -70,6 +88,13 @@ Install and upgrade:
 
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
+
+### openSUSE/SUSE Linux
+
+Install and upgrade:
+
+1. Download the `.rpm` file from the [releases page][]
+2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
 
 ### Arch Linux
 
@@ -87,6 +112,7 @@ Install a prebuilt binary from the [releases page][]
 
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
+[Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md

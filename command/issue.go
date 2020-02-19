@@ -247,8 +247,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 	if preview {
 		out := colorableOut(cmd)
-		printIssuePreview(out, palette, issue)
-		return nil
+		return printIssuePreview(out, palette, issue)
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
@@ -256,7 +255,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 }
 
-func printIssuePreview(out io.Writer, palette *utils.Palette, issue *api.Issue) {
+func printIssuePreview(out io.Writer, palette *utils.Palette, issue *api.Issue) error {
 	coloredLabels := labelList(*issue)
 	if coloredLabels != "" {
 		coloredLabels = palette.Gray(fmt.Sprintf("(%s)", coloredLabels))
@@ -269,12 +268,19 @@ func printIssuePreview(out io.Writer, palette *utils.Palette, issue *api.Issue) 
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
 		coloredLabels,
 	)))
+
 	if issue.Body != "" {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, utils.RenderMarkdown(issue.Body))
-		fmt.Fprintln(out)
+    fmt.Fprintln(out)
+	  md, err := utils.RenderMarkdown(issue.Body)
+	  if err != nil {
+		  return err
+	  }
+	  fmt.Fprintln(out, md)
+	  fmt.Fprintln(out)
 	}
 	fmt.Fprintf(out, palette.Gray("View this issue on GitHub: %s\n"), issue.URL)
+
+	return nil
 }
 
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)

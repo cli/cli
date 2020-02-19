@@ -205,7 +205,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is acually a pr
+		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
 		msg := "There are no open pull requests"
 
 		userSetFlags := false
@@ -308,15 +308,14 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	if preview {
 		out := colorableOut(cmd)
-		printPrPreview(out, palette, pr)
-		return nil
+		return printPrPreview(out, palette, pr)
 	} else {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
 }
 
-func printPrPreview(out io.Writer, palette *utils.Palette, pr *api.PullRequest) {
+func printPrPreview(out io.Writer, palette *utils.Palette, pr *api.PullRequest) error {
 	fmt.Fprintln(out, palette.Bold(pr.Title))
 	fmt.Fprintln(out, palette.Gray(fmt.Sprintf(
 		"%s wants to merge %s into %s from %s",
@@ -327,10 +326,16 @@ func printPrPreview(out io.Writer, palette *utils.Palette, pr *api.PullRequest) 
 	)))
 	if pr.Body != "" {
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, utils.RenderMarkdown(pr.Body))
-		fmt.Fprintln(out)
+	  md, err := utils.RenderMarkdown(pr.Body)
+	  if err != nil {
+	  	return err
+	  }
+  	fmt.Fprintln(out, md)
+	  fmt.Fprintln(out)
 	}
 	fmt.Fprintf(out, palette.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+  
+	return nil
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)

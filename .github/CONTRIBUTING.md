@@ -26,6 +26,8 @@ Contributions to this project are [released][legal] to the public under the [pro
 
 Please note that this project adheres to a [Contributor Code of Conduct][code-of-conduct]. By participating in this project you agree to abide by its terms.
 
+We generate manual pages from source on every release! You do not need to submit PRs for those specifically; the docs will get updated if your PR gets accepted.
+
 ## Resources
 
 - [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/)
