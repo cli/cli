@@ -186,6 +186,18 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (*ghrepo.Interfa
 	// TODO now to actually get the user to populate the config.
 	// TODO fix other uses of ResolveRemotesToRepos
 
+	/*
+		Two choices:
+
+		1. tell users to run `gh set-default-repo` or similar.
+		2. notice that we're picking between a fork and a parent and ask, then set for them
+
+		i don't like 1 because i don't want to think through the UX for it right now.
+
+		i don't like 2 because by the time we detect the fork/parent thing we're in a context function
+		fairly far from the user; pausing to do a survey thing there feels kind of bad.
+	*/
+
 	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride, configDefault)
 	if err != nil {
 		return nil, err
