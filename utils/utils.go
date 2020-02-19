@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/browser"
 	"github.com/spf13/cobra"
@@ -21,32 +22,14 @@ func OpenInBrowser(url string) error {
 	return PrepareCmd(browseCmd).Run()
 }
 
-func normalizeNewlines(d []byte) []byte {
-	d = bytes.Replace(d, []byte("\r\n"), []byte("\n"), -1)
-	d = bytes.Replace(d, []byte("\r"), []byte("\n"), -1)
-	return d
+func normalizeNewlines(s string) string {
+	s = strings.Replace(s, "\r\n", "\n", -1)
+	s = strings.Replace(s, "\r", "\n", -1)
+	return s
 }
 
-func RenderMarkdown(text string) string {
-	textB := []byte(text)
-	textB = normalizeNewlines(textB)
-	mdCompiler := md.Compiler{
-		Columns: 100,
-		SyntaxHighlighter: md.SyntaxTheme{
-			"keyword": md.Style{Color: "#9196ed"},
-			"comment": md.Style{
-				Color: "#c0c0c2",
-			},
-			"literal": md.Style{
-				Color: "#aaedf7",
-			},
-			"name": md.Style{
-				Color: "#fe8eb5",
-			},
-		},
-	}
-
-	return mdCompiler.Compile(string(textB))
+func RenderMarkdown(text string) (string, error) {
+	return glamour.Render(normalizeNewlines(text), "dark")
 }
 
 func Pluralize(num int, thing string) string {
