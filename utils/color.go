@@ -31,7 +31,7 @@ func NewColorable(f *os.File) io.Writer {
 func makeColorFunc(color string, forceColor bool) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
-		if isStdoutTerminal() || forceColor {
+		if forceColor || isStdoutTerminal() {
 			return cf(arg)
 		}
 		return arg
