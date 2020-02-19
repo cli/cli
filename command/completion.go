@@ -33,14 +33,13 @@ When installing with Homebrew, see https://docs.brew.sh/Shell-Completion
 
 		switch shellType {
 		case "bash":
-			RootCmd.GenBashCompletion(cmd.OutOrStdout())
+			return RootCmd.GenBashCompletion(cmd.OutOrStdout())
 		case "zsh":
-			RootCmd.GenZshCompletion(cmd.OutOrStdout())
+			return RootCmd.GenZshCompletion(cmd.OutOrStdout())
 		case "fish":
-			cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
+			return cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
 		default:
 			return fmt.Errorf("unsupported shell type %q", shellType)
 		}
-		return nil
 	},
 }
