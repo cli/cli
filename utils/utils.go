@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	md "github.com/vilmibm/go-termd"
 )
 
 // OpenInBrowser opens the url in a web browser based on OS and $BROWSER environment variable
