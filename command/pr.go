@@ -163,7 +163,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	case "open":
 		graphqlState = []string{"OPEN"}
 	case "closed":
-		graphqlState = []string{"CLOSED"}
+		graphqlState = []string{"CLOSED", "MERGED"}
 	case "merged":
 		graphqlState = []string{"MERGED"}
 	case "all":
