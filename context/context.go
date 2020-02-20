@@ -201,6 +201,10 @@ func (c *fsContext) Remotes() (Remotes, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		if len(gitRemotes) == 0 {
+			return nil, errors.New("No git remotes found")
+		}
 		sshTranslate := git.ParseSSHConfig().Translator()
 		c.remotes = translateRemotes(gitRemotes, sshTranslate)
 	}
