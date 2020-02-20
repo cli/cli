@@ -256,13 +256,13 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	)))
 
 	if issue.Body != "" {
-    fmt.Fprintln(out)
-	  md, err := utils.RenderMarkdown(issue.Body)
-	  if err != nil {
-		  return err
-	  }
-	  fmt.Fprintln(out, md)
-	  fmt.Fprintln(out)
+		fmt.Fprintln(out)
+		md, err := utils.RenderMarkdown(issue.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, md)
+		fmt.Fprintln(out)
 	}
 
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
