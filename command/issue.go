@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -407,7 +408,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		ago := now.Sub(issue.UpdatedAt)
 
 		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			truncate(70, replaceExcessiveWhitespace(issue.Title)),
+			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
 			coloredLabels,
 			utils.Gray(utils.FuzzyAgo(ago)))
 	}
