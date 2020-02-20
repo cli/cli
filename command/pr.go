@@ -309,12 +309,12 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	)))
 	if pr.Body != "" {
 		fmt.Fprintln(out)
-	  md, err := utils.RenderMarkdown(pr.Body)
-	  if err != nil {
-	  	return err
-	  }
-  	fmt.Fprintln(out, md)
-	  fmt.Fprintln(out)
+		md, err := utils.RenderMarkdown(pr.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, md)
+		fmt.Fprintln(out)
 	}
 
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
