@@ -22,6 +22,7 @@ type TablePrinter interface {
 
 func NewTablePrinter(w io.Writer) TablePrinter {
 	if outFile, isFile := w.(*os.File); isFile {
+		// TODO: use utils.IsTerminal()
 		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
 		if isatty.IsTerminal(outFile.Fd()) || isCygwin {
 			ttyWidth := 80
