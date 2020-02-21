@@ -38,12 +38,15 @@ func AddHeader(name, value string) ClientOption {
 }
 
 // VerboseLog enables request/response logging within a RoundTripper
-func VerboseLog(out io.Writer, logBodies bool) ClientOption {
+func VerboseLog(out io.Writer, logTraffic bool, colorize bool) ClientOption {
 	logger := &httpretty.Logger{
-		RequestHeader:  true,
-		RequestBody:    logBodies,
-		ResponseHeader: true,
-		ResponseBody:   logBodies,
+		Time:           true,
+		TLS:            false,
+		Colors:         colorize,
+		RequestHeader:  logTraffic,
+		RequestBody:    logTraffic,
+		ResponseHeader: logTraffic,
+		ResponseBody:   logTraffic,
 		Formatters:     []httpretty.Formatter{&httpretty.JSONFormatter{}},
 	}
 	logger.SetOutput(out)
