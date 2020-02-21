@@ -18,9 +18,9 @@ Please do:
 ## Submitting a bug fix
 
 0. Clone this repository
-0. Create a new branch: `git checkout -b my-branch-name`
-0. Make your change, add tests, and ensure tests pass
-0. Make a PR: `gh pr create --web`
+1. Create a new branch: `git checkout -b my-branch-name`
+2. Make your change, add tests, and ensure tests pass
+3. Make a PR: `gh pr create --web`
 
 Contributions to this project are [released][legal] to the public under the [project's open source license][license].
 
