@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/henvic/httpretty"
 )
 
 // ClientOption represents an argument to NewClient
@@ -37,29 +39,18 @@ func AddHeader(name, value string) ClientOption {
 
 // VerboseLog enables request/response logging within a RoundTripper
 func VerboseLog(out io.Writer, logBodies bool) ClientOption {
-	return func(tr http.RoundTripper) http.RoundTripper {
-		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			fmt.Fprintf(out, "> %s %s\n", req.Method, req.URL.RequestURI())
-			if logBodies && req.Body != nil && inspectableMIMEType(req.Header.Get("Content-type")) {
-				newBody := &bytes.Buffer{}
-				io.Copy(out, io.TeeReader(req.Body, newBody))
-				fmt.Fprintln(out)
-				req.Body = ioutil.NopCloser(newBody)
-			}
-			res, err := tr.RoundTrip(req)
-			if err == nil {
-				fmt.Fprintf(out, "< HTTP %s\n", res.Status)
-				if logBodies && res.Body != nil && inspectableMIMEType(res.Header.Get("Content-type")) {
-					newBody := &bytes.Buffer{}
-					// TODO: pretty-print response JSON
-					io.Copy(out, io.TeeReader(res.Body, newBody))
-					fmt.Fprintln(out)
-					res.Body = ioutil.NopCloser(newBody)
-				}
-			}
-			return res, err
-		}}
+	logger := &httpretty.Logger{
+		RequestHeader:  true,
+		RequestBody:    logBodies,
+		ResponseHeader: true,
+		ResponseBody:   logBodies,
+		Formatters:     []httpretty.Formatter{&httpretty.JSONFormatter{}},
 	}
+	logger.SetOutput(out)
+	logger.SetBodyFilter(func(h http.Header) (skip bool, err error) {
+		return !inspectableMIMEType(h.Get("Content-Type")), nil
+	})
+	return logger.RoundTripper
 }
 
 // ReplaceTripper substitutes the underlying RoundTripper with a custom one

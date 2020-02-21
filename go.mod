@@ -9,6 +9,7 @@ require (
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.0
+	github.com/henvic/httpretty v0.0.3
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.4
 	github.com/mattn/go-isatty v0.0.12
