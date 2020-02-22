@@ -98,7 +98,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
-		printPrs(out, 0, *prPayload.CurrentPR)
+		printPrs(out, 0, true, *prPayload.CurrentPR)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
@@ -107,7 +107,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader(out, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
+		printPrs(out, prPayload.ViewerCreated.TotalCount, false, prPayload.ViewerCreated.PullRequests...)
 	} else {
 		printMessage(out, "  You have no open pull requests")
 	}
@@ -115,7 +115,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader(out, "Requesting a code review from you")
 	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
+		printPrs(out, prPayload.ReviewRequested.TotalCount, false, prPayload.ReviewRequested.PullRequests...)
 	} else {
 		printMessage(out, "  You have no pull requests to review")
 	}
@@ -382,10 +382,13 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 	return
 }
 
-func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
+func printPrs(w io.Writer, totalCount int, printStatus bool, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		if printStatus {
+			fmt.Fprintf(w, " (%s)", pr.State)
+		}
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
