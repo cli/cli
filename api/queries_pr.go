@@ -150,6 +150,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	fragment pr on PullRequest {
 		number
 		title
+		state
 		url
 		headRefName
 		headRepositoryOwner {
@@ -185,7 +186,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
+			pullRequests(headRefName: $headRefName, first: $per_page) {
 				totalCount
 				edges {
 					node {
