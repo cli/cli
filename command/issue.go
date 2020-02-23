@@ -132,23 +132,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	table := utils.NewTablePrinter(out)
-	for _, issue := range issues {
-		issueNum := strconv.Itoa(issue.Number)
-		if table.IsTTY() {
-			issueNum = "#" + issueNum
-		}
-		labels := labelList(issue)
-		if labels != "" && table.IsTTY() {
-			labels = fmt.Sprintf("(%s)", labels)
-		}
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, utils.Gray)
-		table.EndRow()
-	}
-	table.Render()
-
+	printIssues(out, "", len(issues), issues)
 	return nil
 }
 
@@ -397,21 +381,26 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
+	table := utils.NewTablePrinter(w)
 	for _, issue := range issues {
-		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		coloredLabels := labelList(issue)
-		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
 		}
-
+		issueNum = prefix + issueNum
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-
-		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
-			coloredLabels,
-			utils.Gray(utils.FuzzyAgo(ago)))
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(text.Truncate(70, replaceExcessiveWhitespace(issue.Title)), nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		table.EndRow()
 	}
+	table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)
