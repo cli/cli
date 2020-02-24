@@ -80,7 +80,7 @@ type PullRequestReviewStatus struct {
 }
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
-	status := PullRequestReviewStatus{}
+	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
 	case "CHANGES_REQUESTED":
 		status.ChangesRequested = true

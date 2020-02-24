@@ -78,7 +78,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 }
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string, templatePaths []string) (*titleBody, error) {
-	inProgress := titleBody{}
+	var inProgress titleBody
 	templateContents := ""
 
 	if providedBody == "" && len(templatePaths) > 0 {
@@ -110,7 +110,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		},
 	}
 
-	var qs = []*survey.Question{}
+	var qs []*survey.Question
 	if providedTitle == "" {
 		qs = append(qs, titleQuestion)
 	}
