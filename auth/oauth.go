@@ -49,7 +49,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	q.Set("client_id", oa.ClientID)
 	q.Set("redirect_uri", fmt.Sprintf("http://localhost:%d/callback", port))
 	// TODO: make scopes configurable
-	q.Set("scope", "repo")
+	q.Set("scope", "repo, gist")
 	q.Set("state", state)
 
 	startURL := fmt.Sprintf("https://%s/login/oauth/authorize?%s", oa.Hostname, q.Encode())
