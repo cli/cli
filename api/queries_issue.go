@@ -185,21 +185,21 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
-      repository(owner: $owner, name: $repo) {
-		hasIssuesEnabled
-        issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
-          nodes {
-            ...issue
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-        }
-      }
-    }
-  `
+	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
+				nodes {
+					...issue
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}
+	}
+	`
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),
