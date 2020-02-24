@@ -12,9 +12,10 @@ import (
 
 // Repository contains information about a GitHub repo
 type Repository struct {
-	ID    string
-	Name  string
-	Owner RepositoryOwner
+	ID       string
+	Name     string
+	CloneURL string
+	Owner    RepositoryOwner
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
@@ -57,6 +58,46 @@ func (r Repository) ViewerCanPush() bool {
 	default:
 		return false
 	}
+}
+
+func RepoExistsOnGitHub(client *Client, repo ghrepo.Interface) (bool, error) {
+	query := `
+	query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			id
+		}
+	}
+	`
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	result := struct {
+		Repository Repository
+	}{}
+	err := client.GraphQL(query, variables, &result)
+
+	if err == nil {
+		// we found it.
+		return true, nil
+	}
+
+	// we didn't find it, but need to determine if we hit an error or it just doesn't exist.
+	graphqlError, isGraphQLError := err.(*GraphQLErrorResponse)
+	if isGraphQLError {
+		tolerated := true
+		for _, ge := range graphqlError.Errors {
+			if ge.Type != "NOT_FOUND" {
+				tolerated = false
+			}
+		}
+		if tolerated {
+			err = nil
+		}
+	}
+
+	return false, err
 }
 
 // GitHubRepo looks up the node ID of a named repository
@@ -190,9 +231,10 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 
 // repositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID string
-	Name   string
-	Owner  struct {
+	NodeID   string
+	Name     string
+	CloneURL string `json:"clone_url"`
+	Owner    struct {
 		Login string
 	}
 }
@@ -208,8 +250,9 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	return &Repository{
-		ID:   result.NodeID,
-		Name: result.Name,
+		ID:       result.NodeID,
+		Name:     result.Name,
+		CloneURL: result.CloneURL,
 		Owner: RepositoryOwner{
 			Login: result.Owner.Login,
 		},
