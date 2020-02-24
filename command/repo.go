@@ -20,17 +20,16 @@ var repoCmd = &cobra.Command{
 	Long: `Work with GitHub repositories.
 
 A repository can be supplied as an argument in any of the following formats:
-- by owner/repo, e.g. "cli/cli"
-- by URL, e.g. "https://github.com/cli/cli"`,
+- "OWNER/REPO"
+- by URL, e.g. "https://github.com/OWNER/REPO"`,
 }
 
 var repoViewCmd = &cobra.Command{
-	Use:   "view [{<owner/repo> | <url>}]",
+	Use:   "view [<repo>]",
 	Short: "View a repository in the browser",
-	Long: `View a repository specified by the argument in the browser.
+	Long: `View a GitHub repository in the browser.
 
-Without an argument, the repository that belongs to the current
-branch is opened.`,
+With no argument, the repository for the current directory is opened.`,
 	RunE: repoView,
 }
 
@@ -45,10 +44,11 @@ func repoView(cmd *cobra.Command, args []string) error {
 		}
 		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(*baseRepo))
 	} else {
-		if strings.HasPrefix(args[0], "http") {
-			openURL = args[0]
+		repoArg := args[0]
+		if strings.HasPrefix(repoArg, "http:/") || strings.HasPrefix(repoArg, "https:/") {
+			openURL = repoArg
 		} else {
-			openURL = fmt.Sprintf("https://github.com/%s", args[0])
+			openURL = fmt.Sprintf("https://github.com/%s", repoArg)
 		}
 	}
 
