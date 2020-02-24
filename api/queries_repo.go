@@ -97,7 +97,7 @@ type RepoNetworkResult struct {
 
 // RepoNetwork inspects the relationship between multiple GitHub repositories
 func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, error) {
-	queries := []string{}
+	queries := make([]string, 0, len(repos))
 	for i, repo := range repos {
 		queries = append(queries, fmt.Sprintf(`
 		repo_%03d: repository(owner: %q, name: %q) {
@@ -150,7 +150,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		return result, err
 	}
 
-	keys := []string{}
+	keys := make([]string, 0, len(graphqlResult))
 	for key := range graphqlResult {
 		keys = append(keys, key)
 	}
