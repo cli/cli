@@ -42,7 +42,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(*baseRepo))
+		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(baseRepo))
 	} else {
 		repoArg := args[0]
 		if strings.HasPrefix(repoArg, "http:/") || strings.HasPrefix(repoArg, "https:/") {
