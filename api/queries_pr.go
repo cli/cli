@@ -497,7 +497,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
       }
 	}`
 
-	prs := []PullRequest{}
+	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
 
@@ -555,7 +555,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			variables[name] = val
 		}
 	}
-
+loop:
 	for {
 		variables["limit"] = pageLimit
 		var data response
@@ -571,17 +571,16 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 		for _, edge := range prData.Edges {
 			prs = append(prs, edge.Node)
 			if len(prs) == limit {
-				goto done
+				break loop
 			}
 		}
 
 		if prData.PageInfo.HasNextPage {
 			variables["endCursor"] = prData.PageInfo.EndCursor
 			pageLimit = min(pageLimit, limit-len(prs))
-			continue
+		} else {
+			break
 		}
-	done:
-		break
 	}
 
 	return prs, nil
