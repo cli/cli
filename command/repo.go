@@ -36,13 +36,13 @@ branch is opened.`,
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return err
-	}
 
 	var openURL string
 	if len(args) == 0 {
+		baseRepo, err := determineBaseRepo(cmd, ctx)
+		if err != nil {
+			return err
+		}
 		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(*baseRepo))
 	} else {
 		if strings.HasPrefix(args[0], "http") {

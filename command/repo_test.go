@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/utils"
 )
 
@@ -35,9 +36,12 @@ func TestRepoView(t *testing.T) {
 }
 
 func TestRepoView_ownerRepo(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	initContext = func() context.Context {
+		return ctx
+	}
+	initFakeHTTP()
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -62,9 +66,12 @@ func TestRepoView_ownerRepo(t *testing.T) {
 }
 
 func TestRepoView_fullURL(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	initContext = func() context.Context {
+		return ctx
+	}
+	initFakeHTTP()
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
