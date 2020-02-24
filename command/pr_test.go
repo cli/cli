@@ -210,6 +210,30 @@ No pull requests match your search
 	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
 }
 
+func TestPRList_filteringClosed(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	http.StubResponse(200, respBody)
+
+	_, err := RunCommand(prListCmd, `pr list -s closed`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			State []string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.State, []string{"CLOSED", "MERGED"})
+}
+
 func TestPRList_filteringAssignee(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()

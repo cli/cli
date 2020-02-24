@@ -97,14 +97,13 @@ var initContext = func() context.Context {
 // BasicClient returns an API client that borrows from but does not depend on
 // user configuration
 func BasicClient() (*api.Client, error) {
-	opts := []api.ClientOption{
-		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+	opts := []api.ClientOption{}
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
 	}
+	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)))
 	if c, err := context.ParseDefaultConfig(); err == nil {
 		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", c.Token)))
-	}
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr, false))
 	}
 	return api.NewClient(opts...), nil
 }
@@ -123,18 +122,26 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := []api.ClientOption{
+	opts := []api.ClientOption{}
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
+	}
+	opts = append(opts,
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks
 		// shadow-cat-preview: Draft pull requests
 		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json, application/vnd.github.shadow-cat-preview"),
 		api.AddHeader("GraphQL-Features", "pe_mobile"),
-	}
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, api.VerboseLog(os.Stderr, strings.Contains(verbose, "api")))
-	}
+	)
+
 	return api.NewClient(opts...), nil
+}
+
+func apiVerboseLog() api.ClientOption {
+	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
+	colorize := utils.IsTerminal(os.Stderr)
+	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
 }
 
 func colorableOut(cmd *cobra.Command) io.Writer {

@@ -11,3 +11,5 @@
 
 # macOS
 .DS_Store
+
+vendor/

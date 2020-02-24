@@ -112,27 +112,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
-	compareURL := fmt.Sprintf(
-		"https://github.com/%s/compare/%s...%s?expand=1",
-		ghrepo.FullName(baseRepo),
-		baseBranch,
-		headBranchLabel,
-	)
-
-	isWeb, err := cmd.Flags().GetBool("web")
-	if err != nil {
-		return fmt.Errorf("could not parse web: %q", err)
-	}
-	if isWeb {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
-		return utils.OpenInBrowser(compareURL)
-	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
-		utils.Cyan(headBranchLabel),
-		utils.Cyan(baseBranch),
-		ghrepo.FullName(baseRepo))
-
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
 		return fmt.Errorf("could not parse title: %w", err)
@@ -141,6 +120,21 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
+
+	isWeb, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return fmt.Errorf("could not parse web: %q", err)
+	}
+	if isWeb {
+		compareURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
+		return utils.OpenInBrowser(compareURL)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
+		utils.Cyan(headBranchLabel),
+		utils.Cyan(baseBranch),
+		ghrepo.FullName(baseRepo))
 
 	action := SubmitAction
 
@@ -203,12 +197,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
 	} else if action == PreviewAction {
-		openURL := fmt.Sprintf(
-			"%s&title=%s&body=%s",
-			compareURL,
-			url.QueryEscape(title),
-			url.QueryEscape(body),
-		)
+		openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
@@ -218,6 +207,22 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	return nil
 
+}
+
+func generateCompareURL(r ghrepo.Interface, base, head, title, body string) string {
+	u := fmt.Sprintf(
+		"https://github.com/%s/compare/%s...%s?expand=1",
+		ghrepo.FullName(r),
+		base,
+		head,
+	)
+	if title != "" {
+		u += "&title=" + url.QueryEscape(title)
+	}
+	if body != "" {
+		u += "&body=" + url.QueryEscape(body)
+	}
+	return u
 }
 
 var prCreateCmd = &cobra.Command{

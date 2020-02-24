@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -163,7 +164,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	case "open":
 		graphqlState = []string{"OPEN"}
 	case "closed":
-		graphqlState = []string{"CLOSED"}
+		graphqlState = []string{"CLOSED", "MERGED"}
 	case "merged":
 		graphqlState = []string{"MERGED"}
 	case "all":
@@ -309,12 +310,12 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	)))
 	if pr.Body != "" {
 		fmt.Fprintln(out)
-	  md, err := utils.RenderMarkdown(pr.Body)
-	  if err != nil {
-	  	return err
-	  }
-  	fmt.Fprintln(out, md)
-	  fmt.Fprintln(out)
+		md, err := utils.RenderMarkdown(pr.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, md)
+		fmt.Fprintln(out)
 	}
 
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
@@ -384,7 +385,7 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -430,13 +431,6 @@ func printHeader(w io.Writer, s string) {
 
 func printMessage(w io.Writer, s string) {
 	fmt.Fprintln(w, utils.Gray(s))
-}
-
-func truncate(maxLength int, title string) string {
-	if len(title) > maxLength {
-		return title[0:maxLength-3] + "..."
-	}
-	return title
 }
 
 func replaceExcessiveWhitespace(s string) string {
