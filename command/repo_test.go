@@ -26,7 +26,7 @@ func TestRepoView(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -56,7 +56,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/cli/cli in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/cli/cli in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -86,7 +86,7 @@ func TestRepoView_fullURL(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/cli/cli in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/cli/cli in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")

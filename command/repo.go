@@ -52,6 +52,6 @@ func repoView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 	return utils.OpenInBrowser(openURL)
 }
