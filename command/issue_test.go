@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/utils"
@@ -516,7 +517,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
+	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
 	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
