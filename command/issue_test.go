@@ -492,5 +492,31 @@ func TestIssueCreate_web(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
-	eq(t, output.String(), "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n")
+	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	eq(t, output.Stderr(), "")
+}
+
+func TestIssueCreate_webTitleBody(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(issueCreateCmd, `issue create -w -t mytitle -b mybody`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
+	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }

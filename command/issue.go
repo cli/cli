@@ -294,8 +294,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
-
 	baseOverride, err := cmd.Flags().GetString("repo")
 	if err != nil {
 		return err
@@ -309,15 +307,32 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	title, err := cmd.Flags().GetString("title")
+	if err != nil {
+		return fmt.Errorf("could not parse title: %w", err)
+	}
+	body, err := cmd.Flags().GetString("body")
+	if err != nil {
+		return fmt.Errorf("could not parse body: %w", err)
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
-		if len(templateFiles) > 1 {
+		if title != "" || body != "" {
+			openURL += fmt.Sprintf(
+				"?title=%s&body=%s",
+				url.QueryEscape(title),
+				url.QueryEscape(body),
+			)
+		} else if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
-		cmd.Printf("Opening %s in your browser.\n", openURL)
+		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
 
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -333,15 +348,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	action := SubmitAction
-
-	title, err := cmd.Flags().GetString("title")
-	if err != nil {
-		return fmt.Errorf("could not parse title: %w", err)
-	}
-	body, err := cmd.Flags().GetString("body")
-	if err != nil {
-		return fmt.Errorf("could not parse body: %w", err)
-	}
 
 	interactive := title == "" || body == ""
 
