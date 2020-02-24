@@ -387,7 +387,13 @@ func printPrs(w io.Writer, totalCount int, printStatus bool, prs ...api.PullRequ
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 		if printStatus {
-			fmt.Fprintf(w, " (%s)", pr.State)
+			if pr.State == "OPEN" {
+				fmt.Fprintf(w, " %s", utils.Green("(OPEN)"))
+			} else if pr.State == "MERGED" {
+				fmt.Fprintf(w, " %s", utils.Magenta("(MERGED)"))
+			} else if pr.State == "CLOSED" {
+				fmt.Fprintf(w, " %s", utils.Red("(CLOSED)"))
+			}
 		}
 
 		checks := pr.ChecksStatus()
