@@ -185,12 +185,16 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
+    query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
       repository(owner: $owner, name: $repo) {
 		hasIssuesEnabled
-        issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
+        issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
           nodes {
             ...issue
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
           }
         }
       }
@@ -198,7 +202,6 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
   `
 
 	variables := map[string]interface{}{
-		"limit":  limit,
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"states": states,
@@ -210,25 +213,49 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 		variables["assignee"] = assigneeString
 	}
 
-	var resp struct {
+	var response struct {
 		Repository struct {
 			Issues struct {
-				Nodes []Issue
+				Nodes    []Issue
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
 			}
 			HasIssuesEnabled bool
 		}
 	}
 
-	err := client.GraphQL(query, variables, &resp)
-	if err != nil {
-		return nil, err
+	var issues []Issue
+	pageLimit := min(limit, 100)
+
+loop:
+	for {
+		variables["limit"] = pageLimit
+		err := client.GraphQL(query, variables, &response)
+		if err != nil {
+			return nil, err
+		}
+		if !response.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+
+		for _, issue := range response.Repository.Issues.Nodes {
+			issues = append(issues, issue)
+			if len(issues) == limit {
+				break loop
+			}
+		}
+
+		if response.Repository.Issues.PageInfo.HasNextPage {
+			variables["endCursor"] = response.Repository.Issues.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(issues))
+		} else {
+			break
+		}
 	}
 
-	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
-	}
-
-	return resp.Repository.Issues.Nodes, nil
+	return issues, nil
 }
 
 func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
