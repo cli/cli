@@ -165,46 +165,37 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	if inParent {
+		remoteDesired := forceYes
 		if !forceYes {
-			remoteDesired := forceYes
-			if !forceYes {
-				prompt := &survey.Confirm{
-					Message: "Would you like to add a remote for the new fork?",
-				}
-				err = survey.AskOne(prompt, &remoteDesired)
-				if err != nil {
-					return fmt.Errorf("failed to prompt: %w", err)
-				}
+			err = Confirm("Would you like to add a remote for the new fork?", &remoteDesired)
+			if err != nil {
+				return fmt.Errorf("failed to prompt: %w", err)
 			}
-			if remoteDesired {
-				_, err := git.AddRemote("fork", forkedRepo.CloneURL, "")
-				if err != nil {
-					return fmt.Errorf("failed to add remote: %w", err)
-				}
-
-				fetchCmd := git.GitCommand("fetch", "fork")
-				fetchCmd.Stdin = os.Stdin
-				fetchCmd.Stdout = os.Stdout
-				fetchCmd.Stderr = os.Stderr
-				err = utils.PrepareCmd(fetchCmd).Run()
-				if err != nil {
-					return fmt.Errorf("failed to fetch new remote: %w", err)
-				}
-
-				fmt.Fprintf(out, "%s %s\n", utils.Green("remote added at "), utils.Cyan("fork"))
+		}
+		if remoteDesired {
+			_, err := git.AddRemote("fork", forkedRepo.CloneURL, "")
+			if err != nil {
+				return fmt.Errorf("failed to add remote: %w", err)
 			}
+
+			fetchCmd := git.GitCommand("fetch", "fork")
+			fetchCmd.Stdin = os.Stdin
+			fetchCmd.Stdout = os.Stdout
+			fetchCmd.Stderr = os.Stderr
+			err = utils.PrepareCmd(fetchCmd).Run()
+			if err != nil {
+				return fmt.Errorf("failed to fetch new remote: %w", err)
+			}
+
+			fmt.Fprintf(out, "%s %s\n", utils.Green("remote added at"), utils.Cyan("fork"))
 		}
 	} else {
 		cloneDesired := forceYes
 		if !forceYes {
-			prompt := &survey.Confirm{
-				Message: "Would you like to clone the new fork?",
-			}
-			err = survey.AskOne(prompt, &cloneDesired)
+			err = Confirm("Would you like to clone the new fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
-
 		}
 		if cloneDesired {
 			cloneCmd := git.GitCommand("clone", forkedRepo.CloneURL)
@@ -219,6 +210,13 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+var Confirm = func(prompt string, result *bool) error {
+	p := &survey.Confirm{
+		Message: prompt,
+	}
+	return survey.AskOne(p, result)
 }
 
 func repoView(cmd *cobra.Command, args []string) error {
