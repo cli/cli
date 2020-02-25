@@ -40,6 +40,7 @@ type PullRequest struct {
 		}
 	}
 	IsCrossRepository   bool
+	IsDraft             bool
 	MaintainerCanModify bool
 
 	ReviewDecision string
@@ -156,6 +157,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			login
 		}
 		isCrossRepository
+		isDraft
 		commits(last: 1) {
 			nodes {
 				commit {
@@ -366,6 +368,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 						login
 					}
 					isCrossRepository
+					isDraft
 				}
 			}
 		}
@@ -460,6 +463,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			login
 		}
 		isCrossRepository
+		isDraft
 	}
 	`
 

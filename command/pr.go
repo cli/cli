@@ -214,7 +214,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(prNum, nil, colorFuncForPR(pr))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
@@ -225,6 +225,14 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func colorFuncForPR(pr api.PullRequest) func(string) string {
+	if pr.State == "OPEN" && pr.IsDraft {
+		return utils.Gray
+	} else {
+		return colorFuncForState(pr.State)
+	}
 }
 
 func colorFuncForState(state string) func(string) string {
@@ -385,7 +393,13 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+
+		prNumberColorFunc := utils.Green
+		if pr.IsDraft {
+			prNumberColorFunc = utils.Gray
+		}
+
+		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
