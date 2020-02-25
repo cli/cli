@@ -5,9 +5,16 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"testing"
+
+	"github.com/cli/cli/context"
 )
 
 func TestGistCreate(t *testing.T) {
+	ctx := context.NewBlank()
+	initContext = func() context.Context {
+		return ctx
+	}
+
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
