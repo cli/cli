@@ -215,6 +215,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 var Confirm = func(prompt string, result *bool) error {
 	p := &survey.Confirm{
 		Message: prompt,
+		Default: true,
 	}
 	return survey.AskOne(p, result)
 }
