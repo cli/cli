@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/cli/cli/git"
@@ -14,6 +15,8 @@ import (
 func init() {
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoCloneCmd)
+	repoCmd.AddCommand(repoCreateCmd)
+	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
 	repoCmd.AddCommand(repoViewCmd)
 }
 
@@ -35,6 +38,13 @@ var repoCloneCmd = &cobra.Command{
 
 To pass 'git clone' options, separate them with '--'.`,
 	RunE: repoClone,
+}
+
+var repoCreateCmd = &cobra.Command{
+	Use:   "create [<name>]",
+	Short: "Create a new repository",
+	Long:  `Create a new GitHub repository.`,
+	RunE:  repoCreate,
 }
 
 var repoViewCmd = &cobra.Command{
@@ -61,6 +71,61 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	return utils.PrepareCmd(cloneCmd).Run()
+}
+
+func repoCreate(cmd *cobra.Command, args []string) error {
+	var name string
+	if len(args) > 0 {
+		name = args[0]
+	} else {
+		dir, err := git.ToplevelDir()
+		if err != nil {
+			return err
+		}
+		name = path.Base(dir)
+	}
+
+	visibility := "PRIVATE"
+	if isPublic, err := cmd.Flags().GetBool("public"); err == nil && isPublic {
+		visibility = "PUBLIC"
+	}
+
+	ctx := contextForCommand(cmd)
+	client, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	variables := map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":       name,
+			"visibility": visibility,
+		},
+	}
+
+	var response struct {
+		CreateRepository struct {
+			Repository struct {
+				URL string
+			}
+		}
+	}
+
+	err = client.GraphQL(`
+	mutation($input: CreateRepositoryInput!) {
+		createRepository(input: $input) {
+			repository {
+				url
+			}
+		}
+	}
+	`, variables, &response)
+	if err != nil {
+		return err
+	}
+
+	cmd.Println(response.CreateRepository.Repository.URL)
+	return nil
 }
 
 func repoView(cmd *cobra.Command, args []string) error {
