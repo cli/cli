@@ -99,7 +99,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			if didForkRepo && pushTries < maxPushTries {
 				pushTries++
 				// first wait 2 seconds after forking, then 4s, then 6s
-				time.Sleep(time.Duration(2*pushTries) * time.Second)
+				waitSeconds := 2 * pushTries
+				fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+				time.Sleep(time.Duration(waitSeconds) * time.Second)
 				continue
 			}
 			return err
