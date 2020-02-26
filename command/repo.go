@@ -21,8 +21,8 @@ func init() {
 	repoCmd.AddCommand(repoViewCmd)
 	repoCmd.AddCommand(repoForkCmd)
 
-	repoForkCmd.Flags().BoolP("yes", "y", false, "Run non-interactively, saying yes to prompts")
-	repoForkCmd.Flags().BoolP("no", "n", false, "Run non-interactively, saying no to prompts")
+	repoForkCmd.Flags().StringP("clone", "c", "prompt", "prompt: prompt about cloning fork. true: clone fork. false: never clone fork")
+	repoForkCmd.Flags().StringP("remote", "r", "prompt", "prompt: prompt about adding remote for fork. true: add remote for fork. false: never add remote fork")
 }
 
 var repoCmd = &cobra.Command{
@@ -87,11 +87,11 @@ func isURL(arg string) bool {
 func repoFork(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 
-	forceYes, err := cmd.Flags().GetBool("yes")
+	clonePref, err := cmd.Flags().GetString("clone")
 	if err != nil {
 		return err
 	}
-	forceNo, err := cmd.Flags().GetBool("no")
+	remotePref, err := cmd.Flags().GetString("remote")
 	if err != nil {
 		return err
 	}
@@ -169,13 +169,13 @@ func repoFork(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
 
-	if forceNo {
+	if (inParent && remotePref == "false") || (!inParent && clonePref == "false") {
 		return nil
 	}
 
 	if inParent {
-		remoteDesired := forceYes
-		if !forceYes {
+		remoteDesired := remotePref == "true"
+		if remotePref == "prompt" {
 			err = Confirm("Would you like to add a remote for the new fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
@@ -199,8 +199,8 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(out, "%s Remote added at %s\n", greenCheck, utils.Bold("fork"))
 		}
 	} else {
-		cloneDesired := forceYes
-		if !forceYes {
+		cloneDesired := clonePref == "true"
+		if clonePref == "prompt" {
 			err = Confirm("Would you like to clone the new fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)

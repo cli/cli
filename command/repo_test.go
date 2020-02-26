@@ -25,7 +25,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "repo.json")()
 
-	_, err := RunCommand(repoForkCmd, "repo fork -n")
+	_, err := RunCommand(repoForkCmd, "repo fork --remote=false")
 	if err == nil {
 		t.Errorf("expected repo fork to error")
 	}
@@ -41,7 +41,7 @@ func TestRepoFork_in_parent(t *testing.T) {
 	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	output, err := RunCommand(repoForkCmd, "repo fork -n")
+	output, err := RunCommand(repoForkCmd, "repo fork --remote=false")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -66,11 +66,11 @@ func TestRepoFork_outside(t *testing.T) {
 	}{
 		{
 			name: "url arg",
-			args: "repo fork -n http://github.com/OWNER/REPO.git",
+			args: "repo fork --clone=false http://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "full name arg",
-			args: "repo fork -n OWNER/REPO",
+			args: "repo fork --clone=false OWNER/REPO",
 		},
 	}
 	for _, tt := range tests {
@@ -112,7 +112,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 		return &outputStub{}
 	})()
 
-	output, err := RunCommand(repoForkCmd, "repo fork -y")
+	output, err := RunCommand(repoForkCmd, "repo fork --remote=true")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 		return &outputStub{}
 	})()
 
-	output, err := RunCommand(repoForkCmd, "repo fork -y OWNER/REPO")
+	output, err := RunCommand(repoForkCmd, "repo fork --clone=true OWNER/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
