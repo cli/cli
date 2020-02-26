@@ -10,7 +10,7 @@ import (
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPR       *PullRequest
+	CurrentPRs      []PullRequest
 }
 
 type PullRequestAndTotalCount struct {
@@ -262,11 +262,13 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPR = resp.Repository.PullRequest
-	if currentPR == nil {
+	var currentPRs []PullRequest
+	if resp.Repository.PullRequest != nil {
+		currentPRs = append(currentPRs, *resp.Repository.PullRequest)
+	} else {
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = &edge.Node
+				currentPRs = append(currentPRs, edge.Node)
 			}
 		}
 	}
@@ -280,7 +282,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR: currentPR,
+		CurrentPRs: currentPRs,
 	}
 
 	return &payload, nil
