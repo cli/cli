@@ -172,7 +172,7 @@ func TestPRList(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), `
-3 pull requests in OWNER/REPO
+Showing 3 of 3 pull requests in OWNER/REPO
 
 `)
 	eq(t, output.String(), `32	New feature	feature

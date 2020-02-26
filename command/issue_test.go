@@ -111,7 +111,7 @@ func TestIssueList(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), `
-3 issues in OWNER/REPO
+Showing 3 of 3 issues in OWNER/REPO
 
 `)
 

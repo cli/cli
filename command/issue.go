@@ -113,9 +113,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	issues := issuesData.Issues
-	issueCount := issuesData.TotalCount
+	totalIssueCount := issuesData.TotalCount
 
-	title := utils.GetTitle(cmd, "issue", limit, issueCount, baseRepo)
+	title := getTitle(cmd, "issue", len(issues), totalIssueCount, baseRepo)
 	fmt.Fprintf(colorableErr(cmd), title)
 
 	out := cmd.OutOrStdout()

@@ -191,9 +191,9 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	prs := prsData.PullRequests
-	prCount := prsData.TotalCount
+	totalPrCount := prsData.TotalCount
 
-	title := utils.GetTitle(cmd, "pull request", limit, prCount, baseRepo)
+	title := getTitle(cmd, "pull request", len(prs), totalPrCount, baseRepo)
 	fmt.Fprintf(colorableErr(cmd), title) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
