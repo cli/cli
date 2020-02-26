@@ -56,7 +56,13 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	oa.logf("open %s\n", startURL)
 	if err := openInBrowser(startURL); err != nil {
 		fmt.Fprintf(os.Stderr, "error opening web browser: %s\n", err)
+		fmt.Fprintf(os.Stderr, "")
 		fmt.Fprintf(os.Stderr, "Please open the following URL manually:\n%s\n", startURL)
+		fmt.Fprintf(os.Stderr, "")
+		// TODO: Temporary workaround for https://github.com/cli/cli/issues/297
+		fmt.Fprintf(os.Stderr, "If you are on a server or other headless system, use this workaround instead:")
+		fmt.Fprintf(os.Stderr, "  1. Complete authentication on a GUI system")
+		fmt.Fprintf(os.Stderr, "  2. Copy the contents of ~/.config/gh/config.yml to this system")
 	}
 
 	http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
