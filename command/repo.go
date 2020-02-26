@@ -137,6 +137,14 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	remoteAdd := git.GitCommand("remote", "add", "origin", repo.URL+".git")
+	remoteAdd.Stdout = os.Stdout
+	remoteAdd.Stderr = os.Stderr
+	err = utils.PrepareCmd(remoteAdd).Run()
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintln(cmd.OutOrStdout(), repo.URL)
 	return nil
 }

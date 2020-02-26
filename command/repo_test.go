@@ -96,9 +96,10 @@ func TestRepoCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO\n")
 	eq(t, output.Stderr(), "")
 
-	if seenCmd != nil {
+	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/OWNER/REPO.git")
 
 	var reqBody struct {
 		Query     string
