@@ -32,7 +32,11 @@ func getTitle(cmd *cobra.Command, cmdType string, matchCount int, totalMatchCoun
 
 	title = "\nShowing %d of %s in %s"
 	if (!limitSet && userSetFlagCounter > 0) || (userSetFlagCounter > 1) {
-		title += " that match your search\n\n"
+		matchStr := "match"
+		if totalMatchCount == 1 {
+			matchStr = "matches"
+		}
+		title += fmt.Sprintf(" that %s your search\n\n", matchStr)
 	} else {
 		title += "\n\n"
 	}
