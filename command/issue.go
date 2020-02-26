@@ -429,7 +429,7 @@ func labelList(issue api.Issue) string {
 		return ""
 	}
 
-	labelNames := []string{}
+	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
 		labelNames = append(labelNames, label.Name)
 	}
