@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -70,8 +71,11 @@ func UncommittedChangeCount() (int, error) {
 	return count, nil
 }
 
+// Push publishes a git ref to a remote and sets up upstream configuration
 func Push(remote string, ref string) error {
 	pushCmd := GitCommand("push", "--set-upstream", remote, ref)
+	pushCmd.Stdout = os.Stdout
+	pushCmd.Stderr = os.Stderr
 	return utils.PrepareCmd(pushCmd).Run()
 }
 

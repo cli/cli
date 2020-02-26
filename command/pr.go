@@ -85,7 +85,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	prPayload, err := api.PullRequests(apiClient, *baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(*baseRepo))
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
@@ -136,7 +136,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(*baseRepo))
+	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -174,8 +174,8 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	params := map[string]interface{}{
-		"owner": (*baseRepo).RepoOwner(),
-		"repo":  (*baseRepo).RepoName(),
+		"owner": baseRepo.RepoOwner(),
+		"repo":  baseRepo.RepoName(),
 		"state": graphqlState,
 	}
 	if len(labels) > 0 {
@@ -214,7 +214,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(prNum, nil, colorFuncForPR(pr))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
@@ -225,6 +225,14 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func colorFuncForPR(pr api.PullRequest) func(string) string {
+	if pr.State == "OPEN" && pr.IsDraft {
+		return utils.Gray
+	} else {
+		return colorFuncForState(pr.State)
+	}
 }
 
 func colorFuncForState(state string) func(string) string {
@@ -261,7 +269,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, *baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
 		if err != nil {
 			return err
 		}
@@ -273,15 +281,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 
 		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(*baseRepo), prNumber)
+			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
 			if preview {
-				pr, err = api.PullRequestByNumber(apiClient, *baseRepo, prNumber)
+				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, *baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -385,14 +393,17 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		if pr.State == "OPEN" {
-			fmt.Fprintf(w, "  %s", utils.Green(prNumber))
+
+		prNumberColorFunc := utils.Green
+		if pr.IsDraft {
+			prNumberColorFunc = utils.Gray
 		} else if pr.State == "MERGED" {
-			fmt.Fprintf(w, "  %s", utils.Magenta(prNumber))
+			prNumberColorFunc = utils.Magenta
 		} else if pr.State == "CLOSED" {
-			fmt.Fprintf(w, "  %s", utils.Red(prNumber))
+			prNumberColorFunc = utils.Red
 		}
-		fmt.Fprintf(w, "  %s %s", text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+
+		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
