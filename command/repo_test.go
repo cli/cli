@@ -29,7 +29,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected repo fork to error")
 	}
-	if err.Error() != "someone/REPO already exists!" {
+	if err.Error() != "someone/REPO already exists" {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -49,8 +49,7 @@ func TestRepoFork_in_parent(t *testing.T) {
 	eq(t, output.Stderr(), "")
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`Forking OWNER/REPO`),
+		regexp.MustCompile(`Created fork someone/REPO`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -88,8 +87,7 @@ func TestRepoFork_outside(t *testing.T) {
 			eq(t, output.Stderr(), "")
 
 			expectedLines := []*regexp.Regexp{
-				regexp.MustCompile(`successfully forked to someone/REPO`),
-				regexp.MustCompile(`Forking OWNER/REPO`),
+				regexp.MustCompile(`Created fork someone/REPO`),
 			}
 			for _, r := range expectedLines {
 				if !r.MatchString(output.String()) {
@@ -131,9 +129,8 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	eq(t, output.Stderr(), "")
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Forking OWNER/REPO`),
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`remote added at fork`),
+		regexp.MustCompile(`Created fork someone/REPO`),
+		regexp.MustCompile(`Remote added at fork`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -164,8 +161,8 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`Forking OWNER/REPO`),
+		regexp.MustCompile(`Created fork someone/REPO`),
+		regexp.MustCompile(`Cloned fork`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -203,8 +200,8 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`Forking OWNER/REPO`),
+		regexp.MustCompile(`Created fork someone/REPO`),
+		regexp.MustCompile(`Cloned fork`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -242,8 +239,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	eq(t, cmdRun, false)
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`Forking OWNER/REPO`),
+		regexp.MustCompile(`Created fork someone/REPO`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -290,9 +286,8 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	eq(t, output.Stderr(), "")
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Forking OWNER/REPO`),
-		regexp.MustCompile(`successfully forked to someone/REPO`),
-		regexp.MustCompile(`remote added at fork`),
+		regexp.MustCompile(`Created fork someone/REPO`),
+		regexp.MustCompile(`Remote added at fork`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {
@@ -332,8 +327,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	eq(t, cmdRun, false)
 
 	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Forking OWNER/REPO`),
-		regexp.MustCompile(`successfully forked to someone/REPO`),
+		regexp.MustCompile(`Created fork someone/REPO`),
 	}
 	for _, r := range expectedLines {
 		if !r.MatchString(output.String()) {

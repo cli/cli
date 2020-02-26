@@ -132,33 +132,42 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	greenCheck := utils.Green("✓")
+	redX := utils.Bold(utils.Red("X"))
 	out := colorableOut(cmd)
-	fmt.Fprintf(out, "Forking %s...\n", utils.Cyan(ghrepo.FullName(toFork)))
+	s := utils.Spinner()
+	loading := utils.Gray(fmt.Sprintf("Forking %s...", utils.Bold(utils.Gray(ghrepo.FullName(toFork)))))
+	s.Suffix = " " + loading
+	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
+	s.Start()
 
 	authLogin, err := ctx.AuthLogin()
 	if err != nil {
+		s.Stop()
 		return fmt.Errorf("could not determine current username: %w", err)
 	}
 
 	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
 	exists, err := api.RepoExistsOnGitHub(apiClient, possibleFork)
 	if err != nil {
+		s.Stop()
 		return fmt.Errorf("problem with API request: %w", err)
 	}
 
 	if exists {
-		return fmt.Errorf("%s %s", utils.Cyan(ghrepo.FullName(possibleFork)), utils.Red("already exists!"))
+		s.Stop()
+		fmt.Fprintf(out, redX+" ")
+		return fmt.Errorf("%s already exists", utils.Bold(ghrepo.FullName(possibleFork)))
 	}
 
 	forkedRepo, err := api.ForkRepo(apiClient, toFork)
 	if err != nil {
+		s.Stop()
 		return fmt.Errorf("failed to fork: %w", err)
 	}
+	s.Stop()
 
-	fmt.Fprintf(out, "%s %s %s!\n",
-		utils.Cyan(ghrepo.FullName(toFork)),
-		utils.Green("successfully forked to"),
-		utils.Cyan(ghrepo.FullName(forkedRepo)))
+	fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
 
 	if forceNo {
 		return nil
@@ -187,7 +196,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to fetch new remote: %w", err)
 			}
 
-			fmt.Fprintf(out, "%s %s\n", utils.Green("remote added at"), utils.Cyan("fork"))
+			fmt.Fprintf(out, "%s Remote added at %s\n", greenCheck, utils.Bold("fork"))
 		}
 	} else {
 		cloneDesired := forceYes
@@ -206,6 +215,8 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
+
+			fmt.Fprintf(out, "%s Cloned fork\n", greenCheck)
 		}
 	}
 
