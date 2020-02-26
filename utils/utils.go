@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/pkg/browser"
 )
@@ -58,4 +59,8 @@ func FuzzyAgo(ago time.Duration) string {
 	}
 
 	return fmtDuration(int(ago.Hours()/24/365), "year")
+}
+
+func Spinner() *spinner.Spinner {
+	return spinner.New(spinner.CharSets[11], 400*time.Millisecond)
 }
