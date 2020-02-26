@@ -48,7 +48,7 @@ func TestRepoClone(t *testing.T) {
 			})
 			defer restoreCmd()
 
-			output, err := RunCommand(repoViewCmd, tt.args)
+			output, err := RunCommand(repoCloneCmd, tt.args)
 			if err != nil {
 				t.Fatalf("error running command `repo clone`: %v", err)
 			}
