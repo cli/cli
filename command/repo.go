@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
@@ -16,6 +17,10 @@ func init() {
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoCloneCmd)
 	repoCmd.AddCommand(repoCreateCmd)
+	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
+	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
+	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
+	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
 	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
 	repoCmd.AddCommand(repoViewCmd)
 }
@@ -85,9 +90,40 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		name = path.Base(dir)
 	}
 
+	isPublic, err := cmd.Flags().GetBool("public")
+	if err != nil {
+		return err
+	}
+	hasIssuesEnabled, err := cmd.Flags().GetBool("enable-issues")
+	if err != nil {
+		return err
+	}
+	hasWikiEnabled, err := cmd.Flags().GetBool("enable-wiki")
+	if err != nil {
+		return err
+	}
+	description, err := cmd.Flags().GetString("description")
+	if err != nil {
+		return err
+	}
+	homepage, err := cmd.Flags().GetString("homepage")
+	if err != nil {
+		return err
+	}
+
+	// TODO: move this into constant within `api`
 	visibility := "PRIVATE"
-	if isPublic, err := cmd.Flags().GetBool("public"); err == nil && isPublic {
+	if isPublic {
 		visibility = "PUBLIC"
+	}
+
+	input := api.RepoCreateInput{
+		Name:             name,
+		Visibility:       visibility,
+		Description:      description,
+		Homepage:         homepage,
+		HasIssuesEnabled: hasIssuesEnabled,
+		HasWikiEnabled:   hasWikiEnabled,
 	}
 
 	ctx := contextForCommand(cmd)
@@ -96,35 +132,12 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	variables := map[string]interface{}{
-		"input": map[string]interface{}{
-			"name":       name,
-			"visibility": visibility,
-		},
-	}
-
-	var response struct {
-		CreateRepository struct {
-			Repository struct {
-				URL string
-			}
-		}
-	}
-
-	err = client.GraphQL(`
-	mutation($input: CreateRepositoryInput!) {
-		createRepository(input: $input) {
-			repository {
-				url
-			}
-		}
-	}
-	`, variables, &response)
+	repo, err := api.RepoCreate(client, input)
 	if err != nil {
 		return err
 	}
 
-	cmd.Println(response.CreateRepository.Repository.URL)
+	fmt.Fprintln(cmd.OutOrStdout(), repo.URL)
 	return nil
 }
 

@@ -1,6 +1,9 @@
 package command
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"os/exec"
 	"strings"
 	"testing"
@@ -58,6 +61,59 @@ func TestRepoClone(t *testing.T) {
 			}
 			eq(t, strings.Join(seenCmd.Args, " "), tt.want)
 		})
+	}
+}
+
+func TestRepoCreate(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	initContext = func() context.Context {
+		return ctx
+	}
+
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "createRepository": {
+		"repository": {
+			"id": "REPOID",
+			"url": "https://github.com/OWNER/REPO"
+		}
+	} } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(repoCreateCmd, "repo create REPO")
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO\n")
+	eq(t, output.Stderr(), "")
+
+	if seenCmd != nil {
+		t.Fatal("expected a command to run")
+	}
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	json.Unmarshal(bodyBytes, &reqBody)
+	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
+		t.Errorf("expected %q, got %q", "REPO", repoName)
+	}
+	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
+		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
 	}
 }
 

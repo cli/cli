@@ -14,6 +14,7 @@ import (
 type Repository struct {
 	ID    string
 	Name  string
+	URL   string
 	Owner RepositoryOwner
 
 	IsPrivate        bool
@@ -215,4 +216,44 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		},
 		ViewerPermission: "WRITE",
 	}, nil
+}
+
+// RepoCreateInput represents input parameters for RepoCreate
+type RepoCreateInput struct {
+	Name        string `json:"name"`
+	Visibility  string `json:"visibility"`
+	Homepage    string `json:"homepage,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	HasIssuesEnabled bool `json:"hasIssuesEnabled"`
+	HasWikiEnabled   bool `json:"hasWikiEnabled"`
+}
+
+// RepoCreate creates a new GitHub repository
+func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
+	var response struct {
+		CreateRepository struct {
+			Repository Repository
+		}
+	}
+
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	err := client.GraphQL(`
+	mutation($input: CreateRepositoryInput!) {
+		createRepository(input: $input) {
+			repository {
+				id
+				url
+			}
+		}
+	}
+	`, variables, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response.CreateRepository.Repository, nil
 }
