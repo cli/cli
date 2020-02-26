@@ -136,7 +136,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	redX := utils.Bold(utils.Red("X"))
 	out := colorableOut(cmd)
 	s := utils.Spinner()
-	loading := utils.Gray(fmt.Sprintf("Forking %s...", utils.Bold(utils.Gray(ghrepo.FullName(toFork)))))
+	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(toFork))) + utils.Gray("...")
 	s.Suffix = " " + loading
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 	s.Start()
