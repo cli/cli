@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -107,7 +108,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issuesData, err := api.IssueList(apiClient, *baseRepo, state, labels, assignee, limit)
+	issuesData, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issuePayload, err := api.IssueStatus(apiClient, *baseRepo, currentUser)
+	issuePayload, err := api.IssueStatus(apiClient, baseRepo, currentUser)
 	if err != nil {
 		return err
 	}
@@ -163,7 +164,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 
 	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(*baseRepo))
+	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Issues assigned to you")
@@ -207,7 +208,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issue, err := issueFromArg(apiClient, *baseRepo, args[0])
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
 	if err != nil {
 		return err
 	}
@@ -243,13 +244,13 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	)))
 
 	if issue.Body != "" {
-    fmt.Fprintln(out)
-	  md, err := utils.RenderMarkdown(issue.Body)
-	  if err != nil {
-		  return err
-	  }
-	  fmt.Fprintln(out, md)
-	  fmt.Fprintln(out)
+		fmt.Fprintln(out)
+		md, err := utils.RenderMarkdown(issue.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, md)
+		fmt.Fprintln(out)
 	}
 
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
@@ -280,8 +281,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(*baseRepo))
-
 	baseOverride, err := cmd.Flags().GetString("repo")
 	if err != nil {
 		return err
@@ -295,31 +294,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
-		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(*baseRepo))
-		if len(templateFiles) > 1 {
-			openURL += "/choose"
-		}
-		cmd.Printf("Opening %s in your browser.\n", openURL)
-		return utils.OpenInBrowser(openURL)
-	}
-
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	repo, err := api.GitHubRepo(apiClient, *baseRepo)
-	if err != nil {
-		return err
-	}
-	if !repo.HasIssuesEnabled {
-		return fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(*baseRepo))
-	}
-
-	action := SubmitAction
-
 	title, err := cmd.Flags().GetString("title")
 	if err != nil {
 		return fmt.Errorf("could not parse title: %w", err)
@@ -328,6 +302,39 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
+
+	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
+		// TODO: move URL generation into GitHubRepository
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
+		if title != "" || body != "" {
+			openURL += fmt.Sprintf(
+				"?title=%s&body=%s",
+				url.QueryEscape(title),
+				url.QueryEscape(body),
+			)
+		} else if len(templateFiles) > 1 {
+			openURL += "/choose"
+		}
+		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
+		return utils.OpenInBrowser(openURL)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
+
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	repo, err := api.GitHubRepo(apiClient, baseRepo)
+	if err != nil {
+		return err
+	}
+	if !repo.HasIssuesEnabled {
+		return fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(baseRepo))
+	}
+
+	action := SubmitAction
 
 	interactive := title == "" || body == ""
 
@@ -356,7 +363,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if action == PreviewAction {
 		openURL := fmt.Sprintf(
 			"https://github.com/%s/issues/new/?title=%s&body=%s",
-			ghrepo.FullName(*baseRepo),
+			ghrepo.FullName(baseRepo),
 			url.QueryEscape(title),
 			url.QueryEscape(body),
 		)
@@ -394,7 +401,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		ago := now.Sub(issue.UpdatedAt)
 
 		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			truncate(70, replaceExcessiveWhitespace(issue.Title)),
+			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
 			coloredLabels,
 			utils.Gray(utils.FuzzyAgo(ago)))
 	}

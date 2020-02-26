@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cli/cli/pkg/text"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -21,6 +22,7 @@ type TablePrinter interface {
 
 func NewTablePrinter(w io.Writer) TablePrinter {
 	if outFile, isFile := w.(*os.File); isFile {
+		// TODO: use utils.IsTerminal()
 		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
 		if isatty.IsTerminal(outFile.Fd()) || isCygwin {
 			ttyWidth := 80
@@ -62,16 +64,16 @@ func (t ttyTablePrinter) IsTTY() bool {
 	return true
 }
 
-func (t *ttyTablePrinter) AddField(text string, truncateFunc func(int, string) string, colorFunc func(string) string) {
+func (t *ttyTablePrinter) AddField(s string, truncateFunc func(int, string) string, colorFunc func(string) string) {
 	if truncateFunc == nil {
-		truncateFunc = truncate
+		truncateFunc = text.Truncate
 	}
 	if t.rows == nil {
 		t.rows = [][]tableField{[]tableField{}}
 	}
 	rowI := len(t.rows) - 1
 	field := tableField{
-		Text:         text,
+		Text:         s,
 		TruncateFunc: truncateFunc,
 		ColorFunc:    colorFunc,
 	}
@@ -92,7 +94,7 @@ func (t *ttyTablePrinter) Render() error {
 	// measure maximum content width per column
 	for _, row := range t.rows {
 		for col, field := range row {
-			textLen := len(field.Text)
+			textLen := text.DisplayWidth(field.Text)
 			if textLen > colWidths[col] {
 				colWidths[col] = textLen
 			}
@@ -128,7 +130,9 @@ func (t *ttyTablePrinter) Render() error {
 			truncVal := field.TruncateFunc(colWidths[col], field.Text)
 			if col < numCols-1 {
 				// pad value with spaces on the right
-				truncVal = fmt.Sprintf("%-*s", colWidths[col], truncVal)
+				if padWidth := colWidths[col] - text.DisplayWidth(field.Text); padWidth > 0 {
+					truncVal += strings.Repeat(" ", padWidth)
+				}
 			}
 			if field.ColorFunc != nil {
 				truncVal = field.ColorFunc(truncVal)
@@ -172,14 +176,4 @@ func (t *tsvTablePrinter) EndRow() {
 
 func (t *tsvTablePrinter) Render() error {
 	return nil
-}
-
-func truncate(maxLength int, title string) string {
-	if len(title) > maxLength {
-		if maxLength > 3 {
-			return title[0:maxLength-3] + "..."
-		}
-		return title[0:maxLength]
-	}
-	return title
 }

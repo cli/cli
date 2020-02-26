@@ -63,7 +63,7 @@ func FuzzyAgo(ago time.Duration) string {
 	return fmtDuration(int(ago.Hours()/24/365), "year")
 }
 
-func GetTitle(cmd *cobra.Command, cmdType string, limit int, matchCount int, baseRepo *ghrepo.Interface) string {
+func GetTitle(cmd *cobra.Command, cmdType string, limit int, matchCount int, baseRepo ghrepo.Interface) string {
 	userSetFlagCounter := 0
 	limitSet := false
 
@@ -81,14 +81,14 @@ func GetTitle(cmd *cobra.Command, cmdType string, limit int, matchCount int, bas
 		if userSetFlagCounter > 0 {
 			msg = fmt.Sprintf("No %ss match your search", cmdType)
 		}
-		return fmt.Sprintf(title, msg, ghrepo.FullName(*baseRepo))
+		return fmt.Sprintf(title, msg, ghrepo.FullName(baseRepo))
 	}
 
 	if (!limitSet && userSetFlagCounter > 0) || (userSetFlagCounter > 1) {
 		title = "\n%s match your search in %s\n\n"
 	}
 
-	out := fmt.Sprintf(title, Pluralize(matchCount, cmdType), ghrepo.FullName(*baseRepo))
+	out := fmt.Sprintf(title, Pluralize(matchCount, cmdType), ghrepo.FullName(baseRepo))
 
 	if limit < matchCount {
 		out = out + fmt.Sprintln(Gray(fmt.Sprintf("Showing %d/%d results\n", limit, matchCount)))

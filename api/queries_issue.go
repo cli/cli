@@ -185,21 +185,24 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-    query($owner: String!, $repo: String!, $limit: Int, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
-      repository(owner: $owner, name: $repo) {
-		hasIssuesEnabled
-        issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
-					totalCount
-					nodes {
-            ...issue
-          }
-        }
-      }
-    }
-  `
+	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
+				totalCount
+				nodes {
+					...issue
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}
+	}
+	`
 
 	variables := map[string]interface{}{
-		"limit":  limit,
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"states": states,
@@ -211,26 +214,50 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 		variables["assignee"] = assigneeString
 	}
 
-	var resp struct {
+	var response struct {
 		Repository struct {
 			Issues struct {
-				Nodes      []Issue
 				TotalCount int
+				Nodes      []Issue
+				PageInfo   struct {
+					HasNextPage bool
+					EndCursor   string
+				}
 			}
 			HasIssuesEnabled bool
 		}
 	}
 
-	err := client.GraphQL(query, variables, &resp)
-	if err != nil {
-		return nil, err
+	var issues []Issue
+	pageLimit := min(limit, 100)
+
+loop:
+	for {
+		variables["limit"] = pageLimit
+		err := client.GraphQL(query, variables, &response)
+		if err != nil {
+			return nil, err
+		}
+		if !response.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+
+		for _, issue := range response.Repository.Issues.Nodes {
+			issues = append(issues, issue)
+			if len(issues) == limit {
+				break loop
+			}
+		}
+
+		if response.Repository.Issues.PageInfo.HasNextPage {
+			variables["endCursor"] = response.Repository.Issues.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(issues))
+		} else {
+			break
+		}
 	}
 
-	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
-	}
-
-	res := IssuesAndTotalCount{Issues: resp.Repository.Issues.Nodes, TotalCount: resp.Repository.Issues.TotalCount}
+	res := IssuesAndTotalCount{Issues: issues, TotalCount: response.Repository.Issues.TotalCount}
 	return &res, nil
 }
 

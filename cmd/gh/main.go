@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
-	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -71,8 +70,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 }
 
 func shouldCheckForUpdate() bool {
-	errFd := os.Stderr.Fd()
-	return updaterEnabled != "" && (isatty.IsTerminal(errFd) || isatty.IsCygwinTerminal(errFd))
+	return updaterEnabled != "" && utils.IsTerminal(os.Stderr)
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
