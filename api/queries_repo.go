@@ -60,23 +60,8 @@ func (r Repository) ViewerCanPush() bool {
 	}
 }
 
-func RepoExistsOnGitHub(client *Client, repo ghrepo.Interface) (bool, error) {
-	query := `
-	query($owner: String!, $name: String!) {
-		repository(owner: $owner, name: $name) {
-			id
-		}
-	}
-	`
-	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"name":  repo.RepoName(),
-	}
-
-	result := struct {
-		Repository Repository
-	}{}
-	err := client.GraphQL(query, variables, &result)
+func GitHubRepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
+	repo, err := GitHubRepo(client, repo)
 
 	if err == nil {
 		// we found it.
@@ -100,7 +85,6 @@ func RepoExistsOnGitHub(client *Client, repo ghrepo.Interface) (bool, error) {
 	return false, err
 }
 
-// GitHubRepo looks up the node ID of a named repository
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
@@ -119,12 +103,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}{}
 	err := client.GraphQL(query, variables, &result)
 
-	if err != nil || result.Repository.ID == "" {
-		newErr := fmt.Errorf("failed to determine repository ID for '%s'", ghrepo.FullName(repo))
-		if err != nil {
-			newErr = fmt.Errorf("%s: %w", newErr, err)
-		}
-		return nil, newErr
+	if err != nil {
+		return nil, err
 	}
 
 	return &result.Repository, nil

@@ -148,7 +148,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
-	exists, err := api.RepoExistsOnGitHub(apiClient, possibleFork)
+	exists, err := api.GitHubRepoExists(apiClient, possibleFork)
 	if err != nil {
 		s.Stop()
 		return fmt.Errorf("problem with API request: %w", err)
