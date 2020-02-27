@@ -123,7 +123,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 		return &outputStub{}
 	})()
 
-	output, err := RunCommand(repoForkCmd, "repo fork --remote=true")
+	output, err := RunCommand(repoForkCmd, "repo fork --remote")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 		return &outputStub{}
 	})()
 
-	output, err := RunCommand(repoForkCmd, "repo fork --clone=true OWNER/REPO")
+	output, err := RunCommand(repoForkCmd, "repo fork --clone OWNER/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
