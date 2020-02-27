@@ -3,6 +3,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"sort"
 
@@ -133,7 +134,12 @@ type fsContext struct {
 }
 
 func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
+	configHome := "~/.config"
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome != "" {
+		configHome = xdgConfigHome
+	}
+	dir, _ := homedir.Expand(configHome + "/gh")
 	return dir
 }
 
