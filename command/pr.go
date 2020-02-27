@@ -333,7 +333,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
 func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(arg); err == nil {
+	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 

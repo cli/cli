@@ -273,7 +273,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
 
 func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(arg); err == nil {
+	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
 	}
 
