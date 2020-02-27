@@ -22,8 +22,8 @@ func init() {
 	repoCmd.AddCommand(repoViewCmd)
 	repoCmd.AddCommand(repoForkCmd)
 
-	repoForkCmd.Flags().StringP("clone", "c", "prompt", "prompt: prompt about cloning fork. true: clone fork. false: never clone fork")
-	repoForkCmd.Flags().StringP("remote", "r", "prompt", "prompt: prompt about adding remote for fork. true: add remote for fork. false: never add remote fork")
+	repoForkCmd.Flags().StringP("clone", "c", "prompt", "true: clone fork. false: never clone fork")
+	repoForkCmd.Flags().StringP("remote", "r", "prompt", "true: add remote for fork. false: never add remote fork")
 }
 
 var repoCmd = &cobra.Command{
