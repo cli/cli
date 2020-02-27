@@ -475,6 +475,7 @@ func TestPRView_numberArg(t *testing.T) {
 func TestPRView_numberArgWithHash(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {

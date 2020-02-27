@@ -243,9 +243,10 @@ func TestIssueView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
-func TestIssueViewWithHash(t *testing.T) {
+func TestIssueView_numberArgWithHash(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
