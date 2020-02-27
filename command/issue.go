@@ -69,7 +69,7 @@ var issueViewCmd = &cobra.Command{
 	Use: "view {<number> | <url> | <branch>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return FlagError{errors.New("issue required as argument")}
+			return FlagError{errors.New("issue integer or URL required as argument")}
 		}
 		return nil
 	},
