@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
@@ -84,6 +85,10 @@ func isURL(arg string) bool {
 	return strings.HasPrefix(arg, "http:/") || strings.HasPrefix(arg, "https:/")
 }
 
+var Since = func(t time.Time) time.Duration {
+	return time.Since(t)
+}
+
 func repoFork(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 
@@ -148,23 +153,25 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
-	exists, err := api.GitHubRepoExists(apiClient, possibleFork)
-	if err != nil {
-		s.Stop()
-		return fmt.Errorf("problem with API request: %w", err)
-	}
-
-	if exists {
-		s.Stop()
-		fmt.Fprintf(out, redX+" ")
-		return fmt.Errorf("%s already exists", utils.Bold(ghrepo.FullName(possibleFork)))
-	}
 
 	forkedRepo, err := api.ForkRepo(apiClient, toFork)
 	if err != nil {
 		s.Stop()
 		return fmt.Errorf("failed to fork: %w", err)
 	}
+
+	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
+	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
+	// returns the fork repo data even if it already exists -- with no change in status code or
+	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
+	// we assume the fork already existed and report an error.
+	created_ago := Since(forkedRepo.CreatedAt)
+	if created_ago > time.Minute {
+		s.Stop()
+		fmt.Fprintf(out, redX+" ")
+		return fmt.Errorf("%s already exists", utils.Bold(ghrepo.FullName(possibleFork)))
+	}
+
 	s.Stop()
 
 	fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/utils"
@@ -23,7 +24,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 	}
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	defer http.StubWithFixture(200, "repo.json")()
+	defer http.StubWithFixture(200, "forkResult.json")()
 
 	_, err := RunCommand(repoForkCmd, "repo fork --remote=false")
 	if err == nil {
@@ -34,11 +35,21 @@ func TestRepoFork_already_forked(t *testing.T) {
 	}
 }
 
+func stubSince(d time.Duration) func() {
+	originalSince := Since
+	Since = func(t time.Time) time.Duration {
+		return d
+	}
+	return func() {
+		Since = originalSince
+	}
+}
+
 func TestRepoFork_in_parent(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	output, err := RunCommand(repoForkCmd, "repo fork --remote=false")
@@ -75,8 +86,8 @@ func TestRepoFork_outside(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer stubSince(2 * time.Second)()
 			http := initFakeHTTP()
-			defer http.StubWithFixture(200, "repoNotFound.json")()
 			defer http.StubWithFixture(200, "forkResult.json")()
 
 			output, err := RunCommand(repoForkCmd, tt.args)
@@ -101,9 +112,9 @@ func TestRepoFork_outside(t *testing.T) {
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
@@ -141,8 +152,8 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmd *exec.Cmd
@@ -173,8 +184,8 @@ func TestRepoFork_outside_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmd *exec.Cmd
@@ -212,8 +223,8 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
@@ -251,9 +262,9 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
@@ -299,9 +310,9 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	defer http.StubWithFixture(200, "repoNotFound.json")()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
