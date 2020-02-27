@@ -62,31 +62,6 @@ func (r Repository) ViewerCanPush() bool {
 	}
 }
 
-func GitHubRepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
-	repo, err := GitHubRepo(client, repo)
-
-	if err == nil {
-		// we found it.
-		return true, nil
-	}
-
-	// we didn't find it, but need to determine if we hit an error or it just doesn't exist.
-	graphqlError, isGraphQLError := err.(*GraphQLErrorResponse)
-	if isGraphQLError {
-		tolerated := true
-		for _, ge := range graphqlError.Errors {
-			if ge.Type != "NOT_FOUND" {
-				tolerated = false
-			}
-		}
-		if tolerated {
-			err = nil
-		}
-	}
-
-	return false, err
-}
-
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
