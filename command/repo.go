@@ -170,8 +170,8 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	created_ago := Since(forkedRepo.CreatedAt)
 	if created_ago > time.Minute {
 		s.Stop()
-		fmt.Fprintf(out, redX+" ")
-		return fmt.Errorf("%s already exists", utils.Bold(ghrepo.FullName(possibleFork)))
+		fmt.Fprint(out, redX+" ")
+		return fmt.Errorf("%s already exists", ghrepo.FullName(possibleFork))
 	}
 
 	s.Stop()
