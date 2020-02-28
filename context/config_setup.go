@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/OpenPeeDeeP/xdg"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
 	"gopkg.in/yaml.v3"
@@ -26,7 +27,7 @@ var (
 
 // TODO: have a conversation about whether this belongs in the "context" package
 // FIXME: make testable
-func setupConfigFile(filename string) (*configEntry, error) {
+func setupConfigFile(fn string) (*configEntry, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
@@ -60,6 +61,8 @@ func setupConfigFile(filename string) (*configEntry, error) {
 	}
 	data := make(map[string][]configEntry)
 	data[flow.Hostname] = []configEntry{entry}
+
+	filename := filepath.Join(xdg.New("", "gh").ConfigHome(), fn)
 
 	err = os.MkdirAll(filepath.Dir(filename), 0771)
 	if err != nil {

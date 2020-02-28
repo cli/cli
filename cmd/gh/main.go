@@ -9,8 +9,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/OpenPeeDeeP/xdg"
 	"github.com/cli/cli/command"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
 	"github.com/mattn/go-isatty"
@@ -86,6 +86,6 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	}
 
 	repo := updaterEnabled
-	stateFilePath := path.Join(context.ConfigDir(), "state.yml")
+	stateFilePath := path.Join(xdg.New("", "gh").DataHome(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
 }

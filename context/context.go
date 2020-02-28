@@ -3,14 +3,11 @@ package context
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path"
 	"sort"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/mitchellh/go-homedir"
 )
 
 // Context represents the interface for querying information about the current environment
@@ -133,23 +130,9 @@ type fsContext struct {
 	authToken string
 }
 
-func ConfigDir() string {
-	configHome := "~/.config"
-	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	if xdgConfigHome != "" {
-		configHome = xdgConfigHome
-	}
-	dir, _ := homedir.Expand(configHome + "/gh")
-	return dir
-}
-
-func configFile() string {
-	return path.Join(ConfigDir(), "config.yml")
-}
-
 func (c *fsContext) getConfig() (*configEntry, error) {
 	if c.config == nil {
-		entry, err := parseOrSetupConfigFile(configFile())
+		entry, err := parseOrSetupConfigFile(".config.yml")
 		if err != nil {
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/OpenPeeDeeP/xdg"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,7 +27,7 @@ func parseOrSetupConfigFile(fn string) (*configEntry, error) {
 }
 
 func parseConfigFile(fn string) (*configEntry, error) {
-	f, err := os.Open(fn)
+	f, err := os.Open(xdg.New("", "gh").QueryConfig(fn))
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func parseConfigFile(fn string) (*configEntry, error) {
 
 // ParseDefaultConfig reads the configuration file
 func ParseDefaultConfig() (*configEntry, error) {
-	return parseConfigFile(configFile())
+	return parseConfigFile(".config.yml")
 }
 
 func parseConfig(r io.Reader) (*configEntry, error) {
