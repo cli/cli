@@ -264,7 +264,11 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	var currentPR = resp.Repository.PullRequest
 	if currentPR == nil {
 		for _, edge := range resp.Repository.PullRequests.Edges {
-			if edge.Node.HeadLabel() == currentPRHeadRef {
+			currHeadLabel := currentPRHeadRef
+			if edge.Node.IsCrossRepository {
+				currHeadLabel = fmt.Sprintf("%s:%s", currentUsername, currentPRHeadRef)
+			}
+			if edge.Node.HeadLabel() == currHeadLabel {
 				currentPR = &edge.Node
 			}
 		}
