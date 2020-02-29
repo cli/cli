@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/command"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func Test_printError(t *testing.T) {
@@ -63,6 +64,15 @@ check your internet connection or githubstatus.com
 				debug: false,
 			},
 			wantOut: "unknown command foo\n\nUsage:\n\n",
+		},
+		{
+			name: "pflag help error",
+			args: args{
+				err:   &command.FlagError{Err: pflag.ErrHelp},
+				cmd:   cmd,
+				debug: false,
+			},
+			wantOut: "Usage:\n\n",
 		},
 	}
 

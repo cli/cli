@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/utils"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var updaterEnabled = ""
@@ -58,14 +59,29 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		return
 	}
 
+	var flagError *command.FlagError
+	if errors.As(err, &flagError) {
+		if flagError.Err == pflag.ErrHelp {
+			fmt.Fprintln(out, cmd.UsageString())
+			return
+		}
+
+		fmt.Fprintln(out, flagError)
+		if !strings.HasSuffix(flagError.Error(), "\n") {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out, cmd.UsageString())
+		return
+	}
+
 	fmt.Fprintln(out, err)
 
-	var flagError *command.FlagError
-	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
+	if strings.HasPrefix(err.Error(), "unknown command ") {
 		if !strings.HasSuffix(err.Error(), "\n") {
 			fmt.Fprintln(out)
 		}
 		fmt.Fprintln(out, cmd.UsageString())
+		return
 	}
 }
 
