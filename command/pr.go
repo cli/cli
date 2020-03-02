@@ -71,16 +71,17 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
-	if err != nil {
-		return err
-	}
 	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
 	}
 
 	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
 	if err != nil {
 		return err
 	}
@@ -275,7 +276,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 		openURL = pr.URL
 	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
 		if err != nil {
 			return err
 		}
@@ -345,11 +346,7 @@ func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*a
 	return api.PullRequestForBranch(apiClient, baseRepo, arg)
 }
 
-func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
-	baseRepo, err := ctx.BaseRepo()
-	if err != nil {
-		return
-	}
+func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
 	prHeadRef, err = ctx.Branch()
 	if err != nil {
 		return
