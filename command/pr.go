@@ -97,8 +97,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
-	if prPayload.CurrentPR != nil {
-		printPrs(out, 0, *prPayload.CurrentPR)
+	if prPayload.CurrentPRs != nil {
+		printPrs(out, 0, prPayload.CurrentPRs...)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
@@ -397,6 +397,10 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		prNumberColorFunc := utils.Green
 		if pr.IsDraft {
 			prNumberColorFunc = utils.Gray
+		} else if pr.State == "MERGED" {
+			prNumberColorFunc = utils.Magenta
+		} else if pr.State == "CLOSED" {
+			prNumberColorFunc = utils.Red
 		}
 
 		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
