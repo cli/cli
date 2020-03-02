@@ -61,14 +61,10 @@ func TestRepoFork_in_parent(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
+	r := regexp.MustCompile(`Created fork someone/REPO`)
+	if !r.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
 	}
 }
 
@@ -99,14 +95,10 @@ func TestRepoFork_outside(t *testing.T) {
 
 			eq(t, output.Stderr(), "")
 
-			expectedLines := []*regexp.Regexp{
-				regexp.MustCompile(`Created fork someone/REPO`),
-			}
-			for _, r := range expectedLines {
-				if !r.MatchString(output.String()) {
-					t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-					return
-				}
+			r := regexp.MustCompile(`Created fork someone/REPO`)
+			if !r.MatchString(output.String()) {
+				t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+				return
 			}
 		})
 	}
@@ -251,14 +243,10 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 
 	eq(t, cmdRun, false)
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
+	r := regexp.MustCompile(`Created fork someone/REPO`)
+	if !r.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
 	}
 }
 
@@ -339,14 +327,10 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 
 	eq(t, cmdRun, false)
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
+	r := regexp.MustCompile(`Created fork someone/REPO`)
+	if !r.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
 	}
 }
 
