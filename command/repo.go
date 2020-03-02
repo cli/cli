@@ -140,7 +140,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	greenCheck := utils.Green("✓")
-	redX := utils.Bold(utils.Red("X"))
 	out := colorableOut(cmd)
 	s := utils.Spinner()
 	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(toFork))) + utils.Gray("...")
@@ -162,6 +161,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to fork: %w", err)
 	}
 
+	s.Stop()
 	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
 	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
 	// returns the fork repo data even if it already exists -- with no change in status code or
@@ -169,14 +169,13 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// we assume the fork already existed and report an error.
 	created_ago := Since(forkedRepo.CreatedAt)
 	if created_ago > time.Minute {
-		s.Stop()
-		fmt.Fprint(out, redX+" ")
-		return fmt.Errorf("%s already exists", ghrepo.FullName(possibleFork))
+		fmt.Fprintf(out, "%s %s %s\n",
+			utils.Yellow("!"),
+			utils.Bold(ghrepo.FullName(possibleFork)),
+			"already exists")
+	} else {
+		fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
 	}
-
-	s.Stop()
-
-	fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
 
 	if (inParent && remotePref == "false") || (!inParent && clonePref == "false") {
 		return nil
@@ -185,7 +184,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	if inParent {
 		remoteDesired := remotePref == "true"
 		if remotePref == "prompt" {
-			err = Confirm("Would you like to add a remote for the new fork?", &remoteDesired)
+			err = Confirm("Would you like to add a remote for the fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
@@ -210,7 +209,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	} else {
 		cloneDesired := clonePref == "true"
 		if clonePref == "prompt" {
-			err = Confirm("Would you like to clone the new fork?", &cloneDesired)
+			err = Confirm("Would you like to clone the fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}

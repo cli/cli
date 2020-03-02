@@ -26,12 +26,14 @@ func TestRepoFork_already_forked(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	_, err := RunCommand(repoForkCmd, "repo fork --remote=false")
-	if err == nil {
-		t.Errorf("expected repo fork to error")
+	output, err := RunCommand(repoForkCmd, "repo fork --remote=false")
+	if err != nil {
+		t.Errorf("got unexpected error: %v", err)
 	}
-	if err.Error() != "someone/REPO already exists" {
-		t.Errorf("unexpected error: %v", err)
+	r := regexp.MustCompile(`someone/REPO already exists`)
+	if !r.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
 	}
 }
 
