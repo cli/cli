@@ -22,8 +22,8 @@ func init() {
 	repoCmd.AddCommand(repoViewCmd)
 	repoCmd.AddCommand(repoForkCmd)
 
-	repoForkCmd.Flags().StringP("clone", "c", "prompt", "Clone fork. Pass false to not clone fork.")
-	repoForkCmd.Flags().StringP("remote", "r", "prompt", "Add remote for fork. Pass false to not add remote.")
+	repoForkCmd.Flags().String("clone", "prompt", "Clone fork. Pass false to not clone fork.")
+	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork. Pass false to not add remote.")
 	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
 }
