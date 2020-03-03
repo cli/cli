@@ -207,11 +207,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		}
 	} else if isTTY {
 		doSetup := false
-		// TODO: use overridable Confirm
-		err := survey.AskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)),
-			Default: true,
-		}, &doSetup)
+		err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
 		if err != nil {
 			return err
 		}
