@@ -246,6 +246,8 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 		createRepository(input: $input) {
 			repository {
 				id
+				name
+				owner { login }
 				url
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
@@ -79,15 +80,16 @@ func repoClone(cmd *cobra.Command, args []string) error {
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
+	projectDir, projectDirErr := git.ToplevelDir()
+
 	var name string
 	if len(args) > 0 {
 		name = args[0]
 	} else {
-		dir, err := git.ToplevelDir()
-		if err != nil {
-			return err
+		if projectDirErr != nil {
+			return projectDirErr
 		}
-		name = path.Base(dir)
+		name = path.Base(projectDir)
 	}
 
 	isPublic, err := cmd.Flags().GetBool("public")
@@ -137,15 +139,70 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	remoteAdd := git.GitCommand("remote", "add", "origin", repo.URL+".git")
-	remoteAdd.Stdout = os.Stdout
-	remoteAdd.Stderr = os.Stderr
-	err = utils.PrepareCmd(remoteAdd).Run()
-	if err != nil {
-		return err
+	out := cmd.OutOrStdout()
+	greenCheck := utils.Green("✓")
+	isTTY := false
+	if outFile, isFile := out.(*os.File); isFile {
+		isTTY = utils.IsTerminal(outFile)
+		if isTTY {
+			// FIXME: duplicates colorableOut
+			out = utils.NewColorable(outFile)
+		}
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), repo.URL)
+	if isTTY {
+		fmt.Fprintf(out, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintln(out, repo.URL)
+	}
+
+	remoteURL := repo.URL + ".git"
+
+	if projectDirErr == nil {
+		// TODO: use git.AddRemote
+		remoteAdd := git.GitCommand("remote", "add", "origin", remoteURL)
+		remoteAdd.Stdout = os.Stdout
+		remoteAdd.Stderr = os.Stderr
+		err = utils.PrepareCmd(remoteAdd).Run()
+		if err != nil {
+			return err
+		}
+		if isTTY {
+			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
+		}
+	} else if isTTY {
+		doSetup := false
+		// TODO: use overridable Confirm
+		err := survey.AskOne(&survey.Confirm{
+			Message: fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)),
+			Default: true,
+		}, &doSetup)
+		if err != nil {
+			return err
+		}
+
+		if doSetup {
+			path := repo.Name
+
+			gitInit := git.GitCommand("init", path)
+			gitInit.Stdout = os.Stdout
+			gitInit.Stderr = os.Stderr
+			err = utils.PrepareCmd(gitInit).Run()
+			if err != nil {
+				return err
+			}
+			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+			gitRemoteAdd.Stdout = os.Stdout
+			gitRemoteAdd.Stderr = os.Stderr
+			err = utils.PrepareCmd(gitRemoteAdd).Run()
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(out, "%s Initialized repository in './%s/'\n", greenCheck, path)
+		}
+	}
+
 	return nil
 }
 
