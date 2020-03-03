@@ -19,6 +19,7 @@ import (
 func init() {
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoCloneCmd)
+
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
 	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
@@ -26,13 +27,14 @@ func init() {
 	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
 	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
 	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
-	repoCmd.AddCommand(repoViewCmd)
-	repoCmd.AddCommand(repoForkCmd)
 
+	repoCmd.AddCommand(repoForkCmd)
 	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
-	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork. {true|false|prompt}")
+	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
 	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
+
+	repoCmd.AddCommand(repoViewCmd)
 }
 
 var repoCmd = &cobra.Command{
