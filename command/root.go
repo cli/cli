@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Version is dynamically set by the toolchain or overriden by the Makefile.
@@ -47,6 +48,9 @@ func init() {
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		if err == pflag.ErrHelp {
+			return err
+		}
 		return &FlagError{Err: err}
 	})
 }
