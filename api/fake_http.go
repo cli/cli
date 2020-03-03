@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 )
 
@@ -36,6 +38,13 @@ func (f *FakeHTTP) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp.Request = req
 	f.Requests = append(f.Requests, req)
 	return resp, nil
+}
+
+func (f *FakeHTTP) StubWithFixture(status int, fixtureFileName string) func() {
+	fixturePath := path.Join("../test/fixtures/", fixtureFileName)
+	fixtureFile, _ := os.Open(fixturePath)
+	f.StubResponse(status, fixtureFile)
+	return func() { fixtureFile.Close() }
 }
 
 func (f *FakeHTTP) StubRepoResponse(owner, repo string) {

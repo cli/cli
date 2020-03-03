@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/alecthomas/chroma v0.7.1 // indirect
+	github.com/briandowns/spinner v1.9.0
 	github.com/charmbracelet/glamour v0.1.1-0.20200210132808-8d4e3f0692f8
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
