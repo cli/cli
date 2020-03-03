@@ -30,14 +30,14 @@ jobs:
         if: "!contains(github.ref, '-')"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-          HUB: 'bin/hub api -HACCEPT:application/vnd.github.inertia-preview+json '
           PENDING_COLUMN: 8189733
           DONE_COLUMN: 7110130
         shell: bash
         run: |
           curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
-          cards=$($HUB projects/columns/$PENDING_COLUMN/cards | jq "map(.id)|.[]")
-          for card in $cards; do $HUB projects/columns/cards/$card/moves --field position=top --field column_id=$DONE_COLUMN; done
+          api() { bin/hub api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
+          cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
+          for card in $cards; do api projects/columns/cards/$card/moves --field position=top --field column_id=$DONE_COLUMN; done
   msi:
     needs: goreleaser
     runs-on: windows-latest
