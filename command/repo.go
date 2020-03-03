@@ -195,15 +195,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
 
-			fetchCmd := git.GitCommand("fetch", "fork")
-			fetchCmd.Stdin = os.Stdin
-			fetchCmd.Stdout = os.Stdout
-			fetchCmd.Stderr = os.Stderr
-			err = utils.PrepareCmd(fetchCmd).Run()
-			if err != nil {
-				return fmt.Errorf("failed to fetch new remote: %w", err)
-			}
-
 			fmt.Fprintf(out, "%s Remote added at %s\n", greenCheck, utils.Bold("fork"))
 		}
 	} else {
