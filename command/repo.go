@@ -39,7 +39,7 @@ func init() {
 
 var repoCmd = &cobra.Command{
 	Use:   "repo",
-	Short: "View repositories",
+	Short: "Create, clone, fork, and view repositories",
 	Long: `Work with GitHub repositories.
 
 A repository can be supplied as an argument in any of the following formats:
