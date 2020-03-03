@@ -108,6 +108,10 @@ func TestRepoCreate(t *testing.T) {
 		}
 	}
 
+	if len(http.Requests) != 1 {
+		t.Fatalf("expected 1 HTTP request, got %d", len(http.Requests))
+	}
+
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	json.Unmarshal(bodyBytes, &reqBody)
 	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
@@ -115,6 +119,138 @@ func TestRepoCreate(t *testing.T) {
 	}
 	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
 		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
+	}
+	if _, ownerSet := reqBody.Variables.Input["ownerId"]; ownerSet {
+		t.Error("expected ownerId not to be set")
+	}
+}
+
+func TestRepoCreate_org(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	initContext = func() context.Context {
+		return ctx
+	}
+
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "node_id": "ORGID"
+	}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "createRepository": {
+		"repository": {
+			"id": "REPOID",
+			"url": "https://github.com/ORG/REPO"
+		}
+	} } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(repoCreateCmd, "repo create ORG/REPO")
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	eq(t, output.String(), "https://github.com/ORG/REPO\n")
+	eq(t, output.Stderr(), "")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/ORG/REPO.git")
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	if len(http.Requests) != 2 {
+		t.Fatalf("expected 2 HTTP requests, got %d", len(http.Requests))
+	}
+
+	eq(t, http.Requests[0].URL.Path, "/users/ORG")
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	json.Unmarshal(bodyBytes, &reqBody)
+	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
+		t.Errorf("expected %q, got %q", "ORGID", orgID)
+	}
+	if _, teamSet := reqBody.Variables.Input["teamId"]; teamSet {
+		t.Error("expected teamId not to be set")
+	}
+}
+
+func TestRepoCreate_orgWithTeam(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	initContext = func() context.Context {
+		return ctx
+	}
+
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "node_id": "TEAMID",
+	  "organization": { "node_id": "ORGID" }
+	}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "createRepository": {
+		"repository": {
+			"id": "REPOID",
+			"url": "https://github.com/ORG/REPO"
+		}
+	} } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(repoCreateCmd, "repo create ORG/REPO --team monkeys")
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	eq(t, output.String(), "https://github.com/ORG/REPO\n")
+	eq(t, output.Stderr(), "")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/ORG/REPO.git")
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	if len(http.Requests) != 2 {
+		t.Fatalf("expected 2 HTTP requests, got %d", len(http.Requests))
+	}
+
+	eq(t, http.Requests[0].URL.Path, "/orgs/ORG/teams/monkeys")
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	json.Unmarshal(bodyBytes, &reqBody)
+	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
+		t.Errorf("expected %q, got %q", "ORGID", orgID)
+	}
+	if teamID := reqBody.Variables.Input["teamId"].(string); teamID != "TEAMID" {
+		t.Errorf("expected %q, got %q", "TEAMID", teamID)
 	}
 }
 

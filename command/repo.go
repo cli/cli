@@ -20,6 +20,7 @@ func init() {
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
 	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
+	repoCreateCmd.Flags().StringP("team", "t", "", "The name of the organization team to be granted access")
 	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
 	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
 	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
@@ -49,8 +50,10 @@ To pass 'git clone' options, separate them with '--'.`,
 var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
-	Long:  `Create a new GitHub repository.`,
-	RunE:  repoCreate,
+	Long: `Create a new GitHub repository.
+
+Use the "ORG/NAME" syntax to create a repository within your organization.`,
+	RunE: repoCreate,
 }
 
 var repoViewCmd = &cobra.Command{
@@ -82,9 +85,20 @@ func repoClone(cmd *cobra.Command, args []string) error {
 func repoCreate(cmd *cobra.Command, args []string) error {
 	projectDir, projectDirErr := git.ToplevelDir()
 
+	orgName := ""
+	teamSlug, err := cmd.Flags().GetString("team")
+	if err != nil {
+		return err
+	}
+
 	var name string
 	if len(args) > 0 {
 		name = args[0]
+		if strings.Contains(name, "/") {
+			newRepo := ghrepo.FromFullName(name)
+			orgName = newRepo.RepoOwner()
+			name = newRepo.RepoName()
+		}
 	} else {
 		if projectDirErr != nil {
 			return projectDirErr
@@ -122,6 +136,8 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	input := api.RepoCreateInput{
 		Name:             name,
 		Visibility:       visibility,
+		OwnerID:          orgName,
+		TeamID:           teamSlug,
 		Description:      description,
 		Homepage:         homepage,
 		HasIssuesEnabled: hasIssuesEnabled,

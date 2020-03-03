@@ -225,6 +225,9 @@ type RepoCreateInput struct {
 	Homepage    string `json:"homepage,omitempty"`
 	Description string `json:"description,omitempty"`
 
+	OwnerID string `json:"ownerId,omitempty"`
+	TeamID  string `json:"teamId,omitempty"`
+
 	HasIssuesEnabled bool `json:"hasIssuesEnabled"`
 	HasWikiEnabled   bool `json:"hasWikiEnabled"`
 }
@@ -235,6 +238,21 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 		CreateRepository struct {
 			Repository Repository
 		}
+	}
+
+	if input.TeamID != "" {
+		orgID, teamID, err := resolveOrganizationTeam(client, input.OwnerID, input.TeamID)
+		if err != nil {
+			return nil, err
+		}
+		input.TeamID = teamID
+		input.OwnerID = orgID
+	} else if input.OwnerID != "" {
+		orgID, err := resolveOrganization(client, input.OwnerID)
+		if err != nil {
+			return nil, err
+		}
+		input.OwnerID = orgID
 	}
 
 	variables := map[string]interface{}{
