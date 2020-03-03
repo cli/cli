@@ -26,17 +26,13 @@ jobs:
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
-  cards:
-    needs: goreleaser
-    runs-on: ubuntu-latest
-    if: ${!contains(github.ref, "-")}
-    env:
-      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      HUB: 'bin/hub api -HACCEPT:application/vnd.github.inertia-preview+json '
-      PENDING_COLUMN: 8189733
-      DONE_COLUMN: 7110130
-    steps:
       - name: move cards
+        if: ${!contains(github.ref, "-")}
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          HUB: 'bin/hub api -HACCEPT:application/vnd.github.inertia-preview+json '
+          PENDING_COLUMN: 8189733
+          DONE_COLUMN: 7110130
         shell: bash
         run: |
           curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
