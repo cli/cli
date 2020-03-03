@@ -57,7 +57,7 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 			v.Replace([]string{})
 		default:
 			switch v.Type() {
-			case "bool", "string":
+			case "bool", "string", "int":
 				v.Set(f.DefValue)
 			}
 		}
