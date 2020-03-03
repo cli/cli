@@ -57,7 +57,7 @@ func (c *blankContext) Remotes() (Remotes, error) {
 }
 
 func (c *blankContext) SetRemotes(stubs map[string]string) {
-	c.remotes = Remotes{}
+	c.remotes = make([]*Remote, 0, len(stubs))
 	for remoteName, repo := range stubs {
 		ownerWithName := strings.SplitN(repo, "/", 2)
 		c.remotes = append(c.remotes, &Remote{

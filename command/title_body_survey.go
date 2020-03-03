@@ -54,7 +54,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 		Index int
 	}{}
 	if len(templatePaths) > 1 {
-		templateNames := []string{}
+		templateNames := make([]string, 0, len(templatePaths))
 		for _, p := range templatePaths {
 			templateNames = append(templateNames, githubtemplate.ExtractName(p))
 		}
@@ -78,7 +78,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 }
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string, templatePaths []string) (*titleBody, error) {
-	inProgress := titleBody{}
+	var inProgress titleBody
 	templateContents := ""
 
 	if providedBody == "" && len(templatePaths) > 0 {
@@ -110,7 +110,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		},
 	}
 
-	qs := []*survey.Question{}
+	var qs []*survey.Question
 	if providedTitle == "" {
 		qs = append(qs, titleQuestion)
 	}
