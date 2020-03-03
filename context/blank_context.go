@@ -30,6 +30,10 @@ func (c *blankContext) SetAuthToken(t string) {
 	c.authToken = t
 }
 
+func (c *blankContext) SetAuthLogin(login string) {
+	c.authLogin = login
+}
+
 func (c *blankContext) AuthLogin() (string, error) {
 	return c.authLogin, nil
 }
@@ -53,7 +57,7 @@ func (c *blankContext) Remotes() (Remotes, error) {
 }
 
 func (c *blankContext) SetRemotes(stubs map[string]string) {
-	c.remotes = Remotes{}
+	c.remotes = make([]*Remote, 0, len(stubs))
 	for remoteName, repo := range stubs {
 		ownerWithName := strings.SplitN(repo, "/", 2)
 		c.remotes = append(c.remotes, &Remote{

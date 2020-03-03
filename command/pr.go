@@ -71,16 +71,17 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
-	if err != nil {
-		return err
-	}
 	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
 	}
 
 	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
 	if err != nil {
 		return err
 	}
@@ -97,8 +98,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
-	if prPayload.CurrentPR != nil {
-		printPrs(out, 0, *prPayload.CurrentPR)
+	if prPayload.CurrentPRs != nil {
+		printPrs(out, 0, prPayload.CurrentPRs...)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
@@ -214,7 +215,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(prNum, nil, colorFuncForPR(pr))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
@@ -225,6 +226,14 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func colorFuncForPR(pr api.PullRequest) func(string) string {
+	if pr.State == "OPEN" && pr.IsDraft {
+		return utils.Gray
+	} else {
+		return colorFuncForState(pr.State)
+	}
 }
 
 func colorFuncForState(state string) func(string) string {
@@ -267,7 +276,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 		openURL = pr.URL
 	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
 		if err != nil {
 			return err
 		}
@@ -325,7 +334,7 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
 func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(arg); err == nil {
+	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 
@@ -337,11 +346,7 @@ func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*a
 	return api.PullRequestForBranch(apiClient, baseRepo, arg)
 }
 
-func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
-	baseRepo, err := ctx.BaseRepo()
-	if err != nil {
-		return
-	}
+func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
 	prHeadRef, err = ctx.Branch()
 	if err != nil {
 		return
@@ -385,7 +390,17 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+
+		prNumberColorFunc := utils.Green
+		if pr.IsDraft {
+			prNumberColorFunc = utils.Gray
+		} else if pr.State == "MERGED" {
+			prNumberColorFunc = utils.Magenta
+		} else if pr.State == "CLOSED" {
+			prNumberColorFunc = utils.Red
+		}
+
+		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()

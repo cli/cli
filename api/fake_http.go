@@ -6,6 +6,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
+	"strings"
 )
 
 // FakeHTTP provides a mechanism by which to stub HTTP responses through
@@ -37,6 +40,13 @@ func (f *FakeHTTP) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+func (f *FakeHTTP) StubWithFixture(status int, fixtureFileName string) func() {
+	fixturePath := path.Join("../test/fixtures/", fixtureFileName)
+	fixtureFile, _ := os.Open(fixturePath)
+	f.StubResponse(status, fixtureFile)
+	return func() { fixtureFile.Close() }
+}
+
 func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
 	body := bytes.NewBufferString(fmt.Sprintf(`
 		{ "data": { "repo_000": {
@@ -50,6 +60,38 @@ func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
 			"viewerPermission": "WRITE"
 		} } }
 	`, repo, owner))
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       ioutil.NopCloser(body),
+	}
+	f.responseStubs = append(f.responseStubs, resp)
+}
+
+func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
+	forkRepo := strings.SplitN(forkFullName, "/", 2)
+	parentRepo := strings.SplitN(parentFullName, "/", 2)
+	body := bytes.NewBufferString(fmt.Sprintf(`
+		{ "data": { "repo_000": {
+			"id": "REPOID2",
+			"name": "%s",
+			"owner": {"login": "%s"},
+			"defaultBranchRef": {
+				"name": "master",
+				"target": {"oid": "deadbeef"}
+			},
+			"viewerPermission": "ADMIN",
+			"parent": {
+				"id": "REPOID1",
+				"name": "%s",
+				"owner": {"login": "%s"},
+				"defaultBranchRef": {
+					"name": "master",
+					"target": {"oid": "deadbeef"}
+				},
+				"viewerPermission": "READ"
+			}
+		} } }
+	`, forkRepo[1], forkRepo[0], parentRepo[1], parentRepo[0]))
 	resp := &http.Response{
 		StatusCode: 200,
 		Body:       ioutil.NopCloser(body),

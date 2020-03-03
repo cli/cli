@@ -9,6 +9,9 @@
 # VS Code
 .vscode
 
+# IntelliJ
+.idea
+
 # macOS
 .DS_Store
 

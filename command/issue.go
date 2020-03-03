@@ -69,7 +69,7 @@ var issueViewCmd = &cobra.Command{
 	Use: "view {<number> | <url> | <branch>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return FlagError{errors.New("issue required as argument")}
+			return FlagError{errors.New("issue number or URL required as argument")}
 		}
 		return nil
 	},
@@ -273,7 +273,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
 
 func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(arg); err == nil {
+	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
 	}
 
@@ -429,7 +429,7 @@ func labelList(issue api.Issue) string {
 		return ""
 	}
 
-	labelNames := []string{}
+	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
 		labelNames = append(labelNames, label.Name)
 	}

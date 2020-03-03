@@ -1,0 +1,9 @@
+{
+  "node_id": "123",
+  "name": "REPO",
+  "clone_url": "https://github.com/someone/repo.git",
+  "created_at": "2011-01-26T19:01:12Z",
+  "owner": {
+    "login": "someone"
+  }
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Version is dynamically set by the toolchain or overriden by the Makefile.
@@ -47,6 +48,9 @@ func init() {
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		if err == pflag.ErrHelp {
+			return err
+		}
 		return &FlagError{Err: err}
 	})
 }
@@ -97,7 +101,7 @@ var initContext = func() context.Context {
 // BasicClient returns an API client that borrows from but does not depend on
 // user configuration
 func BasicClient() (*api.Client, error) {
-	opts := []api.ClientOption{}
+	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, apiVerboseLog())
 	}
@@ -122,7 +126,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := []api.ClientOption{}
+	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, apiVerboseLog())
 	}

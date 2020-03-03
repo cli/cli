@@ -10,7 +10,7 @@ import (
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPR       *PullRequest
+	CurrentPRs      []PullRequest
 }
 
 type PullRequestAndTotalCount struct {
@@ -40,6 +40,7 @@ type PullRequest struct {
 		}
 	}
 	IsCrossRepository   bool
+	IsDraft             bool
 	MaintainerCanModify bool
 
 	ReviewDecision string
@@ -80,7 +81,7 @@ type PullRequestReviewStatus struct {
 }
 
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
-	status := PullRequestReviewStatus{}
+	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
 	case "CHANGES_REQUESTED":
 		status.ChangesRequested = true
@@ -150,12 +151,14 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	fragment pr on PullRequest {
 		number
 		title
+		state
 		url
 		headRefName
 		headRepositoryOwner {
 			login
 		}
 		isCrossRepository
+		isDraft
 		commits(last: 1) {
 			nodes {
 				commit {
@@ -185,7 +188,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
+			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
 				edges {
 					node {
@@ -259,11 +262,13 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPR = resp.Repository.PullRequest
-	if currentPR == nil {
+	var currentPRs []PullRequest
+	if resp.Repository.PullRequest != nil {
+		currentPRs = append(currentPRs, *resp.Repository.PullRequest)
+	} else {
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = &edge.Node
+				currentPRs = append(currentPRs, edge.Node)
 			}
 		}
 	}
@@ -277,7 +282,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR: currentPR,
+		CurrentPRs: currentPRs,
 	}
 
 	return &payload, nil
@@ -366,6 +371,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 						login
 					}
 					isCrossRepository
+					isDraft
 				}
 			}
 		}
@@ -460,6 +466,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			login
 		}
 		isCrossRepository
+		isDraft
 	}
 	`
 

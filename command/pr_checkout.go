@@ -38,8 +38,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
-	cmdQueue := [][]string{}
-
+	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
 	if headRemote != nil {
 		// there is an existing git remote for PR head
