@@ -475,6 +475,38 @@ func TestPRView_numberArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
+func TestPRView_numberArgWithHash(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(prViewCmd, "pr view \"#23\"")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
+}
+
 func TestPRView_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()

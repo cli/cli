@@ -247,6 +247,40 @@ func TestIssueView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
+func TestIssueView_numberArgWithHash(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+		"number": 123,
+		"url": "https://github.com/OWNER/REPO/issues/123"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		seenCmd = cmd
+		return &outputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(issueViewCmd, "issue view \"#123\"")
+	if err != nil {
+		t.Errorf("error running command `issue view`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+}
+
 func TestIssueView_preview(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()

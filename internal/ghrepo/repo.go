@@ -24,7 +24,7 @@ func FullName(r Interface) string {
 }
 
 func FromFullName(nwo string) Interface {
-	r := ghRepo{}
+	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
 	if len(parts) == 2 {
 		r.owner, r.name = parts[0], parts[1]

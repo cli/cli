@@ -117,7 +117,7 @@ func flagRequiresArgumentCompletion(flag *pflag.Flag) string {
 }
 
 func subCommandPath(rootCmd *cobra.Command, cmd *cobra.Command) string {
-	path := []string{}
+	path := make([]string, 0, 1)
 	currentCmd := cmd
 	if rootCmd == cmd {
 		return ""
@@ -142,7 +142,7 @@ func rangeCommands(cmd *cobra.Command, callback func(subCmd *cobra.Command)) {
 
 func commandCompletionCondition(rootCmd, cmd *cobra.Command) string {
 	localNonPersistentFlags := cmd.LocalNonPersistentFlags()
-	bareConditions := []string{}
+	bareConditions := make([]string, 0, 1)
 	if rootCmd != cmd {
 		bareConditions = append(bareConditions, fmt.Sprintf("__fish_%s_seen_subcommand_path %s", rootCmd.Name(), subCommandPath(rootCmd, cmd)))
 	} else {
