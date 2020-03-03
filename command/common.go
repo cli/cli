@@ -20,8 +20,8 @@ func getTitle(cmd *cobra.Command, cmdType string, matchCount int, totalMatchCoun
 		}
 	})
 
-	title := "\n%s in %s\n\n"
 	if totalMatchCount == 0 {
+		title := "\n%s in %s\n\n"
 		msg := fmt.Sprintf("There are no open %ss", cmdType)
 
 		if userSetFlagCounter > 0 {
@@ -30,7 +30,7 @@ func getTitle(cmd *cobra.Command, cmdType string, matchCount int, totalMatchCoun
 		return fmt.Sprintf(title, msg, ghrepo.FullName(baseRepo))
 	}
 
-	title = "\nShowing %d of %s in %s"
+	title := "\nShowing %d of %s in %s"
 	if (!limitSet && userSetFlagCounter > 0) || (userSetFlagCounter > 1) {
 		matchStr := "match"
 		if totalMatchCount == 1 {

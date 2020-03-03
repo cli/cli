@@ -129,6 +129,149 @@ Showing 3 of 3 issues in OWNER/REPO
 	}
 }
 
+func TestIssueList_limit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueListCmd, "issue list -L 10")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 issues in OWNER/REPO
+
+`)
+}
+
+func TestIssueList_smallLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueListCmd, "issue list -L 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 2 of 3 issues in OWNER/REPO
+
+`)
+}
+
+func TestIssueList_multipleFilterWithLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueListCmd, "issue list -s open -l web -L 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 2 of 3 issues in OWNER/REPO that match your search
+
+`)
+}
+
+func TestIssueList_multipleFilterWithoutLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueListCmd, "issue list -s open -l web")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 issues in OWNER/REPO that match your search
+
+`)
+}
+
+func TestIssueList_singleFilter(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueListCmd, "issue list -s open")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 issues in OWNER/REPO that match your search
+
+`)
+}
+
+func TestIssueList_singleResultWithFilter(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	respBody := bytes.NewBufferString(`{
+		"data": {
+			"repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+					"totalCount": 1,
+					"nodes": [
+						{
+								"number": 1,
+								"title": "number won",
+								"url": "https://wow.com",
+								"labels": {
+									"nodes": [
+										{
+												"name": "label"
+										}
+									],
+									"totalCount": 1
+								}
+						}
+					]
+				}
+			}
+		}
+	}`)
+	http.StubResponse(200, respBody)
+
+	output, err := RunCommand(issueListCmd, "issue list -s open")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 1 of 1 issue in OWNER/REPO that matches your search
+
+`)
+}
+
 func TestIssueList_withFlags(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()

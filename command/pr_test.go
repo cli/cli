@@ -181,6 +181,147 @@ Showing 3 of 3 pull requests in OWNER/REPO
 `)
 }
 
+func TestPRList_limit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -L 10")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 pull requests in OWNER/REPO
+
+`)
+}
+
+func TestPRList_smallLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -L 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 2 of 3 pull requests in OWNER/REPO
+
+`)
+}
+
+func TestPRList_multipleFilterWithLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -s open -l one -L 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 2 of 3 pull requests in OWNER/REPO that match your search
+
+`)
+}
+
+func TestPRList_multipleFilterWithoutLimit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -s open -l one")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 pull requests in OWNER/REPO that match your search
+
+`)
+}
+
+func TestPRList_singleFilter(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prList.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -s open")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 3 of 3 pull requests in OWNER/REPO that match your search
+
+`)
+}
+
+func TestPRList_singleResultWithFilter(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	respBody := bytes.NewBufferString(`{
+		"data": {
+			"repository": {
+				"pullRequests": {
+					"totalCount": 1,
+					"edges": [
+						{
+							"node": {
+								"number": 32,
+								"title": "New feature",
+								"url": "https://github.com/monalisa/hello/pull/32",
+								"headRefName": "feature"
+							}
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": ""
+					}
+				}
+			}
+		}
+	}`)
+	http.StubResponse(200, respBody)
+
+	output, err := RunCommand(prListCmd, "pr list -s open -B develop")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.Stderr(), `
+Showing 1 of 1 pull request in OWNER/REPO that matches your search
+
+`)
+}
+
 func TestPRList_filtering(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
