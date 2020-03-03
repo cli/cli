@@ -27,7 +27,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
       - name: move cards
-        if: ${!contains(github.ref, "-")}
+        if: "!contains(github.ref, '-')"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           HUB: 'bin/hub api -HACCEPT:application/vnd.github.inertia-preview+json '
