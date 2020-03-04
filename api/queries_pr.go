@@ -547,11 +547,10 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 				search = append(search, "is:merged")
 			}
 		}
-		if labels, ok := vars["labels"].([]string); ok && len(labels) > 0 {
-			if len(labels) > 1 {
-				return nil, fmt.Errorf("multiple labels with --assignee are not supported")
+		if labels, ok := vars["labels"].([]string); ok {
+			for _, label := range labels {
+				search = append(search, fmt.Sprintf(`label:"%s"`, label))
 			}
-			search = append(search, fmt.Sprintf(`label:"%s"`, labels[0]))
 		}
 		if baseBranch, ok := vars["baseBranch"].(string); ok {
 			search = append(search, fmt.Sprintf(`base:"%s"`, baseBranch))

@@ -297,9 +297,19 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	http.StubResponse(200, respBody)
 
 	_, err := RunCommand(prListCmd, `pr list -l one,two -a hubot`)
-	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
+	if err != nil {
 		t.Fatal(err)
 	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Q string
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc state:open label:"one" label:"two"`)
 }
 
 func TestPRView_preview(t *testing.T) {
