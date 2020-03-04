@@ -23,7 +23,7 @@ test:
 .PHONY: test
 
 site:
-	git worktree add site gh-pages
+	git clone https://github.com/github/cli.github.com.git "$@"
 
 site-docs: site
 	git -C site pull
@@ -33,5 +33,4 @@ site-docs: site
 	rm -f site/manual/*.bak
 	git -C site add 'manual/gh*.md'
 	git -C site commit -m 'update help docs'
-	git -C site push
 .PHONY: site-docs

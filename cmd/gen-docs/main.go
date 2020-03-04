@@ -28,7 +28,7 @@ func main() {
 
 func filePrepender(filename string) string {
 	return `---
-layout: page
+layout: manual
 permalink: /:path/:basename
 ---
 
