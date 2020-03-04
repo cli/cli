@@ -68,7 +68,7 @@ Use the "ORG/NAME" syntax to create a repository within your organization.`,
 
 var repoForkCmd = &cobra.Command{
 	Use:   "fork [<repository>]",
-	Short: "Create a fork of a repository.",
+	Short: "Create a fork of a repository",
 	Long: `Create a fork of a repository.
 
 With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.`,
@@ -77,7 +77,7 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 
 var repoViewCmd = &cobra.Command{
 	Use:   "view [<repository>]",
-	Short: "View a repository in the browser.",
+	Short: "View a repository in the browser",
 	Long: `View a GitHub repository in the browser.
 
 With no argument, the repository for the current directory is opened.`,
