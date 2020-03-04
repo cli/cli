@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// Version is dynamically set by the toolchain or overriden by the Makefile.
+// Version is dynamically set by the toolchain or overridden by the Makefile.
 var Version = "DEV"
 
 // BuildDate is dynamically set at build time in the Makefile.
