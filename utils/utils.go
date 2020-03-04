@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -19,14 +18,8 @@ func OpenInBrowser(url string) error {
 	return PrepareCmd(browseCmd).Run()
 }
 
-func normalizeNewlines(s string) string {
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	s = strings.Replace(s, "\r", "\n", -1)
-	return s
-}
-
 func RenderMarkdown(text string) (string, error) {
-	return glamour.Render(normalizeNewlines(text), "dark")
+	return glamour.Render(text, "dark")
 }
 
 func Pluralize(num int, thing string) string {
