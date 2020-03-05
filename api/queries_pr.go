@@ -504,6 +504,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
       }
 	}`
 
+	var check = make(map[int]struct{})
 	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
@@ -576,9 +577,13 @@ loop:
 		}
 
 		for _, edge := range prData.Edges {
-			prs = append(prs, edge.Node)
-			if len(prs) == limit {
-				break loop
+			if _, ok := check[edge.Node.Number]; !ok {
+				check[edge.Node.Number] = struct{}{}
+				prs = append(prs, edge.Node)
+
+				if len(prs) == limit {
+					break loop
+				}
 			}
 		}
 
@@ -590,21 +595,7 @@ loop:
 		}
 	}
 
-	return removeDuplicates(prs), nil
-}
-
-func removeDuplicates(prs []PullRequest) []PullRequest {
-	var check = make(map[int]struct{})
-	var uniqPRs []PullRequest
-
-	for _, pr := range prs {
-		if _, ok := check[pr.Number]; !ok {
-			check[pr.Number] = struct{}{}
-			uniqPRs = append(uniqPRs, pr)
-		}
-	}
-
-	return uniqPRs
+	return prs, nil
 }
 
 func min(a, b int) int {
