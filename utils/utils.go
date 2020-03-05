@@ -2,9 +2,9 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/pkg/browser"
 )
@@ -18,14 +18,8 @@ func OpenInBrowser(url string) error {
 	return PrepareCmd(browseCmd).Run()
 }
 
-func normalizeNewlines(s string) string {
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	s = strings.Replace(s, "\r", "\n", -1)
-	return s
-}
-
 func RenderMarkdown(text string) (string, error) {
-	return glamour.Render(normalizeNewlines(text), "dark")
+	return glamour.Render(text, "dark")
 }
 
 func Pluralize(num int, thing string) string {
@@ -58,4 +52,8 @@ func FuzzyAgo(ago time.Duration) string {
 	}
 
 	return fmtDuration(int(ago.Hours()/24/365), "year")
+}
+
+func Spinner() *spinner.Spinner {
+	return spinner.New(spinner.CharSets[11], 400*time.Millisecond)
 }

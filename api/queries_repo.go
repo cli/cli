@@ -6,15 +6,19 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
 )
 
 // Repository contains information about a GitHub repo
 type Repository struct {
-	ID    string
-	Name  string
-	Owner RepositoryOwner
+	ID        string
+	Name      string
+	URL       string
+	CloneURL  string
+	CreatedAt time.Time
+	Owner     RepositoryOwner
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
@@ -59,7 +63,6 @@ func (r Repository) ViewerCanPush() bool {
 	}
 }
 
-// GitHubRepo looks up the node ID of a named repository
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
@@ -78,12 +81,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}{}
 	err := client.GraphQL(query, variables, &result)
 
-	if err != nil || result.Repository.ID == "" {
-		newErr := fmt.Errorf("failed to determine repository ID for '%s'", ghrepo.FullName(repo))
-		if err != nil {
-			newErr = fmt.Errorf("%s: %w", newErr, err)
-		}
-		return nil, newErr
+	if err != nil {
+		return nil, err
 	}
 
 	return &result.Repository, nil
@@ -190,9 +189,11 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 
 // repositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID string
-	Name   string
-	Owner  struct {
+	NodeID    string
+	Name      string
+	CreatedAt time.Time `json:"created_at"`
+	CloneURL  string    `json:"clone_url"`
+	Owner     struct {
 		Login string
 	}
 }
@@ -208,11 +209,73 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	return &Repository{
-		ID:   result.NodeID,
-		Name: result.Name,
+		ID:        result.NodeID,
+		Name:      result.Name,
+		CloneURL:  result.CloneURL,
+		CreatedAt: result.CreatedAt,
 		Owner: RepositoryOwner{
 			Login: result.Owner.Login,
 		},
 		ViewerPermission: "WRITE",
 	}, nil
+}
+
+// RepoCreateInput represents input parameters for RepoCreate
+type RepoCreateInput struct {
+	Name        string `json:"name"`
+	Visibility  string `json:"visibility"`
+	Homepage    string `json:"homepage,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	OwnerID string `json:"ownerId,omitempty"`
+	TeamID  string `json:"teamId,omitempty"`
+
+	HasIssuesEnabled bool `json:"hasIssuesEnabled"`
+	HasWikiEnabled   bool `json:"hasWikiEnabled"`
+}
+
+// RepoCreate creates a new GitHub repository
+func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
+	var response struct {
+		CreateRepository struct {
+			Repository Repository
+		}
+	}
+
+	if input.TeamID != "" {
+		orgID, teamID, err := resolveOrganizationTeam(client, input.OwnerID, input.TeamID)
+		if err != nil {
+			return nil, err
+		}
+		input.TeamID = teamID
+		input.OwnerID = orgID
+	} else if input.OwnerID != "" {
+		orgID, err := resolveOrganization(client, input.OwnerID)
+		if err != nil {
+			return nil, err
+		}
+		input.OwnerID = orgID
+	}
+
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	err := client.GraphQL(`
+	mutation($input: CreateRepositoryInput!) {
+		createRepository(input: $input) {
+			repository {
+				id
+				name
+				owner { login }
+				url
+			}
+		}
+	}
+	`, variables, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response.CreateRepository.Repository, nil
 }

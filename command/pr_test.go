@@ -98,6 +98,36 @@ func TestPRStatus(t *testing.T) {
 	}
 }
 
+func TestPRStatus_fork(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusFork.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &outputStub{[]byte(`branch.blueberries.remote origin
+branch.blueberries.merge refs/heads/blueberries`)}
+		default:
+			panic("not implemented")
+		}
+	})()
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Fatalf("error running command `pr status`: %v", err)
+	}
+
+	branchRE := regexp.MustCompile(`#10.*\[OWNER:blueberries\]`)
+	if !branchRE.MatchString(output.String()) {
+		t.Errorf("did not match current branch:\n%v", output.String())
+	}
+}
+
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
