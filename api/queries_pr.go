@@ -577,13 +577,14 @@ loop:
 		}
 
 		for _, edge := range prData.Edges {
-			if _, ok := check[edge.Node.Number]; !ok {
-				check[edge.Node.Number] = struct{}{}
-				prs = append(prs, edge.Node)
+			if _, exists := check[edge.Node.Number]; exists {
+				continue
+			}
 
-				if len(prs) == limit {
-					break loop
-				}
+			prs = append(prs, edge.Node)
+			check[edge.Node.Number] = struct{}{}
+			if len(prs) == limit {
+				break loop
 			}
 		}
 
