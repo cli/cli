@@ -590,7 +590,21 @@ loop:
 		}
 	}
 
-	return prs, nil
+	return removeDuplicates(prs), nil
+}
+
+func removeDuplicates(prs []PullRequest) []PullRequest {
+	var check = make(map[int]struct{})
+	var uniqPRs []PullRequest
+
+	for _, pr := range prs {
+		if _, ok := check[pr.Number]; !ok {
+			check[pr.Number] = struct{}{}
+			uniqPRs = append(uniqPRs, pr)
+		}
+	}
+
+	return uniqPRs
 }
 
 func min(a, b int) int {
