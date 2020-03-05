@@ -9,21 +9,21 @@ import (
 
 func init() {
 	RootCmd.AddCommand(completionCmd)
-	completionCmd.Flags().StringP("shell", "s", "bash", "The type of shell")
+	completionCmd.Flags().StringP("shell", "s", "bash", "Shell type: {bash|zsh|fish|powershell}")
 }
 
 var completionCmd = &cobra.Command{
-	Use:    "completion",
-	Hidden: true,
-	Short:  "Generates completion scripts",
-	Long: `To enable completion in your shell, run:
+	Use:   "completion",
+	Short: "Generate shell completion scripts",
+	Long: `Generate shell completion scripts for GitHub CLI commands.
 
-  eval "$(gh completion)"
+For example, for bash you could add this to your '~/.bash_profile':
 
-You can add that to your '~/.bash_profile' to enable completion whenever you
-start a new shell.
+	eval "$(gh completion)"
 
-When installing with Homebrew, see https://docs.brew.sh/Shell-Completion
+When installing GitHub CLI through a package manager, however, it's possible that
+no additional shell configuration is necessary to gain completion support. For
+Homebrew, see <https://docs.brew.sh/Shell-Completion>
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		shellType, err := cmd.Flags().GetString("shell")
