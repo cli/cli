@@ -504,6 +504,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
       }
 	}`
 
+	var check = make(map[int]struct{})
 	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
@@ -576,7 +577,12 @@ loop:
 		}
 
 		for _, edge := range prData.Edges {
+			if _, exists := check[edge.Node.Number]; exists {
+				continue
+			}
+
 			prs = append(prs, edge.Node)
+			check[edge.Node.Number] = struct{}{}
 			if len(prs) == limit {
 				break loop
 			}

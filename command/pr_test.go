@@ -240,6 +240,26 @@ No pull requests match your search
 	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
 }
 
+func TestPRList_filteringRemoveDuplicate(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prListWithDuplicates.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prListCmd, "pr list -l one,two")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eq(t, output.String(), `32	New feature	feature
+29	Fixed bad bug	hubot:bug-fix
+28	Improve documentation	docs
+`)
+}
+
 func TestPRList_filteringClosed(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
