@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -108,19 +109,26 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issuesData, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
+	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
 	if err != nil {
 		return err
 	}
-	issues := issuesData.Issues
-	totalIssueCount := issuesData.TotalCount
 
-	title := getTitle(cmd, "issue", len(issues), totalIssueCount, baseRepo)
-	fmt.Fprintf(colorableErr(cmd), title)
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "assignee":
+			hasFilters = true
+		}
+	})
+
+	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	out := cmd.OutOrStdout()
 	table := utils.NewTablePrinter(out)
-	for _, issue := range issues {
+	for _, issue := range listResult.Issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
 			issueNum = "#" + issueNum
@@ -227,6 +235,25 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
+}
+
+func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
+	if totalMatchCount == 0 {
+		if hasFilters {
+			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
+		}
+		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
+	}
+
+	if hasFilters {
+		matchVerb := "match"
+		if totalMatchCount == 1 {
+			matchVerb = "matches"
+		}
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+	}
+
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
 func printIssuePreview(out io.Writer, issue *api.Issue) error {

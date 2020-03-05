@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func init() {
@@ -186,19 +187,25 @@ func prList(cmd *cobra.Command, args []string) error {
 		params["assignee"] = assignee
 	}
 
-	prsData, err := api.PullRequestList(apiClient, params, limit)
+	listResult, err := api.PullRequestList(apiClient, params, limit)
 	if err != nil {
 		return err
 	}
 
-	prs := prsData.PullRequests
-	totalPrCount := prsData.TotalCount
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "base", "assignee":
+			hasFilters = true
+		}
+	})
 
-	title := getTitle(cmd, "pull request", len(prs), totalPrCount, baseRepo)
-	fmt.Fprintf(colorableErr(cmd), title) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
+	title := listHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
-	for _, pr := range prs {
+	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if table.IsTTY() {
 			prNum = "#" + prNum
