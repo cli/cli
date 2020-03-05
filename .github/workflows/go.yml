@@ -23,5 +23,5 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          go test ./...
+          go test -race ./...
           go build -v ./cmd/gh
