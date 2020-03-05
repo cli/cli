@@ -38,6 +38,17 @@ func TestCompletion_fish(t *testing.T) {
 	}
 }
 
+func TestCompletion_powerShell(t *testing.T) {
+	output, err := RunCommand(completionCmd, `completion -s powershell`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(output.String(), "Register-ArgumentCompleter") {
+		t.Errorf("problem in fish completion:\n%s", output)
+	}
+}
+
 func TestCompletion_unsupported(t *testing.T) {
 	_, err := RunCommand(completionCmd, `completion -s csh`)
 	if err == nil || err.Error() != `unsupported shell type "csh"` {

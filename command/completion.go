@@ -36,6 +36,8 @@ When installing with Homebrew, see https://docs.brew.sh/Shell-Completion
 			return RootCmd.GenBashCompletion(cmd.OutOrStdout())
 		case "zsh":
 			return RootCmd.GenZshCompletion(cmd.OutOrStdout())
+		case "powershell":
+			return RootCmd.GenPowerShellCompletion(cmd.OutOrStdout())
 		case "fish":
 			return cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
 		default:
