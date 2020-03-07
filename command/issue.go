@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
-	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -395,7 +394,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
 		table.AddField(issueNum, nil, colorFuncForState(issue.State))
-		table.AddField(text.Truncate(70, replaceExcessiveWhitespace(issue.Title)), nil, nil)
+		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
 		table.EndRow()
