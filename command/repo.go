@@ -153,7 +153,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	input := api.RepoCreateInput{
-		Name:             name,
+		Name:             slug(name),
 		Visibility:       visibility,
 		OwnerID:          orgName,
 		TeamID:           teamSlug,
@@ -405,4 +405,9 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 	return utils.OpenInBrowser(openURL)
+}
+
+func slug(name string) string {
+	fields := strings.Fields(name)
+	return strings.Join(fields, "-")
 }
