@@ -56,3 +56,16 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		t.Errorf("got unexpected error message: %s", err)
 	}
 }
+
+func Test_ExistsRemote(t *testing.T) {
+	exists, err1 := ExistsRemote("https://github.com/angus-lherrou/repo-example.git", "master")
+	doesnt, err2 := ExistsRemote("https://github.com/angus-lherrou/repo-example.git", "fake-branch")
+	if err1 != nil {
+		t.Errorf("got unexpected error message: %s", err1)
+	}
+	if err2 != nil {
+		t.Errorf("got unexpected error message: %s", err2)
+	}
+	eq(t, exists, true)
+	eq(t, doesnt, false)
+}

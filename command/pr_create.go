@@ -93,6 +93,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 	pushTries := 0
 	maxPushTries := 3
+	repoExisted, err := git.ExistsRemote(headRemote.Name, headBranch)
+	if err != nil {
+		return err
+	}
 	for {
 		// TODO: respect existing upstream configuration of the current branch
 		if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
@@ -109,106 +113,138 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		break
 	}
 
-	headBranchLabel := headBranch
-	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
-	}
+	var errorToReturn error
 
-	title, err := cmd.Flags().GetString("title")
-	if err != nil {
-		return fmt.Errorf("could not parse title: %w", err)
-	}
-	body, err := cmd.Flags().GetString("body")
-	if err != nil {
-		return fmt.Errorf("could not parse body: %w", err)
-	}
-
-	isWeb, err := cmd.Flags().GetBool("web")
-	if err != nil {
-		return fmt.Errorf("could not parse web: %q", err)
-	}
-	if isWeb {
-		compareURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
-		return utils.OpenInBrowser(compareURL)
-	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
-		utils.Cyan(headBranchLabel),
-		utils.Cyan(baseBranch),
-		ghrepo.FullName(baseRepo))
-
-	action := SubmitAction
-
-	interactive := title == "" || body == ""
-
-	if interactive {
-		var templateFiles []string
-		if rootDir, err := git.ToplevelDir(); err == nil {
-			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+	for { // break out of execution if an error is received
+		headBranchLabel := headBranch
+		if !ghrepo.IsSame(baseRepo, headRepo) {
+			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 		}
 
-		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
+		title, err := cmd.Flags().GetString("title")
 		if err != nil {
-			return fmt.Errorf("could not collect title and/or body: %w", err)
+			errorToReturn = fmt.Errorf("could not parse title: %w", err)
+			break
 		}
-
-		action = tb.Action
-
-		if action == CancelAction {
-			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
-			return nil
-		}
-
-		if title == "" {
-			title = tb.Title
-		}
-		if body == "" {
-			body = tb.Body
-		}
-	}
-
-	isDraft, err := cmd.Flags().GetBool("draft")
-	if err != nil {
-		return fmt.Errorf("could not parse draft: %w", err)
-	}
-
-	if action == SubmitAction {
-		if title == "" {
-			return fmt.Errorf("pull request title must not be blank")
-		}
-
-		headRefName := headBranch
-		if !ghrepo.IsSame(headRemote, baseRepo) {
-			headRefName = fmt.Sprintf("%s:%s", headRemote.RepoOwner(), headBranch)
-		}
-
-		params := map[string]interface{}{
-			"title":       title,
-			"body":        body,
-			"draft":       isDraft,
-			"baseRefName": baseBranch,
-			"headRefName": headRefName,
-		}
-
-		pr, err := api.CreatePullRequest(client, baseRepo, params)
+		body, err := cmd.Flags().GetString("body")
 		if err != nil {
-			return fmt.Errorf("failed to create pull request: %w", err)
+			errorToReturn = fmt.Errorf("could not parse body: %w", err)
+			break
 		}
 
-		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
-	} else if action == PreviewAction {
-		openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
-		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
-		return utils.OpenInBrowser(openURL)
-	} else {
-		panic("Unreachable state")
-	}
+		isWeb, err := cmd.Flags().GetBool("web")
+		if err != nil {
+			errorToReturn = fmt.Errorf("could not parse web: %q", err)
+			break
+		}
+		if isWeb {
+			compareURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
+			return utils.OpenInBrowser(compareURL)
+		}
 
+		fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
+			utils.Cyan(headBranchLabel),
+			utils.Cyan(baseBranch),
+			ghrepo.FullName(baseRepo))
+
+		action := SubmitAction
+
+		interactive := title == "" || body == ""
+
+		if interactive {
+			var templateFiles []string
+			if rootDir, err := git.ToplevelDir(); err == nil {
+				// TODO: figure out how to stub this in tests
+				templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+			}
+
+			tb, err := titleBodySurvey(cmd, title, body, templateFiles)
+			if err != nil {
+				errorToReturn = fmt.Errorf("could not collect title and/or body: %w", err)
+				break
+			}
+
+			action = tb.Action
+
+			if action == CancelAction {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
+				return nil
+			}
+
+			if title == "" {
+				title = tb.Title
+			}
+			if body == "" {
+				body = tb.Body
+			}
+		}
+
+		isDraft, err := cmd.Flags().GetBool("draft")
+		if err != nil {
+			errorToReturn = fmt.Errorf("could not parse draft: %w", err)
+			break
+		}
+
+		if action == SubmitAction {
+			if title == "" {
+				errorToReturn = fmt.Errorf("pull request title must not be blank")
+				break
+			}
+
+			headRefName := headBranch
+			if !ghrepo.IsSame(headRemote, baseRepo) {
+				headRefName = fmt.Sprintf("%s:%s", headRemote.RepoOwner(), headBranch)
+			}
+
+			params := map[string]interface{}{
+				"title":       title,
+				"body":        body,
+				"draft":       isDraft,
+				"baseRefName": baseBranch,
+				"headRefName": headRefName,
+			}
+
+			pr, err := api.CreatePullRequest(client, baseRepo, params)
+			if err != nil {
+				errorToReturn = fmt.Errorf("failed to create pull request: %w", err)
+				break
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+		} else if action == PreviewAction {
+			openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
+			// TODO could exceed max url length for explorer
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+			return utils.OpenInBrowser(openURL)
+		} else {
+			panic("Unreachable state")
+		}
+		break
+	}
+	if errorToReturn != nil {
+		delTries := 0
+		maxDelTries := 3
+		if !repoExisted {
+			for {
+				// TODO: respect existing upstream configuration of the current branch
+				if err := git.DeleteUpstreamBranch(headRemote.Name, headBranch); err != nil {
+					if didForkRepo && delTries < maxDelTries {
+						delTries++
+						// first wait 2 seconds after forking, then 4s, then 6s
+						waitSeconds := 2 * delTries
+						fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						time.Sleep(time.Duration(waitSeconds) * time.Second)
+						continue
+					}
+					return err
+				}
+				break
+			}
+		}
+		return errorToReturn
+	}
 	return nil
-
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string) string {

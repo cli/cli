@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -77,6 +78,29 @@ func Push(remote string, ref string) error {
 	pushCmd.Stdout = os.Stdout
 	pushCmd.Stderr = os.Stderr
 	return utils.PrepareCmd(pushCmd).Run()
+}
+
+// DeleteUpstreamBranch deletes a git ref in a remote
+func DeleteUpstreamBranch(remote string, ref string) error {
+	pushCmd := GitCommand("push", "--delete", remote, ref)
+	pushCmd.Stdout = os.Stdout
+	pushCmd.Stderr = os.Stderr
+	return utils.PrepareCmd(pushCmd).Run()
+}
+
+// ExistsRemote checks if a branch named `ref` exists in a remote
+func ExistsRemote(remote string, ref string) (bool, error) {
+	r, w, _ := os.Pipe()
+	checkCmd := GitCommand("ls-remote", "--heads", remote, ref)
+	checkCmd.Stdout = w
+	checkCmd.Stderr = os.Stderr
+	err := utils.PrepareCmd(checkCmd).Run()
+	if err != nil {
+		return false, err
+	}
+	w.Close()
+	out, _ := ioutil.ReadAll(r)
+	return len(out) != 0, nil
 }
 
 type BranchConfig struct {
