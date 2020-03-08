@@ -33,6 +33,7 @@ func TestPrCreateHelperProcess(*testing.T) {
 			os.Exit(1)
 		}
 	case "push":
+	case "ls-remote":
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %q", args[1])
 		os.Exit(1)
