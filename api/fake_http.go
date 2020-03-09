@@ -13,7 +13,7 @@ import (
 
 // FakeHTTP provides a mechanism by which to stub HTTP responses through
 type FakeHTTP struct {
-	// Requests stores references to sequental requests that RoundTrip has received
+	// Requests stores references to sequential requests that RoundTrip has received
 	Requests      []*http.Request
 	count         int
 	responseStubs []*http.Response

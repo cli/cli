@@ -25,7 +25,7 @@ type Context interface {
 }
 
 // cap the number of git remotes looked up, since the user might have an
-// unusally large number of git remotes
+// unusually large number of git remotes
 const maxRemotesForLookup = 5
 
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
