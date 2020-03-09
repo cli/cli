@@ -119,6 +119,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse draft: %w", err)
 	}
+	if isDraft && isWeb {
+		return errors.New("the --draft flag is not supported with --web")
+	}
 
 	didForkRepo := false
 	var headRemote *context.Remote
