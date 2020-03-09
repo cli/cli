@@ -155,6 +155,33 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 }
 
+func TestPRStatus_closedMerged(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusClosedMerged.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := []string{
+		"- Checks passing - Changes requested",
+		"- Closed",
+		"- Merged",
+	}
+
+	for _, line := range expected {
+		if !strings.Contains(output.String(), line) {
+			t.Errorf("output did not contain %q: %q", line, output.String())
+		}
+	}
+}
+
 func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
