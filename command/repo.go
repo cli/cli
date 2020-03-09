@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	"regexp"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
@@ -408,6 +409,6 @@ func repoView(cmd *cobra.Command, args []string) error {
 }
 
 func slug(name string) string {
-	fields := strings.Fields(name)
-	return strings.Join(fields, "-")
+	nonWord := regexp.MustCompile(`[^\w.]+`)
+	return nonWord.ReplaceAllLiteralString(name, "-")
 }
