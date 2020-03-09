@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -41,6 +42,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not determine the current branch: %w", err)
 	}
+	headRepo, headRepoErr := repoContext.HeadRepo()
 
 	baseBranch, err := cmd.Flags().GetString("base")
 	if err != nil {
@@ -49,69 +51,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if baseBranch == "" {
 		baseBranch = baseRepo.DefaultBranchRef.Name
 	}
-
-	didForkRepo := false
-	var headRemote *context.Remote
-	headRepo, err := repoContext.HeadRepo()
-	if err != nil {
-		if baseRepo.IsPrivate {
-			return fmt.Errorf("cannot write to private repository '%s'", ghrepo.FullName(baseRepo))
-		}
-		headRepo, err = api.ForkRepo(client, baseRepo)
-		if err != nil {
-			return fmt.Errorf("error forking repo: %w", err)
-		}
-		didForkRepo = true
-		// TODO: support non-HTTPS git remote URLs
-		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
-		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
-		// TODO: figure out what to name the new git remote
-		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
-		if err != nil {
-			return fmt.Errorf("error adding remote: %w", err)
-		}
-		headRemote = &context.Remote{
-			Remote: gitRemote,
-			Owner:  headRepo.RepoOwner(),
-			Repo:   headRepo.RepoName(),
-		}
-	}
-
-	if headBranch == baseBranch && ghrepo.IsSame(baseRepo, headRepo) {
+	if headBranch == baseBranch && headRepo != nil && ghrepo.IsSame(baseRepo, headRepo) {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
-	}
-
-	if headRemote == nil {
-		headRemote, err = repoContext.RemoteForRepo(headRepo)
-		if err != nil {
-			return fmt.Errorf("git remote not found for head repository: %w", err)
-		}
 	}
 
 	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
-	}
-	pushTries := 0
-	maxPushTries := 3
-	for {
-		// TODO: respect existing upstream configuration of the current branch
-		if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
-			if didForkRepo && pushTries < maxPushTries {
-				pushTries++
-				// first wait 2 seconds after forking, then 4s, then 6s
-				waitSeconds := 2 * pushTries
-				fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
-				time.Sleep(time.Duration(waitSeconds) * time.Second)
-				continue
-			}
-			return err
-		}
-		break
-	}
-
-	headBranchLabel := headBranch
-	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
 	title, err := cmd.Flags().GetString("title")
@@ -127,22 +72,19 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse web: %q", err)
 	}
-	if isWeb {
-		compareURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(compareURL))
-		return utils.OpenInBrowser(compareURL)
-	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
-		utils.Cyan(headBranchLabel),
-		utils.Cyan(baseBranch),
-		ghrepo.FullName(baseRepo))
 
 	action := SubmitAction
+	if isWeb {
+		action = PreviewAction
+	} else {
+		fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
+			utils.Cyan(headBranch),
+			utils.Cyan(baseBranch),
+			ghrepo.FullName(baseRepo))
+	}
 
-	interactive := title == "" || body == ""
-
-	if interactive {
+	// TODO: only drop into interactive mode if stdin & stdout are a tty
+	if !isWeb && (title == "" || body == "") {
 		var templateFiles []string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
@@ -169,27 +111,78 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	if action == SubmitAction && title == "" {
+		return errors.New("pull request title must not be blank")
+	}
+
 	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
 		return fmt.Errorf("could not parse draft: %w", err)
 	}
 
+	didForkRepo := false
+	var headRemote *context.Remote
+	if headRepoErr != nil {
+		if baseRepo.IsPrivate {
+			return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
+		}
+		headRepo, err = api.ForkRepo(client, baseRepo)
+		if err != nil {
+			return fmt.Errorf("error forking repo: %w", err)
+		}
+		didForkRepo = true
+		// TODO: support non-HTTPS git remote URLs
+		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
+		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
+		// TODO: figure out what to name the new git remote
+		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
+		if err != nil {
+			return fmt.Errorf("error adding remote: %w", err)
+		}
+		headRemote = &context.Remote{
+			Remote: gitRemote,
+			Owner:  headRepo.RepoOwner(),
+			Repo:   headRepo.RepoName(),
+		}
+	}
+
+	headBranchLabel := headBranch
+	if !ghrepo.IsSame(baseRepo, headRepo) {
+		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+	}
+
+	if headRemote == nil {
+		headRemote, err = repoContext.RemoteForRepo(headRepo)
+		if err != nil {
+			return fmt.Errorf("git remote not found for head repository: %w", err)
+		}
+	}
+
+	pushTries := 0
+	maxPushTries := 3
+	for {
+		// TODO: respect existing upstream configuration of the current branch
+		if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
+			if didForkRepo && pushTries < maxPushTries {
+				pushTries++
+				// first wait 2 seconds after forking, then 4s, then 6s
+				waitSeconds := 2 * pushTries
+				fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+				time.Sleep(time.Duration(waitSeconds) * time.Second)
+				continue
+			}
+			return err
+		}
+		break
+	}
+
 	if action == SubmitAction {
-		if title == "" {
-			return fmt.Errorf("pull request title must not be blank")
-		}
-
-		headRefName := headBranch
-		if !ghrepo.IsSame(headRemote, baseRepo) {
-			headRefName = fmt.Sprintf("%s:%s", headRemote.RepoOwner(), headBranch)
-		}
-
 		params := map[string]interface{}{
 			"title":       title,
 			"body":        body,
 			"draft":       isDraft,
 			"baseRefName": baseBranch,
-			"headRefName": headRefName,
+			"headRefName": headBranchLabel,
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
@@ -208,7 +201,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
-
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string) string {
