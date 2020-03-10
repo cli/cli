@@ -55,9 +55,6 @@ const fragments = `
 			}
 			totalCount
 		}
-		author {
-			login
-		}
 	}
 `
 
