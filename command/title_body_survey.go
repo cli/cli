@@ -23,7 +23,7 @@ const (
 	CancelAction
 )
 
-func confirm() (Action, error) {
+var ConfirmSubmission = func() (Action, error) {
 	confirmAnswers := struct {
 		Confirmation int
 	}{}
@@ -49,7 +49,7 @@ func confirm() (Action, error) {
 	return Action(confirmAnswers.Confirmation), nil
 }
 
-func selectTemplate(templatePaths []string) (string, error) {
+var SelectTemplate = func(templatePaths []string) (string, error) {
 	templateResponse := struct {
 		Index int
 	}{}
@@ -77,17 +77,26 @@ func selectTemplate(templatePaths []string) (string, error) {
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody string, templatePaths []string) (*titleBody, error) {
+var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
+	return survey.Ask(qs, response, opts...)
+}
+
+func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string) (*titleBody, error) {
 	var inProgress titleBody
+	inProgress.Title = defs.Title
 	templateContents := ""
 
-	if providedBody == "" && len(templatePaths) > 0 {
-		var err error
-		templateContents, err = selectTemplate(templatePaths)
-		if err != nil {
-			return nil, err
+	if providedBody == "" {
+		if len(templatePaths) > 0 {
+			var err error
+			templateContents, err = SelectTemplate(templatePaths)
+			if err != nil {
+				return nil, err
+			}
+			inProgress.Body = templateContents
+		} else {
+			inProgress.Body = defs.Body
 		}
-		inProgress.Body = templateContents
 	}
 
 	titleQuestion := &survey.Question{
@@ -127,7 +136,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle string, providedBody stri
 		inProgress.Body = templateContents
 	}
 
-	confirmA, err := confirm()
+	confirmA, err := ConfirmSubmission()
 	if err != nil {
 		return nil, fmt.Errorf("unable to confirm: %w", err)
 	}

@@ -23,6 +23,8 @@ func TestPrCreateHelperProcess(*testing.T) {
 
 	args := test.GetTestHelperProcessArgs()
 	switch args[1] {
+	case "log":
+		fmt.Println("123,cool,\"\"")
 	case "status":
 		switch args[0] {
 		case "clean":
@@ -100,9 +102,9 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
 
-	eq(t, len(ranCommands), 3)
+	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
-	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	eq(t, ranCommands[3][len(ranCommands[3])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
@@ -213,4 +215,32 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 
 	// goal: only care that gql is formatted properly
+}
+
+/*
+ We aren't testing the survey code paths /at all/.
+
+ so if we want to test those code paths, some cases:
+
+ - user supplies no -t/-b and wants to preview in browser
+ - user supplies no -t/-b and wants to submit directly
+ - user supplies no -t/-b and wants to edit the title
+ - user supplies no -t/-b and wants to edit the body
+
+ for defaults:
+
+ - one commit
+ - multiple commits
+
+ checking that defaults are generated appropriately each time.
+
+ it seems that each survey prompt needs to be an injectable hook.
+*/
+
+func PRCreate_survey_preview_defaults(t *testing.T) {
+	// there are going to be calls to:
+	// - git status
+	// - git push
+	// - git rev-parse
+	// - git log
 }

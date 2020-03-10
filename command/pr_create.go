@@ -15,6 +15,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type defaults struct {
+	Title string
+	Body  string
+}
+
+func computeDefaults(baseRef, headRef string) (defaults, error) {
+	commits, err := git.Commits(baseRef, headRef)
+	if err != nil {
+		return defaults{}, err
+	}
+
+	out := defaults{}
+
+	if len(commits) == 1 {
+		out.Title = commits[0].Title
+		body, err := git.CommitBody(commits[0].Sha)
+		if err != nil {
+			return defaults{}, err
+		}
+		out.Body = body
+	} else {
+		out.Title = headRef // TODO format or something?
+
+		body := fmt.Sprintf("---\n%d commits:\n\n", len(commits))
+		for _, c := range commits {
+			body += fmt.Sprintf("- %s %s\n", c.Sha[0:5], c.Title)
+		}
+		out.Body = body
+	}
+
+	return out, nil
+}
+
 func prCreate(cmd *cobra.Command, _ []string) error {
 	ctx := contextForCommand(cmd)
 	remotes, err := ctx.Remotes()
@@ -68,6 +101,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	defs, err := computeDefaults(baseBranch, headBranch)
+	if err != nil {
+		return fmt.Errorf("could not compute title or body defaults:  %w", err)
+	}
+
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return fmt.Errorf("could not parse web: %q", err)
@@ -91,7 +129,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
-		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
+		tb, err := titleBodySurvey(cmd, title, body, defs, templateFiles)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
