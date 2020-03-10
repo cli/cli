@@ -55,6 +55,9 @@ const fragments = `
 			}
 			totalCount
 		}
+		author {
+			login
+		}
 	}
 `
 
@@ -171,7 +174,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	return &payload, nil
 }
 
-func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int) ([]Issue, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string) ([]Issue, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -185,10 +188,10 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String) {
+	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
-			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee}) {
+			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author}) {
 				nodes {
 					...issue
 				}
@@ -211,6 +214,9 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 	if assigneeString != "" {
 		variables["assignee"] = assigneeString
+	}
+	if authorString != "" {
+		variables["author"] = authorString
 	}
 
 	var response struct {
