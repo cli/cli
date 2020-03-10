@@ -109,7 +109,7 @@ $ yay -S github-cli
 
 Install a prebuilt binary from the [releases page][]
 
-### [Build from source](/source.md)
+### [Build from source](/docs/source.md)
 
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
