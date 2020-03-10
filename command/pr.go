@@ -405,11 +405,11 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
 
-		if pr.State != "OPEN" || checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Fprintf(w, "\n  ")
-		}
-
 		if pr.State == "OPEN" {
+			if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
+				fmt.Fprintf(w, "\n  ")
+			}
+
 			if checks.Total > 0 {
 				var summary string
 				if checks.Failing > 0 {
