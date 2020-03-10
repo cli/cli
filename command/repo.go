@@ -158,7 +158,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		OwnerID:          orgName,
 		TeamID:           teamSlug,
 		Description:      description,
-		Homepage:         homepage,
+		HomepageURL:      homepage,
 		HasIssuesEnabled: hasIssuesEnabled,
 		HasWikiEnabled:   hasWikiEnabled,
 	}

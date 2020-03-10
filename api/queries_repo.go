@@ -224,7 +224,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 type RepoCreateInput struct {
 	Name        string `json:"name"`
 	Visibility  string `json:"visibility"`
-	Homepage    string `json:"homepage,omitempty"`
+	HomepageURL string `json:"homepageUrl,omitempty"`
 	Description string `json:"description,omitempty"`
 
 	OwnerID string `json:"ownerId,omitempty"`
