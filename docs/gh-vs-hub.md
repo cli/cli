@@ -1,6 +1,6 @@
 # GitHub CLI & `hub`
 
-GitHub CLI (`gh`) was announced in early 2020 and provides a more seamless way to interact with your GitHub repositories from the command line. We also know that many people are interested in the very similar `hub` project, so we wanted to clarify some potential points of confusion.
+[GitHub CLI](https://cli.github.com/) (`gh`) was [announced in early 2020](https://github.blog/2020-02-12-supercharge-your-command-line-experience-github-cli-is-now-in-beta/) and provides a more seamless way to interact with your GitHub repositories from the command line. We also know that many people are interested in the very similar [`hub`](https://hub.github.com/) project, so we wanted to clarify some potential points of confusion.
 
 ## Why didn’t you just build `gh` on top of `hub`?
 
