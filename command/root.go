@@ -136,7 +136,6 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		// antiope-preview: Checks
 		// shadow-cat-preview: Draft pull requests
 		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json, application/vnd.github.shadow-cat-preview"),
-		api.AddHeader("GraphQL-Features", "pe_mobile"),
 	)
 
 	return api.NewClient(opts...), nil
