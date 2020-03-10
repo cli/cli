@@ -388,21 +388,46 @@ func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 
 	var openURL string
+	var toView ghrepo.Interface
 	if len(args) == 0 {
 		baseRepo, err := determineBaseRepo(cmd, ctx)
 		if err != nil {
 			return err
 		}
 		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(baseRepo))
+		toView = baseRepo
 	} else {
 		repoArg := args[0]
 		if isURL(repoArg) {
 			openURL = repoArg
+			parsedURL, err := url.Parse(repoArg)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
+
+			toView, err = ghrepo.FromURL(parsedURL)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
 		} else {
+			toView = ghrepo.FromFullName(repoArg)
 			openURL = fmt.Sprintf("https://github.com/%s", repoArg)
 		}
 	}
 
+	apiClient, err := apiClientForContext(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	_, err_message := api.GitHubRepo(apiClient, toView)
+	if err_message != nil {
+		return err_message
+	}
+
 	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 	return utils.OpenInBrowser(openURL)
+
+	
 }
