@@ -610,7 +610,6 @@ func TestRepoView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO")
 }
 
-
 func TestRepoView_ownerRepo(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
