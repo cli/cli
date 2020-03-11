@@ -3,44 +3,13 @@ package command
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
-
-func TestPrCreateHelperProcess(*testing.T) {
-	if test.SkipTestHelperProcess() {
-		return
-	}
-
-	args := test.GetTestHelperProcessArgs()
-	switch args[1] {
-	case "log":
-		fmt.Println("123,cool,\"\"")
-	case "status":
-		switch args[0] {
-		case "clean":
-		case "dirty":
-			fmt.Println(" M git/git.go")
-		default:
-			fmt.Fprintf(os.Stderr, "unknown scenario: %q", args[0])
-			os.Exit(1)
-		}
-	case "push":
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %q", args[1])
-		os.Exit(1)
-	}
-	os.Exit(0)
-}
 
 func TestPRCreate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
@@ -52,11 +21,13 @@ func TestPRCreate(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs := CmdStubber{}
+	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	defer teardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
@@ -89,12 +60,14 @@ func TestPRCreate_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		ranCommands = append(ranCommands, cmd.Args)
-		return &outputStub{}
-	})
-	defer restoreCmd()
+	cs := CmdStubber{}
+	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	defer teardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
 
 	output, err := RunCommand(prCreateCmd, `pr create --web`)
 	eq(t, err, nil)
@@ -102,9 +75,10 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
 
-	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
-	eq(t, ranCommands[3][len(ranCommands[3])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	eq(t, len(cs.Calls), 4)
+	eq(t, strings.Join(cs.Calls[2].Args, " "), "git push --set-upstream origin HEAD:feature")
+	browserCall := cs.Calls[3].Args
+	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
@@ -118,11 +92,13 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "dirty")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs := CmdStubber{}
+	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	defer teardown()
+
+	cs.Stub(" M git/git.go")                            // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
@@ -183,11 +159,13 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs := CmdStubber{}
+	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	defer teardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "cross repo" -b "same branch"`)
 	eq(t, err, nil)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
 
@@ -117,7 +118,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	var seenCmds []*exec.Cmd
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmds = append(seenCmds, cmd)
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	output, err := RunCommand(repoForkCmd, "repo fork --remote")
@@ -156,7 +157,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	var seenCmd *exec.Cmd
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	output, err := RunCommand(repoForkCmd, "repo fork --clone OWNER/REPO")
@@ -188,7 +189,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	var seenCmd *exec.Cmd
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	oldConfirm := Confirm
@@ -227,7 +228,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	cmdRun := false
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		cmdRun = true
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	oldConfirm := Confirm
@@ -263,7 +264,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	var seenCmds []*exec.Cmd
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmds = append(seenCmds, cmd)
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	oldConfirm := Confirm
@@ -311,7 +312,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	cmdRun := false
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		cmdRun = true
-		return &outputStub{}
+		return &test.OutputStub{}
 	})()
 
 	oldConfirm := Confirm
@@ -369,7 +370,7 @@ func TestRepoClone(t *testing.T) {
 			var seenCmd *exec.Cmd
 			restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 				seenCmd = cmd
-				return &outputStub{}
+				return &test.OutputStub{}
 			})
 			defer restoreCmd()
 
@@ -409,7 +410,7 @@ func TestRepoCreate(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -474,7 +475,7 @@ func TestRepoCreate_org(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -539,7 +540,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -591,7 +592,7 @@ func TestRepoView(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -624,7 +625,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -656,7 +657,7 @@ func TestRepoView_fullURL(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 

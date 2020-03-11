@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
 
@@ -46,7 +47,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -98,7 +99,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -147,7 +148,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -193,10 +194,10 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify --quiet refs/heads/feature":
-			return &outputStub{}
+			return &test.OutputStub{}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -248,7 +249,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -300,7 +301,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -349,10 +350,10 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &outputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{[]byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -399,10 +400,10 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &outputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{[]byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -452,7 +453,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
