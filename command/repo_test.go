@@ -579,10 +579,14 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 }
 
+
 func TestRepoView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ }
+	`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -612,7 +616,10 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	initContext = func() context.Context {
 		return ctx
 	}
-	initFakeHTTP()
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ }
+	`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
@@ -642,8 +649,10 @@ func TestRepoView_fullURL(t *testing.T) {
 	initContext = func() context.Context {
 		return ctx
 	}
-	initFakeHTTP()
-
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ }
+	`))
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
