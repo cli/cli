@@ -23,6 +23,10 @@ const (
 	CancelAction
 )
 
+var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
+	return survey.Ask(qs, response, opts...)
+}
+
 var ConfirmSubmission = func() (Action, error) {
 	confirmAnswers := struct {
 		Confirmation int
@@ -41,10 +45,12 @@ var ConfirmSubmission = func() (Action, error) {
 		},
 	}
 
-	err := survey.Ask(confirmQs, &confirmAnswers)
+	err := SurveyAsk(confirmQs, &confirmAnswers)
 	if err != nil {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
+
+	fmt.Printf("GOTTA NUMBER %d\n", confirmAnswers.Confirmation)
 
 	return Action(confirmAnswers.Confirmation), nil
 }
@@ -68,17 +74,13 @@ var SelectTemplate = func(templatePaths []string) (string, error) {
 				},
 			},
 		}
-		if err := survey.Ask(selectQs, &templateResponse); err != nil {
+		if err := SurveyAsk(selectQs, &templateResponse); err != nil {
 			return "", fmt.Errorf("could not prompt: %w", err)
 		}
 	}
 
 	templateContents := githubtemplate.ExtractContents(templatePaths[templateResponse.Index])
 	return string(templateContents), nil
-}
-
-var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
-	return survey.Ask(qs, response, opts...)
 }
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string) (*titleBody, error) {
@@ -127,7 +129,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 		qs = append(qs, bodyQuestion)
 	}
 
-	err := survey.Ask(qs, &inProgress)
+	err := SurveyAsk(qs, &inProgress)
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
 	}
