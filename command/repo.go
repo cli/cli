@@ -389,7 +389,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
-		toView, err = determineBaseRepo(cmd, ctx)
+		toView, err = ctx.BaseRepo()
 		if err != nil {
 			return err
 		}

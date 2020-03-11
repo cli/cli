@@ -579,11 +579,9 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 }
 
-
 func TestRepoView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ }
 	`))
