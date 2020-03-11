@@ -78,6 +78,9 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseRemote.Name
 		mergeRef := ref
 		if pr.MaintainerCanModify {
+			remote = fmt.Sprintf("git@github.com:%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
+		} else {
 			remote = fmt.Sprintf("https://github.com/%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}

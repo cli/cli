@@ -312,8 +312,8 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/pull/123/head")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
 
 func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
@@ -464,6 +464,6 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote git@github.com:hubot/REPO.git")
 	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
