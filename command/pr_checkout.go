@@ -18,11 +18,24 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	remoteNames := []string{
+		"upstream",
+		"github",
+		"origin",
+		"*",
+	}
+
+	if len(args) == 2 {
+		remoteNames = []string{args[1]}
+	}
+
 	// FIXME: duplicates logic from fsContext.BaseRepo
-	baseRemote, err := remotes.FindByName("upstream", "github", "origin", "*")
+	baseRemote, err := remotes.FindByName(remoteNames...)
 	if err != nil {
 		return err
 	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -100,7 +113,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 }
 
 var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout {<number> | <url> | <branch>}",
+	Use:   "checkout {<number> | <url> | <branch>} [<remote>]",
 	Short: "Check out a pull request in Git",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
