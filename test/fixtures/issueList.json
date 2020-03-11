@@ -15,9 +15,6 @@
                   }
                 ],
                 "totalCount": 1
-              },
-              "author": {
-                "login": "foo"
               }
           },
           {
@@ -31,9 +28,6 @@
                   }
                 ],
                 "totalCount": 1
-              },
-              "author": {
-                "login": "bar"
               }
           },
           {
@@ -47,9 +41,6 @@
                   }
                 ],
                 "totalCount": 1
-              },
-              "author": {
-                "login": "bar"
               }
           }
         ]
