@@ -391,45 +391,51 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prNumberColorFunc := utils.Green
+		prStateColorFunc := utils.Green
 		if pr.IsDraft {
-			prNumberColorFunc = utils.Gray
+			prStateColorFunc = utils.Gray
 		} else if pr.State == "MERGED" {
-			prNumberColorFunc = utils.Magenta
+			prStateColorFunc = utils.Magenta
 		} else if pr.State == "CLOSED" {
-			prNumberColorFunc = utils.Red
+			prStateColorFunc = utils.Red
 		}
 
-		fmt.Fprintf(w, "  %s  %s %s", prNumberColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
-		if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Fprintf(w, "\n  ")
-		}
 
-		if checks.Total > 0 {
-			var summary string
-			if checks.Failing > 0 {
-				if checks.Failing == checks.Total {
-					summary = utils.Red("All checks failing")
-				} else {
-					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
-				}
-			} else if checks.Pending > 0 {
-				summary = utils.Yellow("Checks pending")
-			} else if checks.Passing == checks.Total {
-				summary = utils.Green("Checks passing")
+		if pr.State == "OPEN" {
+			if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
+				fmt.Fprintf(w, "\n  ")
 			}
-			fmt.Fprintf(w, " - %s", summary)
-		}
 
-		if reviews.ChangesRequested {
-			fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
-		} else if reviews.ReviewRequired {
-			fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
-		} else if reviews.Approved {
-			fmt.Fprintf(w, " - %s", utils.Green("Approved"))
+			if checks.Total > 0 {
+				var summary string
+				if checks.Failing > 0 {
+					if checks.Failing == checks.Total {
+						summary = utils.Red("All checks failing")
+					} else {
+						summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+					}
+				} else if checks.Pending > 0 {
+					summary = utils.Yellow("Checks pending")
+				} else if checks.Passing == checks.Total {
+					summary = utils.Green("Checks passing")
+				}
+				fmt.Fprintf(w, " - %s", summary)
+			}
+
+			if reviews.ChangesRequested {
+				fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
+			} else if reviews.ReviewRequired {
+				fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
+			} else if reviews.Approved {
+				fmt.Fprintf(w, " - %s", utils.Green("Approved"))
+			}
+		} else {
+			s := strings.Title(strings.ToLower(pr.State))
+			fmt.Fprintf(w, " - %s", prStateColorFunc(s))
 		}
 
 		fmt.Fprint(w, "\n")
