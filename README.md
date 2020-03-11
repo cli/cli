@@ -24,11 +24,9 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 - `gh repo [view, create, clone, fork]`
 - `gh help`
 
-Check out the [docs][] for more information.
-
 ## Documentation
 
-Read the official docs at [https://cli.github.com/manual/](https://cli.github.com/manual/)
+Read the official docs at [https://cli.github.com/manual/](https://cli.github.com/manual/) for more information.
 
 ## Comparison with hub
 
@@ -111,16 +109,6 @@ $ yay -S github-cli
 ### Other platforms
 
 Install a prebuilt binary from the [releases page][]
-
-## Setting an Editor
-
-For macOS and Linux, `gh` will respect the following environment variables, in this order, based on your OS and shell setup:
-
-1. `GIT_EDITOR`
-2. `VISUAL`    
-3. `EDITOR`
-
-On Windows, the editor will currently always be Notepad.
 
 ### [Build from source](/source.md)
 
