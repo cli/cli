@@ -26,7 +26,7 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 
 ## Documentation
 
-Read the official docs at [https://cli.github.com/manual/](https://cli.github.com/manual/) for more information.
+Read the [official docs](https://cli.github.com/manual/) for more information.
 
 ## Comparison with hub
 
