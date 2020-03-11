@@ -24,8 +24,9 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 - `gh repo [view, create, clone, fork]`
 - `gh help`
 
-Check out the [docs][] for more information.
+## Documentation
 
+Read the [official docs](https://cli.github.com/manual/) for more information.
 
 ## Comparison with hub
 
