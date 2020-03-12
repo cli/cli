@@ -182,6 +182,38 @@ func TestPRStatus_closedMerged(t *testing.T) {
 	}
 }
 
+func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#10  Blueberries are certainly a good fruit \[blueberries\]`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+
+	unexpectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`#9  Blueberries are a good fruit \[blueberries\] - Merged`),
+		regexp.MustCompile(`#8  Blueberries are probably a good fruit \[blueberries\] - Closed`),
+	}
+	for _, r := range unexpectedLines {
+		if r.MatchString(output.String()) {
+			t.Errorf("output unexpectedly match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
