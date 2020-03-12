@@ -84,7 +84,14 @@ Install and upgrade:
 1. Download the `.deb` file from the [releases page][]
 2. `sudo apt install git && sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
 
-### Fedora/Centos Linux
+### Fedora Linux
+
+Install and upgrade:
+
+1. Download the `.rpm` file from the [releases page][]
+2. `sudo dnf install gh_*_linux_amd64.rpm` install the downloaded file
+
+### Centos Linux
 
 Install and upgrade:
 
