@@ -37,6 +37,7 @@ func init() {
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
@@ -109,9 +110,14 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	author, err := cmd.Flags().GetString("author")
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s\n\n", ghrepo.FullName(baseRepo))
 
-	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
+	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
 	if err != nil {
 		return err
 	}
