@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/utils"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/core"
@@ -26,9 +25,8 @@ func TestPRCreate(t *testing.T) {
 		} } } }
 	`))
 
-	cs := CmdStubber{}
-	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
-	defer teardown()
+	cs, cmdTeardown := InitCmdStubber()
+	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
@@ -65,9 +63,8 @@ func TestPRCreate_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	cs := CmdStubber{}
-	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
-	defer teardown()
+	cs, cmdTeardown := InitCmdStubber()
+	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
@@ -97,9 +94,8 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		} } } }
 	`))
 
-	cs := CmdStubber{}
-	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
-	defer teardown()
+	cs, cmdTeardown := InitCmdStubber()
+	defer cmdTeardown()
 
 	cs.Stub(" M git/git.go")                            // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
@@ -164,9 +160,8 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } } }
 	`))
 
-	cs := CmdStubber{}
-	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
-	defer teardown()
+	cs, cmdTeardown := InitCmdStubber()
+	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
@@ -300,9 +295,7 @@ func TestPRCreate_survey_preview_defaults(t *testing.T) {
 		} } } }
 	`))
 
-	// TODO initCmdStubber in command/testing
-	cs := CmdStubber{}
-	cmdTeardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	cs, cmdTeardown := InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status

@@ -21,6 +21,12 @@ type CmdStubber struct {
 	Calls []*exec.Cmd
 }
 
+func InitCmdStubber() (*CmdStubber, func()) {
+	cs := CmdStubber{}
+	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	return &cs, teardown
+}
+
 func (cs *CmdStubber) Stub(desiredOutput string) {
 	// TODO maybe have some kind of command mapping but going simple for now
 	cs.Stubs = append(cs.Stubs, &test.OutputStub{[]byte(desiredOutput)})
