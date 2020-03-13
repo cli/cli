@@ -153,7 +153,7 @@ func TestIssueList_withFlags(t *testing.T) {
 	} } }
 	`))
 
-	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mentioned me")
+	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mentioned me --milestone 1.x")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -172,6 +172,7 @@ No issues match your search in OWNER/REPO
 			States     []string
 			Author     string
 			Mentioned  string
+			Milestone  string
 		}
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
@@ -181,6 +182,7 @@ No issues match your search in OWNER/REPO
 	eq(t, reqBody.Variables.States, []string{"OPEN"})
 	eq(t, reqBody.Variables.Author, "foo")
 	eq(t, reqBody.Variables.Mentioned, "me")
+	eq(t, reqBody.Variables.Milestone, "1.x")
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {

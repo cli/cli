@@ -40,7 +40,7 @@ func TestIssueList(t *testing.T) {
 	`))
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
-	_, err := IssueList(client, repo, "open", []string{}, "", 251, "", "")
+	_, err := IssueList(client, repo, "open", []string{}, "", 251, "", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
