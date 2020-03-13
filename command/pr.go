@@ -98,8 +98,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
-	if prPayload.CurrentPRs != nil {
-		printPrs(out, 0, prPayload.CurrentPRs...)
+	if prPayload.CurrentPR != nil {
+		printPrs(out, 0, *prPayload.CurrentPR)
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
