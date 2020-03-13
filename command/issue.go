@@ -67,7 +67,7 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url> | <branch>}",
+	Use: "view {<number> | <url>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return FlagError{errors.New("issue number or URL required as argument")}
