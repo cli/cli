@@ -10,7 +10,7 @@ import (
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPRs      []PullRequest
+	CurrentPR       *PullRequest
 }
 
 type PullRequestAndTotalCount struct {
@@ -262,13 +262,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPRs []PullRequest
-	if resp.Repository.PullRequest != nil {
-		currentPRs = append(currentPRs, *resp.Repository.PullRequest)
-	} else {
+	var currentPR = resp.Repository.PullRequest
+	if currentPR == nil {
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPRs = append(currentPRs, edge.Node)
+				currentPR = &edge.Node
+				break // Take the most recent PR for the current branch
 			}
 		}
 	}
@@ -282,7 +281,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPRs: currentPRs,
+		CurrentPR: currentPR,
 	}
 
 	return &payload, nil
