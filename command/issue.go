@@ -23,7 +23,6 @@ import (
 func init() {
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
-	issueCmd.AddCommand(issueViewCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
@@ -39,6 +38,7 @@ func init() {
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
+	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
 
