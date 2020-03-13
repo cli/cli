@@ -50,8 +50,6 @@ var ConfirmSubmission = func() (Action, error) {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	fmt.Printf("GOTTA NUMBER %d\n", confirmAnswers.Confirmation)
-
 	return Action(confirmAnswers.Confirmation), nil
 }
 

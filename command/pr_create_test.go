@@ -3,16 +3,11 @@ package command
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
-
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/core"
 )
 
 func TestPRCreate(t *testing.T) {
@@ -25,7 +20,7 @@ func TestPRCreate(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := InitCmdStubber()
+	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
@@ -63,7 +58,7 @@ func TestPRCreate_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	cs, cmdTeardown := InitCmdStubber()
+	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
@@ -94,7 +89,7 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := InitCmdStubber()
+	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub(" M git/git.go")                            // git status
@@ -160,7 +155,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := InitCmdStubber()
+	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
@@ -195,81 +190,6 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	// goal: only care that gql is formatted properly
 }
 
-/*
- We aren't testing the survey code paths /at all/.
-
- so if we want to test those code paths, some cases:
-
- - user supplies no -t/-b and wants to preview in browser
- - user supplies no -t/-b and wants to submit directly
- - user supplies no -t/-b and wants to edit the title
- - user supplies no -t/-b and wants to edit the body
-
- for defaults:
-
- - one commit
- - multiple commits
-
- checking that defaults are generated appropriately each time.
-
- it seems that each survey prompt needs to be an injectable hook.
-*/
-
-type askStubber struct {
-	Asks  [][]*survey.Question
-	Count int
-	Stubs [][]*QuestionStub
-}
-
-func initAskStubber() (*askStubber, func()) {
-	origSurveyAsk := SurveyAsk
-	as := askStubber{}
-	SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
-		as.Asks = append(as.Asks, qs)
-		count := as.Count
-		as.Count += 1
-		if count >= len(as.Stubs) {
-			panic(fmt.Sprintf("more asks than stubs. most recent call: %v", qs))
-		}
-
-		// actually set response
-		stubbedQuestions := as.Stubs[count]
-		for i, sq := range stubbedQuestions {
-			q := qs[i]
-			if q.Name != sq.Name {
-				panic(fmt.Sprintf("stubbed question mismatch: %s != %s", q.Name, sq.Name))
-			}
-			if sq.Default {
-				defaultValue := reflect.ValueOf(q.Prompt).Elem().FieldByName("Default")
-				core.WriteAnswer(response, q.Name, defaultValue)
-			} else {
-				core.WriteAnswer(response, q.Name, sq.Value)
-			}
-		}
-
-		return nil
-	}
-	teardown := func() {
-		SurveyAsk = origSurveyAsk
-	}
-	return &as, teardown
-}
-
-type QuestionStub struct {
-	Name    string
-	Value   interface{}
-	Default bool
-}
-
-func (as *askStubber) Stub(stubbedQuestions []*QuestionStub) {
-	// A call to .Ask takes a list of questions; a stub is then a list of questions in the same order.
-	as.Stubs = append(as.Stubs, stubbedQuestions)
-}
-
-func (as *askStubber) StubWithDefaults() {
-	as.Stubs = append(as.Stubs, nil)
-}
-
 func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
@@ -280,7 +200,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := InitCmdStubber()
+	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
@@ -291,11 +211,6 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	as, surveyTeardown := initAskStubber()
 	defer surveyTeardown()
 
-	// so here is a problem: we lose survey's default detection. This works for specifying what a user
-	// has typed in, but not for simulating when a user inputs nothing.
-	// so; how to simulate when a user inputs nothing? can have a special method for that--even just
-	// "all defaults" would be ok -- but need to figure out if we can even /access/ what the default
-	// values would be.
 	as.Stub([]*QuestionStub{
 		&QuestionStub{
 			Name:    "title",

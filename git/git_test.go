@@ -15,7 +15,7 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		Output   string
 	}
 	cases := []c{
-		c{Label: "no changes", Expected: 0, Output: ""}, // TODO will this fail and be seen as one newline?
+		c{Label: "no changes", Expected: 0, Output: ""},
 		c{Label: "one change", Expected: 1, Output: " M poem.txt"},
 		c{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
 	}
