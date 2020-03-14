@@ -1,0 +1,65 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 1,
+        "edges": [
+          {
+            "node": {
+              "number": 8,
+              "title": "Blueberries are a good fruit",
+              "state": "OPEN",
+              "url": "https://github.com/cli/cli/pull/8",
+              "headRefName": "blueberries",
+              "reviewDecision": "CHANGES_REQUESTED",
+              "commits": {
+                "nodes": [
+                  {
+                    "commit": {
+                      "statusCheckRollup": {
+                        "contexts": {
+                          "nodes": [
+                            {
+                              "state": "SUCCESS"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 1,
+      "edges": [
+        {
+          "node": {
+            "number": 10,
+            "state": "CLOSED",
+            "title": "Strawberries are not actually berries",
+            "url": "https://github.com/cli/cli/pull/10",
+            "headRefName": "strawberries"
+          }
+        },
+        {
+          "node": {
+            "number": 9,
+            "state": "MERGED",
+            "title": "Bananas are berries",
+            "url": "https://github.com/cli/cli/pull/9",
+            "headRefName": "banananana"
+          }
+        }
+      ]
+    },
+    "reviewRequested": {
+      "totalCount": 0,
+      "edges": []
+    }
+  }
+}

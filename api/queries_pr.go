@@ -10,7 +10,7 @@ import (
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPRs      []PullRequest
+	CurrentPR       *PullRequest
 }
 
 type PullRequestAndTotalCount struct {
@@ -262,13 +262,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPRs []PullRequest
-	if resp.Repository.PullRequest != nil {
-		currentPRs = append(currentPRs, *resp.Repository.PullRequest)
-	} else {
+	var currentPR = resp.Repository.PullRequest
+	if currentPR == nil {
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPRs = append(currentPRs, edge.Node)
+				currentPR = &edge.Node
+				break // Take the most recent PR for the current branch
 			}
 		}
 	}
@@ -282,7 +281,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPRs: currentPRs,
+		CurrentPR: currentPR,
 	}
 
 	return &payload, nil
@@ -507,6 +506,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 		}
 	}`
 
+	var check = make(map[int]struct{})
 	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
@@ -583,7 +583,12 @@ loop:
 		}
 
 		for _, edge := range prData.Edges {
+			if _, exists := check[edge.Node.Number]; exists {
+				continue
+			}
+
 			prs = append(prs, edge.Node)
+			check[edge.Node.Number] = struct{}{}
 			if len(prs) == limit {
 				break loop
 			}

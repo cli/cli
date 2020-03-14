@@ -158,7 +158,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		OwnerID:          orgName,
 		TeamID:           teamSlug,
 		Description:      description,
-		Homepage:         homepage,
+		HomepageURL:      homepage,
 		HasIssuesEnabled: hasIssuesEnabled,
 		HasWikiEnabled:   hasWikiEnabled,
 	}
@@ -386,23 +386,40 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-
-	var openURL string
+	var toView ghrepo.Interface
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(cmd, ctx)
+		var err error
+		toView, err = determineBaseRepo(cmd, ctx)
 		if err != nil {
 			return err
 		}
-		openURL = fmt.Sprintf("https://github.com/%s", ghrepo.FullName(baseRepo))
 	} else {
 		repoArg := args[0]
 		if isURL(repoArg) {
-			openURL = repoArg
+			parsedURL, err := url.Parse(repoArg)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
+
+			toView, err = ghrepo.FromURL(parsedURL)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
 		} else {
-			openURL = fmt.Sprintf("https://github.com/%s", repoArg)
+			toView = ghrepo.FromFullName(repoArg)
 		}
 	}
 
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = api.GitHubRepo(apiClient, toView)
+	if err != nil {
+		return err
+	}
+
+	openURL := fmt.Sprintf("https://github.com/%s", ghrepo.FullName(toView))
 	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 	return utils.OpenInBrowser(openURL)
 }

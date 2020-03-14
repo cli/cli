@@ -23,7 +23,6 @@ import (
 func init() {
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
-	issueCmd.AddCommand(issueViewCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
@@ -37,7 +36,9 @@ func init() {
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
+	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
 
@@ -66,7 +67,7 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url> | <branch>}",
+	Use: "view {<number> | <url>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return FlagError{errors.New("issue number or URL required as argument")}
@@ -109,7 +110,12 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
+	author, err := cmd.Flags().GetString("author")
+	if err != nil {
+		return err
+	}
+
+	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
 	if err != nil {
 		return err
 	}
@@ -117,7 +123,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	hasFilters := false
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		switch f.Name {
-		case "state", "label", "assignee":
+		case "state", "label", "assignee", "author":
 			hasFilters = true
 		}
 	})
