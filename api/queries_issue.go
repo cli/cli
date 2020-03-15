@@ -24,6 +24,7 @@ type Issue struct {
 	URL       string
 	State     string
 	Body      string
+	CreatedAt time.Time
 	UpdatedAt time.Time
 	Comments  struct {
 		TotalCount int
@@ -275,6 +276,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 			hasIssuesEnabled
 			issue(number: $issue_number) {
 				title
+				state
 				body
 				author {
 					login
@@ -289,6 +291,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				}
 				number
 				url
+				createdAt
 			}
 		}
 	}`
