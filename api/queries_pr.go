@@ -301,6 +301,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				url
 				number
 				title
+				state
 				body
 				author {
 				  login
@@ -356,6 +357,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 				nodes {
 					number
 					title
+					state
 					body
 					author {
 						login
