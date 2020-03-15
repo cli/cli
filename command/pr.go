@@ -296,9 +296,12 @@ func prView(cmd *cobra.Command, args []string) error {
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
+	prStateColorFunc := colorFuncForPR(*pr)
+
 	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintf(out, "%s", prStateColorFunc(pr.State))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		"%s wants to merge %s into %s from %s",
+		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
