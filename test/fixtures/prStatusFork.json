@@ -8,8 +8,10 @@
             "node": {
               "number": 10,
               "title": "Blueberries are a good fruit",
+              "state": "OPEN",
               "url": "https://github.com/PARENT/REPO/pull/10",
               "headRefName": "blueberries",
+              "isDraft": false,
               "headRepositoryOwner": {
                 "login": "OWNER"
               },

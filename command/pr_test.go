@@ -399,7 +399,7 @@ func TestPRView_preview(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`OPEN • nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`Open • nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
 	}
@@ -429,7 +429,7 @@ func TestPRView_previewClosedState(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`CLOSED • nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`Closed • nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
 	}
@@ -459,7 +459,7 @@ func TestPRView_previewMergedState(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`MERGED • nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`Merged • nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
 	}
@@ -494,7 +494,7 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`OPEN • nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
 	}
@@ -529,7 +529,7 @@ func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`OPEN • nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
 	}
 	for _, r := range expectedLines {
