@@ -4,6 +4,7 @@
       "pullRequest": {
         "number": 12,
         "title": "Blueberries are from a fork",
+        "state": "OPEN",
         "body": "**blueberries taste good**",
         "url": "https://github.com/OWNER/REPO/pull/12",
         "author": {

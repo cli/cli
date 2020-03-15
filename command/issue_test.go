@@ -289,6 +289,8 @@ func TestIssueView_preview(t *testing.T) {
 		"number": 123,
 		"body": "**bold story**",
 		"title": "ix of coins",
+		"state": "OPEN",
+		"created_at": "2011-01-26T19:01:12Z",
 		"author": {
 			"login": "marseilles"
 		},
@@ -313,7 +315,7 @@ func TestIssueView_preview(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
+		regexp.MustCompile(`OPEN • marseilles opened about 292 years ago • 9 comments • tarot`),
 		regexp.MustCompile(`bold story`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
@@ -335,6 +337,8 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 		"number": 123,
 		"body": "",
 		"title": "ix of coins",
+		"state": "OPEN",
+		"created_at": "2011-01-26T19:01:12Z",
 		"author": {
 			"login": "marseilles"
 		},
@@ -359,7 +363,7 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
+		regexp.MustCompile(`OPEN • marseilles opened about 292 years ago • 9 comments • tarot`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
 	for _, r := range expectedLines {
