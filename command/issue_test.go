@@ -309,6 +309,36 @@ func TestIssueView_preview(t *testing.T) {
 	}
 }
 
+func TestIssueView_previewClosedState(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueView_previewClosedState.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueViewCmd, "issue view -p 123")
+	if err != nil {
+		t.Errorf("error running command `issue view`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	expectedLines := []*regexp.Regexp{
+		regexp.MustCompile(`ix of coins`),
+		regexp.MustCompile(`CLOSED • marseilles opened about 292 years ago • 9 comments • tarot`),
+		regexp.MustCompile(`bold story`),
+		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+	}
+	for _, r := range expectedLines {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
+
 func TestIssueView_previewWithEmptyBody(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
