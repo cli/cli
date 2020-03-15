@@ -148,7 +148,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if labels != "" && table.IsTTY() {
 			labels = fmt.Sprintf("(%s)", labels)
 		}
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issueNum, nil, utils.ColorFuncForState(issue.State))
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		table.EndRow()

@@ -232,20 +232,7 @@ func colorFuncForPR(pr api.PullRequest) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	} else {
-		return colorFuncForState(pr.State)
-	}
-}
-
-func colorFuncForState(state string) func(string) string {
-	switch state {
-	case "OPEN":
-		return utils.Green
-	case "CLOSED":
-		return utils.Red
-	case "MERGED":
-		return utils.Magenta
-	default:
-		return nil
+		return utils.ColorFuncForState(pr.State)
 	}
 }
 

@@ -57,3 +57,17 @@ func FuzzyAgo(ago time.Duration) string {
 func Spinner() *spinner.Spinner {
 	return spinner.New(spinner.CharSets[11], 400*time.Millisecond)
 }
+
+// ColorFuncForState returns a color function for a PR/Issue state
+func ColorFuncForState(state string) func(string) string {
+	switch state {
+	case "OPEN":
+		return Green
+	case "CLOSED":
+		return Red
+	case "MERGED":
+		return Magenta
+	default:
+		return nil
+	}
+}
