@@ -284,27 +284,9 @@ func TestIssueView_preview(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"body": "**bold story**",
-		"title": "ix of coins",
-		"state": "OPEN",
-		"created_at": "2011-01-26T19:01:12Z",
-		"author": {
-			"login": "marseilles"
-		},
-		"labels": {
-			"nodes": [
-				{"name": "tarot"}
-			]
-		},
-		"comments": {
-		  "totalCount": 9
-		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	jsonFile, _ := os.Open("../test/fixtures/issueView_preview.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
 
 	output, err := RunCommand(issueViewCmd, "issue view -p 123")
 	if err != nil {
@@ -332,27 +314,9 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"body": "",
-		"title": "ix of coins",
-		"state": "OPEN",
-		"created_at": "2011-01-26T19:01:12Z",
-		"author": {
-			"login": "marseilles"
-		},
-		"labels": {
-			"nodes": [
-				{"name": "tarot"}
-			]
-		},
-		"comments": {
-		  "totalCount": 9
-		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	jsonFile, _ := os.Open("../test/fixtures/issueView_previewWithEmptyBody.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
 
 	output, err := RunCommand(issueViewCmd, "issue view -p 123")
 	if err != nil {
