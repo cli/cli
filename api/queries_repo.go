@@ -69,6 +69,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		repository(owner: $owner, name: $name) {
 			id
 			hasIssuesEnabled
+			isPrivate
+			viewerPermission
 		}
 	}`
 	variables := map[string]interface{}{

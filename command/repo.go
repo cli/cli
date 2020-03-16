@@ -18,7 +18,9 @@ import (
 
 func init() {
 	RootCmd.AddCommand(repoCmd)
+
 	repoCmd.AddCommand(repoCloneCmd)
+	repoCloneCmd.Flags().StringP("protocol", "p", "auto", "Transport protocol for cloning. One of [git, ssh, https, auto]")
 
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
@@ -53,6 +55,9 @@ var repoCloneCmd = &cobra.Command{
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
+Picks ssh:// for private repos and for those you have commit
+access to, https:// otherwise. Use --protocol to override.
+
 To pass 'git clone' options, separate them with '--'.`,
 	RunE: repoClone,
 }
@@ -86,8 +91,19 @@ With no argument, the repository for the current directory is opened.`,
 
 func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
+
+	protocol, err := cmd.Flags().GetString("protocol")
+	if err != nil {
+		return err
+	}
+
+	cloneFormat, err := cloneFmt(cloneURL, protocol)
+	if err != nil {
+		return err
+	}
+
 	if !strings.Contains(cloneURL, ":") {
-		cloneURL = fmt.Sprintf("https://github.com/%s.git", cloneURL)
+		cloneURL = fmt.Sprintf(cloneFormat, cloneURL)
 	}
 
 	cloneArgs := []string{"clone"}
@@ -99,6 +115,58 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	return utils.PrepareCmd(cloneCmd).Run()
+}
+
+const (
+	CloneGit   = "git://github.com/%s.git"
+	CloneSSH   = "ssh://git@github.com/%s.git"
+	CloneHTTPS = "https://github.com/%s.git"
+)
+
+func cloneFmt(name string, protocol string) (string, error) {
+	var cloneFmt string
+
+	switch protocol {
+	case "git":
+		cloneFmt = CloneGit
+	case "ssh":
+		cloneFmt = CloneSSH
+	case "https":
+		cloneFmt = CloneHTTPS
+	case "auto":
+		auto, err := autoCloneURL(name)
+		if err != nil {
+			return "", err
+		}
+		cloneFmt = auto
+	default:
+		return "", fmt.Errorf("unknown clone protocol: %s", protocol)
+	}
+
+	return cloneFmt, nil
+}
+
+func autoCloneURL(name string) (string, error) {
+	apiClient, err := BasicClient()
+	if err != nil {
+		return "", fmt.Errorf("unable to create client: %w", err)
+	}
+
+	githubRepo := ghrepo.FromFullName(name)
+	if githubRepo.RepoName() == "" || githubRepo.RepoOwner() == "" {
+		return "", fmt.Errorf("could not parse owner or repo name from %s", name)
+	}
+
+	repo, err := api.GitHubRepo(apiClient, githubRepo)
+	if err != nil {
+		return "", err
+	}
+
+	if repo.ViewerCanPush() || repo.IsPrivate {
+		return CloneSSH, nil
+	}
+
+	return CloneGit, nil
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
