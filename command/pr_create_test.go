@@ -322,3 +322,51 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
+
+func TestPRCreate_survey_autofill(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                                        // git status
+	cs.Stub("1234567890,the sky above the port")                       // git log
+	cs.Stub("was the color of a television, turned to a dead channel") // git show
+	cs.Stub("")                                                        // git rev-parse
+	cs.Stub("")                                                        // git push
+	cs.Stub("")                                                        // browser open
+
+	output, err := RunCommand(prCreateCmd, `pr create -f`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	expectedBody := "was the color of a television, turned to a dead channel"
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "the sky above the port")
+	eq(t, reqBody.Variables.Input.Body, expectedBody)
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
