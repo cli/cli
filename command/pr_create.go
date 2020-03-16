@@ -55,9 +55,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
 	}
 
-	_, err = api.PullRequestForBranch(client, baseRepo, headBranch)
-	if err != fmt.Errorf("no open pull requests found for branch %q", headBranch) {
-		return fmt.Errorf("pull request for branch %q already exists", headBranch)
+	existingPr, _ := api.PullRequestForBranch(client, baseRepo, headBranch)
+	if existingPr != nil {
+		return fmt.Errorf("pull request for branch %q already exists:\n%s", headBranch, existingPr.URL)
 	}
 
 	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
