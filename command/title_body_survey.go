@@ -27,7 +27,7 @@ var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey
 	return survey.Ask(qs, response, opts...)
 }
 
-var ConfirmSubmission = func() (Action, error) {
+func confirmSubmission() (Action, error) {
 	confirmAnswers := struct {
 		Confirmation int
 	}{}
@@ -53,7 +53,7 @@ var ConfirmSubmission = func() (Action, error) {
 	return Action(confirmAnswers.Confirmation), nil
 }
 
-var SelectTemplate = func(templatePaths []string) (string, error) {
+func selectTemplate(templatePaths []string) (string, error) {
 	templateResponse := struct {
 		Index int
 	}{}
@@ -89,7 +89,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 	if providedBody == "" {
 		if len(templatePaths) > 0 {
 			var err error
-			templateContents, err = SelectTemplate(templatePaths)
+			templateContents, err = selectTemplate(templatePaths)
 			if err != nil {
 				return nil, err
 			}
@@ -136,7 +136,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 		inProgress.Body = templateContents
 	}
 
-	confirmA, err := ConfirmSubmission()
+	confirmA, err := confirmSubmission()
 	if err != nil {
 		return nil, fmt.Errorf("unable to confirm: %w", err)
 	}

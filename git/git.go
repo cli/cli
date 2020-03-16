@@ -78,8 +78,9 @@ type Commit struct {
 
 func Commits(baseRef, headRef string) ([]*Commit, error) {
 	logCmd := GitCommand(
+		"-c", "log.ShowSignature=false",
 		"log", "--pretty=format:%H,%s",
-		fmt.Sprintf("%s..%s", baseRef, headRef))
+		"--cherry", fmt.Sprintf("%s...%s", baseRef, headRef))
 	output, err := utils.PrepareCmd(logCmd).Output()
 	if err != nil {
 		return []*Commit{}, err
@@ -107,7 +108,7 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 }
 
 func CommitBody(sha string) (string, error) {
-	showCmd := GitCommand("show", "-s", "--pretty=format:%b", sha)
+	showCmd := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
 	output, err := utils.PrepareCmd(showCmd).Output()
 	if err != nil {
 		return "", err

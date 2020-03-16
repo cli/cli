@@ -245,7 +245,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	}{}
 	json.Unmarshal(bodyBytes, &reqBody)
 
-	expectedBody := "---\n2 commits:\n\n- 12345 commit 0\n- 23456 commit 1\n"
+	expectedBody := "- commit 0\n- commit 1\n"
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "feature")
@@ -321,23 +321,4 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
-}
-
-func TestPRCreate_survey_defaults_no_changes(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
-
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	cs, cmdTeardown := initCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git status
-	cs.Stub("") // git log
-
-	_, err := RunCommand(prCreateCmd, `pr create`)
-	if err == nil {
-		t.Error("expected error")
-	}
-	eq(t, err.Error(), "could not compute title or body defaults:  could not find any commits between master and feature")
 }

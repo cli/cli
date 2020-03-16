@@ -38,9 +38,9 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 	} else {
 		out.Title = headRef // TODO format or something?
 
-		body := fmt.Sprintf("---\n%d commits:\n\n", len(commits))
+		body := ""
 		for _, c := range commits {
-			body += fmt.Sprintf("- %s %s\n", c.Sha[0:5], c.Title)
+			body += fmt.Sprintf("- %s\n", c.Title)
 		}
 		out.Body = body
 	}
@@ -103,7 +103,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	defs, err := computeDefaults(baseBranch, headBranch)
 	if err != nil {
-		return fmt.Errorf("could not compute title or body defaults:  %w", err)
+		fmt.Fprintf(colorableErr(cmd), "%s warning: could not compute title or body defaults:  %w\n", utils.Yellow("!"), err)
 	}
 
 	isWeb, err := cmd.Flags().GetBool("web")
