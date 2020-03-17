@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/utils"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestIssueStatus(t *testing.T) {
@@ -584,4 +585,25 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
 	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+}
+
+func TestIssueStateTitleWithColor(t *testing.T) {
+	tests := map[string]struct {
+		state string
+		want  string
+	}{
+
+		"Open state":   {state: "OPEN", want: "Open"},
+		"Closed state": {state: "CLOSED", want: "Closed"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := issueStateTitleWithColor(tc.state)
+			diff := cmp.Diff(tc.want, got)
+			if diff != "" {
+				t.Fatalf(diff)
+			}
+		})
+	}
 }

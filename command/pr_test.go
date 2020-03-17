@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/utils"
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -779,4 +780,26 @@ func TestReplaceExcessiveWhitespace(t *testing.T) {
 	eq(t, replaceExcessiveWhitespace("  hello goodbye  "), "hello goodbye")
 	eq(t, replaceExcessiveWhitespace("hello   goodbye"), "hello goodbye")
 	eq(t, replaceExcessiveWhitespace("   hello \n goodbye   "), "hello goodbye")
+}
+
+func TestPrStateTitleWithColor(t *testing.T) {
+	tests := map[string]struct {
+		state string
+		want  string
+	}{
+
+		"Format OPEN state":   {state: "OPEN", want: "Open"},
+		"Format CLOSED state": {state: "CLOSED", want: "Closed"},
+		"Format MERGED state": {state: "MERGED", want: "Merged"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := issueStateTitleWithColor(tc.state)
+			diff := cmp.Diff(tc.want, got)
+			if diff != "" {
+				t.Fatalf(diff)
+			}
+		})
+	}
 }

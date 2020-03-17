@@ -236,9 +236,8 @@ func prStateTitleWithColor(pr api.PullRequest) string {
 func colorFuncForPR(pr api.PullRequest) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
-	} else {
-		return utils.ColorFuncForState(pr.State)
 	}
+	return utils.ColorFuncForState(pr.State)
 }
 
 func prView(cmd *cobra.Command, args []string) error {
