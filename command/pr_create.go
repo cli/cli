@@ -36,7 +36,7 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 		}
 		out.Body = body
 	} else {
-		out.Title = headRef // TODO format or something?
+		out.Title = utils.Humanize(headRef)
 
 		body := ""
 		for _, c := range commits {

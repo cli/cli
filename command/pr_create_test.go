@@ -191,7 +191,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 }
 
 func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("OWNER/REPO", "cool_bug-fixes")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -248,10 +248,10 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	expectedBody := "- commit 0\n- commit 1\n"
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "feature")
+	eq(t, reqBody.Variables.Input.Title, "cool bug fixes")
 	eq(t, reqBody.Variables.Input.Body, expectedBody)
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
-	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+	eq(t, reqBody.Variables.Input.HeadRefName, "cool_bug-fixes")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
