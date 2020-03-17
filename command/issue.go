@@ -85,8 +85,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -166,8 +165,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -224,8 +222,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -297,9 +294,8 @@ func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) 
 func issueCreate(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 
-	repoOverride, _ := cmd.Flags().GetString("repo")
 	// NB no auto forking like over in pr create
-	baseRepo, err := determineBaseRepo(cmd, ctx, repoOverride)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}

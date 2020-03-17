@@ -76,8 +76,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -133,8 +132,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -259,8 +257,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repo, _ := cmd.Flags().GetString("repo")
-	baseRepo, err := determineBaseRepo(cmd, ctx, repo)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
