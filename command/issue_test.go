@@ -297,7 +297,7 @@ func TestIssueView_preview(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments • tarot`),
+		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
 		regexp.MustCompile(`bold story`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
@@ -357,7 +357,7 @@ func TestIssueView_previewClosedState(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Closed • marseilles opened about 292 years ago • 9 comments • tarot`),
+		regexp.MustCompile(`Closed • marseilles opened about 292 years ago • 9 comments`),
 		regexp.MustCompile(`bold story`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
@@ -387,7 +387,7 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments • tarot`),
+		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
 		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
 	}
 	for _, r := range expectedLines {

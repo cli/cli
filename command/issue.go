@@ -254,26 +254,17 @@ func IssueStateTitleWithColor(state string) string {
 }
 
 func printIssuePreview(out io.Writer, issue *api.Issue) error {
-	coloredLabels := labelList(*issue)
-	if coloredLabels != "" {
-		coloredLabels = fmt.Sprintf("%s", coloredLabels)
-	}
-
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
 	fmt.Fprintln(out, utils.Bold(issue.Title))
 	fmt.Fprintf(out, "%s", IssueStateTitleWithColor(issue.State))
-	fmt.Fprint(out, utils.Gray(fmt.Sprintf(
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
 		" • %s opened %s • %s",
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
 	)))
-	if coloredLabels != "" {
-		fmt.Fprintf(out, utils.Gray(fmt.Sprintf(" • %s", coloredLabels)))
-	}
-	fmt.Fprintf(out, "\n")
 
 	if issue.Body != "" {
 		fmt.Fprintln(out)
