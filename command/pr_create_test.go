@@ -3,42 +3,12 @@ package command
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
-
-func TestPrCreateHelperProcess(*testing.T) {
-	if test.SkipTestHelperProcess() {
-		return
-	}
-
-	args := test.GetTestHelperProcessArgs()
-	switch args[1] {
-	case "status":
-		switch args[0] {
-		case "clean":
-		case "dirty":
-			fmt.Println(" M git/git.go")
-		default:
-			fmt.Fprintf(os.Stderr, "unknown scenario: %q", args[0])
-			os.Exit(1)
-		}
-	case "push":
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %q", args[1])
-		os.Exit(1)
-	}
-	os.Exit(0)
-}
 
 func TestPRCreate(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
@@ -50,11 +20,12 @@ func TestPRCreate(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
@@ -87,12 +58,13 @@ func TestPRCreate_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		ranCommands = append(ranCommands, cmd.Args)
-		return &outputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
 
 	output, err := RunCommand(prCreateCmd, `pr create --web`)
 	eq(t, err, nil)
@@ -100,9 +72,10 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
 
-	eq(t, len(ranCommands), 3)
-	eq(t, strings.Join(ranCommands[1], " "), "git push --set-upstream origin HEAD:feature")
-	eq(t, ranCommands[2][len(ranCommands[2])-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	eq(t, len(cs.Calls), 4)
+	eq(t, strings.Join(cs.Calls[2].Args, " "), "git push --set-upstream origin HEAD:feature")
+	browserCall := cs.Calls[3].Args
+	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
@@ -116,11 +89,12 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "dirty")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub(" M git/git.go")                            // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
@@ -181,11 +155,12 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } } }
 	`))
 
-	origGitCommand := git.GitCommand
-	git.GitCommand = test.StubExecCommand("TestPrCreateHelperProcess", "clean")
-	defer func() {
-		git.GitCommand = origGitCommand
-	}()
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
 
 	output, err := RunCommand(prCreateCmd, `pr create -t "cross repo" -b "same branch"`)
 	eq(t, err, nil)
@@ -213,4 +188,263 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 
 	// goal: only care that gql is formatted properly
+}
+
+func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "cool_bug-fixes")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git rev-parse
+	cs.Stub("")                                         // git push
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:    "title",
+			Default: true,
+		},
+		&QuestionStub{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+
+	output, err := RunCommand(prCreateCmd, `pr create`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	expectedBody := "- commit 0\n- commit 1\n"
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "cool bug fixes")
+	eq(t, reqBody.Variables.Input.Body, expectedBody)
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "cool_bug-fixes")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                                        // git status
+	cs.Stub("1234567890,the sky above the port")                       // git log
+	cs.Stub("was the color of a television, turned to a dead channel") // git show
+	cs.Stub("")                                                        // git rev-parse
+	cs.Stub("")                                                        // git push
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:    "title",
+			Default: true,
+		},
+		&QuestionStub{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+
+	output, err := RunCommand(prCreateCmd, `pr create`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	expectedBody := "was the color of a television, turned to a dead channel"
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "the sky above the port")
+	eq(t, reqBody.Variables.Input.Body, expectedBody)
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_survey_autofill(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                                        // git status
+	cs.Stub("1234567890,the sky above the port")                       // git log
+	cs.Stub("was the color of a television, turned to a dead channel") // git show
+	cs.Stub("")                                                        // git rev-parse
+	cs.Stub("")                                                        // git push
+	cs.Stub("")                                                        // browser open
+
+	output, err := RunCommand(prCreateCmd, `pr create -f`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	json.Unmarshal(bodyBytes, &reqBody)
+
+	expectedBody := "was the color of a television, turned to a dead channel"
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "the sky above the port")
+	eq(t, reqBody.Variables.Input.Body, expectedBody)
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_defaults_error_autofill(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+
+	_, err := RunCommand(prCreateCmd, "pr create -f")
+
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+}
+
+func TestPRCreate_defaults_error_web(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+
+	_, err := RunCommand(prCreateCmd, "pr create -w")
+
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+}
+
+func TestPRCreate_defaults_error_interactive(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+	cs.Stub("") // git rev-parse
+	cs.Stub("") // git push
+	cs.Stub("") // browser open
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:    "title",
+			Default: true,
+		},
+		&QuestionStub{
+			Name:  "body",
+			Value: "social distancing",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := RunCommand(prCreateCmd, `pr create`)
+	eq(t, err, nil)
+
+	stderr := string(output.Stderr())
+	eq(t, strings.Contains(stderr, "warning: could not compute title or body defaults: could not find any commits"), true)
 }
