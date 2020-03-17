@@ -18,7 +18,8 @@
         "headRepositoryOwner": {
           "login": "hubot"
         },
-        "isCrossRepository": true
+        "isCrossRepository": true,
+        "isDraft": false
       }
     }
   }

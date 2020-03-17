@@ -20,7 +20,8 @@
             "author": {
               "login": "nobody"
             },
-            "isCrossRepository": true
+            "isCrossRepository": true,
+            "isDraft": false
           },
           {
             "number": 10,
@@ -39,7 +40,8 @@
             "commits": {
               "totalCount": 8
             },
-            "isCrossRepository": false
+            "isCrossRepository": false,
+            "isDraft": false
           }
         ]
       }
