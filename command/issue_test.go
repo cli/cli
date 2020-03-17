@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 	"github.com/google/go-cmp/cmp"
 )
@@ -227,7 +228,7 @@ func TestIssueView(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -261,7 +262,7 @@ func TestIssueView_numberArgWithHash(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -412,7 +413,7 @@ func TestIssueView_notFound(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -459,7 +460,7 @@ func TestIssueView_urlArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -544,7 +545,7 @@ func TestIssueCreate_web(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -570,7 +571,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
