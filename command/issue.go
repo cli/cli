@@ -39,7 +39,7 @@ func init() {
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	issueCmd.AddCommand(issueViewCmd)
-	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
+	issueViewCmd.Flags().BoolP("web", "w", false, "Open issue in browser")
 }
 
 var issueCmd = &cobra.Command{
@@ -233,17 +233,17 @@ func issueView(cmd *cobra.Command, args []string) error {
 	}
 	openURL := issue.URL
 
-	preview, err := cmd.Flags().GetBool("preview")
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printIssuePreview(out, issue)
 	}
 
 }
