@@ -321,6 +321,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 				}
 				isCrossRepository
+				isDraft
 				maintainerCanModify
 			}
 		}
