@@ -552,8 +552,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 }
 
-
-func TestRepoView(t *testing.T) {
+func TestRepoView_web(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -568,7 +567,7 @@ func TestRepoView(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view")
+	output, err := RunCommand(repoViewCmd, "repo view -w")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -583,7 +582,7 @@ func TestRepoView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO")
 }
 
-func TestRepoView_ownerRepo(t *testing.T) {
+func TestRepoView_web_ownerRepo(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
 	initContext = func() context.Context {
@@ -601,7 +600,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view cli/cli")
+	output, err := RunCommand(repoViewCmd, "repo view -w cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -616,7 +615,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	eq(t, url, "https://github.com/cli/cli")
 }
 
-func TestRepoView_fullURL(t *testing.T) {
+func TestRepoView_web_fullURL(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
 	initContext = func() context.Context {
@@ -633,7 +632,7 @@ func TestRepoView_fullURL(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view https://github.com/cli/cli")
+	output, err := RunCommand(repoViewCmd, "repo view -w https://github.com/cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -646,4 +645,78 @@ func TestRepoView_fullURL(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/cli/cli")
+}
+
+func TestRepoView(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": {
+				"repository": {
+		      "description": "social distancing"
+		}}}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "name": "readme.md",
+		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
+	`))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"social distancing",
+		"truly cool readme",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
+
+}
+
+func TestRepoView_nonmarkdown_readme(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": {
+				"repository": {
+		      "description": "social distancing"
+		}}}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "name": "readme.org",
+		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
+	`))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"social distancing",
+		"# truly cool readme",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
+}
+
+func TestRepoView_blanks(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString("{}"))
+	http.StubResponse(200, bytes.NewBufferString("{}"))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"No description provided",
+		"No README provided",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
 }
