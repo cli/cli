@@ -74,7 +74,7 @@ var issueViewCmd = &cobra.Command{
 		}
 		return nil
 	},
-	Short: "View an issue in the browser",
+	Short: "View an issue",
 	RunE:  issueView,
 }
 

@@ -57,10 +57,10 @@ var prStatusCmd = &cobra.Command{
 var prViewCmd = &cobra.Command{
 	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument in the browser.
+	Long: `View a pull request specified by the argument.
 
 Without an argument, the pull request that belongs to the current
-branch is opened.`,
+branch is displayed.`,
 	RunE: prView,
 }
 
