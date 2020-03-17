@@ -228,7 +228,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func PRStateTitleWithColor(pr api.PullRequest) string {
+func prStateTitleWithColor(pr api.PullRequest) string {
 	prStateColorFunc := colorFuncForPR(pr)
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
@@ -302,7 +302,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	fmt.Fprintln(out, utils.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", PRStateTitleWithColor(*pr))
+	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
 		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
@@ -427,7 +427,7 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprintf(w, " - %s", utils.Green("Approved"))
 			}
 		} else {
-			fmt.Fprintf(w, " - %s", PRStateTitleWithColor(pr))
+			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
 		fmt.Fprint(w, "\n")

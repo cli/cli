@@ -248,7 +248,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 }
 
-func IssueStateTitleWithColor(state string) string {
+func issueStateTitleWithColor(state string) string {
 	colorFunc := utils.ColorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
 }
@@ -258,7 +258,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	ago := now.Sub(issue.CreatedAt)
 
 	fmt.Fprintln(out, utils.Bold(issue.Title))
-	fmt.Fprintf(out, "%s", IssueStateTitleWithColor(issue.State))
+	fmt.Fprintf(out, "%s", issueStateTitleWithColor(issue.State))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
 		" • %s opened %s • %s",
 		issue.Author.Login,
