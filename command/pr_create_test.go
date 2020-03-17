@@ -370,3 +370,81 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
+
+func TestPRCreate_defaults_error_autofill(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+
+	_, err := RunCommand(prCreateCmd, "pr create -f")
+
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+}
+
+func TestPRCreate_defaults_error_web(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+
+	_, err := RunCommand(prCreateCmd, "pr create -w")
+
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+}
+
+func TestPRCreate_defaults_error_interactive(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git status
+	cs.Stub("") // git log
+	cs.Stub("") // git rev-parse
+	cs.Stub("") // git push
+	cs.Stub("") // browser open
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:    "title",
+			Default: true,
+		},
+		&QuestionStub{
+			Name:  "body",
+			Value: "social distancing",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		&QuestionStub{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := RunCommand(prCreateCmd, `pr create`)
+	eq(t, err, nil)
+
+	stderr := string(output.Stderr())
+	eq(t, strings.Contains(stderr, "warning: could not compute title or body defaults: could not find any commits"), true)
+}

@@ -101,10 +101,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
-	defs, err := computeDefaults(baseBranch, headBranch)
-	if err != nil {
-		fmt.Fprintf(colorableErr(cmd), "%s warning: could not compute title or body defaults:  %w\n", utils.Yellow("!"), err)
-	}
+	defs, defaultsErr := computeDefaults(baseBranch, headBranch)
 
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {
@@ -119,7 +116,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	action := SubmitAction
 	if isWeb {
 		action = PreviewAction
+		if (title == "" || body == "") && defaultsErr != nil {
+			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
+		}
 	} else if autofill {
+		if defaultsErr != nil {
+			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
+		}
 		action = SubmitAction
 		title = defs.Title
 		body = defs.Body
@@ -128,6 +131,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			utils.Cyan(headBranch),
 			utils.Cyan(baseBranch),
 			ghrepo.FullName(baseRepo))
+		if (title == "" || body == "") && defaultsErr != nil {
+			fmt.Fprintf(colorableErr(cmd), "%s warning: could not compute title or body defaults: %s\n", utils.Yellow("!"), defaultsErr)
+		}
 	}
 
 	// TODO: only drop into interactive mode if stdin & stdout are a tty
