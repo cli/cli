@@ -81,8 +81,9 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
-	if err != nil {
+	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
 		return err
 	}
 
@@ -100,6 +101,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
 		printPrs(out, 0, *prPayload.CurrentPR)
+	} else if currentPRHeadRef == "" {
+		printMessage(out, "  There is no current branch")
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
