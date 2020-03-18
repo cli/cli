@@ -15,6 +15,10 @@ func TestPRCreate(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
@@ -30,7 +34,7 @@ func TestPRCreate(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -51,6 +55,32 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_alreadyExists(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "headRefName": "feature" }
+		] } } } }
+	`))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+
+	_, err := RunCommand(prCreateCmd, `pr create`)
+	if err == nil {
+		t.Fatal("error expected, got nil")
+	}
+	if err.Error() != "a pull request for branch \"feature\" already exists:\nhttps://github.com/OWNER/REPO/pull/123" {
+		t.Errorf("got error %q", err)
+	}
 }
 
 func TestPRCreate_web(t *testing.T) {
@@ -83,6 +113,10 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -150,6 +184,10 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
@@ -165,7 +203,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "cross repo" -b "same branch"`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -194,6 +232,10 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	initBlankContext("OWNER/REPO", "cool_bug-fixes")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -231,7 +273,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -260,6 +302,10 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
@@ -298,7 +344,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -328,6 +374,10 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
@@ -346,7 +396,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -f`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
