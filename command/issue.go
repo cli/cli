@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
-	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -23,7 +22,6 @@ import (
 func init() {
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
-	issueCmd.AddCommand(issueViewCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
@@ -39,6 +37,7 @@ func init() {
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
+	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
 }
 
@@ -67,7 +66,7 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url> | <branch>}",
+	Use: "view {<number> | <url>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return FlagError{errors.New("issue number or URL required as argument")}
@@ -138,23 +137,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	table := utils.NewTablePrinter(out)
-	for _, issue := range issues {
-		issueNum := strconv.Itoa(issue.Number)
-		if table.IsTTY() {
-			issueNum = "#" + issueNum
-		}
-		labels := labelList(issue)
-		if labels != "" && table.IsTTY() {
-			labels = fmt.Sprintf("(%s)", labels)
-		}
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, utils.Gray)
-		table.EndRow()
-	}
-	table.Render()
-
+	printIssues(out, "", len(issues), issues)
 	return nil
 }
 
@@ -358,7 +341,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
+		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -409,21 +392,26 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
+	table := utils.NewTablePrinter(w)
 	for _, issue := range issues {
-		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		coloredLabels := labelList(issue)
-		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
 		}
-
+		issueNum = prefix + issueNum
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-
-		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
-			coloredLabels,
-			utils.Gray(utils.FuzzyAgo(ago)))
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		table.EndRow()
 	}
+	table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)

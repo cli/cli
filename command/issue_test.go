@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
 
@@ -28,10 +29,10 @@ func TestIssueStatus(t *testing.T) {
 	}
 
 	expectedIssues := []*regexp.Regexp{
-		regexp.MustCompile(`#8.*carrots`),
-		regexp.MustCompile(`#9.*squash`),
-		regexp.MustCompile(`#10.*broccoli`),
-		regexp.MustCompile(`#11.*swiss chard`),
+		regexp.MustCompile(`(?m)8.*carrots.*about.*ago`),
+		regexp.MustCompile(`(?m)9.*squash.*about.*ago`),
+		regexp.MustCompile(`(?m)10.*broccoli.*about.*ago`),
+		regexp.MustCompile(`(?m)11.*swiss chard.*about.*ago`),
 	}
 
 	for _, r := range expectedIssues {
@@ -226,7 +227,7 @@ func TestIssueView(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -260,7 +261,7 @@ func TestIssueView_numberArgWithHash(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -383,7 +384,7 @@ func TestIssueView_notFound(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -430,7 +431,7 @@ func TestIssueView_urlArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -515,7 +516,7 @@ func TestIssueCreate_web(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -541,7 +542,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 

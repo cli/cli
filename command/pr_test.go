@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -110,7 +111,7 @@ func TestPRStatus_fork(t *testing.T) {
 	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &outputStub{[]byte(`branch.blueberries.remote origin
+			return &test.OutputStub{[]byte(`branch.blueberries.remote origin
 branch.blueberries.merge refs/heads/blueberries`)}
 		default:
 			panic("not implemented")
@@ -421,7 +422,7 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 	http.StubResponse(200, jsonFile)
 
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -456,7 +457,7 @@ func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
 	http.StubResponse(200, jsonFile)
 
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -493,10 +494,10 @@ func TestPRView_currentBranch(t *testing.T) {
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &outputStub{}
+			return &test.OutputStub{}
 		default:
 			seenCmd = cmd
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -531,10 +532,10 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &outputStub{}
+			return &test.OutputStub{}
 		default:
 			seenCmd = cmd
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
@@ -563,7 +564,7 @@ func TestPRView_numberArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -595,7 +596,7 @@ func TestPRView_numberArgWithHash(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -627,7 +628,7 @@ func TestPRView_urlArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -661,7 +662,7 @@ func TestPRView_branchArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
@@ -696,7 +697,7 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 	var seenCmd *exec.Cmd
 	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
 		seenCmd = cmd
-		return &outputStub{}
+		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
