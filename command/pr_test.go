@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 	"github.com/google/go-cmp/cmp"
@@ -491,7 +492,7 @@ func TestPRView_previewDraftState(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`Open • nobody wants to merge 12 commits into master from blueberries`),
+		regexp.MustCompile(`Draft • nobody wants to merge 12 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
 	}
@@ -556,7 +557,7 @@ func TestPRView_previewDraftStatebyBranch(t *testing.T) {
 
 	expectedLines := []*regexp.Regexp{
 		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
+		regexp.MustCompile(`Draft • nobody wants to merge 8 commits into master from blueberries`),
 		regexp.MustCompile(`blueberries taste good`),
 		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
 	}
@@ -844,19 +845,21 @@ func TestReplaceExcessiveWhitespace(t *testing.T) {
 }
 
 func TestPrStateTitleWithColor(t *testing.T) {
+
 	tests := map[string]struct {
-		state string
-		want  string
+		pr   api.PullRequest
+		want string
 	}{
 
-		"Format OPEN state":   {state: "OPEN", want: "Open"},
-		"Format CLOSED state": {state: "CLOSED", want: "Closed"},
-		"Format MERGED state": {state: "MERGED", want: "Merged"},
+		"Format OPEN state":              {pr: api.PullRequest{State: "OPEN", IsDraft: false}, want: "Open"},
+		"Format OPEN state for Draft PR": {pr: api.PullRequest{State: "OPEN", IsDraft: true}, want: "Draft"},
+		"Format CLOSED state":            {pr: api.PullRequest{State: "CLOSED", IsDraft: false}, want: "Closed"},
+		"Format MERGED state":            {pr: api.PullRequest{State: "MERGED", IsDraft: false}, want: "Merged"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := issueStateTitleWithColor(tc.state)
+			got := prStateTitleWithColor(tc.pr)
 			diff := cmp.Diff(tc.want, got)
 			if diff != "" {
 				t.Fatalf(diff)
