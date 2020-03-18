@@ -156,33 +156,6 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 }
 
-func TestPRStatus_closedMerged(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusClosedMerged.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prStatusCmd, "pr status")
-	if err != nil {
-		t.Errorf("error running command `pr status`: %v", err)
-	}
-
-	expected := []string{
-		"- Checks passing - Changes requested",
-		"- Closed",
-		"- Merged",
-	}
-
-	for _, line := range expected {
-		if !strings.Contains(output.String(), line) {
-			t.Errorf("output did not contain %q: %q", line, output.String())
-		}
-	}
-}
-
 func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -212,6 +185,48 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 			t.Errorf("output unexpectedly match regexp /%s/\n> output\n%s\n", r, output)
 			return
 		}
+	}
+}
+
+func TestPRStatus_currentBranch_Closed(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#8  Blueberries are a good fruit \[blueberries\] - Closed`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
+func TestPRStatus_currentBranch_Merged(t *testing.T) {
+	initBlankContext("OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(prStatusCmd, "pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#8  Blueberries are a good fruit \[blueberries\] - Merged`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
 	}
 }
 

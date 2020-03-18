@@ -8,7 +8,7 @@
             "node": {
               "number": 8,
               "title": "Blueberries are a good fruit",
-              "state": "OPEN",
+              "state": "CLOSED",
               "url": "https://github.com/cli/cli/pull/8",
               "headRefName": "blueberries",
               "reviewDecision": "CHANGES_REQUESTED",
@@ -35,27 +35,8 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 1,
-      "edges": [
-        {
-          "node": {
-            "number": 10,
-            "state": "CLOSED",
-            "title": "Strawberries are not actually berries",
-            "url": "https://github.com/cli/cli/pull/10",
-            "headRefName": "strawberries"
-          }
-        },
-        {
-          "node": {
-            "number": 9,
-            "state": "MERGED",
-            "title": "Bananas are berries",
-            "url": "https://github.com/cli/cli/pull/9",
-            "headRefName": "banananana"
-          }
-        }
-      ]
+      "totalCount": 0,
+      "edges": []
     },
     "reviewRequested": {
       "totalCount": 0,
