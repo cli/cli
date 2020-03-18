@@ -2,6 +2,7 @@
   "data": {
     "repository": {
       "pullRequests": {
+        "totalCount": 3,
         "edges": [
           {
             "node": {

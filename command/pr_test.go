@@ -58,7 +58,7 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 			v.Replace([]string{})
 		default:
 			switch v.Type() {
-			case "bool", "string":
+			case "bool", "string", "int":
 				v.Set(f.DefValue)
 			}
 		}
@@ -276,6 +276,10 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	eq(t, output.Stderr(), `
+Showing 3 of 3 pull requests in OWNER/REPO
+
+`)
 	eq(t, output.String(), `32	New feature	feature
 29	Fixed bad bug	hubot:bug-fix
 28	Improve documentation	docs
@@ -297,9 +301,8 @@ func TestPRList_filtering(t *testing.T) {
 
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), `
-Pull requests for OWNER/REPO
+No pull requests match your search in OWNER/REPO
 
-No pull requests match your search
 `)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)

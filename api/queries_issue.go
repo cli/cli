@@ -171,7 +171,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	return &payload, nil
 }
 
-func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string) ([]Issue, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string) (*IssuesAndTotalCount, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -189,6 +189,7 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author}) {
+				totalCount
 				nodes {
 					...issue
 				}
@@ -219,8 +220,9 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	var response struct {
 		Repository struct {
 			Issues struct {
-				Nodes    []Issue
-				PageInfo struct {
+				TotalCount int
+				Nodes      []Issue
+				PageInfo   struct {
 					HasNextPage bool
 					EndCursor   string
 				}
@@ -258,7 +260,8 @@ loop:
 		}
 	}
 
-	return issues, nil
+	res := IssuesAndTotalCount{Issues: issues, TotalCount: response.Repository.Issues.TotalCount}
+	return &res, nil
 }
 
 func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
