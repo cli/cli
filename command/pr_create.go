@@ -123,10 +123,26 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if defaultsErr != nil {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
-		action = SubmitAction
 		title = defs.Title
 		body = defs.Body
-	} else {
+	}
+
+	if !isWeb {
+		headBranchLabel := headBranch
+		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
+			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+		}
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, headBranchLabel)
+		var notFound *api.NotFoundError
+		if err != nil && !errors.As(err, &notFound) {
+			return fmt.Errorf("error checking for existing pull request: %w", err)
+		}
+		if err == nil {
+			return fmt.Errorf("a pull request for branch %q already exists:\n%s", headBranchLabel, existingPR.URL)
+		}
+	}
+
+	if !isWeb && !autofill {
 		fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
 			utils.Cyan(headBranch),
 			utils.Cyan(baseBranch),
