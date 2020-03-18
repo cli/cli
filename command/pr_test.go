@@ -845,12 +845,10 @@ func TestReplaceExcessiveWhitespace(t *testing.T) {
 }
 
 func TestPrStateTitleWithColor(t *testing.T) {
-
 	tests := map[string]struct {
 		pr   api.PullRequest
 		want string
 	}{
-
 		"Format OPEN state":              {pr: api.PullRequest{State: "OPEN", IsDraft: false}, want: "Open"},
 		"Format OPEN state for Draft PR": {pr: api.PullRequest{State: "OPEN", IsDraft: true}, want: "Draft"},
 		"Format CLOSED state":            {pr: api.PullRequest{State: "CLOSED", IsDraft: false}, want: "Closed"},

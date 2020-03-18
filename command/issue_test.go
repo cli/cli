@@ -593,7 +593,6 @@ func TestIssueStateTitleWithColor(t *testing.T) {
 		state string
 		want  string
 	}{
-
 		"Open state":   {state: "OPEN", want: "Open"},
 		"Closed state": {state: "CLOSED", want: "Closed"},
 	}
