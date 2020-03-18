@@ -29,10 +29,10 @@ func TestIssueStatus(t *testing.T) {
 	}
 
 	expectedIssues := []*regexp.Regexp{
-		regexp.MustCompile(`#8.*carrots`),
-		regexp.MustCompile(`#9.*squash`),
-		regexp.MustCompile(`#10.*broccoli`),
-		regexp.MustCompile(`#11.*swiss chard`),
+		regexp.MustCompile(`(?m)8.*carrots.*about.*ago`),
+		regexp.MustCompile(`(?m)9.*squash.*about.*ago`),
+		regexp.MustCompile(`(?m)10.*broccoli.*about.*ago`),
+		regexp.MustCompile(`(?m)11.*swiss chard.*about.*ago`),
 	}
 
 	for _, r := range expectedIssues {
