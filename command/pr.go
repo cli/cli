@@ -230,6 +230,9 @@ func prList(cmd *cobra.Command, args []string) error {
 
 func prStateTitleWithColor(pr api.PullRequest) string {
 	prStateColorFunc := colorFuncForPR(pr)
+	if pr.State == "OPEN" && pr.IsDraft {
+		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+	}
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
