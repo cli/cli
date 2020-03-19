@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -218,6 +219,44 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		},
 		ViewerPermission: "WRITE",
 	}, nil
+}
+
+// RepoFindFork finds a fork of repo affiliated with the viewer
+func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	result := struct {
+		Repository struct {
+			Forks struct {
+				Nodes []Repository
+			}
+		}
+	}{}
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+	}
+
+	if err := client.GraphQL(`
+	query($owner: String!, $repo: String!) {
+		repository(owner: $owner, name: $repo) {
+			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
+				nodes {
+					id
+					name
+					owner { login }
+					url
+				}
+			}
+		}
+	}
+	`, variables, &result); err != nil {
+		return nil, err
+	}
+
+	if len(result.Repository.Forks.Nodes) > 0 {
+		return &result.Repository.Forks.Nodes[0], nil
+	}
+	return nil, &NotFoundError{errors.New("no fork found")}
 }
 
 // RepoCreateInput represents input parameters for RepoCreate

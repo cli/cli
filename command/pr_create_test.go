@@ -15,6 +15,10 @@ func TestPRCreate(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
 	`))
@@ -34,7 +38,7 @@ func TestPRCreate(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -62,6 +66,10 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "url": "https://github.com/OWNER/REPO/pull/123",
 			  "headRefName": "feature" }
@@ -87,6 +95,10 @@ func TestPRCreate_web(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
 
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
@@ -113,6 +125,10 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	http := initFakeHTTP()
 
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
@@ -233,6 +249,10 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
 	`))
@@ -273,7 +293,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -302,6 +322,10 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
@@ -344,7 +368,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -374,6 +398,10 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
 	`))
@@ -396,7 +424,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -f`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -457,6 +485,10 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
