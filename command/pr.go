@@ -433,7 +433,7 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			}
 		} else {
 			s := strings.Title(strings.ToLower(pr.State))
-			fmt.Fprintf(w, "%s", prStateColorFunc(s))
+			fmt.Fprintf(w, "- %s", prStateColorFunc(s))
 		}
 
 		fmt.Fprint(w, "\n")
