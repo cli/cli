@@ -398,7 +398,7 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			prStateColorFunc = utils.Red
 		}
 
-		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s ", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -412,24 +412,24 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				var summary string
 				if checks.Failing > 0 {
 					if checks.Failing == checks.Total {
-						summary = utils.Red("× All checks failing")
+						summary = utils.Red("× All checks failing ")
 					} else {
-						summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing ", checks.Failing, checks.Total))
 					}
 				} else if checks.Pending > 0 {
-					summary = utils.Yellow("Checks pending")
+					summary = utils.Yellow("- Checks pending ")
 				} else if checks.Passing == checks.Total {
-					summary = utils.Green("✓ Checks passing")
+					summary = utils.Green("✓ Checks passing ")
 				}
 				fmt.Fprintf(w, "%s", summary)
 			}
 
 			if reviews.ChangesRequested {
-				fmt.Fprintf(w, "%s", utils.Red("+ Changes requested"))
+				fmt.Fprintf(w, "%s", utils.Red("+ Changes requested "))
 			} else if reviews.ReviewRequired {
-				fmt.Fprintf(w, "%s", utils.Yellow("- Review required"))
+				fmt.Fprintf(w, "%s", utils.Yellow("- Review required "))
 			} else if reviews.Approved {
-				fmt.Fprintf(w, "%s", utils.Green("✓ Approved"))
+				fmt.Fprintf(w, "%s", utils.Green("✓ Approved "))
 			}
 		} else {
 			s := strings.Title(strings.ToLower(pr.State))
