@@ -81,8 +81,9 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
-	if err != nil {
+	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
 		return err
 	}
 
@@ -100,6 +101,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	printHeader(out, "Current branch")
 	if prPayload.CurrentPR != nil {
 		printPrs(out, 0, *prPayload.CurrentPR)
+	} else if currentPRHeadRef == "" {
+		printMessage(out, "  There is no current branch")
 	} else {
 		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 		printMessage(out, message)
@@ -136,8 +139,6 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -189,28 +190,25 @@ func prList(cmd *cobra.Command, args []string) error {
 		params["assignee"] = assignee
 	}
 
-	prs, err := api.PullRequestList(apiClient, params, limit)
+	listResult, err := api.PullRequestList(apiClient, params, limit)
 	if err != nil {
 		return err
 	}
 
-	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
-		msg := "There are no open pull requests"
-
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No pull requests match your search"
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "base", "assignee":
+			hasFilters = true
 		}
-		printMessage(colorErr, msg)
-		return nil
-	}
+	})
+
+	title := listHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
-	for _, pr := range prs {
+	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if table.IsTTY() {
 			prNum = "#" + prNum

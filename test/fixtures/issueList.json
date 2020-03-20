@@ -3,6 +3,7 @@
     "repository": {
       "hasIssuesEnabled": true,
       "issues": {
+        "totalCount": 3,
         "nodes": [
           {
               "number": 1,

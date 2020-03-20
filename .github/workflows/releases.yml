@@ -38,6 +38,13 @@ jobs:
           api() { bin/hub api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
           cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
           for card in $cards; do api projects/columns/cards/$card/moves --field position=top --field column_id=$DONE_COLUMN; done
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')" # skip prereleases
+        with:
+          formula-name: gh
+        env:
+          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
   msi:
     needs: goreleaser
     runs-on: windows-latest

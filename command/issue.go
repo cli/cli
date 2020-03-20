@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
-	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -34,7 +33,7 @@ func init() {
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
+	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
@@ -115,45 +114,26 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s\n\n", ghrepo.FullName(baseRepo))
-
-	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
+	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
 	if err != nil {
 		return err
 	}
 
-	if len(issues) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is actually an issue
-		msg := "There are no open issues"
-
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No issues match your search"
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "assignee", "author":
+			hasFilters = true
 		}
-		printMessage(colorErr, msg)
-		return nil
-	}
+	})
+
+	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	out := cmd.OutOrStdout()
-	table := utils.NewTablePrinter(out)
-	for _, issue := range issues {
-		issueNum := strconv.Itoa(issue.Number)
-		if table.IsTTY() {
-			issueNum = "#" + issueNum
-		}
-		labels := labelList(issue)
-		if labels != "" && table.IsTTY() {
-			labels = fmt.Sprintf("(%s)", labels)
-		}
-		table.AddField(issueNum, nil, utils.ColorFuncForState(issue.State))
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, utils.Gray)
-		table.EndRow()
-	}
-	table.Render()
+
+	printIssues(out, "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }
@@ -251,6 +231,25 @@ func issueView(cmd *cobra.Command, args []string) error {
 func issueStateTitleWithColor(state string) string {
 	colorFunc := utils.ColorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
+}
+
+func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
+	if totalMatchCount == 0 {
+		if hasFilters {
+			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
+		}
+		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
+	}
+
+	if hasFilters {
+		matchVerb := "match"
+		if totalMatchCount == 1 {
+			matchVerb = "matches"
+		}
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+	}
+
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
 func printIssuePreview(out io.Writer, issue *api.Issue) error {
@@ -413,21 +412,26 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
+	table := utils.NewTablePrinter(w)
 	for _, issue := range issues {
-		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		coloredLabels := labelList(issue)
-		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
 		}
-
+		issueNum = prefix + issueNum
+		labels := labelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-
-		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
-			coloredLabels,
-			utils.Gray(utils.FuzzyAgo(ago)))
+		table.AddField(issueNum, nil, utils.ColorFuncForState(issue.State))
+		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		table.EndRow()
 	}
+	table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)

@@ -174,6 +174,11 @@ func changelogURL(version string) string {
 }
 
 func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
+	repo, err := cmd.Flags().GetString("repo")
+	if err == nil && repo != "" {
+		return ghrepo.FromFullName(repo), nil
+	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return nil, err
