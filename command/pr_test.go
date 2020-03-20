@@ -384,222 +384,115 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	}
 }
 
-func TestPRView_previewOpenState(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prViewCmd, "pr view -p 12")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
+func TestPRView_Preview(t *testing.T) {
+	tests := map[string]struct {
+		ownerRepo       string
+		args            string
+		fixture         string
+		expectedOutputs []*regexp.Regexp
+	}{
+		"Open PR": {
+			ownerRepo: "master",
+			args:      "pr view -p 12",
+			fixture:   "../test/fixtures/prViewPreview.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are from a fork`),
+				regexp.MustCompile(`Open • nobody wants to merge 12 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			},
+		},
+		"Open PR for the current branch": {
+			ownerRepo: "blueberries",
+			args:      "pr view -p",
+			fixture:   "../test/fixtures/prView.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are a good fruit`),
+				regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			},
+		},
+		"Open PR wth empty body for the current branch": {
+			ownerRepo: "blueberries",
+			args:      "pr view -p",
+			fixture:   "../test/fixtures/prView_EmptyBody.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are a good fruit`),
+				regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			},
+		},
+		"Closed PR": {
+			ownerRepo: "master",
+			args:      "pr view -p 12",
+			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are from a fork`),
+				regexp.MustCompile(`Closed • nobody wants to merge 12 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			},
+		},
+		"Merged PR": {
+			ownerRepo: "master",
+			args:      "pr view -p 12",
+			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are from a fork`),
+				regexp.MustCompile(`Merged • nobody wants to merge 12 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			},
+		},
+		"Draft PR": {
+			ownerRepo: "master",
+			args:      "pr view -p 12",
+			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are from a fork`),
+				regexp.MustCompile(`Draft • nobody wants to merge 12 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			},
+		},
+		"Draft PR by branch": {
+			ownerRepo: "master",
+			args:      "pr view -p blueberries",
+			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`Blueberries are a good fruit`),
+				regexp.MustCompile(`Draft • nobody wants to merge 8 commits into master from blueberries`),
+				regexp.MustCompile(`blueberries taste good`),
+				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			},
+		},
 	}
 
-	eq(t, output.Stderr(), "")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			http := initFakeHTTP()
+			http.StubRepoResponse("OWNER", "REPO")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`Open • nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
+			jsonFile, _ := os.Open(tc.fixture)
+			defer jsonFile.Close()
+			http.StubResponse(200, jsonFile)
 
-func TestPRView_previewClosedState(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+			output, err := RunCommand(prViewCmd, tc.args)
+			if err != nil {
+				t.Errorf("error running command `%v`: %v", tc.args, err)
+			}
 
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewClosedState.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+			eq(t, output.Stderr(), "")
 
-	output, err := RunCommand(prViewCmd, "pr view -p 12")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`Closed • nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestPRView_previewMergedState(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewMergedState.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prViewCmd, "pr view -p 12")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`Merged • nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestPRView_previewDraftState(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewDraftState.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prViewCmd, "pr view -p 12")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`Draft • nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestPRView_previewCurrentBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prView.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand(prViewCmd, "pr view -p")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestPRView_previewDraftStatebyBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewDraftStatebyBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prViewCmd, "pr view -p blueberries")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`Draft • nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prView_EmptyBody.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand(prViewCmd, "pr view -p")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
+			for _, r := range tc.expectedOutputs {
+				if !r.MatchString(output.String()) {
+					t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+					return
+				}
+			}
+		})
 	}
 }
 

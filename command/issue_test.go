@@ -281,122 +281,81 @@ func TestIssueView_numberArgWithHash(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
-func TestIssueView_preview(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/issueView_preview.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(issueViewCmd, "issue view -p 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
+func TestIssueView_Preview(t *testing.T) {
+	tests := map[string]struct {
+		ownerRepo       string
+		command         string
+		fixture         string
+		expectedOutputs []*regexp.Regexp
+	}{
+		"Open issue": {
+			ownerRepo: "master",
+			command:   "issue view -p 123",
+			fixture:   "../test/fixtures/issueView_preview.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`ix of coins`),
+				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
+				regexp.MustCompile(`bold story`),
+				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			},
+		},
+		"Open issue with no label": {
+			ownerRepo: "master",
+			command:   "issue view -p 123",
+			fixture:   "../test/fixtures/issueView_previewNoLabel.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`ix of coins`),
+				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
+				regexp.MustCompile(`bold story`),
+				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			},
+		},
+		"Open issue with empty body": {
+			ownerRepo: "master",
+			command:   "issue view -p 123",
+			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`ix of coins`),
+				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
+				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			},
+		},
+		"Closed issue": {
+			ownerRepo: "master",
+			command:   "issue view -p 123",
+			fixture:   "../test/fixtures/issueView_previewClosedState.json",
+			expectedOutputs: []*regexp.Regexp{
+				regexp.MustCompile(`ix of coins`),
+				regexp.MustCompile(`Closed • marseilles opened about 292 years ago • 9 comments`),
+				regexp.MustCompile(`bold story`),
+				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			},
+		},
 	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			http := initFakeHTTP()
+			http.StubRepoResponse("OWNER", "REPO")
 
-	eq(t, output.Stderr(), "")
+			jsonFile, _ := os.Open(tc.fixture)
+			defer jsonFile.Close()
+			http.StubResponse(200, jsonFile)
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-		regexp.MustCompile(`bold story`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
+			output, err := RunCommand(issueViewCmd, tc.command)
+			if err != nil {
+				t.Errorf("error running command `%v`: %v", tc.command, err)
+			}
 
-func TestIssueView_previewNoLabel(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+			eq(t, output.Stderr(), "")
 
-	jsonFile, _ := os.Open("../test/fixtures/issueView_previewNoLabel.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(issueViewCmd, "issue view -p 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-		regexp.MustCompile(`bold story`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestIssueView_previewClosedState(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/issueView_previewClosedState.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(issueViewCmd, "issue view -p 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Closed • marseilles opened about 292 years ago • 9 comments`),
-		regexp.MustCompile(`bold story`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
-}
-
-func TestIssueView_previewWithEmptyBody(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/issueView_previewWithEmptyBody.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(issueViewCmd, "issue view -p 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
+			for _, r := range tc.expectedOutputs {
+				if !r.MatchString(output.String()) {
+					t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+					return
+				}
+			}
+		})
 	}
 }
 
