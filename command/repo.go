@@ -344,7 +344,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if remoteDesired {
-			_, err := git.AddRemote("fork", forkedRepo.CloneURL, "")
+			_, err := git.AddRemote("fork", forkedRepo.CloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
