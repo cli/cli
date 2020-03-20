@@ -316,18 +316,11 @@ func TestIssueView_preview(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
-		regexp.MustCompile(`bold story`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"ix of coins",
+		`opened by marseilles. 9 comments. \(tarot\)`,
+		"bold story",
+		"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_previewWithEmptyBody(t *testing.T) {
@@ -362,17 +355,10 @@ func TestIssueView_previewWithEmptyBody(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`ix of coins`),
-		regexp.MustCompile(`opened by marseilles. 9 comments. \(tarot\)`),
-		regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"ix of coins",
+		`opened by marseilles. 9 comments. \(tarot\)`,
+		"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_notFound(t *testing.T) {

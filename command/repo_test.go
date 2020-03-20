@@ -137,16 +137,9 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Remote added at fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Remote added at fork")
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
@@ -169,16 +162,9 @@ func TestRepoFork_outside_yes(t *testing.T) {
 
 	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Cloned fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
@@ -208,16 +194,9 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 
 	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Cloned fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
@@ -290,16 +269,9 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Remote added at fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Remote added at fork")
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {

@@ -416,18 +416,11 @@ func TestPRView_preview(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are from a fork",
+		"nobody wants to merge 12 commits into master from blueberries",
+		"blueberries taste good",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12")
 }
 
 func TestPRView_previewCurrentBranch(t *testing.T) {
@@ -451,18 +444,11 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are a good fruit",
+		"nobody wants to merge 8 commits into master from blueberries",
+		"blueberries taste good",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
 }
 
 func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
@@ -486,17 +472,10 @@ func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are a good fruit",
+		"nobody wants to merge 8 commits into master from blueberries",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
 }
 
 func TestPRView_currentBranch(t *testing.T) {
