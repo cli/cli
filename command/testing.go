@@ -11,8 +11,8 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
 
 // TODO this is split between here and test/helpers.go. I did that because otherwise our test
@@ -27,7 +27,7 @@ type CmdStubber struct {
 
 func initCmdStubber() (*CmdStubber, func()) {
 	cs := CmdStubber{}
-	teardown := utils.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	teardown := run.SetPrepareCmd(createStubbedPrepareCmd(&cs))
 	return &cs, teardown
 }
 
@@ -36,8 +36,8 @@ func (cs *CmdStubber) Stub(desiredOutput string) {
 	cs.Stubs = append(cs.Stubs, &test.OutputStub{[]byte(desiredOutput)})
 }
 
-func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) utils.Runnable {
-	return func(cmd *exec.Cmd) utils.Runnable {
+func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
+	return func(cmd *exec.Cmd) run.Runnable {
 		cs.Calls = append(cs.Calls, cmd)
 		call := cs.Count
 		cs.Count += 1

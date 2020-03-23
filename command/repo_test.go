@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
 
 func TestRepoFork_already_forked(t *testing.T) {
@@ -116,7 +116,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmds = append(seenCmds, cmd)
 		return &test.OutputStub{}
 	})()
@@ -155,7 +155,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmd *exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})()
@@ -187,7 +187,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmd *exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})()
@@ -226,7 +226,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		cmdRun = true
 		return &test.OutputStub{}
 	})()
@@ -262,7 +262,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmds = append(seenCmds, cmd)
 		return &test.OutputStub{}
 	})()
@@ -310,7 +310,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		cmdRun = true
 		return &test.OutputStub{}
 	})()
@@ -368,7 +368,7 @@ func TestRepoClone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var seenCmd *exec.Cmd
-			restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+			restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 				seenCmd = cmd
 				return &test.OutputStub{}
 			})
@@ -408,7 +408,7 @@ func TestRepoCreate(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -473,7 +473,7 @@ func TestRepoCreate_org(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -538,7 +538,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -580,7 +580,6 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 }
 
-
 func TestRepoView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
@@ -590,7 +589,7 @@ func TestRepoView(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -623,7 +622,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -655,7 +654,7 @@ func TestRepoView_fullURL(t *testing.T) {
 	{ }
 	`))
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
 )
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
@@ -76,7 +76,7 @@ func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 // after the fetch.
 func AddRemote(name, initURL, finalURL string) (*Remote, error) {
 	addCmd := exec.Command("git", "remote", "add", "-f", name, initURL)
-	err := utils.PrepareCmd(addCmd).Run()
+	err := run.PrepareCmd(addCmd).Run()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func AddRemote(name, initURL, finalURL string) (*Remote, error) {
 		finalURL = initURL
 	} else {
 		setCmd := exec.Command("git", "remote", "set-url", name, finalURL)
-		err := utils.PrepareCmd(setCmd).Run()
+		err := run.PrepareCmd(setCmd).Run()
 		if err != nil {
 			return nil, err
 		}

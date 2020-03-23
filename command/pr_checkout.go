@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
 	"github.com/spf13/cobra"
 )
 
@@ -91,7 +91,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		if err := utils.PrepareCmd(cmd).Run(); err != nil {
+		if err := run.PrepareCmd(cmd).Run(); err != nil {
 			return err
 		}
 	}

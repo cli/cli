@@ -4,8 +4,8 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
 
 func Test_UncommittedChangeCount(t *testing.T) {
@@ -20,13 +20,13 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		c{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
 	}
 
-	teardown := utils.SetPrepareCmd(func(*exec.Cmd) utils.Runnable {
+	teardown := run.SetPrepareCmd(func(*exec.Cmd) run.Runnable {
 		return &test.OutputStub{}
 	})
 	defer teardown()
 
 	for _, v := range cases {
-		_ = utils.SetPrepareCmd(func(*exec.Cmd) utils.Runnable {
+		_ = run.SetPrepareCmd(func(*exec.Cmd) run.Runnable {
 			return &test.OutputStub{[]byte(v.Output)}
 		})
 		ucc, _ := UncommittedChangeCount()
