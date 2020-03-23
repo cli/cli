@@ -21,6 +21,15 @@ func VerifyRef(ref string) bool {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
+	err := utils.PrepareCmd(GitCommand("log")).Run()
+	if err != nil {
+		// this is a hack.
+		errRe := regexp.MustCompile("your current branch '([^']+)' does not have any commits yet")
+		matches := errRe.FindAllStringSubmatch(err.Error(), -1)
+		if len(matches) > 0 && matches[0][1] != "" {
+			return matches[0][1], nil
+		}
+	}
 	// we avoid using `git branch --show-current` for compatibility with git < 2.22
 	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	output, err := utils.PrepareCmd(branchCmd).Output()
