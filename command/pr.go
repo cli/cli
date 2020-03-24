@@ -300,7 +300,7 @@ func prView(cmd *cobra.Command, args []string) error {
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -355,7 +355,7 @@ func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*a
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 
-	return api.PullRequestForBranch(apiClient, baseRepo, arg)
+	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
