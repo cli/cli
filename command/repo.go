@@ -1,7 +1,6 @@
 package command
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -450,31 +449,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	type readmeResponse struct {
-		Name    string
-		Content string
-	}
-
-	var readme readmeResponse
-
-	err = apiClient.REST("GET", fmt.Sprintf("repos/%s/readme", fullName), nil, &readme)
-	if err != nil && !strings.HasSuffix(err.Error(), "'Not Found'") {
-		return fmt.Errorf("could not get readme for repo: %w", err)
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(readme.Content)
-	if err != nil {
-		return fmt.Errorf("failed to decode readme: %w", err)
-	}
-
-	readmeContent := string(decoded)
-
-	if strings.HasSuffix(readme.Name, ".md") {
-		readmeContent, err = utils.RenderMarkdown(readmeContent)
-		if err != nil {
-			return fmt.Errorf("failed to render readme as markdown: %w", err)
-		}
-	}
+	readmeContent, err := api.RepositoryReadme(apiClient, fullName)
 
 	if readmeContent == "" {
 		readmeContent = utils.Gray("No README provided")
