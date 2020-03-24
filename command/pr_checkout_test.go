@@ -350,7 +350,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &test.OutputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{[]byte("refs/heads/feature\n"), nil}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
 			return &test.OutputStub{}
@@ -400,7 +400,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &test.OutputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{[]byte("refs/heads/feature\n"), nil}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
 			return &test.OutputStub{}
