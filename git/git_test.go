@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os/exec"
 	"testing"
 
@@ -35,4 +36,22 @@ func Test_UncommittedChangeCount(t *testing.T) {
 			t.Errorf("got unexpected ucc value: %d for case %s", ucc, v.Label)
 		}
 	}
+}
+
+func Test_CurrentBranch_no_commits(t *testing.T) {
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+
+	expected := "cool_branch-name"
+
+	cs.StubError(fmt.Sprintf("fatal: your current branch '%s' does not have any commits yet", expected))
+
+	result, err := CurrentBranch()
+	if err != nil {
+		t.Errorf("got unexpected error: %w", err)
+	}
+	if result != expected {
+		t.Errorf("unexpected branch name: %s instead of %s", result, expected)
+	}
+
 }

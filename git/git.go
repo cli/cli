@@ -28,7 +28,7 @@ func CurrentBranch() (string, error) {
 		matches := errRe.FindAllStringSubmatch(err.Error(), -1)
 		if len(matches) > 0 && matches[0][1] != "" {
 			return matches[0][1], nil
-		}
+		} // else we continue on. it's weird that git log failed but we'll let other errors surface.
 	}
 	// we avoid using `git branch --show-current` for compatibility with git < 2.22
 	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
