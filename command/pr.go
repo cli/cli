@@ -421,7 +421,7 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				} else if checks.Passing == checks.Total {
 					summary = utils.Green("✓ Checks passing ")
 				}
-				fmt.Fprintf(w, "%s", summary)
+				fmt.Fprint(w, summary)
 			}
 
 			if reviews.ChangesRequested {
