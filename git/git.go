@@ -21,23 +21,27 @@ func VerifyRef(ref string) bool {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	err := run.PrepareCmd(GitCommand("log")).Run()
-	if err != nil {
-		// this is a hack.
-		errRe := regexp.MustCompile("your current branch '([^']+)' does not have any commits yet")
-		matches := errRe.FindAllStringSubmatch(err.Error(), -1)
-		if len(matches) > 0 && matches[0][1] != "" {
-			return matches[0][1], nil
-		} // else we continue on. it's weird that git log failed but we'll let other errors surface.
-	}
+	noBranchError := errors.New("git: not on any branch")
+
 	// we avoid using `git branch --show-current` for compatibility with git < 2.22
-	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	output, err := run.PrepareCmd(branchCmd).Output()
+	output, err := run.PrepareCmd(GitCommand("rev-parse", "--abbrev-ref", "HEAD")).Output()
 	branchName := firstLine(output)
-	if err == nil && branchName == "HEAD" {
-		return "", errors.New("git: not on any branch")
+	if err == nil {
+		if branchName == "HEAD" {
+			return "", noBranchError
+		} else {
+			return branchName, nil
+		}
 	}
-	return branchName, err
+
+	// Fall back to symbolic-ref in case we're in a repository with no commits
+	output, err = run.PrepareCmd(GitCommand("symbolic-ref", "--short", "HEAD")).Output()
+	if err != nil {
+		return "", noBranchError
+	}
+	branchName = firstLine(output)
+
+	return branchName, nil
 }
 
 func listRemotes() ([]string, error) {
