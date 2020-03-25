@@ -132,13 +132,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
 			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 		}
-		existingPR, err := api.PullRequestForBranch(client, baseRepo, headBranchLabel)
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
 		}
 		if err == nil {
-			return fmt.Errorf("a pull request for branch %q already exists:\n%s", headBranchLabel, existingPR.URL)
+			return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s", headBranchLabel, baseBranch, existingPR.URL)
 		}
 	}
 
