@@ -249,9 +249,21 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return err
+	var baseRepo ghrepo.Interface
+	var prArg string
+	if len(args) > 0 {
+		prArg = args[0]
+		if prNum, repo := prFromURL(prArg); repo != nil {
+			prArg = prNum
+			baseRepo = repo
+		}
+	}
+
+	if baseRepo == nil {
+		baseRepo, err = determineBaseRepo(cmd, ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	preview, err := cmd.Flags().GetBool("preview")
@@ -262,7 +274,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, prArg)
 		if err != nil {
 			return err
 		}
@@ -282,7 +294,7 @@ func prView(cmd *cobra.Command, args []string) error {
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -326,17 +338,19 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
+func prFromURL(arg string) (string, ghrepo.Interface) {
+	if m := prURLRE.FindStringSubmatch(arg); m != nil {
+		return m[3], ghrepo.New(m[1], m[2])
+	}
+	return "", nil
+}
+
 func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 
-	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		prNumber, _ := strconv.Atoi(m[3])
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, arg)
+	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {

@@ -64,7 +64,8 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "url": "https://github.com/OWNER/REPO/pull/123",
-			  "headRefName": "feature" }
+			  "headRefName": "feature",
+				"baseRefName": "master" }
 		] } } } }
 	`))
 
@@ -78,8 +79,34 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	if err == nil {
 		t.Fatal("error expected, got nil")
 	}
-	if err.Error() != "a pull request for branch \"feature\" already exists:\nhttps://github.com/OWNER/REPO/pull/123" {
+	if err.Error() != "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123" {
 		t.Errorf("got error %q", err)
+	}
+}
+
+func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString("{}"))
+
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git rev-parse
+
+	_, err := RunCommand(prCreateCmd, `pr create -BanotherBase -t"cool" -b"nah"`)
+	if err != nil {
+		t.Errorf("got unexpected error %q", err)
 	}
 }
 
