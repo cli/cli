@@ -23,8 +23,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/briandowns/spinner v1.9.0 h1:+OMAisemaHar1hjuJ3Z2hIvNhQl9Y7GLPWUwwz2Pxo8=
 github.com/briandowns/spinner v1.9.0/go.mod h1://Zf9tMcxfRUA36V23M6YGEAv+kECGfvpnLTnb8n4XQ=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
-github.com/charmbracelet/glamour v0.1.1-0.20200304134224-7e5c90143acc h1:WSZ06evYgfSZYqkcv0+jFVSVCJeYsIvU+J4ILZUrha4=
-github.com/charmbracelet/glamour v0.1.1-0.20200304134224-7e5c90143acc/go.mod h1:sC1EP6T+3nFnl5vwf0TYEs1inMigQxZ7n912YKoxJow=
+github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058 h1:Ks+RZ6s6UriHnL+yusm3OoaLwpV9WPvMV+FXQ6qMD7M=
+github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058/go.mod h1:sC1EP6T+3nFnl5vwf0TYEs1inMigQxZ7n912YKoxJow=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
