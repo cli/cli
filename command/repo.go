@@ -449,7 +449,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	readmeContent, err := api.RepositoryReadme(apiClient, fullName)
+	readmeContent, _ := api.RepositoryReadme(apiClient, fullName)
 
 	if readmeContent == "" {
 		readmeContent = utils.Gray("No README provided")
