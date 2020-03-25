@@ -31,7 +31,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prViewCmd.Flags().BoolP("web", "w", false, "Open pull request in browser")
 }
 
 var prCmd = &cobra.Command{
@@ -57,10 +57,10 @@ var prStatusCmd = &cobra.Command{
 var prViewCmd = &cobra.Command{
 	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument in the browser.
+	Long: `View a pull request specified by the argument.
 
 Without an argument, the pull request that belongs to the current
-branch is opened.`,
+branch is displayed.`,
 	RunE: prView,
 }
 
@@ -272,7 +272,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	preview, err := cmd.Flags().GetBool("preview")
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if preview {
+			if !web {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
 					return err
@@ -309,12 +309,12 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printPrPreview(out, pr)
 	}
 }
 
