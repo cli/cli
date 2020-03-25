@@ -145,7 +145,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify --quiet refs/heads/feature":
 			return &errorStub{"exit status: 1"}

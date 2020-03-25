@@ -98,7 +98,7 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	`))
 	http.StubResponse(200, bytes.NewBufferString("{}"))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git status
