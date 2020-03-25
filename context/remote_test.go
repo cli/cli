@@ -137,7 +137,8 @@ func Test_resolvedRemotes_forkLookup(t *testing.T) {
 		{ "id": "FORKID",
 		  "url": "https://github.com/FORKOWNER/REPO",
 		  "name": "REPO",
-		  "owner": { "login": "FORKOWNER" }
+		  "owner": { "login": "FORKOWNER" },
+		  "viewerPermission": "WRITE"
 		}
 	] } } } }
 	`))

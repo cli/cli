@@ -97,6 +97,10 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "url": "https://github.com/OWNER/REPO/pull/123",
 			  "headRefName": "feature",

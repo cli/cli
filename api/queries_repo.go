@@ -245,6 +245,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 					name
 					owner { login }
 					url
+					viewerPermission
 				}
 			}
 		}
@@ -253,8 +254,12 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		return nil, err
 	}
 
-	if len(result.Repository.Forks.Nodes) > 0 {
-		return &result.Repository.Forks.Nodes[0], nil
+	forks := result.Repository.Forks.Nodes
+	// we check ViewerCanPush, even though we expect it to always be true per
+	// `affiliations` condition, to guard against versions of GitHub with a
+	// faulty `affiliations` implementation
+	if len(forks) > 0 && forks[0].ViewerCanPush() {
+		return &forks[0], nil
 	}
 	return nil, &NotFoundError{errors.New("no fork found")}
 }
