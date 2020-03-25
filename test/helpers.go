@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
+	"testing"
 
 	"github.com/cli/cli/internal/run"
 )
@@ -59,5 +61,16 @@ func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
 			panic(fmt.Sprintf("more execs than stubs. most recent call: %v", cmd))
 		}
 		return cs.Stubs[call]
+	}
+}
+
+func ExpectLines(t *testing.T, output string, lines ...string) {
+	var r *regexp.Regexp
+	for _, l := range lines {
+		r = regexp.MustCompile(l)
+		if !r.MatchString(output) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
 	}
 }

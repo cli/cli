@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -69,6 +70,8 @@ func Humanize(s string) string {
 	return strings.Map(h, s)
 }
 
-func Spinner() *spinner.Spinner {
-	return spinner.New(spinner.CharSets[11], 400*time.Millisecond)
+func Spinner(w io.Writer) *spinner.Spinner {
+	s := spinner.New(spinner.CharSets[11], 400*time.Millisecond)
+	s.Writer = w
+	return s
 }

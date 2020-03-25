@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -36,6 +37,7 @@ func init() {
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
 
 	repoCmd.AddCommand(repoViewCmd)
+	repoViewCmd.Flags().BoolP("web", "w", false, "Open repository in browser")
 }
 
 var repoCmd = &cobra.Command{
@@ -79,9 +81,9 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 var repoViewCmd = &cobra.Command{
 	Use:   "view [<repository>]",
 	Short: "View a repository in the browser",
-	Long: `View a GitHub repository in the browser.
+	Long: `View a GitHub repository.
 
-With no argument, the repository for the current directory is opened.`,
+With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
@@ -296,7 +298,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 
 	greenCheck := utils.Green("✓")
 	out := colorableOut(cmd)
-	s := utils.Spinner()
+	s := utils.Spinner(out)
 	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(toFork))) + utils.Gray("...")
 	s.Suffix = " " + loading
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
@@ -387,6 +389,7 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
@@ -415,12 +418,67 @@ func repoView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = api.GitHubRepo(apiClient, toView)
+	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err
 	}
 
-	openURL := fmt.Sprintf("https://github.com/%s", ghrepo.FullName(toView))
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
-	return utils.OpenInBrowser(openURL)
+	web, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return err
+	}
+
+	fullName := ghrepo.FullName(toView)
+
+	openURL := fmt.Sprintf("https://github.com/%s", fullName)
+	if web {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		return utils.OpenInBrowser(openURL)
+	}
+
+	repoTmpl := `
+{{.FullName}}
+{{.Description}}
+
+{{.Readme}}
+
+{{.View}}
+`
+
+	tmpl, err := template.New("repo").Parse(repoTmpl)
+	if err != nil {
+		return err
+	}
+
+	readmeContent, _ := api.RepositoryReadme(apiClient, fullName)
+
+	if readmeContent == "" {
+		readmeContent = utils.Gray("No README provided")
+	}
+
+	description := repo.Description
+	if description == "" {
+		description = utils.Gray("No description provided")
+	}
+
+	repoData := struct {
+		FullName    string
+		Description string
+		Readme      string
+		View        string
+	}{
+		FullName:    utils.Bold(fullName),
+		Description: description,
+		Readme:      readmeContent,
+		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
+	}
+
+	out := colorableOut(cmd)
+
+	err = tmpl.Execute(out, repoData)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

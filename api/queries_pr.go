@@ -340,7 +340,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) (*PullRequest, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
@@ -376,9 +376,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 		}
 	}`
 
-	branchWithoutOwner := branch
-	if idx := strings.Index(branch, ":"); idx >= 0 {
-		branchWithoutOwner = branch[idx+1:]
+	branchWithoutOwner := headBranch
+	if idx := strings.Index(headBranch, ":"); idx >= 0 {
+		branchWithoutOwner = headBranch[idx+1:]
 	}
 
 	variables := map[string]interface{}{
@@ -394,12 +394,17 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 	}
 
 	for _, pr := range resp.Repository.PullRequests.Nodes {
-		if pr.HeadLabel() == branch {
+		if pr.HeadLabel() == headBranch {
+			if baseBranch != "" {
+				if pr.BaseRefName != baseBranch {
+					continue
+				}
+			}
 			return &pr, nil
 		}
 	}
 
-	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", branch)}
+	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository

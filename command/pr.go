@@ -31,7 +31,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prViewCmd.Flags().BoolP("web", "w", false, "Open pull request in browser")
 }
 
 var prCmd = &cobra.Command{
@@ -57,10 +57,10 @@ var prStatusCmd = &cobra.Command{
 var prViewCmd = &cobra.Command{
 	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument in the browser.
+	Long: `View a pull request specified by the argument.
 
 Without an argument, the pull request that belongs to the current
-branch is opened.`,
+branch is displayed.`,
 	RunE: prView,
 }
 
@@ -255,12 +255,24 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return err
+	var baseRepo ghrepo.Interface
+	var prArg string
+	if len(args) > 0 {
+		prArg = args[0]
+		if prNum, repo := prFromURL(prArg); repo != nil {
+			prArg = prNum
+			baseRepo = repo
+		}
 	}
 
-	preview, err := cmd.Flags().GetBool("preview")
+	if baseRepo == nil {
+		baseRepo, err = determineBaseRepo(cmd, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -268,7 +280,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, prArg)
 		if err != nil {
 			return err
 		}
@@ -281,14 +293,14 @@ func prView(cmd *cobra.Command, args []string) error {
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if preview {
+			if !web {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -297,12 +309,12 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printPrPreview(out, pr)
 	}
 }
 
@@ -331,17 +343,19 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
+func prFromURL(arg string) (string, ghrepo.Interface) {
+	if m := prURLRE.FindStringSubmatch(arg); m != nil {
+		return m[3], ghrepo.New(m[1], m[2])
+	}
+	return "", nil
+}
+
 func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
 
-	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		prNumber, _ := strconv.Atoi(m[3])
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, arg)
+	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {

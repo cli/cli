@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/run"
 	"github.com/spf13/cobra"
+
+	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 )
 
 func prCheckout(cmd *cobra.Command, args []string) error {
@@ -18,19 +20,36 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// FIXME: duplicates logic from fsContext.BaseRepo
-	baseRemote, err := remotes.FindByName("upstream", "github", "origin", "*")
-	if err != nil {
-		return err
-	}
+
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	pr, err := prFromArg(apiClient, baseRemote, args[0])
+	var baseRepo ghrepo.Interface
+	prArg := args[0]
+	if prNum, repo := prFromURL(prArg); repo != nil {
+		prArg = prNum
+		baseRepo = repo
+	}
+
+	if baseRepo == nil {
+		baseRepo, err = determineBaseRepo(cmd, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, prArg)
 	if err != nil {
 		return err
+	}
+
+	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
+	baseURLOrName := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
+	if baseRemote != nil {
+		baseURLOrName = baseRemote.Name
 	}
 
 	headRemote := baseRemote
@@ -67,15 +86,15 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 		if newBranchName == currentBranch {
 			// PR head matches currently checked out branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, ref})
+			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
 			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
 		} else {
 			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseRemote.Name, fmt.Sprintf("%s:%s", ref, newBranchName)})
+			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
 		}
 
-		remote := baseRemote.Name
+		remote := baseURLOrName
 		mergeRef := ref
 		if pr.MaintainerCanModify {
 			remote = fmt.Sprintf("https://github.com/%s/%s.git", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
