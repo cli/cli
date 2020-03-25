@@ -59,7 +59,7 @@ mainLoop:
 		}
 	}
 
-	sort.Sort(sort.StringSlice(results))
+	sort.Strings(results)
 	return results
 }
 

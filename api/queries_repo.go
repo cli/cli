@@ -155,7 +155,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		keys = append(keys, key)
 	}
 	// sort keys to ensure `repo_{N}` entries are processed in order
-	sort.Sort(sort.StringSlice(keys))
+	sort.Strings(keys)
 
 	// Iterate over keys of GraphQL response data and, based on its name,
 	// dynamically allocate the target struct an individual message gets decoded to.
