@@ -37,27 +37,6 @@ func Test_UncommittedChangeCount(t *testing.T) {
 	}
 }
 
-func Test_CurrentBranch_no_commits(t *testing.T) {
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-
-	expected := "branch-name"
-
-	cs.StubError("")
-	cs.Stub(expected)
-
-	result, err := CurrentBranch()
-	if err != nil {
-		t.Errorf("got unexpected error: %w", err)
-	}
-	if len(cs.Calls) != 2 {
-		t.Errorf("expected 2 git calls, saw %d", len(cs.Calls))
-	}
-	if result != expected {
-		t.Errorf("unexpected branch name: %s instead of %s", result, expected)
-	}
-}
-
 func Test_CurrentBranch(t *testing.T) {
 	cs, teardown := test.InitCmdStubber()
 	defer teardown()
@@ -82,13 +61,33 @@ func Test_CurrentBranch_detached_head(t *testing.T) {
 	cs, teardown := test.InitCmdStubber()
 	defer teardown()
 
-	cs.Stub("HEAD")
+	cs.StubError("")
 
 	_, err := CurrentBranch()
 	if err == nil {
 		t.Errorf("expected an error")
 	}
 	expectedError := "git: not on any branch"
+	if err.Error() != expectedError {
+		t.Errorf("got unexpected error: %s instead of %s", err.Error(), expectedError)
+	}
+	if len(cs.Calls) != 1 {
+		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
+	}
+}
+
+func Test_CurrentBranch_unexpected_error(t *testing.T) {
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+
+	cs.StubError("lol")
+
+	expectedError := "lol\nstub: lol"
+
+	_, err := CurrentBranch()
+	if err == nil {
+		t.Errorf("expected an error")
+	}
 	if err.Error() != expectedError {
 		t.Errorf("got unexpected error: %s instead of %s", err.Error(), expectedError)
 	}

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -13,7 +14,7 @@ import (
 // OutputStub implements a simple utils.Runnable
 type OutputStub struct {
 	Out   []byte
-	Error error
+	Error *run.CmdError
 }
 
 func (s OutputStub) Output() ([]byte, error) {
@@ -47,9 +48,11 @@ func (cs *CmdStubber) Stub(desiredOutput string) {
 	cs.Stubs = append(cs.Stubs, &OutputStub{[]byte(desiredOutput), nil})
 }
 
-func (cs *CmdStubber) StubError(msg string) {
-	// TODO consider handling CmdErr instead of a raw error
-	cs.Stubs = append(cs.Stubs, &OutputStub{[]byte{}, errors.New(msg)})
+func (cs *CmdStubber) StubError(errText string) {
+	stderrBuff := bytes.NewBufferString(errText)
+	args := []string{"stub"} // TODO make more real?
+	err := errors.New(errText)
+	cs.Stubs = append(cs.Stubs, &OutputStub{[]byte{}, &run.CmdError{stderrBuff, args, err}})
 }
 
 func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {

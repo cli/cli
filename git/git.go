@@ -21,7 +21,6 @@ func VerifyRef(ref string) bool {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-
 	refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
 
 	output, err := run.PrepareCmd(refCmd).Output()
