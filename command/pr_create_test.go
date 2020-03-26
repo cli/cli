@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/git"
 )
 
 func TestPRCreate(t *testing.T) {
@@ -27,6 +28,8 @@ func TestPRCreate(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
@@ -72,6 +75,8 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 
@@ -100,6 +105,8 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git rev-parse
@@ -118,6 +125,8 @@ func TestPRCreate_web(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
@@ -129,9 +138,9 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, output.String(), "")
 	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
 
-	eq(t, len(cs.Calls), 4)
-	eq(t, strings.Join(cs.Calls[2].Args, " "), "git push --set-upstream origin HEAD:feature")
-	browserCall := cs.Calls[3].Args
+	eq(t, len(cs.Calls), 6)
+	eq(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature")
+	browserCall := cs.Calls[5].Args
 	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
@@ -153,6 +162,8 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub(" M git/git.go")                            // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
@@ -223,6 +234,8 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
@@ -272,6 +285,8 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git rev-parse
@@ -342,6 +357,8 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                                        // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                                        // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                                        // git status
 	cs.Stub("1234567890,the sky above the port")                       // git log
 	cs.Stub("was the color of a television, turned to a dead channel") // git show
@@ -413,6 +430,8 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")                                                        // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                                        // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("")                                                        // git status
 	cs.Stub("1234567890,the sky above the port")                       // git log
 	cs.Stub("was the color of a television, turned to a dead channel") // git show
@@ -456,6 +475,8 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("") // git status
 	cs.Stub("") // git log
 
@@ -472,6 +493,8 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("") // git status
 	cs.Stub("") // git log
 
@@ -493,6 +516,8 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	cs, cmdTeardown := initCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
 	cs.Stub("") // git status
 	cs.Stub("") // git log
 	cs.Stub("") // git rev-parse
@@ -524,4 +549,104 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 
 	stderr := string(output.Stderr())
 	eq(t, strings.Contains(stderr, "warning: could not compute title or body defaults: could not find any commits"), true)
+}
+
+func Test_determineTrackingBranch_empty(t *testing.T) {
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	remotes := context.Remotes{}
+
+	cs.Stub("")              // git config --get-regexp (ReadBranchConfig)
+	cs.Stub("deadbeef HEAD") // git show-ref --verify   (ShowRefs)
+
+	ref := determineTrackingBranch(remotes, "feature")
+	if ref != nil {
+		t.Errorf("expected nil result, got %v", ref)
+	}
+}
+
+func Test_determineTrackingBranch_noMatch(t *testing.T) {
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	remotes := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Owner:  "hubot",
+			Repo:   "Spoon-Knife",
+		},
+		&context.Remote{
+			Remote: &git.Remote{Name: "upstream"},
+			Owner:  "octocat",
+			Repo:   "Spoon-Knife",
+		},
+	}
+
+	cs.Stub("") // git config --get-regexp (ReadBranchConfig)
+	cs.Stub(`deadbeef HEAD
+deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
+
+	ref := determineTrackingBranch(remotes, "feature")
+	if ref != nil {
+		t.Errorf("expected nil result, got %v", ref)
+	}
+}
+
+func Test_determineTrackingBranch_hasMatch(t *testing.T) {
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	remotes := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Owner:  "hubot",
+			Repo:   "Spoon-Knife",
+		},
+		&context.Remote{
+			Remote: &git.Remote{Name: "upstream"},
+			Owner:  "octocat",
+			Repo:   "Spoon-Knife",
+		},
+	}
+
+	cs.Stub("") // git config --get-regexp (ReadBranchConfig)
+	cs.Stub(`deadbeef HEAD
+deadb00f refs/remotes/origin/feature
+deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
+
+	ref := determineTrackingBranch(remotes, "feature")
+	if ref == nil {
+		t.Fatal("expected result, got nil")
+	}
+
+	eq(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/feature", "refs/remotes/upstream/feature"})
+
+	eq(t, ref.RemoteName, "upstream")
+	eq(t, ref.BranchName, "feature")
+}
+
+func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
+	cs, cmdTeardown := initCmdStubber()
+	defer cmdTeardown()
+
+	remotes := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Owner:  "hubot",
+			Repo:   "Spoon-Knife",
+		},
+	}
+
+	cs.Stub(`branch.feature.remote origin
+branch.feature.merge refs/heads/great-feat`) // git config --get-regexp (ReadBranchConfig)
+	cs.Stub(`deadbeef HEAD
+deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
+
+	ref := determineTrackingBranch(remotes, "feature")
+	if ref != nil {
+		t.Errorf("expected nil result, got %v", ref)
+	}
+
+	eq(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"})
 }

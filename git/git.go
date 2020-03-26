@@ -19,6 +19,16 @@ type Ref struct {
 	Name string
 }
 
+// TrackingRef represents a ref for a remote tracking branch
+type TrackingRef struct {
+	RemoteName string
+	BranchName string
+}
+
+func (r TrackingRef) String() string {
+	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
+}
+
 // ShowRefs resolves fully-qualified refs to commit hashes
 func ShowRefs(ref ...string) ([]Ref, error) {
 	args := append([]string{"show-ref", "--verify", "--"}, ref...)
