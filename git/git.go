@@ -173,7 +173,7 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 					continue
 				}
 				cfg.RemoteURL = u
-			} else {
+			} else if !isFilesystemPath(parts[1]) {
 				cfg.RemoteName = parts[1]
 			}
 		case "merge":
@@ -181,6 +181,10 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 		}
 	}
 	return
+}
+
+func isFilesystemPath(p string) bool {
+	return p == "." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "/")
 }
 
 // ToplevelDir returns the top-level directory path of the current repository
