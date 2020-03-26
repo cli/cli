@@ -13,10 +13,31 @@ import (
 	"github.com/cli/cli/utils"
 )
 
-func VerifyRef(ref string) bool {
-	showRef := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
-	err := utils.PrepareCmd(showRef).Run()
-	return err == nil
+// Ref represents a git commit reference
+type Ref struct {
+	Hash string
+	Name string
+}
+
+// ShowRefs resolves fully-qualified refs to commit hashes
+func ShowRefs(ref ...string) ([]Ref, error) {
+	args := append([]string{"show-ref", "--verify", "--"}, ref...)
+	showRef := exec.Command("git", args...)
+	output, err := utils.PrepareCmd(showRef).Output()
+
+	var refs []Ref
+	for _, line := range outputLines(output) {
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		refs = append(refs, Ref{
+			Hash: parts[0],
+			Name: parts[1],
+		})
+	}
+
+	return refs, err
 }
 
 // CurrentBranch reads the checked-out branch for the git repository
