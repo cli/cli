@@ -21,27 +21,23 @@ func VerifyRef(ref string) bool {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	noBranchError := errors.New("git: not on any branch")
 
-	// we avoid using `git branch --show-current` for compatibility with git < 2.22
-	output, err := run.PrepareCmd(GitCommand("rev-parse", "--abbrev-ref", "HEAD")).Output()
-	branchName := firstLine(output)
+	refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
+
+	output, err := run.PrepareCmd(refCmd).Output()
 	if err == nil {
-		if branchName == "HEAD" {
-			return "", noBranchError
-		} else {
-			return branchName, nil
-		}
+		// Found the branch name
+		return firstLine(output), nil
 	}
 
-	// Fall back to symbolic-ref in case we're in a repository with no commits
-	output, err = run.PrepareCmd(GitCommand("symbolic-ref", "--short", "HEAD")).Output()
-	if err != nil {
-		return "", noBranchError
+	ce := err.(*run.CmdError)
+	if ce.Stderr.Len() == 0 {
+		// Detached head
+		return "", errors.New("git: not on any branch")
 	}
-	branchName = firstLine(output)
 
-	return branchName, nil
+	// Unknown error
+	return "", err
 }
 
 func listRemotes() ([]string, error) {
