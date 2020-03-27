@@ -14,7 +14,7 @@ import (
 // OutputStub implements a simple utils.Runnable
 type OutputStub struct {
 	Out   []byte
-	Error *run.CmdError
+	Error error
 }
 
 func (s OutputStub) Output() ([]byte, error) {
@@ -49,6 +49,7 @@ func (cs *CmdStubber) Stub(desiredOutput string) {
 }
 
 func (cs *CmdStubber) StubError(errText string) {
+	// TODO support error types beyond CmdError
 	stderrBuff := bytes.NewBufferString(errText)
 	args := []string{"stub"} // TODO make more real?
 	err := errors.New(errText)

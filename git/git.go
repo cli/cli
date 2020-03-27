@@ -29,10 +29,12 @@ func CurrentBranch() (string, error) {
 		return firstLine(output), nil
 	}
 
-	ce := err.(*run.CmdError)
-	if ce.Stderr.Len() == 0 {
-		// Detached head
-		return "", errors.New("git: not on any branch")
+	var cmdErr *run.CmdError
+	if errors.As(err, &cmdErr) {
+		if cmdErr.Stderr.Len() == 0 {
+			// Detached head
+			return "", errors.New("git: not on any branch")
+		}
 	}
 
 	// Unknown error
