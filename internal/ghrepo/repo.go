@@ -8,21 +8,26 @@ import (
 
 const defaultHostname = "github.com"
 
+// Interface describes an object that represents a GitHub repository
 type Interface interface {
 	RepoName() string
 	RepoOwner() string
 }
 
+// New instantiates a GitHub repository from owner and name arguments
 func New(owner, repo string) Interface {
 	return &ghRepo{
 		owner: owner,
 		name:  repo,
 	}
 }
+
+// FullName serializes a GitHub repository into an "OWNER/REPO" string
 func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
+// FromFullName extracts the GitHub repository inforation from an "OWNER/REPO" string
 func FromFullName(nwo string) Interface {
 	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
@@ -32,6 +37,7 @@ func FromFullName(nwo string) Interface {
 	return &r
 }
 
+// FromURL extracts the GitHub repository information from a URL
 func FromURL(u *url.URL) (Interface, error) {
 	if !strings.EqualFold(u.Hostname(), defaultHostname) && !strings.EqualFold(u.Hostname(), "www."+defaultHostname) {
 		return nil, fmt.Errorf("unsupported hostname: %s", u.Hostname())
@@ -43,6 +49,7 @@ func FromURL(u *url.URL) (Interface, error) {
 	return New(parts[0], strings.TrimSuffix(parts[1], ".git")), nil
 }
 
+// IsSame compares two GitHub repositories
 func IsSame(a, b Interface) bool {
 	return strings.EqualFold(a.RepoOwner(), b.RepoOwner()) &&
 		strings.EqualFold(a.RepoName(), b.RepoName())
