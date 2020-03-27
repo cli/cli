@@ -18,9 +18,8 @@ import (
 func TestRepoFork_already_forked(t *testing.T) {
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
-		ctx.SetBaseRepo("REPO")
+		ctx.SetBaseRepo("OWNER/REPO")
 		ctx.SetBranch("master")
-		ctx.SetAuthLogin("someone")
 		ctx.SetRemotes(map[string]string{
 			"origin": "OWNER/REPO",
 		})

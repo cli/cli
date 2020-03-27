@@ -301,14 +301,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 	s.Start()
 
-	authLogin, err := ctx.AuthLogin()
-	if err != nil {
-		s.Stop()
-		return fmt.Errorf("could not determine current username: %w", err)
-	}
-
-	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
-
 	forkedRepo, err := api.ForkRepo(apiClient, toFork)
 	if err != nil {
 		s.Stop()
@@ -325,7 +317,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	if created_ago > time.Minute {
 		fmt.Fprintf(out, "%s %s %s\n",
 			utils.Yellow("!"),
-			utils.Bold(ghrepo.FullName(possibleFork)),
+			utils.Bold(ghrepo.FullName(forkedRepo)),
 			"already exists")
 	} else {
 		fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
