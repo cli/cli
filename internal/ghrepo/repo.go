@@ -33,7 +33,7 @@ func FromFullName(nwo string) Interface {
 }
 
 func FromURL(u *url.URL) (Interface, error) {
-	if !strings.EqualFold(u.Hostname(), defaultHostname) {
+	if !strings.EqualFold(u.Hostname(), defaultHostname) && !strings.EqualFold(u.Hostname(), "www."+defaultHostname) {
 		return nil, fmt.Errorf("unsupported hostname: %s", u.Hostname())
 	}
 	parts := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 3)

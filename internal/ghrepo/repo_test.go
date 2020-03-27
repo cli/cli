@@ -21,6 +21,12 @@ func Test_repoFromURL(t *testing.T) {
 			err:    nil,
 		},
 		{
+			name:   "www.github.com URL",
+			input:  "http://www.GITHUB.com/monalisa/octo-cat.git",
+			result: "monalisa/octo-cat",
+			err:    nil,
+		},
+		{
 			name:   "unsupported hostname",
 			input:  "https://example.com/one/two",
 			result: "",
