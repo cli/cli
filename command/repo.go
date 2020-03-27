@@ -328,6 +328,15 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	if inParent {
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return err
+		}
+		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
+			fmt.Fprintf(out, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+			return nil
+		}
+
 		remoteDesired := remotePref == "true"
 		if remotePref == "prompt" {
 			err = Confirm("Would you like to add a remote for the fork?", &remoteDesired)

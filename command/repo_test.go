@@ -40,6 +40,31 @@ func TestRepoFork_already_forked(t *testing.T) {
 	}
 }
 
+func TestRepoFork_reuseRemote(t *testing.T) {
+	initContext = func() context.Context {
+		ctx := context.NewBlank()
+		ctx.SetBaseRepo("OWNER/REPO")
+		ctx.SetBranch("master")
+		ctx.SetRemotes(map[string]string{
+			"upstream": "OWNER/REPO",
+			"origin":   "someone/REPO",
+		})
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	defer http.StubWithFixture(200, "forkResult.json")()
+
+	output, err := RunCommand(repoForkCmd, "repo fork")
+	if err != nil {
+		t.Errorf("got unexpected error: %v", err)
+	}
+	if !strings.Contains(output.String(), "Using existing remote origin") {
+		t.Errorf("output did not match: %q", output)
+		return
+	}
+}
+
 func stubSince(d time.Duration) func() {
 	originalSince := Since
 	Since = func(t time.Time) time.Duration {
@@ -578,7 +603,6 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		t.Errorf("expected %q, got %q", "TEAMID", teamID)
 	}
 }
-
 
 func TestRepoView(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
