@@ -22,7 +22,9 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 					{ "status": "COMPLETED",
 					  "conclusion": "FAILURE" },
 					{ "status": "COMPLETED",
-					  "conclusion": "ACTION_REQUIRED" }
+					  "conclusion": "ACTION_REQUIRED" },
+					{ "status": "COMPLETED",
+					  "conclusion": "STALE" }
 				]
 			}
 		}
@@ -32,8 +34,8 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 	eq(t, err, nil)
 
 	checks := pr.ChecksStatus()
-	eq(t, checks.Total, 7)
-	eq(t, checks.Pending, 2)
+	eq(t, checks.Total, 8)
+	eq(t, checks.Pending, 3)
 	eq(t, checks.Failing, 3)
 	eq(t, checks.Passing, 2)
 }
