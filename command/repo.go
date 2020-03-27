@@ -313,8 +313,8 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// returns the fork repo data even if it already exists -- with no change in status code or
 	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
 	// we assume the fork already existed and report an error.
-	created_ago := Since(forkedRepo.CreatedAt)
-	if created_ago > time.Minute {
+	createdAgo := Since(forkedRepo.CreatedAt)
+	if createdAgo > time.Minute {
 		fmt.Fprintf(out, "%s %s %s\n",
 			utils.Yellow("!"),
 			utils.Bold(ghrepo.FullName(forkedRepo)),
