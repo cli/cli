@@ -20,8 +20,8 @@ type defaults struct {
 	Body  string
 }
 
-func computeDefaults(baseRef, headRef string) (defaults, error) {
-	commits, err := git.Commits(baseRef, headRef)
+func computeDefaults(remote, baseRef, headRef string) (defaults, error) {
+	commits, err := git.Commits(remote, baseRef, headRef)
 	if err != nil {
 		return defaults{}, err
 	}
@@ -101,7 +101,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
-	defs, defaultsErr := computeDefaults(baseBranch, headBranch)
+	remote, err := repoContext.RemoteForRepo(baseRepo)
+	if err != nil {
+		return fmt.Errorf("could not find the remote for default repo %w", err)
+	}
+	defs, defaultsErr := computeDefaults(remote.Name, baseBranch, headBranch)
 
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {

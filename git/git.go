@@ -76,11 +76,13 @@ type Commit struct {
 	Title string
 }
 
-func Commits(baseRef, headRef string) ([]*Commit, error) {
+func Commits(remote, baseRef, headRef string) ([]*Commit, error) {
+	remoteBase := fmt.Sprintf("%s/%s", remote, baseRef)
+
 	logCmd := GitCommand(
 		"-c", "log.ShowSignature=false",
 		"log", "--pretty=format:%H,%s",
-		"--cherry", fmt.Sprintf("%s...%s", baseRef, headRef))
+		"--cherry", fmt.Sprintf("%s...%s", remoteBase, headRef))
 	output, err := utils.PrepareCmd(logCmd).Output()
 	if err != nil {
 		return []*Commit{}, err
