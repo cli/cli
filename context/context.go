@@ -51,7 +51,10 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 		repos = append(repos, baseOverride)
 	}
 
-	result := ResolvedRemotes{Remotes: remotes}
+	result := ResolvedRemotes{
+		Remotes:   remotes,
+		apiClient: client,
+	}
 	if hasBaseOverride {
 		result.BaseOverride = baseOverride
 	}
@@ -67,6 +70,7 @@ type ResolvedRemotes struct {
 	BaseOverride ghrepo.Interface
 	Remotes      Remotes
 	Network      api.RepoNetworkResult
+	apiClient    *api.Client
 }
 
 // BaseRepo is the first found repository in the "upstream", "github", "origin"
@@ -95,8 +99,30 @@ func (r ResolvedRemotes) BaseRepo() (*api.Repository, error) {
 	return nil, errors.New("not found")
 }
 
-// HeadRepo is the first found repository that has push access
+// HeadRepo is a fork of base repo (if any), or the first found repository that
+// has push access
 func (r ResolvedRemotes) HeadRepo() (*api.Repository, error) {
+	baseRepo, err := r.BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+
+	// try to find a pushable fork among existing remotes
+	for _, repo := range r.Network.Repositories {
+		if repo != nil && repo.Parent != nil && repo.ViewerCanPush() && ghrepo.IsSame(repo.Parent, baseRepo) {
+			return repo, nil
+		}
+	}
+
+	// a fork might still exist on GitHub, so let's query for it
+	var notFound *api.NotFoundError
+	if repo, err := api.RepoFindFork(r.apiClient, baseRepo); err == nil {
+		return repo, nil
+	} else if !errors.As(err, &notFound) {
+		return nil, err
+	}
+
+	// fall back to any listed repository that has push access
 	for _, repo := range r.Network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
 			return repo, nil

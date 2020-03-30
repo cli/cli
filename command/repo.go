@@ -304,14 +304,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 	s.Start()
 
-	authLogin, err := ctx.AuthLogin()
-	if err != nil {
-		s.Stop()
-		return fmt.Errorf("could not determine current username: %w", err)
-	}
-
-	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
-
 	forkedRepo, err := api.ForkRepo(apiClient, toFork)
 	if err != nil {
 		s.Stop()
@@ -324,11 +316,11 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// returns the fork repo data even if it already exists -- with no change in status code or
 	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
 	// we assume the fork already existed and report an error.
-	created_ago := Since(forkedRepo.CreatedAt)
-	if created_ago > time.Minute {
+	createdAgo := Since(forkedRepo.CreatedAt)
+	if createdAgo > time.Minute {
 		fmt.Fprintf(out, "%s %s %s\n",
 			utils.Yellow("!"),
-			utils.Bold(ghrepo.FullName(possibleFork)),
+			utils.Bold(ghrepo.FullName(forkedRepo)),
 			"already exists")
 	} else {
 		fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
@@ -339,6 +331,15 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	if inParent {
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return err
+		}
+		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
+			fmt.Fprintf(out, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+			return nil
+		}
+
 		remoteDesired := remotePref == "true"
 		if remotePref == "prompt" {
 			err = Confirm("Would you like to add a remote for the fork?", &remoteDesired)
@@ -347,7 +348,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if remoteDesired {
-			_, err := git.AddRemote("fork", forkedRepo.CloneURL, "")
+			_, err := git.AddRemote("fork", forkedRepo.CloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
