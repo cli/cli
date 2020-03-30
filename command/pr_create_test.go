@@ -589,7 +589,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{}
@@ -604,7 +604,7 @@ func Test_determineTrackingBranch_empty(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_noMatch(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{
@@ -631,7 +631,7 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_hasMatch(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{
@@ -664,7 +664,7 @@ deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{
