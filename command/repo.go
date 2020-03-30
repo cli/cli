@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -100,7 +101,7 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneCmd.Stdin = os.Stdin
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
-	return utils.PrepareCmd(cloneCmd).Run()
+	return run.PrepareCmd(cloneCmd).Run()
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
@@ -200,7 +201,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		remoteAdd := git.GitCommand("remote", "add", "origin", remoteURL)
 		remoteAdd.Stdout = os.Stdout
 		remoteAdd.Stderr = os.Stderr
-		err = utils.PrepareCmd(remoteAdd).Run()
+		err = run.PrepareCmd(remoteAdd).Run()
 		if err != nil {
 			return err
 		}
@@ -220,14 +221,14 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 			gitInit := git.GitCommand("init", path)
 			gitInit.Stdout = os.Stdout
 			gitInit.Stderr = os.Stderr
-			err = utils.PrepareCmd(gitInit).Run()
+			err = run.PrepareCmd(gitInit).Run()
 			if err != nil {
 				return err
 			}
 			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
 			gitRemoteAdd.Stdout = os.Stdout
 			gitRemoteAdd.Stderr = os.Stderr
-			err = utils.PrepareCmd(gitRemoteAdd).Run()
+			err = run.PrepareCmd(gitRemoteAdd).Run()
 			if err != nil {
 				return err
 			}
@@ -367,7 +368,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			cloneCmd.Stdin = os.Stdin
 			cloneCmd.Stdout = os.Stdout
 			cloneCmd.Stderr = os.Stderr
-			err = utils.PrepareCmd(cloneCmd).Run()
+			err = run.PrepareCmd(cloneCmd).Run()
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}

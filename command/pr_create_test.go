@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/test"
 )
 
 func TestPRCreate(t *testing.T) {
@@ -29,7 +30,7 @@ func TestPRCreate(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -80,7 +81,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 		] } } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -114,7 +115,7 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	`))
 	http.StubResponse(200, bytes.NewBufferString("{}"))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -138,7 +139,7 @@ func TestPRCreate_web(t *testing.T) {
 	] } } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -179,7 +180,7 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -251,7 +252,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -306,7 +307,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
@@ -382,7 +383,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                                        // git config --get-regexp (determineTrackingBranch)
@@ -459,7 +460,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("")                                                        // git config --get-regexp (determineTrackingBranch)
@@ -504,7 +505,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
@@ -522,7 +523,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
@@ -549,7 +550,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 		} } } }
 	`))
 
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
@@ -588,7 +589,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{}
@@ -603,7 +604,7 @@ func Test_determineTrackingBranch_empty(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_noMatch(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{
@@ -630,7 +631,7 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_hasMatch(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{
@@ -663,7 +664,7 @@ deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
-	cs, cmdTeardown := initCmdStubber()
+	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	remotes := context.Remotes{

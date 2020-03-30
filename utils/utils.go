@@ -8,6 +8,7 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/glamour"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/browser"
 )
 
@@ -17,7 +18,7 @@ func OpenInBrowser(url string) error {
 	if err != nil {
 		return err
 	}
-	return PrepareCmd(browseCmd).Run()
+	return run.PrepareCmd(browseCmd).Run()
 }
 
 func RenderMarkdown(text string) (string, error) {

@@ -84,7 +84,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
 	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
-		return err
+		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
 
 	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)

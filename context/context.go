@@ -210,7 +210,7 @@ func (c *fsContext) Branch() (string, error) {
 
 	currentBranch, err := git.CurrentBranch()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not determine current branch: %w", err)
 	}
 
 	c.branch = currentBranch

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
 
 func TestIssueStatus(t *testing.T) {
@@ -229,7 +229,7 @@ func TestIssueView_web(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -263,7 +263,7 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -372,7 +372,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -419,7 +419,7 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -504,7 +504,7 @@ func TestIssueCreate_web(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -530,7 +530,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})

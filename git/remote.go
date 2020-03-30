@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
 )
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
@@ -74,7 +74,7 @@ func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 // AddRemote adds a new git remote and auto-fetches objects from it
 func AddRemote(name, u string) (*Remote, error) {
 	addCmd := exec.Command("git", "remote", "add", "-f", name, u)
-	err := utils.PrepareCmd(addCmd).Run()
+	err := run.PrepareCmd(addCmd).Run()
 	if err != nil {
 		return nil, err
 	}
