@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"testing"
 )
 
 // OutputStub implements a simple utils.Runnable
@@ -73,4 +75,15 @@ func UseTempGitRepo() *TempGitRepo {
 	}
 
 	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
+}
+
+func ExpectLines(t *testing.T, output string, lines ...string) {
+	var r *regexp.Regexp
+	for _, l := range lines {
+		r = regexp.MustCompile(l)
+		if !r.MatchString(output) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
 }

@@ -144,9 +144,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"- Checks passing - Changes requested",
-		"- Checks pending - Approved",
-		"- 1/3 checks failing - Review required",
+		"✓ Checks passing + Changes requested",
+		"- Checks pending ✓ Approved",
+		"× 1/3 checks failing - Review required",
 	}
 
 	for _, line := range expected {
@@ -409,25 +409,18 @@ func TestPRView_preview(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prViewCmd, "pr view -p 12")
+	output, err := RunCommand(prViewCmd, "pr view 12")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are from a fork`),
-		regexp.MustCompile(`nobody wants to merge 12 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are from a fork",
+		"nobody wants to merge 12 commits into master from blueberries",
+		"blueberries taste good",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12")
 }
 
 func TestPRView_previewCurrentBranch(t *testing.T) {
@@ -444,25 +437,18 @@ func TestPRView_previewCurrentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -p")
+	output, err := RunCommand(prViewCmd, "pr view")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`blueberries taste good`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are a good fruit",
+		"nobody wants to merge 8 commits into master from blueberries",
+		"blueberries taste good",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
 }
 
 func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
@@ -479,27 +465,20 @@ func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -p")
+	output, err := RunCommand(prViewCmd, "pr view")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Blueberries are a good fruit`),
-		regexp.MustCompile(`nobody wants to merge 8 commits into master from blueberries`),
-		regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Blueberries are a good fruit",
+		"nobody wants to merge 8 commits into master from blueberries",
+		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
 }
 
-func TestPRView_currentBranch(t *testing.T) {
+func TestPRView_web_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -520,7 +499,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view")
+	output, err := RunCommand(prViewCmd, "pr view -w")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -537,7 +516,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	}
 }
 
-func TestPRView_noResultsForBranch(t *testing.T) {
+func TestPRView_web_noResultsForBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -558,7 +537,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	_, err := RunCommand(prViewCmd, "pr view")
+	_, err := RunCommand(prViewCmd, "pr view -w")
 	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -568,7 +547,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	}
 }
 
-func TestPRView_numberArg(t *testing.T) {
+func TestPRView_web_numberArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -586,7 +565,7 @@ func TestPRView_numberArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view 23")
+	output, err := RunCommand(prViewCmd, "pr view -w 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -600,7 +579,7 @@ func TestPRView_numberArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_numberArgWithHash(t *testing.T) {
+func TestPRView_web_numberArgWithHash(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -618,7 +597,7 @@ func TestPRView_numberArgWithHash(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view \"#23\"")
+	output, err := RunCommand(prViewCmd, "pr view -w \"#23\"")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -632,7 +611,7 @@ func TestPRView_numberArgWithHash(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_urlArg(t *testing.T) {
+func TestPRView_web_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
@@ -649,7 +628,7 @@ func TestPRView_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view https://github.com/OWNER/REPO/pull/23/files")
+	output, err := RunCommand(prViewCmd, "pr view -w https://github.com/OWNER/REPO/pull/23/files")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -663,7 +642,7 @@ func TestPRView_urlArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_branchArg(t *testing.T) {
+func TestPRView_web_branchArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -683,7 +662,7 @@ func TestPRView_branchArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view blueberries")
+	output, err := RunCommand(prViewCmd, "pr view -w blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -697,7 +676,7 @@ func TestPRView_branchArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_branchWithOwnerArg(t *testing.T) {
+func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -718,7 +697,7 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view hubot:blueberries")
+	output, err := RunCommand(prViewCmd, "pr view -w hubot:blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
