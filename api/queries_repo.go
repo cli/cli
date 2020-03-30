@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -222,6 +223,49 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		},
 		ViewerPermission: "WRITE",
 	}, nil
+}
+
+// RepoFindFork finds a fork of repo affiliated with the viewer
+func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	result := struct {
+		Repository struct {
+			Forks struct {
+				Nodes []Repository
+			}
+		}
+	}{}
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+	}
+
+	if err := client.GraphQL(`
+	query($owner: String!, $repo: String!) {
+		repository(owner: $owner, name: $repo) {
+			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
+				nodes {
+					id
+					name
+					owner { login }
+					url
+					viewerPermission
+				}
+			}
+		}
+	}
+	`, variables, &result); err != nil {
+		return nil, err
+	}
+
+	forks := result.Repository.Forks.Nodes
+	// we check ViewerCanPush, even though we expect it to always be true per
+	// `affiliations` condition, to guard against versions of GitHub with a
+	// faulty `affiliations` implementation
+	if len(forks) > 0 && forks[0].ViewerCanPush() {
+		return &forks[0], nil
+	}
+	return nil, &NotFoundError{errors.New("no fork found")}
 }
 
 // RepoCreateInput represents input parameters for RepoCreate

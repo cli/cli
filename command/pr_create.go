@@ -225,11 +225,25 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("error forking repo: %w", err)
 		}
 		didForkRepo = true
+	}
+
+	headBranchLabel := headBranch
+	if !ghrepo.IsSame(baseRepo, headRepo) {
+		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+	}
+
+	// There are two cases when an existing remote for the head repo will be
+	// missing:
+	// 1. the head repo was just created by auto-forking;
+	// 2. an existing fork was discovered by quering the API.
+	//
+	// In either case, we want to add the head repo as a new git remote so we
+	// can push to it.
+	if err != nil {
 		// TODO: support non-HTTPS git remote URLs
-		baseRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(baseRepo))
 		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
-		// TODO: figure out what to name the new git remote
-		gitRemote, err := git.AddRemote("fork", baseRepoURL, headRepoURL)
+		// TODO: prevent clashes with another remote of a same name
+		gitRemote, err := git.AddRemote("fork", headRepoURL)
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
@@ -238,11 +252,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			Owner:  headRepo.RepoOwner(),
 			Repo:   headRepo.RepoName(),
 		}
-	}
-
-	headBranchLabel := headBranch
-	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
 	// automatically push the branch if it hasn't been pushed anywhere yet

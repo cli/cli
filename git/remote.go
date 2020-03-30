@@ -71,34 +71,22 @@ func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 	return
 }
 
-// AddRemote adds a new git remote. The initURL is the remote URL with which the
-// automatic fetch is made and finalURL, if non-blank, is set as the remote URL
-// after the fetch.
-func AddRemote(name, initURL, finalURL string) (*Remote, error) {
-	addCmd := exec.Command("git", "remote", "add", "-f", name, initURL)
+// AddRemote adds a new git remote and auto-fetches objects from it
+func AddRemote(name, u string) (*Remote, error) {
+	addCmd := exec.Command("git", "remote", "add", "-f", name, u)
 	err := utils.PrepareCmd(addCmd).Run()
 	if err != nil {
 		return nil, err
 	}
 
-	if finalURL == "" {
-		finalURL = initURL
-	} else {
-		setCmd := exec.Command("git", "remote", "set-url", name, finalURL)
-		err := utils.PrepareCmd(setCmd).Run()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	finalURLParsed, err := url.Parse(finalURL)
+	urlParsed, err := url.Parse(u)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Remote{
 		Name:     name,
-		FetchURL: finalURLParsed,
-		PushURL:  finalURLParsed,
+		FetchURL: urlParsed,
+		PushURL:  urlParsed,
 	}, nil
 }
