@@ -13,10 +13,41 @@ import (
 	"github.com/cli/cli/utils"
 )
 
-func VerifyRef(ref string) bool {
-	showRef := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
-	err := utils.PrepareCmd(showRef).Run()
-	return err == nil
+// Ref represents a git commit reference
+type Ref struct {
+	Hash string
+	Name string
+}
+
+// TrackingRef represents a ref for a remote tracking branch
+type TrackingRef struct {
+	RemoteName string
+	BranchName string
+}
+
+func (r TrackingRef) String() string {
+	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
+}
+
+// ShowRefs resolves fully-qualified refs to commit hashes
+func ShowRefs(ref ...string) ([]Ref, error) {
+	args := append([]string{"show-ref", "--verify", "--"}, ref...)
+	showRef := exec.Command("git", args...)
+	output, err := utils.PrepareCmd(showRef).Output()
+
+	var refs []Ref
+	for _, line := range outputLines(output) {
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		refs = append(refs, Ref{
+			Hash: parts[0],
+			Name: parts[1],
+		})
+	}
+
+	return refs, err
 }
 
 // CurrentBranch reads the checked-out branch for the git repository
@@ -152,7 +183,7 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 					continue
 				}
 				cfg.RemoteURL = u
-			} else {
+			} else if !isFilesystemPath(parts[1]) {
 				cfg.RemoteName = parts[1]
 			}
 		case "merge":
@@ -160,6 +191,10 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 		}
 	}
 	return
+}
+
+func isFilesystemPath(p string) bool {
+	return p == "." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "/")
 }
 
 // ToplevelDir returns the top-level directory path of the current repository
