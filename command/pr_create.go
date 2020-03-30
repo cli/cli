@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -75,7 +76,27 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not determine the current branch: %w", err)
 	}
-	headRepo, headRepoErr := repoContext.HeadRepo()
+
+	var headRepo ghrepo.Interface
+	var headRemote *context.Remote
+
+	// determine whether the head branch is already pushed to a remote
+	headBranchPushedTo := determineTrackingBranch(remotes, headBranch)
+	if headBranchPushedTo != nil {
+		for _, r := range remotes {
+			if r.Name != headBranchPushedTo.RemoteName {
+				continue
+			}
+			headRepo = r
+			headRemote = r
+			break
+		}
+	}
+
+	// otherwise, determine the head repository with info obtained from the API
+	if headRepo == nil {
+		headRepo, _ = repoContext.HeadRepo()
+	}
 
 	baseBranch, err := cmd.Flags().GetString("base")
 	if err != nil {
@@ -193,7 +214,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	didForkRepo := false
-	if headRepoErr != nil {
+	// if a head repository could not be determined so far, automatically create
+	// one by forking the base repository
+	if headRepo == nil {
 		if baseRepo.IsPrivate {
 			return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
 		}
@@ -209,7 +232,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
-	headRemote, err := repoContext.RemoteForRepo(headRepo)
 	// There are two cases when an existing remote for the head repo will be
 	// missing:
 	// 1. the head repo was just created by auto-forking;
@@ -232,22 +254,31 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	pushTries := 0
-	maxPushTries := 3
-	for {
-		// TODO: respect existing upstream configuration of the current branch
-		if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
-			if didForkRepo && pushTries < maxPushTries {
-				pushTries++
-				// first wait 2 seconds after forking, then 4s, then 6s
-				waitSeconds := 2 * pushTries
-				fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
-				time.Sleep(time.Duration(waitSeconds) * time.Second)
-				continue
+	// automatically push the branch if it hasn't been pushed anywhere yet
+	if headBranchPushedTo == nil {
+		if headRemote == nil {
+			headRemote, err = repoContext.RemoteForRepo(headRepo)
+			if err != nil {
+				return fmt.Errorf("git remote not found for head repository: %w", err)
 			}
-			return err
 		}
-		break
+
+		pushTries := 0
+		maxPushTries := 3
+		for {
+			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
+				if didForkRepo && pushTries < maxPushTries {
+					pushTries++
+					// first wait 2 seconds after forking, then 4s, then 6s
+					waitSeconds := 2 * pushTries
+					fmt.Fprintf(cmd.ErrOrStderr(), "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+					time.Sleep(time.Duration(waitSeconds) * time.Second)
+					continue
+				}
+				return err
+			}
+			break
+		}
 	}
 
 	if action == SubmitAction {
@@ -272,6 +303,47 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return utils.OpenInBrowser(openURL)
 	} else {
 		panic("Unreachable state")
+	}
+
+	return nil
+}
+
+func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {
+	refsForLookup := []string{"HEAD"}
+	var trackingRefs []git.TrackingRef
+
+	headBranchConfig := git.ReadBranchConfig(headBranch)
+	if headBranchConfig.RemoteName != "" {
+		tr := git.TrackingRef{
+			RemoteName: headBranchConfig.RemoteName,
+			BranchName: strings.TrimPrefix(headBranchConfig.MergeRef, "refs/heads/"),
+		}
+		trackingRefs = append(trackingRefs, tr)
+		refsForLookup = append(refsForLookup, tr.String())
+	}
+
+	for _, remote := range remotes {
+		tr := git.TrackingRef{
+			RemoteName: remote.Name,
+			BranchName: headBranch,
+		}
+		trackingRefs = append(trackingRefs, tr)
+		refsForLookup = append(refsForLookup, tr.String())
+	}
+
+	resolvedRefs, _ := git.ShowRefs(refsForLookup...)
+	if len(resolvedRefs) > 1 {
+		for _, r := range resolvedRefs[1:] {
+			if r.Hash != resolvedRefs[0].Hash {
+				continue
+			}
+			for _, tr := range trackingRefs {
+				if tr.String() != r.Name {
+					continue
+				}
+				return &tr
+			}
+		}
 	}
 
 	return nil

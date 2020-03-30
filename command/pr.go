@@ -31,7 +31,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prViewCmd.Flags().BoolP("web", "w", false, "Open pull request in browser")
 }
 
 var prCmd = &cobra.Command{
@@ -57,10 +57,10 @@ var prStatusCmd = &cobra.Command{
 var prViewCmd = &cobra.Command{
 	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument in the browser.
+	Long: `View a pull request specified by the argument.
 
 Without an argument, the pull request that belongs to the current
-branch is opened.`,
+branch is displayed.`,
 	RunE: prView,
 }
 
@@ -272,7 +272,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	preview, err := cmd.Flags().GetBool("preview")
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if preview {
+			if !web {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
 					return err
@@ -309,12 +309,12 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printPrPreview(out, pr)
 	}
 }
 
@@ -418,7 +418,9 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		reviews := pr.ReviewStatus()
 
 		if pr.State == "OPEN" {
-			if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
+			reviewStatus := reviews.ChangesRequested || reviews.Approved || reviews.ReviewRequired
+			if checks.Total > 0 || reviewStatus {
+				// show checks & reviews on their own line
 				fmt.Fprintf(w, "\n  ")
 			}
 
@@ -426,24 +428,29 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				var summary string
 				if checks.Failing > 0 {
 					if checks.Failing == checks.Total {
-						summary = utils.Red("All checks failing")
+						summary = utils.Red("× All checks failing")
 					} else {
-						summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
+						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
 					}
 				} else if checks.Pending > 0 {
-					summary = utils.Yellow("Checks pending")
+					summary = utils.Yellow("- Checks pending")
 				} else if checks.Passing == checks.Total {
-					summary = utils.Green("Checks passing")
+					summary = utils.Green("✓ Checks passing")
 				}
-				fmt.Fprintf(w, " - %s", summary)
+				fmt.Fprint(w, summary)
+			}
+
+			if checks.Total > 0 && reviewStatus {
+				// add padding between checks & reviews
+				fmt.Fprint(w, " ")
 			}
 
 			if reviews.ChangesRequested {
-				fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
+				fmt.Fprint(w, utils.Red("+ Changes requested"))
 			} else if reviews.ReviewRequired {
-				fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
+				fmt.Fprint(w, utils.Yellow("- Review required"))
 			} else if reviews.Approved {
-				fmt.Fprintf(w, " - %s", utils.Green("Approved"))
+				fmt.Fprint(w, utils.Green("✓ Approved"))
 			}
 		} else {
 			s := strings.Title(strings.ToLower(pr.State))
