@@ -151,8 +151,8 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	}
 
 	expectedCmds := []string{
-		"git remote add -f fork https://github.com/someone/repo.git",
-		"git fetch fork",
+		"git remote rename origin upstream",
+		"git remote add -f origin https://github.com/someone/repo.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -163,7 +163,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
-		"Remote added at fork")
+		"Added remote origin")
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
@@ -171,11 +171,11 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	var seenCmd *exec.Cmd
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})()
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
 
 	output, err := RunCommand(repoForkCmd, "repo fork --clone OWNER/REPO")
 	if err != nil {
@@ -184,7 +184,8 @@ func TestRepoFork_outside_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
@@ -196,11 +197,11 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	var seenCmd *exec.Cmd
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})()
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
 
 	oldConfirm := Confirm
 	Confirm = func(_ string, result *bool) error {
@@ -216,7 +217,8 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
@@ -283,8 +285,8 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	}
 
 	expectedCmds := []string{
-		"git remote add -f fork https://github.com/someone/repo.git",
-		"git fetch fork",
+		"git remote rename origin upstream",
+		"git remote add -f origin https://github.com/someone/repo.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -295,7 +297,8 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
-		"Remote added at fork")
+		"Renamed origin remote to upstream",
+		"Added remote origin")
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
