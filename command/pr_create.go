@@ -122,7 +122,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
-	defs, defaultsErr := computeDefaults(baseBranch, headBranch)
+	baseTrackingBranch := baseBranch
+	if baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName()); err == nil {
+		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
+	}
+	defs, defaultsErr := computeDefaults(baseTrackingBranch, headBranch)
 
 	isWeb, err := cmd.Flags().GetBool("web")
 	if err != nil {

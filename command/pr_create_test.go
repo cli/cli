@@ -514,7 +514,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 
 	_, err := RunCommand(prCreateCmd, "pr create -f")
 
-	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
 
 func TestPRCreate_defaults_error_web(t *testing.T) {
@@ -532,7 +532,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 
 	_, err := RunCommand(prCreateCmd, "pr create -w")
 
-	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
 
 func TestPRCreate_defaults_error_interactive(t *testing.T) {
