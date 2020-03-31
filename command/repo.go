@@ -93,6 +93,28 @@ func repoClone(cmd *cobra.Command, args []string) error {
 		cloneURL = fmt.Sprintf("https://github.com/%s.git", cloneURL)
 	}
 
+	var repo ghrepo.Interface
+	var parentRepo ghrepo.Interface
+
+	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
+	// here to handle hostname aliases in SSH remotes
+	if u, err := git.ParseURL(cloneURL); err == nil {
+		repo, _ = ghrepo.FromURL(u)
+	}
+
+	if repo != nil {
+		ctx := contextForCommand(cmd)
+		apiClient, err := apiClientForContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		parentRepo, err = api.RepoParent(apiClient, repo)
+		if err != nil {
+			return err
+		}
+	}
+
 	cloneArgs := []string{"clone"}
 	cloneArgs = append(cloneArgs, args[1:]...)
 	cloneArgs = append(cloneArgs, cloneURL)
@@ -101,7 +123,26 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneCmd.Stdin = os.Stdin
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
-	return run.PrepareCmd(cloneCmd).Run()
+	err := run.PrepareCmd(cloneCmd).Run()
+	if err != nil {
+		return err
+	}
+
+	if parentRepo != nil {
+		// TODO: support SSH remote URLs
+		upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
+		cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
+
+		cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
+		cloneCmd.Stdout = os.Stdout
+		cloneCmd.Stderr = os.Stderr
+		err := run.PrepareCmd(cloneCmd).Run()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {

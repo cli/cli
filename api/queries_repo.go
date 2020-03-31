@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
+	"github.com/shurcooL/githubv4"
 )
 
 // Repository contains information about a GitHub repo
@@ -91,6 +93,37 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	return &result.Repository, nil
+}
+
+// RepoParent finds out the parent repository of a fork
+func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error) {
+	var query struct {
+		Repository struct {
+			Parent *struct {
+				Name  string
+				Owner struct {
+					Login string
+				}
+			}
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	if query.Repository.Parent == nil {
+		return nil, nil
+	}
+
+	parent := ghrepo.New(query.Repository.Parent.Owner.Login, query.Repository.Parent.Name)
+	return parent, nil
 }
 
 // RepoNetworkResult describes the relationship between related repositories
