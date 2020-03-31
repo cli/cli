@@ -363,12 +363,17 @@ func TestRepoClone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var seenCmd *exec.Cmd
-			restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-				seenCmd = cmd
-				return &test.OutputStub{}
-			})
-			defer restoreCmd()
+			http := initFakeHTTP()
+			http.StubResponse(200, bytes.NewBufferString(`
+			{ "data": { "repository": {
+				"parent": null
+			} } }
+			`))
+
+			cs, restore := test.InitCmdStubber()
+			defer restore()
+
+			cs.Stub("") // git clone
 
 			output, err := RunCommand(repoCloneCmd, tt.args)
 			if err != nil {
@@ -377,13 +382,36 @@ func TestRepoClone(t *testing.T) {
 
 			eq(t, output.String(), "")
 			eq(t, output.Stderr(), "")
-
-			if seenCmd == nil {
-				t.Fatal("expected a command to run")
-			}
-			eq(t, strings.Join(seenCmd.Args, " "), tt.want)
+			eq(t, cs.Count, 1)
+			eq(t, strings.Join(cs.Calls[0].Args, " "), tt.want)
 		})
 	}
+}
+
+func TestRepoClone_hasParent(t *testing.T) {
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"parent": {
+			"owner": {"login": "hubot"},
+			"name": "ORIG"
+		}
+	} } }
+	`))
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
+
+	_, err := RunCommand(repoCloneCmd, "repo clone OWNER/REPO")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+
+	eq(t, cs.Count, 2)
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add upstream https://github.com/hubot/ORIG.git")
 }
 
 func TestRepoCreate(t *testing.T) {
