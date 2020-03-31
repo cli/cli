@@ -215,8 +215,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 									"name": "REPO",
 									"owner": {"login": "OWNER"},
 									"defaultBranchRef": {
-										"name": "default",
-										"target": {"oid": "deadbeef"}
+										"name": "default"
 									},
 									"viewerPermission": "READ"
 								},
@@ -226,8 +225,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 										"name": "REPO",
 										"owner": {"login": "OWNER"},
 										"defaultBranchRef": {
-											"name": "default",
-											"target": {"oid": "deadbeef"}
+											"name": "default"
 										},
 										"viewerPermission": "READ"
 									},
@@ -235,8 +233,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 									"name": "REPO",
 									"owner": {"login": "MYSELF"},
 									"defaultBranchRef": {
-										"name": "default",
-										"target": {"oid": "deadbeef"}
+										"name": "default"
 									},
 									"viewerPermission": "WRITE"
 		} } }
