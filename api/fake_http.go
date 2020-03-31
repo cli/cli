@@ -54,8 +54,7 @@ func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
 			"name": "%s",
 			"owner": {"login": "%s"},
 			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
+				"name": "master"
 			},
 			"viewerPermission": "WRITE"
 		} } }
@@ -76,8 +75,7 @@ func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
 			"name": "%s",
 			"owner": {"login": "%s"},
 			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
+				"name": "master"
 			},
 			"viewerPermission": "ADMIN",
 			"parent": {
@@ -85,8 +83,7 @@ func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
 				"name": "%s",
 				"owner": {"login": "%s"},
 				"defaultBranchRef": {
-					"name": "master",
-					"target": {"oid": "deadbeef"}
+					"name": "master"
 				},
 				"viewerPermission": "READ"
 			}

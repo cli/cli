@@ -28,10 +28,7 @@ type Repository struct {
 	HasIssuesEnabled bool
 	ViewerPermission string
 	DefaultBranchRef struct {
-		Name   string
-		Target struct {
-			OID string
-		}
+		Name string
 	}
 
 	Parent *Repository
@@ -127,7 +124,6 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		viewerPermission
 		defaultBranchRef {
 			name
-			target { oid }
 		}
 		isPrivate
 	}

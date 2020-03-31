@@ -216,8 +216,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 									"name": "REPO",
 									"owner": {"login": "OWNER"},
 									"defaultBranchRef": {
-										"name": "default",
-										"target": {"oid": "deadbeef"}
+										"name": "default"
 									},
 									"viewerPermission": "READ"
 								},
@@ -227,8 +226,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 										"name": "REPO",
 										"owner": {"login": "OWNER"},
 										"defaultBranchRef": {
-											"name": "default",
-											"target": {"oid": "deadbeef"}
+											"name": "default"
 										},
 										"viewerPermission": "READ"
 									},
@@ -236,8 +234,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 									"name": "REPO",
 									"owner": {"login": "MYSELF"},
 									"defaultBranchRef": {
-										"name": "default",
-										"target": {"oid": "deadbeef"}
+										"name": "default"
 									},
 									"viewerPermission": "WRITE"
 		} } }
@@ -515,7 +512,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 
 	_, err := RunCommand(prCreateCmd, "pr create -f")
 
-	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
 
 func TestPRCreate_defaults_error_web(t *testing.T) {
@@ -533,7 +530,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 
 	_, err := RunCommand(prCreateCmd, "pr create -w")
 
-	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between master and feature")
+	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
 
 func TestPRCreate_defaults_error_interactive(t *testing.T) {
