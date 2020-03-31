@@ -129,20 +129,24 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if parentRepo != nil {
-		// TODO: support SSH remote URLs
-		upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
-		cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
-
-		cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
-		cloneCmd.Stdout = os.Stdout
-		cloneCmd.Stderr = os.Stderr
-		err := run.PrepareCmd(cloneCmd).Run()
+		err := addUpstreamRemote(parentRepo, cloneURL)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func addUpstreamRemote(parentRepo ghrepo.Interface, cloneURL string) error {
+	// TODO: support SSH remote URLs
+	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
+	cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
+
+	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	return run.PrepareCmd(cloneCmd).Run()
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
@@ -389,12 +393,28 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if remoteDesired {
-			_, err := git.AddRemote("fork", forkedRepo.CloneURL)
+			remoteName := "origin"
+
+			remotes, err := ctx.Remotes()
+			if err != nil {
+				return err
+			}
+			if _, err := remotes.FindByName(remoteName); err == nil {
+				renameTarget := "upstream"
+				renameCmd := git.GitCommand("remote", "rename", remoteName, renameTarget)
+				err = run.PrepareCmd(renameCmd).Run()
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(out, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
+			}
+
+			_, err = git.AddRemote(remoteName, forkedRepo.CloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
 
-			fmt.Fprintf(out, "%s Remote added at %s\n", greenCheck, utils.Bold("fork"))
+			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
 		}
 	} else {
 		cloneDesired := clonePref == "true"
@@ -412,6 +432,11 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			err = run.PrepareCmd(cloneCmd).Run()
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
+			}
+
+			err = addUpstreamRemote(toFork, forkedRepo.CloneURL)
+			if err != nil {
+				return err
 			}
 
 			fmt.Fprintf(out, "%s Cloned fork\n", greenCheck)
