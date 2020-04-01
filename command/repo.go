@@ -89,11 +89,50 @@ With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
+// parseExtraArgs determines whether any args passed after -- contain an explicit directory name
+// TODO: Leverage something from libgit to parse these instead
+func parseExtraArgs(extraArgs []string) (args []string, cloneDir string) {
+	args = []string{}
+	requiresArgs := make(map[string]bool)
+	// These are the git clone options that require a flag
+	for _, arg := range []string{
+		"--reference",
+		"--reference-if-able",
+		"-o", "--origin",
+		"-b", "--branch",
+		"-u", "--upload-pack",
+		"-c", "--config",
+		"-j", "--jobs",
+		"--depth",
+	} {
+		requiresArgs[arg] = true
+	}
+
+	var lastKey string
+	for _, arg := range extraArgs {
+		if !strings.HasPrefix(arg, "-") {
+			if _, found := requiresArgs[lastKey]; found == false {
+				cloneDir = arg
+			} else {
+				args = append(args, arg)
+			}
+		} else {
+			args = append(args, arg)
+		}
+		lastKey = arg
+	}
+
+	return
+}
+
 func runClone(cloneURL string, cloneDir string, args []string) (target string, err error) {
-	cloneArgs := []string{"clone"}
-	cloneArgs = append(cloneArgs, args...)
+	cloneArgs, target := parseExtraArgs(args)
 	cloneArgs = append(cloneArgs, cloneURL)
 
+	// If the args contain an explicit target, setting cloneDir will override everything else
+	if target != "" {
+		cloneDir = target
+	}
 	// If cloneDir is not set, git would use the bare repo name
 	//   Set `target` so it can be returned but do not pass it to the `GitCommand`
 	if cloneDir == "" {
@@ -102,6 +141,8 @@ func runClone(cloneURL string, cloneDir string, args []string) (target string, e
 		cloneArgs = append(cloneArgs, cloneDir)
 		target = cloneDir
 	}
+
+	cloneArgs = append([]string{"clone"}, cloneArgs...)
 
 	cloneCmd := git.GitCommand(cloneArgs...)
 	cloneCmd.Stdin = os.Stdin
