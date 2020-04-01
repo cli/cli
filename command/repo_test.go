@@ -192,6 +192,32 @@ func TestRepoFork_outside_yes(t *testing.T) {
 		"Cloned fork")
 }
 
+func TestRepoFork_outside_yes_nested(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	http := initFakeHTTP()
+	defer http.StubWithFixture(200, "forkResult.json")()
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
+
+	output, err := RunCommand(repoForkCmd, "repo fork --clone-nested --clone OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/repo")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/repo remote add upstream https://github.com/OWNER/REPO.git")
+
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
+}
+
 func TestRepoFork_outside_survey_yes(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -219,6 +245,39 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 
 	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
 	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
+
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
+}
+
+func TestRepoFork_outside_survey_yes_nested(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	http := initFakeHTTP()
+	defer http.StubWithFixture(200, "forkResult.json")()
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
+
+	oldConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+	defer func() { Confirm = oldConfirm }()
+
+	output, err := RunCommand(repoForkCmd, "repo fork --clone-nested OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/repo")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/repo remote add upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",

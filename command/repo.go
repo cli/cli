@@ -34,6 +34,7 @@ func init() {
 	repoCmd.AddCommand(repoForkCmd)
 	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
 	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
+	repoForkCmd.Flags().Bool("clone-nested", false, "Create nested diretories")
 	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
 
@@ -121,11 +122,15 @@ func repoClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	cloneDir := repo.RepoName()
+
 	cloneArgs := []string{"clone"}
 	cloneArgs = append(cloneArgs, args[1:]...)
 	cloneArgs = append(cloneArgs, cloneURL)
+
 	if cloneNested {
-		cloneArgs = append(cloneArgs, ghrepo.FullName(repo))
+		cloneDir = ghrepo.FullName(repo)
+		cloneArgs = append(cloneArgs, cloneDir)
 	}
 
 	cloneCmd := git.GitCommand(cloneArgs...)
@@ -138,7 +143,7 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if parentRepo != nil {
-		err := addUpstreamRemote(parentRepo, cloneURL)
+		err := addUpstreamRemote(parentRepo, cloneDir)
 		if err != nil {
 			return err
 		}
@@ -147,10 +152,9 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addUpstreamRemote(parentRepo ghrepo.Interface, cloneURL string) error {
+func addUpstreamRemote(parentRepo ghrepo.Interface, cloneDir string) error {
 	// TODO: support SSH remote URLs
 	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
-	cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
 
 	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
@@ -434,7 +438,23 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if cloneDesired {
-			cloneCmd := git.GitCommand("clone", forkedRepo.CloneURL)
+			cloneNested, err := cmd.Flags().GetBool("clone-nested")
+			if err != nil {
+				return err
+			}
+
+			url, _ := url.Parse(forkedRepo.CloneURL)
+			repo, _ := ghrepo.FromURL(url)
+			cloneDir := repo.RepoName()
+
+			cloneArgs := []string{"clone"}
+			cloneArgs = append(cloneArgs, forkedRepo.CloneURL)
+			if cloneNested {
+				cloneDir = ghrepo.FullName(repo)
+				cloneArgs = append(cloneArgs, cloneDir)
+			}
+
+			cloneCmd := git.GitCommand(cloneArgs...)
 			cloneCmd.Stdin = os.Stdin
 			cloneCmd.Stdout = os.Stdout
 			cloneCmd.Stderr = os.Stderr
@@ -443,7 +463,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(toFork, forkedRepo.CloneURL)
+			err = addUpstreamRemote(toFork, cloneDir)
 			if err != nil {
 				return err
 			}
