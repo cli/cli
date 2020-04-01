@@ -87,6 +87,21 @@ With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
+func runClone(cloneURL string, args []string) (target string, err error) {
+	cloneArgs := append(args, cloneURL)
+	target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+
+	cloneArgs = append([]string{"clone"}, cloneArgs...)
+
+	cloneCmd := git.GitCommand(cloneArgs...)
+	cloneCmd.Stdin = os.Stdin
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+
+	err = run.PrepareCmd(cloneCmd).Run()
+	return
+}
+
 func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
@@ -115,21 +130,13 @@ func repoClone(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	cloneArgs := []string{"clone"}
-	cloneArgs = append(cloneArgs, args[1:]...)
-	cloneArgs = append(cloneArgs, cloneURL)
-
-	cloneCmd := git.GitCommand(cloneArgs...)
-	cloneCmd.Stdin = os.Stdin
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-	err := run.PrepareCmd(cloneCmd).Run()
+	cloneDir, err := runClone(cloneURL, args[1:])
 	if err != nil {
 		return err
 	}
 
 	if parentRepo != nil {
-		err := addUpstreamRemote(parentRepo, cloneURL)
+		err := addUpstreamRemote(parentRepo, cloneDir)
 		if err != nil {
 			return err
 		}
@@ -138,10 +145,9 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addUpstreamRemote(parentRepo ghrepo.Interface, cloneURL string) error {
+func addUpstreamRemote(parentRepo ghrepo.Interface, cloneDir string) error {
 	// TODO: support SSH remote URLs
 	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
-	cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
 
 	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
@@ -425,16 +431,12 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if cloneDesired {
-			cloneCmd := git.GitCommand("clone", forkedRepo.CloneURL)
-			cloneCmd.Stdin = os.Stdin
-			cloneCmd.Stdout = os.Stdout
-			cloneCmd.Stderr = os.Stderr
-			err = run.PrepareCmd(cloneCmd).Run()
+			cloneDir, err := runClone(forkedRepo.CloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(toFork, forkedRepo.CloneURL)
+			err = addUpstreamRemote(toFork, cloneDir)
 			if err != nil {
 				return err
 			}
