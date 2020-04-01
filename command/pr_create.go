@@ -95,7 +95,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	// otherwise, determine the head repository with info obtained from the API
 	if headRepo == nil {
-		headRepo, _ = repoContext.HeadRepo()
+		if r, err := repoContext.HeadRepo(); err == nil {
+			headRepo = r
+		}
 	}
 
 	baseBranch, err := cmd.Flags().GetString("base")
@@ -236,6 +238,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
+	if headRemote == nil {
+		headRemote, _ = repoContext.RemoteForRepo(headRepo)
+	}
+
 	// There are two cases when an existing remote for the head repo will be
 	// missing:
 	// 1. the head repo was just created by auto-forking;
@@ -243,7 +249,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	//
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
-	if err != nil {
+	if headRemote == nil {
 		// TODO: support non-HTTPS git remote URLs
 		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
 		// TODO: prevent clashes with another remote of a same name
@@ -260,13 +266,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	// automatically push the branch if it hasn't been pushed anywhere yet
 	if headBranchPushedTo == nil {
-		if headRemote == nil {
-			headRemote, err = repoContext.RemoteForRepo(headRepo)
-			if err != nil {
-				return fmt.Errorf("git remote not found for head repository: %w", err)
-			}
-		}
-
 		pushTries := 0
 		maxPushTries := 3
 		for {

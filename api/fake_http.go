@@ -48,6 +48,10 @@ func (f *FakeHTTP) StubWithFixture(status int, fixtureFileName string) func() {
 }
 
 func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
+	f.StubRepoResponseWithPermission(owner, repo, "WRITE")
+}
+
+func (f *FakeHTTP) StubRepoResponseWithPermission(owner, repo, permission string) {
 	body := bytes.NewBufferString(fmt.Sprintf(`
 		{ "data": { "repo_000": {
 			"id": "REPOID",
@@ -56,9 +60,9 @@ func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
 			"defaultBranchRef": {
 				"name": "master"
 			},
-			"viewerPermission": "WRITE"
+			"viewerPermission": "%s"
 		} } }
-	`, repo, owner))
+	`, repo, owner, permission))
 	resp := &http.Response{
 		StatusCode: 200,
 		Body:       ioutil.NopCloser(body),
