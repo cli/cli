@@ -89,6 +89,29 @@ With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
+func runClone(cloneURL string, cloneDir string, args []string) (target string, err error) {
+	cloneArgs := []string{"clone"}
+	cloneArgs = append(cloneArgs, args...)
+	cloneArgs = append(cloneArgs, cloneURL)
+
+	// If cloneDir is not set, git would use the bare repo name
+	//   Set `target` so it can be returned but do not pass it to the `GitCommand`
+	if cloneDir == "" {
+		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+	} else {
+		cloneArgs = append(cloneArgs, cloneDir)
+		target = cloneDir
+	}
+
+	cloneCmd := git.GitCommand(cloneArgs...)
+	cloneCmd.Stdin = os.Stdin
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+
+	err = run.PrepareCmd(cloneCmd).Run()
+	return
+}
+
 func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
@@ -97,6 +120,8 @@ func repoClone(cmd *cobra.Command, args []string) error {
 
 	var repo ghrepo.Interface
 	var parentRepo ghrepo.Interface
+	var cloneDir string
+	var err error
 
 	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
 	// here to handle hostname aliases in SSH remotes
@@ -117,28 +142,15 @@ func repoClone(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	cloneNested, err := cmd.Flags().GetBool("clone-nested")
-	if err != nil {
+	if cloneNested, err := cmd.Flags().GetBool("clone-nested"); err != nil {
 		return err
+	} else {
+		if cloneNested {
+			cloneDir = ghrepo.FullName(repo)
+		}
 	}
 
-	cloneDir := repo.RepoName()
-
-	cloneArgs := []string{"clone"}
-	cloneArgs = append(cloneArgs, args[1:]...)
-	cloneArgs = append(cloneArgs, cloneURL)
-
-	if cloneNested {
-		cloneDir = ghrepo.FullName(repo)
-		cloneArgs = append(cloneArgs, cloneDir)
-	}
-
-	cloneCmd := git.GitCommand(cloneArgs...)
-	cloneCmd.Stdin = os.Stdin
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-	err = run.PrepareCmd(cloneCmd).Run()
-	if err != nil {
+	if cloneDir, err = runClone(cloneURL, cloneDir, args[1:]); err != nil {
 		return err
 	}
 
@@ -438,28 +450,16 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if cloneDesired {
-			cloneNested, err := cmd.Flags().GetBool("clone-nested")
-			if err != nil {
+			var cloneDir string
+			if cloneNested, err := cmd.Flags().GetBool("clone-nested"); err != nil {
 				return err
+			} else {
+				if cloneNested {
+					cloneDir = ghrepo.FullName(forkedRepo)
+				}
 			}
 
-			url, _ := url.Parse(forkedRepo.CloneURL)
-			repo, _ := ghrepo.FromURL(url)
-			cloneDir := repo.RepoName()
-
-			cloneArgs := []string{"clone"}
-			cloneArgs = append(cloneArgs, forkedRepo.CloneURL)
-			if cloneNested {
-				cloneDir = ghrepo.FullName(repo)
-				cloneArgs = append(cloneArgs, cloneDir)
-			}
-
-			cloneCmd := git.GitCommand(cloneArgs...)
-			cloneCmd.Stdin = os.Stdin
-			cloneCmd.Stdout = os.Stdout
-			cloneCmd.Stderr = os.Stderr
-			err = run.PrepareCmd(cloneCmd).Run()
-			if err != nil {
+			if cloneDir, err = runClone(forkedRepo.CloneURL, cloneDir, []string{}); err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 

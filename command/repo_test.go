@@ -210,8 +210,8 @@ func TestRepoFork_outside_yes_nested(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/repo")
-	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/repo remote add upstream https://github.com/OWNER/REPO.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/REPO")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/REPO remote add upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
@@ -276,8 +276,8 @@ func TestRepoFork_outside_survey_yes_nested(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/repo")
-	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/repo remote add upstream https://github.com/OWNER/REPO.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git someone/REPO")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C someone/REPO remote add upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
