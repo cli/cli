@@ -20,8 +20,24 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Build
+      - name: Run tests
         shell: bash
         run: |
-          go test -race ./...
-          go build -v ./cmd/gh
+          assert-nothing-changed() {
+            local diff
+            git checkout -- .
+            "$@" >/dev/null || true
+            if ! diff="$(git diff --exit-code)"; then
+              printf '\n\e[31mError: running `\e[31;1m%s\e[31;22m` results in modifications that you must check into version control:\e[0m\n%s\n' "$*" "$diff" >&2
+              return 1
+            fi
+          }
+
+          STATUS=0
+          go test -race ./... || STATUS=$?
+          assert-nothing-changed go fmt ./... || STATUS=$?
+          assert-nothing-changed go mod tidy || STATUS=$?
+          exit $STATUS
+
+      - name: Build
+        run: go build -v ./cmd/gh
