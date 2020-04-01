@@ -30,7 +30,7 @@ jobs:
             local diff
             git checkout -- .
             "$@" >/dev/null || true
-            if ! diff="$(git diff --exit-code)"; then
+            if ! diff="$(git diff -U1 --color --exit-code)"; then
               printf '\n\e[31mError: running `\e[31;1m%s\e[31;22m` results in modifications that you must check into version control:\e[0m\n%s\n' "$*" "$diff" >&2
               return 1
             fi
