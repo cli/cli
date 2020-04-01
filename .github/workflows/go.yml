@@ -18,7 +18,10 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Verify dependencies
-        run: go mod verify
+        shell: bash
+        run: |
+          go mod verify
+          go mod download
 
       - name: Run tests
         shell: bash
