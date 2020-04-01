@@ -65,6 +65,49 @@ func TestPRCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 
+func TestPRCreate_withForking(t *testing.T) {
+	initBlankContext("OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponseWithPermission("OWNER", "REPO", "READ")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "forks": { "nodes": [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "node_id": "NODEID",
+		"name": "REPO",
+		"owner": {"login": "myself"},
+		"clone_url": "http://example.com",
+		"created_at": "2008-02-25T20:21:40Z"
+		}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git remote add
+	cs.Stub("")                                         // git push
+
+	output, err := RunCommand(prCreateCmd, `pr create -t title -b body`)
+	eq(t, err, nil)
+
+	eq(t, http.Requests[3].URL.Path, "/repos/OWNER/REPO/forks")
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
 func TestPRCreate_alreadyExists(t *testing.T) {
 	initBlankContext("OWNER/REPO", "feature")
 	http := initFakeHTTP()
