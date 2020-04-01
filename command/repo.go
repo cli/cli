@@ -51,12 +51,14 @@ A repository can be supplied as an argument in any of the following formats:
 }
 
 var repoCloneCmd = &cobra.Command{
-	Use:   "clone <repo>",
+	Use:   "clone <repo> [<directory>]",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
-To pass 'git clone' options, separate them with '--'.`,
+To pass 'git clone' options, separate them with '--'.
+
+In order to clone to a specific directory, provide it before the '--' instead of after the other additional options.`,
 	RunE: repoClone,
 }
 
@@ -87,9 +89,29 @@ With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
+func parseExtraArgs(extraArgs []string) (args []string, target string) {
+	args = extraArgs
+
+	if len(args) > 0 {
+		if !strings.HasPrefix(args[0], "-") {
+			target, args = args[0], args[1:]
+		}
+	}
+	return
+}
+
 func runClone(cloneURL string, args []string) (target string, err error) {
-	cloneArgs := append(args, cloneURL)
-	target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+	cloneArgs, target := parseExtraArgs(args)
+
+	cloneArgs = append(cloneArgs, cloneURL)
+
+	// If the args contain an explicit target, pass it to clone
+	//    otherwise, parse the URL to determine where git cloned it to so we can return it
+	if target != "" {
+		cloneArgs = append(cloneArgs, target)
+	} else {
+		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+	}
 
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
 
