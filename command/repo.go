@@ -21,6 +21,7 @@ import (
 func init() {
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoCloneCmd)
+	repoCloneCmd.Flags().Bool("clone-nested", false, "Create nested diretories")
 
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
@@ -115,15 +116,23 @@ func repoClone(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	cloneNested, err := cmd.Flags().GetBool("clone-nested")
+	if err != nil {
+		return err
+	}
+
 	cloneArgs := []string{"clone"}
 	cloneArgs = append(cloneArgs, args[1:]...)
 	cloneArgs = append(cloneArgs, cloneURL)
+	if cloneNested {
+		cloneArgs = append(cloneArgs, ghrepo.FullName(repo))
+	}
 
 	cloneCmd := git.GitCommand(cloneArgs...)
 	cloneCmd.Stdin = os.Stdin
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
-	err := run.PrepareCmd(cloneCmd).Run()
+	err = run.PrepareCmd(cloneCmd).Run()
 	if err != nil {
 		return err
 	}

@@ -349,6 +349,11 @@ func TestRepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
+			name: "shorthand with nested",
+			args: "repo clone OWNER/REPO --clone-nested",
+			want: "git clone https://github.com/OWNER/REPO.git OWNER/REPO",
+		},
+		{
 			name: "clone arguments",
 			args: "repo clone OWNER/REPO -- -o upstream --depth 1",
 			want: "git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git",
