@@ -75,17 +75,3 @@ func Spinner(w io.Writer) *spinner.Spinner {
 	s.Writer = w
 	return s
 }
-
-// ColorFuncForState returns a color function for a PR/Issue state
-func ColorFuncForState(state string) func(string) string {
-	switch state {
-	case "OPEN":
-		return Green
-	case "CLOSED":
-		return Red
-	case "MERGED":
-		return Magenta
-	default:
-		return nil
-	}
-}

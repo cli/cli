@@ -229,7 +229,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 }
 
 func issueStateTitleWithColor(state string) string {
-	colorFunc := utils.ColorFuncForState(state)
+	colorFunc := colorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
 }
 
@@ -425,7 +425,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, utils.ColorFuncForState(issue.State))
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)

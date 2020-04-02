@@ -238,7 +238,21 @@ func colorFuncForPR(pr api.PullRequest) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	}
-	return utils.ColorFuncForState(pr.State)
+	return colorFuncForState(pr.State)
+}
+
+// colorFuncForState returns a color function for a PR/Issue state
+func colorFuncForState(state string) func(string) string {
+	switch state {
+	case "OPEN":
+		return utils.Green
+	case "CLOSED":
+		return utils.Red
+	case "MERGED":
+		return utils.Magenta
+	default:
+		return nil
+	}
 }
 
 func prView(cmd *cobra.Command, args []string) error {
