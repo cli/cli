@@ -407,82 +407,82 @@ func TestPRView_Preview(t *testing.T) {
 		ownerRepo       string
 		args            string
 		fixture         string
-		expectedOutputs []*regexp.Regexp
+		expectedOutputs []string
 	}{
 		"Open PR": {
 			ownerRepo: "master",
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreview.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are from a fork`),
-				regexp.MustCompile(`Open • nobody wants to merge 12 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Open • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
 			},
 		},
 		"Open PR for the current branch": {
 			ownerRepo: "blueberries",
 			args:      "pr view",
 			fixture:   "../test/fixtures/prView.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are a good fruit`),
-				regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Open • nobody wants to merge 8 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
 			},
 		},
 		"Open PR wth empty body for the current branch": {
 			ownerRepo: "blueberries",
 			args:      "pr view",
 			fixture:   "../test/fixtures/prView_EmptyBody.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are a good fruit`),
-				regexp.MustCompile(`Open • nobody wants to merge 8 commits into master from blueberries`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Open • nobody wants to merge 8 commits into master from blueberries",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
 			},
 		},
 		"Closed PR": {
 			ownerRepo: "master",
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are from a fork`),
-				regexp.MustCompile(`Closed • nobody wants to merge 12 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Closed • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
 			},
 		},
 		"Merged PR": {
 			ownerRepo: "master",
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are from a fork`),
-				regexp.MustCompile(`Merged • nobody wants to merge 12 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Merged • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
 			},
 		},
 		"Draft PR": {
 			ownerRepo: "master",
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are from a fork`),
-				regexp.MustCompile(`Draft • nobody wants to merge 12 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`),
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Draft • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
 			},
 		},
 		"Draft PR by branch": {
 			ownerRepo: "master",
 			args:      "pr view blueberries",
 			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`Blueberries are a good fruit`),
-				regexp.MustCompile(`Draft • nobody wants to merge 8 commits into master from blueberries`),
-				regexp.MustCompile(`blueberries taste good`),
-				regexp.MustCompile(`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`),
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Draft • nobody wants to merge 8 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
 			},
 		},
 	}
@@ -504,12 +504,7 @@ func TestPRView_Preview(t *testing.T) {
 
 			eq(t, output.Stderr(), "")
 
-			for _, r := range tc.expectedOutputs {
-				if !r.MatchString(output.String()) {
-					t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-					return
-				}
-			}
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
 }

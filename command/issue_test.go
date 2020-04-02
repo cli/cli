@@ -290,49 +290,49 @@ func TestIssueView_Preview(t *testing.T) {
 		ownerRepo       string
 		command         string
 		fixture         string
-		expectedOutputs []*regexp.Regexp
+		expectedOutputs []string
 	}{
 		"Open issue": {
 			ownerRepo: "master",
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_preview.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`ix of coins`),
-				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-				regexp.MustCompile(`bold story`),
-				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
 			},
 		},
 		"Open issue with no label": {
 			ownerRepo: "master",
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewNoLabel.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`ix of coins`),
-				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-				regexp.MustCompile(`bold story`),
-				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
 			},
 		},
 		"Open issue with empty body": {
 			ownerRepo: "master",
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`ix of coins`),
-				regexp.MustCompile(`Open • marseilles opened about 292 years ago • 9 comments`),
-				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
 			},
 		},
 		"Closed issue": {
 			ownerRepo: "master",
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewClosedState.json",
-			expectedOutputs: []*regexp.Regexp{
-				regexp.MustCompile(`ix of coins`),
-				regexp.MustCompile(`Closed • marseilles opened about 292 years ago • 9 comments`),
-				regexp.MustCompile(`bold story`),
-				regexp.MustCompile(`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`),
+			expectedOutputs: []string{
+				"ix of coins",
+				"Closed • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
 			},
 		},
 	}
@@ -353,12 +353,7 @@ func TestIssueView_Preview(t *testing.T) {
 
 			eq(t, output.Stderr(), "")
 
-			for _, r := range tc.expectedOutputs {
-				if !r.MatchString(output.String()) {
-					t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-					return
-				}
-			}
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
 }
