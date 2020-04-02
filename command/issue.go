@@ -427,7 +427,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
 		table.EndRow()
 	}
-	table.Render()
+	_ = table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)

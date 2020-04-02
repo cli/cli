@@ -38,9 +38,9 @@ func initAskStubber() (*askStubber, func()) {
 			}
 			if sq.Default {
 				defaultValue := reflect.ValueOf(q.Prompt).Elem().FieldByName("Default")
-				core.WriteAnswer(response, q.Name, defaultValue)
+				_ = core.WriteAnswer(response, q.Name, defaultValue)
 			} else {
-				core.WriteAnswer(response, q.Name, sq.Value)
+				_ = core.WriteAnswer(response, q.Name, sq.Value)
 			}
 		}
 

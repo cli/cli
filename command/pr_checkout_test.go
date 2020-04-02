@@ -167,7 +167,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 			Repo  string
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Owner, "OTHER")
 	eq(t, reqBody.Variables.Repo, "POE")
