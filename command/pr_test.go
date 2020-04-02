@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -110,11 +110,11 @@ func TestPRStatus_fork(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
 			return &test.OutputStub{[]byte(`branch.blueberries.remote origin
-branch.blueberries.merge refs/heads/blueberries`)}
+branch.blueberries.merge refs/heads/blueberries`), nil}
 		default:
 			panic("not implemented")
 		}
@@ -146,9 +146,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"- Checks passing - Changes requested",
-		"- Checks pending - Approved",
-		"- 1/3 checks failing - Review required",
+		"✓ Checks passing + Changes requested",
+		"- Checks pending ✓ Approved",
+		"× 1/3 checks failing - Review required",
 	}
 
 	for _, line := range expected {
@@ -411,7 +411,7 @@ func TestPRView_Preview(t *testing.T) {
 	}{
 		"Open PR": {
 			ownerRepo: "master",
-			args:      "pr view -p 12",
+			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreview.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are from a fork`),
@@ -422,7 +422,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Open PR for the current branch": {
 			ownerRepo: "blueberries",
-			args:      "pr view -p",
+			args:      "pr view",
 			fixture:   "../test/fixtures/prView.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are a good fruit`),
@@ -433,7 +433,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Open PR wth empty body for the current branch": {
 			ownerRepo: "blueberries",
-			args:      "pr view -p",
+			args:      "pr view",
 			fixture:   "../test/fixtures/prView_EmptyBody.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are a good fruit`),
@@ -443,7 +443,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Closed PR": {
 			ownerRepo: "master",
-			args:      "pr view -p 12",
+			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are from a fork`),
@@ -454,7 +454,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Merged PR": {
 			ownerRepo: "master",
-			args:      "pr view -p 12",
+			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are from a fork`),
@@ -465,7 +465,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Draft PR": {
 			ownerRepo: "master",
-			args:      "pr view -p 12",
+			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are from a fork`),
@@ -476,7 +476,7 @@ func TestPRView_Preview(t *testing.T) {
 		},
 		"Draft PR by branch": {
 			ownerRepo: "master",
-			args:      "pr view -p blueberries",
+			args:      "pr view blueberries",
 			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`Blueberries are a good fruit`),
@@ -514,7 +514,7 @@ func TestPRView_Preview(t *testing.T) {
 	}
 }
 
-func TestPRView_currentBranch(t *testing.T) {
+func TestPRView_web_currentBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -524,7 +524,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	http.StubResponse(200, jsonFile)
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
 			return &test.OutputStub{}
@@ -535,7 +535,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view")
+	output, err := RunCommand(prViewCmd, "pr view -w")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -552,7 +552,7 @@ func TestPRView_currentBranch(t *testing.T) {
 	}
 }
 
-func TestPRView_noResultsForBranch(t *testing.T) {
+func TestPRView_web_noResultsForBranch(t *testing.T) {
 	initBlankContext("OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -562,7 +562,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	http.StubResponse(200, jsonFile)
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
 			return &test.OutputStub{}
@@ -573,7 +573,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	_, err := RunCommand(prViewCmd, "pr view")
+	_, err := RunCommand(prViewCmd, "pr view -w")
 	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -583,7 +583,7 @@ func TestPRView_noResultsForBranch(t *testing.T) {
 	}
 }
 
-func TestPRView_numberArg(t *testing.T) {
+func TestPRView_web_numberArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -595,13 +595,13 @@ func TestPRView_numberArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view 23")
+	output, err := RunCommand(prViewCmd, "pr view -w 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -615,7 +615,7 @@ func TestPRView_numberArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_numberArgWithHash(t *testing.T) {
+func TestPRView_web_numberArgWithHash(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -627,13 +627,13 @@ func TestPRView_numberArgWithHash(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view \"#23\"")
+	output, err := RunCommand(prViewCmd, "pr view -w \"#23\"")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -647,7 +647,7 @@ func TestPRView_numberArgWithHash(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_urlArg(t *testing.T) {
+func TestPRView_web_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
@@ -658,13 +658,13 @@ func TestPRView_urlArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view https://github.com/OWNER/REPO/pull/23/files")
+	output, err := RunCommand(prViewCmd, "pr view -w https://github.com/OWNER/REPO/pull/23/files")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -678,7 +678,7 @@ func TestPRView_urlArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_branchArg(t *testing.T) {
+func TestPRView_web_branchArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -692,13 +692,13 @@ func TestPRView_branchArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view blueberries")
+	output, err := RunCommand(prViewCmd, "pr view -w blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -712,7 +712,7 @@ func TestPRView_branchArg(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/pull/23")
 }
 
-func TestPRView_branchWithOwnerArg(t *testing.T) {
+func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -727,13 +727,13 @@ func TestPRView_branchWithOwnerArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view hubot:blueberries")
+	output, err := RunCommand(prViewCmd, "pr view -w hubot:blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}

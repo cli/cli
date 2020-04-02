@@ -17,6 +17,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
+	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f // indirect
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0 // indirect

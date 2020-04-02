@@ -2,32 +2,35 @@ package api
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/utils"
+	"github.com/shurcooL/githubv4"
 )
 
 // Repository contains information about a GitHub repo
 type Repository struct {
-	ID        string
-	Name      string
-	URL       string
-	CloneURL  string
-	CreatedAt time.Time
-	Owner     RepositoryOwner
+	ID          string
+	Name        string
+	Description string
+	URL         string
+	CloneURL    string
+	CreatedAt   time.Time
+	Owner       RepositoryOwner
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
 	ViewerPermission string
 	DefaultBranchRef struct {
-		Name   string
-		Target struct {
-			OID string
-		}
+		Name string
 	}
 
 	Parent *Repository
@@ -69,6 +72,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		repository(owner: $owner, name: $name) {
 			id
 			hasIssuesEnabled
+			description
 		}
 	}`
 	variables := map[string]interface{}{
@@ -86,6 +90,37 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	return &result.Repository, nil
+}
+
+// RepoParent finds out the parent repository of a fork
+func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error) {
+	var query struct {
+		Repository struct {
+			Parent *struct {
+				Name  string
+				Owner struct {
+					Login string
+				}
+			}
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	if query.Repository.Parent == nil {
+		return nil, nil
+	}
+
+	parent := ghrepo.New(query.Repository.Parent.Owner.Login, query.Repository.Parent.Name)
+	return parent, nil
 }
 
 // RepoNetworkResult describes the relationship between related repositories
@@ -122,7 +157,6 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		viewerPermission
 		defaultBranchRef {
 			name
-			target { oid }
 		}
 		isPrivate
 	}
@@ -220,6 +254,49 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}, nil
 }
 
+// RepoFindFork finds a fork of repo affiliated with the viewer
+func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	result := struct {
+		Repository struct {
+			Forks struct {
+				Nodes []Repository
+			}
+		}
+	}{}
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+	}
+
+	if err := client.GraphQL(`
+	query($owner: String!, $repo: String!) {
+		repository(owner: $owner, name: $repo) {
+			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
+				nodes {
+					id
+					name
+					owner { login }
+					url
+					viewerPermission
+				}
+			}
+		}
+	}
+	`, variables, &result); err != nil {
+		return nil, err
+	}
+
+	forks := result.Repository.Forks.Nodes
+	// we check ViewerCanPush, even though we expect it to always be true per
+	// `affiliations` condition, to guard against versions of GitHub with a
+	// faulty `affiliations` implementation
+	if len(forks) > 0 && forks[0].ViewerCanPush() {
+		return &forks[0], nil
+	}
+	return nil, &NotFoundError{errors.New("no fork found")}
+}
+
 // RepoCreateInput represents input parameters for RepoCreate
 type RepoCreateInput struct {
 	Name        string `json:"name"`
@@ -278,4 +355,44 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	}
 
 	return &response.CreateRepository.Repository, nil
+}
+
+func RepositoryReadme(client *Client, fullName string) (string, error) {
+	type readmeResponse struct {
+		Name    string
+		Content string
+	}
+
+	var readme readmeResponse
+
+	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", fullName), nil, &readme)
+	if err != nil && !strings.HasSuffix(err.Error(), "'Not Found'") {
+		return "", fmt.Errorf("could not get readme for repo: %w", err)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(readme.Content)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode readme: %w", err)
+	}
+
+	readmeContent := string(decoded)
+
+	if isMarkdownFile(readme.Name) {
+		readmeContent, err = utils.RenderMarkdown(readmeContent)
+		if err != nil {
+			return "", fmt.Errorf("failed to render readme as markdown: %w", err)
+		}
+	}
+
+	return readmeContent, nil
+
+}
+
+func isMarkdownFile(filename string) bool {
+	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
+	// seem worth executing a regex for this given that assumption.
+	return strings.HasSuffix(filename, ".md") ||
+		strings.HasSuffix(filename, ".markdown") ||
+		strings.HasSuffix(filename, ".mdown") ||
+		strings.HasSuffix(filename, ".mkdown")
 }

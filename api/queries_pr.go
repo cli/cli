@@ -120,7 +120,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 			summary.Passing++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS":
+		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
 			summary.Pending++
 		default:
 			panic(fmt.Errorf("unsupported status: %q", state))

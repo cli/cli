@@ -1,76 +1,80 @@
 package test
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
+	"testing"
+
+	"github.com/cli/cli/internal/run"
 )
 
 // OutputStub implements a simple utils.Runnable
 type OutputStub struct {
-	Out []byte
+	Out   []byte
+	Error error
 }
 
 func (s OutputStub) Output() ([]byte, error) {
+	if s.Error != nil {
+		return s.Out, s.Error
+	}
 	return s.Out, nil
 }
 
 func (s OutputStub) Run() error {
+	if s.Error != nil {
+		return s.Error
+	}
 	return nil
 }
 
-type TempGitRepo struct {
-	Remote   string
-	TearDown func()
+type CmdStubber struct {
+	Stubs []*OutputStub
+	Count int
+	Calls []*exec.Cmd
 }
 
-func UseTempGitRepo() *TempGitRepo {
-	pwd, _ := os.Getwd()
-	oldEnv := make(map[string]string)
-	overrideEnv := func(name, value string) {
-		oldEnv[name] = os.Getenv(name)
-		os.Setenv(name, value)
-	}
+func InitCmdStubber() (*CmdStubber, func()) {
+	cs := CmdStubber{}
+	teardown := run.SetPrepareCmd(createStubbedPrepareCmd(&cs))
+	return &cs, teardown
+}
 
-	remotePath := filepath.Join(pwd, "..", "test", "fixtures", "test.git")
-	home, err := ioutil.TempDir("", "test-repo")
-	if err != nil {
-		panic(err)
-	}
+func (cs *CmdStubber) Stub(desiredOutput string) {
+	// TODO maybe have some kind of command mapping but going simple for now
+	cs.Stubs = append(cs.Stubs, &OutputStub{[]byte(desiredOutput), nil})
+}
 
-	overrideEnv("HOME", home)
-	overrideEnv("XDG_CONFIG_HOME", "")
-	overrideEnv("XDG_CONFIG_DIRS", "")
+func (cs *CmdStubber) StubError(errText string) {
+	// TODO support error types beyond CmdError
+	stderrBuff := bytes.NewBufferString(errText)
+	args := []string{"stub"} // TODO make more real?
+	err := errors.New(errText)
+	cs.Stubs = append(cs.Stubs, &OutputStub{[]byte{}, &run.CmdError{stderrBuff, args, err}})
+}
 
-	targetPath := filepath.Join(home, "test.git")
-	cmd := exec.Command("git", "clone", remotePath, targetPath)
-	if output, err := cmd.Output(); err != nil {
-		panic(fmt.Errorf("error running %s\n%s\n%s", cmd, err, output))
-	}
-
-	if err = os.Chdir(targetPath); err != nil {
-		panic(err)
-	}
-
-	// Our libs expect the origin to be a github url
-	cmd = exec.Command("git", "remote", "set-url", "origin", "https://github.com/github/FAKE-GITHUB-REPO-NAME")
-	if output, err := cmd.Output(); err != nil {
-		panic(fmt.Errorf("error running %s\n%s\n%s", cmd, err, output))
-	}
-
-	tearDown := func() {
-		if err := os.Chdir(pwd); err != nil {
-			panic(err)
+func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
+	return func(cmd *exec.Cmd) run.Runnable {
+		cs.Calls = append(cs.Calls, cmd)
+		call := cs.Count
+		cs.Count += 1
+		if call >= len(cs.Stubs) {
+			panic(fmt.Sprintf("more execs than stubs. most recent call: %v", cmd))
 		}
-		for name, value := range oldEnv {
-			os.Setenv(name, value)
-		}
-		if err = os.RemoveAll(home); err != nil {
-			panic(err)
+		return cs.Stubs[call]
+	}
+}
+
+func ExpectLines(t *testing.T, output string, lines ...string) {
+	var r *regexp.Regexp
+	for _, l := range lines {
+		r = regexp.MustCompile(l)
+		if !r.MatchString(output) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
 		}
 	}
-
-	return &TempGitRepo{Remote: remotePath, TearDown: tearDown}
 }

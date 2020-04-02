@@ -10,36 +10,77 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
 )
 
-func VerifyRef(ref string) bool {
-	showRef := exec.Command("git", "show-ref", "--verify", "--quiet", ref)
-	err := utils.PrepareCmd(showRef).Run()
-	return err == nil
+// Ref represents a git commit reference
+type Ref struct {
+	Hash string
+	Name string
+}
+
+// TrackingRef represents a ref for a remote tracking branch
+type TrackingRef struct {
+	RemoteName string
+	BranchName string
+}
+
+func (r TrackingRef) String() string {
+	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
+}
+
+// ShowRefs resolves fully-qualified refs to commit hashes
+func ShowRefs(ref ...string) ([]Ref, error) {
+	args := append([]string{"show-ref", "--verify", "--"}, ref...)
+	showRef := exec.Command("git", args...)
+	output, err := run.PrepareCmd(showRef).Output()
+
+	var refs []Ref
+	for _, line := range outputLines(output) {
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		refs = append(refs, Ref{
+			Hash: parts[0],
+			Name: parts[1],
+		})
+	}
+
+	return refs, err
 }
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	// we avoid using `git branch --show-current` for compatibility with git < 2.22
-	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	output, err := utils.PrepareCmd(branchCmd).Output()
-	branchName := firstLine(output)
-	if err == nil && branchName == "HEAD" {
-		return "", errors.New("git: not on any branch")
+	refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
+
+	output, err := run.PrepareCmd(refCmd).Output()
+	if err == nil {
+		// Found the branch name
+		return firstLine(output), nil
 	}
-	return branchName, err
+
+	var cmdErr *run.CmdError
+	if errors.As(err, &cmdErr) {
+		if cmdErr.Stderr.Len() == 0 {
+			// Detached head
+			return "", errors.New("git: not on any branch")
+		}
+	}
+
+	// Unknown error
+	return "", err
 }
 
 func listRemotes() ([]string, error) {
 	remoteCmd := exec.Command("git", "remote", "-v")
-	output, err := utils.PrepareCmd(remoteCmd).Output()
+	output, err := run.PrepareCmd(remoteCmd).Output()
 	return outputLines(output), err
 }
 
 func Config(name string) (string, error) {
 	configCmd := exec.Command("git", "config", name)
-	output, err := utils.PrepareCmd(configCmd).Output()
+	output, err := run.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("unknown config key: %s", name)
 	}
@@ -54,7 +95,7 @@ var GitCommand = func(args ...string) *exec.Cmd {
 
 func UncommittedChangeCount() (int, error) {
 	statusCmd := GitCommand("status", "--porcelain")
-	output, err := utils.PrepareCmd(statusCmd).Output()
+	output, err := run.PrepareCmd(statusCmd).Output()
 	if err != nil {
 		return 0, err
 	}
@@ -81,7 +122,7 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 		"-c", "log.ShowSignature=false",
 		"log", "--pretty=format:%H,%s",
 		"--cherry", fmt.Sprintf("%s...%s", baseRef, headRef))
-	output, err := utils.PrepareCmd(logCmd).Output()
+	output, err := run.PrepareCmd(logCmd).Output()
 	if err != nil {
 		return []*Commit{}, err
 	}
@@ -109,7 +150,7 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 
 func CommitBody(sha string) (string, error) {
 	showCmd := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
-	output, err := utils.PrepareCmd(showCmd).Output()
+	output, err := run.PrepareCmd(showCmd).Output()
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +162,7 @@ func Push(remote string, ref string) error {
 	pushCmd := GitCommand("push", "--set-upstream", remote, ref)
 	pushCmd.Stdout = os.Stdout
 	pushCmd.Stderr = os.Stderr
-	return utils.PrepareCmd(pushCmd).Run()
+	return run.PrepareCmd(pushCmd).Run()
 }
 
 type BranchConfig struct {
@@ -134,7 +175,7 @@ type BranchConfig struct {
 func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
 	configCmd := GitCommand("config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix))
-	output, err := utils.PrepareCmd(configCmd).Output()
+	output, err := run.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return
 	}
@@ -152,7 +193,7 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 					continue
 				}
 				cfg.RemoteURL = u
-			} else {
+			} else if !isFilesystemPath(parts[1]) {
 				cfg.RemoteName = parts[1]
 			}
 		case "merge":
@@ -162,10 +203,14 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	return
 }
 
+func isFilesystemPath(p string) bool {
+	return p == "." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "/")
+}
+
 // ToplevelDir returns the top-level directory path of the current repository
 func ToplevelDir() (string, error) {
 	showCmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := utils.PrepareCmd(showCmd).Output()
+	output, err := run.PrepareCmd(showCmd).Output()
 	return firstLine(output), err
 
 }

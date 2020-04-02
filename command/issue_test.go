@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -217,7 +217,7 @@ func TestIssueList_disabledIssues(t *testing.T) {
 	}
 }
 
-func TestIssueView(t *testing.T) {
+func TestIssueView_web(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -230,13 +230,13 @@ func TestIssueView(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view 123")
+	output, err := RunCommand(issueViewCmd, "issue view -w 123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestIssueView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
-func TestIssueView_numberArgWithHash(t *testing.T) {
+func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -264,13 +264,13 @@ func TestIssueView_numberArgWithHash(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view \"#123\"")
+	output, err := RunCommand(issueViewCmd, "issue view -w \"#123\"")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestIssueView_Preview(t *testing.T) {
 	}{
 		"Open issue": {
 			ownerRepo: "master",
-			command:   "issue view -p 123",
+			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_preview.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`ix of coins`),
@@ -305,7 +305,7 @@ func TestIssueView_Preview(t *testing.T) {
 		},
 		"Open issue with no label": {
 			ownerRepo: "master",
-			command:   "issue view -p 123",
+			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewNoLabel.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`ix of coins`),
@@ -316,7 +316,7 @@ func TestIssueView_Preview(t *testing.T) {
 		},
 		"Open issue with empty body": {
 			ownerRepo: "master",
-			command:   "issue view -p 123",
+			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`ix of coins`),
@@ -326,7 +326,7 @@ func TestIssueView_Preview(t *testing.T) {
 		},
 		"Closed issue": {
 			ownerRepo: "master",
-			command:   "issue view -p 123",
+			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []*regexp.Regexp{
 				regexp.MustCompile(`ix of coins`),
@@ -363,7 +363,7 @@ func TestIssueView_Preview(t *testing.T) {
 	}
 }
 
-func TestIssueView_notFound(t *testing.T) {
+func TestIssueView_web_notFound(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 
@@ -374,13 +374,13 @@ func TestIssueView_notFound(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	_, err := RunCommand(issueViewCmd, "issue view 9999")
+	_, err := RunCommand(issueViewCmd, "issue view -w 9999")
 	if err == nil || err.Error() != "graphql error: 'Could not resolve to an Issue with the number of 9999.'" {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	}
 }
 
-func TestIssueView_urlArg(t *testing.T) {
+func TestIssueView_web_urlArg(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -421,13 +421,13 @@ func TestIssueView_urlArg(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view https://github.com/OWNER/REPO/issues/123")
+	output, err := RunCommand(issueViewCmd, "issue view -w https://github.com/OWNER/REPO/issues/123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -506,7 +506,7 @@ func TestIssueCreate_web(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -532,7 +532,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})

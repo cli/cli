@@ -11,16 +11,15 @@ import (
 	"time"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 )
 
 func TestRepoFork_already_forked(t *testing.T) {
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
-		ctx.SetBaseRepo("REPO")
+		ctx.SetBaseRepo("OWNER/REPO")
 		ctx.SetBranch("master")
-		ctx.SetAuthLogin("someone")
 		ctx.SetRemotes(map[string]string{
 			"origin": "OWNER/REPO",
 		})
@@ -37,6 +36,31 @@ func TestRepoFork_already_forked(t *testing.T) {
 	r := regexp.MustCompile(`someone/REPO already exists`)
 	if !r.MatchString(output.String()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
+	}
+}
+
+func TestRepoFork_reuseRemote(t *testing.T) {
+	initContext = func() context.Context {
+		ctx := context.NewBlank()
+		ctx.SetBaseRepo("OWNER/REPO")
+		ctx.SetBranch("master")
+		ctx.SetRemotes(map[string]string{
+			"upstream": "OWNER/REPO",
+			"origin":   "someone/REPO",
+		})
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	defer http.StubWithFixture(200, "forkResult.json")()
+
+	output, err := RunCommand(repoForkCmd, "repo fork")
+	if err != nil {
+		t.Errorf("got unexpected error: %v", err)
+	}
+	if !strings.Contains(output.String(), "Using existing remote origin") {
+		t.Errorf("output did not match: %q", output)
 		return
 	}
 }
@@ -116,7 +140,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmds = append(seenCmds, cmd)
 		return &test.OutputStub{}
 	})()
@@ -127,8 +151,8 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	}
 
 	expectedCmds := []string{
-		"git remote add -f fork https://github.com/someone/repo.git",
-		"git fetch fork",
+		"git remote rename origin upstream",
+		"git remote add -f origin https://github.com/someone/repo.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -137,16 +161,9 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Remote added at fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Added remote origin")
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
@@ -154,11 +171,11 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	var seenCmd *exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})()
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
 
 	output, err := RunCommand(repoForkCmd, "repo fork --clone OWNER/REPO")
 	if err != nil {
@@ -167,18 +184,12 @@ func TestRepoFork_outside_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Cloned fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
@@ -186,11 +197,11 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	var seenCmd *exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})()
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
 
 	oldConfirm := Confirm
 	Confirm = func(_ string, result *bool) error {
@@ -206,18 +217,12 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	eq(t, strings.Join(seenCmd.Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Cloned fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Cloned fork")
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
@@ -226,7 +231,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		cmdRun = true
 		return &test.OutputStub{}
 	})()
@@ -262,7 +267,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	var seenCmds []*exec.Cmd
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmds = append(seenCmds, cmd)
 		return &test.OutputStub{}
 	})()
@@ -280,8 +285,8 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	}
 
 	expectedCmds := []string{
-		"git remote add -f fork https://github.com/someone/repo.git",
-		"git fetch fork",
+		"git remote rename origin upstream",
+		"git remote add -f origin https://github.com/someone/repo.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -290,16 +295,10 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 	eq(t, output.Stderr(), "")
 
-	expectedLines := []*regexp.Regexp{
-		regexp.MustCompile(`Created fork someone/REPO`),
-		regexp.MustCompile(`Remote added at fork`),
-	}
-	for _, r := range expectedLines {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"Created fork someone/REPO",
+		"Renamed origin remote to upstream",
+		"Added remote origin")
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
@@ -310,7 +309,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	defer http.StubWithFixture(200, "forkResult.json")()
 
 	cmdRun := false
-	defer utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		cmdRun = true
 		return &test.OutputStub{}
 	})()
@@ -367,12 +366,17 @@ func TestRepoClone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var seenCmd *exec.Cmd
-			restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
-				seenCmd = cmd
-				return &test.OutputStub{}
-			})
-			defer restoreCmd()
+			http := initFakeHTTP()
+			http.StubResponse(200, bytes.NewBufferString(`
+			{ "data": { "repository": {
+				"parent": null
+			} } }
+			`))
+
+			cs, restore := test.InitCmdStubber()
+			defer restore()
+
+			cs.Stub("") // git clone
 
 			output, err := RunCommand(repoCloneCmd, tt.args)
 			if err != nil {
@@ -381,13 +385,36 @@ func TestRepoClone(t *testing.T) {
 
 			eq(t, output.String(), "")
 			eq(t, output.Stderr(), "")
-
-			if seenCmd == nil {
-				t.Fatal("expected a command to run")
-			}
-			eq(t, strings.Join(seenCmd.Args, " "), tt.want)
+			eq(t, cs.Count, 1)
+			eq(t, strings.Join(cs.Calls[0].Args, " "), tt.want)
 		})
 	}
+}
+
+func TestRepoClone_hasParent(t *testing.T) {
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"parent": {
+			"owner": {"login": "hubot"},
+			"name": "ORIG"
+		}
+	} } }
+	`))
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
+
+	_, err := RunCommand(repoCloneCmd, "repo clone OWNER/REPO")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+
+	eq(t, cs.Count, 2)
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add upstream https://github.com/hubot/ORIG.git")
 }
 
 func TestRepoCreate(t *testing.T) {
@@ -408,7 +435,7 @@ func TestRepoCreate(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -473,7 +500,7 @@ func TestRepoCreate_org(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -538,7 +565,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
@@ -580,8 +607,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 }
 
-
-func TestRepoView(t *testing.T) {
+func TestRepoView_web(t *testing.T) {
 	initBlankContext("OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -590,13 +616,13 @@ func TestRepoView(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view")
+	output, err := RunCommand(repoViewCmd, "repo view -w")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -611,7 +637,7 @@ func TestRepoView(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO")
 }
 
-func TestRepoView_ownerRepo(t *testing.T) {
+func TestRepoView_web_ownerRepo(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
 	initContext = func() context.Context {
@@ -623,13 +649,13 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	`))
 
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view cli/cli")
+	output, err := RunCommand(repoViewCmd, "repo view -w cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -644,7 +670,7 @@ func TestRepoView_ownerRepo(t *testing.T) {
 	eq(t, url, "https://github.com/cli/cli")
 }
 
-func TestRepoView_fullURL(t *testing.T) {
+func TestRepoView_web_fullURL(t *testing.T) {
 	ctx := context.NewBlank()
 	ctx.SetBranch("master")
 	initContext = func() context.Context {
@@ -655,13 +681,13 @@ func TestRepoView_fullURL(t *testing.T) {
 	{ }
 	`))
 	var seenCmd *exec.Cmd
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view https://github.com/cli/cli")
+	output, err := RunCommand(repoViewCmd, "repo view -w https://github.com/cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -674,4 +700,78 @@ func TestRepoView_fullURL(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/cli/cli")
+}
+
+func TestRepoView(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": {
+				"repository": {
+		      "description": "social distancing"
+		}}}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "name": "readme.md",
+		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
+	`))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"social distancing",
+		"truly cool readme",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
+
+}
+
+func TestRepoView_nonmarkdown_readme(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": {
+				"repository": {
+		      "description": "social distancing"
+		}}}
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "name": "readme.org",
+		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
+	`))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"social distancing",
+		"# truly cool readme",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
+}
+
+func TestRepoView_blanks(t *testing.T) {
+	initBlankContext("OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString("{}"))
+	http.StubResponse(200, bytes.NewBufferString("{}"))
+
+	output, err := RunCommand(repoViewCmd, "repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"No description provided",
+		"No README provided",
+		"View this repository on GitHub: https://github.com/OWNER/REPO")
 }

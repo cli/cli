@@ -18,10 +18,29 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Verify dependencies
-        run: go mod verify
-
-      - name: Build
         shell: bash
         run: |
-          go test -race ./...
-          go build -v ./cmd/gh
+          go mod verify
+          go mod download
+
+      - name: Run tests
+        shell: bash
+        run: |
+          assert-nothing-changed() {
+            local diff
+            git checkout -- .
+            "$@" >/dev/null || true
+            if ! diff="$(git diff -U1 --color --exit-code)"; then
+              printf '\n\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n' "$*" "$diff" >&2
+              return 1
+            fi
+          }
+
+          STATUS=0
+          go test -race ./... || STATUS=$?
+          assert-nothing-changed go fmt ./... || STATUS=$?
+          assert-nothing-changed go mod tidy || STATUS=$?
+          exit $STATUS
+
+      - name: Build
+        run: go build -v ./cmd/gh

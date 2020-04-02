@@ -6,12 +6,14 @@ import (
 	"os"
 	"path"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -35,6 +37,7 @@ func init() {
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
 
 	repoCmd.AddCommand(repoViewCmd)
+	repoViewCmd.Flags().BoolP("web", "w", false, "Open repository in browser")
 }
 
 var repoCmd = &cobra.Command{
@@ -78,9 +81,9 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 var repoViewCmd = &cobra.Command{
 	Use:   "view [<repository>]",
 	Short: "View a repository in the browser",
-	Long: `View a GitHub repository in the browser.
+	Long: `View a GitHub repository.
 
-With no argument, the repository for the current directory is opened.`,
+With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
@@ -88,6 +91,28 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
 		cloneURL = fmt.Sprintf("https://github.com/%s.git", cloneURL)
+	}
+
+	var repo ghrepo.Interface
+	var parentRepo ghrepo.Interface
+
+	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
+	// here to handle hostname aliases in SSH remotes
+	if u, err := git.ParseURL(cloneURL); err == nil {
+		repo, _ = ghrepo.FromURL(u)
+	}
+
+	if repo != nil {
+		ctx := contextForCommand(cmd)
+		apiClient, err := apiClientForContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		parentRepo, err = api.RepoParent(apiClient, repo)
+		if err != nil {
+			return err
+		}
 	}
 
 	cloneArgs := []string{"clone"}
@@ -98,7 +123,30 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	cloneCmd.Stdin = os.Stdin
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
-	return utils.PrepareCmd(cloneCmd).Run()
+	err := run.PrepareCmd(cloneCmd).Run()
+	if err != nil {
+		return err
+	}
+
+	if parentRepo != nil {
+		err := addUpstreamRemote(parentRepo, cloneURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func addUpstreamRemote(parentRepo ghrepo.Interface, cloneURL string) error {
+	// TODO: support SSH remote URLs
+	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
+	cloneDir := path.Base(strings.TrimSuffix(cloneURL, ".git"))
+
+	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	return run.PrepareCmd(cloneCmd).Run()
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
@@ -198,7 +246,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		remoteAdd := git.GitCommand("remote", "add", "origin", remoteURL)
 		remoteAdd.Stdout = os.Stdout
 		remoteAdd.Stderr = os.Stderr
-		err = utils.PrepareCmd(remoteAdd).Run()
+		err = run.PrepareCmd(remoteAdd).Run()
 		if err != nil {
 			return err
 		}
@@ -218,14 +266,14 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 			gitInit := git.GitCommand("init", path)
 			gitInit.Stdout = os.Stdout
 			gitInit.Stderr = os.Stderr
-			err = utils.PrepareCmd(gitInit).Run()
+			err = run.PrepareCmd(gitInit).Run()
 			if err != nil {
 				return err
 			}
 			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
 			gitRemoteAdd.Stdout = os.Stdout
 			gitRemoteAdd.Stderr = os.Stderr
-			err = utils.PrepareCmd(gitRemoteAdd).Run()
+			err = run.PrepareCmd(gitRemoteAdd).Run()
 			if err != nil {
 				return err
 			}
@@ -301,14 +349,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 	s.Start()
 
-	authLogin, err := ctx.AuthLogin()
-	if err != nil {
-		s.Stop()
-		return fmt.Errorf("could not determine current username: %w", err)
-	}
-
-	possibleFork := ghrepo.New(authLogin, toFork.RepoName())
-
 	forkedRepo, err := api.ForkRepo(apiClient, toFork)
 	if err != nil {
 		s.Stop()
@@ -321,11 +361,11 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// returns the fork repo data even if it already exists -- with no change in status code or
 	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
 	// we assume the fork already existed and report an error.
-	created_ago := Since(forkedRepo.CreatedAt)
-	if created_ago > time.Minute {
+	createdAgo := Since(forkedRepo.CreatedAt)
+	if createdAgo > time.Minute {
 		fmt.Fprintf(out, "%s %s %s\n",
 			utils.Yellow("!"),
-			utils.Bold(ghrepo.FullName(possibleFork)),
+			utils.Bold(ghrepo.FullName(forkedRepo)),
 			"already exists")
 	} else {
 		fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
@@ -336,6 +376,15 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	if inParent {
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return err
+		}
+		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
+			fmt.Fprintf(out, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+			return nil
+		}
+
 		remoteDesired := remotePref == "true"
 		if remotePref == "prompt" {
 			err = Confirm("Would you like to add a remote for the fork?", &remoteDesired)
@@ -344,12 +393,28 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if remoteDesired {
-			_, err := git.AddRemote("fork", forkedRepo.CloneURL, "")
+			remoteName := "origin"
+
+			remotes, err := ctx.Remotes()
+			if err != nil {
+				return err
+			}
+			if _, err := remotes.FindByName(remoteName); err == nil {
+				renameTarget := "upstream"
+				renameCmd := git.GitCommand("remote", "rename", remoteName, renameTarget)
+				err = run.PrepareCmd(renameCmd).Run()
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(out, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
+			}
+
+			_, err = git.AddRemote(remoteName, forkedRepo.CloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
 
-			fmt.Fprintf(out, "%s Remote added at %s\n", greenCheck, utils.Bold("fork"))
+			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
 		}
 	} else {
 		cloneDesired := clonePref == "true"
@@ -364,9 +429,14 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			cloneCmd.Stdin = os.Stdin
 			cloneCmd.Stdout = os.Stdout
 			cloneCmd.Stderr = os.Stderr
-			err = utils.PrepareCmd(cloneCmd).Run()
+			err = run.PrepareCmd(cloneCmd).Run()
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
+			}
+
+			err = addUpstreamRemote(toFork, forkedRepo.CloneURL)
+			if err != nil {
+				return err
 			}
 
 			fmt.Fprintf(out, "%s Cloned fork\n", greenCheck)
@@ -386,6 +456,7 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
@@ -414,12 +485,67 @@ func repoView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = api.GitHubRepo(apiClient, toView)
+	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err
 	}
 
-	openURL := fmt.Sprintf("https://github.com/%s", ghrepo.FullName(toView))
-	fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
-	return utils.OpenInBrowser(openURL)
+	web, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return err
+	}
+
+	fullName := ghrepo.FullName(toView)
+
+	openURL := fmt.Sprintf("https://github.com/%s", fullName)
+	if web {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		return utils.OpenInBrowser(openURL)
+	}
+
+	repoTmpl := `
+{{.FullName}}
+{{.Description}}
+
+{{.Readme}}
+
+{{.View}}
+`
+
+	tmpl, err := template.New("repo").Parse(repoTmpl)
+	if err != nil {
+		return err
+	}
+
+	readmeContent, _ := api.RepositoryReadme(apiClient, fullName)
+
+	if readmeContent == "" {
+		readmeContent = utils.Gray("No README provided")
+	}
+
+	description := repo.Description
+	if description == "" {
+		description = utils.Gray("No description provided")
+	}
+
+	repoData := struct {
+		FullName    string
+		Description string
+		Readme      string
+		View        string
+	}{
+		FullName:    utils.Bold(fullName),
+		Description: description,
+		Readme:      readmeContent,
+		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
+	}
+
+	out := colorableOut(cmd)
+
+	err = tmpl.Execute(out, repoData)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -48,18 +48,21 @@ func (f *FakeHTTP) StubWithFixture(status int, fixtureFileName string) func() {
 }
 
 func (f *FakeHTTP) StubRepoResponse(owner, repo string) {
+	f.StubRepoResponseWithPermission(owner, repo, "WRITE")
+}
+
+func (f *FakeHTTP) StubRepoResponseWithPermission(owner, repo, permission string) {
 	body := bytes.NewBufferString(fmt.Sprintf(`
 		{ "data": { "repo_000": {
 			"id": "REPOID",
 			"name": "%s",
 			"owner": {"login": "%s"},
 			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
+				"name": "master"
 			},
-			"viewerPermission": "WRITE"
+			"viewerPermission": "%s"
 		} } }
-	`, repo, owner))
+	`, repo, owner, permission))
 	resp := &http.Response{
 		StatusCode: 200,
 		Body:       ioutil.NopCloser(body),
@@ -76,8 +79,7 @@ func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
 			"name": "%s",
 			"owner": {"login": "%s"},
 			"defaultBranchRef": {
-				"name": "master",
-				"target": {"oid": "deadbeef"}
+				"name": "master"
 			},
 			"viewerPermission": "ADMIN",
 			"parent": {
@@ -85,8 +87,7 @@ func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
 				"name": "%s",
 				"owner": {"login": "%s"},
 				"defaultBranchRef": {
-					"name": "master",
-					"target": {"oid": "deadbeef"}
+					"name": "master"
 				},
 				"viewerPermission": "READ"
 			}
