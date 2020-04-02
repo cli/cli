@@ -40,9 +40,19 @@ tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn mor
 
 ### macOS
 
+`gh` is available via [brew][] and [MacPorts][].
+
+#### brew
+
 Install: `brew install github/gh/gh`
 
 Upgrade: `brew update && brew upgrade gh`
+
+#### MacPorts
+
+Install `sudo port install gh`
+
+Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 
 ### Windows
 
