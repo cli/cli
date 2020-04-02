@@ -27,10 +27,10 @@ func init() {
 		editor = "notepad"
 	} else if g := os.Getenv("GIT_EDITOR"); g != "" {
 		editor = g
-	} else if v := os.Getenv("VISUAL"); v != "" {
-		editor = v
 	} else if e := os.Getenv("EDITOR"); e != "" {
 		editor = e
+	} else if v := os.Getenv("VISUAL"); v != "" {
+		editor = v
 	}
 }
 
