@@ -52,7 +52,7 @@ func TestIssueList(t *testing.T) {
 	}
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if reqLimit := reqBody.Variables["limit"].(float64); reqLimit != 100 {
 		t.Errorf("expected 100, got %v", reqLimit)
 	}
@@ -61,7 +61,7 @@ func TestIssueList(t *testing.T) {
 	}
 
 	bodyBytes, _ = ioutil.ReadAll(http.Requests[1].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if endCursor := reqBody.Variables["endCursor"].(string); endCursor != "ENDCURSOR" {
 		t.Errorf("expected %q, got %q", "ENDCURSOR", endCursor)
 	}

@@ -35,7 +35,7 @@ func Test_RepoCreate(t *testing.T) {
 	}
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if description := reqBody.Variables.Input["description"].(string); description != "roasted chesnuts" {
 		t.Errorf("expected description to be %q, got %q", "roasted chesnuts", description)
 	}

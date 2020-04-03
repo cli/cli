@@ -162,7 +162,7 @@ No issues match your search in OWNER/REPO
 			Author   string
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Assignee, "probablyCher")
 	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
@@ -191,7 +191,7 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 	reqBody := struct {
 		Variables map[string]interface{}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	_, assigneeDeclared := reqBody.Variables["assignee"]
 	_, labelsDeclared := reqBody.Variables["labels"]
@@ -471,7 +471,7 @@ func TestIssueCreate(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "hello")
