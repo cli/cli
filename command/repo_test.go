@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -337,6 +338,65 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	}
 }
 
+func TestParseExtraArgs(t *testing.T) {
+	type Wanted struct {
+		args []string
+		dir  string
+	}
+	tests := []struct {
+		name string
+		args []string
+		want Wanted
+	}{
+		{
+			name: "args and target",
+			args: []string{"target_directory", "-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "only args",
+			args: []string{"-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "",
+			},
+		},
+		{
+			name: "only target",
+			args: []string{"target_directory"},
+			want: Wanted{
+				args: []string{},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "no args",
+			args: []string{},
+			want: Wanted{
+				args: []string{},
+				dir:  "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, dir := parseCloneArgs(tt.args)
+			got := Wanted{
+				args: args,
+				dir:  dir,
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %#v want %#v", got, tt.want)
+			}
+		})
+	}
+
+}
+
 func TestRepoClone(t *testing.T) {
 	tests := []struct {
 		name string
@@ -349,9 +409,19 @@ func TestRepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
+			name: "shorthand with directory",
+			args: "repo clone OWNER/REPO target_directory",
+			want: "git clone https://github.com/OWNER/REPO.git target_directory",
+		},
+		{
 			name: "clone arguments",
 			args: "repo clone OWNER/REPO -- -o upstream --depth 1",
 			want: "git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git",
+		},
+		{
+			name: "clone arguments with directory",
+			args: "repo clone OWNER/REPO target_directory -- -o upstream --depth 1",
+			want: "git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git target_directory",
 		},
 		{
 			name: "HTTPS URL",
