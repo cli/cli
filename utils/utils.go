@@ -22,7 +22,11 @@ func OpenInBrowser(url string) error {
 }
 
 func RenderMarkdown(text string) (string, error) {
-	return glamour.Render(text, "dark")
+	style := "notty"
+	if isColorEnabled() {
+		style = "dark"
+	}
+	return glamour.Render(text, style)
 }
 
 func Pluralize(num int, thing string) string {
