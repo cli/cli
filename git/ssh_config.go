@@ -72,7 +72,7 @@ func ParseSSHConfig() SSHAliasMap {
 func sshParse(r ...io.Reader) SSHAliasMap {
 	config := make(SSHAliasMap)
 	for _, file := range r {
-		sshParseConfig(config, file)
+		_ = sshParseConfig(config, file)
 	}
 	return config
 }

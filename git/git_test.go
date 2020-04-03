@@ -27,7 +27,7 @@ func Test_UncommittedChangeCount(t *testing.T) {
 
 	for _, v := range cases {
 		_ = run.SetPrepareCmd(func(*exec.Cmd) run.Runnable {
-			return &test.OutputStub{[]byte(v.Output), nil}
+			return &test.OutputStub{Out: []byte(v.Output)}
 		})
 		ucc, _ := UncommittedChangeCount()
 

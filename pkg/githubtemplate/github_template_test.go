@@ -108,7 +108,7 @@ func TestFind(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, p := range tt.prepare {
 				fp := path.Join(tmpdir, p)
-				os.MkdirAll(path.Dir(fp), 0700)
+				_ = os.MkdirAll(path.Dir(fp), 0700)
 				file, err := os.Create(fp)
 				if err != nil {
 					t.Fatal(err)
@@ -179,7 +179,7 @@ about: This is how you report bugs
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
 			if got := ExtractName(tt.args.filePath); got != tt.want {
 				t.Errorf("ExtractName() = %v, want %v", got, tt.want)
 			}
@@ -244,7 +244,7 @@ Even more
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
 			if got := ExtractContents(tt.args.filePath); string(got) != tt.want {
 				t.Errorf("ExtractContents() = %v, want %v", string(got), tt.want)
 			}

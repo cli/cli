@@ -111,8 +111,8 @@ func TestPRStatus_fork(t *testing.T) {
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &test.OutputStub{[]byte(`branch.blueberries.remote origin
-branch.blueberries.merge refs/heads/blueberries`), nil}
+			return &test.OutputStub{Out: []byte(`branch.blueberries.remote origin
+branch.blueberries.merge refs/heads/blueberries`)}
 		default:
 			panic("not implemented")
 		}
