@@ -45,12 +45,11 @@ jobs:
           assert-nothing-changed go fmt ./...
           assert-nothing-changed go mod tidy
 
-          bin/golangci-lint run --out-format tab --issues-exit-code 0 | while read -r loc linter msg; do
-            line="${loc#*:}"
-            printf '::warning file=%s,line=%s,col=%s::%s\n' \
-              "${loc%%:*}" "${line%%:*}" "${loc##*:}" \
-              "[$linter] $msg"
-          done
+          while read -r file linter msg; do
+            IFS=: read -ra f <<<"$file"
+            printf '::error file=%s,line=%s,col=%s::%s\n' "${f[0]}" "${f[1]}" "${f[2]}" "[$linter] $msg"
+            STATUS=1
+          done < <(bin/golangci-lint run --out-format tab)
 
           exit $STATUS
 
