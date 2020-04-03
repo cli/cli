@@ -87,7 +87,7 @@ With no argument, the repository for the current directory is displayed.`,
 	RunE: repoView,
 }
 
-func parseExtraArgs(extraArgs []string) (args []string, target string) {
+func parseCloneArgs(extraArgs []string) (args []string, target string) {
 	args = extraArgs
 
 	if len(args) > 0 {
@@ -99,7 +99,7 @@ func parseExtraArgs(extraArgs []string) (args []string, target string) {
 }
 
 func runClone(cloneURL string, args []string) (target string, err error) {
-	cloneArgs, target := parseExtraArgs(args)
+	cloneArgs, target := parseCloneArgs(args)
 
 	cloneArgs = append(cloneArgs, cloneURL)
 

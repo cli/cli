@@ -383,7 +383,7 @@ func TestParseExtraArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, dir := parseExtraArgs(tt.args)
+			args, dir := parseCloneArgs(tt.args)
 			got := Wanted{
 				args: args,
 				dir:  dir,
