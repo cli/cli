@@ -18,6 +18,7 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
+// Ref. https://developer.github.com/v4/object/issue/
 type Issue struct {
 	Number    int
 	Title     string
@@ -32,15 +33,44 @@ type Issue struct {
 	Author struct {
 		Login string
 	}
-
-	Labels struct {
-		Nodes      []IssueLabel
+	Assignees struct {
+		Edges []struct {
+			Node struct {
+				Login string
+			}
+		}
 		TotalCount int
 	}
-}
-
-type IssueLabel struct {
-	Name string
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	}
+	ProjectCards struct {
+		Edges []struct {
+			Node struct {
+				Project struct {
+					Name string
+				}
+				Column struct {
+					Name string
+				}
+			}
+		}
+		TotalCount int
+	}
+	Milestone struct {
+		Title string
+	}
+	Participants struct {
+		Edges []struct {
+			Node struct {
+				Login string
+			}
+		}
+		TotalCount int
+	}
 }
 
 const fragments = `
