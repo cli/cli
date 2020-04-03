@@ -7,14 +7,14 @@ import (
 
 func TestChangelogURL(t *testing.T) {
 	tag := "0.3.2"
-	url := fmt.Sprintf("https://github.com/cli/cli/releases/tag/v0.3.2")
+	url := "https://github.com/cli/cli/releases/tag/v0.3.2"
 	result := changelogURL(tag)
 	if result != url {
 		t.Errorf("expected %s to create url %s but got %s", tag, url, result)
 	}
 
 	tag = "v0.3.2"
-	url = fmt.Sprintf("https://github.com/cli/cli/releases/tag/v0.3.2")
+	url = "https://github.com/cli/cli/releases/tag/v0.3.2"
 	result = changelogURL(tag)
 	if result != url {
 		t.Errorf("expected %s to create url %s but got %s", tag, url, result)

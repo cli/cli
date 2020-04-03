@@ -170,7 +170,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
-		message := fmt.Sprintf("  There are no issues assigned to you")
+		message := "  There are no issues assigned to you"
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
