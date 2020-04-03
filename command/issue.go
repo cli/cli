@@ -297,8 +297,8 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 			return err
 		}
 		fmt.Fprintln(out, md)
-		fmt.Fprintln(out)
 	}
+	fmt.Fprintln(out)
 
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
