@@ -12,15 +12,12 @@
           "login": "marseilles"
         },
         "assignees": {
-          "edges": [
-            { "node": {
-                "login": "marseilles"
-              }
+          "nodes": [
+            {
+              "login": "marseilles"
             },
             {
-              "node": {
-                "login": "monaco"
-              }
+              "login": "monaco"
             }
           ],
           "totalcount": 2
@@ -40,15 +37,13 @@
           "totalcount": 3
         },
         "projectcards": {
-          "edges": [
+          "nodes": [
             {
-              "node": {
-                "project": {
-                  "name": "The GitHub CLI"
-                },
-                "column": {
-                  "name": "to do list"
-                }
+              "project": {
+                "name": "The GitHub CLI"
+              },
+              "column": {
+                "name": "to do list"
               }
             }
           ],
@@ -58,21 +53,15 @@
           "title": "uluru"
         },
         "participants": {
-          "edges": [
+          "nodes": [
             {
-              "node": {
-                "login": "marseilles"
-              }
+              "login": "marseilles"
             },
             {
-              "node": {
-                "login": "monaco"
-              }
+              "login": "monaco"
             },
             {
-              "node": {
-                "login": "montpellier"
-              }
+              "login": "montpellier"
             }
           ],
           "totalcount": 3

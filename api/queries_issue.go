@@ -34,10 +34,8 @@ type Issue struct {
 		Login string
 	}
 	Assignees struct {
-		Edges []struct {
-			Node struct {
-				Login string
-			}
+		Nodes []struct {
+			Login string
 		}
 		TotalCount int
 	}
@@ -48,14 +46,12 @@ type Issue struct {
 		TotalCount int
 	}
 	ProjectCards struct {
-		Edges []struct {
-			Node struct {
-				Project struct {
-					Name string
-				}
-				Column struct {
-					Name string
-				}
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
 			}
 		}
 		TotalCount int
@@ -64,10 +60,8 @@ type Issue struct {
 		Title string
 	}
 	Participants struct {
-		Edges []struct {
-			Node struct {
-				Login string
-			}
+		Nodes []struct {
+			Login string
 		}
 		TotalCount int
 	}
@@ -321,10 +315,8 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				url
 				createdAt
 				assignees(first: 3) {
-					edges{
-						node {
-							login
-						}
+					nodes {
+						login
 					}
 					totalCount
 				}
@@ -335,14 +327,12 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					totalCount
 				}
 				projectCards(first: 3) {
-					edges{
-						node {
-							project {
-								name
-							}
-							column {
-								name
-							}
+					nodes {
+						project {
+							name
+						}
+						column {
+							name
 						}
 					}
 					totalCount
@@ -351,10 +341,8 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					title
 				}
 				participants(first: 3) {
-					edges{
-						node {
-							login
-						}
+					nodes {
+						login
 					}
 					totalCount
 				}

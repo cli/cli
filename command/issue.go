@@ -465,17 +465,17 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 }
 
 func assigneeList(issue api.Issue) string {
-	if len(issue.Assignees.Edges) == 0 {
+	if len(issue.Assignees.Nodes) == 1 {
 		return ""
 	}
 
-	AssigneeNames := make([]string, 0, len(issue.Assignees.Edges))
-	for _, assignee := range issue.Assignees.Edges {
-		AssigneeNames = append(AssigneeNames, assignee.Node.Login)
+	AssigneeNames := make([]string, 0, len(issue.Assignees.Nodes))
+	for _, assignee := range issue.Assignees.Nodes {
+		AssigneeNames = append(AssigneeNames, assignee.Login)
 	}
 
 	list := strings.Join(AssigneeNames, ", ")
-	if issue.Assignees.TotalCount > len(issue.Assignees.Edges) {
+	if issue.Assignees.TotalCount > len(issue.Assignees.Nodes) {
 		list += ", …"
 	}
 	return list
@@ -499,34 +499,34 @@ func labelList(issue api.Issue) string {
 }
 
 func projectList(issue api.Issue) string {
-	if len(issue.ProjectCards.Edges) == 0 {
+	if len(issue.ProjectCards.Nodes) == 0 {
 		return ""
 	}
 
-	projectNames := make([]string, 0, len(issue.ProjectCards.Edges))
-	for _, project := range issue.ProjectCards.Edges {
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Node.Project.Name, project.Node.Column.Name))
+	projectNames := make([]string, 0, len(issue.ProjectCards.Nodes))
+	for _, project := range issue.ProjectCards.Nodes {
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, project.Column.Name))
 	}
 
 	list := strings.Join(projectNames, ", ")
-	if issue.ProjectCards.TotalCount > len(issue.ProjectCards.Edges) {
+	if issue.ProjectCards.TotalCount > len(issue.ProjectCards.Nodes) {
 		list += ", …"
 	}
 	return list
 }
 
 func participantList(issue api.Issue) string {
-	if len(issue.Participants.Edges) == 0 {
+	if len(issue.Participants.Nodes) == 0 {
 		return ""
 	}
 
-	participantNames := make([]string, 0, len(issue.Participants.Edges))
-	for _, participant := range issue.Participants.Edges {
-		participantNames = append(participantNames, participant.Node.Login)
+	participantNames := make([]string, 0, len(issue.Participants.Nodes))
+	for _, participant := range issue.Participants.Nodes {
+		participantNames = append(participantNames, participant.Login)
 	}
 
 	list := strings.Join(participantNames, ", ")
-	if issue.Participants.TotalCount > len(issue.Participants.Edges) {
+	if issue.Participants.TotalCount > len(issue.Participants.Nodes) {
 		list += ", …"
 	}
 	return list

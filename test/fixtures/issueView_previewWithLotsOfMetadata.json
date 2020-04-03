@@ -12,20 +12,15 @@
           "login": "marseilles"
         },
         "assignees": {
-          "edges": [
-            { "node": {
-                "login": "marseilles"
-              }
+          "nodes": [
+            {
+              "login": "marseilles"
             },
             {
-              "node": {
-                "login": "monaco"
-              }
+              "login": "monaco"
             },
             {
-              "node": {
-                "login": "montpellier"
-              }
+              "login": "montpellier"
             }
           ],
           "totalcount": 4
@@ -45,35 +40,29 @@
           "totalcount": 4
         },
         "projectcards": {
-          "edges": [
+          "nodes": [
             {
-              "node": {
-                "project": {
-                  "name": "Project 1"
-                },
-                "column": {
-                  "name": "column A"
-                }
+              "project": {
+                "name": "Project 1"
+              },
+              "column": {
+                "name": "column A"
               }
             },
             {
-              "node": {
-                "project": {
-                  "name": "Project 2"
-                },
-                "column": {
-                  "name": "column B"
-                }
+              "project": {
+                "name": "Project 2"
+              },
+              "column": {
+                "name": "column B"
               }
             },
             {
-              "node": {
-                "project": {
-                  "name": "Project 3"
-                },
-                "column": {
-                  "name": "column C"
-                }
+              "project": {
+                "name": "Project 3"
+              },
+              "column": {
+                "name": "column C"
               }
             }
           ],
@@ -83,21 +72,15 @@
           "title": "uluru"
         },
         "participants": {
-          "edges": [
+          "nodes": [
             {
-              "node": {
-                "login": "marseilles"
-              }
+              "login": "marseilles"
             },
             {
-              "node": {
-                "login": "monaco"
-              }
+              "login": "monaco"
             },
             {
-              "node": {
-                "login": "montpellier"
-              }
+              "login": "montpellier"
             }
           ],
           "totalcount": 4
