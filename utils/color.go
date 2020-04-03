@@ -44,7 +44,7 @@ func makeColorFunc(color string) func(string) string {
 
 func isColorEnabled() bool {
 	if !checkedNoColor {
-		_isColorEnabled = os.Getenv("NO_COLOR") != "1"
+		_isColorEnabled = os.Getenv("NO_COLOR") == ""
 		checkedNoColor = true
 	}
 	return _isColorEnabled
