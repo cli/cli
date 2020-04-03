@@ -1,0 +1,112 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "**bold story**",
+        "title": "ix of coins",
+        "state": "OPEN",
+        "created_at": "2011-01-26T19:01:12Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "assignees": {
+          "edges": [
+            { "node": {
+                "login": "marseilles"
+              }
+            },
+            {
+              "node": {
+                "login": "monaco"
+              }
+            },
+            {
+              "node": {
+                "login": "montpellier"
+              }
+            }
+          ],
+          "totalcount": 4
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "one"
+            },
+            {
+              "name": "two"
+            },
+            {
+              "name": "three"
+            }
+          ],
+          "totalcount": 4
+        },
+        "projectcards": {
+          "edges": [
+            {
+              "node": {
+                "project": {
+                  "name": "Project 1"
+                },
+                "column": {
+                  "name": "column A"
+                }
+              }
+            },
+            {
+              "node": {
+                "project": {
+                  "name": "Project 2"
+                },
+                "column": {
+                  "name": "column B"
+                }
+              }
+            },
+            {
+              "node": {
+                "project": {
+                  "name": "Project 3"
+                },
+                "column": {
+                  "name": "column C"
+                }
+              }
+            }
+          ],
+          "totalcount": 4
+        },
+        "milestone": {
+          "title": "uluru"
+        },
+        "participants": {
+          "edges": [
+            {
+              "node": {
+                "login": "marseilles"
+              }
+            },
+            {
+              "node": {
+                "login": "monaco"
+              }
+            },
+            {
+              "node": {
+                "login": "montpellier"
+              }
+            }
+          ],
+          "totalcount": 4
+        },
+        "comments": {
+          "totalcount": 9
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

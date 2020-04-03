@@ -11,12 +11,30 @@
         "author": {
           "login": "marseilles"
         },
+        "assignees": {
+          "edges": [],
+          "totalcount": 0
+        },
         "labels": {
-          "nodes": [
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "edges": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "participants": {
+          "edges": [
             {
-              "name": "tarot"
+              "node": {
+                "login": "marseilles"
+              }
             }
-          ]
+          ],
+          "totalcount": 1
         },
         "comments": {
           "totalCount": 9
