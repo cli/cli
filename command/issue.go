@@ -256,8 +256,9 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
+	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(issue.Title))
-	fmt.Fprintf(out, "%s", issueStateTitleWithColor(issue.State))
+	fmt.Fprint(out, issueStateTitleWithColor(issue.State))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
 		" • %s opened %s • %s",
 		issue.Author.Login,
@@ -265,6 +266,30 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
 	)))
 
+	// Metadata
+	fmt.Fprintln(out)
+	if assignees := assigneeList(*issue); assignees != "" {
+		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Assignees: ")))
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := labelList(*issue); labels != "" {
+		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Labels: ")))
+		fmt.Fprintln(out, labels)
+	}
+	if projects := projectList(*issue); projects != "" {
+		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Projects: ")))
+		fmt.Fprintln(out, projects)
+	}
+	if issue.Milestone.Title != "" {
+		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Milestone: ")))
+		fmt.Fprintln(out, issue.Milestone.Title)
+	}
+	if participants := participantList(*issue); participants != "" {
+		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Participants: ")))
+		fmt.Fprintln(out, participants)
+	}
+
+	// Body
 	if issue.Body != "" {
 		fmt.Fprintln(out)
 		md, err := utils.RenderMarkdown(issue.Body)
@@ -275,6 +300,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 		fmt.Fprintln(out)
 	}
 
+	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
 }
@@ -438,6 +464,23 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 	}
 }
 
+func assigneeList(issue api.Issue) string {
+	if len(issue.Assignees.Edges) == 0 {
+		return ""
+	}
+
+	AssigneeNames := make([]string, 0, len(issue.Assignees.Edges))
+	for _, assignee := range issue.Assignees.Edges {
+		AssigneeNames = append(AssigneeNames, assignee.Node.Login)
+	}
+
+	list := strings.Join(AssigneeNames, ", ")
+	if issue.Assignees.TotalCount > len(issue.Assignees.Edges) {
+		list += ", …"
+	}
+	return list
+}
+
 func labelList(issue api.Issue) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
@@ -450,6 +493,40 @@ func labelList(issue api.Issue) string {
 
 	list := strings.Join(labelNames, ", ")
 	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func projectList(issue api.Issue) string {
+	if len(issue.ProjectCards.Edges) == 0 {
+		return ""
+	}
+
+	projectNames := make([]string, 0, len(issue.ProjectCards.Edges))
+	for _, project := range issue.ProjectCards.Edges {
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Node.Project.Name, project.Node.Column.Name))
+	}
+
+	list := strings.Join(projectNames, ", ")
+	if issue.ProjectCards.TotalCount > len(issue.ProjectCards.Edges) {
+		list += ", …"
+	}
+	return list
+}
+
+func participantList(issue api.Issue) string {
+	if len(issue.Participants.Edges) == 0 {
+		return ""
+	}
+
+	participantNames := make([]string, 0, len(issue.Participants.Edges))
+	for _, participant := range issue.Participants.Edges {
+		participantNames = append(participantNames, participant.Node.Login)
+	}
+
+	list := strings.Join(participantNames, ", ")
+	if issue.Participants.TotalCount > len(issue.Participants.Edges) {
 		list += ", …"
 	}
 	return list
