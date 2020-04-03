@@ -56,9 +56,7 @@ var repoCloneCmd = &cobra.Command{
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
-To pass 'git clone' options, separate them with '--'.
-
-In order to clone to a specific directory, provide it before the '--' instead of after the other additional options.`,
+To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
 }
 
