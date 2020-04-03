@@ -20,13 +20,14 @@
             "author": {
               "login": "nobody"
             },
-            "isCrossRepository": true
+            "isCrossRepository": true,
+            "isDraft": false
           },
           {
             "number": 10,
             "title": "Blueberries are a good fruit",
             "state": "OPEN",
-            "body": "",
+            "body": "**blueberries taste good**",
             "url": "https://github.com/OWNER/REPO/pull/10",
             "baseRefName": "master",
             "headRefName": "blueberries",
@@ -39,7 +40,8 @@
             "commits": {
               "totalCount": 8
             },
-            "isCrossRepository": false
+            "isCrossRepository": false,
+            "isDraft": true
           }
         ]
       }

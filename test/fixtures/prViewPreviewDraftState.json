@@ -19,7 +19,7 @@
           "login": "hubot"
         },
         "isCrossRepository": true,
-        "isDraft": false
+        "isDraft": true
       }
     }
   }

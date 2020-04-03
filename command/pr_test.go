@@ -11,8 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -400,82 +402,111 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	}
 }
 
-func TestPRView_preview(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prViewPreview.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	output, err := RunCommand(prViewCmd, "pr view 12")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
+func TestPRView_Preview(t *testing.T) {
+	tests := map[string]struct {
+		ownerRepo       string
+		args            string
+		fixture         string
+		expectedOutputs []string
+	}{
+		"Open PR": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreview.json",
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Open • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+			},
+		},
+		"Open PR for the current branch": {
+			ownerRepo: "blueberries",
+			args:      "pr view",
+			fixture:   "../test/fixtures/prView.json",
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Open • nobody wants to merge 8 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+			},
+		},
+		"Open PR wth empty body for the current branch": {
+			ownerRepo: "blueberries",
+			args:      "pr view",
+			fixture:   "../test/fixtures/prView_EmptyBody.json",
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Open • nobody wants to merge 8 commits into master from blueberries",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+			},
+		},
+		"Closed PR": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Closed • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+			},
+		},
+		"Merged PR": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Merged • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+			},
+		},
+		"Draft PR": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
+			expectedOutputs: []string{
+				"Blueberries are from a fork",
+				"Draft • nobody wants to merge 12 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+			},
+		},
+		"Draft PR by branch": {
+			ownerRepo: "master",
+			args:      "pr view blueberries",
+			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
+			expectedOutputs: []string{
+				"Blueberries are a good fruit",
+				"Draft • nobody wants to merge 8 commits into master from blueberries",
+				"blueberries taste good",
+				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+			},
+		},
 	}
 
-	eq(t, output.Stderr(), "")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			http := initFakeHTTP()
+			http.StubRepoResponse("OWNER", "REPO")
 
-	test.ExpectLines(t, output.String(),
-		"Blueberries are from a fork",
-		"nobody wants to merge 12 commits into master from blueberries",
-		"blueberries taste good",
-		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12")
-}
+			jsonFile, _ := os.Open(tc.fixture)
+			defer jsonFile.Close()
+			http.StubResponse(200, jsonFile)
 
-func TestPRView_previewCurrentBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+			output, err := RunCommand(prViewCmd, tc.args)
+			if err != nil {
+				t.Errorf("error running command `%v`: %v", tc.args, err)
+			}
 
-	jsonFile, _ := os.Open("../test/fixtures/prView.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+			eq(t, output.Stderr(), "")
 
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand(prViewCmd, "pr view")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
 	}
-
-	eq(t, output.Stderr(), "")
-
-	test.ExpectLines(t, output.String(),
-		"Blueberries are a good fruit",
-		"nobody wants to merge 8 commits into master from blueberries",
-		"blueberries taste good",
-		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
-}
-
-func TestPRView_previewCurrentBranchWithEmptyBody(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prView_EmptyBody.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
-
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand(prViewCmd, "pr view")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	eq(t, output.Stderr(), "")
-
-	test.ExpectLines(t, output.String(),
-		"Blueberries are a good fruit",
-		"nobody wants to merge 8 commits into master from blueberries",
-		"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10")
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {
@@ -716,4 +747,26 @@ func TestReplaceExcessiveWhitespace(t *testing.T) {
 	eq(t, replaceExcessiveWhitespace("  hello goodbye  "), "hello goodbye")
 	eq(t, replaceExcessiveWhitespace("hello   goodbye"), "hello goodbye")
 	eq(t, replaceExcessiveWhitespace("   hello \n goodbye   "), "hello goodbye")
+}
+
+func TestPrStateTitleWithColor(t *testing.T) {
+	tests := map[string]struct {
+		pr   api.PullRequest
+		want string
+	}{
+		"Format OPEN state":              {pr: api.PullRequest{State: "OPEN", IsDraft: false}, want: "Open"},
+		"Format OPEN state for Draft PR": {pr: api.PullRequest{State: "OPEN", IsDraft: true}, want: "Draft"},
+		"Format CLOSED state":            {pr: api.PullRequest{State: "CLOSED", IsDraft: false}, want: "Closed"},
+		"Format MERGED state":            {pr: api.PullRequest{State: "MERGED", IsDraft: false}, want: "Merged"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := prStateTitleWithColor(tc.pr)
+			diff := cmp.Diff(tc.want, got)
+			if diff != "" {
+				t.Fatalf(diff)
+			}
+		})
+	}
 }

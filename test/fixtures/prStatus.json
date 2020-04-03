@@ -8,8 +8,10 @@
             "node": {
               "number": 10,
               "title": "Blueberries are a good fruit",
+              "state": "OPEN",
               "url": "https://github.com/cli/cli/pull/10",
               "headRefName": "blueberries",
+              "isDraft": false,
               "headRepositoryOwner": {
                 "login": "OWNER"
               },
@@ -26,8 +28,10 @@
           "node": {
             "number": 8,
             "title": "Strawberries are not actually berries",
+            "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/8",
-            "headRefName": "strawberries"
+            "headRefName": "strawberries",
+            "isDraft": false
           }
         }
       ]
@@ -39,16 +43,18 @@
           "node": {
             "number": 9,
             "title": "Apples are tasty",
+            "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/9",
-            "headRefName": "apples"
-          }
-        },
-        {
+            "headRefName": "apples",
+            "isDraft": false
+          } }, {
           "node": {
             "number": 11,
             "title": "Figs are my favorite",
+            "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/1",
-            "headRefName": "figs"
+            "headRefName": "figs",
+            "isDraft": true
           }
         }
       ]

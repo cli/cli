@@ -1,0 +1,28 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "",
+        "title": "ix of coins",
+        "state": "OPEN",
+        "created_at": "2011-01-26T19:01:12Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "tarot"
+            }
+          ]
+        },
+        "comments": {
+          "totalCount": 9
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

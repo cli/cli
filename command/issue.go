@@ -228,6 +228,11 @@ func issueView(cmd *cobra.Command, args []string) error {
 
 }
 
+func issueStateTitleWithColor(state string) string {
+	colorFunc := colorFuncForState(state)
+	return colorFunc(strings.Title(strings.ToLower(state)))
+}
+
 func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
 	if totalMatchCount == 0 {
 		if hasFilters {
@@ -248,17 +253,16 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 }
 
 func printIssuePreview(out io.Writer, issue *api.Issue) error {
-	coloredLabels := labelList(*issue)
-	if coloredLabels != "" {
-		coloredLabels = utils.Gray(fmt.Sprintf("(%s)", coloredLabels))
-	}
+	now := time.Now()
+	ago := now.Sub(issue.CreatedAt)
 
 	fmt.Fprintln(out, utils.Bold(issue.Title))
+	fmt.Fprintf(out, "%s", issueStateTitleWithColor(issue.State))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		"opened by %s. %s. %s",
+		" • %s opened %s • %s",
 		issue.Author.Login,
+		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
-		coloredLabels,
 	)))
 
 	if issue.Body != "" {

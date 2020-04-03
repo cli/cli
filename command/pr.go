@@ -226,14 +226,22 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func prStateTitleWithColor(pr api.PullRequest) string {
+	prStateColorFunc := colorFuncForPR(pr)
+	if pr.State == "OPEN" && pr.IsDraft {
+		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+	}
+	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+}
+
 func colorFuncForPR(pr api.PullRequest) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
-	} else {
-		return colorFuncForState(pr.State)
 	}
+	return colorFuncForState(pr.State)
 }
 
+// colorFuncForState returns a color function for a PR/Issue state
 func colorFuncForState(state string) func(string) string {
 	switch state {
 	case "OPEN":
@@ -320,8 +328,9 @@ func prView(cmd *cobra.Command, args []string) error {
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		"%s wants to merge %s into %s from %s",
+		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
@@ -453,8 +462,7 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprint(w, utils.Green("✓ Approved"))
 			}
 		} else {
-			s := strings.Title(strings.ToLower(pr.State))
-			fmt.Fprintf(w, " - %s", prStateColorFunc(s))
+			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
 		fmt.Fprint(w, "\n")

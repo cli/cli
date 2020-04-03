@@ -301,6 +301,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				url
 				number
 				title
+				state
 				body
 				author {
 				  login
@@ -320,6 +321,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 				}
 				isCrossRepository
+				isDraft
 				maintainerCanModify
 			}
 		}
@@ -356,6 +358,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 				nodes {
 					number
 					title
+					state
 					body
 					author {
 						login

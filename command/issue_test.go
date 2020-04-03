@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestIssueStatus(t *testing.T) {
@@ -284,81 +285,77 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
-func TestIssueView(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"body": "**bold story**",
-		"title": "ix of coins",
-		"author": {
-			"login": "marseilles"
+func TestIssueView_Preview(t *testing.T) {
+	tests := map[string]struct {
+		ownerRepo       string
+		command         string
+		fixture         string
+		expectedOutputs []string
+	}{
+		"Open issue": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_preview.json",
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+			},
 		},
-		"labels": {
-			"nodes": [
-				{"name": "tarot"}
-			]
+		"Open issue with no label": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewNoLabel.json",
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+			},
 		},
-		"comments": {
-		  "totalCount": 9
+		"Open issue with empty body": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
+			expectedOutputs: []string{
+				"ix of coins",
+				"Open • marseilles opened about 292 years ago • 9 comments",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+			},
 		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
-
-	output, err := RunCommand(issueViewCmd, "issue view 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
+		"Closed issue": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewClosedState.json",
+			expectedOutputs: []string{
+				"ix of coins",
+				"Closed • marseilles opened about 292 years ago • 9 comments",
+				"bold story",
+				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+			},
+		},
 	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			http := initFakeHTTP()
+			http.StubRepoResponse("OWNER", "REPO")
 
-	eq(t, output.Stderr(), "")
+			jsonFile, _ := os.Open(tc.fixture)
+			defer jsonFile.Close()
+			http.StubResponse(200, jsonFile)
 
-	test.ExpectLines(t, output.String(),
-		"ix of coins",
-		`opened by marseilles. 9 comments. \(tarot\)`,
-		"bold story",
-		"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123")
-}
+			output, err := RunCommand(issueViewCmd, tc.command)
+			if err != nil {
+				t.Errorf("error running command `%v`: %v", tc.command, err)
+			}
 
-func TestIssueView_WithEmptyBody(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+			eq(t, output.Stderr(), "")
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"body": "",
-		"title": "ix of coins",
-		"author": {
-			"login": "marseilles"
-		},
-		"labels": {
-			"nodes": [
-				{"name": "tarot"}
-			]
-		},
-		"comments": {
-		  "totalCount": 9
-		},
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
-
-	output, err := RunCommand(issueViewCmd, "issue view 123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
 	}
-
-	eq(t, output.Stderr(), "")
-
-	test.ExpectLines(t, output.String(),
-		"ix of coins",
-		`opened by marseilles. 9 comments. \(tarot\)`,
-		"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_web_notFound(t *testing.T) {
@@ -655,6 +652,26 @@ func Test_listHeader(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := listHeader(tt.args.repoName, tt.args.itemName, tt.args.matchCount, tt.args.totalMatchCount, tt.args.hasFilters); got != tt.want {
 				t.Errorf("listHeader() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIssueStateTitleWithColor(t *testing.T) {
+	tests := map[string]struct {
+		state string
+		want  string
+	}{
+		"Open state":   {state: "OPEN", want: "Open"},
+		"Closed state": {state: "CLOSED", want: "Closed"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := issueStateTitleWithColor(tc.state)
+			diff := cmp.Diff(tc.want, got)
+			if diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
