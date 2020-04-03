@@ -36,7 +36,8 @@ tools bring GitHub to the terminal, `hub` behaves as a proxy to `git` and `gh` i
 tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn more.
 
 
-## Installation and Upgrading
+<!-- this anchor is linked to from elsewhere, so avoid renaming it -->
+## Installation
 
 ### macOS
 
