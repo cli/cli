@@ -317,14 +317,47 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				comments {
 					totalCount
 				}
+				number
+				url
+				createdAt
+				assignees(first: 3) {
+					edges{
+						node {
+							login
+						}
+					}
+					totalCount
+				}
 				labels(first: 3) {
 					nodes {
 						name
 					}
+					totalCount
 				}
-				number
-				url
-				createdAt
+				projectCards(first: 3) {
+					edges{
+						node {
+							project {
+								name
+							}
+							column {
+								name
+							}
+						}
+					}
+					totalCount
+				}
+				milestone{
+					title
+				}
+				participants(first: 3) {
+					edges{
+						node {
+							login
+						}
+					}
+					totalCount
+				}
 			}
 		}
 	}`
