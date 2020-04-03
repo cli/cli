@@ -54,7 +54,7 @@ func TestPRCreate(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "my title")
@@ -316,7 +316,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID0")
 	eq(t, reqBody.Variables.Input.Title, "cross repo")
@@ -392,7 +392,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	expectedBody := "- commit 0\n- commit 1\n"
 
@@ -469,7 +469,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	expectedBody := "was the color of a television, turned to a dead channel"
 
@@ -527,7 +527,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 			}
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	expectedBody := "was the color of a television, turned to a dead channel"
 

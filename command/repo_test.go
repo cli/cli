@@ -466,7 +466,7 @@ func TestRepoCreate(t *testing.T) {
 	}
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
 		t.Errorf("expected %q, got %q", "REPO", repoName)
 	}
@@ -533,7 +533,7 @@ func TestRepoCreate_org(t *testing.T) {
 	eq(t, http.Requests[0].URL.Path, "/users/ORG")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
 		t.Errorf("expected %q, got %q", "ORGID", orgID)
 	}
@@ -598,7 +598,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	eq(t, http.Requests[0].URL.Path, "/orgs/ORG/teams/monkeys")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
 		t.Errorf("expected %q, got %q", "ORGID", orgID)
 	}

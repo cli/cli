@@ -170,7 +170,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
-		message := fmt.Sprintf("  There are no issues assigned to you")
+		message := "  There are no issues assigned to you"
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
@@ -427,7 +427,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
 		table.EndRow()
 	}
-	table.Render()
+	_ = table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)

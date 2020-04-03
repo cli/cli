@@ -14,33 +14,14 @@ jobs:
         with:
           go-version: 1.13
 
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Verify dependencies
-        shell: bash
-        run: |
-          go mod verify
-          go mod download
+      - name: Download dependencies
+        run: go mod download
 
       - name: Run tests
-        shell: bash
-        run: |
-          assert-nothing-changed() {
-            local diff
-            git checkout -- .
-            "$@" >/dev/null || true
-            if ! diff="$(git diff -U1 --color --exit-code)"; then
-              printf '\n\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n' "$*" "$diff" >&2
-              return 1
-            fi
-          }
-
-          STATUS=0
-          go test -race ./... || STATUS=$?
-          assert-nothing-changed go fmt ./... || STATUS=$?
-          assert-nothing-changed go mod tidy || STATUS=$?
-          exit $STATUS
+        run: go test -race ./...
 
       - name: Build
         run: go build -v ./cmd/gh

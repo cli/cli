@@ -65,7 +65,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		fmt.Fprintf(os.Stderr, "  2. Copy the contents of ~/.config/gh/config.yml to this system")
 	}
 
-	http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		oa.logf("server handler: %s\n", r.URL.Path)
 		if r.URL.Path != "/callback" {
 			w.WriteHeader(404)

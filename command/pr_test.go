@@ -55,11 +55,11 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		switch v := f.Value.(type) {
 		case pflag.SliceValue:
-			v.Replace([]string{})
+			_ = v.Replace([]string{})
 		default:
 			switch v.Type() {
 			case "bool", "string", "int":
-				v.Set(f.DefValue)
+				_ = v.Set(f.DefValue)
 			}
 		}
 	})
@@ -111,8 +111,8 @@ func TestPRStatus_fork(t *testing.T) {
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &test.OutputStub{[]byte(`branch.blueberries.remote origin
-branch.blueberries.merge refs/heads/blueberries`), nil}
+			return &test.OutputStub{Out: []byte(`branch.blueberries.remote origin
+branch.blueberries.merge refs/heads/blueberries`)}
 		default:
 			panic("not implemented")
 		}
@@ -312,7 +312,7 @@ No pull requests match your search in OWNER/REPO
 			Labels []string
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
 	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
@@ -357,7 +357,7 @@ func TestPRList_filteringClosed(t *testing.T) {
 			State []string
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.State, []string{"CLOSED", "MERGED"})
 }
@@ -381,7 +381,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 			Q string
 		}
 	}{}
-	json.Unmarshal(bodyBytes, &reqBody)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`)
 }

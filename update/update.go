@@ -76,7 +76,7 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(stateFilePath, content, 0600)
+	_ = ioutil.WriteFile(stateFilePath, content, 0600)
 
 	return nil
 }
