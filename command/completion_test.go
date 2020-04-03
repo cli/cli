@@ -45,7 +45,7 @@ func TestCompletion_powerShell(t *testing.T) {
 	}
 
 	if !strings.Contains(output.String(), "Register-ArgumentCompleter") {
-		t.Errorf("problem in fish completion:\n%s", output)
+		t.Errorf("problem in powershell completion:\n%s", output)
 	}
 }
 
