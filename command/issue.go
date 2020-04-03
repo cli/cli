@@ -268,15 +268,15 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 
 	// Metadata
 	fmt.Fprintln(out)
-	if assignees := assigneeList(*issue); assignees != "" {
+	if assignees := issueAssigneeList(*issue); assignees != "" {
 		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Assignees: ")))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := labelList(*issue); labels != "" {
+	if labels := issueLabelList(*issue); labels != "" {
 		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Labels: ")))
 		fmt.Fprintln(out, labels)
 	}
-	if projects := projectList(*issue); projects != "" {
+	if projects := issueProjectList(*issue); projects != "" {
 		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Projects: ")))
 		fmt.Fprintln(out, projects)
 	}
@@ -284,7 +284,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Milestone: ")))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
-	if participants := participantList(*issue); participants != "" {
+	if participants := issueParticipantList(*issue); participants != "" {
 		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Participants: ")))
 		fmt.Fprintln(out, participants)
 	}
@@ -445,7 +445,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		labels := labelList(issue)
+		labels := issueLabelList(issue)
 		if labels != "" && table.IsTTY() {
 			labels = fmt.Sprintf("(%s)", labels)
 		}
@@ -464,8 +464,8 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 	}
 }
 
-func assigneeList(issue api.Issue) string {
-	if len(issue.Assignees.Nodes) == 1 {
+func issueAssigneeList(issue api.Issue) string {
+	if len(issue.Assignees.Nodes) == 0 {
 		return ""
 	}
 
@@ -481,7 +481,7 @@ func assigneeList(issue api.Issue) string {
 	return list
 }
 
-func labelList(issue api.Issue) string {
+func issueLabelList(issue api.Issue) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
 	}
@@ -498,7 +498,7 @@ func labelList(issue api.Issue) string {
 	return list
 }
 
-func projectList(issue api.Issue) string {
+func issueProjectList(issue api.Issue) string {
 	if len(issue.ProjectCards.Nodes) == 0 {
 		return ""
 	}
@@ -515,7 +515,7 @@ func projectList(issue api.Issue) string {
 	return list
 }
 
-func participantList(issue api.Issue) string {
+func issueParticipantList(issue api.Issue) string {
 	if len(issue.Participants.Nodes) == 0 {
 		return ""
 	}
