@@ -52,6 +52,3 @@ jobs:
           done < <(bin/golangci-lint run --out-format tab)
 
           exit $STATUS
-
-      - name: Build
-        run: go build -v ./cmd/gh
