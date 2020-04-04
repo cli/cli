@@ -10,6 +10,29 @@
         "author": {
           "login": "nobody"
         },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "participants": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            }
+          ],
+          "totalcount": 1
+        },
         "commits": {
           "totalCount": 12
         },
