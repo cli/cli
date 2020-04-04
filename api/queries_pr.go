@@ -355,6 +355,38 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				isCrossRepository
 				isDraft
 				maintainerCanModify
+				assignees(first: 3) {
+					nodes {
+						login
+					}
+					totalCount
+				}
+				labels(first: 3) {
+					nodes {
+						name
+					}
+					totalCount
+				}
+				projectCards(first: 3) {
+					nodes {
+						project {
+							name
+						}
+						column {
+							name
+						}
+					}
+					totalCount
+				}
+				milestone{
+					title
+				}
+				participants(first: 3) {
+					nodes {
+						login
+					}
+					totalCount
+				}
 			}
 		}
 	}`
@@ -406,6 +438,38 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					isCrossRepository
 					isDraft
+					assignees(first: 3) {
+						nodes {
+							login
+						}
+						totalCount
+					}
+					labels(first: 3) {
+						nodes {
+							name
+						}
+						totalCount
+					}
+					projectCards(first: 3) {
+						nodes {
+							project {
+								name
+							}
+							column {
+								name
+							}
+						}
+						totalCount
+					}
+					milestone{
+						title
+					}
+					participants(first: 3) {
+						nodes {
+							login
+						}
+						totalCount
+					}
 				}
 			}
 		}
