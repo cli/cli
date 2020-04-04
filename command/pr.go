@@ -342,23 +342,23 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	// TODO: Reviewers
 	fmt.Fprintln(out)
 	if assignees := prAssigneeList(*pr); assignees != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Assignees: ")))
+		fmt.Fprint(out, utils.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
 	if labels := prLabelList(*pr); labels != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Labels: ")))
+		fmt.Fprint(out, utils.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
 	if projects := prProjectList(*pr); projects != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Projects: ")))
+		fmt.Fprint(out, utils.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
 	if pr.Milestone.Title != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Milestone: ")))
+		fmt.Fprint(out, utils.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
 	}
 	if participants := prParticipantList(*pr); participants != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Participants: ")))
+		fmt.Fprint(out, utils.Bold("Participants: "))
 		fmt.Fprintln(out, participants)
 	}
 
