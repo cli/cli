@@ -61,6 +61,38 @@ type PullRequest struct {
 			}
 		}
 	}
+	Assignees struct {
+		Nodes []struct {
+			Login string
+		}
+		TotalCount int
+	}
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	}
+	ProjectCards struct {
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
+			}
+		}
+		TotalCount int
+	}
+	Milestone struct {
+		Title string
+	}
+	Participants struct {
+		Nodes []struct {
+			Login string
+		}
+		TotalCount int
+	}
 }
 
 type NotFoundError struct {
