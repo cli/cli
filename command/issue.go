@@ -269,23 +269,23 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	// Metadata
 	fmt.Fprintln(out)
 	if assignees := issueAssigneeList(*issue); assignees != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Assignees: ")))
+		fmt.Fprint(out, utils.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
 	if labels := issueLabelList(*issue); labels != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Labels: ")))
+		fmt.Fprint(out, utils.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
 	if projects := issueProjectList(*issue); projects != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Projects: ")))
+		fmt.Fprint(out, utils.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
 	if issue.Milestone.Title != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Milestone: ")))
+		fmt.Fprint(out, utils.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
 	if participants := issueParticipantList(*issue); participants != "" {
-		fmt.Fprint(out, utils.Bold(fmt.Sprintf("Participants: ")))
+		fmt.Fprint(out, utils.Bold("Participants: "))
 		fmt.Fprintln(out, participants)
 	}
 
