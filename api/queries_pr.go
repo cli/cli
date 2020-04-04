@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
 )
@@ -59,6 +60,27 @@ type PullRequest struct {
 					}
 				}
 			}
+		}
+	}
+	ReviewRequests struct {
+		Nodes []struct {
+			RequestedReviewer struct {
+				TypeName string `json:"__typename"`
+				User     struct {
+					Login string
+				}
+			}
+		}
+		TotalCount int
+	}
+	Reviews struct {
+		Nodes []struct {
+			Author struct {
+				Login string
+			}
+			State       string
+			CreatedAt   time.Time
+			PublishedAt time.Time
 		}
 	}
 	Assignees struct {
@@ -355,6 +377,28 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				isCrossRepository
 				isDraft
 				maintainerCanModify
+				reviewRequests(first: 3) {
+					nodes {
+						requestedReviewer {
+							__typename
+							...on User {
+								login
+							}
+						}
+					}
+					totalCount
+				}
+				reviews(last: 3) {
+					nodes {
+						author {
+						  login
+						}
+						state
+						createdAt
+						publishedAt
+					}
+					totalCount
+				}
 				assignees(first: 3) {
 					nodes {
 						login
@@ -438,6 +482,28 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					isCrossRepository
 					isDraft
+					reviewRequests(first: 3) {
+						nodes {
+							requestedReviewer {
+								__typename
+								...on User {
+									login
+								}
+							}
+						}
+						totalCount
+					}
+					reviews(last: 3) {
+						nodes {
+							author {
+							  login
+							}
+							state
+							createdAt
+							publishedAt
+						}
+						totalCount
+					}
 					assignees(first: 3) {
 						nodes {
 							login
