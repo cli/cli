@@ -66,9 +66,7 @@ type PullRequest struct {
 		Nodes []struct {
 			RequestedReviewer struct {
 				TypeName string `json:"__typename"`
-				User     struct {
-					Login string
-				}
+				Login    string
 			}
 		}
 		TotalCount int
