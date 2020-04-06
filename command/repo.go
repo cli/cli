@@ -169,7 +169,7 @@ func addUpstreamRemote(parentRepo ghrepo.Interface, cloneDir string) error {
 	// TODO: support SSH remote URLs
 	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
 
-	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
+	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	return run.PrepareCmd(cloneCmd).Run()

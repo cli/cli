@@ -186,7 +186,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	eq(t, output.Stderr(), "")
 
 	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
-	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add -f upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
@@ -219,7 +219,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	eq(t, output.Stderr(), "")
 
 	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/repo.git")
-	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add upstream https://github.com/OWNER/REPO.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C repo remote add -f upstream https://github.com/OWNER/REPO.git")
 
 	test.ExpectLines(t, output.String(),
 		"Created fork someone/REPO",
@@ -484,7 +484,7 @@ func TestRepoClone_hasParent(t *testing.T) {
 	}
 
 	eq(t, cs.Count, 2)
-	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add upstream https://github.com/hubot/ORIG.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/hubot/ORIG.git")
 }
 
 func TestRepoCreate(t *testing.T) {
