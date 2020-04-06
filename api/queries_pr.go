@@ -375,7 +375,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				isCrossRepository
 				isDraft
 				maintainerCanModify
-				reviewRequests(first: 3) {
+				reviewRequests(first: 100) {
 					nodes {
 						requestedReviewer {
 							__typename
@@ -386,7 +386,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 					totalCount
 				}
-				reviews(last: 3) {
+				reviews(last: 100) {
 					nodes {
 						author {
 						  login
@@ -480,7 +480,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					isCrossRepository
 					isDraft
-					reviewRequests(first: 3) {
+					reviewRequests(first: 100) {
 						nodes {
 							requestedReviewer {
 								__typename
@@ -491,7 +491,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 						}
 						totalCount
 					}
-					reviews(last: 3) {
+					reviews(last: 100) {
 						nodes {
 							author {
 							  login
