@@ -70,7 +70,11 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 }
 
 func shouldCheckForUpdate() bool {
-	return updaterEnabled != "" && utils.IsTerminal(os.Stderr)
+	return updaterEnabled != "" && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
+}
+
+func isCompletionCommand() bool {
+	return len(os.Args) > 1 && os.Args[1] == "completion"
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
