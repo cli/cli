@@ -101,7 +101,9 @@ func (gr GraphQLErrorResponse) Error() string {
 	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
 }
 
-// GraphQL performs a GraphQL request and parses the response
+// GraphQL performs a GraphQL request and parses the response.
+//
+// Deprecated: the `githubv4` library should be used instead
 func (c Client) GraphQL(query string, variables map[string]interface{}, data interface{}) error {
 	url := "https://api.github.com/graphql"
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
