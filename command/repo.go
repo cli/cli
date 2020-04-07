@@ -51,7 +51,7 @@ A repository can be supplied as an argument in any of the following formats:
 }
 
 var repoCloneCmd = &cobra.Command{
-	Use:   "clone <repo> [<directory>]",
+	Use:   "clone <repository> [<directory>]",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
