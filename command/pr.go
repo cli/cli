@@ -337,10 +337,13 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
+	fmt.Fprintln(out)
 
 	// Metadata
-	// TODO: Reviewers
-	fmt.Fprintln(out)
+	if reviewers := prReviewerList(*pr); reviewers != "" {
+		fmt.Fprint(out, utils.Bold("Reviewers: "))
+		fmt.Fprintln(out, reviewers)
+	}
 	if assignees := prAssigneeList(*pr); assignees != "" {
 		fmt.Fprint(out, utils.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
@@ -372,6 +375,51 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
+}
+
+//
+const requestedReviewState = "REQUESTED"
+
+type reviewerState struct {
+	Name  string
+	State string
+}
+
+// prReviewerList generates a reviewer list with their last state
+func prReviewerList(pr api.PullRequest) string {
+	reviewerStates := parseReviewers(pr)
+	reviewers := make([]string, 0, len(reviewerStates))
+
+	for _, reviewer := range reviewerStates {
+		reviewers = append(reviewers, fmt.Sprintf("%s (%s)", reviewer.Name, strings.Title(strings.ToLower(reviewer.State))))
+	}
+	reviewerList := strings.Join(reviewers, ", ")
+
+	return reviewerList
+}
+
+// parseReviewers parses given Reviews and ReviewRequests
+func parseReviewers(pr api.PullRequest) map[string]*reviewerState {
+	var reviewerStates = map[string]*reviewerState{}
+
+	for _, review := range pr.Reviews.Nodes {
+		if review.Author.Login != pr.Author.Login {
+			reviewerStates[review.Author.Login] = &reviewerState{
+				Name:  review.Author.Login,
+				State: strings.Title(strings.ToLower(review.State)),
+			}
+		}
+	}
+
+	// Overwrite reviewer's state if a review request for the same reviewer exists.
+	for _, reviewRequest := range pr.ReviewRequests.Nodes {
+		reviewerStates[reviewRequest.RequestedReviewer.Login] = &reviewerState{
+			Name:  reviewRequest.RequestedReviewer.Login,
+			State: requestedReviewState,
+		}
+	}
+
+	return reviewerStates
 }
 
 func prAssigneeList(pr api.PullRequest) string {
