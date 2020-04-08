@@ -284,10 +284,6 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 		fmt.Fprint(out, utils.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
-	if participants := issueParticipantList(*issue); participants != "" {
-		fmt.Fprint(out, utils.Bold("Participants: "))
-		fmt.Fprintln(out, participants)
-	}
 
 	// Body
 	if issue.Body != "" {
