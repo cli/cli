@@ -76,22 +76,44 @@
                 },
                 {
                   "name": "three"
+                },
+                {
+                  "name": "four"
+                },
+                {
+                  "name": "five"
                 }
               ],
-              "totalcount": 3
+              "totalcount": 5
             },
             "projectcards": {
               "nodes": [
                 {
                   "project": {
-                    "name": "The GitHub CLI"
+                    "name": "Project 1"
                   },
                   "column": {
-                    "name": "to do list"
+                    "name": "column A"
+                  }
+                },
+                {
+                  "project": {
+                    "name": "Project 2"
+                  },
+                  "column": {
+                    "name": "column B"
+                  }
+                },
+                {
+                  "project": {
+                    "name": "Project 3"
+                  },
+                  "column": {
+                    "name": "column C"
                   }
                 }
               ],
-              "totalcount": 1
+              "totalcount": 3
             },
             "milestone": {
               "title": "uluru"
