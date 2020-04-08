@@ -17,12 +17,9 @@
             },
             {
               "login": "monaco"
-            },
-            {
-              "login": "montpellier"
             }
           ],
-          "totalcount": 4
+          "totalcount": 2
         },
         "labels": {
           "nodes": [
@@ -34,9 +31,15 @@
             },
             {
               "name": "three"
+            },
+            {
+              "name": "four"
+            },
+            {
+              "name": "five"
             }
           ],
-          "totalcount": 4
+          "totalcount": 5
         },
         "projectcards": {
           "nodes": [
@@ -65,7 +68,7 @@
               }
             }
           ],
-          "totalcount": 4
+          "totalcount": 3
         },
         "milestone": {
           "title": "uluru"
@@ -82,7 +85,7 @@
               "login": "montpellier"
             }
           ],
-          "totalcount": 4
+          "totalcount": 3
         },
         "commits": {
           "totalCount": 12
