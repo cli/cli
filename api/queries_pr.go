@@ -397,19 +397,19 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 					totalCount
 				}
-				assignees(first: 3) {
+				assignees(first: 100) {
 					nodes {
 						login
 					}
 					totalCount
 				}
-				labels(first: 3) {
+				labels(first: 100) {
 					nodes {
 						name
 					}
 					totalCount
 				}
-				projectCards(first: 3) {
+				projectCards(first: 100) {
 					nodes {
 						project {
 							name
@@ -423,7 +423,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
-				participants(first: 3) {
+				participants(first: 100) {
 					nodes {
 						login
 					}
@@ -502,19 +502,19 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 						}
 						totalCount
 					}
-					assignees(first: 3) {
+					assignees(first: 100) {
 						nodes {
 							login
 						}
 						totalCount
 					}
-					labels(first: 3) {
+					labels(first: 100) {
 						nodes {
 							name
 						}
 						totalCount
 					}
-					projectCards(first: 3) {
+					projectCards(first: 100) {
 						nodes {
 							project {
 								name
@@ -528,7 +528,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					milestone{
 						title
 					}
-					participants(first: 3) {
+					participants(first: 100) {
 						nodes {
 							login
 						}
