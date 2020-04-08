@@ -378,11 +378,32 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 }
 
 //
-const requestedReviewState = "REQUESTED"
+const (
+	requestedReviewState        = "REQUESTED"
+	approvedReviewState         = "APPROVED"
+	changesRequestedReviewState = "CHANGES_REQUESTED"
+	commentedReviewState        = "COMMENTED"
+)
 
 type reviewerState struct {
 	Name  string
 	State string
+}
+
+// colorFuncForReviewerState returns a color function for a reviewer state
+func colorFuncForReviewerState(state string) func(string) string {
+	switch state {
+	case requestedReviewState:
+		return utils.Yellow
+	case approvedReviewState:
+		return utils.Green
+	case changesRequestedReviewState:
+		return utils.Red
+	case commentedReviewState:
+		return func(str string) string { return str } // Do nothing
+	default:
+		return nil
+	}
 }
 
 // prReviewerList generates a reviewer list with their last state
@@ -391,7 +412,8 @@ func prReviewerList(pr api.PullRequest) string {
 	reviewers := make([]string, 0, len(reviewerStates))
 
 	for _, reviewer := range reviewerStates {
-		reviewers = append(reviewers, fmt.Sprintf("%s (%s)", reviewer.Name, strings.Title(strings.ToLower(reviewer.State))))
+		stateColorFunc := colorFuncForReviewerState(reviewer.State)
+		reviewers = append(reviewers, fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " "))))
 	}
 	reviewerList := strings.Join(reviewers, ", ")
 
@@ -406,7 +428,7 @@ func parseReviewers(pr api.PullRequest) map[string]*reviewerState {
 		if review.Author.Login != pr.Author.Login {
 			reviewerStates[review.Author.Login] = &reviewerState{
 				Name:  review.Author.Login,
-				State: strings.Title(strings.ToLower(review.State)),
+				State: review.State,
 			}
 		}
 	}
