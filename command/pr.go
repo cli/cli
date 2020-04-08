@@ -357,10 +357,6 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		fmt.Fprint(out, utils.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
 	}
-	if participants := prParticipantList(*pr); participants != "" {
-		fmt.Fprint(out, utils.Bold("Participants: "))
-		fmt.Fprintln(out, participants)
-	}
 
 	// Body
 	if pr.Body != "" {
