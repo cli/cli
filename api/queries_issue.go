@@ -314,19 +314,19 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				number
 				url
 				createdAt
-				assignees(first: 3) {
+				assignees(first: 100) {
 					nodes {
 						login
 					}
 					totalCount
 				}
-				labels(first: 3) {
+				labels(first: 100) {
 					nodes {
 						name
 					}
 					totalCount
 				}
-				projectCards(first: 3) {
+				projectCards(first: 100) {
 					nodes {
 						project {
 							name
@@ -340,7 +340,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				milestone{
 					title
 				}
-				participants(first: 3) {
+				participants(first: 100) {
 					nodes {
 						login
 					}
