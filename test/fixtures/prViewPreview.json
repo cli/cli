@@ -25,14 +25,6 @@
         "milestone": {
           "title": ""
         },
-        "participants": {
-          "nodes": [
-            {
-              "login": "marseilles"
-            }
-          ],
-          "totalcount": 1
-        },
         "commits": {
           "totalCount": 12
         },

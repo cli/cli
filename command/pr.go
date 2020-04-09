@@ -425,23 +425,6 @@ func prProjectList(pr api.PullRequest) string {
 	return list
 }
 
-func prParticipantList(pr api.PullRequest) string {
-	if len(pr.Participants.Nodes) == 0 {
-		return ""
-	}
-
-	participantNames := make([]string, 0, len(pr.Participants.Nodes))
-	for _, participant := range pr.Participants.Nodes {
-		participantNames = append(participantNames, participant.Login)
-	}
-
-	list := strings.Join(participantNames, ", ")
-	if pr.Participants.TotalCount > len(pr.Participants.Nodes) {
-		list += ", …"
-	}
-	return list
-}
-
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 
 func prFromURL(arg string) (string, ghrepo.Interface) {
