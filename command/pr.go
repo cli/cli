@@ -31,7 +31,7 @@ func init() {
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("web", "w", false, "Open pull request in browser")
+	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
 }
 
 var prCmd = &cobra.Command{
@@ -56,11 +56,13 @@ var prStatusCmd = &cobra.Command{
 }
 var prViewCmd = &cobra.Command{
 	Use:   "view [{<number> | <url> | <branch>}]",
-	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument.
+	Short: "View a pull request",
+	Long: `Display the title, body, and other information about a pull request.
 
-Without an argument, the pull request that belongs to the current
-branch is displayed.`,
+Without an argument, the pull request that belongs to the current branch
+is displayed.
+
+With '--web', open the pull request in a web browser instead.`,
 	RunE: prView,
 }
 

@@ -38,7 +38,7 @@ func init() {
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	issueCmd.AddCommand(issueViewCmd)
-	issueViewCmd.Flags().BoolP("web", "w", false, "Open issue in browser")
+	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
 }
 
 var issueCmd = &cobra.Command{
@@ -74,7 +74,10 @@ var issueViewCmd = &cobra.Command{
 		return nil
 	},
 	Short: "View an issue",
-	RunE:  issueView,
+	Long: `Display the title, body, and other information about an issue.
+
+With '--web', open the issue in a web browser instead.`,
+	RunE: issueView,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
