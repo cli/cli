@@ -37,7 +37,7 @@ func init() {
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
 
 	repoCmd.AddCommand(repoViewCmd)
-	repoViewCmd.Flags().BoolP("web", "w", false, "Open repository in browser")
+	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
 }
 
 var repoCmd = &cobra.Command{
@@ -51,7 +51,7 @@ A repository can be supplied as an argument in any of the following formats:
 }
 
 var repoCloneCmd = &cobra.Command{
-	Use:   "clone <repo> [<directory>]",
+	Use:   "clone <repository> [<directory>]",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
@@ -80,10 +80,12 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 
 var repoViewCmd = &cobra.Command{
 	Use:   "view [<repository>]",
-	Short: "View a repository in the browser",
-	Long: `View a GitHub repository.
+	Short: "View a repository",
+	Long: `Display the description and the README of a GitHub repository.
 
-With no argument, the repository for the current directory is displayed.`,
+With no argument, the repository for the current directory is displayed.
+
+With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
 }
 
@@ -169,7 +171,7 @@ func addUpstreamRemote(parentRepo ghrepo.Interface, cloneDir string) error {
 	// TODO: support SSH remote URLs
 	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
 
-	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "upstream", upstreamURL)
+	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	return run.PrepareCmd(cloneCmd).Run()

@@ -27,14 +27,6 @@
               "totalcount": 0
             },
             "milestone": {},
-            "participants": {
-              "nodes": [
-                {
-                  "login": "nobody"
-                }
-              ],
-              "totalcount": 1
-            },
             "commits": {
               "totalCount": 12
             },
@@ -117,20 +109,6 @@
             },
             "milestone": {
               "title": "uluru"
-            },
-            "participants": {
-              "nodes": [
-                {
-                  "login": "marseilles"
-                },
-                {
-                  "login": "monaco"
-                },
-                {
-                  "login": "montpellier"
-                }
-              ],
-              "totalcount": 3
             },
             "headRepositoryOwner": {
               "login": "OWNER"

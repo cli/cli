@@ -104,12 +104,6 @@ type PullRequest struct {
 	Milestone struct {
 		Title string
 	}
-	Participants struct {
-		Nodes []struct {
-			Login string
-		}
-		TotalCount int
-	}
 }
 
 type NotFoundError struct {
@@ -418,12 +412,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
-				participants(first: 100) {
-					nodes {
-						login
-					}
-					totalCount
-				}
 			}
 		}
 	}`
@@ -520,12 +508,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					milestone{
 						title
-					}
-					participants(first: 100) {
-						nodes {
-							login
-						}
-						totalCount
 					}
 				}
 			}
