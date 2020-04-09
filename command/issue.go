@@ -511,23 +511,6 @@ func issueProjectList(issue api.Issue) string {
 	return list
 }
 
-func issueParticipantList(issue api.Issue) string {
-	if len(issue.Participants.Nodes) == 0 {
-		return ""
-	}
-
-	participantNames := make([]string, 0, len(issue.Participants.Nodes))
-	for _, participant := range issue.Participants.Nodes {
-		participantNames = append(participantNames, participant.Login)
-	}
-
-	list := strings.Join(participantNames, ", ")
-	if issue.Participants.TotalCount > len(issue.Participants.Nodes) {
-		list += ", …"
-	}
-	return list
-}
-
 func displayURL(urlStr string) string {
 	u, err := url.Parse(urlStr)
 	if err != nil {

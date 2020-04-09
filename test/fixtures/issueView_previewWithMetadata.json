@@ -74,20 +74,6 @@
         "milestone": {
           "title": "uluru"
         },
-        "participants": {
-          "nodes": [
-            {
-              "login": "marseilles"
-            },
-            {
-              "login": "monaco"
-            },
-            {
-              "login": "montpellier"
-            }
-          ],
-          "totalcount": 3
-        },
         "comments": {
           "totalcount": 9
         },

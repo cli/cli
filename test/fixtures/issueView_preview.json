@@ -26,14 +26,6 @@
         "milestone": {
           "title": ""
         },
-        "participants": {
-          "nodes": [
-            {
-              "login": "marseilles"
-            }
-          ],
-          "totalcount": 1
-        },
         "comments": {
           "totalCount": 9
         },

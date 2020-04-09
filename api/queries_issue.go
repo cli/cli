@@ -59,12 +59,6 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
-	Participants struct {
-		Nodes []struct {
-			Login string
-		}
-		TotalCount int
-	}
 }
 
 const fragments = `
@@ -339,12 +333,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				}
 				milestone{
 					title
-				}
-				participants(first: 100) {
-					nodes {
-						login
-					}
-					totalCount
 				}
 			}
 		}
