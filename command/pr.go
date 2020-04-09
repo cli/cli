@@ -327,6 +327,7 @@ func prView(cmd *cobra.Command, args []string) error {
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
+	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
@@ -336,6 +337,28 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
+
+	// Metadata
+	// TODO: Reviewers
+	fmt.Fprintln(out)
+	if assignees := prAssigneeList(*pr); assignees != "" {
+		fmt.Fprint(out, utils.Bold("Assignees: "))
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := prLabelList(*pr); labels != "" {
+		fmt.Fprint(out, utils.Bold("Labels: "))
+		fmt.Fprintln(out, labels)
+	}
+	if projects := prProjectList(*pr); projects != "" {
+		fmt.Fprint(out, utils.Bold("Projects: "))
+		fmt.Fprintln(out, projects)
+	}
+	if pr.Milestone.Title != "" {
+		fmt.Fprint(out, utils.Bold("Milestone: "))
+		fmt.Fprintln(out, pr.Milestone.Title)
+	}
+
+	// Body
 	if pr.Body != "" {
 		fmt.Fprintln(out)
 		md, err := utils.RenderMarkdown(pr.Body)
@@ -343,11 +366,63 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 			return err
 		}
 		fmt.Fprintln(out, md)
-		fmt.Fprintln(out)
 	}
+	fmt.Fprintln(out)
 
+	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
+}
+
+func prAssigneeList(pr api.PullRequest) string {
+	if len(pr.Assignees.Nodes) == 0 {
+		return ""
+	}
+
+	AssigneeNames := make([]string, 0, len(pr.Assignees.Nodes))
+	for _, assignee := range pr.Assignees.Nodes {
+		AssigneeNames = append(AssigneeNames, assignee.Login)
+	}
+
+	list := strings.Join(AssigneeNames, ", ")
+	if pr.Assignees.TotalCount > len(pr.Assignees.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func prLabelList(pr api.PullRequest) string {
+	if len(pr.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := make([]string, 0, len(pr.Labels.Nodes))
+	for _, label := range pr.Labels.Nodes {
+		labelNames = append(labelNames, label.Name)
+	}
+
+	list := strings.Join(labelNames, ", ")
+	if pr.Labels.TotalCount > len(pr.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func prProjectList(pr api.PullRequest) string {
+	if len(pr.ProjectCards.Nodes) == 0 {
+		return ""
+	}
+
+	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
+	for _, project := range pr.ProjectCards.Nodes {
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, project.Column.Name))
+	}
+
+	list := strings.Join(projectNames, ", ")
+	if pr.ProjectCards.TotalCount > len(pr.ProjectCards.Nodes) {
+		list += ", …"
+	}
+	return list
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)

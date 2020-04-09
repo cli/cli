@@ -409,15 +409,45 @@ func TestPRView_Preview(t *testing.T) {
 		fixture         string
 		expectedOutputs []string
 	}{
-		"Open PR": {
+		"Open PR without metadata": {
 			ownerRepo: "master",
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreview.json",
 			expectedOutputs: []string{
-				"Blueberries are from a fork",
-				"Open • nobody wants to merge 12 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+				`Blueberries are from a fork`,
+				`Open • nobody wants to merge 12 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with metadata by number": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewWithMetadataByNumber.json",
+			expectedOutputs: []string{
+				`Blueberries are from a fork`,
+				`Open • nobody wants to merge 12 commits into master from blueberries`,
+				`Assignees: marseilles, monaco\n`,
+				`Labels: one, two, three, four, five\n`,
+				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Milestone: uluru\n`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
+			},
+		},
+		"Open PR with metadata by branch": {
+			ownerRepo: "master",
+			args:      "pr view blueberries",
+			fixture:   "../test/fixtures/prViewPreviewWithMetadataByBranch.json",
+			expectedOutputs: []string{
+				`Blueberries are a good fruit`,
+				`Open • nobody wants to merge 8 commits into master from blueberries`,
+				`Assignees: marseilles, monaco\n`,
+				`Labels: one, two, three, four, five\n`,
+				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Milestone: uluru\n`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10\n`,
 			},
 		},
 		"Open PR for the current branch": {
@@ -425,10 +455,10 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view",
 			fixture:   "../test/fixtures/prView.json",
 			expectedOutputs: []string{
-				"Blueberries are a good fruit",
-				"Open • nobody wants to merge 8 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+				`Blueberries are a good fruit`,
+				`Open • nobody wants to merge 8 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
 		"Open PR wth empty body for the current branch": {
@@ -436,9 +466,9 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view",
 			fixture:   "../test/fixtures/prView_EmptyBody.json",
 			expectedOutputs: []string{
-				"Blueberries are a good fruit",
-				"Open • nobody wants to merge 8 commits into master from blueberries",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+				`Blueberries are a good fruit`,
+				`Open • nobody wants to merge 8 commits into master from blueberries`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
 		"Closed PR": {
@@ -446,10 +476,10 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
 			expectedOutputs: []string{
-				"Blueberries are from a fork",
-				"Closed • nobody wants to merge 12 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+				`Blueberries are from a fork`,
+				`Closed • nobody wants to merge 12 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
 		},
 		"Merged PR": {
@@ -457,10 +487,10 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
 			expectedOutputs: []string{
-				"Blueberries are from a fork",
-				"Merged • nobody wants to merge 12 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+				`Blueberries are from a fork`,
+				`Merged • nobody wants to merge 12 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
 		},
 		"Draft PR": {
@@ -468,10 +498,10 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view 12",
 			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
 			expectedOutputs: []string{
-				"Blueberries are from a fork",
-				"Draft • nobody wants to merge 12 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12",
+				`Blueberries are from a fork`,
+				`Draft • nobody wants to merge 12 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
 		},
 		"Draft PR by branch": {
@@ -479,10 +509,10 @@ func TestPRView_Preview(t *testing.T) {
 			args:      "pr view blueberries",
 			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
 			expectedOutputs: []string{
-				"Blueberries are a good fruit",
-				"Draft • nobody wants to merge 8 commits into master from blueberries",
-				"blueberries taste good",
-				"View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10",
+				`Blueberries are a good fruit`,
+				`Draft • nobody wants to merge 8 commits into master from blueberries`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
 	}

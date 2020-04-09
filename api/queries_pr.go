@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
 )
@@ -60,6 +61,51 @@ type PullRequest struct {
 				}
 			}
 		}
+	}
+	ReviewRequests struct {
+		Nodes []struct {
+			RequestedReviewer struct {
+				TypeName string `json:"__typename"`
+				Login    string
+			}
+		}
+		TotalCount int
+	}
+	Reviews struct {
+		Nodes []struct {
+			Author struct {
+				Login string
+			}
+			State       string
+			CreatedAt   time.Time
+			PublishedAt time.Time
+		}
+	}
+	Assignees struct {
+		Nodes []struct {
+			Login string
+		}
+		TotalCount int
+	}
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	}
+	ProjectCards struct {
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
+			}
+		}
+		TotalCount int
+	}
+	Milestone struct {
+		Title string
 	}
 }
 
@@ -323,6 +369,54 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				isCrossRepository
 				isDraft
 				maintainerCanModify
+				reviewRequests(first: 100) {
+					nodes {
+						requestedReviewer {
+							__typename
+							...on User {
+								login
+							}
+						}
+					}
+					totalCount
+				}
+				reviews(last: 100) {
+					nodes {
+						author {
+						  login
+						}
+						state
+						createdAt
+						publishedAt
+					}
+					totalCount
+				}
+				assignees(first: 100) {
+					nodes {
+						login
+					}
+					totalCount
+				}
+				labels(first: 100) {
+					nodes {
+						name
+					}
+					totalCount
+				}
+				projectCards(first: 100) {
+					nodes {
+						project {
+							name
+						}
+						column {
+							name
+						}
+					}
+					totalCount
+				}
+				milestone{
+					title
+				}
 			}
 		}
 	}`
@@ -374,6 +468,54 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					isCrossRepository
 					isDraft
+					reviewRequests(first: 100) {
+						nodes {
+							requestedReviewer {
+								__typename
+								...on User {
+									login
+								}
+							}
+						}
+						totalCount
+					}
+					reviews(last: 100) {
+						nodes {
+							author {
+							  login
+							}
+							state
+							createdAt
+							publishedAt
+						}
+						totalCount
+					}
+					assignees(first: 100) {
+						nodes {
+							login
+						}
+						totalCount
+					}
+					labels(first: 100) {
+						nodes {
+							name
+						}
+						totalCount
+					}
+					projectCards(first: 100) {
+						nodes {
+							project {
+								name
+							}
+							column {
+								name
+							}
+						}
+						totalCount
+					}
+					milestone{
+						title
+					}
 				}
 			}
 		}
