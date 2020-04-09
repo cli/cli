@@ -61,13 +61,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not initialize API client: %w", err)
 	}
 
-	baseRepoOverride, _ := cmd.Flags().GetString("repo")
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client, baseRepoOverride)
-	if err != nil {
-		return err
-	}
+	// baseRepoOverride, _ := cmd.Flags().GetString("repo")
+	// repoContext, err := context.ResolveRemotesToRepos(remotes, client, baseRepoOverride)
+	// if err != nil {
+	// 	return err
+	// }
 
-	baseRepo, err := repoContext.BaseRepo()
+	baseRepo, err := remotes.FindByName("origin")
 	if err != nil {
 		return fmt.Errorf("could not determine base repository: %w", err)
 	}
@@ -94,18 +94,19 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	// otherwise, determine the head repository with info obtained from the API
-	if headRepo == nil {
-		if r, err := repoContext.HeadRepo(); err == nil {
-			headRepo = r
-		}
-	}
+	// if headRepo == nil {
+	// 	if r, err := repoContext.HeadRepo(); err == nil {
+	// 		headRepo = r
+	// 	}
+	// }
+	headRepo = baseRepo
 
 	baseBranch, err := cmd.Flags().GetString("base")
 	if err != nil {
 		return err
 	}
 	if baseBranch == "" {
-		baseBranch = baseRepo.DefaultBranchRef.Name
+		baseBranch = "master"
 	}
 	if headBranch == baseBranch && headRepo != nil && ghrepo.IsSame(baseRepo, headRepo) {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
@@ -154,7 +155,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		body = defs.Body
 	}
 
-	if !isWeb {
+	if !isWeb && false {
 		headBranchLabel := headBranch
 		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
 			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
@@ -222,10 +223,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	didForkRepo := false
 	// if a head repository could not be determined so far, automatically create
 	// one by forking the base repository
-	if headRepo == nil {
-		if baseRepo.IsPrivate {
-			return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
-		}
+	if headRepo == nil && false {
+		// if baseRepo.IsPrivate {
+		// 	return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
+		// }
 		headRepo, err = api.ForkRepo(client, baseRepo)
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
@@ -238,9 +239,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
-	if headRemote == nil {
-		headRemote, _ = repoContext.RemoteForRepo(headRepo)
-	}
+	// if headRemote == nil {
+	// 	headRemote, _ = repoContext.RemoteForRepo(headRepo)
+	// }
 
 	// There are two cases when an existing remote for the head repo will be
 	// missing:
@@ -249,7 +250,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	//
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
-	if headRemote == nil {
+	if headRemote == nil && false {
 		// TODO: support non-HTTPS git remote URLs
 		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
 		// TODO: prevent clashes with another remote of a same name
@@ -265,7 +266,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	// automatically push the branch if it hasn't been pushed anywhere yet
-	if headBranchPushedTo == nil {
+	if headBranchPushedTo == nil && false {
 		pushTries := 0
 		maxPushTries := 3
 		for {
@@ -285,20 +286,21 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if action == SubmitAction {
-		params := map[string]interface{}{
-			"title":       title,
-			"body":        body,
-			"draft":       isDraft,
-			"baseRefName": baseBranch,
-			"headRefName": headBranchLabel,
-		}
+		// params := map[string]interface{}{
+		// 	"title":       title,
+		// 	"body":        body,
+		// 	"draft":       isDraft,
+		// 	"baseRefName": baseBranch,
+		// 	"headRefName": headBranchLabel,
+		// }
 
-		pr, err := api.CreatePullRequest(client, baseRepo, params)
-		if err != nil {
-			return fmt.Errorf("failed to create pull request: %w", err)
-		}
+		// pr, err := api.CreatePullRequest(client, baseRepo, params)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to create pull request: %w", err)
+		// }
 
-		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+		// fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+		fmt.Fprintln(cmd.OutOrStdout(), "(skipping creating pull request while prototyping)")
 	} else if action == PreviewAction {
 		openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
 		// TODO could exceed max url length for explorer
