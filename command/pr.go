@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -411,17 +412,20 @@ func prReviewerList(pr api.PullRequest) string {
 	reviewerStates := parseReviewers(pr)
 	reviewers := make([]string, 0, len(reviewerStates))
 
+	sortReviewerStates(reviewerStates)
+
 	for _, reviewer := range reviewerStates {
 		stateColorFunc := colorFuncForReviewerState(reviewer.State)
 		reviewers = append(reviewers, fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " "))))
 	}
+
 	reviewerList := strings.Join(reviewers, ", ")
 
 	return reviewerList
 }
 
 // parseReviewers parses given Reviews and ReviewRequests
-func parseReviewers(pr api.PullRequest) map[string]*reviewerState {
+func parseReviewers(pr api.PullRequest) []*reviewerState {
 	var reviewerStates = map[string]*reviewerState{}
 
 	for _, review := range pr.Reviews.Nodes {
@@ -441,7 +445,29 @@ func parseReviewers(pr api.PullRequest) map[string]*reviewerState {
 		}
 	}
 
-	return reviewerStates
+	// Convert map to slice for ease of sort
+	result := []*reviewerState{}
+	for _, reviewer := range reviewerStates {
+		result = append(result, reviewer)
+	}
+
+	return result
+}
+
+// sortReviewerStates puts completed reviews before review requests and sort names alphabetically
+func sortReviewerStates(reviewerStates []*reviewerState) {
+	sort.Slice(reviewerStates, func(i, j int) bool {
+		if reviewerStates[i].State == requestedReviewState &&
+			reviewerStates[j].State != requestedReviewState {
+			return false
+		}
+		if reviewerStates[j].State == requestedReviewState &&
+			reviewerStates[i].State != requestedReviewState {
+			return true
+		}
+
+		return reviewerStates[i].Name < reviewerStates[j].Name
+	})
 }
 
 func prAssigneeList(pr api.PullRequest) string {

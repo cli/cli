@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
 )
@@ -76,9 +75,7 @@ type PullRequest struct {
 			Author struct {
 				Login string
 			}
-			State       string
-			CreatedAt   time.Time
-			PublishedAt time.Time
+			State string
 		}
 	}
 	Assignees struct {
@@ -392,8 +389,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 						  login
 						}
 						state
-						createdAt
-						publishedAt
 					}
 					totalCount
 				}
@@ -497,8 +492,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 							  login
 							}
 							state
-							createdAt
-							publishedAt
 						}
 						totalCount
 					}

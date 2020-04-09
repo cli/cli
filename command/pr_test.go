@@ -427,10 +427,22 @@ func TestPRView_Preview(t *testing.T) {
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
 				`Open • nobody wants to merge 12 commits into master from blueberries`,
+				`Reviewers: 2 \(Approved\), 3 \(Commented\), 1 \(Requested\)\n`,
 				`Assignees: marseilles, monaco\n`,
 				`Labels: one, two, three, four, five\n`,
 				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
 				`Milestone: uluru\n`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
+			},
+		},
+		"Open PR with reviewers by number": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
+			expectedOutputs: []string{
+				`Blueberries are from a fork`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), xyz \(Approved\), 123 \(Requested\), abc \(Requested\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},
