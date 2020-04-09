@@ -428,7 +428,7 @@ func prReviewerList(pr api.PullRequest) string {
 
 // parseReviewers parses given Reviews and ReviewRequests
 func parseReviewers(pr api.PullRequest) []*reviewerState {
-	var reviewerStates = map[string]*reviewerState{}
+	reviewerStates := make(map[string]*reviewerState)
 
 	for _, review := range pr.Reviews.Nodes {
 		if review.Author.Login != pr.Author.Login {
@@ -448,7 +448,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 	}
 
 	// Convert map to slice for ease of sort
-	result := []*reviewerState{}
+	result := make([]*reviewerState, 0, len(reviewerStates))
 	for _, reviewer := range reviewerStates {
 		result = append(result, reviewer)
 	}
