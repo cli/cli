@@ -380,9 +380,9 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	return nil
 }
 
-//
+// Ref. https://developer.github.com/v4/enum/pullrequestreviewstate/
 const (
-	requestedReviewState        = "REQUESTED"
+	requestedReviewState        = "REQUESTED" // This is our own state for review request
 	approvedReviewState         = "APPROVED"
 	changesRequestedReviewState = "CHANGES_REQUESTED"
 	commentedReviewState        = "COMMENTED"
