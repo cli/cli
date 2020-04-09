@@ -11,12 +11,20 @@
         "author": {
           "login": "marseilles"
         },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
         "labels": {
-          "nodes": [
-            {
-              "name": "tarot"
-            }
-          ]
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
         },
         "comments": {
           "totalCount": 9

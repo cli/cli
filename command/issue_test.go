@@ -292,26 +292,30 @@ func TestIssueView_Preview(t *testing.T) {
 		fixture         string
 		expectedOutputs []string
 	}{
-		"Open issue": {
+		"Open issue without metadata": {
 			ownerRepo: "master",
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_preview.json",
 			expectedOutputs: []string{
-				"ix of coins",
-				"Open • marseilles opened about 292 years ago • 9 comments",
-				"bold story",
-				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+				`ix of coins`,
+				`Open • marseilles opened about 292 years ago • 9 comments`,
+				`bold story`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
-		"Open issue with no label": {
+		"Open issue with metadata": {
 			ownerRepo: "master",
 			command:   "issue view 123",
-			fixture:   "../test/fixtures/issueView_previewNoLabel.json",
+			fixture:   "../test/fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
-				"ix of coins",
-				"Open • marseilles opened about 292 years ago • 9 comments",
-				"bold story",
-				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+				`ix of coins`,
+				`Open • marseilles opened about 292 years ago • 9 comments`,
+				`Assignees: marseilles, monaco\n`,
+				`Labels: one, two, three, four, five\n`,
+				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Milestone: uluru\n`,
+				`bold story`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
 		"Open issue with empty body": {
@@ -319,9 +323,9 @@ func TestIssueView_Preview(t *testing.T) {
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
-				"ix of coins",
-				"Open • marseilles opened about 292 years ago • 9 comments",
-				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+				`ix of coins`,
+				`Open • marseilles opened about 292 years ago • 9 comments`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
 		"Closed issue": {
@@ -329,10 +333,10 @@ func TestIssueView_Preview(t *testing.T) {
 			command:   "issue view 123",
 			fixture:   "../test/fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
-				"ix of coins",
-				"Closed • marseilles opened about 292 years ago • 9 comments",
-				"bold story",
-				"View this issue on GitHub: https://github.com/OWNER/REPO/issues/123",
+				`ix of coins`,
+				`Closed • marseilles opened about 292 years ago • 9 comments`,
+				`bold story`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
 	}
