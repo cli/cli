@@ -409,6 +409,12 @@ func colorFuncForReviewerState(state string) func(string) string {
 	}
 }
 
+// formattedReviewerState formats a reviewerState with state color
+func formattedReviewerState(reviewer *reviewerState) string {
+	stateColorFunc := colorFuncForReviewerState(reviewer.State)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " ")))
+}
+
 // prReviewerList generates a reviewer list with their last state
 func prReviewerList(pr api.PullRequest) string {
 	reviewerStates := parseReviewers(pr)
@@ -417,8 +423,7 @@ func prReviewerList(pr api.PullRequest) string {
 	sortReviewerStates(reviewerStates)
 
 	for _, reviewer := range reviewerStates {
-		stateColorFunc := colorFuncForReviewerState(reviewer.State)
-		reviewers = append(reviewers, fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " "))))
+		reviewers = append(reviewers, formattedReviewerState(reviewer))
 	}
 
 	reviewerList := strings.Join(reviewers, ", ")
@@ -456,7 +461,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 	return result
 }
 
-// sortReviewerStates puts completed reviews before review requests and sort names alphabetically
+// sortReviewerStates puts completed reviews before review requests and sorts names alphabetically
 func sortReviewerStates(reviewerStates []*reviewerState) {
 	sort.Slice(reviewerStates, func(i, j int) bool {
 		if reviewerStates[i].State == requestedReviewState &&
