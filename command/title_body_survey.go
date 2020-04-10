@@ -177,12 +177,7 @@ func askExtraFields(extraFieldsSelect []string) error {
 		var selectedReviewers []string
 		reviewers := &survey.MultiSelect{
 			Message: "Reviewers",
-			Options: []string{
-				"ampinsk",
-				"billygriffin",
-				"mislav",
-				"vilmibm",
-			},
+			Options: fakeUsersAndTeams,
 		}
 		err := survey.AskOne(reviewers, &selectedReviewers)
 		if err != nil {
@@ -194,12 +189,7 @@ func askExtraFields(extraFieldsSelect []string) error {
 		var selectedAssignees []string
 		assignees := &survey.MultiSelect{
 			Message: "Assignees",
-			Options: []string{
-				"ampinsk",
-				"billygriffin",
-				"mislav",
-				"vilmibm",
-			},
+			Options: fakeUsersAndTeams,
 		}
 		err := survey.AskOne(assignees, &selectedAssignees)
 		if err != nil {
