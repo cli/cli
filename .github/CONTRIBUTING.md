@@ -6,16 +6,16 @@
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
-Given that this project is very early and still in beta, we're only accepting pull requests for bug fixes right now. We'd love to
-hear about ideas for new features as issues, though!
+We accept pull requests for bug fixes and features where we've discussed the approach in an issue and given the go-ahead for a community member to work on it. We'd also love to hear about ideas for new features as issues.
 
 Please do:
 
 * open an issue if things aren't working as expected
 * open an issue to propose a significant change
 * open a PR to fix a bug
+* open a PR if a member of the GitHub CLI team has given the ok after discussion in an issue
 
-## Submitting a bug fix
+## Submitting a pull request
 
 0. Clone this repository
 0. Create a new branch: `git checkout -b my-branch-name`
