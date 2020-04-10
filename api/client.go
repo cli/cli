@@ -146,6 +146,10 @@ func (c Client) REST(method string, p string, body io.Reader, data interface{}) 
 		return handleHTTPError(resp)
 	}
 
+	if resp.StatusCode == http.StatusNoContent && resp.ContentLength == 0 {
+		return nil
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
