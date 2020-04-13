@@ -75,7 +75,5 @@ func Humanize(s string) string {
 }
 
 func Spinner(w io.Writer) *spinner.Spinner {
-	s := spinner.New(spinner.CharSets[11], 400*time.Millisecond)
-	s.Writer = w
-	return s
+	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
 }

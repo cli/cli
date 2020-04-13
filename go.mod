@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
-	github.com/briandowns/spinner v1.9.0
+	github.com/briandowns/spinner v1.10.1-0.20200410162419-bf6cf7ae6727
 	github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/google/go-cmp v0.2.0
