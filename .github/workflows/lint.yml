@@ -2,9 +2,9 @@ name: Lint
 on:
   push:
     paths:
-    - '**.go'
-    - go.mod
-    - go.sum
+      - "**.go"
+      - go.mod
+      - go.sum
 
 jobs:
   lint:
