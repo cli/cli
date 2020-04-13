@@ -22,6 +22,8 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/briandowns/spinner v1.9.0 h1:+OMAisemaHar1hjuJ3Z2hIvNhQl9Y7GLPWUwwz2Pxo8=
 github.com/briandowns/spinner v1.9.0/go.mod h1://Zf9tMcxfRUA36V23M6YGEAv+kECGfvpnLTnb8n4XQ=
+github.com/briandowns/spinner v1.10.1-0.20200410162419-bf6cf7ae6727 h1:DOyHtIQZmwFEOt/makVyey2RMTPkpi1IQsWsWX0OcGE=
+github.com/briandowns/spinner v1.10.1-0.20200410162419-bf6cf7ae6727/go.mod h1:QOuQk7x+EaDASo80FEXwlwiA+j/PPIcX3FScO+3/ZPQ=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058 h1:Ks+RZ6s6UriHnL+yusm3OoaLwpV9WPvMV+FXQ6qMD7M=
 github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058/go.mod h1:sC1EP6T+3nFnl5vwf0TYEs1inMigQxZ7n912YKoxJow=
