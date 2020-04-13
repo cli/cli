@@ -361,17 +361,17 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	defer surveyTeardown()
 
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:    "title",
 			Default: true,
 		},
-		&QuestionStub{
+		{
 			Name:    "body",
 			Default: true,
 		},
 	})
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:  "confirmation",
 			Value: 1,
 		},
@@ -438,17 +438,17 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	defer surveyTeardown()
 
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:    "title",
 			Default: true,
 		},
-		&QuestionStub{
+		{
 			Name:    "body",
 			Default: true,
 		},
 	})
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:  "confirmation",
 			Value: 1,
 		},
@@ -605,17 +605,17 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	defer surveyTeardown()
 
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:    "title",
 			Default: true,
 		},
-		&QuestionStub{
+		{
 			Name:  "body",
 			Value: "social distancing",
 		},
 	})
 	as.Stub([]*QuestionStub{
-		&QuestionStub{
+		{
 			Name:  "confirmation",
 			Value: 0,
 		},
