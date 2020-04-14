@@ -124,6 +124,12 @@ Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/gi
 $ yay -S github-cli
 ```
 
+### Void Linux
+
+```bash
+$ sudo xbps-install github-cli
+```
+
 ### Other platforms
 
 Install a prebuilt binary from the [releases page][]
