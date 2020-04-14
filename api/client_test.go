@@ -50,3 +50,17 @@ func TestGraphQLError(t *testing.T) {
 		t.Fatalf("got %q", err.Error())
 	}
 }
+
+func TestRESTGetDelete(t *testing.T) {
+	http := &FakeHTTP{}
+
+	client := NewClient(
+		ReplaceTripper(http),
+	)
+
+	http.StubResponse(204, bytes.NewBuffer([]byte{}))
+
+	r := bytes.NewReader([]byte(`{}`))
+	err := client.REST("DELETE", "applications/CLIENTID/grant", r, nil)
+	eq(t, err, nil)
+}
