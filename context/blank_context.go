@@ -22,6 +22,14 @@ type blankContext struct {
 	remotes   Remotes
 }
 
+func (c *blankContext) Config() (Config, error) {
+	config, err := ParseConfig("boom.txt")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse config during tests. did you remember to stub? error: %s", err))
+	}
+	return config, nil
+}
+
 func (c *blankContext) AuthToken() (string, error) {
 	return c.authToken, nil
 }

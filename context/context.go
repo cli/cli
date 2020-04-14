@@ -22,6 +22,7 @@ type Context interface {
 	Remotes() (Remotes, error)
 	BaseRepo() (ghrepo.Interface, error)
 	SetBaseRepo(string)
+	Config() (Config, error)
 }
 
 // cap the number of git remotes looked up, since the user might have an
@@ -151,7 +152,7 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config    *configEntry
+	config    Config
 	remotes   Remotes
 	branch    string
 	baseRepo  ghrepo.Interface
@@ -167,13 +168,13 @@ func configFile() string {
 	return path.Join(ConfigDir(), "config.yml")
 }
 
-func (c *fsContext) getConfig() (*configEntry, error) {
+func (c *fsContext) Config() (Config, error) {
 	if c.config == nil {
-		entry, err := parseOrSetupConfigFile(configFile())
+		config, err := parseOrSetupConfigFile(configFile())
 		if err != nil {
 			return nil, err
 		}
-		c.config = entry
+		c.config = config
 		c.authToken = ""
 	}
 	return c.config, nil
@@ -184,11 +185,12 @@ func (c *fsContext) AuthToken() (string, error) {
 		return c.authToken, nil
 	}
 
-	config, err := c.getConfig()
+	config, err := c.Config()
 	if err != nil {
 		return "", err
 	}
-	return config.Token, nil
+
+	return config.Get(defaultHostname, "oauth_token")
 }
 
 func (c *fsContext) SetAuthToken(t string) {
@@ -196,11 +198,12 @@ func (c *fsContext) SetAuthToken(t string) {
 }
 
 func (c *fsContext) AuthLogin() (string, error) {
-	config, err := c.getConfig()
+	config, err := c.Config()
 	if err != nil {
 		return "", err
 	}
-	return config.User, nil
+
+	return config.Get(defaultHostname, "user")
 }
 
 func (c *fsContext) Branch() (string, error) {

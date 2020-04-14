@@ -16,7 +16,7 @@ import (
 )
 
 func TestIssueStatus(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -45,7 +45,7 @@ func TestIssueStatus(t *testing.T) {
 }
 
 func TestIssueStatus_blankSlate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -82,7 +82,7 @@ Issues opened by you
 }
 
 func TestIssueStatus_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -99,7 +99,7 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -132,7 +132,7 @@ Showing 3 of 3 issues in OWNER/REPO
 }
 
 func TestIssueList_withFlags(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -172,7 +172,7 @@ No issues match your search in OWNER/REPO
 }
 
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -201,7 +201,7 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 }
 
 func TestIssueList_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -218,7 +218,7 @@ func TestIssueList_disabledIssues(t *testing.T) {
 }
 
 func TestIssueView_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -252,7 +252,7 @@ func TestIssueView_web(t *testing.T) {
 }
 
 func TestIssueView_web_numberArgWithHash(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -342,7 +342,7 @@ func TestIssueView_Preview(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
 			http := initFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
 
@@ -363,7 +363,7 @@ func TestIssueView_Preview(t *testing.T) {
 }
 
 func TestIssueView_web_notFound(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -390,7 +390,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 }
 
 func TestIssueView_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -408,7 +408,7 @@ func TestIssueView_disabledIssues(t *testing.T) {
 }
 
 func TestIssueView_web_urlArg(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -441,7 +441,7 @@ func TestIssueView_web_urlArg(t *testing.T) {
 }
 
 func TestIssueCreate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -482,7 +482,7 @@ func TestIssueCreate(t *testing.T) {
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -500,7 +500,7 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 }
 
 func TestIssueCreate_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -526,7 +526,7 @@ func TestIssueCreate_web(t *testing.T) {
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
