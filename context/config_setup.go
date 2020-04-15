@@ -36,6 +36,7 @@ func setupConfigFile(filename string) (*configEntry, error) {
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
+		Scopes:       []string{"repo", "read:org"},
 		WriteSuccessHTML: func(w io.Writer) {
 			fmt.Fprintln(w, oauthSuccessPage)
 		},
