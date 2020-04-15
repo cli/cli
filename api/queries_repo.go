@@ -388,6 +388,53 @@ func RepositoryReadme(client *Client, fullName string) (string, error) {
 
 }
 
+type RepoMetadataResult struct {
+	AssignableUsers struct {
+		Nodes []struct {
+			ID    string
+			Login string
+		}
+	} `graphql:"assignableUsers(first: 100)"`
+	Labels struct {
+		Nodes []struct {
+			ID   string
+			Name string
+		}
+	} `graphql:"labels(first: 100)"`
+	Projects struct {
+		Nodes []struct {
+			ID   string
+			Name string
+		}
+	} `graphql:"projects(first: 100, states: [OPEN])"`
+	Milestones struct {
+		Nodes []struct {
+			ID    string
+			Title string
+		}
+	} `graphql:"milestones(first: 100, states: [OPEN])"`
+}
+
+// RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
+func RepoMetadata(client *Client, repo ghrepo.Interface) (*RepoMetadataResult, error) {
+	var query struct {
+		Repository RepoMetadataResult `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return &query.Repository, nil
+}
+
 func isMarkdownFile(filename string) bool {
 	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
 	// seem worth executing a regex for this given that assumption.

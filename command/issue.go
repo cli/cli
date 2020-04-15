@@ -29,6 +29,10 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
+	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
@@ -350,6 +354,23 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	if err != nil {
+		return fmt.Errorf("could not parse assignees: %w", err)
+	}
+	labelNames, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return fmt.Errorf("could not parse labels: %w", err)
+	}
+	projectNames, err := cmd.Flags().GetStringSlice("project")
+	if err != nil {
+		return fmt.Errorf("could not parse projects: %w", err)
+	}
+	milestoneTitle, err := cmd.Flags().GetString("milestone")
+	if err != nil {
+		return fmt.Errorf("could not parse milestone: %w", err)
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
@@ -421,6 +442,75 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		params := map[string]interface{}{
 			"title": title,
 			"body":  body,
+		}
+
+		if len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != "" {
+			metadata, err := api.RepoMetadata(apiClient, baseRepo)
+			if err != nil {
+				return err
+			}
+
+			var assigneeIDs []string
+			for _, assigneeLogin := range assignees {
+				var found bool
+				for _, u := range metadata.AssignableUsers.Nodes {
+					if strings.EqualFold(assigneeLogin, u.Login) {
+						assigneeIDs = append(assigneeIDs, u.ID)
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("could not find user to assign: '%s'", assigneeLogin)
+				}
+			}
+			params["assigneeIds"] = assigneeIDs
+
+			var labelIDs []string
+			for _, labelName := range labelNames {
+				var found bool
+				for _, l := range metadata.Labels.Nodes {
+					if strings.EqualFold(labelName, l.Name) {
+						labelIDs = append(labelIDs, l.ID)
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("could not find label '%s'", labelName)
+				}
+			}
+			params["labelIds"] = labelIDs
+
+			var projectIDs []string
+			for _, projectName := range projectNames {
+				var found bool
+				for _, p := range metadata.Projects.Nodes {
+					if strings.EqualFold(projectName, p.Name) {
+						projectIDs = append(projectIDs, p.ID)
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("could not find project '%s'", projectName)
+				}
+			}
+			params["projectIds"] = projectIDs
+
+			if milestoneTitle != "" {
+				var milestoneID string
+				for _, m := range metadata.Milestones.Nodes {
+					if strings.EqualFold(milestoneTitle, m.Title) {
+						milestoneID = m.ID
+						break
+					}
+				}
+				if milestoneID == "" {
+					return fmt.Errorf("could not find milestone '%s'", milestoneTitle)
+				}
+				params["milestoneId"] = milestoneID
+			}
 		}
 
 		newIssue, err := api.IssueCreate(apiClient, repo, params)
