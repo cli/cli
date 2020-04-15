@@ -131,6 +131,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		opts = append(opts, apiVerboseLog())
 	}
 	opts = append(opts,
+		api.CheckScopes("read:org"),
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks

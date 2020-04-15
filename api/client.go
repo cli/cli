@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -60,6 +61,46 @@ func VerboseLog(out io.Writer, logTraffic bool, colorize bool) ClientOption {
 func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	return func(http.RoundTripper) http.RoundTripper {
 		return tr
+	}
+}
+
+var issuedScopesWarning bool
+
+// CheckScopes checks whether an OAuth scope is present in a response
+func CheckScopes(wantedScope string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			res, err := tr.RoundTrip(req)
+			if err != nil || issuedScopesWarning {
+				return res, err
+			}
+
+			isApp := res.Header.Get("X-Oauth-Client-Id") != ""
+			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+
+			hasWanted := false
+			for _, s := range hasScopes {
+				if wantedScope == strings.TrimSpace(s) {
+					hasWanted = true
+					break
+				}
+			}
+
+			if !hasWanted {
+				fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
+				// TODO: offer to take the person through the authentication flow again?
+				// TODO: retry the original request if it was a read?
+				if isApp {
+					fmt.Fprintln(os.Stderr, "To re-authenticate, please `rm ~/.config/gh/config.yml` and try again.")
+				} else {
+					// the person has pasted a Personal Access Token
+					fmt.Fprintln(os.Stderr, "Re-generate your token in `rm ~/.config/gh/config.yml` and try again.")
+				}
+				issuedScopesWarning = true
+			}
+
+			return res, nil
+		}}
 	}
 }
 
