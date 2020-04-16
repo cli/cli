@@ -127,7 +127,16 @@ $ yay -S github-cli
 ### Android (Termux)
 
 If you have arm64 or amd64 architecture:
-                                                                       1. Download the `.deb` file from the [releases page][] for your architecture                                                                  2. Run:                                                                ```bash                                                                dpkg -i  PATH/TO/.deb                                                  ```                                                                                                                                           If you have other architecture, follow guide to [compile it](/docs/source.md)
+
+1. Download the `.deb` file for your architecture from [releases page][]
+2. Run: 
+
+```bash
+dpkg -i PATH/TO/.deb
+```
+
+If you have another architecture, follow the guide to [compile it](/docs/source.md).
+
 
 ### Other platforms
 
