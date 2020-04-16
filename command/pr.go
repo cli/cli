@@ -499,6 +499,10 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 		}
 
 		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		if pr.State != "OPEN" {
+			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
+		}
+		fmt.Fprintf(w, utils.Gray("\n  %s"), pr.URL)
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -538,11 +542,9 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.Approved {
 				fmt.Fprint(w, utils.Green("✓ Approved"))
 			}
-		} else {
-			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
-		fmt.Fprint(w, "\n")
+		fmt.Fprint(w, "\n\n")
 	}
 	remaining := totalCount - len(prs)
 	if remaining > 0 {
