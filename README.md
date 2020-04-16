@@ -124,6 +124,11 @@ Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/gi
 $ yay -S github-cli
 ```
 
+### Android (Termux)
+
+If you have arm64 or amd64 architecture:
+                                                                       1. Download the `.deb` file from the [releases page][] for your architecture                                                                  2. Run:                                                                ```bash                                                                dpkg -i  PATH/TO/.deb                                                  ```                                                                                                                                           If you have other architecture, follow guide to [compile it](/docs/source.md)
+
 ### Other platforms
 
 Install a prebuilt binary from the [releases page][]
