@@ -1,3 +1,4 @@
+﻿
 # GitHub CLI
 
 `gh` is GitHub on the command line, and it's now available in beta. It brings pull requests, issues, and other GitHub concepts to
@@ -55,6 +56,8 @@ Install: `sudo port install gh`
 
 Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 
+------
+
 ### Windows
 
 `gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
@@ -88,12 +91,18 @@ choco upgrade gh
 
 MSI installers are available for download on the [releases page][].
 
+------
+
+
 ### Debian/Ubuntu Linux
 
 Install and upgrade:
 
 1. Download the `.deb` file from the [releases page][]
 2. `sudo apt install git && sudo dpkg -i gh_*_linux_amd64.deb`  install the downloaded file
+
+------
+
 
 ### Fedora Linux
 
@@ -102,12 +111,17 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo dnf install gh_*_linux_amd64.rpm` install the downloaded file
 
+------
+
+
 ### Centos Linux
 
 Install and upgrade:
 
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
+
+------
 
 ### openSUSE/SUSE Linux
 
@@ -116,6 +130,8 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][]
 2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
 
+------
+
 ### Arch Linux
 
 Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
@@ -123,6 +139,8 @@ Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/gi
 ```bash
 $ yay -S github-cli
 ```
+
+------
 
 ### Other platforms
 
