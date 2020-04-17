@@ -64,11 +64,14 @@ Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 Install:
 
 ```
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
 scoop install gh
 ```
 
-Upgrade: `scoop update gh`
+Upgrade:
+
+```
+scoop update gh
+```
 
 #### Chocolatey
 
