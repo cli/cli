@@ -16,8 +16,6 @@ type Config interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
-	configForHost(string) (*HostConfig, error)
-	parseHosts(*yaml.Node) ([]*HostConfig, error)
 }
 
 type NotFoundError struct {

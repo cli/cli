@@ -54,7 +54,7 @@ hosts:
 `)()
 	config, err := ParseConfig("filename")
 	eq(t, err, nil)
-	_, err = config.configForHost("github.com")
+	_, err = config.Get("github.com", "user")
 	eq(t, err, errors.New(`could not find config entry for "github.com"`))
 }
 
