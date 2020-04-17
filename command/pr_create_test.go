@@ -42,7 +42,7 @@ func TestPRCreate(t *testing.T) {
 	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[len(http.Requests)-1].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {

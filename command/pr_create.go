@@ -95,7 +95,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 	// otherwise, determine the head repository with info obtained from the API
 	if headRepo == nil {
-		if r, err := repoContext.HeadRepo(); err == nil {
+		// If we can push to the base repo, choose it. Otherwise
+		// look for a fork that we can push to.
+		if br, err := repoContext.BaseRepo(); err == nil && br.ViewerCanPush() {
+			headRepo = br
+		} else if r, err := repoContext.HeadRepo(); err == nil {
 			headRepo = r
 		}
 	}
