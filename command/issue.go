@@ -371,6 +371,8 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse milestone: %w", err)
 	}
 
+	hasMetadata := len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != ""
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
@@ -407,7 +409,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles)
+		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles, !hasMetadata)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -444,72 +446,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			"body":  body,
 		}
 
-		if len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != "" {
+		if hasMetadata {
 			metadata, err := api.RepoMetadata(apiClient, baseRepo)
 			if err != nil {
 				return err
 			}
-
-			var assigneeIDs []string
-			for _, assigneeLogin := range assignees {
-				var found bool
-				for _, u := range metadata.AssignableUsers.Nodes {
-					if strings.EqualFold(assigneeLogin, u.Login) {
-						assigneeIDs = append(assigneeIDs, u.ID)
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("could not find user to assign: '%s'", assigneeLogin)
-				}
-			}
-			params["assigneeIds"] = assigneeIDs
-
-			var labelIDs []string
-			for _, labelName := range labelNames {
-				var found bool
-				for _, l := range metadata.Labels.Nodes {
-					if strings.EqualFold(labelName, l.Name) {
-						labelIDs = append(labelIDs, l.ID)
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("could not find label '%s'", labelName)
-				}
-			}
-			params["labelIds"] = labelIDs
-
-			var projectIDs []string
-			for _, projectName := range projectNames {
-				var found bool
-				for _, p := range metadata.Projects.Nodes {
-					if strings.EqualFold(projectName, p.Name) {
-						projectIDs = append(projectIDs, p.ID)
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("could not find project '%s'", projectName)
-				}
-			}
-			params["projectIds"] = projectIDs
-
-			if milestoneTitle != "" {
-				var milestoneID string
-				for _, m := range metadata.Milestones.Nodes {
-					if strings.EqualFold(milestoneTitle, m.Title) {
-						milestoneID = m.ID
-						break
-					}
-				}
-				if milestoneID == "" {
-					return fmt.Errorf("could not find milestone '%s'", milestoneTitle)
-				}
-				params["milestoneId"] = milestoneID
+			err = addMetadataToIssueParams(params, metadata, assignees, labelNames, projectNames, milestoneTitle)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -521,6 +465,36 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
 	} else {
 		panic("Unreachable state")
+	}
+
+	return nil
+}
+
+func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames []string, milestoneTitle string) error {
+	assigneeIDs, err := metadata.AssigneesToIDs(assignees)
+	if err != nil {
+		return fmt.Errorf("could not assign user: %w", err)
+	}
+	params["assigneeIds"] = assigneeIDs
+
+	labelIDs, err := metadata.LabelsToIDs(labelNames)
+	if err != nil {
+		return fmt.Errorf("could not add label: %w", err)
+	}
+	params["labelIds"] = labelIDs
+
+	projectIDs, err := metadata.ProjectsToIDs(projectNames)
+	if err != nil {
+		return fmt.Errorf("could not add to project: %w", err)
+	}
+	params["projectIds"] = projectIDs
+
+	if milestoneTitle != "" {
+		milestoneID, err := metadata.MilestoneToID(milestoneTitle)
+		if err != nil {
+			return fmt.Errorf("could not add to milestone '%s': %w", milestoneTitle, err)
+		}
+		params["milestoneId"] = milestoneID
 	}
 
 	return nil

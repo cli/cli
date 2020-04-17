@@ -124,6 +124,29 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	reviewers, err := cmd.Flags().GetStringSlice("reviewer")
+	if err != nil {
+		return fmt.Errorf("could not parse reviewers: %w", err)
+	}
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	if err != nil {
+		return fmt.Errorf("could not parse assignees: %w", err)
+	}
+	labelNames, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return fmt.Errorf("could not parse labels: %w", err)
+	}
+	projectNames, err := cmd.Flags().GetStringSlice("project")
+	if err != nil {
+		return fmt.Errorf("could not parse projects: %w", err)
+	}
+	milestoneTitle, err := cmd.Flags().GetString("milestone")
+	if err != nil {
+		return fmt.Errorf("could not parse milestone: %w", err)
+	}
+
+	hasMetadata := len(reviewers) > 0 || len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != ""
+
 	baseTrackingBranch := baseBranch
 	if baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName()); err == nil {
 		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
@@ -187,7 +210,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
-		tb, err := titleBodySurvey(cmd, title, body, defs, templateFiles)
+		tb, err := titleBodySurvey(cmd, title, body, defs, templateFiles, !hasMetadata)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -293,6 +316,22 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranchLabel,
 		}
 
+		if hasMetadata {
+			metadata, err := api.RepoMetadata(client, baseRepo)
+			if err != nil {
+				return err
+			}
+			err = addMetadataToIssueParams(params, metadata, assignees, labelNames, projectNames, milestoneTitle)
+			if err != nil {
+				return err
+			}
+			reviewerIDs, err := metadata.AssigneesToIDs(reviewers)
+			if err != nil {
+				return fmt.Errorf("could not request reviewer: %w", err)
+			}
+			params["reviewerIds"] = reviewerIDs
+		}
+
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
 		if err != nil {
 			return fmt.Errorf("failed to create pull request: %w", err)
@@ -385,4 +424,10 @@ func init() {
 		"The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
+
+	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
+	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to a project by `name`")
+	prCreateCmd.Flags().StringP("milestone", "m", "", "Add the pull request to a milestone by `name`")
 }

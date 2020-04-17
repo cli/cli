@@ -415,6 +415,69 @@ type RepoMetadataResult struct {
 	} `graphql:"milestones(first: 100, states: [OPEN])"`
 }
 
+func (m *RepoMetadataResult) AssigneesToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, assigneeLogin := range names {
+		found := false
+		for _, u := range m.AssignableUsers.Nodes {
+			if strings.EqualFold(assigneeLogin, u.Login) {
+				ids = append(ids, u.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", assigneeLogin)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) LabelsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, labelName := range names {
+		found := false
+		for _, l := range m.Labels.Nodes {
+			if strings.EqualFold(labelName, l.Name) {
+				ids = append(ids, l.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", labelName)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, projectName := range names {
+		found := false
+		for _, p := range m.Projects.Nodes {
+			if strings.EqualFold(projectName, p.Name) {
+				ids = append(ids, p.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", projectName)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
+	for _, m := range m.Milestones.Nodes {
+		if strings.EqualFold(title, m.Title) {
+			return m.ID, nil
+		}
+	}
+	return "", errors.New("not found")
+}
+
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
 func RepoMetadata(client *Client, repo ghrepo.Interface) (*RepoMetadataResult, error) {
 	var query struct {

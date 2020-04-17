@@ -27,7 +27,13 @@ var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey
 	return survey.Ask(qs, response, opts...)
 }
 
-func confirmSubmission() (Action, error) {
+func confirmSubmission(allowPreview bool) (Action, error) {
+	options := []string{}
+	if allowPreview {
+		options = append(options, "Preview in browser")
+	}
+	options = append(options, "Submit", "Cancel")
+
 	confirmAnswers := struct {
 		Confirmation int
 	}{}
@@ -36,11 +42,7 @@ func confirmSubmission() (Action, error) {
 			Name: "confirmation",
 			Prompt: &survey.Select{
 				Message: "What's next?",
-				Options: []string{
-					"Preview in browser",
-					"Submit",
-					"Cancel",
-				},
+				Options: options,
 			},
 		},
 	}
@@ -50,7 +52,11 @@ func confirmSubmission() (Action, error) {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	return Action(confirmAnswers.Confirmation), nil
+	choice := confirmAnswers.Confirmation
+	if !allowPreview {
+		choice++
+	}
+	return Action(choice), nil
 }
 
 func selectTemplate(templatePaths []string) (string, error) {
@@ -81,7 +87,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string) (*titleBody, error) {
+func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string, allowPreview bool) (*titleBody, error) {
 	var inProgress titleBody
 	inProgress.Title = defs.Title
 	templateContents := ""
@@ -136,7 +142,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 		inProgress.Body = templateContents
 	}
 
-	confirmA, err := confirmSubmission()
+	confirmA, err := confirmSubmission(allowPreview)
 	if err != nil {
 		return nil, fmt.Errorf("unable to confirm: %w", err)
 	}

@@ -20,6 +20,7 @@ type PullRequestAndTotalCount struct {
 }
 
 type PullRequest struct {
+	ID          string
 	Number      int
 	Title       string
 	State       string
@@ -558,6 +559,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		mutation CreatePullRequest($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
 				pullRequest {
+					id
 					url
 				}
 			}
@@ -567,7 +569,10 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "title", "body", "draft", "baseRefName", "headRefName":
+			inputParams[key] = val
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -583,8 +588,65 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	if err != nil {
 		return nil, err
 	}
+	pr := &result.CreatePullRequest.PullRequest
 
-	return &result.CreatePullRequest.PullRequest, nil
+	// metadata parameters aren't currently available in `createPullRequest`,
+	// but they are in `updatePullRequest`
+	updateParams := make(map[string]interface{})
+	for key, val := range params {
+		switch key {
+		case "assigneeIds", "labelIds", "projectIds", "milestoneId":
+			if !isBlank(val) {
+				updateParams[key] = val
+			}
+		}
+	}
+	if len(updateParams) > 0 {
+		updateQuery := `
+		mutation UpdatePullRequest($input: CreatePullRequestInput!) {
+			updatePullRequest(input: $input)
+		}`
+		updateParams["pullRequestId"] = pr.ID
+		variables := map[string]interface{}{
+			"input": inputParams,
+		}
+		err := client.GraphQL(updateQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// reviewers are requested in yet another additional mutation
+	if ids, ok := params["reviewerIds"]; ok && !isBlank(ids) {
+		reviewQuery := `
+		mutation RequestReviews($input: CreatePullRequestInput!) {
+			requestReviews(input: $input)
+		}`
+		reviewParams := map[string]interface{}{
+			"pullRequestId": pr.ID,
+			"userIds":       ids,
+		}
+		variables := map[string]interface{}{
+			"input": reviewParams,
+		}
+		err := client.GraphQL(reviewQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pr, nil
+}
+
+func isBlank(v interface{}) bool {
+	switch vv := v.(type) {
+	case string:
+		return vv != ""
+	case []string:
+		return vv != nil && len(vv) > 0
+	default:
+		return true
+	}
 }
 
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
