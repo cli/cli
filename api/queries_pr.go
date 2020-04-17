@@ -643,7 +643,7 @@ func isBlank(v interface{}) bool {
 	case string:
 		return vv != ""
 	case []string:
-		return vv != nil && len(vv) > 0
+		return len(vv) > 0
 	default:
 		return true
 	}
