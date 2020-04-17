@@ -88,9 +88,11 @@ func isLegacy(root *yaml.Node) bool {
 }
 
 func migrateConfig(fn string, root *yaml.Node) error {
-	// TODO i'm sorry
-	newConfigData := map[string]map[string]map[string]string{}
-	newConfigData["hosts"] = map[string]map[string]string{}
+	type ConfigEntry map[string]string
+	type ConfigHash map[string]ConfigEntry
+
+	newConfigData := map[string]ConfigHash{}
+	newConfigData["hosts"] = ConfigHash{}
 
 	topLevelKeys := root.Content[0].Content
 
@@ -102,7 +104,7 @@ func migrateConfig(fn string, root *yaml.Node) error {
 			break
 		}
 		hostname := x.Value
-		newConfigData["hosts"][hostname] = map[string]string{}
+		newConfigData["hosts"][hostname] = ConfigEntry{}
 
 		authKeys := topLevelKeys[i+1].Content[0].Content
 
