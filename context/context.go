@@ -178,12 +178,12 @@ func (c *fsContext) AuthToken() (string, error) {
 		return c.authToken, nil
 	}
 
-	config, err := c.Config()
+	cfg, err := c.Config()
 	if err != nil {
 		return "", err
 	}
 
-	token, err := config.Get(defaultHostname, "token")
+	token, err := cfg.Get(defaultHostname, "oauth_token")
 	if token == "" || err != nil {
 		return "", err
 	}
