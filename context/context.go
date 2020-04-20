@@ -3,14 +3,16 @@ package context
 import (
 	"errors"
 	"fmt"
-	"path"
 	"sort"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/mitchellh/go-homedir"
 )
+
+// TODO these are sprinkled across command, context, config, and ghrepo
+const defaultHostname = "github.com"
 
 // Context represents the interface for querying information about the current environment
 type Context interface {
@@ -22,7 +24,7 @@ type Context interface {
 	Remotes() (Remotes, error)
 	BaseRepo() (ghrepo.Interface, error)
 	SetBaseRepo(string)
-	Config() (Config, error)
+	Config() (config.Config, error)
 }
 
 // cap the number of git remotes looked up, since the user might have an
@@ -152,25 +154,16 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config    Config
+	config    config.Config
 	remotes   Remotes
 	branch    string
 	baseRepo  ghrepo.Interface
 	authToken string
 }
 
-func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
-	return dir
-}
-
-func configFile() string {
-	return path.Join(ConfigDir(), "config.yml")
-}
-
-func (c *fsContext) Config() (Config, error) {
+func (c *fsContext) Config() (config.Config, error) {
 	if c.config == nil {
-		config, err := parseOrSetupConfigFile(configFile())
+		config, err := config.ParseOrSetupConfigFile(config.ConfigFile())
 		if err != nil {
 			return nil, err
 		}

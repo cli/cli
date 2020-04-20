@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/config"
 )
 
 const defaultTestConfig = `hosts:
@@ -84,7 +85,7 @@ func initBlankContext(cfg, repo, branch string) {
 
 		// NOTE we are not restoring the original readConfig; we never want to touch the config file on
 		// disk during tests.
-		context.StubConfig(cfg)
+		config.StubConfig(cfg)
 
 		return ctx
 	}

@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"errors"
@@ -6,11 +6,22 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 
+	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
-func parseOrSetupConfigFile(fn string) (Config, error) {
+func ConfigDir() string {
+	dir, _ := homedir.Expand("~/.config/gh")
+	return dir
+}
+
+func ConfigFile() string {
+	return path.Join(ConfigDir(), "config.yml")
+}
+
+func ParseOrSetupConfigFile(fn string) (Config, error) {
 	config, err := ParseConfig(fn)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		return setupConfigFile(fn)
@@ -19,7 +30,7 @@ func parseOrSetupConfigFile(fn string) (Config, error) {
 }
 
 func ParseDefaultConfig() (Config, error) {
-	return ParseConfig(configFile())
+	return ParseConfig(ConfigFile())
 }
 
 var ReadConfigFile = func(fn string) ([]byte, error) {
@@ -38,7 +49,7 @@ var ReadConfigFile = func(fn string) ([]byte, error) {
 }
 
 var WriteConfigFile = func(fn string, data []byte) error {
-	cfgFile, err := os.OpenFile(configFile(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // cargo coded from setup
+	cfgFile, err := os.OpenFile(ConfigFile(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // cargo coded from setup
 	if err != nil {
 		return err
 	}

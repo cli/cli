@@ -1,4 +1,4 @@
-package context
+package config
 
 import (
 	"errors"
@@ -149,7 +149,7 @@ func (c *fileConfig) Write() error {
 		return err
 	}
 
-	return WriteConfigFile(configFile(), marshalled)
+	return WriteConfigFile(ConfigFile(), marshalled)
 }
 
 func (c *fileConfig) Hosts() ([]*HostConfig, error) {

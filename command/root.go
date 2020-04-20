@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 
@@ -17,7 +18,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// TODO these are sprinkled across command, context, and ghrepo
+// TODO these are sprinkled across command, context, config, and ghrepo
 const defaultHostname = "github.com"
 
 // Version is dynamically set by the toolchain or overridden by the Makefile.
@@ -110,7 +111,7 @@ func BasicClient() (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)))
 
-	c, err := context.ParseDefaultConfig()
+	c, err := config.ParseDefaultConfig()
 	if err != nil {
 		return nil, err
 	}
