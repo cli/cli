@@ -190,7 +190,12 @@ func (c *fsContext) AuthToken() (string, error) {
 		return "", err
 	}
 
-	return config.Get(defaultHostname, "oauth_token")
+	token, err := config.Get(defaultHostname, "token")
+	if token == "" || err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (c *fsContext) SetAuthToken(t string) {
@@ -203,7 +208,12 @@ func (c *fsContext) AuthLogin() (string, error) {
 		return "", err
 	}
 
-	return config.Get(defaultHostname, "user")
+	login, err := config.Get(defaultHostname, "user")
+	if login == "" || err != nil {
+		return "", err
+	}
+
+	return login, nil
 }
 
 func (c *fsContext) Branch() (string, error) {
