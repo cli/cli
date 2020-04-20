@@ -13,12 +13,15 @@ func init() {
 	configGetCmd.Flags().StringP("host", "h", "", "Get per-host setting")
 	configSetCmd.Flags().StringP("host", "h", "", "Set per-host setting")
 
+	// TODO reveal and add usage once we properly support multiple hosts
+	configGetCmd.Flags().MarkHidden("host")
+	configSetCmd.Flags().MarkHidden("host")
 }
 
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Set and get gh settings",
-	Long: `Get and set key/value strings. They can be optionally scoped to a particular host.
+	Long: `Get and set key/value strings.
 
 Current respected settings:
 - git_protocol: https or ssh. Default is https.
@@ -27,28 +30,25 @@ Current respected settings:
 }
 
 var configGetCmd = &cobra.Command{
-	Use:   "get",
+	Use:   "get <key>",
 	Short: "Prints the value of a given configuration key.",
-	Long: `Get the value for a given configuration key, optionally scoping by hostname.
+	Long: `Get the value for a given configuration key.
 
 Examples:
-  gh config get git_protocol
+  $ gh config get git_protocol
   https
-  gh config get --host example.com
-  ssh
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: configGet,
 }
 
 var configSetCmd = &cobra.Command{
-	Use:   "set",
+	Use:   "set <key> <value>",
 	Short: "Updates configuration with the value of a given key.",
-	Long: `Update the configuration by setting a key to a value, optionally scoping by hostname.
+	Long: `Update the configuration by setting a key to a value.
 
 Examples:
-  gh config set editor vim
-  gh config set --host example.com editor eclipse
+  $ gh config set editor vim
 `,
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
