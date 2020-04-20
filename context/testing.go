@@ -2,8 +2,6 @@ package context
 
 import (
 	"io"
-	"reflect"
-	"testing"
 )
 
 func StubBackupConfig() func() {
@@ -35,12 +33,5 @@ func StubConfig(content string) func() {
 	}
 	return func() {
 		ReadConfigFile = orig
-	}
-}
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

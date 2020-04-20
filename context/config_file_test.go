@@ -3,10 +3,18 @@ package context
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 func Test_parseConfig(t *testing.T) {
 	defer StubConfig(`---
