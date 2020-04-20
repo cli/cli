@@ -79,9 +79,19 @@ func AddRemote(name, u string) (*Remote, error) {
 		return nil, err
 	}
 
-	urlParsed, err := url.Parse(u)
-	if err != nil {
-		return nil, err
+	var urlParsed *url.URL
+	if strings.HasPrefix(u, "https") {
+		urlParsed, err = url.Parse(u)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		urlParsed, err = ParseURL(u)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return &Remote{

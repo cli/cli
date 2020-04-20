@@ -127,7 +127,7 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
-		cloneURL = fmt.Sprintf("https://github.com/%s.git", cloneURL)
+		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 
 	var repo ghrepo.Interface
@@ -158,7 +158,7 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if parentRepo != nil {
-		err := addUpstreamRemote(parentRepo, cloneDir)
+		err := addUpstreamRemote(cmd, parentRepo, cloneDir)
 		if err != nil {
 			return err
 		}
@@ -167,9 +167,8 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addUpstreamRemote(parentRepo ghrepo.Interface, cloneDir string) error {
-	// TODO: support SSH remote URLs
-	upstreamURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(parentRepo))
+func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir string) error {
+	upstreamURL := formatRemoteURL(cmd, ghrepo.FullName(parentRepo))
 
 	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
@@ -267,14 +266,10 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(out, repo.URL)
 	}
 
-	remoteURL := repo.URL + ".git"
+	remoteURL := formatRemoteURL(cmd, ghrepo.FullName(repo))
 
 	if projectDirErr == nil {
-		// TODO: use git.AddRemote
-		remoteAdd := git.GitCommand("remote", "add", "origin", remoteURL)
-		remoteAdd.Stdout = os.Stdout
-		remoteAdd.Stderr = os.Stderr
-		err = run.PrepareCmd(remoteAdd).Run()
+		_, err = git.AddRemote("origin", remoteURL)
 		if err != nil {
 			return err
 		}
@@ -361,6 +356,15 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 
+		} else if strings.HasPrefix(repoArg, "git@") {
+			parsedURL, err := git.ParseURL(repoArg)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
+			toFork, err = ghrepo.FromURL(parsedURL)
+			if err != nil {
+				return fmt.Errorf("did not understand argument: %w", err)
+			}
 		} else {
 			toFork = ghrepo.FromFullName(repoArg)
 			if toFork.RepoName() == "" || toFork.RepoOwner() == "" {
@@ -437,7 +441,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(out, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
 			}
 
-			_, err = git.AddRemote(remoteName, forkedRepo.CloneURL)
+			forkedRepoCloneURL := formatRemoteURL(cmd, ghrepo.FullName(forkedRepo))
+
+			_, err = git.AddRemote(remoteName, forkedRepoCloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
@@ -458,7 +464,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(toFork, cloneDir)
+			err = addUpstreamRemote(cmd, toFork, cloneDir)
 			if err != nil {
 				return err
 			}
