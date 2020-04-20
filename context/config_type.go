@@ -132,7 +132,7 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 	hosts, err := c.Hosts()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse hosts config: %s", err)
+		return nil, fmt.Errorf("failed to parse hosts config: %w", err)
 	}
 
 	for _, hc := range hosts {
@@ -159,12 +159,12 @@ func (c *fileConfig) Hosts() ([]*HostConfig, error) {
 
 	_, hostsEntry, err := c.FindEntry("hosts")
 	if err != nil {
-		return nil, fmt.Errorf("could not find hosts config: %s", err)
+		return nil, fmt.Errorf("could not find hosts config: %w", err)
 	}
 
 	hostConfigs, err := c.parseHosts(hostsEntry)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse hosts config: %s", err)
+		return nil, fmt.Errorf("could not parse hosts config: %w", err)
 	}
 
 	c.hosts = hostConfigs

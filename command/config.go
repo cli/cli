@@ -99,12 +99,12 @@ func configSet(cmd *cobra.Command, args []string) error {
 
 	err = cfg.Set(hostname, key, value)
 	if err != nil {
-		return fmt.Errorf("failed to set %q to %q: %s", key, value, err)
+		return fmt.Errorf("failed to set %q to %q: %w", key, value, err)
 	}
 
 	err = cfg.Write()
 	if err != nil {
-		return fmt.Errorf("failed to write config to disk: %s", err)
+		return fmt.Errorf("failed to write config to disk: %w", err)
 	}
 
 	return nil

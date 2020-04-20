@@ -142,7 +142,7 @@ func migrateConfig(fn string, root *yaml.Node) error {
 
 	err = BackupConfigFile(fn)
 	if err != nil {
-		return fmt.Errorf("failed to back up existing config: %s", err)
+		return fmt.Errorf("failed to back up existing config: %w", err)
 	}
 
 	return WriteConfigFile(fn, newConfig)
@@ -162,7 +162,7 @@ func ParseConfig(fn string) (Config, error) {
 
 		_, root, err = parseConfigFile(fn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reparse migrated config: %s", err)
+			return nil, fmt.Errorf("failed to reparse migrated config: %w", err)
 		}
 	}
 
