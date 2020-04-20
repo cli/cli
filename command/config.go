@@ -14,8 +14,17 @@ func init() {
 	configSetCmd.Flags().StringP("host", "h", "", "Set per-host setting")
 
 	// TODO reveal and add usage once we properly support multiple hosts
-	configGetCmd.Flags().MarkHidden("host")
-	configSetCmd.Flags().MarkHidden("host")
+	err := configGetCmd.Flags().MarkHidden("host")
+
+	if err != nil {
+		panic("this should not happen")
+	}
+
+	// TODO reveal and add usage once we properly support multiple hosts
+	err = configSetCmd.Flags().MarkHidden("host")
+	if err != nil {
+		panic("this should not happen")
+	}
 }
 
 var configCmd = &cobra.Command{
