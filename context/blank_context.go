@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 )
 
@@ -20,6 +21,14 @@ type blankContext struct {
 	branch    string
 	baseRepo  ghrepo.Interface
 	remotes   Remotes
+}
+
+func (c *blankContext) Config() (config.Config, error) {
+	cfg, err := config.ParseConfig("boom.txt")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse config during tests. did you remember to stub? error: %s", err))
+	}
+	return cfg, nil
 }
 
 func (c *blankContext) AuthToken() (string, error) {

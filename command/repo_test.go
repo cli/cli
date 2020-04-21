@@ -77,7 +77,7 @@ func stubSince(d time.Duration) func() {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -134,7 +134,7 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -261,7 +261,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -303,7 +303,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -678,7 +678,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 }
 
 func TestRepoView_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -773,7 +773,7 @@ func TestRepoView_web_fullURL(t *testing.T) {
 }
 
 func TestRepoView(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -801,7 +801,7 @@ func TestRepoView(t *testing.T) {
 }
 
 func TestRepoView_nonmarkdown_readme(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -828,7 +828,7 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 }
 
 func TestRepoView_blanks(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString("{}"))

@@ -4,12 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 )
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
