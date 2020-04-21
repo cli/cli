@@ -117,8 +117,11 @@ func BasicClient() (*api.Client, error) {
 	}
 
 	token, err := c.Get(defaultHostname, "oauth_token")
-	if token == "" || err != nil {
+	if err != nil {
 		return nil, err
+	}
+	if token == "" {
+		return nil, fmt.Errorf("no oauth_token set in config")
 	}
 
 	opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
