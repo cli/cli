@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"os"
 	"regexp"
@@ -209,7 +208,7 @@ func prList(cmd *cobra.Command, args []string) error {
 
 	title := listHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
 
-	if terminal.IsTerminal(int(os.Stdout.Fd())) {
+	if utils.IsTerminal(os.Stdout) {
 		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 	}
 
