@@ -447,7 +447,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 
 		if hasMetadata {
-			metadata, err := api.RepoMetadata(apiClient, baseRepo)
+			metadataInput := api.RepoMetadataInput{
+				Assignees:  len(assignees) > 0,
+				Labels:     len(labelNames) > 0,
+				Projects:   len(projectNames) > 0,
+				Milestones: milestoneTitle != "",
+			}
+
+			metadata, err := api.RepoMetadata(apiClient, baseRepo, metadataInput)
 			if err != nil {
 				return err
 			}
@@ -471,7 +478,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames []string, milestoneTitle string) error {
-	assigneeIDs, err := metadata.AssigneesToIDs(assignees)
+	assigneeIDs, err := metadata.MembersToIDs(assignees)
 	if err != nil {
 		return fmt.Errorf("could not assign user: %w", err)
 	}

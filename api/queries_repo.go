@@ -389,37 +389,17 @@ func RepositoryReadme(client *Client, fullName string) (string, error) {
 }
 
 type RepoMetadataResult struct {
-	AssignableUsers struct {
-		Nodes []struct {
-			ID    string
-			Login string
-		}
-	} `graphql:"assignableUsers(first: 100)"`
-	Labels struct {
-		Nodes []struct {
-			ID   string
-			Name string
-		}
-	} `graphql:"labels(first: 100)"`
-	Projects struct {
-		Nodes []struct {
-			ID   string
-			Name string
-		}
-	} `graphql:"projects(first: 100, states: [OPEN])"`
-	Milestones struct {
-		Nodes []struct {
-			ID    string
-			Title string
-		}
-	} `graphql:"milestones(first: 100, states: [OPEN])"`
+	AssignableUsers []RepoAssignee
+	Labels          []RepoLabel
+	Projects        []RepoProject
+	Milestones      []RepoMilestone
 }
 
-func (m *RepoMetadataResult) AssigneesToIDs(names []string) ([]string, error) {
+func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 	var ids []string
 	for _, assigneeLogin := range names {
 		found := false
-		for _, u := range m.AssignableUsers.Nodes {
+		for _, u := range m.AssignableUsers {
 			if strings.EqualFold(assigneeLogin, u.Login) {
 				ids = append(ids, u.ID)
 				found = true
@@ -437,7 +417,7 @@ func (m *RepoMetadataResult) LabelsToIDs(names []string) ([]string, error) {
 	var ids []string
 	for _, labelName := range names {
 		found := false
-		for _, l := range m.Labels.Nodes {
+		for _, l := range m.Labels {
 			if strings.EqualFold(labelName, l.Name) {
 				ids = append(ids, l.ID)
 				found = true
@@ -455,7 +435,7 @@ func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, error) {
 	var ids []string
 	for _, projectName := range names {
 		found := false
-		for _, p := range m.Projects.Nodes {
+		for _, p := range m.Projects {
 			if strings.EqualFold(projectName, p.Name) {
 				ids = append(ids, p.ID)
 				found = true
@@ -470,7 +450,7 @@ func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, error) {
 }
 
 func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
-	for _, m := range m.Milestones.Nodes {
+	for _, m := range m.Milestones {
 		if strings.EqualFold(title, m.Title) {
 			return m.ID, nil
 		}
@@ -478,24 +458,228 @@ func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 	return "", errors.New("not found")
 }
 
+type RepoMetadataInput struct {
+	Assignees  bool
+	Reviewers  bool
+	Labels     bool
+	Projects   bool
+	Milestones bool
+}
+
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
-func RepoMetadata(client *Client, repo ghrepo.Interface) (*RepoMetadataResult, error) {
+func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
+	result := RepoMetadataResult{}
+
+	if input.Assignees {
+		users, err := RepoAssignableUsers(client, repo)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching assignees: %w", err)
+		}
+		result.AssignableUsers = users
+	}
+	if input.Reviewers {
+		// TODO
+	}
+	if input.Labels {
+		labels, err := RepoLabels(client, repo)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching labels: %w", err)
+		}
+		result.Labels = labels
+	}
+	if input.Projects {
+		// TODO: org-level projects
+		projects, err := RepoProjects(client, repo)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching projects: %w", err)
+		}
+		result.Projects = projects
+	}
+	if input.Assignees {
+		milestones, err := RepoMilestones(client, repo)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching milestones: %w", err)
+		}
+		result.Milestones = milestones
+	}
+
+	return &result, nil
+}
+
+type RepoProject struct {
+	ID   string
+	Name string
+}
+
+// RepoProjects fetches all open projects for a repository
+func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	var query struct {
-		Repository RepoMetadataResult `graphql:"repository(owner: $owner, name: $name)"`
+		Repository struct {
+			Projects struct {
+				Nodes    []RepoProject
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projects(states: [OPEN], first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
 	variables := map[string]interface{}{
-		"owner": githubv4.String(repo.RepoOwner()),
-		"name":  githubv4.String(repo.RepoName()),
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
 	}
 
 	v4 := githubv4.NewClient(client.http)
-	err := v4.Query(context.Background(), &query, variables)
-	if err != nil {
-		return nil, err
+
+	var projects []RepoProject
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, query.Repository.Projects.Nodes...)
+		if !query.Repository.Projects.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = query.Repository.Projects.PageInfo.EndCursor
 	}
 
-	return &query.Repository, nil
+	return projects, nil
+}
+
+type RepoAssignee struct {
+	ID    string
+	Login string
+}
+
+// RepoAssignableUsers fetches all the assignable users for a repository
+func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
+	var query struct {
+		Repository struct {
+			AssignableUsers struct {
+				Nodes    []RepoAssignee
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"assignableUsers(first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var users []RepoAssignee
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, query.Repository.AssignableUsers.Nodes...)
+		if !query.Repository.AssignableUsers.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = query.Repository.AssignableUsers.PageInfo.EndCursor
+	}
+
+	return users, nil
+}
+
+type RepoLabel struct {
+	ID   string
+	Name string
+}
+
+// RepoLabels fetches all the labels in a repository
+func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
+	var query struct {
+		Repository struct {
+			Labels struct {
+				Nodes    []RepoLabel
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"labels(first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var labels []RepoLabel
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		labels = append(labels, query.Repository.Labels.Nodes...)
+		if !query.Repository.Labels.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = query.Repository.Labels.PageInfo.EndCursor
+	}
+
+	return labels, nil
+}
+
+type RepoMilestone struct {
+	ID    string
+	Title string
+}
+
+// RepoMilestones fetches all open milestones in a repository
+func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, error) {
+	var query struct {
+		Repository struct {
+			Milestones struct {
+				Nodes    []RepoMilestone
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"milestones(states: [OPEN], first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var milestones []RepoMilestone
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		milestones = append(milestones, query.Repository.Milestones.Nodes...)
+		if !query.Repository.Milestones.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = query.Repository.Milestones.PageInfo.EndCursor
+	}
+
+	return milestones, nil
 }
 
 func isMarkdownFile(filename string) bool {

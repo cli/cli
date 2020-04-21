@@ -317,7 +317,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 
 		if hasMetadata {
-			metadata, err := api.RepoMetadata(client, baseRepo)
+			// TODO: input
+			metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{})
 			if err != nil {
 				return err
 			}
@@ -325,7 +326,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			reviewerIDs, err := metadata.AssigneesToIDs(reviewers)
+			reviewerIDs, err := metadata.MembersToIDs(reviewers)
 			if err != nil {
 				return fmt.Errorf("could not request reviewer: %w", err)
 			}
