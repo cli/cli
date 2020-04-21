@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -125,12 +124,11 @@ hosts:
   github.com:
     user: OWNER
     oauth_token: MUSTBEHIGHCUZIMATOKEN
+
 editor: ed
-git_protocol: ssh 
+git_protocol: ssh
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
-
-	fmt.Println("IN TEST")
 
 	output, err := RunCommand(configGetCmd, "config get -hgithub.com git_protocol")
 	if err != nil {

@@ -35,20 +35,10 @@ type ConfigMap struct {
 }
 
 func (cm *ConfigMap) GetStringValue(key string) (string, error) {
-	// TODO defaults should not be handled at this level.
 	_, valueNode, err := cm.FindEntry(key)
-	var notFound *NotFoundError
-
-	if err != nil && errors.As(err, &notFound) {
-		return defaultFor(key), nil
-	} else if err != nil {
+	if err != nil {
 		return "", err
 	}
-
-	if valueNode.Value == "" {
-		return defaultFor(key), nil
-	}
-
 	return valueNode.Value, nil
 }
 
@@ -107,28 +97,36 @@ type fileConfig struct {
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
-	value, err := c.GetStringValue(key)
-	fmt.Println("!!!!!!", value)
-	if err != nil {
-		return "", err
-	}
-
 	if hostname != "" {
-		fmt.Println("hostname")
 		hostCfg, err := c.configForHost(hostname)
 		if err != nil {
 			return "", err
 		}
+
 		hostValue, err := hostCfg.GetStringValue(key)
-		if err != nil {
+		var notFound *NotFoundError
+
+		if err != nil && !errors.As(err, &notFound) {
 			return "", err
 		}
 
-		fmt.Println("WHY", hostValue)
-
 		if hostValue != "" {
-			value = hostValue
+			return hostValue, nil
 		}
+	}
+
+	value, err := c.GetStringValue(key)
+
+	var notFound *NotFoundError
+
+	if err != nil && errors.As(err, &notFound) {
+		return defaultFor(key), nil
+	} else if err != nil {
+		return "", err
+	}
+
+	if value == "" {
+		return defaultFor(key), nil
 	}
 
 	return value, nil
