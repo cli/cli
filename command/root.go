@@ -47,6 +47,8 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
+	RootCmd.SetHelpFunc(aTempHelpFuncfunc)
+
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -205,4 +207,34 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 	}
 
 	return baseRepo, nil
+}
+
+type helpEntry struct {
+	Title string
+	Body  string
+}
+
+func aTempHelpFuncfunc(command *cobra.Command, s []string) {
+	out := colorableOut(command)
+	fmt.Fprint(out, "\nWork seamlessly with GitHub from the command line.\n\n")
+
+	var commands []string
+	for _, c := range command.Commands() {
+		s := c.Name() + ":" + strings.Repeat(" ", c.NamePadding()) + c.Short
+		commands = append(commands, s)
+	}
+
+	helpEntries := []helpEntry{
+		{"USAGE", `
+  gh <command> <subcommand> [flags]
+  Commands are run inside of a GitHub repository.`},
+		{"CORE COMMANDS", strings.Join(commands, "\n")},
+	}
+
+	for _, e := range helpEntries {
+		if e.Title != "" {
+			fmt.Fprintln(out, utils.Bold(e.Title))
+		}
+		fmt.Fprintln(out, strings.TrimLeft(e.Body, "\n")+"\n")
+	}
 }
