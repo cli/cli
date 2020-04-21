@@ -35,6 +35,7 @@ type ConfigMap struct {
 }
 
 func (cm *ConfigMap) GetStringValue(key string) (string, error) {
+	// TODO defaults should not be handled at this level.
 	_, valueNode, err := cm.FindEntry(key)
 	var notFound *NotFoundError
 
@@ -106,15 +107,31 @@ type fileConfig struct {
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
-	if hostname == "" {
-		return c.GetStringValue(key)
-	} else {
+	value, err := c.GetStringValue(key)
+	fmt.Println("!!!!!!", value)
+	if err != nil {
+		return "", err
+	}
+
+	if hostname != "" {
+		fmt.Println("hostname")
 		hostCfg, err := c.configForHost(hostname)
 		if err != nil {
 			return "", err
 		}
-		return hostCfg.GetStringValue(key)
+		hostValue, err := hostCfg.GetStringValue(key)
+		if err != nil {
+			return "", err
+		}
+
+		fmt.Println("WHY", hostValue)
+
+		if hostValue != "" {
+			value = hostValue
+		}
 	}
+
+	return value, nil
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {

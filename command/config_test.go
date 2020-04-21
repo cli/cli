@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -113,6 +114,27 @@ git_protocol: https
 	output, err := RunCommand(configGetCmd, "config get -hgithub.com git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
+	}
+
+	eq(t, output.String(), "ssh\n")
+}
+
+func TestConfigGetHost_unset(t *testing.T) {
+	cfg := `---
+hosts:
+  github.com:
+    user: OWNER
+    oauth_token: MUSTBEHIGHCUZIMATOKEN
+editor: ed
+git_protocol: ssh 
+`
+	initBlankContext(cfg, "OWNER/REPO", "master")
+
+	fmt.Println("IN TEST")
+
+	output, err := RunCommand(configGetCmd, "config get -hgithub.com git_protocol")
+	if err != nil {
+		t.Fatalf("error running command `config get -hgithub.com git_protocol`: %v", err)
 	}
 
 	eq(t, output.String(), "ssh\n")
