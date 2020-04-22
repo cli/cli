@@ -244,7 +244,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
 	Read the manual at <http://cli.github.com/manual>`},
 		{"FEEDBACK", `
   Fill out our feedback form <https://forms.gle/umxd3h31c7aMQFKG7>
-  Open an issue using “gh issue create -R cli/cli`},
+  Open an issue using “gh issue create -R cli/cli”`},
 		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
 	}
 
