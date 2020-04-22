@@ -232,7 +232,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
 			command.Long},
 		{"USAGE", `
   # most gh commands need to be run in a directory containing a GitHub repository.
-  gh <command> [subcommand] [flags]`},
+  gh <command> <subcommand> [flags]`},
 		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
 		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
 		{"FEEDBACK", `
