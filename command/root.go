@@ -247,7 +247,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
 		{
 			"",
 			command.Long},
-		{"USAGE", command.UsageString()},
+		{"USAGE", command.Use},
 		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
 		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
 		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
