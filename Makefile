@@ -32,7 +32,7 @@ site-docs: site
 	for f in site/manual/gh*.md; do sed -i.bak -e '/^### SEE ALSO/,$$d' "$$f"; done
 	rm -f site/manual/*.bak
 	git -C site add 'manual/gh*.md'
-	git -C site commit -m 'update help docs'
+	git -C site commit -m 'update help docs' || true
 .PHONY: site-docs
 
 site-publish: site-docs
