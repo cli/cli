@@ -434,14 +434,20 @@ func prReviewerList(pr api.PullRequest) string {
 // Ref. https://developer.github.com/v4/union/requestedreviewer/
 const teamTypeName = "Team"
 
+const ghostName = "ghost"
+
 // parseReviewers parses given Reviews and ReviewRequests
 func parseReviewers(pr api.PullRequest) []*reviewerState {
 	reviewerStates := make(map[string]*reviewerState)
 
 	for _, review := range pr.Reviews.Nodes {
 		if review.Author.Login != pr.Author.Login {
-			reviewerStates[review.Author.Login] = &reviewerState{
-				Name:  review.Author.Login,
+			name := review.Author.Login
+			if name == "" {
+				name = ghostName
+			}
+			reviewerStates[name] = &reviewerState{
+				Name:  name,
 				State: review.State,
 			}
 		}

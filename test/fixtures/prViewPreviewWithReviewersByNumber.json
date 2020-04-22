@@ -64,6 +64,12 @@
                 "login": "xyz"
               },
               "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": ""
+              },
+              "state": "APPROVED"
             }
           ]
         },
