@@ -18,6 +18,7 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
+// Ref. https://developer.github.com/v4/object/issue/
 type Issue struct {
 	Number    int
 	Title     string
@@ -32,15 +33,32 @@ type Issue struct {
 	Author struct {
 		Login string
 	}
-
-	Labels struct {
-		Nodes      []IssueLabel
+	Assignees struct {
+		Nodes []struct {
+			Login string
+		}
 		TotalCount int
 	}
-}
-
-type IssueLabel struct {
-	Name string
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	}
+	ProjectCards struct {
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
+			}
+		}
+		TotalCount int
+	}
+	Milestone struct {
+		Title string
+	}
 }
 
 const fragments = `
@@ -287,14 +305,35 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				comments {
 					totalCount
 				}
-				labels(first: 3) {
-					nodes {
-						name
-					}
-				}
 				number
 				url
 				createdAt
+				assignees(first: 100) {
+					nodes {
+						login
+					}
+					totalCount
+				}
+				labels(first: 100) {
+					nodes {
+						name
+					}
+					totalCount
+				}
+				projectCards(first: 100) {
+					nodes {
+						project {
+							name
+						}
+						column {
+							name
+						}
+					}
+					totalCount
+				}
+				milestone{
+					title
+				}
 			}
 		}
 	}`

@@ -10,7 +10,14 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/config"
 )
+
+const defaultTestConfig = `hosts:
+  github.com:
+    user: OWNER
+    oauth_token: 1234567890
+`
 
 type askStubber struct {
 	Asks  [][]*survey.Question
@@ -63,7 +70,7 @@ func (as *askStubber) Stub(stubbedQuestions []*QuestionStub) {
 	as.Stubs = append(as.Stubs, stubbedQuestions)
 }
 
-func initBlankContext(repo, branch string) {
+func initBlankContext(cfg, repo, branch string) {
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
 		ctx.SetBaseRepo(repo)
@@ -71,6 +78,15 @@ func initBlankContext(repo, branch string) {
 		ctx.SetRemotes(map[string]string{
 			"origin": "OWNER/REPO",
 		})
+
+		if cfg == "" {
+			cfg = defaultTestConfig
+		}
+
+		// NOTE we are not restoring the original readConfig; we never want to touch the config file on
+		// disk during tests.
+		config.StubConfig(cfg)
+
 		return ctx
 	}
 }
