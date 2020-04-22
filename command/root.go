@@ -76,6 +76,7 @@ func (fe FlagError) Unwrap() error {
 
 // RootCmd is the entry point of command-line execution
 var RootCmd = &cobra.Command{
+	Use:   "gh <command> <subcommand> [flags]",
 	Short: "GitHub CLI",
 	Long:  `Work seamlessly with GitHub from the command line.`,
 
@@ -246,9 +247,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
 		{
 			"",
 			command.Long},
-		{"USAGE", `
-  # most gh commands need to be run in a directory containing a GitHub repository.
-  gh <command> [subcommand] [flags]`},
+		{"USAGE", command.UsageString()},
 		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
 		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
 		{"EXAMPLES", `
