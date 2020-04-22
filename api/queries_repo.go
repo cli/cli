@@ -469,41 +469,66 @@ type RepoMetadataInput struct {
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
 func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
 	result := RepoMetadataResult{}
+	errc := make(chan error)
+	count := 0
 
 	if input.Assignees {
-		users, err := RepoAssignableUsers(client, repo)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching assignees: %w", err)
-		}
-		result.AssignableUsers = users
+		count++
+		go func() {
+			users, err := RepoAssignableUsers(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching assignees: %w", err)
+			}
+			result.AssignableUsers = users
+			errc <- err
+		}()
 	}
 	if input.Reviewers {
 		// TODO
 	}
 	if input.Labels {
-		labels, err := RepoLabels(client, repo)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching labels: %w", err)
-		}
-		result.Labels = labels
+		count++
+		go func() {
+			labels, err := RepoLabels(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching labels: %w", err)
+			}
+			result.Labels = labels
+			errc <- err
+		}()
 	}
 	if input.Projects {
-		// TODO: org-level projects
-		projects, err := RepoProjects(client, repo)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching projects: %w", err)
-		}
-		result.Projects = projects
+		count++
+		go func() {
+			// TODO: org-level projects
+			projects, err := RepoProjects(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching projects: %w", err)
+			}
+			result.Projects = projects
+			errc <- err
+		}()
 	}
-	if input.Assignees {
-		milestones, err := RepoMilestones(client, repo)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching milestones: %w", err)
-		}
-		result.Milestones = milestones
+	if input.Milestones {
+		count++
+		go func() {
+			milestones, err := RepoMilestones(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching milestones: %w", err)
+			}
+			result.Milestones = milestones
+			errc <- err
+		}()
 	}
 
-	return &result, nil
+	var err error
+	for i := 0; i < count; i++ {
+		if e := <-errc; e != nil {
+			err = e
+		}
+	}
+
+	return &result, err
 }
 
 type RepoProject struct {
