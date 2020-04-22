@@ -459,7 +459,8 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if cloneDesired {
-			cloneDir, err := runClone(forkedRepo.CloneURL, []string{})
+			forkedRepoCloneURL := formatRemoteURL(cmd, ghrepo.FullName(forkedRepo))
+			cloneDir, err := runClone(forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
