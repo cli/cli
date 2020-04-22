@@ -13,7 +13,7 @@ import (
 )
 
 func TestPRCreate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -66,7 +66,7 @@ func TestPRCreate(t *testing.T) {
 }
 
 func TestPRCreate_withForking(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithPermission("OWNER", "REPO", "READ")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -109,7 +109,7 @@ func TestPRCreate_withForking(t *testing.T) {
 }
 
 func TestPRCreate_alreadyExists(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -142,7 +142,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 }
 
 func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -174,7 +174,7 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 }
 
 func TestPRCreate_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -205,7 +205,7 @@ func TestPRCreate_web(t *testing.T) {
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 
 	http.StubRepoResponse("OWNER", "REPO")
@@ -330,7 +330,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 }
 
 func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
-	initBlankContext("OWNER/REPO", "cool_bug-fixes")
+	initBlankContext("", "OWNER/REPO", "cool_bug-fixes")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -406,7 +406,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 }
 
 func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -483,7 +483,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 }
 
 func TestPRCreate_survey_autofill(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -541,7 +541,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_autofill(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -559,7 +559,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -577,7 +577,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_interactive(t *testing.T) {
-	initBlankContext("OWNER/REPO", "feature")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`

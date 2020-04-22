@@ -77,7 +77,7 @@ func stubSince(d time.Duration) func() {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -134,7 +134,7 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -153,7 +153,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 
 	expectedCmds := []string{
 		"git remote rename origin upstream",
-		"git remote add -f origin https://github.com/someone/repo.git",
+		"git remote add -f origin https://github.com/someone/REPO.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -261,7 +261,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -287,7 +287,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 	expectedCmds := []string{
 		"git remote rename origin upstream",
-		"git remote add -f origin https://github.com/someone/repo.git",
+		"git remote add -f origin https://github.com/someone/REPO.git",
 	}
 
 	for x, cmd := range seenCmds {
@@ -303,7 +303,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
@@ -499,7 +499,11 @@ func TestRepoCreate(t *testing.T) {
 	{ "data": { "createRepository": {
 		"repository": {
 			"id": "REPOID",
-			"url": "https://github.com/OWNER/REPO"
+			"url": "https://github.com/OWNER/REPO",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			}
 		}
 	} } }
 	`))
@@ -522,7 +526,7 @@ func TestRepoCreate(t *testing.T) {
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/OWNER/REPO.git")
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/OWNER/REPO.git")
 
 	var reqBody struct {
 		Query     string
@@ -564,7 +568,11 @@ func TestRepoCreate_org(t *testing.T) {
 	{ "data": { "createRepository": {
 		"repository": {
 			"id": "REPOID",
-			"url": "https://github.com/ORG/REPO"
+			"url": "https://github.com/ORG/REPO",
+			"name": "REPO",
+			"owner": {
+				"login": "ORG"
+			}
 		}
 	} } }
 	`))
@@ -587,7 +595,7 @@ func TestRepoCreate_org(t *testing.T) {
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/ORG/REPO.git")
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/ORG/REPO.git")
 
 	var reqBody struct {
 		Query     string
@@ -629,7 +637,11 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	{ "data": { "createRepository": {
 		"repository": {
 			"id": "REPOID",
-			"url": "https://github.com/ORG/REPO"
+			"url": "https://github.com/ORG/REPO",
+			"name": "REPO",
+			"owner": {
+				"login": "ORG"
+			}
 		}
 	} } }
 	`))
@@ -652,7 +664,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add origin https://github.com/ORG/REPO.git")
+	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/ORG/REPO.git")
 
 	var reqBody struct {
 		Query     string
@@ -678,7 +690,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 }
 
 func TestRepoView_web(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -773,7 +785,7 @@ func TestRepoView_web_fullURL(t *testing.T) {
 }
 
 func TestRepoView(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -801,7 +813,7 @@ func TestRepoView(t *testing.T) {
 }
 
 func TestRepoView_nonmarkdown_readme(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -828,7 +840,7 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 }
 
 func TestRepoView_blanks(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString("{}"))

@@ -1,4 +1,4 @@
-package context
+package config
 
 const oauthSuccessPage = `
 <!doctype html>
