@@ -14,7 +14,7 @@
             "nodes": [
                 {
                     "requestedReviewer": {
-                        "__typename": "user",
+                        "__typename": "User",
                         "login": "1"
                     }
                 }

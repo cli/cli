@@ -19,6 +19,12 @@
               }
             },
             {
+                "requestedReviewer": {
+                    "__typename": "Team",
+                    "name": "Team 1"
+                }
+            },
+            {
               "requestedReviewer": {
                 "__typename": "user",
                 "login": "abc"

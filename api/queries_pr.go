@@ -66,6 +66,7 @@ type PullRequest struct {
 			RequestedReviewer struct {
 				TypeName string `json:"__typename"`
 				Login    string
+				Name     string
 			}
 		}
 		TotalCount int
@@ -373,6 +374,9 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 							...on User {
 								login
 							}
+							...on Team {
+								name
+							}
 						}
 					}
 					totalCount
@@ -469,6 +473,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 								__typename
 								...on User {
 									login
+								}
+								...on Team {
+									name
 								}
 							}
 						}

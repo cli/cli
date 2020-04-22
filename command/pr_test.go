@@ -442,7 +442,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Reviewers: DEF \(Commented\), def \(Changes requested\), xyz \(Approved\), 123 \(Requested\), abc \(Requested\)\n`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},

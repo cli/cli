@@ -431,6 +431,9 @@ func prReviewerList(pr api.PullRequest) string {
 	return reviewerList
 }
 
+// Ref. https://developer.github.com/v4/union/requestedreviewer/
+const teamTypeName = "Team"
+
 // parseReviewers parses given Reviews and ReviewRequests
 func parseReviewers(pr api.PullRequest) []*reviewerState {
 	reviewerStates := make(map[string]*reviewerState)
@@ -446,8 +449,12 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		reviewerStates[reviewRequest.RequestedReviewer.Login] = &reviewerState{
-			Name:  reviewRequest.RequestedReviewer.Login,
+		name := reviewRequest.RequestedReviewer.Login
+		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
+			name = reviewRequest.RequestedReviewer.Name
+		}
+		reviewerStates[name] = &reviewerState{
+			Name:  name,
 			State: requestedReviewState,
 		}
 	}
