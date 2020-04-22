@@ -240,8 +240,8 @@ func rootHelpFunc(command *cobra.Command, s []string) {
   Open an issue using “gh issue create -R cli/cli`},
 		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
 		{"EXAMPLES", `
-  $ cd your-repository
-  $ gh pr list
+  $ gh issue create
+  $ gh repo clone
   $ gh pr checkout 321`},
 		{"LEARN MORE", `
   Use "gh <command> <subcommand> --help" for more information about a command.
