@@ -87,7 +87,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 	if err != nil {
 		return nil, fmt.Errorf("could not read config: %w", err)
 	}
-	editorName, _ := cfg.Get(defaultHostname, "editor")
+	editorCommand, _ := cfg.Get(defaultHostname, "editor")
 
 	var inProgress titleBody
 	inProgress.Title = defs.Title
@@ -116,7 +116,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 	bodyQuestion := &survey.Question{
 		Name: "body",
 		Prompt: &surveyext.GhEditor{
-			EditorName: editorName,
+			EditorCommand: editorCommand,
 			Editor: &survey.Editor{
 				Message:       "Body",
 				FileName:      "*.md",
