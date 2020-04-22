@@ -222,3 +222,22 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 
 	return baseRepo, nil
 }
+
+func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
+	ctx := contextForCommand(cmd)
+
+	protocol := "https"
+	cfg, err := ctx.Config()
+	if err != nil {
+		fmt.Fprintf(colorableErr(cmd), "%s failed to load config: %s. using defaults\n", utils.Yellow("!"), err)
+	} else {
+		cfgProtocol, _ := cfg.Get(defaultHostname, "git_protocol")
+		protocol = cfgProtocol
+	}
+
+	if protocol == "ssh" {
+		return fmt.Sprintf("git@%s:%s.git", defaultHostname, fullRepoName)
+	}
+
+	return fmt.Sprintf("https://%s/%s.git", defaultHostname, fullRepoName)
+}
