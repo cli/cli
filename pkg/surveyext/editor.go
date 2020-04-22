@@ -18,25 +18,34 @@ import (
 )
 
 var (
-	bom    = []byte{0xef, 0xbb, 0xbf}
-	editor = "nano" // EXTENDED to switch from vim as a default editor
+	bom           = []byte{0xef, 0xbb, 0xbf}
+	defaultEditor = "nano" // EXTENDED to switch from vim as a default editor
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		editor = "notepad"
+		defaultEditor = "notepad"
 	} else if g := os.Getenv("GIT_EDITOR"); g != "" {
-		editor = g
+		defaultEditor = g
 	} else if v := os.Getenv("VISUAL"); v != "" {
-		editor = v
+		defaultEditor = v
 	} else if e := os.Getenv("EDITOR"); e != "" {
-		editor = e
+		defaultEditor = e
 	}
 }
 
 // EXTENDED to enable different prompting behavior
 type GhEditor struct {
 	*survey.Editor
+	EditorName string
+}
+
+func (e *GhEditor) editorName() string {
+	if e.EditorName == "" {
+		return defaultEditor
+	}
+
+	return e.EditorName
 }
 
 // EXTENDED to change prompt text
@@ -69,7 +78,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		// EXTENDED to support printing editor in prompt
 		EditorTemplateData{
 			Editor:     *e.Editor,
-			EditorName: filepath.Base(editor),
+			EditorName: filepath.Base(e.editorName()),
 			Config:     config,
 		},
 	)
@@ -110,7 +119,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 				EditorTemplateData{
 					// EXTENDED to support printing editor in prompt
 					Editor:     *e.Editor,
-					EditorName: filepath.Base(editor),
+					EditorName: filepath.Base(e.editorName()),
 					ShowHelp:   true,
 					Config:     config,
 				},
@@ -155,7 +164,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 
 	stdio := e.Stdio()
 
-	args, err := shellquote.Split(editor)
+	args, err := shellquote.Split(e.editorName())
 	if err != nil {
 		return "", err
 	}

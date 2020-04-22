@@ -82,6 +82,13 @@ func selectTemplate(templatePaths []string) (string, error) {
 }
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string) (*titleBody, error) {
+	ctx := contextForCommand(cmd)
+	cfg, err := ctx.Config()
+	if err != nil {
+		return nil, fmt.Errorf("could not read config: %w", err)
+	}
+	editorName, _ := cfg.Get(defaultHostname, "editor")
+
 	var inProgress titleBody
 	inProgress.Title = defs.Title
 	templateContents := ""
@@ -109,6 +116,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 	bodyQuestion := &survey.Question{
 		Name: "body",
 		Prompt: &surveyext.GhEditor{
+			EditorName: editorName,
 			Editor: &survey.Editor{
 				Message:       "Body",
 				FileName:      "*.md",
@@ -127,7 +135,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 		qs = append(qs, bodyQuestion)
 	}
 
-	err := SurveyAsk(qs, &inProgress)
+	err = SurveyAsk(qs, &inProgress)
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
 	}
