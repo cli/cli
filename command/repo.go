@@ -333,7 +333,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to create client: %w", err)
 	}
 
-	var toFork ghrepo.Interface
+	var repoToFork ghrepo.Interface
 	inParent := false // whether or not we're forking the repo we're currently "in"
 	if len(args) == 0 {
 		baseRepo, err := determineBaseRepo(cmd, ctx)
@@ -341,7 +341,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
 		inParent = true
-		toFork = baseRepo
+		repoToFork = baseRepo
 	} else {
 		repoArg := args[0]
 
@@ -351,7 +351,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 
-			toFork, err = ghrepo.FromURL(parsedURL)
+			repoToFork, err = ghrepo.FromURL(parsedURL)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
@@ -361,13 +361,13 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
-			toFork, err = ghrepo.FromURL(parsedURL)
+			repoToFork, err = ghrepo.FromURL(parsedURL)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			toFork = ghrepo.FromFullName(repoArg)
-			if toFork.RepoName() == "" || toFork.RepoOwner() == "" {
+			repoToFork = ghrepo.FromFullName(repoArg)
+			if repoToFork.RepoName() == "" || repoToFork.RepoOwner() == "" {
 				return fmt.Errorf("could not parse owner or repo name from %s", repoArg)
 			}
 		}
@@ -376,12 +376,12 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	greenCheck := utils.Green("✓")
 	out := colorableOut(cmd)
 	s := utils.Spinner(out)
-	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(toFork))) + utils.Gray("...")
+	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
 	s.Suffix = " " + loading
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 	s.Start()
 
-	forkedRepo, err := api.ForkRepo(apiClient, toFork)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
 	if err != nil {
 		s.Stop()
 		return fmt.Errorf("failed to fork: %w", err)
@@ -464,7 +464,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(cmd, toFork, cloneDir)
+			err = addUpstreamRemote(cmd, repoToFork, cloneDir)
 			if err != nil {
 				return err
 			}
