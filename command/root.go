@@ -244,7 +244,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
   $ gh repo clone
   $ gh pr checkout 321`},
 		{"LEARN MORE", `
-  Use "gh <command> <subcommand> --help" for more information about a command.
+  Use "gh [command] [subcommand] --help" for more information about a command.
   Read the manual at <http://cli.github.com/manual>`},
 	}
 
