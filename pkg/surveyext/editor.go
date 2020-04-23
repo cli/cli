@@ -18,25 +18,34 @@ import (
 )
 
 var (
-	bom    = []byte{0xef, 0xbb, 0xbf}
-	editor = "nano" // EXTENDED to switch from vim as a default editor
+	bom           = []byte{0xef, 0xbb, 0xbf}
+	defaultEditor = "nano" // EXTENDED to switch from vim as a default editor
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		editor = "notepad"
+		defaultEditor = "notepad"
 	} else if g := os.Getenv("GIT_EDITOR"); g != "" {
-		editor = g
+		defaultEditor = g
 	} else if v := os.Getenv("VISUAL"); v != "" {
-		editor = v
+		defaultEditor = v
 	} else if e := os.Getenv("EDITOR"); e != "" {
-		editor = e
+		defaultEditor = e
 	}
 }
 
 // EXTENDED to enable different prompting behavior
 type GhEditor struct {
 	*survey.Editor
+	EditorCommand string
+}
+
+func (e *GhEditor) editorCommand() string {
+	if e.EditorCommand == "" {
+		return defaultEditor
+	}
+
+	return e.EditorCommand
 }
 
 // EXTENDED to change prompt text
@@ -49,17 +58,17 @@ var EditorQuestionTemplate = `
 {{- else }}
   {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
   {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
-	{{- color "cyan"}}[(e) to launch {{ .EditorName }}, enter to skip] {{color "reset"}}
+	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}, enter to skip] {{color "reset"}}
 {{- end}}`
 
 // EXTENDED to pass editor name (to use in prompt)
 type EditorTemplateData struct {
 	survey.Editor
-	EditorName string
-	Answer     string
-	ShowAnswer bool
-	ShowHelp   bool
-	Config     *survey.PromptConfig
+	EditorCommand string
+	Answer        string
+	ShowAnswer    bool
+	ShowHelp      bool
+	Config        *survey.PromptConfig
 }
 
 // EXTENDED to augment prompt text and keypress handling
@@ -68,9 +77,9 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		EditorQuestionTemplate,
 		// EXTENDED to support printing editor in prompt
 		EditorTemplateData{
-			Editor:     *e.Editor,
-			EditorName: filepath.Base(editor),
-			Config:     config,
+			Editor:        *e.Editor,
+			EditorCommand: filepath.Base(e.editorCommand()),
+			Config:        config,
 		},
 	)
 	if err != nil {
@@ -109,10 +118,10 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 				EditorQuestionTemplate,
 				EditorTemplateData{
 					// EXTENDED to support printing editor in prompt
-					Editor:     *e.Editor,
-					EditorName: filepath.Base(editor),
-					ShowHelp:   true,
-					Config:     config,
+					Editor:        *e.Editor,
+					EditorCommand: filepath.Base(e.editorCommand()),
+					ShowHelp:      true,
+					Config:        config,
 				},
 			)
 			if err != nil {
@@ -155,7 +164,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 
 	stdio := e.Stdio()
 
-	args, err := shellquote.Split(editor)
+	args, err := shellquote.Split(e.editorCommand())
 	if err != nil {
 		return "", err
 	}

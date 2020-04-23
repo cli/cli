@@ -74,7 +74,7 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 }
 
 func TestPRStatus(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -102,7 +102,7 @@ func TestPRStatus(t *testing.T) {
 }
 
 func TestPRStatus_fork(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
 
@@ -132,7 +132,7 @@ branch.blueberries.merge refs/heads/blueberries`)}
 }
 
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -159,7 +159,7 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -191,7 +191,7 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -212,7 +212,7 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Merged(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -233,7 +233,7 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 }
 
 func TestPRStatus_blankSlate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -265,7 +265,7 @@ Requesting a code review from you
 }
 
 func TestPRList_stdout_is_not_a_tty(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -286,7 +286,7 @@ func TestPRList_stdout_is_not_a_tty(t *testing.T) {
 }
 
 func TestPRList_filtering_stdout_is_not_a_tty(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -315,7 +315,7 @@ func TestPRList_filtering_stdout_is_not_a_tty(t *testing.T) {
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -335,7 +335,7 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 }
 
 func TestPRList_filteringClosed(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -359,7 +359,7 @@ func TestPRList_filteringClosed(t *testing.T) {
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -383,7 +383,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 }
 
 func TestPRList_filteringAssigneeLabels(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -513,7 +513,7 @@ func TestPRView_Preview(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			initBlankContext("OWNER/REPO", tc.ownerRepo)
+			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
 			http := initFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
 
@@ -534,7 +534,7 @@ func TestPRView_Preview(t *testing.T) {
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -572,7 +572,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 }
 
 func TestPRView_web_noResultsForBranch(t *testing.T) {
-	initBlankContext("OWNER/REPO", "blueberries")
+	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -603,7 +603,7 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 }
 
 func TestPRView_web_numberArg(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -635,7 +635,7 @@ func TestPRView_web_numberArg(t *testing.T) {
 }
 
 func TestPRView_web_numberArgWithHash(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -667,7 +667,7 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 }
 
 func TestPRView_web_urlArg(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -698,7 +698,7 @@ func TestPRView_web_urlArg(t *testing.T) {
 }
 
 func TestPRView_web_branchArg(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -732,7 +732,7 @@ func TestPRView_web_branchArg(t *testing.T) {
 }
 
 func TestPRView_web_branchWithOwnerArg(t *testing.T) {
-	initBlankContext("OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
