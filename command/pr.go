@@ -208,8 +208,11 @@ func prList(cmd *cobra.Command, args []string) error {
 
 	title := listHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
 
-	if utils.IsTerminal(os.Stdout) {
-		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	out := cmd.OutOrStdout()
+	if outFile, isFile := out.(*os.File); isFile {
+		if utils.IsTerminal(outFile) {
+			fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+		}
 	}
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
