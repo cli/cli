@@ -40,3 +40,22 @@ func TestChangelogURL(t *testing.T) {
 		t.Errorf("expected %s to create url %s but got %s", tag, url, result)
 	}
 }
+
+func TestRemoteURLFormatting_no_config(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	result := formatRemoteURL(repoForkCmd, "OWNER/REPO")
+	eq(t, result, "https://github.com/OWNER/REPO.git")
+}
+
+func TestRemoteURLFormatting_ssh_config(t *testing.T) {
+	cfg := `---
+hosts:
+  github.com:
+    user: OWNER
+    oauth_token: MUSTBEHIGHCUZIMATOKEN
+git_protocol: ssh
+`
+	initBlankContext(cfg, "OWNER/REPO", "master")
+	result := formatRemoteURL(repoForkCmd, "OWNER/REPO")
+	eq(t, result, "git@github.com:OWNER/REPO.git")
+}
