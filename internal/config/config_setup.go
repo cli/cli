@@ -24,9 +24,14 @@ var (
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
 
-// TODO: have a conversation about whether this belongs in the "context" package
-// FIXME: make testable
-func setupConfigFile(filename string) (Config, error) {
+// IsGitHubApp reports whether an OAuth app is "GitHub CLI" or "GitHub CLI (dev)"
+func IsGitHubApp(id string) bool {
+	// this intentionally doesn't use `oauthClientID` because that is a variable
+	// that can potentially be changed at build time via GH_OAUTH_CLIENT_ID
+	return id == "178c6fc778ccc68e1d6a" || id == "4d747ba5675d5d66553f"
+}
+
+func AuthFlow(notice string) (string, string, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
@@ -43,15 +48,30 @@ func setupConfigFile(filename string) (Config, error) {
 		VerboseStream: verboseStream,
 	}
 
-	fmt.Fprintln(os.Stderr, "Notice: authentication required")
+	fmt.Fprintln(os.Stderr, notice)
 	fmt.Fprintf(os.Stderr, "Press Enter to open %s in your browser... ", flow.Hostname)
 	_ = waitForEnter(os.Stdin)
 	token, err := flow.ObtainAccessToken()
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	userLogin, err := getViewer(token)
+	if err != nil {
+		return "", "", err
+	}
+
+	return token, userLogin, nil
+}
+
+func AuthFlowComplete() {
+	fmt.Fprintln(os.Stderr, "Authentication complete. Press Enter to continue... ")
+	_ = waitForEnter(os.Stdin)
+}
+
+// FIXME: make testable
+func setupConfigFile(filename string) (Config, error) {
+	token, userLogin, err := AuthFlow("Notice: authentication required")
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +82,9 @@ func setupConfigFile(filename string) (Config, error) {
 	}
 
 	yamlHosts := map[string]map[string]string{}
-	yamlHosts[flow.Hostname] = map[string]string{}
-	yamlHosts[flow.Hostname]["user"] = userLogin
-	yamlHosts[flow.Hostname]["oauth_token"] = token
+	yamlHosts[oauthHost] = map[string]string{}
+	yamlHosts[oauthHost]["user"] = userLogin
+	yamlHosts[oauthHost]["oauth_token"] = token
 
 	defaultConfig := yamlConfig{
 		Hosts: yamlHosts,
@@ -85,14 +105,9 @@ func setupConfigFile(filename string) (Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	n, err := cfgFile.Write(yamlData)
-	if err == nil && n < len(yamlData) {
-		err = io.ErrShortWrite
-	}
-
-	if err == nil {
-		fmt.Fprintln(os.Stderr, "Authentication complete. Press Enter to continue... ")
-		_ = waitForEnter(os.Stdin)
+	_, err = cfgFile.Write(yamlData)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO cleaner error handling? this "should" always work given that we /just/ wrote the file...

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
@@ -33,6 +32,16 @@ func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			req.Header.Add(name, value)
+			return tr.RoundTrip(req)
+		}}
+	}
+}
+
+// AddHeaderFunc is an AddHeader that gets the string value from a function
+func AddHeaderFunc(name string, value func() string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			req.Header.Add(name, value())
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -67,15 +76,15 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 var issuedScopesWarning bool
 
 // CheckScopes checks whether an OAuth scope is present in a response
-func CheckScopes(wantedScope string) ClientOption {
+func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			if err != nil || issuedScopesWarning {
+			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
 				return res, err
 			}
 
-			isApp := res.Header.Get("X-Oauth-Client-Id") != ""
+			appID := res.Header.Get("X-Oauth-Client-Id")
 			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
 
 			hasWanted := false
@@ -87,14 +96,8 @@ func CheckScopes(wantedScope string) ClientOption {
 			}
 
 			if !hasWanted {
-				fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
-				// TODO: offer to take the person through the authentication flow again?
-				// TODO: retry the original request if it was a read?
-				if isApp {
-					fmt.Fprintln(os.Stderr, "To re-authenticate, please `rm ~/.config/gh/config.yml` and try again.")
-				} else {
-					// the person has pasted a Personal Access Token
-					fmt.Fprintln(os.Stderr, "Re-generate your token in `rm ~/.config/gh/config.yml` and try again.")
+				if err := cb(appID); err != nil {
+					return res, err
 				}
 				issuedScopesWarning = true
 			}
