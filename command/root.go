@@ -19,7 +19,7 @@ import (
 )
 
 // TODO these are sprinkled across command, context, config, and ghrepo
-const defaultHostname = "github.com"
+var defaultHostname = "github.com"
 
 // Version is dynamically set by the toolchain or overridden by the Makefile.
 var Version = "DEV"
@@ -30,6 +30,10 @@ var BuildDate = "" // YYYY-MM-DD
 var versionOutput = ""
 
 func init() {
+	if gheHostname := os.Getenv("GITHUB_HOST"); gheHostname != "" {
+		defaultHostname = gheHostname
+	}
+
 	if Version == "DEV" {
 		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "(devel)" {
 			Version = info.Main.Version

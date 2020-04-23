@@ -13,16 +13,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	oauthHost = "github.com"
-)
-
 var (
+	oauthHost = "github.com"
+
 	// The "GitHub CLI" OAuth app
 	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
+
+func init() {
+	if gheHostname := os.Getenv("GITHUB_HOST"); gheHostname != "" {
+		oauthHost = gheHostname
+	}
+}
 
 // TODO: have a conversation about whether this belongs in the "context" package
 // FIXME: make testable

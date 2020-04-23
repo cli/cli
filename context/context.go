@@ -3,6 +3,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/cli/cli/api"
@@ -12,7 +13,13 @@ import (
 )
 
 // TODO these are sprinkled across command, context, config, and ghrepo
-const defaultHostname = "github.com"
+var defaultHostname = "github.com"
+
+func init() {
+	if gheHostname := os.Getenv("GITHUB_HOST"); gheHostname != "" {
+		defaultHostname = gheHostname
+	}
+}
 
 // Context represents the interface for querying information about the current environment
 type Context interface {
