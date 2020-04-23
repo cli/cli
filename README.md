@@ -45,7 +45,7 @@ tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn mor
 
 #### Homebrew
 
-Install: `brew install github/gh/gh`
+Install: `brew install gh`
 
 Upgrade: `brew upgrade gh`
 
