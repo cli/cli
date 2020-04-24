@@ -397,21 +397,36 @@ func isMarkdownFile(filename string) bool {
 		strings.HasSuffix(filename, ".mkdown")
 }
 
+type PageInfo struct {
+	HasNextPage bool
+	EndCursor   string
+}
+
 type RepoWithTotalCountAndNameWithOwner struct {
 	TotalCount int
 	Nodes      []struct {
 		NameWithOwner string
 	}
+	PageInfo PageInfo
 }
 
-func Repositories(client *Client, limit int) (*RepoWithTotalCountAndNameWithOwner, error) {
+type RepositoriesResopnse struct {
+	TotalCount   int
+	Repositories []string
+}
+
+func Repositories(client *Client, limit int) (*RepositoriesResopnse, error) {
 	query := `
-	query($limit: Int!) {
+	query($limit: Int!, $endCursor: String) {
 		viewer {
-			repositories(first: $limit, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], ownerAffiliations:[OWNER, ORGANIZATION_MEMBER, COLLABORATOR]) {
+			repositories(first: $limit, after: $endCursor, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], ownerAffiliations:[OWNER, ORGANIZATION_MEMBER, COLLABORATOR]) {
 				totalCount
 				nodes {
 					nameWithOwner
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
 				}
 			}
 		}
@@ -423,13 +438,35 @@ func Repositories(client *Client, limit int) (*RepoWithTotalCountAndNameWithOwne
 		}
 	}{}
 
-	pageLimit := min(limit, 100)
-	variables := map[string]interface{}{
-		"limit": pageLimit,
-	}
-	if err := client.GraphQL(query, variables, &result); err != nil {
-		return nil, err
+	var hasNextPage bool = true
+	var response = &RepositoriesResopnse{TotalCount: 0, Repositories: []string{}}
+	variables := map[string]interface{}{}
+
+	for hasNextPage {
+		pageLimit := min(limit, 100)
+		variables["limit"] = pageLimit
+
+		if err := client.GraphQL(query, variables, &result); err != nil {
+			return nil, err
+		}
+
+		response.TotalCount = result.Viewer.Repositories.TotalCount
+		hasNextPage = result.Viewer.Repositories.PageInfo.HasNextPage
+
+		for _, repo := range result.Viewer.Repositories.Nodes {
+			response.Repositories = append(response.Repositories, repo.NameWithOwner)
+			if len(response.Repositories) == limit {
+				break
+			}
+		}
+
+		if hasNextPage {
+			variables["endCursor"] = result.Viewer.Repositories.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(response.Repositories))
+		} else {
+			break
+		}
 	}
 
-	return &result.Viewer.Repositories, nil
+	return response, nil
 }

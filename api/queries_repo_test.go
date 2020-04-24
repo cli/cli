@@ -73,7 +73,7 @@ func Test_GetAllRepositories(t *testing.T) {
 		t.Errorf("expected totalCount to be %q, got %q", 3, response.TotalCount)
 	}
 
-	if len(response.Nodes) != 3 {
-		t.Errorf("expected %q repositories in response, got %q", 3, response.Nodes)
+	if len(response.Repositories) != 3 {
+		t.Errorf("expected %q repositories in response, got %q", 3, response.Repositories)
 	}
 }

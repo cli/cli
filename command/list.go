@@ -52,13 +52,13 @@ func listRepos(cmd *cobra.Command, args []string) error {
 	}
 
 	if !raw {
-		title := fmt.Sprintf("Showing %d of %d repositories.", len(repos.Nodes), repos.TotalCount)
+		title := fmt.Sprintf("Showing %d of %d repositories.", len(repos.Repositories), repos.TotalCount)
 		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 	}
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
-	for i := range repos.Nodes {
-		table.AddField(repos.Nodes[i].NameWithOwner, nil, nil)
+	for i := range repos.Repositories {
+		table.AddField(repos.Repositories[i], nil, nil)
 		table.EndRow()
 	}
 	err = table.Render()
