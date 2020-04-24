@@ -396,3 +396,40 @@ func isMarkdownFile(filename string) bool {
 		strings.HasSuffix(filename, ".mdown") ||
 		strings.HasSuffix(filename, ".mkdown")
 }
+
+type RepoWithTotalCountAndNameWithOwner struct {
+	TotalCount int
+	Nodes      []struct {
+		NameWithOwner string
+	}
+}
+
+func Repositories(client *Client, limit int) (*RepoWithTotalCountAndNameWithOwner, error) {
+	query := `
+	query($limit: Int!) {
+		viewer {
+			repositories(first: $limit, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], ownerAffiliations:[OWNER, ORGANIZATION_MEMBER, COLLABORATOR]) {
+				totalCount
+				nodes {
+					nameWithOwner
+				}
+			}
+		}
+	}`
+
+	result := struct {
+		Viewer struct {
+			Repositories RepoWithTotalCountAndNameWithOwner
+		}
+	}{}
+
+	pageLimit := min(limit, 100)
+	variables := map[string]interface{}{
+		"limit": pageLimit,
+	}
+	if err := client.GraphQL(query, variables, &result); err != nil {
+		return nil, err
+	}
+
+	return &result.Viewer.Repositories, nil
+}

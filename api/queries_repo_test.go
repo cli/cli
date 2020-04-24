@@ -43,3 +43,37 @@ func Test_RepoCreate(t *testing.T) {
 		t.Errorf("expected homepageUrl to be %q, got %q", "http://example.com", homepage)
 	}
 }
+
+func Test_GetAllRepositories(t *testing.T) {
+	http := &FakeHTTP{}
+	client := NewClient(ReplaceTripper(http))
+
+	http.StubResponse(200, bytes.NewBufferString(`{
+		"data":{
+			"viewer":{
+				"repositories":{
+					"totalCount":3,
+					"nodes":[
+						{"nameWithOwner":"repo1"},
+						{"nameWithOwner":"repo2"},
+						{"nameWithOwner":"repo3"}
+					]
+				}
+			}
+		}
+	}`))
+
+	response, err := Repositories(client, 10)
+
+	if err != nil {
+		t.Errorf("expected error to be nil, got %q", err)
+	}
+
+	if response.TotalCount != 3 {
+		t.Errorf("expected totalCount to be %q, got %q", 3, response.TotalCount)
+	}
+
+	if len(response.Nodes) != 3 {
+		t.Errorf("expected %q repositories in response, got %q", 3, response.Nodes)
+	}
+}
