@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -66,10 +67,11 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
 
-		// local branch already exists
+		// there is a local branch with the same name as the remote branch
 		if _, err := git.ShowRefs("refs/heads/" + newBranchName); err == nil {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
+			cmds := commandsToMuckWithTheConfig(cmd, baseURLOrName, pr, currentBranch, newBranchName)
+			cmdQueue = append(cmdQueue, cmds...)
 		} else {
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
@@ -77,33 +79,13 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// no git remote for PR head
-
 		// avoid naming the new branch the same as the default branch
 		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 
-		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
-		if newBranchName == currentBranch {
-			// PR head matches currently checked out branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
-		} else {
-			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-		}
-
-		remote := baseURLOrName
-		mergeRef := ref
-		if pr.MaintainerCanModify {
-			remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
-			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
-		}
-		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
-		}
+		cmds := commandsToMuckWithTheConfig(cmd, baseURLOrName, pr, currentBranch, newBranchName)
+		cmdQueue = append(cmdQueue, cmds...)
 	}
 
 	for _, args := range cmdQueue {
@@ -116,6 +98,33 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func commandsToMuckWithTheConfig(cmd *cobra.Command, remote string, pr *api.PullRequest, currentBranch string, newBranchName string) [][]string {
+	var cmdQueue [][]string
+
+	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
+	if newBranchName == currentBranch {
+		// PR head matches currently checked out branch
+		cmdQueue = append(cmdQueue, []string{"git", "fetch", remote, ref})
+		cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+	} else {
+		// create a new branch
+		cmdQueue = append(cmdQueue, []string{"git", "fetch", remote, fmt.Sprintf("%s:%s", ref, newBranchName)})
+		cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+	}
+
+	mergeRef := ref
+	if pr.MaintainerCanModify {
+		remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
+		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
+	}
+	if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
+	}
+
+	return cmdQueue
 }
 
 var prCheckoutCmd = &cobra.Command{
