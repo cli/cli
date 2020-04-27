@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/pkg/githubtemplate"
@@ -88,6 +89,16 @@ func selectTemplate(templatePaths []string) (string, error) {
 }
 
 func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, defs defaults, templatePaths []string, allowPreview bool) (*titleBody, error) {
+	editorCommand := os.Getenv("GH_EDITOR")
+	if editorCommand == "" {
+		ctx := contextForCommand(cmd)
+		cfg, err := ctx.Config()
+		if err != nil {
+			return nil, fmt.Errorf("could not read config: %w", err)
+		}
+		editorCommand, _ = cfg.Get(defaultHostname, "editor")
+	}
+
 	var inProgress titleBody
 	inProgress.Title = defs.Title
 	templateContents := ""
@@ -115,6 +126,7 @@ func titleBodySurvey(cmd *cobra.Command, providedTitle, providedBody string, def
 	bodyQuestion := &survey.Question{
 		Name: "body",
 		Prompt: &surveyext.GhEditor{
+			EditorCommand: editorCommand,
 			Editor: &survey.Editor{
 				Message:       "Body",
 				FileName:      "*.md",

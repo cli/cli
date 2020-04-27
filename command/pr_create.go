@@ -273,8 +273,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
 	if headRemote == nil {
-		// TODO: support non-HTTPS git remote URLs
-		headRepoURL := fmt.Sprintf("https://github.com/%s.git", ghrepo.FullName(headRepo))
+		headRepoURL := formatRemoteURL(cmd, ghrepo.FullName(headRepo))
+
 		// TODO: prevent clashes with another remote of a same name
 		gitRemote, err := git.AddRemote("fork", headRepoURL)
 		if err != nil {
