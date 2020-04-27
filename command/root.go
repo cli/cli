@@ -51,6 +51,8 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
+	RootCmd.SetHelpFunc(rootHelpFunc)
+
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -74,12 +76,9 @@ func (fe FlagError) Unwrap() error {
 
 // RootCmd is the entry point of command-line execution
 var RootCmd = &cobra.Command{
-	Use:   "gh",
+	Use:   "gh <command> <subcommand> [flags]",
 	Short: "GitHub CLI",
-	Long: `Work seamlessly with GitHub from the command line.
-
-GitHub CLI is in early stages of development, and we'd love to hear your
-feedback at <https://forms.gle/umxd3h31c7aMQFKG7>`,
+	Long:  `Work seamlessly with GitHub from the command line.`,
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -221,6 +220,71 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 	}
 
 	return baseRepo, nil
+}
+
+func rootHelpFunc(command *cobra.Command, s []string) {
+	type helpEntry struct {
+		Title string
+		Body  string
+	}
+
+	coreCommandNames := []string{"issue", "pr", "repo"}
+	var coreCommands []string
+	var additionalCommands []string
+	for _, c := range command.Commands() {
+		if c.Short == "" {
+			continue
+		}
+		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
+		if includes(coreCommandNames, c.Name()) {
+			coreCommands = append(coreCommands, s)
+		} else {
+			additionalCommands = append(additionalCommands, s)
+		}
+	}
+
+	helpEntries := []helpEntry{
+		{
+			"",
+			command.Long},
+		{"USAGE", command.Use},
+		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
+		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
+		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
+		{"EXAMPLES", `
+  $ gh issue create
+  $ gh repo clone
+  $ gh pr checkout 321`},
+		{"LEARN MORE", `
+  Use "gh <command> <subcommand> --help" for more information about a command.
+  Read the manual at <http://cli.github.com/manual>`},
+		{"FEEDBACK", `
+  Fill out our feedback form <https://forms.gle/umxd3h31c7aMQFKG7>
+  Open an issue using “gh issue create -R cli/cli”`},
+	}
+
+	out := colorableOut(command)
+	for _, e := range helpEntries {
+		if e.Title != "" {
+			fmt.Fprintln(out, utils.Bold(e.Title))
+		}
+		fmt.Fprintln(out, strings.TrimLeft(e.Body, "\n")+"\n")
+	}
+}
+
+// rpad adds padding to the right of a string.
+func rpad(s string, padding int) string {
+	template := fmt.Sprintf("%%-%ds ", padding)
+	return fmt.Sprintf(template, s)
+}
+
+func includes(a []string, s string) bool {
+	for _, x := range a {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
 
 func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
