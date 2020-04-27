@@ -373,7 +373,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 1,
+			Value: 0,
 		},
 	})
 
@@ -450,7 +450,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 1,
+			Value: 0,
 		},
 	})
 
@@ -617,7 +617,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 0,
+			Value: 1,
 		},
 	})
 

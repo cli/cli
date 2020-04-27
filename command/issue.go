@@ -371,8 +371,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse milestone: %w", err)
 	}
 
-	hasMetadata := len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != ""
-
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
@@ -405,11 +403,17 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	action := SubmitAction
+	tb := titleBody{
+		Assignees: assignees,
+		Labels:    labelNames,
+		Projects:  projectNames,
+		Milestone: milestoneTitle,
+	}
 
 	interactive := title == "" || body == ""
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles, !hasMetadata)
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -446,19 +450,22 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			"body":  body,
 		}
 
-		if hasMetadata {
-			metadataInput := api.RepoMetadataInput{
-				Assignees:  len(assignees) > 0,
-				Labels:     len(labelNames) > 0,
-				Projects:   len(projectNames) > 0,
-				Milestones: milestoneTitle != "",
+		if tb.HasMetadata() {
+			if tb.MetadataResult == nil {
+				metadataInput := api.RepoMetadataInput{
+					Assignees:  len(tb.Assignees) > 0,
+					Labels:     len(tb.Labels) > 0,
+					Projects:   len(tb.Projects) > 0,
+					Milestones: tb.Milestone != "",
+				}
+
+				tb.MetadataResult, err = api.RepoMetadata(apiClient, baseRepo, metadataInput)
+				if err != nil {
+					return err
+				}
 			}
 
-			metadata, err := api.RepoMetadata(apiClient, baseRepo, metadataInput)
-			if err != nil {
-				return err
-			}
-			err = addMetadataToIssueParams(params, metadata, assignees, labelNames, projectNames, milestoneTitle)
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
 			if err != nil {
 				return err
 			}

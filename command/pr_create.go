@@ -145,8 +145,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse milestone: %w", err)
 	}
 
-	hasMetadata := len(reviewers) > 0 || len(assignees) > 0 || len(labelNames) > 0 || len(projectNames) > 0 || milestoneTitle != ""
-
 	baseTrackingBranch := baseBranch
 	if baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName()); err == nil {
 		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
@@ -202,6 +200,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	tb := titleBody{
+		Reviewers: reviewers,
+		Assignees: assignees,
+		Labels:    labelNames,
+		Projects:  projectNames,
+		Milestone: milestoneTitle,
+	}
+
 	// TODO: only drop into interactive mode if stdin & stdout are a tty
 	if !isWeb && !autofill && (title == "" || body == "") {
 		var templateFiles []string
@@ -210,7 +216,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
-		tb, err := titleBodySurvey(cmd, title, body, defs, templateFiles, !hasMetadata)
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -316,27 +322,30 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranchLabel,
 		}
 
-		if hasMetadata {
-			metadataInput := api.RepoMetadataInput{
-				Reviewers:  len(reviewers) > 0,
-				Assignees:  len(assignees) > 0,
-				Labels:     len(labelNames) > 0,
-				Projects:   len(projectNames) > 0,
-				Milestones: milestoneTitle != "",
+		if tb.HasMetadata() {
+			if tb.MetadataResult == nil {
+				metadataInput := api.RepoMetadataInput{
+					Reviewers:  len(tb.Reviewers) > 0,
+					Assignees:  len(tb.Assignees) > 0,
+					Labels:     len(tb.Labels) > 0,
+					Projects:   len(tb.Projects) > 0,
+					Milestones: tb.Milestone != "",
+				}
+
+				tb.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
+				if err != nil {
+					return err
+				}
 			}
 
-			metadata, err := api.RepoMetadata(client, baseRepo, metadataInput)
-			if err != nil {
-				return err
-			}
-			err = addMetadataToIssueParams(params, metadata, assignees, labelNames, projectNames, milestoneTitle)
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
 			if err != nil {
 				return err
 			}
 
 			var userReviewers []string
 			var teamReviewers []string
-			for _, r := range reviewers {
+			for _, r := range tb.Reviewers {
 				if strings.ContainsRune(r, '/') {
 					teamReviewers = append(teamReviewers, r)
 				} else {
@@ -344,13 +353,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 				}
 			}
 
-			userReviewerIDs, err := metadata.MembersToIDs(userReviewers)
+			userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
 			if err != nil {
 				return fmt.Errorf("could not request reviewer: %w", err)
 			}
 			params["userReviewerIds"] = userReviewerIDs
 
-			teamReviewerIDs, err := metadata.TeamsToIDs(teamReviewers)
+			teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
 			if err != nil {
 				return fmt.Errorf("could not request reviewer: %w", err)
 			}
