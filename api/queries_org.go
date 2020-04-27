@@ -67,9 +67,8 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 }
 
 type OrgTeam struct {
-	ID          string
-	Slug        string
-	Description string
+	ID   string
+	Slug string
 }
 
 // OrganizationTeams fetches all the teams in an organization

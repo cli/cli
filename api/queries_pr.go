@@ -603,7 +603,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 	if len(updateParams) > 0 {
 		updateQuery := `
-		mutation UpdatePullRequest($input: CreatePullRequestInput!) {
+		mutation UpdatePullRequest($input: UpdatePullRequestInput!) {
 			updatePullRequest(input: $input) { clientMutationId }
 		}`
 		updateParams["pullRequestId"] = pr.ID
@@ -627,7 +627,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 
 	if len(reviewParams) > 0 {
 		reviewQuery := `
-		mutation RequestReviews($input: CreatePullRequestInput!) {
+		mutation RequestReviews($input: RequestReviewsInput!) {
 			requestReviews(input: $input) { clientMutationId }
 		}`
 		reviewParams["pullRequestId"] = pr.ID
@@ -646,9 +646,9 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 func isBlank(v interface{}) bool {
 	switch vv := v.(type) {
 	case string:
-		return vv != ""
+		return vv == ""
 	case []string:
-		return len(vv) > 0
+		return len(vv) == 0
 	default:
 		return true
 	}
