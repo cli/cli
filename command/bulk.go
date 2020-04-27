@@ -103,10 +103,11 @@ func bulk(cmd *cobra.Command, args []string) error {
 	}
 
 	operation := args[0]
-	// TODO: open, close
 	switch operation {
 	case "add":
 		return api.BulkAddLabels(client, inputItems, labels)
+	case "open", "close":
+		return api.BulkChangeState(client, inputItems, operation)
 	case "browse":
 		for _, item := range inputItems {
 			url := fmt.Sprintf("https://github.com/%s/%s", item.Repository.RepoOwner(), item.Repository.RepoName())

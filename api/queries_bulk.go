@@ -116,3 +116,38 @@ func BulkAddLabels(client *Client, inputs []BulkInput, labelNames []string) erro
 
 	return nil
 }
+
+func BulkChangeState(client *Client, inputs []BulkInput, state string) error {
+	ids, err := ResolveNodeIDs(client, inputs)
+	if err != nil {
+		return err
+	}
+
+	var mutations []string
+	var newState string
+
+	switch state {
+	case "open":
+		newState = "OPEN"
+	case "close":
+		newState = "CLOSED"
+	default:
+		return fmt.Errorf("unrecognized state: %q", state)
+	}
+
+	for i, id := range ids {
+		mutations = append(mutations, fmt.Sprintf(`
+			m%03d: updateIssue(input: {
+				id: %q
+				state: %s
+			}) { clientMutationId }
+		`, i, id.Issue.ID, newState))
+	}
+
+	err = client.GraphQL(fmt.Sprintf(`mutation{%s}`, strings.Join(mutations, "")), nil, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
