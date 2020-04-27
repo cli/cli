@@ -604,11 +604,11 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	if len(updateParams) > 0 {
 		updateQuery := `
 		mutation UpdatePullRequest($input: CreatePullRequestInput!) {
-			updatePullRequest(input: $input)
+			updatePullRequest(input: $input) { clientMutationId }
 		}`
 		updateParams["pullRequestId"] = pr.ID
 		variables := map[string]interface{}{
-			"input": inputParams,
+			"input": updateParams,
 		}
 		err := client.GraphQL(updateQuery, variables, &result)
 		if err != nil {
@@ -617,15 +617,20 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 
 	// reviewers are requested in yet another additional mutation
-	if ids, ok := params["reviewerIds"]; ok && !isBlank(ids) {
+	reviewParams := make(map[string]interface{})
+	if ids, ok := params["userReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["userIds"] = ids
+	}
+	if ids, ok := params["teamReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["teamIds"] = ids
+	}
+
+	if len(reviewParams) > 0 {
 		reviewQuery := `
 		mutation RequestReviews($input: CreatePullRequestInput!) {
-			requestReviews(input: $input)
+			requestReviews(input: $input) { clientMutationId }
 		}`
-		reviewParams := map[string]interface{}{
-			"pullRequestId": pr.ID,
-			"userIds":       ids,
-		}
+		reviewParams["pullRequestId"] = pr.ID
 		variables := map[string]interface{}{
 			"input": reviewParams,
 		}

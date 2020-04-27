@@ -28,17 +28,12 @@ func resolveOrganizationTeam(client *Client, orgName, teamSlug string) (string, 
 	return response.Organization.NodeID, response.NodeID, err
 }
 
-type OrgProject struct {
-	ID   string
-	Name string
-}
-
 // OrganizationProjects fetches all open projects for an organization
-func OrganizationProjects(client *Client, owner string) ([]OrgProject, error) {
+func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 	var query struct {
 		Organization struct {
 			Projects struct {
-				Nodes    []OrgProject
+				Nodes    []RepoProject
 				PageInfo struct {
 					HasNextPage bool
 					EndCursor   string
@@ -54,7 +49,7 @@ func OrganizationProjects(client *Client, owner string) ([]OrgProject, error) {
 
 	v4 := githubv4.NewClient(client.http)
 
-	var projects []OrgProject
+	var projects []RepoProject
 	for {
 		err := v4.Query(context.Background(), &query, variables)
 		if err != nil {
@@ -72,8 +67,9 @@ func OrganizationProjects(client *Client, owner string) ([]OrgProject, error) {
 }
 
 type OrgTeam struct {
-	ID   string
-	Name string
+	ID          string
+	Slug        string
+	Description string
 }
 
 // OrganizationTeams fetches all the teams in an organization

@@ -317,8 +317,15 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 
 		if hasMetadata {
-			// TODO: input
-			metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{})
+			metadataInput := api.RepoMetadataInput{
+				Reviewers:  len(reviewers) > 0,
+				Assignees:  len(assignees) > 0,
+				Labels:     len(labelNames) > 0,
+				Projects:   len(projectNames) > 0,
+				Milestones: milestoneTitle != "",
+			}
+
+			metadata, err := api.RepoMetadata(client, baseRepo, metadataInput)
 			if err != nil {
 				return err
 			}
@@ -326,11 +333,28 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			reviewerIDs, err := metadata.MembersToIDs(reviewers)
+
+			var userReviewers []string
+			var teamReviewers []string
+			for _, r := range reviewers {
+				if strings.ContainsRune(r, '/') {
+					teamReviewers = append(teamReviewers, r)
+				} else {
+					userReviewers = append(teamReviewers, r)
+				}
+			}
+
+			userReviewerIDs, err := metadata.MembersToIDs(userReviewers)
 			if err != nil {
 				return fmt.Errorf("could not request reviewer: %w", err)
 			}
-			params["reviewerIds"] = reviewerIDs
+			params["userReviewerIds"] = userReviewerIDs
+
+			teamReviewerIDs, err := metadata.TeamsToIDs(teamReviewers)
+			if err != nil {
+				return fmt.Errorf("could not request reviewer: %w", err)
+			}
+			params["teamReviewerIds"] = teamReviewerIDs
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)

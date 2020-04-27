@@ -393,6 +393,7 @@ type RepoMetadataResult struct {
 	Labels          []RepoLabel
 	Projects        []RepoProject
 	Milestones      []RepoMilestone
+	Teams           []OrgTeam
 }
 
 func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
@@ -408,6 +409,25 @@ func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 		}
 		if !found {
 			return nil, fmt.Errorf("'%s' not found", assigneeLogin)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) TeamsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, teamSlug := range names {
+		found := false
+		slug := teamSlug[strings.IndexRune(teamSlug, '/')+1:]
+		for _, t := range m.Teams {
+			if strings.EqualFold(slug, t.Slug) {
+				ids = append(ids, t.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", teamSlug)
 		}
 	}
 	return ids, nil
@@ -472,7 +492,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	errc := make(chan error)
 	count := 0
 
-	if input.Assignees {
+	if input.Assignees || input.Reviewers {
 		count++
 		go func() {
 			users, err := RepoAssignableUsers(client, repo)
@@ -484,7 +504,17 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 		}()
 	}
 	if input.Reviewers {
-		// TODO
+		count++
+		go func() {
+			teams, err := OrganizationTeams(client, repo.RepoOwner())
+			// TODO: better detection of non-org repos
+			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+				errc <- fmt.Errorf("error fetching organization teams: %w", err)
+				return
+			}
+			result.Teams = teams
+			errc <- nil
+		}()
 	}
 	if input.Labels {
 		count++
@@ -500,13 +530,21 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Projects {
 		count++
 		go func() {
-			// TODO: org-level projects
 			projects, err := RepoProjects(client, repo)
 			if err != nil {
-				err = fmt.Errorf("error fetching projects: %w", err)
+				errc <- fmt.Errorf("error fetching projects: %w", err)
+				return
 			}
 			result.Projects = projects
-			errc <- err
+
+			orgProjects, err := OrganizationProjects(client, repo.RepoOwner())
+			// TODO: better detection of non-org repos
+			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+				errc <- fmt.Errorf("error fetching organization projects: %w", err)
+				return
+			}
+			result.Projects = append(result.Projects, orgProjects...)
+			errc <- nil
 		}()
 	}
 	if input.Milestones {
