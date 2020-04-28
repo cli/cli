@@ -680,3 +680,25 @@ func TestIssueStateTitleWithColor(t *testing.T) {
 		})
 	}
 }
+
+func TestIssueClose(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	jsonFile, _ := os.Open("../test/fixtures/issueClose.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand(issueStatusCmd, "issue close 13")
+	if err != nil {
+		t.Errorf("error running command `issue close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`WHATEVER!`)
+
+	if !r.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		return
+	}
+}
