@@ -689,7 +689,7 @@ func TestIssueClose(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "id": "A-VERY-IMPORTANT-ID"}
+		"issue": { "number": 13}
 	} } }
 	`))
 
