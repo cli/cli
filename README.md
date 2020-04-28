@@ -7,7 +7,7 @@ the terminal next to where you are already working with `git` and your code.
 
 ## Availability
 
-While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It does not currently support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning support for GitHub Enterprise Server after GitHub CLI is out of beta (likely toward the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on. 
+While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It does not currently support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning support for GitHub Enterprise Server after GitHub CLI is out of beta (likely toward the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on.
 
 ## We need your feedback
 
@@ -22,6 +22,7 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 - `gh pr [status, list, view, checkout, create]`
 - `gh issue [status, list, view, create]`
 - `gh repo [view, create, clone, fork]`
+- `gh config [get, set]`
 - `gh help`
 
 ## Documentation
