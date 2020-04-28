@@ -539,12 +539,16 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("expected a number but: %w", err)
 	}
 
-	err = api.IssueClose(apiClient, baseRepo, issueNumber)
+	alreadyClosed, err := api.IssueClose(apiClient, baseRepo, issueNumber)
 	if err != nil {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s closed issue #%d\n", utils.Green("✔"), issueNumber)
+	if alreadyClosed {
+		fmt.Fprintf(colorableErr(cmd), "%s issue #%d is already closed\n", utils.Yellow("!"), issueNumber)
+	} else {
+		fmt.Fprintf(colorableErr(cmd), "%s closed issue #%d\n", utils.Green("✔"), issueNumber)
+	}
 
 	return nil
 }

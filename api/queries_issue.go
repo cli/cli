@@ -28,6 +28,7 @@ type Issue struct {
 	Title     string
 	URL       string
 	State     string
+	Closed    bool
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -307,6 +308,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				id
 				title
 				state
+				closed
 				body
 				author {
 					login
@@ -367,13 +369,17 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	return &resp.Repository.Issue, nil
 }
 
-func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) error {
+func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) (alreadyClosed bool, _ error) {
 	issue, err := IssueByNumber(client, repo, issueNumber)
 	var idErr *IssuesDisabledError
 	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(repo))
+		return false, fmt.Errorf("issues disabled for %s", ghrepo.FullName(repo))
 	} else if err != nil {
-		return fmt.Errorf("failed to find issue #%d: %w", issueNumber, err)
+		return false, fmt.Errorf("failed to find issue #%d: %w", issueNumber, err)
+	}
+
+	if issue.Closed {
+		return true, nil
 	}
 
 	var mutation struct {
@@ -392,8 +398,8 @@ func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) error {
 	err = v4.Mutate(context.Background(), &mutation, input, nil)
 
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	return false, nil
 }
