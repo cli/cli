@@ -709,3 +709,26 @@ func TestIssueClose(t *testing.T) {
 		return
 	}
 }
+
+func TestIssueClose_issuesDisabled(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueCloseCmd, "issue close 13")
+	if err == nil {
+		t.Fatalf("expected error when issues are disabled")
+	}
+
+	if !strings.Contains(err.Error(), "issues disabled") {
+		t.Fatalf("got unexpected error: %s", err)
+	}
+
+	return
+}

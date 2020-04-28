@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -62,6 +63,10 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
+}
+
+type IssuesDisabledError struct {
+	error
 }
 
 const fragments = `
@@ -355,7 +360,8 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+
+		return nil, &IssuesDisabledError{fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))}
 	}
 
 	return &resp.Repository.Issue, nil
@@ -363,8 +369,11 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 
 func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) error {
 	issue, err := IssueByNumber(client, repo, issueNumber)
-	if err != nil {
-		return fmt.Errorf("Faile to find issue #%d: %w", issueNumber, err)
+	var idErr *IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(repo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issueNumber, err)
 	}
 
 	var mutation struct {
