@@ -544,6 +544,8 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
+	fmt.Fprintf(colorableErr(cmd), "%s closed issue #%d\n", utils.Green("✔"), issueNumber)
+
 	return nil
 }
 

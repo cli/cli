@@ -686,19 +686,26 @@ func TestIssueClose(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "id": "A-VERY-IMPORTANT-ID"}
+	} } }
+	`))
+
 	jsonFile, _ := os.Open("../test/fixtures/issueClose.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(issueStatusCmd, "issue close 13")
+	output, err := RunCommand(issueCloseCmd, "issue close 13")
 	if err != nil {
 		t.Errorf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`WHATEVER!`)
+	r := regexp.MustCompile(`closed issue #13`)
 
-	if !r.MatchString(output.String()) {
-		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+	if !r.MatchString(output.Stderr()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 		return
 	}
 }
