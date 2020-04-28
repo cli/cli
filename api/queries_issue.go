@@ -22,6 +22,7 @@ type IssuesAndTotalCount struct {
 
 // Ref. https://developer.github.com/v4/object/issue/
 type Issue struct {
+	ID        string
 	Number    int
 	Title     string
 	URL       string
@@ -298,6 +299,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
+				id
 				title
 				state
 				body
@@ -360,22 +362,29 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 }
 
 func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) error {
+	issue, err := IssueByNumber(client, repo, issueNumber)
+	if err != nil {
+		return fmt.Errorf("Faile to find issue #%d: %w", issueNumber, err)
+	}
+
 	var mutation struct {
-		closeIssue struct {
+		CloseIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
 	input := githubv4.CloseIssueInput{
-		IssueID: issueNumber,
+		IssueID: issue.ID,
 	}
 
 	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
-	if err != nil {
-		return nil
-	}
+	err = v4.Mutate(context.Background(), &mutation, input, nil)
 
-	fmt.Printf("%v\n", mutation)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
