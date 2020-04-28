@@ -702,7 +702,7 @@ func TestIssueClose(t *testing.T) {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`closed issue #13`)
+	r := regexp.MustCompile(`Closed issue #13`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
