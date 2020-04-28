@@ -534,23 +534,28 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issueNumber, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("expected a number but: %w", err)
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	var idErr *api.IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
 	}
 
-	alreadyClosed, err := api.IssueClose(apiClient, baseRepo, issueNumber)
+	if issue.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s issue #%d is already closed\n", utils.Yellow("!"), issue.Number)
+		return nil
+	}
+
+	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
-	if alreadyClosed {
-		fmt.Fprintf(colorableErr(cmd), "%s issue #%d is already closed\n", utils.Yellow("!"), issueNumber)
-	} else {
-		fmt.Fprintf(colorableErr(cmd), "%s closed issue #%d\n", utils.Green("✔"), issueNumber)
-	}
+	fmt.Fprintf(colorableErr(cmd), "%s closed issue #%d\n", utils.Green("✔"), issue.Number)
 
 	return nil
+
 }
 
 func displayURL(urlStr string) string {

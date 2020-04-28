@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -369,19 +368,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	return &resp.Repository.Issue, nil
 }
 
-func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) (alreadyClosed bool, _ error) {
-	issue, err := IssueByNumber(client, repo, issueNumber)
-	var idErr *IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return false, fmt.Errorf("issues disabled for %s", ghrepo.FullName(repo))
-	} else if err != nil {
-		return false, fmt.Errorf("failed to find issue #%d: %w", issueNumber, err)
-	}
-
-	if issue.Closed {
-		return true, nil
-	}
-
+func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 	var mutation struct {
 		CloseIssue struct {
 			Issue struct {
@@ -395,11 +382,11 @@ func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) (already
 	}
 
 	v4 := githubv4.NewClient(client.http)
-	err = v4.Mutate(context.Background(), &mutation, input, nil)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return false, nil
+	return nil
 }
