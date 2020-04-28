@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 type IssuesPayload struct {
@@ -355,4 +357,25 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	return &resp.Repository.Issue, nil
+}
+
+func IssueClose(client *Client, repo ghrepo.Interface, issueNumber int) error {
+	var mutation struct {
+		closeIssue struct {
+		} `graphql:"closeIssue(input: $input)"`
+	}
+
+	input := githubv4.CloseIssueInput{
+		IssueID: issueNumber,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	if err != nil {
+		return nil
+	}
+
+	fmt.Printf("%v\n", mutation)
+
+	return nil
 }

@@ -39,6 +39,8 @@ func init() {
 
 	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
+
+	issueCmd.AddCommand(issueCloseCmd)
 }
 
 var issueCmd = &cobra.Command{
@@ -78,6 +80,12 @@ var issueViewCmd = &cobra.Command{
 
 With '--web', open the issue in a web browser instead.`,
 	RunE: issueView,
+}
+var issueCloseCmd = &cobra.Command{
+	Use:   "close <number>",
+	Short: "close and issue issues",
+	Args:  cobra.ExactArgs(1),
+	RunE:  issueClose,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -512,6 +520,31 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func issueClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issueNumber, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("expected a number but: %w", err)
+	}
+
+	err = api.IssueClose(apiClient, baseRepo, issueNumber)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	return nil
 }
 
 func displayURL(urlStr string) string {
