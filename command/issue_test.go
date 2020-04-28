@@ -699,14 +699,13 @@ func TestIssueClose(t *testing.T) {
 
 	output, err := RunCommand(issueCloseCmd, "issue close 13")
 	if err != nil {
-		t.Errorf("error running command `issue close`: %v", err)
+		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
 	r := regexp.MustCompile(`closed issue #13`)
 
 	if !r.MatchString(output.Stderr()) {
-		t.Errorf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-		return
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
 
@@ -729,6 +728,4 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 	if !strings.Contains(err.Error(), "issues disabled") {
 		t.Fatalf("got unexpected error: %s", err)
 	}
-
-	return
 }
