@@ -598,7 +598,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Red("✔"), issue.Number)
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Green("✔"), issue.Number)
 
 	return nil
 }
