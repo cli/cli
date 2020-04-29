@@ -77,6 +77,7 @@ func stubSince(d time.Duration) func() {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
+	t.Skip("Skipping temporarily because the spinner is creates a data race and a flaky test")
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -134,6 +135,7 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
+	t.Skip("Skipping temporarily because the spinner is creates a data race and a flaky test")
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -261,6 +263,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
+	t.Skip("Skipping temporarily because the spinner is creates a data race and a flaky test")
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -303,6 +306,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
+	t.Skip("Skipping temporarily because the spinner is creates a data race and a flaky test")
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
