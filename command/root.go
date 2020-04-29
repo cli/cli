@@ -132,12 +132,47 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, apiVerboseLog())
 	}
+
+	getAuthValue := func() string {
+		return fmt.Sprintf("token %s", token)
+	}
+
+	checkScopesFunc := func(appID string) error {
+		if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
+			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
+			if err != nil {
+				return err
+			}
+			cfg, err := ctx.Config()
+			if err != nil {
+				return err
+			}
+			_ = cfg.Set(defaultHostname, "oauth_token", newToken)
+			_ = cfg.Set(defaultHostname, "user", loginHandle)
+			// update config file on disk
+			err = cfg.Write()
+			if err != nil {
+				return err
+			}
+			// update configuration in memory
+			token = newToken
+			config.AuthFlowComplete()
+		} else {
+			fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
+			fmt.Fprintln(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable `read:org`")
+			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+		}
+		return nil
+	}
+
 	opts = append(opts,
-		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
+		api.CheckScopes("read:org", checkScopesFunc),
+		api.AddHeaderFunc("Authorization", getAuthValue),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks
 		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json"),

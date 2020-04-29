@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/cli/cli/pkg/browser"
 )
@@ -29,6 +30,7 @@ type OAuthFlow struct {
 	Hostname         string
 	ClientID         string
 	ClientSecret     string
+	Scopes           []string
 	WriteSuccessHTML func(io.Writer)
 	VerboseStream    io.Writer
 }
@@ -45,11 +47,15 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 
+	scopes := "repo"
+	if oa.Scopes != nil {
+		scopes = strings.Join(oa.Scopes, " ")
+	}
+
 	q := url.Values{}
 	q.Set("client_id", oa.ClientID)
 	q.Set("redirect_uri", fmt.Sprintf("http://127.0.0.1:%d/callback", port))
-	// TODO: make scopes configurable
-	q.Set("scope", "repo")
+	q.Set("scope", scopes)
 	q.Set("state", state)
 
 	startURL := fmt.Sprintf("https://%s/login/oauth/authorize?%s", oa.Hostname, q.Encode())
