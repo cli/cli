@@ -805,3 +805,24 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestIssueReopen_issuesDisabled(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	if err == nil {
+		t.Fatalf("expected error when issues are disabled")
+	}
+
+	if !strings.Contains(err.Error(), "issues disabled") {
+		t.Fatalf("got unexpected error: %s", err)
+	}
+}
