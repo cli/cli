@@ -762,18 +762,18 @@ func TestIssueReopen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 1}
+		"issue": { "number": 2, "closed": true}
 	} } }
 	`))
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(issueReopenCmd, "issue reopen 1")
+	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
 	if err != nil {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Reopened issue #13`)
+	r := regexp.MustCompile(`Reopened issue #2`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
