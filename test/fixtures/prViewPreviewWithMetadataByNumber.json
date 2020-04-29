@@ -66,6 +66,14 @@
               "column": {
                 "name": "column C"
               }
+            },
+            {
+              "project": {
+                "name": "Project 4"
+              },
+              "column": {
+                "name": ""
+              }
             }
           ],
           "totalcount": 3
