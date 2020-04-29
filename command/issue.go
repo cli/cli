@@ -593,7 +593,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	err = api.IssueClose(apiClient, baseRepo, *issue)
+	err = api.IssueReopen(apiClient, baseRepo, *issue)
 	if err != nil {
 		return fmt.Errorf("API call failed:%w", err)
 	}
