@@ -707,6 +707,32 @@ func TestIssueClose(t *testing.T) {
 	}
 }
 
+func TestIssueClose_alreadyClosed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 13, "closed": true}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueCloseCmd, "issue close 13")
+	if err != nil {
+		t.Fatalf("error running command `issue close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`#13 is already closed`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestIssueClose_issuesDisabled(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
