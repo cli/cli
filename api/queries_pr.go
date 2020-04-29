@@ -6,9 +6,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
+
+	"github.com/cli/cli/internal/ghrepo"
 )
+
+type PullRequestReviewState int
+
+const (
+	ReviewApprove PullRequestReviewState = iota
+	ReviewRequestChanges
+	ReviewComment
+)
+
+type PullRequestReviewInput struct {
+	Body  string
+	State PullRequestReviewState
+}
 
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
@@ -591,6 +605,34 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 
 	return &result.CreatePullRequest.PullRequest, nil
+}
+
+func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
+	var mutation struct {
+		AddPullRequestReview struct {
+			ClientMutationID string
+		} `graphql:"addPullRequestReview(input:$input)"`
+	}
+
+	state := githubv4.PullRequestReviewEventComment
+	switch input.State {
+	case ReviewApprove:
+		state = githubv4.PullRequestReviewEventApprove
+	case ReviewRequestChanges:
+		state = githubv4.PullRequestReviewEventRequestChanges
+	}
+
+	body := githubv4.String(input.Body)
+
+	gqlInput := githubv4.AddPullRequestReviewInput{
+		PullRequestID: pr.ID,
+		Event:         &state,
+		Body:          &body,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	return v4.Mutate(context.Background(), &mutation, gqlInput, nil)
 }
 
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
