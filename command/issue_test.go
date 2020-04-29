@@ -779,3 +779,29 @@ func TestIssueReopen(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestIssueReopen_alreadyOpen(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 2, "closed": false}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	if err != nil {
+		t.Fatalf("error running command `issue reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`#2 is already open`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}

@@ -589,7 +589,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	if !issue.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d was already open\n", utils.Yellow("!"), issue.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already open\n", utils.Yellow("!"), issue.Number)
 		return nil
 	}
 
