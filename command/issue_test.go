@@ -693,9 +693,7 @@ func TestIssueClose(t *testing.T) {
 	} } }
 	`))
 
-	jsonFile, _ := os.Open("../test/fixtures/issueClose.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand(issueCloseCmd, "issue close 13")
 	if err != nil {
