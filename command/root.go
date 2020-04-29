@@ -51,6 +51,8 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
+	RootCmd.SetHelpFunc(rootHelpFunc)
+
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -74,12 +76,9 @@ func (fe FlagError) Unwrap() error {
 
 // RootCmd is the entry point of command-line execution
 var RootCmd = &cobra.Command{
-	Use:   "gh",
+	Use:   "gh <command> <subcommand> [flags]",
 	Short: "GitHub CLI",
-	Long: `Work seamlessly with GitHub from the command line.
-
-GitHub CLI is in early stages of development, and we'd love to hear your
-feedback at <https://forms.gle/umxd3h31c7aMQFKG7>`,
+	Long:  `Work seamlessly with GitHub from the command line.`,
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
@@ -111,20 +110,11 @@ func BasicClient() (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)))
 
-	c, err := config.ParseDefaultConfig()
-	if err != nil {
-		return nil, err
+	if c, err := config.ParseDefaultConfig(); err == nil {
+		if token, _ := c.Get(defaultHostname, "oauth_token"); token != "" {
+			opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+		}
 	}
-
-	token, err := c.Get(defaultHostname, "oauth_token")
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
-		return nil, fmt.Errorf("no oauth_token set in config")
-	}
-
-	opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
 	return api.NewClient(opts...), nil
 }
 
@@ -142,12 +132,47 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		opts = append(opts, apiVerboseLog())
 	}
+
+	getAuthValue := func() string {
+		return fmt.Sprintf("token %s", token)
+	}
+
+	checkScopesFunc := func(appID string) error {
+		if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
+			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
+			if err != nil {
+				return err
+			}
+			cfg, err := ctx.Config()
+			if err != nil {
+				return err
+			}
+			_ = cfg.Set(defaultHostname, "oauth_token", newToken)
+			_ = cfg.Set(defaultHostname, "user", loginHandle)
+			// update config file on disk
+			err = cfg.Write()
+			if err != nil {
+				return err
+			}
+			// update configuration in memory
+			token = newToken
+			config.AuthFlowComplete()
+		} else {
+			fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
+			fmt.Fprintln(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable `read:org`")
+			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+		}
+		return nil
+	}
+
 	opts = append(opts,
-		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
+		api.CheckScopes("read:org", checkScopesFunc),
+		api.AddHeaderFunc("Authorization", getAuthValue),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks
 		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json"),
@@ -221,4 +246,88 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 	}
 
 	return baseRepo, nil
+}
+
+func rootHelpFunc(command *cobra.Command, s []string) {
+	type helpEntry struct {
+		Title string
+		Body  string
+	}
+
+	coreCommandNames := []string{"issue", "pr", "repo"}
+	var coreCommands []string
+	var additionalCommands []string
+	for _, c := range command.Commands() {
+		if c.Short == "" {
+			continue
+		}
+		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
+		if includes(coreCommandNames, c.Name()) {
+			coreCommands = append(coreCommands, s)
+		} else {
+			additionalCommands = append(additionalCommands, s)
+		}
+	}
+
+	helpEntries := []helpEntry{
+		{
+			"",
+			command.Long},
+		{"USAGE", command.Use},
+		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
+		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
+		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
+		{"EXAMPLES", `
+  $ gh issue create
+  $ gh repo clone
+  $ gh pr checkout 321`},
+		{"LEARN MORE", `
+  Use "gh <command> <subcommand> --help" for more information about a command.
+  Read the manual at <http://cli.github.com/manual>`},
+		{"FEEDBACK", `
+  Fill out our feedback form <https://forms.gle/umxd3h31c7aMQFKG7>
+  Open an issue using “gh issue create -R cli/cli”`},
+	}
+
+	out := colorableOut(command)
+	for _, e := range helpEntries {
+		if e.Title != "" {
+			fmt.Fprintln(out, utils.Bold(e.Title))
+		}
+		fmt.Fprintln(out, strings.TrimLeft(e.Body, "\n")+"\n")
+	}
+}
+
+// rpad adds padding to the right of a string.
+func rpad(s string, padding int) string {
+	template := fmt.Sprintf("%%-%ds ", padding)
+	return fmt.Sprintf(template, s)
+}
+
+func includes(a []string, s string) bool {
+	for _, x := range a {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
+	ctx := contextForCommand(cmd)
+
+	protocol := "https"
+	cfg, err := ctx.Config()
+	if err != nil {
+		fmt.Fprintf(colorableErr(cmd), "%s failed to load config: %s. using defaults\n", utils.Yellow("!"), err)
+	} else {
+		cfgProtocol, _ := cfg.Get(defaultHostname, "git_protocol")
+		protocol = cfgProtocol
+	}
+
+	if protocol == "ssh" {
+		return fmt.Sprintf("git@%s:%s.git", defaultHostname, fullRepoName)
+	}
+
+	return fmt.Sprintf("https://%s/%s.git", defaultHostname, fullRepoName)
 }

@@ -504,7 +504,11 @@ func issueProjectList(issue api.Issue) string {
 
 	projectNames := make([]string, 0, len(issue.ProjectCards.Nodes))
 	for _, project := range issue.ProjectCards.Nodes {
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, project.Column.Name))
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
 	}
 
 	list := strings.Join(projectNames, ", ")

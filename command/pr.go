@@ -531,7 +531,11 @@ func prProjectList(pr api.PullRequest) string {
 
 	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
 	for _, project := range pr.ProjectCards.Nodes {
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, project.Column.Name))
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
 	}
 
 	list := strings.Join(projectNames, ", ")
