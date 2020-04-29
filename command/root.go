@@ -151,6 +151,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	getAuthValue := func() string {
 		return fmt.Sprintf("token %s", token)
 	}
+
 	checkScopesFunc := func(appID string) error {
 		if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
 			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
