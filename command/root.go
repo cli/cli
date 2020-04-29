@@ -110,20 +110,11 @@ func BasicClient() (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)))
 
-	c, err := config.ParseDefaultConfig()
-	if err != nil {
-		return nil, err
+	if c, err := config.ParseDefaultConfig(); err == nil {
+		if token, _ := c.Get(defaultHostname, "oauth_token"); token != "" {
+			opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+		}
 	}
-
-	token, err := c.Get(defaultHostname, "oauth_token")
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
-		return nil, fmt.Errorf("no oauth_token set in config")
-	}
-
-	opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
 	return api.NewClient(opts...), nil
 }
 
