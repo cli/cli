@@ -11,12 +11,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/briandowns/spinner"
+
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
+	"github.com/cli/cli/utils"
 )
 
+func stubSpinner() {
+	// not bothering with teardown since we never want spinners when doing tests
+	utils.StartSpinner = func(_ *spinner.Spinner) {
+	}
+	utils.StopSpinner = func(_ *spinner.Spinner) {
+	}
+}
+
 func TestRepoFork_already_forked(t *testing.T) {
+	stubSpinner()
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
 		ctx.SetBaseRepo("OWNER/REPO")
@@ -42,6 +54,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 }
 
 func TestRepoFork_reuseRemote(t *testing.T) {
+	stubSpinner()
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
 		ctx.SetBaseRepo("OWNER/REPO")
@@ -77,6 +90,7 @@ func stubSince(d time.Duration) func() {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
+	stubSpinner()
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -98,6 +112,7 @@ func TestRepoFork_in_parent(t *testing.T) {
 }
 
 func TestRepoFork_outside(t *testing.T) {
+	stubSpinner()
 	tests := []struct {
 		name string
 		args string
@@ -134,6 +149,7 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
+	stubSpinner()
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -168,6 +184,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
+	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
@@ -194,6 +211,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
+	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
@@ -227,6 +245,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
+	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
@@ -261,6 +280,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
+	stubSpinner()
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
@@ -303,6 +323,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
+	stubSpinner()
 	initBlankContext("", "OWNER/REPO", "master")
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
