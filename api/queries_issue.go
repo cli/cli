@@ -390,3 +390,22 @@ func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 
 	return nil
 }
+
+func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
+	var mutation struct {
+		ReopenIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenIssue(input: $input)"`
+	}
+
+	input := githubv4.ReopenIssueInput{
+		IssueID: issue.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
