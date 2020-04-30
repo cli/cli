@@ -800,3 +800,28 @@ func TestPrStateTitleWithColor(t *testing.T) {
 		})
 	}
 }
+
+func TestPrClose(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 96 }
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(prCloseCmd, "pr close 96")
+	if err != nil {
+		t.Fatalf("error running command `pr close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Closed pull request #96`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
