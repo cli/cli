@@ -51,7 +51,6 @@ func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
 	cmd.SetOut(&outBuf)
 	errBuf := bytes.Buffer{}
 	cmd.SetErr(&errBuf)
-
 	// Reset flag values so they don't leak between tests
 	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -820,6 +819,31 @@ func TestPrClose(t *testing.T) {
 	}
 
 	r := regexp.MustCompile(`Closed pull request #96`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrClose_alreadyClosed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 101, "closed": true }
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(prCloseCmd, "pr close 101")
+	if err != nil {
+		t.Fatalf("error running command `pr close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #101 is already closed`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
