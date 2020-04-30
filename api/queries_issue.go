@@ -407,9 +407,5 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Mutate(context.Background(), &mutation, input, nil)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
