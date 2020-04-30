@@ -348,10 +348,12 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	query($owner: String!, $repo: String!, $pr_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pr_number) {
+				id
 				url
 				number
 				title
 				state
+				closed
 				body
 				author {
 				  login

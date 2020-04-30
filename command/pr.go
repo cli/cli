@@ -351,6 +351,8 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	fmt.Printf("🌭 %+v\n", pr)
+
 	if pr.Closed {
 		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
 		return nil
