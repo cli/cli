@@ -69,6 +69,7 @@ With '--web', open the pull request in a web browser instead.`,
 var prCloseCmd = &cobra.Command{
 	Use:   "close [{<number> | <url>}]",
 	Short: "Close a pull request",
+	Args:  cobra.ExactArgs(1),
 	RunE:  prClose,
 }
 
