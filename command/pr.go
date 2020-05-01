@@ -23,6 +23,7 @@ func init() {
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
+	prCmd.AddCommand(prReopenCmd)
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -71,6 +72,12 @@ var prCloseCmd = &cobra.Command{
 	Short: "Close a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prClose,
+}
+var prReopenCmd = &cobra.Command{
+	Use:   "reopen [{<number> | <url>}]",
+	Short: "Reopen a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prReopen,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -363,6 +370,38 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d\n", utils.Red("✔"), pr.Number)
+
+	return nil
+}
+
+func prReopen(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.Closed == false {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already open\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestReopen(apiClient, baseRepo, *pr)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Red("✔"), pr.Number)
 
 	return nil
 }
