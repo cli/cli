@@ -900,7 +900,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 	}
 }
 
-func TestPRReopen_merged(t *testing.T) {
+func TestPRReopen_alreadyMerged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
