@@ -8,13 +8,11 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/core"
-	"github.com/google/shlex"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
+	"github.com/google/shlex"
+	"github.com/spf13/pflag"
 )
 
 const defaultTestConfig = `hosts:
@@ -115,13 +113,19 @@ func (c cmdOut) Stderr() string {
 	return c.errBuf.String()
 }
 
-func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
-	rootCmd := cmd.Root()
-	argv, err := shlex.Split(args)
+func RunCommand(args string) (*cmdOut, error) {
+	rootCmd := RootCmd
+	rootArgv, err := shlex.Split(args)
 	if err != nil {
 		return nil, err
 	}
-	rootCmd.SetArgs(argv)
+
+	cmd, _, err := rootCmd.Traverse(rootArgv)
+	if err != nil {
+		return nil, err
+	}
+
+	rootCmd.SetArgs(rootArgv)
 
 	outBuf := bytes.Buffer{}
 	cmd.SetOut(&outBuf)
