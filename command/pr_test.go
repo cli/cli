@@ -918,9 +918,10 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was merged.`)
+	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was already merged.`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
+
 }
