@@ -914,13 +914,13 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand(prReopenCmd, "pr reopen 666")
-	if err != nil {
-		t.Fatalf("error running command `pr reopen`: %v", err)
+	if err == nil {
+		t.Fatalf("expected an error running command `pr reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was already merged.`)
+	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was already merged`)
 
-	if !r.MatchString(output.Stderr()) {
+	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 
