@@ -429,7 +429,7 @@ func TestPRView_Preview(t *testing.T) {
 				`Open • nobody wants to merge 12 commits into master from blueberries`,
 				`Assignees: marseilles, monaco\n`,
 				`Labels: one, two, three, four, five\n`,
-				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`Milestone: uluru\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,

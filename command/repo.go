@@ -379,11 +379,11 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
 	s.Suffix = " " + loading
 	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
-	s.Start()
+	utils.StartSpinner(s)
 
 	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
 	if err != nil {
-		s.Stop()
+		utils.StopSpinner(s)
 		return fmt.Errorf("failed to fork: %w", err)
 	}
 

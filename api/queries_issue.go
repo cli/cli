@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 type IssuesPayload struct {
@@ -20,10 +22,12 @@ type IssuesAndTotalCount struct {
 
 // Ref. https://developer.github.com/v4/object/issue/
 type Issue struct {
+	ID        string
 	Number    int
 	Title     string
 	URL       string
 	State     string
+	Closed    bool
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -59,6 +63,10 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
+}
+
+type IssuesDisabledError struct {
+	error
 }
 
 const fragments = `
@@ -296,8 +304,10 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
+				id
 				title
 				state
+				closed
 				body
 				author {
 					login
@@ -351,8 +361,51 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	if !resp.Repository.HasIssuesEnabled {
-		return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+
+		return nil, &IssuesDisabledError{fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))}
 	}
 
 	return &resp.Repository.Issue, nil
+}
+
+func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
+	var mutation struct {
+		CloseIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"closeIssue(input: $input)"`
+	}
+
+	input := githubv4.CloseIssueInput{
+		IssueID: issue.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
+	var mutation struct {
+		ReopenIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenIssue(input: $input)"`
+	}
+
+	input := githubv4.ReopenIssueInput{
+		IssueID: issue.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
 }

@@ -43,6 +43,9 @@ func init() {
 
 	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
+
+	issueCmd.AddCommand(issueCloseCmd)
+	issueCmd.AddCommand(issueReopenCmd)
 }
 
 var issueCmd = &cobra.Command{
@@ -82,6 +85,18 @@ var issueViewCmd = &cobra.Command{
 
 With '--web', open the issue in a web browser instead.`,
 	RunE: issueView,
+}
+var issueCloseCmd = &cobra.Command{
+	Use:   "close <numberOrURL>",
+	Short: "close issue",
+	Args:  cobra.ExactArgs(1),
+	RunE:  issueClose,
+}
+var issueReopenCmd = &cobra.Command{
+	Use:   "reopen <numberOrURL>",
+	Short: "reopen issue",
+	Args:  cobra.ExactArgs(1),
+	RunE:  issueReopen,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -582,7 +597,11 @@ func issueProjectList(issue api.Issue) string {
 
 	projectNames := make([]string, 0, len(issue.ProjectCards.Nodes))
 	for _, project := range issue.ProjectCards.Nodes {
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, project.Column.Name))
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
 	}
 
 	list := strings.Join(projectNames, ", ")
@@ -590,6 +609,76 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func issueClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	var idErr *api.IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+	}
+
+	if issue.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already closed\n", utils.Yellow("!"), issue.Number)
+		return nil
+	}
+
+	err = api.IssueClose(apiClient, baseRepo, *issue)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d\n", utils.Red("✔"), issue.Number)
+
+	return nil
+}
+
+func issueReopen(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	var idErr *api.IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+	}
+
+	if !issue.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already open\n", utils.Yellow("!"), issue.Number)
+		return nil
+	}
+
+	err = api.IssueReopen(apiClient, baseRepo, *issue)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Green("✔"), issue.Number)
+
+	return nil
 }
 
 func displayURL(urlStr string) string {

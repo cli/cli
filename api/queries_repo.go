@@ -607,7 +607,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		if !query.Repository.Projects.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Repository.Projects.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Repository.Projects.PageInfo.EndCursor)
 	}
 
 	return projects, nil
@@ -651,7 +651,7 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		if !query.Repository.AssignableUsers.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Repository.AssignableUsers.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Repository.AssignableUsers.PageInfo.EndCursor)
 	}
 
 	return users, nil
@@ -695,7 +695,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		if !query.Repository.Labels.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Repository.Labels.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Repository.Labels.PageInfo.EndCursor)
 	}
 
 	return labels, nil
@@ -739,7 +739,7 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 		if !query.Repository.Milestones.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Repository.Milestones.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Repository.Milestones.PageInfo.EndCursor)
 	}
 
 	return milestones, nil
