@@ -312,7 +312,7 @@ func TestIssueView_Preview(t *testing.T) {
 				`Open • marseilles opened about 292 years ago • 9 comments`,
 				`Assignees: marseilles, monaco\n`,
 				`Labels: one, two, three, four, five\n`,
-				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`Milestone: uluru\n`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -678,5 +678,151 @@ func TestIssueStateTitleWithColor(t *testing.T) {
 				t.Fatalf(diff)
 			}
 		})
+	}
+}
+
+func TestIssueClose(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 13}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueCloseCmd, "issue close 13")
+	if err != nil {
+		t.Fatalf("error running command `issue close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Closed issue #13`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueClose_alreadyClosed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 13, "closed": true}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueCloseCmd, "issue close 13")
+	if err != nil {
+		t.Fatalf("error running command `issue close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`#13 is already closed`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueClose_issuesDisabled(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueCloseCmd, "issue close 13")
+	if err == nil {
+		t.Fatalf("expected error when issues are disabled")
+	}
+
+	if !strings.Contains(err.Error(), "issues disabled") {
+		t.Fatalf("got unexpected error: %s", err)
+	}
+}
+
+func TestIssueReopen(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 2, "closed": true}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	if err != nil {
+		t.Fatalf("error running command `issue reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Reopened issue #2`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueReopen_alreadyOpen(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": true,
+		"issue": { "number": 2, "closed": false}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	if err != nil {
+		t.Fatalf("error running command `issue reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`#2 is already open`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueReopen_issuesDisabled(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"hasIssuesEnabled": false
+	} } }
+	`))
+
+	_, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	if err == nil {
+		t.Fatalf("expected error when issues are disabled")
+	}
+
+	if !strings.Contains(err.Error(), "issues disabled") {
+		t.Fatalf("got unexpected error: %s", err)
 	}
 }
