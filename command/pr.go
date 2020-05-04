@@ -360,8 +360,8 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d was already merged\n", utils.Yellow("!"), pr.Number)
-		return nil
+		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+		return err
 	} else if pr.Closed {
 		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
 		return nil
