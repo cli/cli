@@ -369,7 +369,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 
 	err = api.PullRequestClose(apiClient, baseRepo, *pr)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return fmt.Errorf("API call failed: %w", err)
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d\n", utils.Red("✔"), pr.Number)
@@ -406,7 +406,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 
 	err = api.PullRequestReopen(apiClient, baseRepo, *pr)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return fmt.Errorf("API call failed: %w", err)
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
