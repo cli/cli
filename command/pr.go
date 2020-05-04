@@ -73,19 +73,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	remotes, err := ctx.Remotes()
-	if err != nil {
-		return err
-	}
-
 	currentUser, err := ctx.AuthLogin()
-	if err != nil {
-		return err
-	}
-
-	repoOverride, _ := cmd.Flags().GetString("repo")
-
-	remoteContext, err := context.ResolveRemotesToRepos(remotes, apiClient, repoOverride)
 	if err != nil {
 		return err
 	}
@@ -95,6 +83,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
 	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
@@ -114,10 +103,9 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	printHeader(out, "Current branch")
 	currentPR := prPayload.CurrentPR
 	currentBranch, _ := ctx.Branch()
-	remoteRepo, _ := remoteContext.BaseRepo()
 	noPRMessage := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
 	if currentPR != nil {
-		if remoteRepo.DefaultBranchRef.Name == currentBranch && currentPR.State != "OPEN" {
+		if baseRepo.(*api.Repository).DefaultBranchRef.Name == currentBranch && currentPR.State != "OPEN" {
 			printMessage(out, noPRMessage)
 		} else {
 			printPrs(out, 0, *currentPR)

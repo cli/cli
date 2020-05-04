@@ -77,7 +77,6 @@ func TestPRStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
 	defer jsonFile.Close()
@@ -105,7 +104,6 @@ func TestPRStatus(t *testing.T) {
 func TestPRStatus_fork(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
 	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusFork.json")
@@ -137,7 +135,6 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
 	defer jsonFile.Close()
@@ -164,7 +161,6 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
@@ -198,7 +194,6 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
 	defer jsonFile.Close()
@@ -219,7 +214,6 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
@@ -242,7 +236,6 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
 	defer jsonFile.Close()
@@ -263,7 +256,6 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
@@ -286,7 +278,6 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
 	defer jsonFile.Close()
@@ -307,7 +298,6 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
