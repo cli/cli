@@ -395,8 +395,8 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d can't be reopened because it was already merged\n", utils.Red("!"), pr.Number)
-		return nil
+		err := fmt.Errorf("%s Pull request #%d can't be reopened because it was already merged", utils.Red("!"), pr.Number)
+		return err
 	}
 
 	if !pr.Closed {
