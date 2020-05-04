@@ -6,11 +6,11 @@ Use plain text
 
 _*example:*_
 `gh help`
-help is a required argument in this command
+The argument help is required in this command
 
 ## Placeholder values
 
-Use Angled brackets to represent text that you must supply
+Use angled brackets to represent text that a user must supply
 
 _*example:*_
 `gh pr view <issueNumber>`
@@ -22,18 +22,18 @@ Place optional arguments in square brackets
 
 _*example:*_
 `gh pr checkout [--web]`
-Replace `--web` is an optional argument
+The argument `--web` is optional.
 
 ## Mutually exclusive arguments
 
-Place mutually exclusive arguments inside braces separated by a vertical bar.
+Place mutually exclusive arguments inside braces, separate arguments with vertical bars.
 
 _*example:*_
 `gh pr {view | create}`
 
 ## Repeatable arguements
 
-One or more arguments can replace arguments with ellipsis
+Ellipsis represent arguments that can appear multiple times
 
 _*example:*_
 `gh pr close <numbers … >`
