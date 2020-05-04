@@ -60,7 +60,7 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 		if !query.Organization.Projects.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Organization.Projects.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Organization.Projects.PageInfo.EndCursor)
 	}
 
 	return projects, nil
@@ -103,7 +103,7 @@ func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
 		if !query.Organization.Teams.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = query.Organization.Teams.PageInfo.EndCursor
+		variables["endCursor"] = githubv4.String(query.Organization.Teams.PageInfo.EndCursor)
 	}
 
 	return teams, nil
