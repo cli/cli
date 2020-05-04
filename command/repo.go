@@ -127,6 +127,15 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 func repoClone(cmd *cobra.Command, args []string) error {
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
+		if !strings.Contains(cloneURL, "/") {
+			ctx := contextForCommand(cmd)
+			currentUsername, err := ctx.AuthLogin()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("currentUesrname: %s\n", currentUsername)
+			cloneURL = currentUsername + "/" + cloneURL
+		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 

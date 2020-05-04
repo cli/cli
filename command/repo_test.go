@@ -430,6 +430,11 @@ func TestRepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
+			name: "shorthand without username",
+			args: "repo clone REPO",
+			want: "git clone https://github.com/OWNER/REPO.git",
+		},
+		{
 			name: "shorthand with directory",
 			args: "repo clone OWNER/REPO target_directory",
 			want: "git clone https://github.com/OWNER/REPO.git target_directory",
@@ -457,6 +462,11 @@ func TestRepoClone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.NewBlank()
+			ctx.SetAuthLogin("OWNER")
+			initContext = func() context.Context {
+				return ctx
+			}
 			http := initFakeHTTP()
 			http.StubResponse(200, bytes.NewBufferString(`
 			{ "data": { "repository": {
