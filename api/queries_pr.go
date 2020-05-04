@@ -761,7 +761,7 @@ loop:
 	return &res, nil
 }
 
-func PullRequestClose(client *Client, repo ghrepo.Interface, pr PullRequest) error {
+func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
 	var mutation struct {
 		ClosePullRequest struct {
 			PullRequest struct {
@@ -780,7 +780,7 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr PullRequest) err
 	return err
 }
 
-func PullRequestReopen(client *Client, repo ghrepo.Interface, pr PullRequest) error {
+func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {

@@ -367,7 +367,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	err = api.PullRequestClose(apiClient, baseRepo, *pr)
+	err = api.PullRequestClose(apiClient, baseRepo, pr)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
@@ -395,7 +395,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d can't be reopened because it was already merged.\n", utils.Red("!"), pr.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d can't be reopened because it was already merged\n", utils.Red("!"), pr.Number)
 		return nil
 	}
 
@@ -404,7 +404,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	err = api.PullRequestReopen(apiClient, baseRepo, *pr)
+	err = api.PullRequestReopen(apiClient, baseRepo, pr)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
