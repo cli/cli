@@ -450,7 +450,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	err = api.PullRequestMerge(apiClient, baseRepo, pr)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
