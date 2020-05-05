@@ -37,3 +37,10 @@ Ellipsis represent arguments that can appear multiple times
 
 _*example:*_
 `gh pr close <numbers … >`
+
+## Variable naming
+
+For multi-word variables use dash-case (all lower case with words seperated by dashes)
+
+_*example:*_
+`gh pr checkout <issue-number>`
