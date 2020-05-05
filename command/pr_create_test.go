@@ -39,7 +39,7 @@ func TestPRCreate(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
+	output, err := RunCommand(`pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
@@ -101,7 +101,7 @@ func TestPRCreate_withForking(t *testing.T) {
 	cs.Stub("")                                         // git remote add
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(prCreateCmd, `pr create -t title -b body`)
+	output, err := RunCommand(`pr create -t title -b body`)
 	eq(t, err, nil)
 
 	eq(t, http.Requests[3].URL.Path, "/repos/OWNER/REPO/forks")
@@ -132,7 +132,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 
-	_, err := RunCommand(prCreateCmd, `pr create`)
+	_, err := RunCommand(`pr create`)
 	if err == nil {
 		t.Fatal("error expected, got nil")
 	}
@@ -167,7 +167,7 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git rev-parse
 
-	_, err := RunCommand(prCreateCmd, `pr create -BanotherBase -t"cool" -b"nah"`)
+	_, err := RunCommand(`pr create -BanotherBase -t"cool" -b"nah"`)
 	if err != nil {
 		t.Errorf("got unexpected error %q", err)
 	}
@@ -192,7 +192,7 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Stub("")                                         // git push
 	cs.Stub("")                                         // browser
 
-	output, err := RunCommand(prCreateCmd, `pr create --web`)
+	output, err := RunCommand(`pr create --web`)
 	eq(t, err, nil)
 
 	eq(t, output.String(), "")
@@ -232,7 +232,7 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(prCreateCmd, `pr create -t "my title" -b "my body"`)
+	output, err := RunCommand(`pr create -t "my title" -b "my body"`)
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
@@ -301,7 +301,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(prCreateCmd, `pr create -t "cross repo" -b "same branch"`)
+	output, err := RunCommand(`pr create -t "cross repo" -b "same branch"`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
@@ -377,7 +377,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 		},
 	})
 
-	output, err := RunCommand(prCreateCmd, `pr create`)
+	output, err := RunCommand(`pr create`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
@@ -454,7 +454,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 		},
 	})
 
-	output, err := RunCommand(prCreateCmd, `pr create`)
+	output, err := RunCommand(`pr create`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
@@ -512,7 +512,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 	cs.Stub("")                                                        // git push
 	cs.Stub("")                                                        // browser open
 
-	output, err := RunCommand(prCreateCmd, `pr create -f`)
+	output, err := RunCommand(`pr create -f`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
@@ -553,7 +553,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 	cs.Stub("") // git status
 	cs.Stub("") // git log
 
-	_, err := RunCommand(prCreateCmd, "pr create -f")
+	_, err := RunCommand("pr create -f")
 
 	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
@@ -571,7 +571,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 	cs.Stub("") // git status
 	cs.Stub("") // git log
 
-	_, err := RunCommand(prCreateCmd, "pr create -w")
+	_, err := RunCommand("pr create -w")
 
 	eq(t, err.Error(), "could not compute title or body defaults: could not find any commits between origin/master and feature")
 }
@@ -621,7 +621,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 		},
 	})
 
-	output, err := RunCommand(prCreateCmd, `pr create`)
+	output, err := RunCommand(`pr create`)
 	eq(t, err, nil)
 
 	stderr := string(output.Stderr())
