@@ -15,6 +15,7 @@ type Config interface {
 	Hosts() ([]*HostConfig, error)
 	Get(string, string) (string, error)
 	Set(string, string, string) error
+	List(string) (*map[string]string, error)
 	Write() error
 }
 
@@ -142,6 +143,33 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 		}
 		return hostCfg.SetStringValue(key, value)
 	}
+}
+
+func (c *fileConfig) List(hostname string) (*map[string]string, error) {
+	var root *yaml.Node
+	if hostname != "" {
+		hostCfg, err := c.configForHost(hostname)
+		if err != nil {
+			return nil, err
+		}
+		root = hostCfg.Root
+	} else {
+		root = c.ConfigMap.Root
+	}
+
+	entries := make(map[string]string)
+	topLevelKeys := root.Content
+	for i, v := range topLevelKeys {
+		// if v.Value == key && i+1 < len(topLevelKeys) {
+		// 	keyNode = v
+		// 	valueNode = topLevelKeys[i+1]
+		// 	return
+		// }
+		fmt.Printf("%d %s %s\n", i, v.Value, v.ShortTag())
+		entries[v.Value] = v.ShortTag()
+	}
+
+	return &entries, nil
 }
 
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {

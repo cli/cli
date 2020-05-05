@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,9 +11,13 @@ func init() {
 	configCmd.AddCommand(configGetCmd)
 	configCmd.AddCommand(configSetCmd)
 
+	configCmd.Flags().BoolP("list", "l", false, "List config settings")
+	configCmd.Flags().StringP("host", "h", "", "Get per-host setting")
 	configGetCmd.Flags().StringP("host", "h", "", "Get per-host setting")
 	configSetCmd.Flags().StringP("host", "h", "", "Set per-host setting")
 
+	// TODO reveal and add usage once we properly support multiple hosts
+	_ = configCmd.Flags().MarkHidden("host")
 	// TODO reveal and add usage once we properly support multiple hosts
 	_ = configGetCmd.Flags().MarkHidden("host")
 	// TODO reveal and add usage once we properly support multiple hosts
@@ -28,6 +33,7 @@ Current respected settings:
 - git_protocol: https or ssh. Default is https.
 - editor: if unset, defaults to environment variables.
 `,
+	RunE: configList,
 }
 
 var configGetCmd = &cobra.Command{
@@ -53,6 +59,36 @@ Examples:
 `,
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
+}
+
+func configList(cmd *cobra.Command, args []string) error {
+	showList, err := cmd.Flags().GetBool("list")
+	if !showList {
+		return cmd.Usage()
+	}
+
+	hostname, err := cmd.Flags().GetString("host")
+	if err != nil {
+		return err
+	}
+
+	ctx := contextForCommand(cmd)
+
+	cfg, err := ctx.Config()
+	if err != nil {
+		return err
+	}
+
+	entries, err := cfg.List(hostname)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range *entries {
+		fmt.Printf("%s=%s\n", k, v)
+	}
+
+	return nil
 }
 
 func configGet(cmd *cobra.Command, args []string) error {
