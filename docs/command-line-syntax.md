@@ -10,7 +10,7 @@ The argument help is required in this command
 
 ## Placeholder values
 
-Use angled brackets to represent text that a user must supply
+Use angled brackets to represent a value the user must supply
 
 _*example:*_
 `gh pr view <issueNumber>`
