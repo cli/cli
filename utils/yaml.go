@@ -26,7 +26,7 @@ func FlattenYamlNode(node *yaml.Node) []*FlatYamlEntry {
 		for i := 0; i < len(nodes)-1; i += 2 {
 			key := nodes[i]
 			value := nodes[i+1]
-			if key.Kind == yaml.ScalarNode && value.Kind == yaml.MappingNode {
+			if value.Kind == yaml.MappingNode {
 				keyStr := key.Value
 				children := FlattenYamlNode(value)
 				for _, c := range children {
