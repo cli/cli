@@ -18,29 +18,26 @@ func FlattenYamlNode(node *yaml.Node) []*FlatYamlEntry {
 		return make([]*FlatYamlEntry, 0)
 	}
 
-	var entries []*FlatYamlEntry
-	if node.Kind == yaml.MappingNode {
-		entries = make([]*FlatYamlEntry, 0)
-		nodes := node.Content
+	entries := make([]*FlatYamlEntry, 0)
+	nodes := node.Content
 
-		for i := 0; i < len(nodes)-1; i += 2 {
-			key := nodes[i]
-			value := nodes[i+1]
-			if value.Kind == yaml.MappingNode {
-				keyStr := key.Value
-				children := FlattenYamlNode(value)
-				for _, c := range children {
-					c.Key = fmt.Sprintf("%s.%s", keyStr, c.Key)
-				}
-				entries = append(entries, children...)
-			} else if value.Kind == yaml.ScalarNode {
-				keyStr := key.Value
-				valueStr := value.Value
-				entries = append(entries, &FlatYamlEntry{
-					Key:   keyStr,
-					Value: valueStr,
-				})
+	for i := 0; i < len(nodes)-1; i += 2 {
+		key := nodes[i]
+		value := nodes[i+1]
+		if value.Kind == yaml.MappingNode {
+			keyStr := key.Value
+			children := FlattenYamlNode(value)
+			for _, c := range children {
+				c.Key = fmt.Sprintf("%s.%s", keyStr, c.Key)
 			}
+			entries = append(entries, children...)
+		} else if value.Kind == yaml.ScalarNode {
+			keyStr := key.Value
+			valueStr := value.Value
+			entries = append(entries, &FlatYamlEntry{
+				Key:   keyStr,
+				Value: valueStr,
+			})
 		}
 	}
 
