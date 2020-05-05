@@ -1015,3 +1015,23 @@ func TestPrMerge_squash(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestPrMerge_alreadyMerged(t *testing.T) {
+	initWithStubs(
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 4")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #4 was already merged`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
