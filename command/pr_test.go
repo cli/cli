@@ -15,9 +15,6 @@ import (
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/shlex"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -25,51 +22,6 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
-}
-
-type cmdOut struct {
-	outBuf, errBuf *bytes.Buffer
-}
-
-func (c cmdOut) String() string {
-	return c.outBuf.String()
-}
-
-func (c cmdOut) Stderr() string {
-	return c.errBuf.String()
-}
-
-func RunCommand(cmd *cobra.Command, args string) (*cmdOut, error) {
-	rootCmd := cmd.Root()
-	argv, err := shlex.Split(args)
-	if err != nil {
-		return nil, err
-	}
-	rootCmd.SetArgs(argv)
-
-	outBuf := bytes.Buffer{}
-	cmd.SetOut(&outBuf)
-	errBuf := bytes.Buffer{}
-	cmd.SetErr(&errBuf)
-	// Reset flag values so they don't leak between tests
-	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		switch v := f.Value.(type) {
-		case pflag.SliceValue:
-			_ = v.Replace([]string{})
-		default:
-			switch v.Type() {
-			case "bool", "string", "int":
-				_ = v.Set(f.DefValue)
-			}
-		}
-	})
-
-	_, err = rootCmd.ExecuteC()
-	cmd.SetOut(nil)
-	cmd.SetErr(nil)
-
-	return &cmdOut{&outBuf, &errBuf}, err
 }
 
 func TestPRStatus(t *testing.T) {
@@ -81,7 +33,7 @@ func TestPRStatus(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -119,7 +71,7 @@ branch.blueberries.merge refs/heads/blueberries`)}
 		}
 	})()
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Fatalf("error running command `pr status`: %v", err)
 	}
@@ -139,7 +91,7 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -166,7 +118,7 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -198,7 +150,7 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -219,7 +171,7 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -240,7 +192,7 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -261,7 +213,7 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -282,7 +234,7 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -303,7 +255,7 @@ func TestPRStatus_blankSlate(t *testing.T) {
 	{ "data": {} }
 	`))
 
-	output, err := RunCommand(prStatusCmd, "pr status")
+	output, err := RunCommand("pr status")
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}
@@ -335,7 +287,7 @@ func TestPRList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prListCmd, "pr list")
+	output, err := RunCommand("pr list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +310,7 @@ func TestPRList_filtering(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	output, err := RunCommand(prListCmd, `pr list -s all -l one,two -l three`)
+	output, err := RunCommand(`pr list -s all -l one,two -l three`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +343,7 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(prListCmd, "pr list -l one,two")
+	output, err := RunCommand("pr list -l one,two")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +362,7 @@ func TestPRList_filteringClosed(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	_, err := RunCommand(prListCmd, `pr list -s closed`)
+	_, err := RunCommand(`pr list -s closed`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +386,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	_, err := RunCommand(prListCmd, `pr list -s merged -l "needs tests" -a hubot -B develop`)
+	_, err := RunCommand(`pr list -s merged -l "needs tests" -a hubot -B develop`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +410,7 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
 	http.StubResponse(200, respBody)
 
-	_, err := RunCommand(prListCmd, `pr list -l one,two -a hubot`)
+	_, err := RunCommand(`pr list -l one,two -a hubot`)
 	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
 		t.Fatal(err)
 	}
@@ -589,7 +541,7 @@ func TestPRView_Preview(t *testing.T) {
 			defer jsonFile.Close()
 			http.StubResponse(200, jsonFile)
 
-			output, err := RunCommand(prViewCmd, tc.args)
+			output, err := RunCommand(tc.args)
 			if err != nil {
 				t.Errorf("error running command `%v`: %v", tc.args, err)
 			}
@@ -622,7 +574,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w")
+	output, err := RunCommand("pr view -w")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -660,7 +612,7 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	_, err := RunCommand(prViewCmd, "pr view -w")
+	_, err := RunCommand("pr view -w")
 	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -688,7 +640,7 @@ func TestPRView_web_numberArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w 23")
+	output, err := RunCommand("pr view -w 23")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -720,7 +672,7 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w \"#23\"")
+	output, err := RunCommand("pr view -w \"#23\"")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -751,7 +703,7 @@ func TestPRView_web_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w https://github.com/OWNER/REPO/pull/23/files")
+	output, err := RunCommand("pr view -w https://github.com/OWNER/REPO/pull/23/files")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -785,7 +737,7 @@ func TestPRView_web_branchArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w blueberries")
+	output, err := RunCommand("pr view -w blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -820,7 +772,7 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prViewCmd, "pr view -w hubot:blueberries")
+	output, err := RunCommand("pr view -w hubot:blueberries")
 	if err != nil {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
@@ -876,7 +828,7 @@ func TestPrClose(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(prCloseCmd, "pr close 96")
+	output, err := RunCommand("pr close 96")
 	if err != nil {
 		t.Fatalf("error running command `pr close`: %v", err)
 	}
@@ -901,7 +853,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(prCloseCmd, "pr close 101")
+	output, err := RunCommand("pr close 101")
 	if err != nil {
 		t.Fatalf("error running command `pr close`: %v", err)
 	}
@@ -926,7 +878,7 @@ func TestPRReopen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(prReopenCmd, "pr reopen 666")
+	output, err := RunCommand("pr reopen 666")
 	if err != nil {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
@@ -951,7 +903,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(prReopenCmd, "pr reopen 666")
+	output, err := RunCommand("pr reopen 666")
 	if err != nil {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
@@ -976,7 +928,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(prReopenCmd, "pr reopen 666")
+	output, err := RunCommand("pr reopen 666")
 	if err == nil {
 		t.Fatalf("expected an error running command `pr reopen`: %v", err)
 	}
