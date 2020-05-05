@@ -14,7 +14,7 @@ Use angled brackets to represent a value the user must supply
 
 _*example:*_
 `gh pr view <issueNumber>`
-Replace `<issueNumber>` with an issue number
+Replace `<issue-number>` with an issue number
 
 ## Optional arguments
 
