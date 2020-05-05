@@ -24,6 +24,7 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
+	prCmd.AddCommand(prMergeCmd)
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -78,6 +79,13 @@ var prReopenCmd = &cobra.Command{
 	Short: "Reopen a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
+}
+
+var prMergeCmd = &cobra.Command{
+	Use:   "merge <number | url>",
+	Short: "Merge a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prMerge,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -416,6 +424,38 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
+
+	return nil
+}
+
+func prMerge(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
+		return err
+	}
+
+	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
 
 	return nil
 }
