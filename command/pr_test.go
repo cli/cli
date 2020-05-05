@@ -141,6 +141,27 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	}
 }
 
+func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand("pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#10  Blueberries are certainly a good fruit \[blueberries\]`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -162,6 +183,27 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	}
 }
 
+func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand("pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`There is no pull request associated with \[blueberries\]`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
 func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -177,6 +219,27 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	}
 
 	expectedLine := regexp.MustCompile(`#8  Blueberries are a good fruit \[blueberries\] - Merged`)
+	if !expectedLine.MatchString(output.String()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
+func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand("pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`There is no pull request associated with \[blueberries\]`)
 	if !expectedLine.MatchString(output.String()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", expectedLine, output)
 		return
@@ -750,4 +813,130 @@ func TestPrStateTitleWithColor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrClose(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 96 }
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr close 96")
+	if err != nil {
+		t.Fatalf("error running command `pr close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Closed pull request #96`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrClose_alreadyClosed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 101, "closed": true }
+		} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr close 101")
+	if err != nil {
+		t.Fatalf("error running command `pr close`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #101 is already closed`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReopen(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 666, "closed": true}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr reopen 666")
+	if err != nil {
+		t.Fatalf("error running command `pr reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Reopened pull request #666`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReopen_alreadyOpen(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 666, "closed": false}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr reopen 666")
+	if err != nil {
+		t.Fatalf("error running command `pr reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #666 is already open`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReopen_alreadyMerged(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 666, "closed": true, "state": "MERGED"}
+	} } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr reopen 666")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was already merged`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+
 }

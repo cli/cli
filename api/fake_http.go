@@ -70,6 +70,25 @@ func (f *FakeHTTP) StubRepoResponseWithPermission(owner, repo, permission string
 	f.responseStubs = append(f.responseStubs, resp)
 }
 
+func (f *FakeHTTP) StubRepoResponseWithDefaultBranch(owner, repo, defaultBranch string) {
+	body := bytes.NewBufferString(fmt.Sprintf(`
+		{ "data": { "repo_000": {
+			"id": "REPOID",
+			"name": "%s",
+			"owner": {"login": "%s"},
+			"defaultBranchRef": {
+				"name": "%s"
+			},
+			"viewerPermission": "READ"
+		} } }
+	`, repo, owner, defaultBranch))
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       ioutil.NopCloser(body),
+	}
+	f.responseStubs = append(f.responseStubs, resp)
+}
+
 func (f *FakeHTTP) StubForkedRepoResponse(forkFullName, parentFullName string) {
 	forkRepo := strings.SplitN(forkFullName, "/", 2)
 	parentRepo := strings.SplitN(parentFullName, "/", 2)

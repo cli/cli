@@ -21,16 +21,18 @@ func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
-	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prStatusCmd)
-	prCmd.AddCommand(prViewCmd)
+	prCmd.AddCommand(prCloseCmd)
+	prCmd.AddCommand(prReopenCmd)
 
+	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
+	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
 }
 
@@ -64,6 +66,18 @@ is displayed.
 
 With '--web', open the pull request in a web browser instead.`,
 	RunE: prView,
+}
+var prCloseCmd = &cobra.Command{
+	Use:   "close <number | url>",
+	Short: "Close a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prClose,
+}
+var prReopenCmd = &cobra.Command{
+	Use:   "reopen <number | url>",
+	Short: "Reopen a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prReopen,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -101,13 +115,19 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
-	if prPayload.CurrentPR != nil {
-		printPrs(out, 0, *prPayload.CurrentPR)
+	currentPR := prPayload.CurrentPR
+	currentBranch, _ := ctx.Branch()
+	noPRMessage := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
+	if currentPR != nil {
+		if baseRepo.(*api.Repository).DefaultBranchRef.Name == currentBranch && currentPR.State != "OPEN" {
+			printMessage(out, noPRMessage)
+		} else {
+			printPrs(out, 0, *currentPR)
+		}
 	} else if currentPRHeadRef == "" {
 		printMessage(out, "  There is no current branch")
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
-		printMessage(out, message)
+		printMessage(out, noPRMessage)
 	}
 	fmt.Fprintln(out)
 
@@ -326,6 +346,78 @@ func prView(cmd *cobra.Command, args []string) error {
 		out := colorableOut(cmd)
 		return printPrPreview(out, pr)
 	}
+}
+
+func prClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d\n", utils.Red("✔"), pr.Number)
+
+	return nil
+}
+
+func prReopen(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d can't be reopened because it was already merged", utils.Red("!"), pr.Number)
+		return err
+	}
+
+	if !pr.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already open\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestReopen(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
+
+	return nil
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
