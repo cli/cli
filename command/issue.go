@@ -83,13 +83,13 @@ With '--web', open the issue in a web browser instead.`,
 	RunE: issueView,
 }
 var issueCloseCmd = &cobra.Command{
-	Use:   "close <numberOrURL>",
+	Use:   "close {<number> | <url>}",
 	Short: "close issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueClose,
 }
 var issueReopenCmd = &cobra.Command{
-	Use:   "reopen <numberOrURL>",
+	Use:   "reopen {<number> | <url>}",
 	Short: "reopen issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueReopen,
