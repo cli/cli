@@ -975,3 +975,43 @@ func TestPrMerge(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestPrMerge_rebase(t *testing.T) {
+	initWithStubs(
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 2 --rebase")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Rebased pull request #2`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_squash(t *testing.T) {
+	initWithStubs(
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 3 --squash")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Squashed and merged pull request #3`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}

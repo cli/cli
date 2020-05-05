@@ -25,6 +25,9 @@ func init() {
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
+	prMergeCmd.Flags().BoolP("merge", "m", true, "merge the commits with the base branch")
+	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
+	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -58,7 +61,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [{<number> | <url> | <branch>}]",
+	Use:   "view <{<number> | <url> | <branch>}>",
 	Short: "View a pull request",
 	Long: `Display the title, body, and other information about a pull request.
 
@@ -82,7 +85,7 @@ var prReopenCmd = &cobra.Command{
 }
 
 var prMergeCmd = &cobra.Command{
-	Use:   "merge <number | url>",
+	Use:   "merge <number | url> [--rebase | --merge | --squash]",
 	Short: "Merge a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prMerge,
@@ -450,12 +453,32 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = api.PullRequestMerge(apiClient, baseRepo, pr)
+	rebase, err := cmd.Flags().GetBool("rebase")
+	if err != nil {
+		return err
+	}
+	squash, err := cmd.Flags().GetBool("squash")
+	if err != nil {
+		return err
+	}
+
+	var output string
+	if rebase {
+		output = fmt.Sprintf("%s Rebased pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestRebase(apiClient, baseRepo, pr)
+	} else if squash {
+		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestSquash(apiClient, baseRepo, pr)
+	} else {
+		output = fmt.Sprintf("%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	fmt.Fprintf(colorableErr(cmd), output)
 
 	return nil
 }

@@ -800,6 +800,18 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 }
 
 func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	return merge(client, repo, pr, githubv4.PullRequestMergeMethodMerge)
+}
+
+func PullRequestRebase(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	return merge(client, repo, pr, githubv4.PullRequestMergeMethodRebase)
+}
+
+func PullRequestSquash(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	return merge(client, repo, pr, githubv4.PullRequestMergeMethodSquash)
+}
+
+func merge(client *Client, repo ghrepo.Interface, pr *PullRequest, mergeMethod githubv4.PullRequestMergeMethod) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {
@@ -810,6 +822,7 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 
 	input := githubv4.MergePullRequestInput{
 		PullRequestID: pr.ID,
+		MergeMethod:   &mergeMethod,
 	}
 
 	v4 := githubv4.NewClient(client.http)
