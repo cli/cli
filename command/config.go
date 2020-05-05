@@ -84,8 +84,8 @@ func configList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	for k, v := range *entries {
-		fmt.Printf("%s=%s\n", k, v)
+	for _, e := range entries {
+		fmt.Printf("%s\n", e)
 	}
 
 	return nil

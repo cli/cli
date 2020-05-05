@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cli/cli/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,7 +16,7 @@ type Config interface {
 	Hosts() ([]*HostConfig, error)
 	Get(string, string) (string, error)
 	Set(string, string, string) error
-	List(string) (*map[string]string, error)
+	List(string) ([]string, error)
 	Write() error
 }
 
@@ -145,7 +146,7 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 	}
 }
 
-func (c *fileConfig) List(hostname string) (*map[string]string, error) {
+func (c *fileConfig) List(hostname string) ([]string, error) {
 	var root *yaml.Node
 	if hostname != "" {
 		hostCfg, err := c.configForHost(hostname)
@@ -157,19 +158,13 @@ func (c *fileConfig) List(hostname string) (*map[string]string, error) {
 		root = c.ConfigMap.Root
 	}
 
-	entries := make(map[string]string)
-	topLevelKeys := root.Content
-	for i, v := range topLevelKeys {
-		// if v.Value == key && i+1 < len(topLevelKeys) {
-		// 	keyNode = v
-		// 	valueNode = topLevelKeys[i+1]
-		// 	return
-		// }
-		fmt.Printf("%d %s %s\n", i, v.Value, v.ShortTag())
-		entries[v.Value] = v.ShortTag()
+	entries := utils.FlattenYamlNode(root)
+	list := make([]string, 0)
+	for _, e := range entries {
+		list = append(list, fmt.Sprintf("%s=%s", e.Key, e.Value))
 	}
 
-	return &entries, nil
+	return list, nil
 }
 
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
