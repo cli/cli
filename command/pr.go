@@ -20,6 +20,7 @@ import (
 func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
+	prCheckoutCmd.Flags().StringP("branch", "b", "", "Supply the local branch to checkout into")
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)

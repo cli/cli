@@ -239,10 +239,9 @@ func issueView(cmd *cobra.Command, args []string) error {
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
 	}
+	out := colorableOut(cmd)
+	return printIssuePreview(out, issue)
 
 }
 

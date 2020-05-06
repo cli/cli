@@ -57,41 +57,44 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
+	localBranchName, err := cmd.Flags().GetString("branch")
+	if err != nil {
+		return err
+	}
+	if localBranchName == "" {
+		localBranchName = fmt.Sprintf("pr/%d", pr.Number)
+	}
+
 	var cmdQueue [][]string
-	newBranchName := pr.HeadRefName
 	if headRemote != nil {
 		// there is an existing git remote for PR head
-		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
-		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
+		srcRef := fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
+		destRef := fmt.Sprintf("refs/remotes/%s/%s", headRemote.Name, pr.HeadRefName)
+		refSpec := fmt.Sprintf("+%s:%s", srcRef, destRef)
 
 		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
 
-		// local branch already exists
-		if _, err := git.ShowRefs("refs/heads/" + newBranchName); err == nil {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+		if _, err := git.ShowRefs("refs/heads/" + localBranchName); err == nil {
+			// local branch already exists
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", localBranchName})
+			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", destRef})
 		} else {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", localBranchName, "--no-track", destRef})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranchName), headRemote.Name})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranchName), srcRef})
 		}
 	} else {
 		// no git remote for PR head
 
-		// avoid naming the new branch the same as the default branch
-		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
-			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
-		}
-
 		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
-		if newBranchName == currentBranch {
+		if localBranchName == currentBranch {
 			// PR head matches currently checked out branch
 			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
 			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
 		} else {
 			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranchName)})
+			cmdQueue = append(cmdQueue, []string{"git", "checkout", localBranchName})
 		}
 
 		remote := baseURLOrName
@@ -100,9 +103,9 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 			remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
-		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
+		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", localBranchName)); err != nil || mc == "" {
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranchName), remote})
+			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranchName), mergeRef})
 		}
 	}
 
@@ -121,9 +124,12 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
 	Short: "Check out a pull request in Git",
+	Long: `Check out a pull request locally.
+
+	With '--branch <branch>', checkout the pull request into a specific local branch.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return errors.New("requires a pull request number as an argument")
+			return errors.New("pull request number or url or branch required as an argument")
 		}
 		return nil
 	},
