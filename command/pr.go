@@ -457,7 +457,6 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		}
 
 		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		fmt.Printf("🌭 %+v\n", pr)
 		if err != nil {
 			return err
 		}
