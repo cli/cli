@@ -976,6 +976,26 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_noPrNumberGiven(t *testing.T) {
+	initWithStubs(
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 100, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #100`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestPrMerge_rebase(t *testing.T) {
 	initWithStubs(
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {

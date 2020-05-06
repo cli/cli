@@ -85,9 +85,9 @@ var prReopenCmd = &cobra.Command{
 }
 
 var prMergeCmd = &cobra.Command{
-	Use:   "merge <number | url> [--rebase | --merge | --squash]",
+	Use:   "merge [number | url] [--rebase | --merge | --squash]",
 	Short: "Merge a pull request",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE:  prMerge,
 }
 
@@ -110,6 +110,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
+
 	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
@@ -443,9 +444,23 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
-	if err != nil {
-		return err
+	var pr *api.PullRequest
+	if len(args) > 0 {
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		if err != nil {
+			return err
+		}
+	} else {
+		_, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		fmt.Printf("🌭 %+v\n", pr)
+		if err != nil {
+			return err
+		}
 	}
 
 	if pr.State == "MERGED" {

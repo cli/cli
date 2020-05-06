@@ -446,6 +446,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	type response struct {
 		Repository struct {
 			PullRequests struct {
+				ID    githubv4.ID
 				Nodes []PullRequest
 			}
 		}
@@ -456,6 +457,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
 				nodes {
+					id
 					number
 					title
 					state
