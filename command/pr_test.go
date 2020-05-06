@@ -946,8 +946,8 @@ type stubResponse struct {
 	ResponseBody io.Reader
 }
 
-func initWithStubs(stubs ...stubResponse) {
-	initBlankContext("", "OWNER/REPO", "master")
+func initWithStubs(branch string, stubs ...stubResponse) {
+	initBlankContext("", "OWNER/REPO", branch)
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -957,7 +957,7 @@ func initWithStubs(stubs ...stubResponse) {
 }
 
 func TestPrMerge(t *testing.T) {
-	initWithStubs(
+	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
 		} } }`)},
@@ -977,10 +977,16 @@ func TestPrMerge(t *testing.T) {
 }
 
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
-	initWithStubs(
-		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
-			"pullRequest": { "number": 100, "closed": false, "state": "OPEN"}
-		} } }`)},
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+
+	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewWithMetadataByBranch.json")
+	defer jsonFile.Close()
+
+	initWithStubs("blueberries",
+		stubResponse{200, jsonFile},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
 
@@ -989,7 +995,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #100`)
+	r := regexp.MustCompile(`Merged pull request #10`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -997,7 +1003,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 }
 
 func TestPrMerge_rebase(t *testing.T) {
-	initWithStubs(
+	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
 		} } }`)},
@@ -1017,7 +1023,7 @@ func TestPrMerge_rebase(t *testing.T) {
 }
 
 func TestPrMerge_squash(t *testing.T) {
-	initWithStubs(
+	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
 		} } }`)},
@@ -1037,7 +1043,7 @@ func TestPrMerge_squash(t *testing.T) {
 }
 
 func TestPrMerge_alreadyMerged(t *testing.T) {
-	initWithStubs(
+	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
 		} } }`)},
