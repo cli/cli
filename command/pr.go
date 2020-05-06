@@ -492,7 +492,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), output)
+	fmt.Fprint(colorableErr(cmd), output)
 
 	return nil
 }
