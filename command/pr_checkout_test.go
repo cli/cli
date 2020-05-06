@@ -46,7 +46,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -61,9 +61,9 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b pr/123 --no-track refs/remotes/origin/feature")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.pr/123.remote origin")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.pr/123.merge refs/heads/feature")
 }
 
 func TestPRCheckout_urlArg(t *testing.T) {
@@ -98,7 +98,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -112,7 +112,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b pr/123 --no-track refs/remotes/origin/feature")
 }
 
 func TestPRCheckout_urlArg_differentBase(t *testing.T) {
@@ -147,7 +147,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -173,8 +173,8 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	eq(t, reqBody.Variables.Repo, "POE")
 
 	eq(t, len(ranCommands), 5)
-	eq(t, strings.Join(ranCommands[1], " "), "git fetch https://github.com/OTHER/POE.git refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.remote https://github.com/OTHER/POE.git")
+	eq(t, strings.Join(ranCommands[1], " "), "git fetch https://github.com/OTHER/POE.git refs/pull/123/head:pr/123")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.pr/123.remote https://github.com/OTHER/POE.git")
 }
 
 func TestPRCheckout_branchArg(t *testing.T) {
@@ -210,7 +210,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -224,7 +224,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 5)
-	eq(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:pr/123")
 }
 
 func TestPRCheckout_existingBranch(t *testing.T) {
@@ -260,7 +260,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &test.OutputStub{}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -275,7 +275,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 
 	eq(t, len(ranCommands), 3)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout pr/123")
 	eq(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
 }
 
@@ -313,7 +313,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify -- refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/pr/123":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -328,9 +328,9 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch robot-fork +refs/heads/feature:refs/remotes/robot-fork/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track robot-fork/feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote robot-fork")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b pr/123 --no-track refs/remotes/robot-fork/feature")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.pr/123.remote robot-fork")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.pr/123.merge refs/heads/feature")
 }
 
 func TestPRCheckout_differentRepo(t *testing.T) {
@@ -366,7 +366,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git config branch.feature.merge":
+		case "git config branch.pr/123.merge":
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -380,10 +380,10 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/pull/123/head")
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:pr/123")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout pr/123")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.pr/123.remote origin")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.pr/123.merge refs/pull/123/head")
 }
 
 func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
@@ -419,7 +419,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git config branch.feature.merge":
+		case "git config branch.pr/123.merge":
 			return &test.OutputStub{Out: []byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -433,13 +433,13 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 2)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:pr/123")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout pr/123")
 }
 
 func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	ctx := context.NewBlank()
-	ctx.SetBranch("feature")
+	ctx.SetBranch("pr/123")
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
@@ -470,7 +470,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git config branch.feature.merge":
+		case "git config branch.pr/123.merge":
 			return &test.OutputStub{Out: []byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -521,7 +521,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git config branch.feature.merge":
+		case "git config branch.pr/123.merge":
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
@@ -535,8 +535,62 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:pr/123")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout pr/123")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.pr/123.remote https://github.com/hubot/REPO.git")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.pr/123.merge refs/heads/feature")
+}
+
+func TestPRCheckout_withBranchFlag(t *testing.T) {
+	// Just need to test it with any one of the use cases. That the value passed is being respected
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO",
+			"defaultBranchRef": {
+				"name": "master"
+			}
+		},
+		"isCrossRepository": false,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify -- refs/heads/abc":
+			return &errorStub{"exit status: 1"}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(`pr checkout 123 -b abc`)
+	eq(t, err, nil)
+	eq(t, output.String(), "")
+
+	eq(t, len(ranCommands), 4)
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b abc --no-track refs/remotes/origin/feature")
+	eq(t, strings.Join(ranCommands[2], " "), "git config branch.abc.remote origin")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.abc.merge refs/heads/feature")
 }
