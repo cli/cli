@@ -482,7 +482,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 	var output string
 	if rebase {
-		output = fmt.Sprintf("%s Rebased pull request #%d\n", utils.Green("✔"), pr.Number)
+		output = fmt.Sprintf("%s Rebased and merged pull request #%d\n", utils.Green("✔"), pr.Number)
 		err = api.PullRequestRebase(apiClient, baseRepo, pr)
 	} else if squash {
 		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
