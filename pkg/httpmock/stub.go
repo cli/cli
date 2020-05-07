@@ -3,68 +3,12 @@ package httpmock
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 )
-
-type Registry struct {
-	mu    sync.Mutex
-	stubs []*Stub
-}
-
-func (r *Registry) Register(m Matcher, resp Responder) {
-	r.stubs = append(r.stubs, &Stub{
-		Matcher:   m,
-		Responder: resp,
-	})
-}
-
-type Testing interface {
-	Errorf(string, ...interface{})
-}
-
-func (r *Registry) Verify(t Testing) {
-	n := 0
-	for _, s := range r.stubs {
-		if !s.matched {
-			n++
-		}
-	}
-	if n > 0 {
-		t.Errorf("%d unmatched HTTP stubs", n)
-	}
-}
-
-// RoundTrip satisfies http.RoundTripper
-func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
-	var stub *Stub
-
-	r.mu.Lock()
-	for _, s := range r.stubs {
-		if s.matched || !s.Matcher(req) {
-			continue
-		}
-		if stub != nil {
-			r.mu.Unlock()
-			return nil, fmt.Errorf("more than 1 stub matched %v", req)
-		}
-		stub = s
-	}
-	if stub != nil {
-		stub.matched = true
-	}
-	r.mu.Unlock()
-
-	if stub == nil {
-		return nil, fmt.Errorf("no registered stubs matched %v", req)
-	}
-	return stub.Responder(req)
-}
 
 type Matcher func(req *http.Request) bool
 type Responder func(req *http.Request) (*http.Response, error)
@@ -73,6 +17,10 @@ type Stub struct {
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
+}
+
+func MatchAny(*http.Request) bool {
+	return true
 }
 
 func GraphQL(q string) Matcher {

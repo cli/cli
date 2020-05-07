@@ -94,15 +94,7 @@ func initBlankContext(cfg, repo, branch string) {
 	}
 }
 
-func initFakeHTTP() *api.FakeHTTP {
-	http := &api.FakeHTTP{}
-	apiClientForContext = func(context.Context) (*api.Client, error) {
-		return api.NewClient(api.ReplaceTripper(http)), nil
-	}
-	return http
-}
-
-func initMockHTTP() *httpmock.Registry {
+func initFakeHTTP() *httpmock.Registry {
 	http := &httpmock.Registry{}
 	apiClientForContext = func(context.Context) (*api.Client, error) {
 		return api.NewClient(api.ReplaceTripper(http)), nil

@@ -221,20 +221,6 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	return result, nil
 }
 
-func RepoNetworkStubResponse(owner, repo, permission string) string {
-	return fmt.Sprintf(`
-		{ "data": { "repo_000": {
-			"id": "REPOID",
-			"name": "%s",
-			"owner": {"login": "%s"},
-			"defaultBranchRef": {
-				"name": "master"
-			},
-			"viewerPermission": "%s"
-		} } }
-	`, repo, owner, permission)
-}
-
 // repositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
 	NodeID    string

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/pkg/httpmock"
@@ -409,9 +408,9 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 
 func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
-	http := initMockHTTP()
+	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(httpmock.GraphQL(`\bviewerPermission\b`), httpmock.StringResponse(api.RepoNetworkStubResponse("OWNER", "REPO", "WRITE")))
+	http.Register(httpmock.GraphQL(`\bviewerPermission\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
 	http.Register(httpmock.GraphQL(`\bforks\(`), httpmock.StringResponse(`
 		{ "data": { "repository": { "forks": { "nodes": [
 		] } } } }

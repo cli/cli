@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/httpmock"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -70,7 +71,7 @@ func Test_translateRemotes(t *testing.T) {
 }
 
 func Test_resolvedRemotes_triangularSetup(t *testing.T) {
-	http := &api.FakeHTTP{}
+	http := &httpmock.Registry{}
 	apiClient := api.NewClient(api.ReplaceTripper(http))
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -137,7 +138,7 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 }
 
 func Test_resolvedRemotes_forkLookup(t *testing.T) {
-	http := &api.FakeHTTP{}
+	http := &httpmock.Registry{}
 	apiClient := api.NewClient(api.ReplaceTripper(http))
 
 	http.StubResponse(200, bytes.NewBufferString(`
