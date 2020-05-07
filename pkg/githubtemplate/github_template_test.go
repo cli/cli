@@ -148,9 +148,7 @@ name: Bug Report
 about: This is how you report bugs
 ---
 
-Template contents
----
-More of template
+**Template contents**
 `,
 			args: args{
 				filePath: tmpfile.Name(),
