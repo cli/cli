@@ -1,8 +1,8 @@
 # How we document our command line syntax
 
-## Required arguments
+## Required text
 
-Use plain text
+Use plain text for any part of the command that can not be changed
 
 _*example:*_
 `gh help`
@@ -36,7 +36,7 @@ _*example:*_
 Ellipsis represent arguments that can appear multiple times
 
 _*example:*_
-`gh pr close <numbers … >`
+`gh pr close <numbers>...`
 
 ## Variable naming
 
@@ -44,3 +44,11 @@ For multi-word variables use dash-case (all lower case with words seperated by d
 
 _*example:*_
 `gh pr checkout <issue-number>`
+
+## Complex examples
+
+_*required argument with mutually exclusive optoins:*_
+`gh pr close <{number | url}>`
+
+_*optional argument with mutually exclusive optoins:*_
+`gh pr close [{<number> | <url>}]`
