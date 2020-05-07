@@ -112,26 +112,17 @@ func TestPRReview_number_arg(t *testing.T) {
 }
 
 func TestPRReview_no_arg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
+	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "foobar123",
-			"number": 123,
-			"headRefName": "feature",
-			"headRepositoryOwner": {
-				"login": "hubot"
-			},
-			"headRepository": {
-				"name": "REPO",
-				"defaultBranchRef": {
-					"name": "master"
-				}
-			},
-			"isCrossRepository": false,
-			"maintainerCanModify": false
-		} } } } `))
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
 
 	_, err := RunCommand(`pr review --comment="cool story"`)
@@ -180,26 +171,17 @@ func TestPRReview(t *testing.T) {
 	}
 
 	for _, kase := range cases {
-		initBlankContext("", "OWNER/REPO", "master")
+		initBlankContext("", "OWNER/REPO", "feature")
 		http := initFakeHTTP()
 		http.StubRepoResponse("OWNER", "REPO")
 		http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "foobar123",
-			"number": 123,
-			"headRefName": "feature",
-			"headRepositoryOwner": {
-				"login": "hubot"
-			},
-			"headRepository": {
-				"name": "REPO",
-				"defaultBranchRef": {
-					"name": "master"
-				}
-			},
-			"isCrossRepository": false,
-			"maintainerCanModify": false
-		} } } } `))
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
 		http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
 
 		_, err := RunCommand(kase.Cmd)
