@@ -162,6 +162,26 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	}
 }
 
+func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand("pr status -R OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#8  Blueberries are a good fruit \[blueberries\]`)
+	if expectedLine.MatchString(output.String()) {
+		t.Errorf("output not expected to match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -188,7 +208,7 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
@@ -230,7 +250,7 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
