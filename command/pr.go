@@ -68,13 +68,13 @@ With '--web', open the pull request in a web browser instead.`,
 	RunE: prView,
 }
 var prCloseCmd = &cobra.Command{
-	Use:   "close <number | url>",
+	Use:   "close {<number> | <url> | <branch>}",
 	Short: "Close a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prClose,
 }
 var prReopenCmd = &cobra.Command{
-	Use:   "reopen <number | url>",
+	Use:   "reopen {<number> | <url> | <branch>}",
 	Short: "Reopen a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
