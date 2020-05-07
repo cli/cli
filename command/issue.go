@@ -398,7 +398,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	action := SubmitAction
 
-	interactive := title == "" || body == ""
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
 		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles)
@@ -419,6 +419,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 		if body == "" {
 			body = tb.Body
+		}
+	} else {
+		if title == "" {
+			return fmt.Errorf("title can't be blank")
 		}
 	}
 
