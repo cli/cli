@@ -971,7 +971,7 @@ func TestPrMerge(t *testing.T) {
 
 	r := regexp.MustCompile(`Merged pull request #1`)
 
-	if !r.MatchString(output.Stderr()) {
+	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
@@ -997,7 +997,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 
 	r := regexp.MustCompile(`Merged pull request #10`)
 
-	if !r.MatchString(output.Stderr()) {
+	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
@@ -1015,9 +1015,9 @@ func TestPrMerge_rebase(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Rebased pull request #2`)
+	r := regexp.MustCompile(`Rebased and merged pull request #2`)
 
-	if !r.MatchString(output.Stderr()) {
+	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
@@ -1037,7 +1037,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	r := regexp.MustCompile(`Squashed and merged pull request #3`)
 
-	if !r.MatchString(output.Stderr()) {
+	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
