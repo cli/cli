@@ -2,25 +2,25 @@
 
 ## Required text
 
-Use plain text for any part of the command that can not be changed
+Use plain text for parts of the command that cannot be changed
 
-_*example:*_
+_example:_
 `gh help`
 The argument help is required in this command
 
 ## Placeholder values
 
-Use angled brackets to represent a value the user must supply
+Use angled brackets to represent a value the user must replace
 
-_*example:*_
-`gh pr view <issueNumber>`
+_example:_
+`gh pr view <issue-number>`
 Replace `<issue-number>` with an issue number
 
 ## Optional arguments
 
 Place optional arguments in square brackets
 
-_*example:*_
+_example:_
 `gh pr checkout [--web]`
 The argument `--web` is optional.
 
@@ -28,27 +28,30 @@ The argument `--web` is optional.
 
 Place mutually exclusive arguments inside braces, separate arguments with vertical bars.
 
-_*example:*_
+_example:_
 `gh pr {view | create}`
 
-## Repeatable arguements
+## Repeatable arguments
 
 Ellipsis represent arguments that can appear multiple times
 
-_*example:*_
-`gh pr close <numbers>...`
+_example:_
+`gh pr close <pr-number>...`
 
 ## Variable naming
 
-For multi-word variables use dash-case (all lower case with words seperated by dashes)
+For multi-word variables use dash-case (all lower case with words separated by dashes)
 
-_*example:*_
+_example:_
 `gh pr checkout <issue-number>`
 
-## Complex examples
+## Additional examples
 
-_*required argument with mutually exclusive optoins:*_
-`gh pr close <{number | url}>`
+_optional argument with placeholder:_
+`command sub-command [<arg>]`
 
-_*optional argument with mutually exclusive optoins:*_
-`gh pr close [{<number> | <url>}]`
+_required argument with mutually exclusive options:_
+`command sub-command <{path | string}>`
+
+_optional argument with mutually exclusive options:_
+`command sub-command [{<path> | <string>}]`
