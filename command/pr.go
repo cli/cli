@@ -85,7 +85,7 @@ var prReopenCmd = &cobra.Command{
 }
 
 var prMergeCmd = &cobra.Command{
-	Use:   "merge [number | url] [--rebase | --merge | --squash]",
+	Use:   "merge [{<number> | <url>}] [<flags>]",
 	Short: "Merge a pull request",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prMerge,
