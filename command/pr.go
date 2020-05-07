@@ -61,7 +61,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view <{<number> | <url> | <branch>}>",
+	Use:   "view [{<number> | <url> | <branch>}]",
 	Short: "View a pull request",
 	Long: `Display the title, body, and other information about a pull request.
 
