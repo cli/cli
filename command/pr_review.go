@@ -53,7 +53,7 @@ func processReviewOpt(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	}
 
 	if found != 1 {
-		return nil, errors.New("need exactly one of approve, request-changes, or comment")
+		return nil, errors.New("need exactly one of --approve, --request-changes, or --comment")
 	}
 
 	val, err := cmd.Flags().GetString(flag)

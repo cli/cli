@@ -17,7 +17,7 @@ func TestPRReview_validation(t *testing.T) {
 	} {
 		http.StubRepoResponse("OWNER", "REPO")
 		_, err := RunCommand(cmd)
-		eq(t, err.Error(), "did not understand desired review action: need exactly one of approve, request-changes, or comment")
+		eq(t, err.Error(), "did not understand desired review action: need exactly one of --approve, --request-changes, or --comment")
 	}
 }
 
