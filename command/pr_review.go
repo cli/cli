@@ -89,9 +89,10 @@ func prReview(cmd *cobra.Command, args []string) error {
 	}
 
 	var prNum int
+	branchWithOwner := ""
 
 	if len(args) == 0 {
-		prNum, _, err = prSelectorForCurrentBranch(ctx, baseRepo)
+		prNum, branchWithOwner, err = prSelectorForCurrentBranch(ctx, baseRepo)
 		if err != nil {
 			return fmt.Errorf("could not query for pull request for current branch: %w", err)
 		}
@@ -114,9 +115,17 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	pr, err := api.PullRequestByNumber(apiClient, baseRepo, prNum)
-	if err != nil {
-		return fmt.Errorf("could not find pull request: %w", err)
+	var pr *api.PullRequest
+	if prNum > 0 {
+		pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNum)
+		if err != nil {
+			return fmt.Errorf("could not find pull request: %w", err)
+		}
+	} else {
+		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		if err != nil {
+			return fmt.Errorf("could not find pull request: %w", err)
+		}
 	}
 
 	err = api.AddReview(apiClient, pr, input)
