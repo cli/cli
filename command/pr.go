@@ -451,12 +451,16 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	} else {
-		_, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
 		if err != nil {
 			return err
 		}
 
-		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		if prNumber != 0 {
+			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+		} else {
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		}
 		if err != nil {
 			return err
 		}
