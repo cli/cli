@@ -470,6 +470,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
 				nodes {
+					id
 					number
 					title
 					state
