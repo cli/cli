@@ -815,7 +815,7 @@ func PullRequestSquash(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 
 func merge(client *Client, repo ghrepo.Interface, pr *PullRequest, mergeMethod githubv4.PullRequestMergeMethod) error {
 	var mutation struct {
-		ReopenPullRequest struct {
+		MergePullRequest struct {
 			PullRequest struct {
 				ID githubv4.ID
 			}
