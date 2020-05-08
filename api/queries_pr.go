@@ -28,6 +28,7 @@ type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
 	CurrentPR       *PullRequest
+	DefaultBranch   string
 }
 
 type PullRequestAndTotalCount struct {
@@ -204,6 +205,9 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 
 	type response struct {
 		Repository struct {
+			DefaultBranchRef struct {
+				Name string
+			}
 			PullRequests edges
 			PullRequest  *PullRequest
 		}
@@ -252,6 +256,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
+			defaultBranchRef { name }
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
 				edges {
@@ -266,6 +271,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		queryPrefix = `
 		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
+				defaultBranchRef { name }
 				pullRequest(number: $number) {
 					...prWithReviews
 				}
@@ -345,7 +351,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR: currentPR,
+		CurrentPR:     currentPR,
+		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
 	}
 
 	return &payload, nil

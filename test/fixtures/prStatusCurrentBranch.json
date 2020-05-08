@@ -13,7 +13,7 @@
               "headRefName": "blueberries",
               "isDraft": false,
               "headRepositoryOwner": {
-                "login": "OWNER/REPO"
+                "login": "OWNER"
               },
               "isCrossRepository": false
             }
@@ -27,7 +27,7 @@
               "headRefName": "blueberries",
               "isDraft": false,
               "headRepositoryOwner": {
-                "login": "OWNER/REPO"
+                "login": "OWNER"
               },
               "isCrossRepository": false
             }
@@ -41,7 +41,7 @@
               "headRefName": "blueberries",
               "isDraft": false,
               "headRepositoryOwner": {
-                "login": "OWNER/REPO"
+                "login": "OWNER"
               },
               "isCrossRepository": false
             }

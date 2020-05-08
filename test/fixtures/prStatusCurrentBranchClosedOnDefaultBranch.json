@@ -1,0 +1,29 @@
+{
+  "data": {
+    "repository": {
+      "defaultBranchRef": { "name": "blueberries" },
+      "pullRequests": {
+        "totalCount": 1,
+        "edges": [
+          {
+            "node": {
+              "number": 8,
+              "title": "Blueberries are a good fruit",
+              "state": "CLOSED",
+              "url": "https://github.com/cli/cli/pull/8",
+              "headRefName": "blueberries"
+            }
+          }
+        ]
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 0,
+      "edges": []
+    },
+    "reviewRequested": {
+      "totalCount": 0,
+      "edges": []
+    }
+  }
+}

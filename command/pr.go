@@ -117,17 +117,15 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	printHeader(out, "Current branch")
 	currentPR := prPayload.CurrentPR
 	currentBranch, _ := ctx.Branch()
-	noPRMessage := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
+	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+		currentPR = nil
+	}
 	if currentPR != nil {
-		if baseRepo.(*api.Repository).DefaultBranchRef.Name == currentBranch && currentPR.State != "OPEN" {
-			printMessage(out, noPRMessage)
-		} else {
-			printPrs(out, 0, *currentPR)
-		}
+		printPrs(out, 1, *currentPR)
 	} else if currentPRHeadRef == "" {
 		printMessage(out, "  There is no current branch")
 	} else {
-		printMessage(out, noPRMessage)
+		printMessage(out, fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]")))
 	}
 	fmt.Fprintln(out)
 
