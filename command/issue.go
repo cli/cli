@@ -418,7 +418,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	action := SubmitAction
-	tb := titleBody{
+	tb := issueMetadataState{
 		Assignees: assignees,
 		Labels:    labelNames,
 		Projects:  projectNames,

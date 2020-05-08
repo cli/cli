@@ -14,7 +14,7 @@ import (
 
 type Action int
 
-type titleBody struct {
+type issueMetadataState struct {
 	Body   string
 	Title  string
 	Action Action
@@ -29,7 +29,7 @@ type titleBody struct {
 	MetadataResult *api.RepoMetadataResult
 }
 
-func (tb *titleBody) HasMetadata() bool {
+func (tb *issueMetadataState) HasMetadata() bool {
 	return len(tb.Reviewers) > 0 ||
 		len(tb.Assignees) > 0 ||
 		len(tb.Labels) > 0 ||
@@ -125,7 +125,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, data *titleBody, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers bool) error {
+func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers bool) error {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
 		ctx := contextForCommand(cmd)
