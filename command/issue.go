@@ -87,13 +87,13 @@ With '--web', open the issue in a web browser instead.`,
 	RunE: issueView,
 }
 var issueCloseCmd = &cobra.Command{
-	Use:   "close <numberOrURL>",
+	Use:   "close {<number> | <url>}",
 	Short: "close issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueClose,
 }
 var issueReopenCmd = &cobra.Command{
-	Use:   "reopen <numberOrURL>",
+	Use:   "reopen {<number> | <url>}",
 	Short: "reopen issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueReopen,
@@ -425,7 +425,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		Milestone: milestoneTitle,
 	}
 
-	interactive := title == "" || body == ""
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
 		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false)
@@ -446,6 +446,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 		if body == "" {
 			body = tb.Body
+		}
+	} else {
+		if title == "" {
+			return fmt.Errorf("title can't be blank")
 		}
 	}
 

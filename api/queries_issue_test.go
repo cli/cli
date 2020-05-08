@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/httpmock"
 )
 
 func TestIssueList(t *testing.T) {
-	http := &FakeHTTP{}
+	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
 	http.StubResponse(200, bytes.NewBufferString(`

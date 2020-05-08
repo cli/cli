@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"github.com/cli/cli/pkg/httpmock"
 )
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
@@ -15,7 +17,7 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func TestGraphQL(t *testing.T) {
-	http := &FakeHTTP{}
+	http := &httpmock.Registry{}
 	client := NewClient(
 		ReplaceTripper(http),
 		AddHeader("Authorization", "token OTOKEN"),
@@ -40,7 +42,7 @@ func TestGraphQL(t *testing.T) {
 }
 
 func TestGraphQLError(t *testing.T) {
-	http := &FakeHTTP{}
+	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
 	response := struct{}{}
@@ -52,7 +54,7 @@ func TestGraphQLError(t *testing.T) {
 }
 
 func TestRESTGetDelete(t *testing.T) {
-	http := &FakeHTTP{}
+	http := &httpmock.Registry{}
 
 	client := NewClient(
 		ReplaceTripper(http),

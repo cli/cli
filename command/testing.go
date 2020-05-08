@@ -1,16 +1,19 @@
 package command
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/core"
-
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/httpmock"
+	"github.com/google/shlex"
+	"github.com/spf13/pflag"
 )
 
 const defaultTestConfig = `hosts:
@@ -91,12 +94,65 @@ func initBlankContext(cfg, repo, branch string) {
 	}
 }
 
-func initFakeHTTP() *api.FakeHTTP {
-	http := &api.FakeHTTP{}
+func initFakeHTTP() *httpmock.Registry {
+	http := &httpmock.Registry{}
 	apiClientForContext = func(context.Context) (*api.Client, error) {
 		return api.NewClient(api.ReplaceTripper(http)), nil
 	}
 	return http
+}
+
+type cmdOut struct {
+	outBuf, errBuf *bytes.Buffer
+}
+
+func (c cmdOut) String() string {
+	return c.outBuf.String()
+}
+
+func (c cmdOut) Stderr() string {
+	return c.errBuf.String()
+}
+
+func RunCommand(args string) (*cmdOut, error) {
+	rootCmd := RootCmd
+	rootArgv, err := shlex.Split(args)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd, _, err := rootCmd.Traverse(rootArgv)
+	if err != nil {
+		return nil, err
+	}
+
+	rootCmd.SetArgs(rootArgv)
+
+	outBuf := bytes.Buffer{}
+	cmd.SetOut(&outBuf)
+	errBuf := bytes.Buffer{}
+	cmd.SetErr(&errBuf)
+
+	// Reset flag values so they don't leak between tests
+	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+		switch v := f.Value.(type) {
+		case pflag.SliceValue:
+			_ = v.Replace([]string{})
+		default:
+			switch v.Type() {
+			case "bool", "string", "int":
+				_ = v.Set(f.DefValue)
+			}
+		}
+	})
+
+	_, err = rootCmd.ExecuteC()
+	cmd.SetOut(nil)
+	cmd.SetErr(nil)
+
+	return &cmdOut{&outBuf, &errBuf}, err
 }
 
 type errorStub struct {
