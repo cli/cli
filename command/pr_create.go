@@ -208,8 +208,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		Milestone: milestoneTitle,
 	}
 
-	// TODO: only drop into interactive mode if stdin & stdout are a tty
-	if !isWeb && !autofill && (title == "" || body == "") {
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+
+	if !isWeb && !autofill && interactive {
 		var templateFiles []string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
