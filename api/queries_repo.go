@@ -66,6 +66,16 @@ func (r Repository) ViewerCanPush() bool {
 	}
 }
 
+// ViewerCanTriage is true when the requesting user can triage issues and pull requests
+func (r Repository) ViewerCanTriage() bool {
+	switch r.ViewerPermission {
+	case "ADMIN", "MAINTAIN", "WRITE", "TRIAGE":
+		return true
+	default:
+		return false
+	}
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
@@ -73,6 +83,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			id
 			hasIssuesEnabled
 			description
+			viewerPermission
 		}
 	}`
 	variables := map[string]interface{}{
@@ -584,7 +595,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"projects(states: [OPEN], first: 100, after: $endCursor)"`
+			} `graphql:"projects(states: [OPEN], first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
@@ -672,7 +683,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"labels(first: 100, after: $endCursor)"`
+			} `graphql:"labels(first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 

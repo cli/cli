@@ -38,7 +38,7 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"projects(states: [OPEN], first: 100, after: $endCursor)"`
+			} `graphql:"projects(states: [OPEN], first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
 		} `graphql:"organization(login: $owner)"`
 	}
 
@@ -81,7 +81,7 @@ func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"teams(first: 100, after: $endCursor)"`
+			} `graphql:"teams(first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
 		} `graphql:"organization(login: $owner)"`
 	}
 
