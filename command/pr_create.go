@@ -333,6 +333,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 					Milestones: tb.Milestone != "",
 				}
 
+				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
 				tb.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
 				if err != nil {
 					return err

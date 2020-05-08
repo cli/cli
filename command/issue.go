@@ -478,6 +478,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 					Milestones: tb.Milestone != "",
 				}
 
+				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
 				tb.MetadataResult, err = api.RepoMetadata(apiClient, baseRepo, metadataInput)
 				if err != nil {
 					return err
