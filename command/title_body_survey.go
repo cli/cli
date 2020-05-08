@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -226,7 +227,6 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			return fmt.Errorf("could not prompt: %w", err)
 		}
 
-		// TODO: show spinner while preloading repo metadata
 		metadataInput := api.RepoMetadataInput{
 			Reviewers:  isChosen("Reviewers"),
 			Assignees:  isChosen("Assignees"),
@@ -234,7 +234,10 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			Projects:   isChosen("Projects"),
 			Milestones: isChosen("Milestone"),
 		}
+		s := utils.Spinner(cmd.OutOrStderr())
+		utils.StartSpinner(s)
 		issueState.MetadataResult, err = api.RepoMetadata(apiClient, repo, metadataInput)
+		utils.StopSpinner(s)
 		if err != nil {
 			return fmt.Errorf("error fetching metadata options: %w", err)
 		}
