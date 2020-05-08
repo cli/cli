@@ -249,6 +249,11 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 }
 
 func rootHelpFunc(command *cobra.Command, s []string) {
+	if command != RootCmd {
+		hackyHelp(command)
+		return
+	}
+
 	type helpEntry struct {
 		Title string
 		Body  string
