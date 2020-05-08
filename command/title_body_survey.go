@@ -126,7 +126,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers bool) error {
+func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers, allowMetadata bool) error {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
 		ctx := contextForCommand(cmd)
@@ -192,7 +192,6 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	}
 
 	allowPreview := !issueState.HasMetadata()
-	allowMetadata := true
 	confirmA, err := confirmSubmission(allowPreview, allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
@@ -324,8 +323,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			issueState.Milestone = ""
 		}
 
-		allowPreview := !issueState.HasMetadata()
-		allowMetadata := false
+		allowPreview = !issueState.HasMetadata()
+		allowMetadata = false
 		confirmA, err = confirmSubmission(allowPreview, allowMetadata)
 		if err != nil {
 			return fmt.Errorf("unable to confirm: %w", err)

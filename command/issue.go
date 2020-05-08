@@ -428,7 +428,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false)
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}

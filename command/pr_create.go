@@ -217,7 +217,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
-		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true)
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true, baseRepo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
