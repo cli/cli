@@ -51,7 +51,7 @@ _optional argument with placeholder:_
 `command sub-command [<arg>]`
 
 _required argument with mutually exclusive options:_
-`command sub-command <{path | string}>`
+`command sub-command {<path> | <string> | literal}`
 
 _optional argument with mutually exclusive options:_
-`command sub-command [{<path> | <string>}]`
+`command sub-command [<path> | <string>]`
