@@ -1,6 +1,6 @@
 # How we document our command line syntax
 
-## Required text
+## Literal text
 
 Use plain text for parts of the command that cannot be changed
 
@@ -10,7 +10,7 @@ The argument help is required in this command
 
 ## Placeholder values
 
-Use angled brackets to represent a value the user must replace
+Use angled brackets to represent a value the user must replace. No other expressions can be contained within the angeled brackets.
 
 _example:_
 `gh pr view <issue-number>`
@@ -18,15 +18,18 @@ Replace `<issue-number>` with an issue number
 
 ## Optional arguments
 
-Place optional arguments in square brackets
+Place optional arguments in square brackets. Mutually exclusive arguments can be included inside square brackets if they are separated with vertical bars.
 
 _example:_
 `gh pr checkout [--web]`
 The argument `--web` is optional.
 
-## Mutually exclusive arguments
+`gh pr view [<number> | <url>]`
+The `<number>` and `<url>` arguments are optional.
 
-Place mutually exclusive arguments inside braces, separate arguments with vertical bars.
+## Required mutually exclusive arguments
+
+Place required mutually exclusive arguments inside braces, separate arguments with vertical bars.
 
 _example:_
 `gh pr {view | create}`
