@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Go 1.13
+      - name: Set up Go 1.14
         uses: actions/setup-go@v2-beta
         with:
-          go-version: 1.13
+          go-version: 1.14
 
       - name: Check out code
         uses: actions/checkout@v2
@@ -24,7 +24,7 @@ jobs:
           go mod verify
           go mod download
 
-          LINT_VERSION=1.24.0
+          LINT_VERSION=1.26.0
           curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
             tar xz --strip-components 1 --wildcards \*/golangci-lint
           mkdir -p bin && mv golangci-lint bin/

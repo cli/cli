@@ -11,10 +11,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Set up Go 1.13
+      - name: Set up Go 1.14
         uses: actions/setup-go@v2-beta
         with:
-          go-version: 1.13
+          go-version: 1.14
       - name: Generate changelog
         run: |
           echo ::set-env name=GORELEASER_CURRENT_TAG::${GITHUB_REF#refs/tags/}
