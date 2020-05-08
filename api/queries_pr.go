@@ -130,6 +130,14 @@ type PullRequestReviewStatus struct {
 	ReviewRequired   bool
 }
 
+type PullRequestMergeMethod int
+
+const (
+	PullRequestMergeMethodMerge PullRequestMergeMethod = iota
+	PullRequestMergeMethodRebase
+	PullRequestMergeMethodSquash
+)
+
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
@@ -801,19 +809,15 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 	return err
 }
 
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
-	return merge(client, repo, pr, githubv4.PullRequestMergeMethodMerge)
-}
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+	mergeMethod := githubv4.PullRequestMergeMethodMerge
+	switch m {
+	case PullRequestMergeMethodRebase:
+		mergeMethod = githubv4.PullRequestMergeMethodRebase
+	case PullRequestMergeMethodSquash:
+		mergeMethod = githubv4.PullRequestMergeMethodSquash
+	}
 
-func PullRequestRebase(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
-	return merge(client, repo, pr, githubv4.PullRequestMergeMethodRebase)
-}
-
-func PullRequestSquash(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
-	return merge(client, repo, pr, githubv4.PullRequestMergeMethodSquash)
-}
-
-func merge(client *Client, repo ghrepo.Interface, pr *PullRequest, mergeMethod githubv4.PullRequestMergeMethod) error {
 	var mutation struct {
 		MergePullRequest struct {
 			PullRequest struct {
