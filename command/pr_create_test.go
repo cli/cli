@@ -66,6 +66,141 @@ func TestPRCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 
+func TestPRCreate_metadata(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`\bviewerPermission\b`),
+		httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
+	http.Register(
+		httpmock.GraphQL(`\bforks\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "forks": { "nodes": [
+		] } } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bpullRequests\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+		] } } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "assignableUsers": {
+			"nodes": [
+				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "MonaLisa", "id": "MONAID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\blabels\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "labels": {
+			"nodes": [
+				{ "name": "feature", "id": "FEATUREID" },
+				{ "name": "TODO", "id": "TODOID" },
+				{ "name": "bug", "id": "BUGID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [
+				{ "title": "GA", "id": "GAID" },
+				{ "title": "Big One.oh", "id": "BIGONEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [
+				{ "name": "Cleanup", "id": "CLEANUPID" },
+				{ "name": "Roadmap", "id": "ROADMAPID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "teams": {
+			"nodes": [
+				{ "slug": "owners", "id": "OWNERSID" },
+				{ "slug": "Core", "id": "COREID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bcreatePullRequest\(`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"id": "NEWPULLID",
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["title"], "TITLE")
+			eq(t, inputs["body"], "BODY")
+		}))
+	http.Register(
+		httpmock.GraphQL(`\bupdatePullRequest\(`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "updatePullRequest": {
+			"clientMutationId": ""
+		} } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["pullRequestId"], "NEWPULLID")
+			eq(t, inputs["assigneeIds"], []interface{}{"MONAID"})
+			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
+			eq(t, inputs["milestoneId"], "BIGONEID")
+		}))
+	http.Register(
+		httpmock.GraphQL(`\brequestReviews\(`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "requestReviews": {
+			"clientMutationId": ""
+		} } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["pullRequestId"], "NEWPULLID")
+			eq(t, inputs["userIds"], []interface{}{"HUBOTID"})
+			eq(t, inputs["teamIds"], []interface{}{"COREID"})
+		}))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+
+	output, err := RunCommand(`pr create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r /core`)
+	eq(t, err, nil)
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
 func TestPRCreate_withForking(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
@@ -374,7 +509,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 1,
+			Value: 0,
 		},
 	})
 
@@ -458,7 +593,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 1,
+			Value: 0,
 		},
 	})
 
@@ -602,7 +737,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "confirmation",
-			Value: 0,
+			Value: 1,
 		},
 	})
 

@@ -66,6 +66,16 @@ func (r Repository) ViewerCanPush() bool {
 	}
 }
 
+// ViewerCanTriage is true when the requesting user can triage issues and pull requests
+func (r Repository) ViewerCanTriage() bool {
+	switch r.ViewerPermission {
+	case "ADMIN", "MAINTAIN", "WRITE", "TRIAGE":
+		return true
+	default:
+		return false
+	}
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query($owner: String!, $name: String!) {
@@ -73,6 +83,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			id
 			hasIssuesEnabled
 			description
+			viewerPermission
 		}
 	}`
 	variables := map[string]interface{}{
@@ -386,6 +397,363 @@ func RepositoryReadme(client *Client, fullName string) (string, error) {
 
 	return readmeContent, nil
 
+}
+
+type RepoMetadataResult struct {
+	AssignableUsers []RepoAssignee
+	Labels          []RepoLabel
+	Projects        []RepoProject
+	Milestones      []RepoMilestone
+	Teams           []OrgTeam
+}
+
+func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, assigneeLogin := range names {
+		found := false
+		for _, u := range m.AssignableUsers {
+			if strings.EqualFold(assigneeLogin, u.Login) {
+				ids = append(ids, u.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", assigneeLogin)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) TeamsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, teamSlug := range names {
+		found := false
+		slug := teamSlug[strings.IndexRune(teamSlug, '/')+1:]
+		for _, t := range m.Teams {
+			if strings.EqualFold(slug, t.Slug) {
+				ids = append(ids, t.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", teamSlug)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) LabelsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, labelName := range names {
+		found := false
+		for _, l := range m.Labels {
+			if strings.EqualFold(labelName, l.Name) {
+				ids = append(ids, l.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", labelName)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, error) {
+	var ids []string
+	for _, projectName := range names {
+		found := false
+		for _, p := range m.Projects {
+			if strings.EqualFold(projectName, p.Name) {
+				ids = append(ids, p.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", projectName)
+		}
+	}
+	return ids, nil
+}
+
+func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
+	for _, m := range m.Milestones {
+		if strings.EqualFold(title, m.Title) {
+			return m.ID, nil
+		}
+	}
+	return "", errors.New("not found")
+}
+
+type RepoMetadataInput struct {
+	Assignees  bool
+	Reviewers  bool
+	Labels     bool
+	Projects   bool
+	Milestones bool
+}
+
+// RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
+func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
+	result := RepoMetadataResult{}
+	errc := make(chan error)
+	count := 0
+
+	if input.Assignees || input.Reviewers {
+		count++
+		go func() {
+			users, err := RepoAssignableUsers(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching assignees: %w", err)
+			}
+			result.AssignableUsers = users
+			errc <- err
+		}()
+	}
+	if input.Reviewers {
+		count++
+		go func() {
+			teams, err := OrganizationTeams(client, repo.RepoOwner())
+			// TODO: better detection of non-org repos
+			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+				errc <- fmt.Errorf("error fetching organization teams: %w", err)
+				return
+			}
+			result.Teams = teams
+			errc <- nil
+		}()
+	}
+	if input.Labels {
+		count++
+		go func() {
+			labels, err := RepoLabels(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching labels: %w", err)
+			}
+			result.Labels = labels
+			errc <- err
+		}()
+	}
+	if input.Projects {
+		count++
+		go func() {
+			projects, err := RepoProjects(client, repo)
+			if err != nil {
+				errc <- fmt.Errorf("error fetching projects: %w", err)
+				return
+			}
+			result.Projects = projects
+
+			orgProjects, err := OrganizationProjects(client, repo.RepoOwner())
+			// TODO: better detection of non-org repos
+			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+				errc <- fmt.Errorf("error fetching organization projects: %w", err)
+				return
+			}
+			result.Projects = append(result.Projects, orgProjects...)
+			errc <- nil
+		}()
+	}
+	if input.Milestones {
+		count++
+		go func() {
+			milestones, err := RepoMilestones(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching milestones: %w", err)
+			}
+			result.Milestones = milestones
+			errc <- err
+		}()
+	}
+
+	var err error
+	for i := 0; i < count; i++ {
+		if e := <-errc; e != nil {
+			err = e
+		}
+	}
+
+	return &result, err
+}
+
+type RepoProject struct {
+	ID   string
+	Name string
+}
+
+// RepoProjects fetches all open projects for a repository
+func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
+	var query struct {
+		Repository struct {
+			Projects struct {
+				Nodes    []RepoProject
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projects(states: [OPEN], first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var projects []RepoProject
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, query.Repository.Projects.Nodes...)
+		if !query.Repository.Projects.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.Projects.PageInfo.EndCursor)
+	}
+
+	return projects, nil
+}
+
+type RepoAssignee struct {
+	ID    string
+	Login string
+}
+
+// RepoAssignableUsers fetches all the assignable users for a repository
+func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
+	var query struct {
+		Repository struct {
+			AssignableUsers struct {
+				Nodes    []RepoAssignee
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"assignableUsers(first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var users []RepoAssignee
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, query.Repository.AssignableUsers.Nodes...)
+		if !query.Repository.AssignableUsers.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.AssignableUsers.PageInfo.EndCursor)
+	}
+
+	return users, nil
+}
+
+type RepoLabel struct {
+	ID   string
+	Name string
+}
+
+// RepoLabels fetches all the labels in a repository
+func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
+	var query struct {
+		Repository struct {
+			Labels struct {
+				Nodes    []RepoLabel
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"labels(first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var labels []RepoLabel
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		labels = append(labels, query.Repository.Labels.Nodes...)
+		if !query.Repository.Labels.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.Labels.PageInfo.EndCursor)
+	}
+
+	return labels, nil
+}
+
+type RepoMilestone struct {
+	ID    string
+	Title string
+}
+
+// RepoMilestones fetches all open milestones in a repository
+func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, error) {
+	var query struct {
+		Repository struct {
+			Milestones struct {
+				Nodes    []RepoMilestone
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"milestones(states: [OPEN], first: 100, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	var milestones []RepoMilestone
+	for {
+		err := v4.Query(context.Background(), &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		milestones = append(milestones, query.Repository.Milestones.Nodes...)
+		if !query.Repository.Milestones.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.Milestones.PageInfo.EndCursor)
+	}
+
+	return milestones, nil
 }
 
 func isMarkdownFile(filename string) bool {

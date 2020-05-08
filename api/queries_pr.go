@@ -586,6 +586,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		mutation CreatePullRequest($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
 				pullRequest {
+					id
 					url
 				}
 			}
@@ -595,7 +596,10 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "title", "body", "draft", "baseRefName", "headRefName":
+			inputParams[key] = val
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -611,8 +615,70 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	if err != nil {
 		return nil, err
 	}
+	pr := &result.CreatePullRequest.PullRequest
 
-	return &result.CreatePullRequest.PullRequest, nil
+	// metadata parameters aren't currently available in `createPullRequest`,
+	// but they are in `updatePullRequest`
+	updateParams := make(map[string]interface{})
+	for key, val := range params {
+		switch key {
+		case "assigneeIds", "labelIds", "projectIds", "milestoneId":
+			if !isBlank(val) {
+				updateParams[key] = val
+			}
+		}
+	}
+	if len(updateParams) > 0 {
+		updateQuery := `
+		mutation UpdatePullRequest($input: UpdatePullRequestInput!) {
+			updatePullRequest(input: $input) { clientMutationId }
+		}`
+		updateParams["pullRequestId"] = pr.ID
+		variables := map[string]interface{}{
+			"input": updateParams,
+		}
+		err := client.GraphQL(updateQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// reviewers are requested in yet another additional mutation
+	reviewParams := make(map[string]interface{})
+	if ids, ok := params["userReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["userIds"] = ids
+	}
+	if ids, ok := params["teamReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["teamIds"] = ids
+	}
+
+	if len(reviewParams) > 0 {
+		reviewQuery := `
+		mutation RequestReviews($input: RequestReviewsInput!) {
+			requestReviews(input: $input) { clientMutationId }
+		}`
+		reviewParams["pullRequestId"] = pr.ID
+		variables := map[string]interface{}{
+			"input": reviewParams,
+		}
+		err := client.GraphQL(reviewQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pr, nil
+}
+
+func isBlank(v interface{}) bool {
+	switch vv := v.(type) {
+	case string:
+		return vv == ""
+	case []string:
+		return len(vv) == 0
+	default:
+		return true
+	}
 }
 
 func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
