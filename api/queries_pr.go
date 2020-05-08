@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/shurcooL/githubv4"
 
@@ -86,6 +85,7 @@ type PullRequest struct {
 			RequestedReviewer struct {
 				TypeName string `json:"__typename"`
 				Login    string
+				Name     string
 			}
 		}
 		TotalCount int
@@ -95,9 +95,7 @@ type PullRequest struct {
 			Author struct {
 				Login string
 			}
-			State       string
-			CreatedAt   time.Time
-			PublishedAt time.Time
+			State string
 		}
 	}
 	Assignees struct {
@@ -403,6 +401,9 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 							...on User {
 								login
 							}
+							...on Team {
+								name
+							}
 						}
 					}
 					totalCount
@@ -413,8 +414,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 						  login
 						}
 						state
-						createdAt
-						publishedAt
 					}
 					totalCount
 				}
@@ -503,6 +502,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 								...on User {
 									login
 								}
+								...on Team {
+									name
+								}
 							}
 						}
 						totalCount
@@ -513,8 +515,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 							  login
 							}
 							state
-							createdAt
-							publishedAt
 						}
 						totalCount
 					}
