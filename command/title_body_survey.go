@@ -125,7 +125,7 @@ func selectTemplate(templatePaths []string) (string, error) {
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers bool) error {
+func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers bool) error {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
 		ctx := contextForCommand(cmd)
@@ -136,7 +136,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 		editorCommand, _ = cfg.Get(defaultHostname, "editor")
 	}
 
-	data.Title = defs.Title
+	issueState.Title = defs.Title
 	templateContents := ""
 
 	if providedBody == "" {
@@ -146,9 +146,9 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 			if err != nil {
 				return err
 			}
-			data.Body = templateContents
+			issueState.Body = templateContents
 		} else {
-			data.Body = defs.Body
+			issueState.Body = defs.Body
 		}
 	}
 
@@ -156,7 +156,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 		Name: "title",
 		Prompt: &survey.Input{
 			Message: "Title",
-			Default: data.Title,
+			Default: issueState.Title,
 		},
 	}
 	bodyQuestion := &survey.Question{
@@ -166,7 +166,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 			Editor: &survey.Editor{
 				Message:       "Body",
 				FileName:      "*.md",
-				Default:       data.Body,
+				Default:       issueState.Body,
 				HideDefault:   true,
 				AppendDefault: true,
 			},
@@ -181,23 +181,23 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 		qs = append(qs, bodyQuestion)
 	}
 
-	err := SurveyAsk(qs, data)
+	err := SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
-	if data.Body == "" {
-		data.Body = templateContents
+	if issueState.Body == "" {
+		issueState.Body = templateContents
 	}
 
-	confirmA, err := confirmSubmission(!data.HasMetadata(), true)
+	confirmA, err := confirmSubmission(!issueState.HasMetadata(), true)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
 
 	if confirmA == MetadataAction {
 		isChosen := func(m string) bool {
-			for _, c := range data.Metadata {
+			for _, c := range issueState.Metadata {
 				if m == c {
 					return true
 				}
@@ -219,7 +219,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 					Options: extraFieldsOptions,
 				},
 			},
-		}, data)
+		}, issueState)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
@@ -232,29 +232,29 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 			Projects:   isChosen("Projects"),
 			Milestones: isChosen("Milestone"),
 		}
-		data.MetadataResult, err = api.RepoMetadata(apiClient, repo, metadataInput)
+		issueState.MetadataResult, err = api.RepoMetadata(apiClient, repo, metadataInput)
 		if err != nil {
 			return fmt.Errorf("error fetching metadata options: %w", err)
 		}
 
 		var users []string
-		for _, u := range data.MetadataResult.AssignableUsers {
+		for _, u := range issueState.MetadataResult.AssignableUsers {
 			users = append(users, u.Login)
 		}
 		var teams []string
-		for _, t := range data.MetadataResult.Teams {
+		for _, t := range issueState.MetadataResult.Teams {
 			teams = append(teams, fmt.Sprintf("%s/%s", repo.RepoOwner(), t.Slug))
 		}
 		var labels []string
-		for _, l := range data.MetadataResult.Labels {
+		for _, l := range issueState.MetadataResult.Labels {
 			labels = append(labels, l.Name)
 		}
 		var projects []string
-		for _, l := range data.MetadataResult.Projects {
+		for _, l := range issueState.MetadataResult.Projects {
 			projects = append(projects, l.Name)
 		}
 		milestones := []string{"(none)"}
-		for _, m := range data.MetadataResult.Milestones {
+		for _, m := range issueState.MetadataResult.Milestones {
 			milestones = append(milestones, m.Title)
 		}
 
@@ -265,7 +265,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 				Prompt: &survey.MultiSelect{
 					Message: "Reviewers",
 					Options: append(users, teams...),
-					Default: data.Reviewers,
+					Default: issueState.Reviewers,
 				},
 			})
 		}
@@ -275,7 +275,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 				Prompt: &survey.MultiSelect{
 					Message: "Assignees",
 					Options: users,
-					Default: data.Assignees,
+					Default: issueState.Assignees,
 				},
 			})
 		}
@@ -285,7 +285,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 				Prompt: &survey.MultiSelect{
 					Message: "Labels",
 					Options: labels,
-					Default: data.Labels,
+					Default: issueState.Labels,
 				},
 			})
 		}
@@ -295,7 +295,7 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 				Prompt: &survey.MultiSelect{
 					Message: "Projects",
 					Options: projects,
-					Default: data.Projects,
+					Default: issueState.Projects,
 				},
 			})
 		}
@@ -305,26 +305,26 @@ func titleBodySurvey(cmd *cobra.Command, data *issueMetadataState, apiClient *ap
 				Prompt: &survey.Select{
 					Message: "Milestone",
 					Options: milestones,
-					Default: data.Milestone,
+					Default: issueState.Milestone,
 				},
 			})
 		}
 
-		err = SurveyAsk(mqs, data, survey.WithKeepFilter(true))
+		err = SurveyAsk(mqs, issueState, survey.WithKeepFilter(true))
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
 
-		if data.Milestone == "(none)" {
-			data.Milestone = ""
+		if issueState.Milestone == "(none)" {
+			issueState.Milestone = ""
 		}
 
-		confirmA, err = confirmSubmission(!data.HasMetadata(), false)
+		confirmA, err = confirmSubmission(!issueState.HasMetadata(), false)
 		if err != nil {
 			return fmt.Errorf("unable to confirm: %w", err)
 		}
 	}
 
-	data.Action = confirmA
+	issueState.Action = confirmA
 	return nil
 }
