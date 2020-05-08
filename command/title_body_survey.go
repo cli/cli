@@ -190,7 +190,9 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		issueState.Body = templateContents
 	}
 
-	confirmA, err := confirmSubmission(!issueState.HasMetadata(), true)
+	allowPreview := !issueState.HasMetadata()
+	allowMetadata := true
+	confirmA, err := confirmSubmission(allowPreview, allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -319,7 +321,9 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			issueState.Milestone = ""
 		}
 
-		confirmA, err = confirmSubmission(!issueState.HasMetadata(), false)
+		allowPreview := !issueState.HasMetadata()
+		allowMetadata := false
+		confirmA, err = confirmSubmission(allowPreview, allowMetadata)
 		if err != nil {
 			return fmt.Errorf("unable to confirm: %w", err)
 		}
