@@ -24,7 +24,7 @@ func TestIssueStatus(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(issueStatusCmd, "issue status")
+	output, err := RunCommand("issue status")
 	if err != nil {
 		t.Errorf("error running command `issue status`: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	} } }
 	`))
 
-	output, err := RunCommand(issueStatusCmd, "issue status")
+	output, err := RunCommand("issue status")
 	if err != nil {
 		t.Errorf("error running command `issue status`: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	} } }
 	`))
 
-	_, err := RunCommand(issueStatusCmd, "issue status")
+	_, err := RunCommand("issue status")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue status`: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestIssueList(t *testing.T) {
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
-	output, err := RunCommand(issueListCmd, "issue list")
+	output, err := RunCommand("issue list")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestIssueList_withFlags(t *testing.T) {
 	} } }
 	`))
 
-	output, err := RunCommand(issueListCmd, "issue list -a probablyCher -l web,bug -s open -A foo")
+	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 	} } }
 	`))
 
-	_, err := RunCommand(issueListCmd, "issue list")
+	_, err := RunCommand("issue list")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestIssueList_disabledIssues(t *testing.T) {
 	} } }
 	`))
 
-	_, err := RunCommand(issueListCmd, "issue list")
+	_, err := RunCommand("issue list")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestIssueView_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view -w 123")
+	output, err := RunCommand("issue view -w 123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view -w \"#123\"")
+	output, err := RunCommand("issue view -w \"#123\"")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestIssueView_Preview(t *testing.T) {
 			defer jsonFile.Close()
 			http.StubResponse(200, jsonFile)
 
-			output, err := RunCommand(issueViewCmd, tc.command)
+			output, err := RunCommand(tc.command)
 			if err != nil {
 				t.Errorf("error running command `%v`: %v", tc.command, err)
 			}
@@ -379,7 +379,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	_, err := RunCommand(issueViewCmd, "issue view -w 9999")
+	_, err := RunCommand("issue view -w 9999")
 	if err == nil || err.Error() != "graphql error: 'Could not resolve to an Issue with the number of 9999.'" {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestIssueView_disabledIssues(t *testing.T) {
 		} } }
 	`))
 
-	_, err := RunCommand(issueViewCmd, `issue view 6666`)
+	_, err := RunCommand(`issue view 6666`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueViewCmd, "issue view -w https://github.com/OWNER/REPO/issues/123")
+	output, err := RunCommand("issue view -w https://github.com/OWNER/REPO/issues/123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestIssueCreate(t *testing.T) {
 		} } } }
 	`))
 
-	output, err := RunCommand(issueCreateCmd, `issue create -t hello -b "cash rules everything around me"`)
+	output, err := RunCommand(`issue create -t hello -b "cash rules everything around me"`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -493,7 +493,7 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 		} } }
 	`))
 
-	_, err := RunCommand(issueCreateCmd, `issue create -t heres -b johnny`)
+	_, err := RunCommand(`issue create -t heres -b johnny`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestIssueCreate_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueCreateCmd, `issue create --web`)
+	output, err := RunCommand(`issue create --web`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -537,7 +537,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(issueCreateCmd, `issue create -w -t mytitle -b mybody`)
+	output, err := RunCommand(`issue create -w -t mytitle -b mybody`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -695,7 +695,7 @@ func TestIssueClose(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(issueCloseCmd, "issue close 13")
+	output, err := RunCommand("issue close 13")
 	if err != nil {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
@@ -721,7 +721,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(issueCloseCmd, "issue close 13")
+	output, err := RunCommand("issue close 13")
 	if err != nil {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
@@ -744,7 +744,7 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 	} } }
 	`))
 
-	_, err := RunCommand(issueCloseCmd, "issue close 13")
+	_, err := RunCommand("issue close 13")
 	if err == nil {
 		t.Fatalf("expected error when issues are disabled")
 	}
@@ -768,7 +768,7 @@ func TestIssueReopen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	output, err := RunCommand("issue reopen 2")
 	if err != nil {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
@@ -794,7 +794,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
-	output, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	output, err := RunCommand("issue reopen 2")
 	if err != nil {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
@@ -817,7 +817,7 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	} } }
 	`))
 
-	_, err := RunCommand(issueReopenCmd, "issue reopen 2")
+	_, err := RunCommand("issue reopen 2")
 	if err == nil {
 		t.Fatalf("expected error when issues are disabled")
 	}

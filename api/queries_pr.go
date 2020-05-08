@@ -1,12 +1,28 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/shurcooL/githubv4"
+
 	"github.com/cli/cli/internal/ghrepo"
 )
+
+type PullRequestReviewState int
+
+const (
+	ReviewApprove PullRequestReviewState = iota
+	ReviewRequestChanges
+	ReviewComment
+)
+
+type PullRequestReviewInput struct {
+	Body  string
+	State PullRequestReviewState
+}
 
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
@@ -24,6 +40,7 @@ type PullRequest struct {
 	Number      int
 	Title       string
 	State       string
+	Closed      bool
 	URL         string
 	BaseRefName string
 	HeadRefName string
@@ -345,10 +362,12 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	query($owner: String!, $repo: String!, $pr_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pr_number) {
+				id
 				url
 				number
 				title
 				state
+				closed
 				body
 				author {
 				  login
@@ -451,6 +470,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
 				nodes {
+					id
 					number
 					title
 					state
@@ -654,6 +674,34 @@ func isBlank(v interface{}) bool {
 	}
 }
 
+func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
+	var mutation struct {
+		AddPullRequestReview struct {
+			ClientMutationID string
+		} `graphql:"addPullRequestReview(input:$input)"`
+	}
+
+	state := githubv4.PullRequestReviewEventComment
+	switch input.State {
+	case ReviewApprove:
+		state = githubv4.PullRequestReviewEventApprove
+	case ReviewRequestChanges:
+		state = githubv4.PullRequestReviewEventRequestChanges
+	}
+
+	body := githubv4.String(input.Body)
+
+	gqlInput := githubv4.AddPullRequestReviewInput{
+		PullRequestID: pr.ID,
+		Event:         &state,
+		Body:          &body,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	return v4.Mutate(context.Background(), &mutation, gqlInput, nil)
+}
+
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
 	type prBlock struct {
 		Edges []struct {
@@ -820,6 +868,44 @@ loop:
 	}
 	res.PullRequests = prs
 	return &res, nil
+}
+
+func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ClosePullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"closePullRequest(input: $input)"`
+	}
+
+	input := githubv4.ClosePullRequestInput{
+		PullRequestID: pr.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
+func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ReopenPullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenPullRequest(input: $input)"`
+	}
+
+	input := githubv4.ReopenPullRequestInput{
+		PullRequestID: pr.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
 }
 
 func min(a, b int) int {

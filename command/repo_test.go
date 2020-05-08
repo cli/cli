@@ -42,7 +42,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	output, err := RunCommand(repoForkCmd, "repo fork --remote=false")
+	output, err := RunCommand("repo fork --remote=false")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestRepoFork_reuseRemote(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	output, err := RunCommand(repoForkCmd, "repo fork")
+	output, err := RunCommand("repo fork")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestRepoFork_in_parent(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
 
-	output, err := RunCommand(repoForkCmd, "repo fork --remote=false")
+	output, err := RunCommand("repo fork --remote=false")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestRepoFork_outside(t *testing.T) {
 			http := initFakeHTTP()
 			defer http.StubWithFixture(200, "forkResult.json")()
 
-			output, err := RunCommand(repoForkCmd, tt.args)
+			output, err := RunCommand(tt.args)
 			if err != nil {
 				t.Errorf("error running command `repo fork`: %v", err)
 			}
@@ -162,7 +162,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	output, err := RunCommand(repoForkCmd, "repo fork --remote")
+	output, err := RunCommand("repo fork --remote")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	cs.Stub("") // git clone
 	cs.Stub("") // git remote add
 
-	output, err := RunCommand(repoForkCmd, "repo fork --clone OWNER/REPO")
+	output, err := RunCommand("repo fork --clone OWNER/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	}
 	defer func() { Confirm = oldConfirm }()
 
-	output, err := RunCommand(repoForkCmd, "repo fork OWNER/REPO")
+	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	}
 	defer func() { Confirm = oldConfirm }()
 
-	output, err := RunCommand(repoForkCmd, "repo fork OWNER/REPO")
+	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	}
 	defer func() { Confirm = oldConfirm }()
 
-	output, err := RunCommand(repoForkCmd, "repo fork")
+	output, err := RunCommand("repo fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	}
 	defer func() { Confirm = oldConfirm }()
 
-	output, err := RunCommand(repoForkCmd, "repo fork")
+	output, err := RunCommand("repo fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -469,7 +469,7 @@ func TestRepoClone(t *testing.T) {
 
 			cs.Stub("") // git clone
 
-			output, err := RunCommand(repoCloneCmd, tt.args)
+			output, err := RunCommand(tt.args)
 			if err != nil {
 				t.Fatalf("error running command `repo clone`: %v", err)
 			}
@@ -499,7 +499,7 @@ func TestRepoClone_hasParent(t *testing.T) {
 	cs.Stub("") // git clone
 	cs.Stub("") // git remote add
 
-	_, err := RunCommand(repoCloneCmd, "repo clone OWNER/REPO")
+	_, err := RunCommand("repo clone OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}
@@ -536,7 +536,7 @@ func TestRepoCreate(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoCreateCmd, "repo create REPO")
+	output, err := RunCommand("repo create REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -605,7 +605,7 @@ func TestRepoCreate_org(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoCreateCmd, "repo create ORG/REPO")
+	output, err := RunCommand("repo create ORG/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -674,7 +674,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoCreateCmd, "repo create ORG/REPO --team monkeys")
+	output, err := RunCommand("repo create ORG/REPO --team monkeys")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -725,7 +725,7 @@ func TestRepoView_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view -w")
+	output, err := RunCommand("repo view -w")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -758,7 +758,7 @@ func TestRepoView_web_ownerRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view -w cli/cli")
+	output, err := RunCommand("repo view -w cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -790,7 +790,7 @@ func TestRepoView_web_fullURL(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(repoViewCmd, "repo view -w https://github.com/cli/cli")
+	output, err := RunCommand("repo view -w https://github.com/cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -820,7 +820,7 @@ func TestRepoView(t *testing.T) {
 		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
 	`))
 
-	output, err := RunCommand(repoViewCmd, "repo view")
+	output, err := RunCommand("repo view")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -848,7 +848,7 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
 	`))
 
-	output, err := RunCommand(repoViewCmd, "repo view")
+	output, err := RunCommand("repo view")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}
@@ -867,7 +867,7 @@ func TestRepoView_blanks(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString("{}"))
 	http.StubResponse(200, bytes.NewBufferString("{}"))
 
-	output, err := RunCommand(repoViewCmd, "repo view")
+	output, err := RunCommand("repo view")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
 	}

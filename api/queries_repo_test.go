@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"testing"
+
+	"github.com/cli/cli/pkg/httpmock"
 )
 
 func Test_RepoCreate(t *testing.T) {
-	http := &FakeHTTP{}
+	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
 	http.StubResponse(200, bytes.NewBufferString(`{}`))

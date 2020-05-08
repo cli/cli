@@ -55,7 +55,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -107,7 +107,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OWNER/REPO/pull/123/files`)
+	output, err := RunCommand(`pr checkout https://github.com/OWNER/REPO/pull/123/files`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -156,7 +156,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OTHER/POE/pull/123/files`)
+	output, err := RunCommand(`pr checkout https://github.com/OTHER/POE/pull/123/files`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -219,7 +219,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout hubot:feature`)
+	output, err := RunCommand(`pr checkout hubot:feature`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -269,7 +269,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -322,7 +322,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -375,7 +375,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -428,7 +428,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -479,7 +479,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -530,7 +530,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 

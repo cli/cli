@@ -17,7 +17,7 @@ editor: ed
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	output, err := RunCommand(configGetCmd, "config get editor")
+	output, err := RunCommand("config get editor")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
@@ -27,7 +27,7 @@ editor: ed
 
 func TestConfigGet_default(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
-	output, err := RunCommand(configGetCmd, "config get git_protocol")
+	output, err := RunCommand("config get git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get git_protocol`: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestConfigGet_default(t *testing.T) {
 func TestConfigGet_not_found(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 
-	output, err := RunCommand(configGetCmd, "config get missing")
+	output, err := RunCommand("config get missing")
 	if err != nil {
 		t.Fatalf("error running command `config get missing`: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestConfigSet(t *testing.T) {
 
 	buf := bytes.NewBufferString("")
 	defer config.StubWriteConfig(buf)()
-	output, err := RunCommand(configSetCmd, "config set editor ed")
+	output, err := RunCommand("config set editor ed")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
 	}
@@ -82,7 +82,7 @@ editor: ed
 	buf := bytes.NewBufferString("")
 	defer config.StubWriteConfig(buf)()
 
-	output, err := RunCommand(configSetCmd, "config set editor vim")
+	output, err := RunCommand("config set editor vim")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
@@ -110,7 +110,7 @@ git_protocol: https
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	output, err := RunCommand(configGetCmd, "config get -hgithub.com git_protocol")
+	output, err := RunCommand("config get -hgithub.com git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
@@ -130,7 +130,7 @@ git_protocol: ssh
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	output, err := RunCommand(configGetCmd, "config get -hgithub.com git_protocol")
+	output, err := RunCommand("config get -hgithub.com git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get -hgithub.com git_protocol`: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestConfigSetHost(t *testing.T) {
 
 	buf := bytes.NewBufferString("")
 	defer config.StubWriteConfig(buf)()
-	output, err := RunCommand(configSetCmd, "config set -hgithub.com git_protocol ssh")
+	output, err := RunCommand("config set -hgithub.com git_protocol ssh")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
 	}
@@ -174,7 +174,7 @@ hosts:
 	buf := bytes.NewBufferString("")
 	defer config.StubWriteConfig(buf)()
 
-	output, err := RunCommand(configSetCmd, "config set -hgithub.com git_protocol https")
+	output, err := RunCommand("config set -hgithub.com git_protocol https")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
