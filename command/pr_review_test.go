@@ -13,7 +13,7 @@ func TestPRReview_validation(t *testing.T) {
 	for _, cmd := range []string{
 		`pr review 123`,
 		`pr review --approve --comment 123`,
-		`pr review --approve="cool" --comment="rad" 123`,
+		`pr review --approve --comment -b"hey" 123`,
 	} {
 		http.StubRepoResponse("OWNER", "REPO")
 		_, err := RunCommand(cmd)
@@ -89,7 +89,7 @@ func TestPRReview_number_arg(t *testing.T) {
 		} } } } `))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
 
-	_, err := RunCommand("pr review --request-changes 123")
+	_, err := RunCommand("pr review --approve 123")
 	if err != nil {
 		t.Fatalf("error running pr review: %s", err)
 	}
@@ -107,7 +107,7 @@ func TestPRReview_number_arg(t *testing.T) {
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Variables.Input.PullRequestID, "foobar123")
-	eq(t, reqBody.Variables.Input.Event, "REQUEST_CHANGES")
+	eq(t, reqBody.Variables.Input.Event, "APPROVE")
 	eq(t, reqBody.Variables.Input.Body, "")
 }
 
@@ -121,11 +121,10 @@ func TestPRReview_no_arg(t *testing.T) {
 			  "id": "foobar123",
 			  "headRefName": "feature",
 				"baseRefName": "master" }
-		] } } } }
-	`))
+		] } } } }`))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
 
-	_, err := RunCommand(`pr review --comment="cool story"`)
+	_, err := RunCommand(`pr review --comment -b "cool story"`)
 	if err != nil {
 		t.Fatalf("error running pr review: %s", err)
 	}
@@ -153,7 +152,16 @@ func TestPRReview_blank_comment(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 
 	_, err := RunCommand(`pr review --comment 123`)
-	eq(t, err.Error(), "did not understand desired review action: cannot leave blank comment")
+	eq(t, err.Error(), "did not understand desired review action: body cannot be blank for comment review")
+}
+
+func TestPRReview_blank_request_changes(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	_, err := RunCommand(`pr review -r 123`)
+	eq(t, err.Error(), "did not understand desired review action: body cannot be blank for request-changes review")
 }
 
 func TestPRReview(t *testing.T) {
@@ -163,11 +171,10 @@ func TestPRReview(t *testing.T) {
 		ExpectedBody  string
 	}
 	cases := []c{
-		c{`pr review --request-changes="bad"`, "REQUEST_CHANGES", "bad"},
-		c{`pr review --request-changes`, "REQUEST_CHANGES", ""},
+		c{`pr review --request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
 		c{`pr review --approve`, "APPROVE", ""},
-		c{`pr review --approve="hot damn"`, "APPROVE", "hot damn"},
-		c{`pr review --comment="i donno"`, "COMMENT", "i donno"},
+		c{`pr review --approve -b"hot damn"`, "APPROVE", "hot damn"},
+		c{`pr review --comment --body "i donno"`, "COMMENT", "i donno"},
 	}
 
 	for _, kase := range cases {
