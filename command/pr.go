@@ -61,7 +61,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [{<number> | <url> | <branch>}]",
+	Use:   "view [<number> | <url> | <branch>]",
 	Short: "View a pull request",
 	Long: `Display the title, body, and other information about a pull request.
 
@@ -72,20 +72,20 @@ With '--web', open the pull request in a web browser instead.`,
 	RunE: prView,
 }
 var prCloseCmd = &cobra.Command{
-	Use:   "close <number | url>",
+	Use:   "close {<number> | <url> | <branch>}",
 	Short: "Close a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prClose,
 }
 var prReopenCmd = &cobra.Command{
-	Use:   "reopen <number | url>",
+	Use:   "reopen {<number> | <url> | <branch>}",
 	Short: "Reopen a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
 }
 
 var prMergeCmd = &cobra.Command{
-	Use:   "merge [{<number> | <url>}] [<flags>]",
+	Use:   "merge [<number> | <url> | <branch>]",
 	Short: "Merge a pull request",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prMerge,
