@@ -17,8 +17,6 @@ import (
 	"github.com/cli/cli/utils"
 )
 
-var isWindows bool
-
 var thankYou = `
      _                    _
     | |                  | |
@@ -37,9 +35,6 @@ _|_ | |     __,   _  _   | |           __
 `
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
-	isWindows = runtime.GOOS == "windows"
-
 	RootCmd.AddCommand(creditsCmd)
 
 	creditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
@@ -54,7 +49,7 @@ Examples:
 
   gh credits            # see a credits animation for this project
   gh credits owner/repo # see a credits animation for owner/repo
-  gh credts -s          # display a static thank you instead of animating
+  gh credits -s         # display a non-animated thank you
   gh credits | cat      # just print the contributors, one per line
 `,
 	Args: cobra.MaximumNArgs(1),
@@ -62,6 +57,7 @@ Examples:
 }
 
 func credits(cmd *cobra.Command, args []string) error {
+	isWindows := runtime.GOOS == "windows"
 	ctx := contextForCommand(cmd)
 	client, err := apiClientForContext(ctx)
 	if err != nil {
@@ -126,6 +122,8 @@ func credits(cmd *cobra.Command, args []string) error {
 	if !isTTY || static {
 		return nil
 	}
+
+	rand.Seed(time.Now().UnixNano())
 
 	lines := []string{}
 
