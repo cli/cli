@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 )
 
@@ -408,20 +409,27 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "forks": { "nodes": [
-	] } } } }
+	defer http.Verify(t)
+	http.Register(httpmock.GraphQL(`\bviewerPermission\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
+	http.Register(httpmock.GraphQL(`\bforks\(`), httpmock.StringResponse(`
+		{ "data": { "repository": { "forks": { "nodes": [
+		] } } } }
 	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`\bpullRequests\(`), httpmock.StringResponse(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
 	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`\bcreatePullRequest\(`), httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
-	`))
+	`, func(inputs map[string]interface{}) {
+		eq(t, inputs["repositoryId"], "REPOID")
+		eq(t, inputs["title"], "the sky above the port")
+		eq(t, inputs["body"], "was the color of a television, turned to a dead channel")
+		eq(t, inputs["baseRefName"], "master")
+		eq(t, inputs["headRefName"], "feature")
+	}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -456,29 +464,6 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 
 	output, err := RunCommand(`pr create`)
 	eq(t, err, nil)
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-				BaseRefName  string
-				HeadRefName  string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	expectedBody := "was the color of a television, turned to a dead channel"
-
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "the sky above the port")
-	eq(t, reqBody.Variables.Input.Body, expectedBody)
-	eq(t, reqBody.Variables.Input.BaseRefName, "master")
-	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
-
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 

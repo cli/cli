@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/pkg/httpmock"
 )
 
 func TestCheckForUpdate(t *testing.T) {
@@ -51,7 +52,7 @@ func TestCheckForUpdate(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.Name, func(t *testing.T) {
-			http := &api.FakeHTTP{}
+			http := &httpmock.Registry{}
 			client := api.NewClient(api.ReplaceTripper(http))
 			http.StubResponse(200, bytes.NewBufferString(fmt.Sprintf(`{
 				"tag_name": "%s",

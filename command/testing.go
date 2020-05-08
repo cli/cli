@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/google/shlex"
 	"github.com/spf13/pflag"
 )
@@ -93,8 +94,8 @@ func initBlankContext(cfg, repo, branch string) {
 	}
 }
 
-func initFakeHTTP() *api.FakeHTTP {
-	http := &api.FakeHTTP{}
+func initFakeHTTP() *httpmock.Registry {
+	http := &httpmock.Registry{}
 	apiClientForContext = func(context.Context) (*api.Client, error) {
 		return api.NewClient(api.ReplaceTripper(http)), nil
 	}
