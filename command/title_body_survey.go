@@ -264,54 +264,74 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 
 		var mqs []*survey.Question
 		if isChosen("Reviewers") {
-			mqs = append(mqs, &survey.Question{
-				Name: "reviewers",
-				Prompt: &survey.MultiSelect{
-					Message: "Reviewers",
-					Options: append(users, teams...),
-					Default: issueState.Reviewers,
-				},
-			})
+			if len(users) > 0 || len(teams) > 0 {
+				mqs = append(mqs, &survey.Question{
+					Name: "reviewers",
+					Prompt: &survey.MultiSelect{
+						Message: "Reviewers",
+						Options: append(users, teams...),
+						Default: issueState.Reviewers,
+					},
+				})
+			} else {
+				cmd.PrintErrln("warning: no available reviewers")
+			}
 		}
 		if isChosen("Assignees") {
-			mqs = append(mqs, &survey.Question{
-				Name: "assignees",
-				Prompt: &survey.MultiSelect{
-					Message: "Assignees",
-					Options: users,
-					Default: issueState.Assignees,
-				},
-			})
+			if len(users) > 0 {
+				mqs = append(mqs, &survey.Question{
+					Name: "assignees",
+					Prompt: &survey.MultiSelect{
+						Message: "Assignees",
+						Options: users,
+						Default: issueState.Assignees,
+					},
+				})
+			} else {
+				cmd.PrintErrln("warning: no assignable users")
+			}
 		}
 		if isChosen("Labels") {
-			mqs = append(mqs, &survey.Question{
-				Name: "labels",
-				Prompt: &survey.MultiSelect{
-					Message: "Labels",
-					Options: labels,
-					Default: issueState.Labels,
-				},
-			})
+			if len(labels) > 0 {
+				mqs = append(mqs, &survey.Question{
+					Name: "labels",
+					Prompt: &survey.MultiSelect{
+						Message: "Labels",
+						Options: labels,
+						Default: issueState.Labels,
+					},
+				})
+			} else {
+				cmd.PrintErrln("warning: no labels in the repository")
+			}
 		}
 		if isChosen("Projects") {
-			mqs = append(mqs, &survey.Question{
-				Name: "projects",
-				Prompt: &survey.MultiSelect{
-					Message: "Projects",
-					Options: projects,
-					Default: issueState.Projects,
-				},
-			})
+			if len(projects) > 0 {
+				mqs = append(mqs, &survey.Question{
+					Name: "projects",
+					Prompt: &survey.MultiSelect{
+						Message: "Projects",
+						Options: projects,
+						Default: issueState.Projects,
+					},
+				})
+			} else {
+				cmd.PrintErrln("warning: no projects to choose from")
+			}
 		}
 		if isChosen("Milestone") {
-			mqs = append(mqs, &survey.Question{
-				Name: "milestone",
-				Prompt: &survey.Select{
-					Message: "Milestone",
-					Options: milestones,
-					Default: issueState.Milestone,
-				},
-			})
+			if len(milestones) > 1 {
+				mqs = append(mqs, &survey.Question{
+					Name: "milestone",
+					Prompt: &survey.Select{
+						Message: "Milestone",
+						Options: milestones,
+						Default: issueState.Milestone,
+					},
+				})
+			} else {
+				cmd.PrintErrln("warning: no milestones in the repository")
+			}
 		}
 
 		err = SurveyAsk(mqs, issueState, survey.WithKeepFilter(true))
