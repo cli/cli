@@ -28,6 +28,7 @@ var Version = "DEV"
 var BuildDate = "" // YYYY-MM-DD
 
 var versionOutput = ""
+var cobraDefaultHelpFunc func(*cobra.Command, []string)
 
 func init() {
 	if Version == "DEV" {
@@ -51,6 +52,7 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
+	cobraDefaultHelpFunc = RootCmd.HelpFunc()
 	RootCmd.SetHelpFunc(rootHelpFunc)
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -250,7 +252,7 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 
 func rootHelpFunc(command *cobra.Command, s []string) {
 	if command != RootCmd {
-		hackyHelp(command)
+		cobraDefaultHelpFunc(command, s)
 		return
 	}
 
