@@ -194,13 +194,17 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		return nil, err
 	}
 
-	reviewState := api.ReviewComment
+	var reviewState api.PullRequestReviewState
 
 	switch typeAnswers.ReviewType {
 	case "Approve":
 		reviewState = api.ReviewApprove
-	case "Request Changes":
+	case "Request changes":
 		reviewState = api.ReviewRequestChanges
+	case "Comment":
+		reviewState = api.ReviewComment
+	default:
+		panic("unreachable state")
 	}
 
 	bodyAnswers := struct {
