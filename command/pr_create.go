@@ -325,16 +325,19 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		if tb.HasMetadata() {
 			if tb.MetadataResult == nil {
-				metadataInput := api.RepoMetadataInput{
-					Reviewers:  len(tb.Reviewers) > 0,
-					Assignees:  len(tb.Assignees) > 0,
-					Labels:     len(tb.Labels) > 0,
-					Projects:   len(tb.Projects) > 0,
-					Milestones: tb.Milestone != "",
+				var milestones []string
+				if tb.Milestone != "" {
+					milestones = append(milestones, tb.Milestone)
+				}
+				resolveInput := api.RepoResolveInput{
+					Reviewers:  tb.Reviewers,
+					Assignees:  tb.Assignees,
+					Labels:     tb.Labels,
+					Projects:   tb.Projects,
+					Milestones: milestones,
 				}
 
-				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
-				tb.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
+				tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
 				if err != nil {
 					return err
 				}
