@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"regexp"
 	"testing"
+
+	"github.com/cli/cli/test"
 )
 
 func TestPRReview_validation(t *testing.T) {
@@ -12,7 +15,6 @@ func TestPRReview_validation(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	for _, cmd := range []string{
-		`pr review 123`,
 		`pr review --approve --comment 123`,
 		`pr review --approve --comment -b"hey" 123`,
 	} {
@@ -217,4 +219,166 @@ func TestPRReview(t *testing.T) {
 		eq(t, reqBody.Variables.Input.Event, kase.ExpectedEvent)
 		eq(t, reqBody.Variables.Input.Body, kase.ExpectedBody)
 	}
+}
+
+func TestPRReview_interactive(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
+	as, teardown := initAskStubber()
+	defer teardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "reviewType",
+			Value: "Approve",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "body",
+			Value: "cool story",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "confirm",
+			Value: true,
+		},
+	})
+
+	output, err := RunCommand(`pr review`)
+	if err != nil {
+		t.Fatalf("got unexpected error running pr review: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"Got:",
+		"cool.*story") // weird because markdown rendering puts a bunch of junk between works
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				Event string
+				Body  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.Event, "APPROVE")
+	eq(t, reqBody.Variables.Input.Body, "cool story")
+}
+
+func TestPRReview_interactive_no_body(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
+	as, teardown := initAskStubber()
+	defer teardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "reviewType",
+			Value: "Request Changes",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "confirm",
+			Value: true,
+		},
+	})
+
+	_, err := RunCommand(`pr review`)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	eq(t, err.Error(), "this type of review cannot be blank")
+}
+
+func TestPRReview_interactive_blank_approve(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
+	as, teardown := initAskStubber()
+	defer teardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "reviewType",
+			Value: "Approve",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "confirm",
+			Value: true,
+		},
+	})
+
+	output, err := RunCommand(`pr review`)
+	if err != nil {
+		t.Fatalf("got unexpected error running pr review: %s", err)
+	}
+
+	unexpect := regexp.MustCompile("Got:")
+	if unexpect.MatchString(output.String()) {
+		t.Errorf("did not expect to see body printed in %s", output.String())
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				Event string
+				Body  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.Event, "APPROVE")
+	eq(t, reqBody.Variables.Input.Body, "")
+
 }

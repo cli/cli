@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
@@ -127,14 +126,9 @@ func selectTemplate(templatePaths []string) (string, error) {
 }
 
 func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers, allowMetadata bool) error {
-	editorCommand := os.Getenv("GH_EDITOR")
-	if editorCommand == "" {
-		ctx := contextForCommand(cmd)
-		cfg, err := ctx.Config()
-		if err != nil {
-			return fmt.Errorf("could not read config: %w", err)
-		}
-		editorCommand, _ = cfg.Get(defaultHostname, "editor")
+	editorCommand, err := determineEditor(cmd)
+	if err != nil {
+		return err
 	}
 
 	issueState.Title = defs.Title
