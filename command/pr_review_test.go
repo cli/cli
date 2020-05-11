@@ -315,7 +315,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 	as.Stub([]*QuestionStub{
 		{
 			Name:  "reviewType",
-			Value: "Request Changes",
+			Value: "Request changes",
 		},
 	})
 	as.Stub([]*QuestionStub{
