@@ -24,6 +24,11 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+
+	err = doc.GenManTree(command.RootCmd, nil, dir)
+	if err != nil {
+		fatal(err)
+	}
 }
 
 func filePrepender(filename string) string {

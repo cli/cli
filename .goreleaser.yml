@@ -35,6 +35,8 @@ archives:
     replacements:
       darwin: macOS
     format: tar.gz
+    files:
+      - manpage/gh*.1
   - id: windows
     builds: [windows]
     <<: *archive_defaults
@@ -76,6 +78,8 @@ nfpms:
     formats:
       - deb
       - rpm
+    files:
+      "./manpage/gh*.1": "/usr/share/man/man1"
 
 scoop:
   bucket:

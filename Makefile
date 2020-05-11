@@ -44,3 +44,11 @@ endif
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 	git -C site push
 .PHONY: site-publish
+
+
+manpage:
+	mkdir -p $@
+
+.PHONY: manpages
+manpages: manpage
+	go run ./cmd/gen-docs ./manpage
