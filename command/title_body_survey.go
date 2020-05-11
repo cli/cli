@@ -176,7 +176,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		qs = append(qs, bodyQuestion)
 	}
 
-	err := SurveyAsk(qs, issueState)
+	err = SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}

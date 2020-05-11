@@ -15,8 +15,7 @@ import (
 )
 
 func init() {
-	// TODO re-register post release
-	// prCmd.AddCommand(prReviewCmd)
+	prCmd.AddCommand(prReviewCmd)
 
 	prReviewCmd.Flags().BoolP("approve", "a", false, "Approve pull request")
 	prReviewCmd.Flags().BoolP("request-changes", "r", false, "Request changes on a pull request")
@@ -62,15 +61,17 @@ func processReviewOpt(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		state = api.ReviewComment
 	}
 
-	if found == 0 {
-		return nil, nil // signal interactive mode
-	} else if found > 1 {
-		return nil, errors.New("need exactly one of --approve, --request-changes, or --comment")
-	}
-
 	body, err := cmd.Flags().GetString("body")
 	if err != nil {
 		return nil, err
+	}
+
+	if found == 0 && body == "" {
+		return nil, nil // signal interactive mode
+	} else if found == 0 && body != "" {
+		return nil, errors.New("--body unsupported without --approve, --request-changes, or --comment")
+	} else if found > 1 {
+		return nil, errors.New("need exactly one of --approve, --request-changes, or --comment")
 	}
 
 	if (flag == "request-changes" || flag == "comment") && body == "" {
@@ -116,7 +117,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	input, err := processReviewOpt(cmd)
+	reviewData, err := processReviewOpt(cmd)
 	if err != nil {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
@@ -132,22 +133,34 @@ func prReview(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("could not find pull request: %w", err)
 		}
+		prNum = pr.Number
 	}
 
-	if input == nil {
-		input, err = reviewSurvey(cmd)
+	out := colorableOut(cmd)
+
+	if reviewData == nil {
+		reviewData, err = reviewSurvey(cmd)
 		if err != nil {
 			return err
 		}
-		if input == nil && err == nil {
-			// Cancelled.
+		if reviewData == nil && err == nil {
+			fmt.Fprint(out, "Discarding.\n")
 			return nil
 		}
 	}
 
-	err = api.AddReview(apiClient, pr, input)
+	err = api.AddReview(apiClient, pr, reviewData)
 	if err != nil {
 		return fmt.Errorf("failed to create review: %w", err)
+	}
+
+	switch reviewData.State {
+	case api.ReviewComment:
+		fmt.Fprintf(out, "%s Reviewed pull request #%d\n", utils.Gray("-"), prNum)
+	case api.ReviewApprove:
+		fmt.Fprintf(out, "%s Approved pull request #%d\n", utils.Green("✓"), prNum)
+	case api.ReviewRequestChanges:
+		fmt.Fprintf(out, "%s Requested changes to pull request #%d\n", utils.Red("+"), prNum)
 	}
 
 	return nil
@@ -171,7 +184,6 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 					"Comment",
 					"Approve",
 					"Request changes",
-					"Cancel",
 				},
 			},
 		},
@@ -189,18 +201,22 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		reviewState = api.ReviewApprove
 	case "Request Changes":
 		reviewState = api.ReviewRequestChanges
-	case "Cancel":
-		return nil, nil
 	}
 
 	bodyAnswers := struct {
 		Body string
 	}{}
 
+	blankAllowed := false
+	if reviewState == api.ReviewApprove {
+		blankAllowed = true
+	}
+
 	bodyQs := []*survey.Question{
 		&survey.Question{
 			Name: "body",
 			Prompt: &surveyext.GhEditor{
+				BlankAllowed:  blankAllowed,
 				EditorCommand: editorCommand,
 				Editor: &survey.Editor{
 					Message:  "Review body",
