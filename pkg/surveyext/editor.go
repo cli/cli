@@ -38,6 +38,7 @@ func init() {
 type GhEditor struct {
 	*survey.Editor
 	EditorCommand string
+	BlankAllowed  bool
 }
 
 func (e *GhEditor) editorCommand() string {
@@ -58,13 +59,14 @@ var EditorQuestionTemplate = `
 {{- else }}
   {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
   {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
-	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}, enter to skip] {{color "reset"}}
+	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}{{- if .BlankAllowed }}, enter to skip{{ end }}] {{color "reset"}}
 {{- end}}`
 
 // EXTENDED to pass editor name (to use in prompt)
 type EditorTemplateData struct {
 	survey.Editor
 	EditorCommand string
+	BlankAllowed  bool
 	Answer        string
 	ShowAnswer    bool
 	ShowHelp      bool
@@ -75,9 +77,10 @@ type EditorTemplateData struct {
 func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (interface{}, error) {
 	err := e.Render(
 		EditorQuestionTemplate,
-		// EXTENDED to support printing editor in prompt
+		// EXTENDED to support printing editor in prompt and BlankAllowed
 		EditorTemplateData{
 			Editor:        *e.Editor,
+			BlankAllowed:  e.BlankAllowed,
 			EditorCommand: filepath.Base(e.editorCommand()),
 			Config:        config,
 		},
@@ -96,7 +99,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	defer cursor.Show()
 
 	for {
-		// EXTENDED to handle the e to edit / enter to skip behavior
+		// EXTENDED to handle the e to edit / enter to skip behavior + BlankAllowed
 		r, _, err := rr.ReadRune()
 		if err != nil {
 			return "", err
@@ -105,7 +108,11 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 			break
 		}
 		if r == '\r' || r == '\n' {
-			return "", nil
+			if e.BlankAllowed {
+				return "", nil
+			} else {
+				continue
+			}
 		}
 		if r == terminal.KeyInterrupt {
 			return "", terminal.InterruptErr
@@ -117,8 +124,9 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 			err = e.Render(
 				EditorQuestionTemplate,
 				EditorTemplateData{
-					// EXTENDED to support printing editor in prompt
+					// EXTENDED to support printing editor in prompt, BlankAllowed
 					Editor:        *e.Editor,
+					BlankAllowed:  e.BlankAllowed,
 					EditorCommand: filepath.Base(e.editorCommand()),
 					ShowHelp:      true,
 					Config:        config,

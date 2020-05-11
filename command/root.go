@@ -338,3 +338,17 @@ func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
 
 	return fmt.Sprintf("https://%s/%s.git", defaultHostname, fullRepoName)
 }
+
+func determineEditor(cmd *cobra.Command) (string, error) {
+	editorCommand := os.Getenv("GH_EDITOR")
+	if editorCommand == "" {
+		ctx := contextForCommand(cmd)
+		cfg, err := ctx.Config()
+		if err != nil {
+			return "", fmt.Errorf("could not read config: %w", err)
+		}
+		editorCommand, _ = cfg.Get(defaultHostname, "editor")
+	}
+
+	return editorCommand, nil
+}
