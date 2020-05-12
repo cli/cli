@@ -1095,15 +1095,19 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 }
 
 func TestPRMerge_interactive(t *testing.T) {
-	initWithStubs("feature",
+	initWithStubs("blueberries",
 		stubResponse{200, bytes.NewBufferString(`
-		{ "data": { 
-			
-		} }`)})
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+		] } } } }`)},
+		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	cs.Stub("")
+	cs.Stub("")
+	cs.Stub("")
 	cs.Stub("")
 
 	as, surveyTeardown := initAskStubber()
@@ -1111,19 +1115,19 @@ func TestPRMerge_interactive(t *testing.T) {
 
 	as.Stub([]*QuestionStub{
 		{
-			Name:  "choose merge method",
-			Value: "merge",
+			Name:  "mergeMethod",
+			Value: 0,
 		},
 		{
-			Name:    "delete branch locally",
-			Default: true,
-			Value:   "Y",
+			Name:  "deleteBranch",
+			Value: true,
 		},
 	})
 
 	output, err := RunCommand(`pr merge`)
-	eq(t, err, nil)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
 
-	stderr := string(output.Stderr())
-	eq(t, strings.Contains(stderr, "warning: could not compute title or body defaults: could not find any commits"), true)
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
 }

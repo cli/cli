@@ -531,7 +531,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s\n", utils.Red("✔"), utils.Cyan(branch))
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted local branch %s\n", utils.Red("✔"), utils.Cyan(branch))
 	}
 
 	return nil
