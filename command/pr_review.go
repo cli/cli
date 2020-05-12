@@ -431,17 +431,17 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 		fmt.Fprintln(out, rendered)
 
-		fmt.Fprintln(out)
-
-		fmt.Fprintln(out, "s: skip, f: skip file, c: comment, u: suggest, q: quit")
+		fmt.Fprint(out, "s: skip, f: skip file, c: comment, u: suggest, q: quit ")
 
 		action, err := patchSurvey()
 		if err != nil {
 			return nil, err
 		}
 
-		fmt.Fprintf(out, "GOT ACTION %d\n", action)
-
+		if action == HunkActionQuit {
+			fmt.Fprintln(out, "Quitting.")
+			return nil, nil
+		}
 	}
 
 	fmt.Fprintln(out)
@@ -478,9 +478,20 @@ func patchSurvey() (HunkAction, error) {
 		if err != nil {
 			return -1, err
 		}
-		fmt.Println(r)
-		break
-
+		switch {
+		case r == 's':
+			return HunkActionSkip, nil
+		case r == 'f':
+			return HunkActionSkipFile, nil
+		case r == 'c':
+			return HunkActionComment, nil
+		case r == 'u':
+			return HunkActionSuggest, nil
+		case r == 'q':
+			return HunkActionQuit, nil
+		case r == sterm.KeyInterrupt:
+			return -1, sterm.InterruptErr
+		}
 	}
 
 	return -1, nil
