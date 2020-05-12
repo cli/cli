@@ -438,6 +438,10 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 			return nil, err
 		}
 
+		if action == HunkActionComment {
+			// TODO collect via survey's editor widget. it's bootleg but does a lot for us.
+		}
+
 		if action == HunkActionQuit {
 			fmt.Fprintln(out, "Quitting.")
 			return nil, nil
