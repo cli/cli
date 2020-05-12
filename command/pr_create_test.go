@@ -141,6 +141,12 @@ func TestPRCreate_metadata(t *testing.T) {
 	`, func(inputs map[string]interface{}) {
 			eq(t, inputs["title"], "TITLE")
 			eq(t, inputs["body"], "BODY")
+			if v, ok := inputs["assigneeIds"]; ok {
+				t.Errorf("did not expect assigneeIds: %v", v)
+			}
+			if v, ok := inputs["userIds"]; ok {
+				t.Errorf("did not expect userIds: %v", v)
+			}
 		}))
 	http.Register(
 		httpmock.GraphQL(`\bupdatePullRequest\(`),

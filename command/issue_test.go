@@ -556,6 +556,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
 			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
 			eq(t, inputs["milestoneId"], "BIGONEID")
+			if v, ok := inputs["userIds"]; ok {
+				t.Errorf("did not expect userIds: %v", v)
+			}
+			if v, ok := inputs["teamIds"]; ok {
+				t.Errorf("did not expect teamIds: %v", v)
+			}
 		}))
 
 	output, err := RunCommand(`issue create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`)
