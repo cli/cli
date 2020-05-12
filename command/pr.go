@@ -3,10 +3,12 @@ package command
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -471,34 +473,124 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	rebase, err := cmd.Flags().GetBool("rebase")
-	if err != nil {
-		return err
-	}
-	squash, err := cmd.Flags().GetBool("squash")
-	if err != nil {
-		return err
+	mergeMethod := api.PullRequestMergeMethodMerge
+	deleteBranch := true
+
+	isInteractive := !cmd.Flags().Changed("rebase") && !cmd.Flags().Changed("squash") && !cmd.Flags().Changed("merged")
+	if isInteractive {
+		mergeMethod, deleteBranch, err = prInteractiveMerge()
+		if err != nil {
+			return nil
+		}
+
+	} else {
+		rebase, err := cmd.Flags().GetBool("rebase")
+		if err != nil {
+			return err
+		}
+		squash, err := cmd.Flags().GetBool("squash")
+		if err != nil {
+			return err
+		}
+
+		if rebase {
+			mergeMethod = api.PullRequestMergeMethodRebase
+		} else if squash {
+			mergeMethod = api.PullRequestMergeMethodSquash
+		} else {
+			mergeMethod = api.PullRequestMergeMethodMerge
+		}
 	}
 
-	var output string
-	if rebase {
-		output = fmt.Sprintf("%s Rebased and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	var action string
+	if mergeMethod == api.PullRequestMergeMethodRebase {
+		action = "Rebased and merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
-	} else if squash {
-		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	} else if mergeMethod == api.PullRequestMergeMethodSquash {
+		action = "Squashed and merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
-	} else {
-		output = fmt.Sprintf("%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	} else if mergeMethod == api.PullRequestMergeMethodMerge {
+		action = "Merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+	} else {
+		fmt.Fprintf(os.Stderr, "Unknown merge method used\n")
+		os.Exit(1)
 	}
 
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprint(colorableOut(cmd), output)
+	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
+
+	if deleteBranch {
+		branch, err := prDeleteCurrentBranch(baseRepo.(*api.Repository))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s\n", utils.Red("✔"), utils.Cyan(branch))
+	}
 
 	return nil
+}
+
+func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
+	mergeMethodQuestion := &survey.Question{
+		Name: "mergeMethod",
+		Prompt: &survey.Select{
+			Message: "What merge method would you like to use?",
+			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
+			Default: "merge",
+		},
+	}
+
+	deleteBranchQuestion := &survey.Question{
+		Name: "deleteBranch",
+		Prompt: &survey.Confirm{
+			Message: "Delete the branch locally and on GitHub?",
+			Default: true,
+		},
+	}
+
+	qs := []*survey.Question{mergeMethodQuestion, deleteBranchQuestion}
+
+	answers := struct {
+		MergeMethod  int
+		DeleteBranch bool
+	}{}
+
+	err := SurveyAsk(qs, &answers)
+	if err != nil {
+		return 0, false, fmt.Errorf("could not prompt: %w", err)
+	}
+
+	var mergeMethod api.PullRequestMergeMethod
+	switch answers.MergeMethod {
+	case 0:
+		mergeMethod = api.PullRequestMergeMethodMerge
+	case 1:
+		mergeMethod = api.PullRequestMergeMethodRebase
+	case 2:
+		mergeMethod = api.PullRequestMergeMethodSquash
+	}
+
+	deleteBranch := answers.DeleteBranch
+	return mergeMethod, deleteBranch, nil
+}
+
+func prDeleteCurrentBranch(repo *api.Repository) (string, error) {
+	branch, err := git.CurrentBranch()
+	if err != nil {
+		return "", err
+	}
+
+	err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+	if err != nil {
+		return "", err
+	}
+
+	err = git.DeleteBranch(branch)
+	return branch, err
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {

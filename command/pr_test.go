@@ -1061,3 +1061,37 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestPRMerge_interactive(t *testing.T) {
+	initWithStubs("feature",
+		stubResponse{200, bytes.NewBufferString(`
+		{ "data": { 
+			
+		} }`)})
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "choose merge method",
+			Value: "merge",
+		},
+		{
+			Name:    "delete branch locally",
+			Default: true,
+			Value:   "Y",
+		},
+	})
+
+	output, err := RunCommand(`pr merge`)
+	eq(t, err, nil)
+
+	stderr := string(output.Stderr())
+	eq(t, strings.Contains(stderr, "warning: could not compute title or body defaults: could not find any commits"), true)
+}
