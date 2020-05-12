@@ -21,6 +21,8 @@ func init() {
 	prReviewCmd.Flags().BoolP("request-changes", "r", false, "Request changes on a pull request")
 	prReviewCmd.Flags().BoolP("comment", "c", false, "Comment on a pull request")
 	prReviewCmd.Flags().StringP("body", "b", "", "Specify the body of a review")
+
+	prReviewCmd.Flags().BoolP("patch", "p", false, "Review interactively in patch mode")
 }
 
 var prReviewCmd = &cobra.Command{
@@ -137,9 +139,19 @@ func prReview(cmd *cobra.Command, args []string) error {
 	}
 
 	out := colorableOut(cmd)
+	patchMode, err := cmd.Flags().GetBool("patch")
+	if err != nil {
+		return err
+	}
+
+	if patchMode {
+		fmt.Fprintln(out, "FLIP MODE")
+		return nil
+	}
 
 	if reviewData == nil {
 		reviewData, err = reviewSurvey(cmd)
+
 		if err != nil {
 			return err
 		}
