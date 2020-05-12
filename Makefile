@@ -28,7 +28,7 @@ site:
 site-docs: site
 	git -C site pull
 	git -C site rm 'manual/gh*.md' 2>/dev/null || true
-	go run ./cmd/gen-docs site/manual
+	go run ./cmd/gen-docs --website --doc-path site/manual
 	for f in site/manual/gh*.md; do sed -i.bak -e '/^### SEE ALSO/,$$d' "$$f"; done
 	rm -f site/manual/*.bak
 	git -C site add 'manual/gh*.md'
@@ -51,4 +51,4 @@ manpage:
 
 .PHONY: manpages
 manpages: manpage
-	go run ./cmd/gen-docs ./manpage
+	go run ./cmd/gen-docs --man-page --doc-path ./manpage
