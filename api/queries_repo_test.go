@@ -188,7 +188,8 @@ func Test_RepoResolveMetadataIDs(t *testing.T) {
 		Labels:    []string{"bug", "help wanted"},
 	}
 
-	expectedQuery := `u000: user(login:"monalisa"){id,login}
+	expectedQuery := `{
+u000: user(login:"monalisa"){id,login}
 u001: user(login:"hubot"){id,login}
 u002: user(login:"octocat"){id,login}
 repository(owner:"OWNER",name:"REPO"){
@@ -198,6 +199,7 @@ l001: label(name:"help wanted"){id,name}
 organization(login:"OWNER"){
 t000: team(slug:"core"){id,slug}
 t001: team(slug:"robots"){id,slug}
+}
 }
 `
 	responseJSON := `

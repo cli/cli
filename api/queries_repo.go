@@ -623,6 +623,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	}
 
 	query := &bytes.Buffer{}
+	fmt.Fprint(query, "{\n")
 	for i, u := range users {
 		fmt.Fprintf(query, "u%03d: user(login:%q){id,login}\n", i, u)
 	}
@@ -640,6 +641,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 		}
 		fmt.Fprint(query, "}\n")
 	}
+	fmt.Fprint(query, "}\n")
 
 	response := make(map[string]json.RawMessage)
 	err = client.GraphQL(query.String(), nil, &response)

@@ -325,48 +325,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranchLabel,
 		}
 
-		if tb.HasMetadata() {
-			if tb.MetadataResult == nil {
-				resolveInput := api.RepoResolveInput{
-					Reviewers:  tb.Reviewers,
-					Assignees:  tb.Assignees,
-					Labels:     tb.Labels,
-					Projects:   tb.Projects,
-					Milestones: tb.Milestones,
-				}
-
-				tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
-			if err != nil {
-				return err
-			}
-
-			var userReviewers []string
-			var teamReviewers []string
-			for _, r := range tb.Reviewers {
-				if strings.ContainsRune(r, '/') {
-					teamReviewers = append(teamReviewers, r)
-				} else {
-					userReviewers = append(teamReviewers, r)
-				}
-			}
-
-			userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
-			if err != nil {
-				return fmt.Errorf("could not request reviewer: %w", err)
-			}
-			params["userReviewerIds"] = userReviewerIDs
-
-			teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
-			if err != nil {
-				return fmt.Errorf("could not request reviewer: %w", err)
-			}
-			params["teamReviewerIds"] = teamReviewerIDs
+		err = addMetadataToIssueParams(client, baseRepo, params, &tb)
+		if err != nil {
+			return err
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
