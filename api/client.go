@@ -207,6 +207,45 @@ func (c Client) REST(method string, p string, body io.Reader, data interface{}) 
 	return nil
 }
 
+// DirectRequest is a low-level interface to making generic API requests
+func (c Client) DirectRequest(method string, p string, params interface{}, headers []string) (*http.Response, error) {
+	url := "https://api.github.com/" + p
+	var body io.Reader
+	var bodyIsJSON bool
+
+	switch pp := params.(type) {
+	case map[string]interface{}:
+		b, err := json.Marshal(pp)
+		if err != nil {
+			return nil, fmt.Errorf("error serializing parameters: %w", err)
+		}
+		body = bytes.NewBuffer(b)
+		bodyIsJSON = true
+	case io.Reader:
+		body = pp
+	default:
+		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
+	}
+
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if bodyIsJSON {
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	}
+	for _, h := range headers {
+		idx := strings.IndexRune(h, ':')
+		if idx == -1 {
+			return nil, fmt.Errorf("header %q requires a value separated by ':'", h)
+		}
+		req.Header.Set(h[0:idx], strings.TrimSpace(h[idx+1:]))
+	}
+
+	return c.http.Do(req)
+}
+
 func handleResponse(resp *http.Response, data interface{}) error {
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 
