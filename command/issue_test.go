@@ -500,27 +500,15 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`\bu000:`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "labels": {
-			"nodes": [
-				{ "name": "feature", "id": "FEATUREID" },
-				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			}
+		} }
 		`))
 	http.Register(
 		httpmock.GraphQL(`\bmilestones\(`),

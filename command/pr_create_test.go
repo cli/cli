@@ -87,27 +87,19 @@ func TestPRCreate_metadata(t *testing.T) {
 		] } } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`\bteam\(`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "labels": {
-			"nodes": [
-				{ "name": "feature", "id": "FEATUREID" },
-				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"u001": { "login": "hubot", "id": "HUBOTID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			},
+			"organization": {
+				"t000": { "slug": "core", "id": "COREID" }
+			}
+		} }
 		`))
 	http.Register(
 		httpmock.GraphQL(`\bmilestones\(`),
@@ -136,17 +128,6 @@ func TestPRCreate_metadata(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
-		httpmock.StringResponse(`
-		{ "data": { "organization": { "teams": {
-			"nodes": [
-				{ "slug": "owners", "id": "OWNERSID" },
-				{ "slug": "Core", "id": "COREID" }
-			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))

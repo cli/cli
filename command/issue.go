@@ -473,15 +473,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 		if tb.HasMetadata() {
 			if tb.MetadataResult == nil {
-				metadataInput := api.RepoMetadataInput{
-					Assignees:  len(tb.Assignees) > 0,
-					Labels:     len(tb.Labels) > 0,
-					Projects:   len(tb.Projects) > 0,
-					Milestones: len(tb.Milestones) > 0,
+				resolveInput := api.RepoResolveInput{
+					Assignees:  tb.Assignees,
+					Labels:     tb.Labels,
+					Projects:   tb.Projects,
+					Milestones: tb.Milestones,
 				}
 
-				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
-				tb.MetadataResult, err = api.RepoMetadata(apiClient, baseRepo, metadataInput)
+				tb.MetadataResult, err = api.RepoResolveMetadataIDs(apiClient, baseRepo, resolveInput)
 				if err != nil {
 					return err
 				}

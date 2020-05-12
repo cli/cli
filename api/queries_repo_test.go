@@ -46,6 +46,136 @@ func Test_RepoCreate(t *testing.T) {
 		t.Errorf("expected homepageUrl to be %q, got %q", "http://example.com", homepage)
 	}
 }
+func Test_RepoMetadata(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	repo := ghrepo.FromFullName("OWNER/REPO")
+	input := RepoMetadataInput{
+		Assignees:  true,
+		Reviewers:  true,
+		Labels:     true,
+		Projects:   true,
+		Milestones: true,
+	}
+
+	http.Register(
+		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "assignableUsers": {
+			"nodes": [
+				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "MonaLisa", "id": "MONAID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\blabels\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "labels": {
+			"nodes": [
+				{ "name": "feature", "id": "FEATUREID" },
+				{ "name": "TODO", "id": "TODOID" },
+				{ "name": "bug", "id": "BUGID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [
+				{ "title": "GA", "id": "GAID" },
+				{ "title": "Big One.oh", "id": "BIGONEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [
+				{ "name": "Cleanup", "id": "CLEANUPID" },
+				{ "name": "Roadmap", "id": "ROADMAPID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projects": {
+			"nodes": [
+				{ "name": "Triage", "id": "TRIAGEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "teams": {
+			"nodes": [
+				{ "slug": "owners", "id": "OWNERSID" },
+				{ "slug": "Core", "id": "COREID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+
+	result, err := RepoMetadata(client, repo, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedMemberIDs := []string{"MONAID", "HUBOTID"}
+	memberIDs, err := result.MembersToIDs([]string{"monalisa", "hubot"})
+	if err != nil {
+		t.Errorf("error resolving members: %v", err)
+	}
+	if !sliceEqual(memberIDs, expectedMemberIDs) {
+		t.Errorf("expected members %v, got %v", expectedMemberIDs, memberIDs)
+	}
+
+	expectedTeamIDs := []string{"COREID", "OWNERSID"}
+	teamIDs, err := result.TeamsToIDs([]string{"OWNER/core", "/owners"})
+	if err != nil {
+		t.Errorf("error resolving teams: %v", err)
+	}
+	if !sliceEqual(teamIDs, expectedTeamIDs) {
+		t.Errorf("expected teams %v, got %v", expectedTeamIDs, teamIDs)
+	}
+
+	expectedLabelIDs := []string{"BUGID", "TODOID"}
+	labelIDs, err := result.LabelsToIDs([]string{"bug", "todo"})
+	if err != nil {
+		t.Errorf("error resolving labels: %v", err)
+	}
+	if !sliceEqual(labelIDs, expectedLabelIDs) {
+		t.Errorf("expected labels %v, got %v", expectedLabelIDs, labelIDs)
+	}
+
+	expectedProjectIDs := []string{"TRIAGEID", "ROADMAPID"}
+	projectIDs, err := result.ProjectsToIDs([]string{"triage", "roadmap"})
+	if err != nil {
+		t.Errorf("error resolving projects: %v", err)
+	}
+	if !sliceEqual(projectIDs, expectedProjectIDs) {
+		t.Errorf("expected projects %v, got %v", expectedProjectIDs, projectIDs)
+	}
+
+	expectedMilestoneID := "BIGONEID"
+	milestoneID, err := result.MilestoneToID("big one.oh")
+	if err != nil {
+		t.Errorf("error resolving milestone: %v", err)
+	}
+	if milestoneID != expectedMilestoneID {
+		t.Errorf("expected milestone %v, got %v", expectedMilestoneID, milestoneID)
+	}
+}
 
 func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
