@@ -479,7 +479,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	isInteractive := !cmd.Flags().Changed("rebase") && !cmd.Flags().Changed("squash") && !cmd.Flags().Changed("merged")
+	isInteractive := !cmd.Flags().Changed("rebase") && !cmd.Flags().Changed("squash") && !cmd.Flags().Changed("merge")
 	if isInteractive {
 		mergeMethod, deleteBranch, err = prInteractiveMerge()
 		if err != nil {
@@ -592,7 +592,7 @@ func prDeleteCurrentBranch(repo *api.Repository) (string, error) {
 		return "", err
 	}
 
-	err = git.DeleteBranch(branch)
+	err = git.DeleteLocalBranch(branch)
 	return branch, err
 }
 

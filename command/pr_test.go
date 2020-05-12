@@ -996,7 +996,7 @@ func TestPrMerge(t *testing.T) {
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
 
-	output, err := RunCommand("pr merge 1")
+	output, err := RunCommand("pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1013,6 +1013,10 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	defer cmdTeardown()
 
 	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
+	cs.Stub("")                                                                                  // git checkout master
+	cs.Stub("")                                                                                  // git branch -d
 
 	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewWithMetadataByBranch.json")
 	defer jsonFile.Close()
@@ -1022,7 +1026,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
 
-	output, err := RunCommand("pr merge")
+	output, err := RunCommand("pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1041,6 +1045,14 @@ func TestPrMerge_rebase(t *testing.T) {
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	output, err := RunCommand("pr merge 2 --rebase")
 	if err != nil {
@@ -1062,6 +1074,14 @@ func TestPrMerge_squash(t *testing.T) {
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
 
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
+
 	output, err := RunCommand("pr merge 3 --squash")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
@@ -1081,6 +1101,14 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	output, err := RunCommand("pr merge 4")
 	if err == nil {
@@ -1105,10 +1133,10 @@ func TestPRMerge_interactive(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
-	cs.Stub("")
-	cs.Stub("")
-	cs.Stub("")
-	cs.Stub("")
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	as, surveyTeardown := initAskStubber()
 	defer surveyTeardown()
