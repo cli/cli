@@ -474,7 +474,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	mergeMethod := api.PullRequestMergeMethodMerge
+	var mergeMethod api.PullRequestMergeMethod
 	deleteBranch, err := cmd.Flags().GetBool("delete-branch")
 	if err != nil {
 		return nil
