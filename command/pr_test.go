@@ -1017,6 +1017,30 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_deleteBranch(t *testing.T) {
+	initWithStubs("blueberries",
+		stubResponse{200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+		] } } } }`)},
+		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
+
+	output, err := RunCommand(`pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+}
+
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
