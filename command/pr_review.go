@@ -3,10 +3,12 @@ package command
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	sterm "github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
@@ -420,11 +422,66 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	}
 
 	for _, hunk := range hunks {
-		fmt.Fprintf(out, "%s\n\n%s\n\n", hunk.File, hunk.Diff)
-		fmt.Fprintln(out, "-----TODO-----")
+		fmt.Fprintf(out, "%s\n\n", utils.Bold(hunk.File))
+		md := fmt.Sprintf("```diff\n%s\n```", hunk.Diff)
+		rendered, err := utils.RenderMarkdown(md)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Fprintln(out, rendered)
+
+		fmt.Fprintln(out)
+
+		fmt.Fprintln(out, "s: skip, f: skip file, c: comment, u: suggest, q: quit")
+
+		action, err := patchSurvey()
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Fprintf(out, "GOT ACTION %d\n", action)
+
 	}
 
 	fmt.Fprintln(out)
 
 	return nil, nil
+}
+
+type HunkAction int
+
+const (
+	HunkActionSkip = iota
+	HunkActionSkipFile
+	HunkActionComment
+	HunkActionSuggest
+	HunkActionQuit
+)
+
+func patchSurvey() (HunkAction, error) {
+	std := sterm.Stdio{
+		In:  os.Stdin,
+		Out: os.Stdout,
+		Err: os.Stderr,
+	}
+	rr := sterm.NewRuneReader(std)
+	_ = rr.SetTermMode()
+	defer func() { _ = rr.RestoreTermMode() }()
+
+	//cursor := e.NewCursor()
+	//cursor.Hide()
+	//defer cursor.Show()
+
+	for {
+		r, _, err := rr.ReadRune()
+		if err != nil {
+			return -1, err
+		}
+		fmt.Println(r)
+		break
+
+	}
+
+	return -1, nil
 }
