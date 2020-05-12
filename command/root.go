@@ -28,6 +28,7 @@ var Version = "DEV"
 var BuildDate = "" // YYYY-MM-DD
 
 var versionOutput = ""
+var cobraDefaultHelpFunc func(*cobra.Command, []string)
 
 func init() {
 	if Version == "DEV" {
@@ -51,6 +52,7 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
+	cobraDefaultHelpFunc = RootCmd.HelpFunc()
 	RootCmd.SetHelpFunc(rootHelpFunc)
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -249,6 +251,11 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 }
 
 func rootHelpFunc(command *cobra.Command, s []string) {
+	if command != RootCmd {
+		cobraDefaultHelpFunc(command, s)
+		return
+	}
+
 	type helpEntry struct {
 		Title string
 		Body  string
@@ -264,7 +271,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
 		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
 		if includes(coreCommandNames, c.Name()) {
 			coreCommands = append(coreCommands, s)
-		} else {
+		} else if c != creditsCmd {
 			additionalCommands = append(additionalCommands, s)
 		}
 	}
@@ -330,4 +337,18 @@ func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
 	}
 
 	return fmt.Sprintf("https://%s/%s.git", defaultHostname, fullRepoName)
+}
+
+func determineEditor(cmd *cobra.Command) (string, error) {
+	editorCommand := os.Getenv("GH_EDITOR")
+	if editorCommand == "" {
+		ctx := contextForCommand(cmd)
+		cfg, err := ctx.Config()
+		if err != nil {
+			return "", fmt.Errorf("could not read config: %w", err)
+		}
+		editorCommand, _ = cfg.Get(defaultHostname, "editor")
+	}
+
+	return editorCommand, nil
 }

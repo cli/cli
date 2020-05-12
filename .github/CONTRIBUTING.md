@@ -23,7 +23,7 @@ Please avoid:
 ## Building the project
 
 Prerequisites:
-- Go 1.13
+- Go 1.14
 
 Build with: `make` or `go build -o bin/gh ./cmd/gh`
 

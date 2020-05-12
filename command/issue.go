@@ -29,6 +29,10 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
+	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
@@ -83,13 +87,13 @@ With '--web', open the issue in a web browser instead.`,
 	RunE: issueView,
 }
 var issueCloseCmd = &cobra.Command{
-	Use:   "close <numberOrURL>",
+	Use:   "close {<number> | <url>}",
 	Short: "close issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueClose,
 }
 var issueReopenCmd = &cobra.Command{
-	Use:   "reopen <numberOrURL>",
+	Use:   "reopen {<number> | <url>}",
 	Short: "reopen issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueReopen,
@@ -365,6 +369,23 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	if err != nil {
+		return fmt.Errorf("could not parse assignees: %w", err)
+	}
+	labelNames, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return fmt.Errorf("could not parse labels: %w", err)
+	}
+	projectNames, err := cmd.Flags().GetStringSlice("project")
+	if err != nil {
+		return fmt.Errorf("could not parse projects: %w", err)
+	}
+	milestoneTitle, err := cmd.Flags().GetString("milestone")
+	if err != nil {
+		return fmt.Errorf("could not parse milestone: %w", err)
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
@@ -397,11 +418,17 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	action := SubmitAction
+	tb := issueMetadataState{
+		Assignees: assignees,
+		Labels:    labelNames,
+		Projects:  projectNames,
+		Milestone: milestoneTitle,
+	}
 
-	interactive := title == "" || body == ""
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body, defaults{}, templateFiles)
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -419,6 +446,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 		if body == "" {
 			body = tb.Body
+		}
+	} else {
+		if title == "" {
+			return fmt.Errorf("title can't be blank")
 		}
 	}
 
@@ -438,6 +469,28 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			"body":  body,
 		}
 
+		if tb.HasMetadata() {
+			if tb.MetadataResult == nil {
+				metadataInput := api.RepoMetadataInput{
+					Assignees:  len(tb.Assignees) > 0,
+					Labels:     len(tb.Labels) > 0,
+					Projects:   len(tb.Projects) > 0,
+					Milestones: tb.Milestone != "",
+				}
+
+				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
+				tb.MetadataResult, err = api.RepoMetadata(apiClient, baseRepo, metadataInput)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
+			if err != nil {
+				return err
+			}
+		}
+
 		newIssue, err := api.IssueCreate(apiClient, repo, params)
 		if err != nil {
 			return err
@@ -446,6 +499,36 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), newIssue.URL)
 	} else {
 		panic("Unreachable state")
+	}
+
+	return nil
+}
+
+func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames []string, milestoneTitle string) error {
+	assigneeIDs, err := metadata.MembersToIDs(assignees)
+	if err != nil {
+		return fmt.Errorf("could not assign user: %w", err)
+	}
+	params["assigneeIds"] = assigneeIDs
+
+	labelIDs, err := metadata.LabelsToIDs(labelNames)
+	if err != nil {
+		return fmt.Errorf("could not add label: %w", err)
+	}
+	params["labelIds"] = labelIDs
+
+	projectIDs, err := metadata.ProjectsToIDs(projectNames)
+	if err != nil {
+		return fmt.Errorf("could not add to project: %w", err)
+	}
+	params["projectIds"] = projectIDs
+
+	if milestoneTitle != "" {
+		milestoneID, err := metadata.MilestoneToID(milestoneTitle)
+		if err != nil {
+			return fmt.Errorf("could not add to milestone '%s': %w", milestoneTitle, err)
+		}
+		params["milestoneId"] = milestoneID
 	}
 
 	return nil

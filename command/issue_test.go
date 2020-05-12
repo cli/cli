@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -477,6 +478,102 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_metadata(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`\bviewerPermission\b`),
+		httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
+	http.Register(
+		httpmock.GraphQL(`\bhasIssuesEnabled\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true,
+			"viewerPermission": "WRITE"
+		} } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "assignableUsers": {
+			"nodes": [
+				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "MonaLisa", "id": "MONAID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\blabels\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "labels": {
+			"nodes": [
+				{ "name": "feature", "id": "FEATUREID" },
+				{ "name": "TODO", "id": "TODOID" },
+				{ "name": "bug", "id": "BUGID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [
+				{ "title": "GA", "id": "GAID" },
+				{ "title": "Big One.oh", "id": "BIGONEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [
+				{ "name": "Cleanup", "id": "CLEANUPID" },
+				{ "name": "Roadmap", "id": "ROADMAPID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": null },
+			"errors": [{
+				"type": "NOT_FOUND",
+				"path": [ "organization" ],
+				"message": "Could not resolve to an Organization with the login of 'OWNER'."
+			}]
+		}
+		`))
+	http.Register(
+		httpmock.GraphQL(`\bcreateIssue\(`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["title"], "TITLE")
+			eq(t, inputs["body"], "BODY")
+			eq(t, inputs["assigneeIds"], []interface{}{"MONAID"})
+			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
+			eq(t, inputs["milestoneId"], "BIGONEID")
+		}))
+
+	output, err := RunCommand(`issue create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }

@@ -1,0 +1,110 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "user",
+                "login": "123"
+              }
+            },
+            {
+                "requestedReviewer": {
+                    "__typename": "Team",
+                    "name": "Team 1"
+                }
+            },
+            {
+              "requestedReviewer": {
+                "__typename": "user",
+                "login": "abc"
+              }
+            }
+          ],
+          "totalcount": 1
+        },
+        "reviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "123"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "login": "def"
+              },
+              "state": "CHANGES_REQUESTED"
+            },
+            {
+              "author": {
+                "login": "abc"
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": "DEF"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "login": "xyz"
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": ""
+              },
+              "state": "APPROVED"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {},
+        "participants": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            }
+          ],
+          "totalcount": 1
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false
+      }
+    }
+  }
+}

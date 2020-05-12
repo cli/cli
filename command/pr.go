@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -131,17 +132,15 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	printHeader(out, "Current branch")
 	currentPR := prPayload.CurrentPR
 	currentBranch, _ := ctx.Branch()
-	noPRMessage := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
+	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+		currentPR = nil
+	}
 	if currentPR != nil {
-		if baseRepo.(*api.Repository).DefaultBranchRef.Name == currentBranch && currentPR.State != "OPEN" {
-			printMessage(out, noPRMessage)
-		} else {
-			printPrs(out, 0, *currentPR)
-		}
+		printPrs(out, 1, *currentPR)
 	} else if currentPRHeadRef == "" {
 		printMessage(out, "  There is no current branch")
 	} else {
-		printMessage(out, noPRMessage)
+		printMessage(out, fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]")))
 	}
 	fmt.Fprintln(out)
 
@@ -604,10 +603,13 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
+	fmt.Fprintln(out)
 
 	// Metadata
-	// TODO: Reviewers
-	fmt.Fprintln(out)
+	if reviewers := prReviewerList(*pr); reviewers != "" {
+		fmt.Fprint(out, utils.Bold("Reviewers: "))
+		fmt.Fprintln(out, reviewers)
+	}
 	if assignees := prAssigneeList(*pr); assignees != "" {
 		fmt.Fprint(out, utils.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
@@ -639,6 +641,116 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
+}
+
+// Ref. https://developer.github.com/v4/enum/pullrequestreviewstate/
+const (
+	requestedReviewState        = "REQUESTED" // This is our own state for review request
+	approvedReviewState         = "APPROVED"
+	changesRequestedReviewState = "CHANGES_REQUESTED"
+	commentedReviewState        = "COMMENTED"
+)
+
+type reviewerState struct {
+	Name  string
+	State string
+}
+
+// colorFuncForReviewerState returns a color function for a reviewer state
+func colorFuncForReviewerState(state string) func(string) string {
+	switch state {
+	case requestedReviewState:
+		return utils.Yellow
+	case approvedReviewState:
+		return utils.Green
+	case changesRequestedReviewState:
+		return utils.Red
+	case commentedReviewState:
+		return func(str string) string { return str } // Do nothing
+	default:
+		return nil
+	}
+}
+
+// formattedReviewerState formats a reviewerState with state color
+func formattedReviewerState(reviewer *reviewerState) string {
+	stateColorFunc := colorFuncForReviewerState(reviewer.State)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " ")))
+}
+
+// prReviewerList generates a reviewer list with their last state
+func prReviewerList(pr api.PullRequest) string {
+	reviewerStates := parseReviewers(pr)
+	reviewers := make([]string, 0, len(reviewerStates))
+
+	sortReviewerStates(reviewerStates)
+
+	for _, reviewer := range reviewerStates {
+		reviewers = append(reviewers, formattedReviewerState(reviewer))
+	}
+
+	reviewerList := strings.Join(reviewers, ", ")
+
+	return reviewerList
+}
+
+// Ref. https://developer.github.com/v4/union/requestedreviewer/
+const teamTypeName = "Team"
+
+const ghostName = "ghost"
+
+// parseReviewers parses given Reviews and ReviewRequests
+func parseReviewers(pr api.PullRequest) []*reviewerState {
+	reviewerStates := make(map[string]*reviewerState)
+
+	for _, review := range pr.Reviews.Nodes {
+		if review.Author.Login != pr.Author.Login {
+			name := review.Author.Login
+			if name == "" {
+				name = ghostName
+			}
+			reviewerStates[name] = &reviewerState{
+				Name:  name,
+				State: review.State,
+			}
+		}
+	}
+
+	// Overwrite reviewer's state if a review request for the same reviewer exists.
+	for _, reviewRequest := range pr.ReviewRequests.Nodes {
+		name := reviewRequest.RequestedReviewer.Login
+		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
+			name = reviewRequest.RequestedReviewer.Name
+		}
+		reviewerStates[name] = &reviewerState{
+			Name:  name,
+			State: requestedReviewState,
+		}
+	}
+
+	// Convert map to slice for ease of sort
+	result := make([]*reviewerState, 0, len(reviewerStates))
+	for _, reviewer := range reviewerStates {
+		result = append(result, reviewer)
+	}
+
+	return result
+}
+
+// sortReviewerStates puts completed reviews before review requests and sorts names alphabetically
+func sortReviewerStates(reviewerStates []*reviewerState) {
+	sort.Slice(reviewerStates, func(i, j int) bool {
+		if reviewerStates[i].State == requestedReviewState &&
+			reviewerStates[j].State != requestedReviewState {
+			return false
+		}
+		if reviewerStates[j].State == requestedReviewState &&
+			reviewerStates[i].State != requestedReviewState {
+			return true
+		}
+
+		return reviewerStates[i].Name < reviewerStates[j].Name
+	})
 }
 
 func prAssigneeList(pr api.PullRequest) string {

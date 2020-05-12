@@ -1,6 +1,7 @@
 {
   "data": {
     "repository": {
+      "defaultBranchRef": { "name": "master" },
       "pullRequests": {
         "totalCount": 1,
         "edges": [

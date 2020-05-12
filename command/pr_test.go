@@ -163,6 +163,26 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	}
 }
 
+func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
+	defer jsonFile.Close()
+	http.StubResponse(200, jsonFile)
+
+	output, err := RunCommand("pr status -R OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expectedLine := regexp.MustCompile(`#8  Blueberries are a good fruit \[blueberries\]`)
+	if expectedLine.MatchString(output.String()) {
+		t.Errorf("output not expected to match regexp /%s/\n> output\n%s\n", expectedLine, output)
+		return
+	}
+}
+
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
@@ -189,7 +209,7 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
@@ -231,7 +251,7 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
+	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json")
 	defer jsonFile.Close()
 	http.StubResponse(200, jsonFile)
 
@@ -442,10 +462,22 @@ func TestPRView_Preview(t *testing.T) {
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
 				`Open • nobody wants to merge 12 commits into master from blueberries`,
+				`Reviewers: 2 \(Approved\), 3 \(Commented\), 1 \(Requested\)\n`,
 				`Assignees: marseilles, monaco\n`,
 				`Labels: one, two, three, four, five\n`,
 				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`Milestone: uluru\n`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
+			},
+		},
+		"Open PR with reviewers by number": {
+			ownerRepo: "master",
+			args:      "pr view 12",
+			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
+			expectedOutputs: []string{
+				`Blueberries are from a fork`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},

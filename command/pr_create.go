@@ -124,6 +124,27 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	reviewers, err := cmd.Flags().GetStringSlice("reviewer")
+	if err != nil {
+		return fmt.Errorf("could not parse reviewers: %w", err)
+	}
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	if err != nil {
+		return fmt.Errorf("could not parse assignees: %w", err)
+	}
+	labelNames, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return fmt.Errorf("could not parse labels: %w", err)
+	}
+	projectNames, err := cmd.Flags().GetStringSlice("project")
+	if err != nil {
+		return fmt.Errorf("could not parse projects: %w", err)
+	}
+	milestoneTitle, err := cmd.Flags().GetString("milestone")
+	if err != nil {
+		return fmt.Errorf("could not parse milestone: %w", err)
+	}
+
 	baseTrackingBranch := baseBranch
 	if baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName()); err == nil {
 		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
@@ -179,15 +200,24 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// TODO: only drop into interactive mode if stdin & stdout are a tty
-	if !isWeb && !autofill && (title == "" || body == "") {
+	tb := issueMetadataState{
+		Reviewers: reviewers,
+		Assignees: assignees,
+		Labels:    labelNames,
+		Projects:  projectNames,
+		Milestone: milestoneTitle,
+	}
+
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+
+	if !isWeb && !autofill && interactive {
 		var templateFiles []string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
 			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
-		tb, err := titleBodySurvey(cmd, title, body, defs, templateFiles)
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true, baseRepo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -293,6 +323,51 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranchLabel,
 		}
 
+		if tb.HasMetadata() {
+			if tb.MetadataResult == nil {
+				metadataInput := api.RepoMetadataInput{
+					Reviewers:  len(tb.Reviewers) > 0,
+					Assignees:  len(tb.Assignees) > 0,
+					Labels:     len(tb.Labels) > 0,
+					Projects:   len(tb.Projects) > 0,
+					Milestones: tb.Milestone != "",
+				}
+
+				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
+				tb.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
+			if err != nil {
+				return err
+			}
+
+			var userReviewers []string
+			var teamReviewers []string
+			for _, r := range tb.Reviewers {
+				if strings.ContainsRune(r, '/') {
+					teamReviewers = append(teamReviewers, r)
+				} else {
+					userReviewers = append(teamReviewers, r)
+				}
+			}
+
+			userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
+			if err != nil {
+				return fmt.Errorf("could not request reviewer: %w", err)
+			}
+			params["userReviewerIds"] = userReviewerIDs
+
+			teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
+			if err != nil {
+				return fmt.Errorf("could not request reviewer: %w", err)
+			}
+			params["teamReviewerIds"] = teamReviewerIDs
+		}
+
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
 		if err != nil {
 			return fmt.Errorf("failed to create pull request: %w", err)
@@ -385,4 +460,10 @@ func init() {
 		"The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
+
+	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
+	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to a project by `name`")
+	prCreateCmd.Flags().StringP("milestone", "m", "", "Add the pull request to a milestone by `name`")
 }
