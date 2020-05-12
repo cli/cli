@@ -145,7 +145,12 @@ func prReview(cmd *cobra.Command, args []string) error {
 	}
 
 	if patchMode {
-		fmt.Fprintln(out, "FLIP MODE")
+		reviewData, err = patchReview(cmd)
+		if err != nil {
+			return err
+		}
+		// for now just return
+		fmt.Fprintln(out, "done with patch mode, stopping here for now")
 		return nil
 	}
 
@@ -285,4 +290,141 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		Body:  bodyAnswers.Body,
 		State: reviewState,
 	}, nil
+}
+
+func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
+	type Hunk struct {
+		File string
+		Diff string
+	}
+
+	hunks := []Hunk{
+		{"diff --git a/command/pr_review.go b/command/pr_review.go",
+			`@@ -11,7 +11,8 @@ import (
+ )
+ 
+ func init() {
+-	prCmd.AddCommand(prReviewCmd)
++	// TODO re-register post release
++	// prCmd.AddCommand(prReviewCmd)
+ 
+ 	prReviewCmd.Flags().BoolP("approve", "a", false, "Approve pull request")
+ 	prReviewCmd.Flags().BoolP("request-changes", "r", false, "Request changes on a pull request")
+		`},
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -8,6 +8,7 @@ import (
+ )
+ 
+ func TestPRReview_validation(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "master")
+ 	http := initFakeHTTP()
+ 	for _, cmd := range []string{
+		`},
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -22,6 +23,7 @@ func TestPRReview_validation(t *testing.T) {
+ }
+ 
+ func TestPRReview_url_arg(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "master")
+ 	http := initFakeHTTP()
+ 	http.StubRepoResponse("OWNER", "REPO")
+		`},
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -67,6 +69,7 @@ func TestPRReview_url_arg(t *testing.T) {
+ }
+ 
+ func TestPRReview_number_arg(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "master")
+ 	http := initFakeHTTP()
+ 	http.StubRepoResponse("OWNER", "REPO")
+		`},
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -112,6 +115,7 @@ func TestPRReview_number_arg(t *testing.T) {
+ }
+ 
+ func TestPRReview_no_arg(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "feature")
+ 	http := initFakeHTTP()
+ 	http.StubRepoResponse("OWNER", "REPO")
+		`},
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -147,6 +151,7 @@ func TestPRReview_no_arg(t *testing.T) {
+ }
+ 
+ func TestPRReview_blank_comment(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "master")
+ 	http := initFakeHTTP()
+ 	http.StubRepoResponse("OWNER", "REPO")`},
+
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -156,6 +161,7 @@ func TestPRReview_blank_comment(t *testing.T) {
+ }
+ 
+ func TestPRReview_blank_request_changes(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	initBlankContext("", "OWNER/REPO", "master")
+ 	http := initFakeHTTP()
+ 	http.StubRepoResponse("OWNER", "REPO")
+ }
+
+		`},
+
+		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
+			`@@ -165,6 +171,7 @@ func TestPRReview_blank_request_changes(t *testing.T) {
+			func TestPRReview(t *testing.T) {
++	t.Skip("skipping until release is done")
+ 	type c struct {
+ 		Cmd           string
+ 		ExpectedEvent string
+		`},
+
+		{"diff --git a/command/root.go b/command/root.go",
+			`@@ -271,7 +271,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
+ 		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
+ 		if includes(coreCommandNames, c.Name()) {
+ 			coreCommands = append(coreCommands, s)
+-		} else {
++		} else if c != creditsCmd {
+ 			additionalCommands = append(additionalCommands, s)
+ 		}
+ 	}`},
+	}
+	out := colorableOut(cmd)
+
+	fmt.Fprintln(out, "- starting review ~/.config/gh/reviews/0001.json")
+	fmt.Fprintln(out, "You are going to review 9 changes across 3 files")
+
+	cont := false
+	continueQs := []*survey.Question{
+		{
+			Name: "continue",
+			Prompt: &survey.Confirm{
+				Message: "Continue?",
+				Default: true,
+			},
+		},
+	}
+
+	err := SurveyAsk(continueQs, &cont)
+	if err != nil {
+		return nil, err
+	}
+
+	if !cont {
+		return nil, nil
+	}
+
+	for _, hunk := range hunks {
+		fmt.Fprintf(out, "%s\n\n%s\n\n", hunk.File, hunk.Diff)
+		fmt.Fprintln(out, "-----TODO-----")
+	}
+
+	fmt.Fprintln(out)
+
+	return nil, nil
 }
