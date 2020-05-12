@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -479,7 +480,24 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	isInteractive := !cmd.Flags().Changed("rebase") && !cmd.Flags().Changed("squash") && !cmd.Flags().Changed("merge")
+	// Ensure only one merge method is specified
+	found := 0
+	isInteractive := false
+	if cmd.Flags().Changed("merge") {
+		found++
+	}
+	if cmd.Flags().Changed("rebase") {
+		found++
+	}
+	if cmd.Flags().Changed("squash") {
+		found++
+	}
+	if found == 0 {
+		isInteractive = true
+	} else if found > 1 {
+		return errors.New("expected exactly one of --merge, --rebase, or --squash")
+	}
+
 	if isInteractive {
 		mergeMethod, deleteBranch, err = prInteractiveMerge()
 		if err != nil {

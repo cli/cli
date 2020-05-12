@@ -996,6 +996,15 @@ func TestPrMerge(t *testing.T) {
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 	)
 
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
+	cs.Stub("")                                                                                  // git checkout master
+	cs.Stub("")
+
 	output, err := RunCommand("pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
@@ -1158,4 +1167,18 @@ func TestPRMerge_interactive(t *testing.T) {
 	}
 
 	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+}
+
+func TestPrMerge_multipleMergeMethods(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	_, err := RunCommand("pr merge 1 --merge --squash")
+	if err == nil {
+		t.Fatal("expected error running `pr merge` with multiple merge methods")
+	}
 }
