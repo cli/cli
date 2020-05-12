@@ -28,6 +28,7 @@ func init() {
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
+	prMergeCmd.Flags().BoolP("delete", "d", true, "Delete the local branch after merge")
 	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -473,7 +474,10 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	mergeMethod := api.PullRequestMergeMethodMerge
-	deleteBranch := true
+	deleteBranch, err := cmd.Flags().GetBool("delete")
+	if err != nil {
+		return nil
+	}
 
 	isInteractive := !cmd.Flags().Changed("rebase") && !cmd.Flags().Changed("squash") && !cmd.Flags().Changed("merged")
 	if isInteractive {
