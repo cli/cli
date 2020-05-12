@@ -140,9 +140,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
-	milestoneTitle, err := cmd.Flags().GetString("milestone")
-	if err != nil {
+	var milestoneTitles []string
+	if milestoneTitle, err := cmd.Flags().GetString("milestone"); err != nil {
 		return fmt.Errorf("could not parse milestone: %w", err)
+	} else if milestoneTitle != "" {
+		milestoneTitles = append(milestoneTitles, milestoneTitle)
 	}
 
 	baseTrackingBranch := baseBranch
@@ -201,11 +203,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	tb := issueMetadataState{
-		Reviewers: reviewers,
-		Assignees: assignees,
-		Labels:    labelNames,
-		Projects:  projectNames,
-		Milestone: milestoneTitle,
+		Reviewers:  reviewers,
+		Assignees:  assignees,
+		Labels:     labelNames,
+		Projects:   projectNames,
+		Milestones: milestoneTitles,
 	}
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
@@ -325,16 +327,12 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 
 		if tb.HasMetadata() {
 			if tb.MetadataResult == nil {
-				var milestones []string
-				if tb.Milestone != "" {
-					milestones = append(milestones, tb.Milestone)
-				}
 				resolveInput := api.RepoResolveInput{
 					Reviewers:  tb.Reviewers,
 					Assignees:  tb.Assignees,
 					Labels:     tb.Labels,
 					Projects:   tb.Projects,
-					Milestones: milestones,
+					Milestones: tb.Milestones,
 				}
 
 				tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
@@ -343,7 +341,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 				}
 			}
 
-			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
 			if err != nil {
 				return err
 			}

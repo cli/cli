@@ -20,12 +20,12 @@ type issueMetadataState struct {
 	Title  string
 	Action Action
 
-	Metadata  []string
-	Reviewers []string
-	Assignees []string
-	Labels    []string
-	Projects  []string
-	Milestone string
+	Metadata   []string
+	Reviewers  []string
+	Assignees  []string
+	Labels     []string
+	Projects   []string
+	Milestones []string
 
 	MetadataResult *api.RepoMetadataResult
 }
@@ -35,7 +35,7 @@ func (tb *issueMetadataState) HasMetadata() bool {
 		len(tb.Assignees) > 0 ||
 		len(tb.Labels) > 0 ||
 		len(tb.Projects) > 0 ||
-		tb.Milestone != ""
+		len(tb.Milestones) > 0
 }
 
 const (
@@ -43,6 +43,8 @@ const (
 	PreviewAction
 	CancelAction
 	MetadataAction
+
+	noMilestone = "(none)"
 )
 
 var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
@@ -257,7 +259,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		for _, l := range issueState.MetadataResult.Projects {
 			projects = append(projects, l.Name)
 		}
-		milestones := []string{"(none)"}
+		milestones := []string{noMilestone}
 		for _, m := range issueState.MetadataResult.Milestones {
 			milestones = append(milestones, m.Title)
 		}
@@ -321,12 +323,16 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		}
 		if isChosen("Milestone") {
 			if len(milestones) > 1 {
+				var milestoneDefault interface{}
+				if len(issueState.Milestones) > 0 {
+					milestoneDefault = issueState.Milestones[0]
+				}
 				mqs = append(mqs, &survey.Question{
 					Name: "milestone",
 					Prompt: &survey.Select{
 						Message: "Milestone",
 						Options: milestones,
-						Default: issueState.Milestone,
+						Default: milestoneDefault,
 					},
 				})
 			} else {
@@ -339,8 +345,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			return fmt.Errorf("could not prompt: %w", err)
 		}
 
-		if issueState.Milestone == "(none)" {
-			issueState.Milestone = ""
+		if len(issueState.Milestones) > 0 && issueState.Milestones[0] == noMilestone {
+			issueState.Milestones = issueState.Milestones[0:0]
 		}
 
 		allowPreview = !issueState.HasMetadata()

@@ -381,9 +381,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
-	milestoneTitle, err := cmd.Flags().GetString("milestone")
-	if err != nil {
+	var milestoneTitles []string
+	if milestoneTitle, err := cmd.Flags().GetString("milestone"); err != nil {
 		return fmt.Errorf("could not parse milestone: %w", err)
+	} else if milestoneTitle != "" {
+		milestoneTitles = append(milestoneTitles, milestoneTitle)
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
@@ -419,10 +421,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	action := SubmitAction
 	tb := issueMetadataState{
-		Assignees: assignees,
-		Labels:    labelNames,
-		Projects:  projectNames,
-		Milestone: milestoneTitle,
+		Assignees:  assignees,
+		Labels:     labelNames,
+		Projects:   projectNames,
+		Milestones: milestoneTitles,
 	}
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
@@ -475,7 +477,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 					Assignees:  len(tb.Assignees) > 0,
 					Labels:     len(tb.Labels) > 0,
 					Projects:   len(tb.Projects) > 0,
-					Milestones: tb.Milestone != "",
+					Milestones: len(tb.Milestones) > 0,
 				}
 
 				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
@@ -485,7 +487,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
+			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
 			if err != nil {
 				return err
 			}
@@ -504,7 +506,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames []string, milestoneTitle string) error {
+func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames, milestoneTitles []string) error {
 	assigneeIDs, err := metadata.MembersToIDs(assignees)
 	if err != nil {
 		return fmt.Errorf("could not assign user: %w", err)
@@ -523,10 +525,10 @@ func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoM
 	}
 	params["projectIds"] = projectIDs
 
-	if milestoneTitle != "" {
-		milestoneID, err := metadata.MilestoneToID(milestoneTitle)
+	if len(milestoneTitles) > 0 {
+		milestoneID, err := metadata.MilestoneToID(milestoneTitles[0])
 		if err != nil {
-			return fmt.Errorf("could not add to milestone '%s': %w", milestoneTitle, err)
+			return fmt.Errorf("could not add to milestone '%s': %w", milestoneTitles[0], err)
 		}
 		params["milestoneId"] = milestoneID
 	}
