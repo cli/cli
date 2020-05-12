@@ -143,6 +143,14 @@ type PullRequestReviewStatus struct {
 	ReviewRequired   bool
 }
 
+type PullRequestMergeMethod int
+
+const (
+	PullRequestMergeMethodMerge PullRequestMergeMethod = iota
+	PullRequestMergeMethodRebase
+	PullRequestMergeMethodSquash
+)
+
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
@@ -466,6 +474,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	type response struct {
 		Repository struct {
 			PullRequests struct {
+				ID    githubv4.ID
 				Nodes []PullRequest
 			}
 		}
@@ -907,6 +916,34 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 
 	input := githubv4.ReopenPullRequestInput{
 		PullRequestID: pr.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+	mergeMethod := githubv4.PullRequestMergeMethodMerge
+	switch m {
+	case PullRequestMergeMethodRebase:
+		mergeMethod = githubv4.PullRequestMergeMethodRebase
+	case PullRequestMergeMethodSquash:
+		mergeMethod = githubv4.PullRequestMergeMethodSquash
+	}
+
+	var mutation struct {
+		MergePullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"mergePullRequest(input: $input)"`
+	}
+
+	input := githubv4.MergePullRequestInput{
+		PullRequestID: pr.ID,
+		MergeMethod:   &mergeMethod,
 	}
 
 	v4 := githubv4.NewClient(client.http)

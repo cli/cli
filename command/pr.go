@@ -25,6 +25,10 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
+	prCmd.AddCommand(prMergeCmd)
+	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
+	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
+	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -58,7 +62,7 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [{<number> | <url> | <branch>}]",
+	Use:   "view [<number> | <url> | <branch>]",
 	Short: "View a pull request",
 	Long: `Display the title, body, and other information about a pull request.
 
@@ -81,6 +85,13 @@ var prReopenCmd = &cobra.Command{
 	RunE:  prReopen,
 }
 
+var prMergeCmd = &cobra.Command{
+	Use:   "merge [<number> | <url> | <branch>]",
+	Short: "Merge a pull request",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  prMerge,
+}
+
 func prStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -100,6 +111,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
+
 	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
@@ -415,6 +427,75 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
+
+	return nil
+}
+
+func prMerge(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	var pr *api.PullRequest
+	if len(args) > 0 {
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		if err != nil {
+			return err
+		}
+	} else {
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		if prNumber != 0 {
+			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+		} else {
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
+		return err
+	}
+
+	rebase, err := cmd.Flags().GetBool("rebase")
+	if err != nil {
+		return err
+	}
+	squash, err := cmd.Flags().GetBool("squash")
+	if err != nil {
+		return err
+	}
+
+	var output string
+	if rebase {
+		output = fmt.Sprintf("%s Rebased and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
+	} else if squash {
+		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
+	} else {
+		output = fmt.Sprintf("%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+	}
+
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprint(colorableOut(cmd), output)
 
 	return nil
 }
