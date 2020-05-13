@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -295,12 +296,6 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 }
 
 func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
-	type Hunk struct {
-		File    string
-		Diff    string
-		Comment string
-	}
-
 	hunks := []Hunk{
 		{"diff --git a/command/pr_review.go b/command/pr_review.go",
 			`@@ -11,7 +11,8 @@ import (
@@ -423,6 +418,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		return nil, nil
 	}
 
+	commentsMade := 0
 	skipFile := false
 	var skipping string
 	for _, hunk := range hunks {
@@ -488,7 +484,11 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 			if err != nil {
 				return nil, err
 			}
-			hunk.Comment = bodyAnswers.Body
+			body := trimBody(bodyAnswers.Body)
+			if !isBlank(body) {
+				hunk.Comment = bodyAnswers.Body
+				commentsMade++
+			}
 		}
 
 		if action == HunkActionQuit {
@@ -497,9 +497,28 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		}
 	}
 
-	fmt.Fprintln(out)
+	// TODO commentsMade ending up at 0, debug the string helpers.
+	fmt.Fprintf(out, "\nWrapping up a review with %s comments.\n", utils.Bold(fmt.Sprintf("%d", commentsMade)))
+
+	reviewData, err := reviewSurvey(cmd)
+
+	if err != nil {
+		return nil, err
+	}
+	if reviewData == nil && err == nil {
+		fmt.Fprint(out, "Discarding.\n")
+		return nil, nil
+	}
+
+	fmt.Fprintln(out, "would actually submit, here~")
 
 	return nil, nil
+}
+
+type Hunk struct {
+	File    string
+	Diff    string
+	Comment string
 }
 
 type HunkAction int
@@ -545,4 +564,15 @@ func patchSurvey() (HunkAction, error) {
 	}
 
 	return -1, nil
+}
+
+func trimBody(body string) string {
+	r := regexp.MustCompile(`(?s)======= everything below.*$`)
+	return r.ReplaceAllString(body, "")
+}
+
+func isBlank(body string) bool {
+	fmt.Println(body)
+	r := regexp.MustCompile(`(?s)\w*`)
+	return r.MatchString(body)
 }
