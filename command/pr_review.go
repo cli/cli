@@ -313,7 +313,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  
  	prReviewCmd.Flags().BoolP("approve", "a", false, "Approve pull request")
  	prReviewCmd.Flags().BoolP("request-changes", "r", false, "Request changes on a pull request")
-		`},
+		`, ""},
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -8,6 +8,7 @@ import (
  )
@@ -323,7 +323,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	initBlankContext("", "OWNER/REPO", "master")
  	http := initFakeHTTP()
  	for _, cmd := range []string{
-		`},
+		`, ""},
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -22,6 +23,7 @@ func TestPRReview_validation(t *testing.T) {
  }
@@ -333,7 +333,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	initBlankContext("", "OWNER/REPO", "master")
  	http := initFakeHTTP()
  	http.StubRepoResponse("OWNER", "REPO")
-		`},
+		`, ""},
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -67,6 +69,7 @@ func TestPRReview_url_arg(t *testing.T) {
  }
@@ -343,7 +343,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	initBlankContext("", "OWNER/REPO", "master")
  	http := initFakeHTTP()
  	http.StubRepoResponse("OWNER", "REPO")
-		`},
+		`, ""},
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -112,6 +115,7 @@ func TestPRReview_number_arg(t *testing.T) {
  }
@@ -353,7 +353,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	initBlankContext("", "OWNER/REPO", "feature")
  	http := initFakeHTTP()
  	http.StubRepoResponse("OWNER", "REPO")
-		`},
+		`, ""},
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -147,6 +151,7 @@ func TestPRReview_no_arg(t *testing.T) {
  }
@@ -362,7 +362,8 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 +	t.Skip("skipping until release is done")
  	initBlankContext("", "OWNER/REPO", "master")
  	http := initFakeHTTP()
- 	http.StubRepoResponse("OWNER", "REPO")`},
+ 	http.StubRepoResponse("OWNER", "REPO")`,
+			""},
 
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -156,6 +161,7 @@ func TestPRReview_blank_comment(t *testing.T) {
@@ -375,7 +376,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	http.StubRepoResponse("OWNER", "REPO")
  }
 
-		`},
+		`, ""},
 
 		{"diff --git a/command/pr_review_test.go b/command/pr_review_test.go",
 			`@@ -165,6 +171,7 @@ func TestPRReview_blank_request_changes(t *testing.T) {
@@ -384,7 +385,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
  	type c struct {
  		Cmd           string
  		ExpectedEvent string
-		`},
+		`, ""},
 
 		{"diff --git a/command/root.go b/command/root.go",
 			`@@ -271,7 +271,7 @@ func rootHelpFunc(command *cobra.Command, s []string) {
@@ -395,7 +396,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 +		} else if c != creditsCmd {
  			additionalCommands = append(additionalCommands, s)
  		}
- 	}`},
+ 	}`, ""},
 	}
 	out := colorableOut(cmd)
 
@@ -422,7 +423,16 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		return nil, nil
 	}
 
+	skipFile := false
+	var skipping string
 	for _, hunk := range hunks {
+		if skipFile {
+			if skipping == hunk.File {
+				continue
+			} else {
+				skipFile = false
+			}
+		}
 		fmt.Fprintf(out, "%s\n\n", utils.Bold(hunk.File))
 		md := fmt.Sprintf("```diff\n%s\n```", hunk.Diff)
 		rendered, err := utils.RenderMarkdown(md)
@@ -437,6 +447,11 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		action, err := patchSurvey()
 		if err != nil {
 			return nil, err
+		}
+
+		if action == HunkActionSkipFile {
+			skipFile = true
+			skipping = hunk.File
 		}
 
 		if action == HunkActionComment {
