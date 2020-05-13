@@ -336,7 +336,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	var repoToFork ghrepo.Interface
 	inParent := false // whether or not we're forking the repo we're currently "in"
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(cmd, ctx)
+		baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
@@ -487,11 +487,15 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
-		toView, err = determineBaseRepo(cmd, ctx)
+		toView, err = determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return err
 		}
@@ -512,10 +516,6 @@ func repoView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
 	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err

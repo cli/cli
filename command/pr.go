@@ -104,7 +104,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	}
 
 	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(cmd, ctx)
+		baseRepo, err = determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return err
 		}
@@ -366,7 +366,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
