@@ -99,7 +99,6 @@ func CheckScopes(wantedScope string, cb func(string, string) error) ClientOption
 				if err := cb(wantedScope, appID); err != nil {
 					return res, err
 				}
-				// TODO seems like we should call RoundTrip again? I tried but it didn't work
 				issuedScopesWarning = true
 			}
 
