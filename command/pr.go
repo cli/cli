@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -21,17 +22,23 @@ func init() {
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
-	prCmd.AddCommand(prListCmd)
 	prCmd.AddCommand(prStatusCmd)
-	prCmd.AddCommand(prViewCmd)
+	prCmd.AddCommand(prCloseCmd)
+	prCmd.AddCommand(prReopenCmd)
+	prCmd.AddCommand(prMergeCmd)
+	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
+	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
+	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 
+	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
-	prViewCmd.Flags().BoolP("preview", "p", false, "Display preview of pull request content")
+	prCmd.AddCommand(prViewCmd)
+	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
 }
 
 var prCmd = &cobra.Command{
@@ -55,13 +62,34 @@ var prStatusCmd = &cobra.Command{
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
-	Use:   "view [{<number> | <url> | <branch>}]",
-	Short: "View a pull request in the browser",
-	Long: `View a pull request specified by the argument in the browser.
+	Use:   "view [<number> | <url> | <branch>]",
+	Short: "View a pull request",
+	Long: `Display the title, body, and other information about a pull request.
 
-Without an argument, the pull request that belongs to the current
-branch is opened.`,
+Without an argument, the pull request that belongs to the current branch
+is displayed.
+
+With '--web', open the pull request in a web browser instead.`,
 	RunE: prView,
+}
+var prCloseCmd = &cobra.Command{
+	Use:   "close {<number> | <url> | <branch>}",
+	Short: "Close a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prClose,
+}
+var prReopenCmd = &cobra.Command{
+	Use:   "reopen {<number> | <url> | <branch>}",
+	Short: "Reopen a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prReopen,
+}
+
+var prMergeCmd = &cobra.Command{
+	Use:   "merge [<number> | <url> | <branch>]",
+	Short: "Merge a pull request",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  prMerge,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -71,10 +99,6 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx)
-	if err != nil {
-		return err
-	}
 	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
@@ -83,6 +107,13 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
+	}
+
+	repoOverride, _ := cmd.Flags().GetString("repo")
+	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
+
+	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
+		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
 
 	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
@@ -97,11 +128,17 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(out, "")
 
 	printHeader(out, "Current branch")
-	if prPayload.CurrentPR != nil {
-		printPrs(out, 0, *prPayload.CurrentPR)
+	currentPR := prPayload.CurrentPR
+	currentBranch, _ := ctx.Branch()
+	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+		currentPR = nil
+	}
+	if currentPR != nil {
+		printPrs(out, 1, *currentPR)
+	} else if currentPRHeadRef == "" {
+		printMessage(out, "  There is no current branch")
 	} else {
-		message := fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]"))
-		printMessage(out, message)
+		printMessage(out, fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]")))
 	}
 	fmt.Fprintln(out)
 
@@ -135,8 +172,6 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nPull requests for %s\n\n", ghrepo.FullName(baseRepo))
 
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
@@ -188,33 +223,30 @@ func prList(cmd *cobra.Command, args []string) error {
 		params["assignee"] = assignee
 	}
 
-	prs, err := api.PullRequestList(apiClient, params, limit)
+	listResult, err := api.PullRequestList(apiClient, params, limit)
 	if err != nil {
 		return err
 	}
 
-	if len(prs) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open prs" message is actually a pr
-		msg := "There are no open pull requests"
-
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No pull requests match your search"
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "base", "assignee":
+			hasFilters = true
 		}
-		printMessage(colorErr, msg)
-		return nil
-	}
+	})
+
+	title := listHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	table := utils.NewTablePrinter(cmd.OutOrStdout())
-	for _, pr := range prs {
+	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForState(pr.State))
+		table.AddField(prNum, nil, colorFuncForPR(pr))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
@@ -227,6 +259,22 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func prStateTitleWithColor(pr api.PullRequest) string {
+	prStateColorFunc := colorFuncForPR(pr)
+	if pr.State == "OPEN" && pr.IsDraft {
+		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+	}
+	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+}
+
+func colorFuncForPR(pr api.PullRequest) func(string) string {
+	if pr.State == "OPEN" && pr.IsDraft {
+		return utils.Gray
+	}
+	return colorFuncForState(pr.State)
+}
+
+// colorFuncForState returns a color function for a PR/Issue state
 func colorFuncForState(state string) func(string) string {
 	switch state {
 	case "OPEN":
@@ -248,12 +296,24 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return err
+	var baseRepo ghrepo.Interface
+	var prArg string
+	if len(args) > 0 {
+		prArg = args[0]
+		if prNum, repo := prFromURL(prArg); repo != nil {
+			prArg = prNum
+			baseRepo = repo
+		}
 	}
 
-	preview, err := cmd.Flags().GetBool("preview")
+	if baseRepo == nil {
+		baseRepo, err = determineBaseRepo(cmd, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -261,27 +321,27 @@ func prView(cmd *cobra.Command, args []string) error {
 	var openURL string
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		pr, err = prFromArg(apiClient, baseRepo, prArg)
 		if err != nil {
 			return err
 		}
 		openURL = pr.URL
 	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx)
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
 		if err != nil {
 			return err
 		}
 
 		if prNumber > 0 {
 			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if preview {
+			if !web {
 				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, branchWithOwner)
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
 			if err != nil {
 				return err
 			}
@@ -290,24 +350,192 @@ func prView(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printPrPreview(out, pr)
 	}
 }
 
+func prClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d\n", utils.Red("✔"), pr.Number)
+
+	return nil
+}
+
+func prReopen(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d can't be reopened because it was already merged", utils.Red("!"), pr.Number)
+		return err
+	}
+
+	if !pr.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already open\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestReopen(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
+
+	return nil
+}
+
+func prMerge(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	var pr *api.PullRequest
+	if len(args) > 0 {
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		if err != nil {
+			return err
+		}
+	} else {
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		if prNumber != 0 {
+			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+		} else {
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
+		return err
+	}
+
+	rebase, err := cmd.Flags().GetBool("rebase")
+	if err != nil {
+		return err
+	}
+	squash, err := cmd.Flags().GetBool("squash")
+	if err != nil {
+		return err
+	}
+
+	var output string
+	if rebase {
+		output = fmt.Sprintf("%s Rebased and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
+	} else if squash {
+		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
+	} else {
+		output = fmt.Sprintf("%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+	}
+
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprint(colorableOut(cmd), output)
+
+	return nil
+}
+
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
+	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		"%s wants to merge %s into %s from %s",
+		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
 	)))
+	fmt.Fprintln(out)
+
+	// Metadata
+	if reviewers := prReviewerList(*pr); reviewers != "" {
+		fmt.Fprint(out, utils.Bold("Reviewers: "))
+		fmt.Fprintln(out, reviewers)
+	}
+	if assignees := prAssigneeList(*pr); assignees != "" {
+		fmt.Fprint(out, utils.Bold("Assignees: "))
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := prLabelList(*pr); labels != "" {
+		fmt.Fprint(out, utils.Bold("Labels: "))
+		fmt.Fprintln(out, labels)
+	}
+	if projects := prProjectList(*pr); projects != "" {
+		fmt.Fprint(out, utils.Bold("Projects: "))
+		fmt.Fprintln(out, projects)
+	}
+	if pr.Milestone.Title != "" {
+		fmt.Fprint(out, utils.Bold("Milestone: "))
+		fmt.Fprintln(out, pr.Milestone.Title)
+	}
+
+	// Body
 	if pr.Body != "" {
 		fmt.Fprintln(out)
 		md, err := utils.RenderMarkdown(pr.Body)
@@ -315,33 +543,197 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 			return err
 		}
 		fmt.Fprintln(out, md)
-		fmt.Fprintln(out)
 	}
+	fmt.Fprintln(out)
 
+	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
 }
 
-var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+// Ref. https://developer.github.com/v4/enum/pullrequestreviewstate/
+const (
+	requestedReviewState        = "REQUESTED" // This is our own state for review request
+	approvedReviewState         = "APPROVED"
+	changesRequestedReviewState = "CHANGES_REQUESTED"
+	commentedReviewState        = "COMMENTED"
+)
 
-func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(arg); err == nil {
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		prNumber, _ := strconv.Atoi(m[3])
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, arg)
+type reviewerState struct {
+	Name  string
+	State string
 }
 
-func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef string, err error) {
-	baseRepo, err := ctx.BaseRepo()
-	if err != nil {
-		return
+// colorFuncForReviewerState returns a color function for a reviewer state
+func colorFuncForReviewerState(state string) func(string) string {
+	switch state {
+	case requestedReviewState:
+		return utils.Yellow
+	case approvedReviewState:
+		return utils.Green
+	case changesRequestedReviewState:
+		return utils.Red
+	case commentedReviewState:
+		return func(str string) string { return str } // Do nothing
+	default:
+		return nil
 	}
+}
+
+// formattedReviewerState formats a reviewerState with state color
+func formattedReviewerState(reviewer *reviewerState) string {
+	stateColorFunc := colorFuncForReviewerState(reviewer.State)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " ")))
+}
+
+// prReviewerList generates a reviewer list with their last state
+func prReviewerList(pr api.PullRequest) string {
+	reviewerStates := parseReviewers(pr)
+	reviewers := make([]string, 0, len(reviewerStates))
+
+	sortReviewerStates(reviewerStates)
+
+	for _, reviewer := range reviewerStates {
+		reviewers = append(reviewers, formattedReviewerState(reviewer))
+	}
+
+	reviewerList := strings.Join(reviewers, ", ")
+
+	return reviewerList
+}
+
+// Ref. https://developer.github.com/v4/union/requestedreviewer/
+const teamTypeName = "Team"
+
+const ghostName = "ghost"
+
+// parseReviewers parses given Reviews and ReviewRequests
+func parseReviewers(pr api.PullRequest) []*reviewerState {
+	reviewerStates := make(map[string]*reviewerState)
+
+	for _, review := range pr.Reviews.Nodes {
+		if review.Author.Login != pr.Author.Login {
+			name := review.Author.Login
+			if name == "" {
+				name = ghostName
+			}
+			reviewerStates[name] = &reviewerState{
+				Name:  name,
+				State: review.State,
+			}
+		}
+	}
+
+	// Overwrite reviewer's state if a review request for the same reviewer exists.
+	for _, reviewRequest := range pr.ReviewRequests.Nodes {
+		name := reviewRequest.RequestedReviewer.Login
+		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
+			name = reviewRequest.RequestedReviewer.Name
+		}
+		reviewerStates[name] = &reviewerState{
+			Name:  name,
+			State: requestedReviewState,
+		}
+	}
+
+	// Convert map to slice for ease of sort
+	result := make([]*reviewerState, 0, len(reviewerStates))
+	for _, reviewer := range reviewerStates {
+		result = append(result, reviewer)
+	}
+
+	return result
+}
+
+// sortReviewerStates puts completed reviews before review requests and sorts names alphabetically
+func sortReviewerStates(reviewerStates []*reviewerState) {
+	sort.Slice(reviewerStates, func(i, j int) bool {
+		if reviewerStates[i].State == requestedReviewState &&
+			reviewerStates[j].State != requestedReviewState {
+			return false
+		}
+		if reviewerStates[j].State == requestedReviewState &&
+			reviewerStates[i].State != requestedReviewState {
+			return true
+		}
+
+		return reviewerStates[i].Name < reviewerStates[j].Name
+	})
+}
+
+func prAssigneeList(pr api.PullRequest) string {
+	if len(pr.Assignees.Nodes) == 0 {
+		return ""
+	}
+
+	AssigneeNames := make([]string, 0, len(pr.Assignees.Nodes))
+	for _, assignee := range pr.Assignees.Nodes {
+		AssigneeNames = append(AssigneeNames, assignee.Login)
+	}
+
+	list := strings.Join(AssigneeNames, ", ")
+	if pr.Assignees.TotalCount > len(pr.Assignees.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func prLabelList(pr api.PullRequest) string {
+	if len(pr.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := make([]string, 0, len(pr.Labels.Nodes))
+	for _, label := range pr.Labels.Nodes {
+		labelNames = append(labelNames, label.Name)
+	}
+
+	list := strings.Join(labelNames, ", ")
+	if pr.Labels.TotalCount > len(pr.Labels.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func prProjectList(pr api.PullRequest) string {
+	if len(pr.ProjectCards.Nodes) == 0 {
+		return ""
+	}
+
+	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
+	for _, project := range pr.ProjectCards.Nodes {
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
+	}
+
+	list := strings.Join(projectNames, ", ")
+	if pr.ProjectCards.TotalCount > len(pr.ProjectCards.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+
+func prFromURL(arg string) (string, ghrepo.Interface) {
+	if m := prURLRE.FindStringSubmatch(arg); m != nil {
+		return m[3], ghrepo.New(m[1], m[2])
+	}
+	return "", nil
+}
+
+func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
+	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
+		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+	}
+
+	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
+}
+
+func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
 	prHeadRef, err = ctx.Branch()
 	if err != nil {
 		return
@@ -385,36 +777,58 @@ func prSelectorForCurrentBranch(ctx context.Context) (prNumber int, prHeadRef st
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
-		fmt.Fprintf(w, "  %s  %s %s", utils.Green(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+
+		prStateColorFunc := utils.Green
+		if pr.IsDraft {
+			prStateColorFunc = utils.Gray
+		} else if pr.State == "MERGED" {
+			prStateColorFunc = utils.Magenta
+		} else if pr.State == "CLOSED" {
+			prStateColorFunc = utils.Red
+		}
+
+		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
-		if checks.Total > 0 || reviews.ChangesRequested || reviews.Approved {
-			fmt.Fprintf(w, "\n  ")
-		}
 
-		if checks.Total > 0 {
-			var summary string
-			if checks.Failing > 0 {
-				if checks.Failing == checks.Total {
-					summary = utils.Red("All checks failing")
-				} else {
-					summary = utils.Red(fmt.Sprintf("%d/%d checks failing", checks.Failing, checks.Total))
-				}
-			} else if checks.Pending > 0 {
-				summary = utils.Yellow("Checks pending")
-			} else if checks.Passing == checks.Total {
-				summary = utils.Green("Checks passing")
+		if pr.State == "OPEN" {
+			reviewStatus := reviews.ChangesRequested || reviews.Approved || reviews.ReviewRequired
+			if checks.Total > 0 || reviewStatus {
+				// show checks & reviews on their own line
+				fmt.Fprintf(w, "\n  ")
 			}
-			fmt.Fprintf(w, " - %s", summary)
-		}
 
-		if reviews.ChangesRequested {
-			fmt.Fprintf(w, " - %s", utils.Red("Changes requested"))
-		} else if reviews.ReviewRequired {
-			fmt.Fprintf(w, " - %s", utils.Yellow("Review required"))
-		} else if reviews.Approved {
-			fmt.Fprintf(w, " - %s", utils.Green("Approved"))
+			if checks.Total > 0 {
+				var summary string
+				if checks.Failing > 0 {
+					if checks.Failing == checks.Total {
+						summary = utils.Red("× All checks failing")
+					} else {
+						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
+					}
+				} else if checks.Pending > 0 {
+					summary = utils.Yellow("- Checks pending")
+				} else if checks.Passing == checks.Total {
+					summary = utils.Green("✓ Checks passing")
+				}
+				fmt.Fprint(w, summary)
+			}
+
+			if checks.Total > 0 && reviewStatus {
+				// add padding between checks & reviews
+				fmt.Fprint(w, " ")
+			}
+
+			if reviews.ChangesRequested {
+				fmt.Fprint(w, utils.Red("+ Changes requested"))
+			} else if reviews.ReviewRequired {
+				fmt.Fprint(w, utils.Yellow("- Review required"))
+			} else if reviews.Approved {
+				fmt.Fprint(w, utils.Green("✓ Approved"))
+			}
+		} else {
+			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
 		fmt.Fprint(w, "\n")

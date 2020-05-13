@@ -28,7 +28,7 @@ func Truncate(max int, s string) string {
 	useEllipsis := false
 	if max >= minWidthForEllipsis {
 		useEllipsis = true
-		max -= 3
+		max -= ellipsisWidth
 	}
 
 	cw := 0

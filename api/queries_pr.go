@@ -1,16 +1,33 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/shurcooL/githubv4"
+
 	"github.com/cli/cli/internal/ghrepo"
 )
+
+type PullRequestReviewState int
+
+const (
+	ReviewApprove PullRequestReviewState = iota
+	ReviewRequestChanges
+	ReviewComment
+)
+
+type PullRequestReviewInput struct {
+	Body  string
+	State PullRequestReviewState
+}
 
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
 	CurrentPR       *PullRequest
+	DefaultBranch   string
 }
 
 type PullRequestAndTotalCount struct {
@@ -19,9 +36,11 @@ type PullRequestAndTotalCount struct {
 }
 
 type PullRequest struct {
+	ID          string
 	Number      int
 	Title       string
 	State       string
+	Closed      bool
 	URL         string
 	BaseRefName string
 	HeadRefName string
@@ -40,6 +59,7 @@ type PullRequest struct {
 		}
 	}
 	IsCrossRepository   bool
+	IsDraft             bool
 	MaintainerCanModify bool
 
 	ReviewDecision string
@@ -60,6 +80,50 @@ type PullRequest struct {
 			}
 		}
 	}
+	ReviewRequests struct {
+		Nodes []struct {
+			RequestedReviewer struct {
+				TypeName string `json:"__typename"`
+				Login    string
+				Name     string
+			}
+		}
+		TotalCount int
+	}
+	Reviews struct {
+		Nodes []struct {
+			Author struct {
+				Login string
+			}
+			State string
+		}
+	}
+	Assignees struct {
+		Nodes []struct {
+			Login string
+		}
+		TotalCount int
+	}
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	}
+	ProjectCards struct {
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
+			}
+		}
+		TotalCount int
+	}
+	Milestone struct {
+		Title string
+	}
 }
 
 type NotFoundError struct {
@@ -79,8 +143,16 @@ type PullRequestReviewStatus struct {
 	ReviewRequired   bool
 }
 
+type PullRequestMergeMethod int
+
+const (
+	PullRequestMergeMethodMerge PullRequestMergeMethod = iota
+	PullRequestMergeMethodRebase
+	PullRequestMergeMethodSquash
+)
+
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
-	status := PullRequestReviewStatus{}
+	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
 	case "CHANGES_REQUESTED":
 		status.ChangesRequested = true
@@ -119,7 +191,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 			summary.Passing++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS":
+		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
 			summary.Pending++
 		default:
 			panic(fmt.Errorf("unsupported status: %q", state))
@@ -139,6 +211,9 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 
 	type response struct {
 		Repository struct {
+			DefaultBranchRef struct {
+				Name string
+			}
 			PullRequests edges
 			PullRequest  *PullRequest
 		}
@@ -150,12 +225,14 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	fragment pr on PullRequest {
 		number
 		title
+		state
 		url
 		headRefName
 		headRepositoryOwner {
 			login
 		}
 		isCrossRepository
+		isDraft
 		commits(last: 1) {
 			nodes {
 				commit {
@@ -185,7 +262,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: OPEN, first: $per_page) {
+			defaultBranchRef { name }
+			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
 				edges {
 					node {
@@ -199,6 +277,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		queryPrefix = `
 		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
+				defaultBranchRef { name }
 				pullRequest(number: $number) {
 					...prWithReviews
 				}
@@ -264,6 +343,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
 				currentPR = &edge.Node
+				break // Take the most recent PR for the current branch
 			}
 		}
 	}
@@ -277,7 +357,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR: currentPR,
+		CurrentPR:     currentPR,
+		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
 	}
 
 	return &payload, nil
@@ -294,9 +375,12 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	query($owner: String!, $repo: String!, $pr_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pr_number) {
+				id
 				url
 				number
 				title
+				state
+				closed
 				body
 				author {
 				  login
@@ -316,7 +400,57 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 				}
 				isCrossRepository
+				isDraft
 				maintainerCanModify
+				reviewRequests(first: 100) {
+					nodes {
+						requestedReviewer {
+							__typename
+							...on User {
+								login
+							}
+							...on Team {
+								name
+							}
+						}
+					}
+					totalCount
+				}
+				reviews(last: 100) {
+					nodes {
+						author {
+						  login
+						}
+						state
+					}
+					totalCount
+				}
+				assignees(first: 100) {
+					nodes {
+						login
+					}
+					totalCount
+				}
+				labels(first: 100) {
+					nodes {
+						name
+					}
+					totalCount
+				}
+				projectCards(first: 100) {
+					nodes {
+						project {
+							name
+						}
+						column {
+							name
+						}
+					}
+					totalCount
+				}
+				milestone{
+					title
+				}
 			}
 		}
 	}`
@@ -336,10 +470,11 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) (*PullRequest, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
+				ID    githubv4.ID
 				Nodes []PullRequest
 			}
 		}
@@ -350,8 +485,10 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
 				nodes {
+					id
 					number
 					title
+					state
 					body
 					author {
 						login
@@ -366,14 +503,64 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 						login
 					}
 					isCrossRepository
+					isDraft
+					reviewRequests(first: 100) {
+						nodes {
+							requestedReviewer {
+								__typename
+								...on User {
+									login
+								}
+								...on Team {
+									name
+								}
+							}
+						}
+						totalCount
+					}
+					reviews(last: 100) {
+						nodes {
+							author {
+							  login
+							}
+							state
+						}
+						totalCount
+					}
+					assignees(first: 100) {
+						nodes {
+							login
+						}
+						totalCount
+					}
+					labels(first: 100) {
+						nodes {
+							name
+						}
+						totalCount
+					}
+					projectCards(first: 100) {
+						nodes {
+							project {
+								name
+							}
+							column {
+								name
+							}
+						}
+						totalCount
+					}
+					milestone{
+						title
+					}
 				}
 			}
 		}
 	}`
 
-	branchWithoutOwner := branch
-	if idx := strings.Index(branch, ":"); idx >= 0 {
-		branchWithoutOwner = branch[idx+1:]
+	branchWithoutOwner := headBranch
+	if idx := strings.Index(headBranch, ":"); idx >= 0 {
+		branchWithoutOwner = headBranch[idx+1:]
 	}
 
 	variables := map[string]interface{}{
@@ -389,12 +576,17 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, branch string) 
 	}
 
 	for _, pr := range resp.Repository.PullRequests.Nodes {
-		if pr.HeadLabel() == branch {
+		if pr.HeadLabel() == headBranch {
+			if baseBranch != "" {
+				if pr.BaseRefName != baseBranch {
+					continue
+				}
+			}
 			return &pr, nil
 		}
 	}
 
-	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", branch)}
+	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
@@ -403,6 +595,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		mutation CreatePullRequest($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
 				pullRequest {
+					id
 					url
 				}
 			}
@@ -412,7 +605,10 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "title", "body", "draft", "baseRefName", "headRefName":
+			inputParams[key] = val
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -428,11 +624,102 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	if err != nil {
 		return nil, err
 	}
+	pr := &result.CreatePullRequest.PullRequest
 
-	return &result.CreatePullRequest.PullRequest, nil
+	// metadata parameters aren't currently available in `createPullRequest`,
+	// but they are in `updatePullRequest`
+	updateParams := make(map[string]interface{})
+	for key, val := range params {
+		switch key {
+		case "assigneeIds", "labelIds", "projectIds", "milestoneId":
+			if !isBlank(val) {
+				updateParams[key] = val
+			}
+		}
+	}
+	if len(updateParams) > 0 {
+		updateQuery := `
+		mutation UpdatePullRequest($input: UpdatePullRequestInput!) {
+			updatePullRequest(input: $input) { clientMutationId }
+		}`
+		updateParams["pullRequestId"] = pr.ID
+		variables := map[string]interface{}{
+			"input": updateParams,
+		}
+		err := client.GraphQL(updateQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// reviewers are requested in yet another additional mutation
+	reviewParams := make(map[string]interface{})
+	if ids, ok := params["userReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["userIds"] = ids
+	}
+	if ids, ok := params["teamReviewerIds"]; ok && !isBlank(ids) {
+		reviewParams["teamIds"] = ids
+	}
+
+	if len(reviewParams) > 0 {
+		reviewQuery := `
+		mutation RequestReviews($input: RequestReviewsInput!) {
+			requestReviews(input: $input) { clientMutationId }
+		}`
+		reviewParams["pullRequestId"] = pr.ID
+		reviewParams["union"] = true
+		variables := map[string]interface{}{
+			"input": reviewParams,
+		}
+		err := client.GraphQL(reviewQuery, variables, &result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pr, nil
 }
 
-func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]PullRequest, error) {
+func isBlank(v interface{}) bool {
+	switch vv := v.(type) {
+	case string:
+		return vv == ""
+	case []string:
+		return len(vv) == 0
+	default:
+		return true
+	}
+}
+
+func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
+	var mutation struct {
+		AddPullRequestReview struct {
+			ClientMutationID string
+		} `graphql:"addPullRequestReview(input:$input)"`
+	}
+
+	state := githubv4.PullRequestReviewEventComment
+	switch input.State {
+	case ReviewApprove:
+		state = githubv4.PullRequestReviewEventApprove
+	case ReviewRequestChanges:
+		state = githubv4.PullRequestReviewEventRequestChanges
+	}
+
+	body := githubv4.String(input.Body)
+
+	gqlInput := githubv4.AddPullRequestReviewInput{
+		PullRequestID: pr.ID,
+		Event:         &state,
+		Body:          &body,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+
+	return v4.Mutate(context.Background(), &mutation, gqlInput, nil)
+}
+
+func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
 	type prBlock struct {
 		Edges []struct {
 			Node PullRequest
@@ -441,6 +728,8 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			HasNextPage bool
 			EndCursor   string
 		}
+		TotalCount int
+		IssueCount int
 	}
 	type response struct {
 		Repository struct {
@@ -460,6 +749,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			login
 		}
 		isCrossRepository
+		isDraft
 	}
 	`
 
@@ -483,23 +773,26 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			first: $limit,
 			after: $endCursor,
 			orderBy: {field: CREATED_AT, direction: DESC}
-		) {
-          edges {
-            node {
-				...pr
-            }
-		  }
-		  pageInfo {
-			  hasNextPage
-			  endCursor
-		  }
-        }
-      }
+			) {
+				totalCount
+				edges {
+					node {
+						...pr
+					}
+				}
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}
 	}`
 
+	var check = make(map[int]struct{})
 	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
+	res := PullRequestAndTotalCount{}
 
 	// If assignee was specified, use the `search` API rather than
 	// `Repository.pullRequests`, but this mode doesn't support multiple labels
@@ -511,6 +804,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) ([]
 			$endCursor: String,
 		) {
 			search(query: $q, type: ISSUE, first: $limit, after: $endCursor) {
+				issueCount
 				edges {
 					node {
 						...pr
@@ -564,12 +858,19 @@ loop:
 			return nil, err
 		}
 		prData := data.Repository.PullRequests
+		res.TotalCount = prData.TotalCount
 		if _, ok := variables["q"]; ok {
 			prData = data.Search
+			res.TotalCount = prData.IssueCount
 		}
 
 		for _, edge := range prData.Edges {
+			if _, exists := check[edge.Node.Number]; exists {
+				continue
+			}
+
 			prs = append(prs, edge.Node)
+			check[edge.Node.Number] = struct{}{}
 			if len(prs) == limit {
 				break loop
 			}
@@ -582,8 +883,74 @@ loop:
 			break
 		}
 	}
+	res.PullRequests = prs
+	return &res, nil
+}
 
-	return prs, nil
+func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ClosePullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"closePullRequest(input: $input)"`
+	}
+
+	input := githubv4.ClosePullRequestInput{
+		PullRequestID: pr.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
+func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ReopenPullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenPullRequest(input: $input)"`
+	}
+
+	input := githubv4.ReopenPullRequestInput{
+		PullRequestID: pr.ID,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+	mergeMethod := githubv4.PullRequestMergeMethodMerge
+	switch m {
+	case PullRequestMergeMethodRebase:
+		mergeMethod = githubv4.PullRequestMergeMethodRebase
+	case PullRequestMergeMethodSquash:
+		mergeMethod = githubv4.PullRequestMergeMethodSquash
+	}
+
+	var mutation struct {
+		MergePullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"mergePullRequest(input: $input)"`
+	}
+
+	input := githubv4.MergePullRequestInput{
+		PullRequestID: pr.ID,
+		MergeMethod:   &mergeMethod,
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
 }
 
 func min(a, b int) int {

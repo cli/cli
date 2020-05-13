@@ -1,0 +1,92 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "**bold story**",
+        "title": "ix of coins",
+        "state": "OPEN",
+        "created_at": "2011-01-26T19:01:12Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            },
+            {
+              "login": "monaco"
+            }
+          ],
+          "totalcount": 2
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "one"
+            },
+            {
+              "name": "two"
+            },
+            {
+              "name": "three"
+            },
+            {
+              "name": "four"
+            },
+            {
+              "name": "five"
+            }
+          ],
+          "totalcount": 5
+        },
+        "projectcards": {
+          "nodes": [
+            {
+              "project": {
+                "name": "Project 1"
+              },
+              "column": {
+                "name": "column A"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 2"
+              },
+              "column": {
+                "name": "column B"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 3"
+              },
+              "column": {
+                "name": "column C"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 4"
+              },
+              "column": {
+                "name": ""
+              }
+            }
+          ],
+          "totalcount": 3
+        },
+        "milestone": {
+          "title": "uluru"
+        },
+        "comments": {
+          "totalcount": 9
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

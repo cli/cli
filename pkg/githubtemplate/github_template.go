@@ -59,18 +59,19 @@ mainLoop:
 		}
 	}
 
-	sort.Sort(sort.StringSlice(results))
+	sort.Strings(results)
 	return results
 }
 
 // ExtractName returns the name of the template from YAML front-matter
 func ExtractName(filePath string) string {
 	contents, err := ioutil.ReadFile(filePath)
-	if err == nil && detectFrontmatter(contents)[0] == 0 {
+	frontmatterBoundaries := detectFrontmatter(contents)
+	if err == nil && frontmatterBoundaries[0] == 0 {
 		templateData := struct {
 			Name string
 		}{}
-		if err := yaml.Unmarshal(contents, &templateData); err == nil && templateData.Name != "" {
+		if err := yaml.Unmarshal(contents[0:frontmatterBoundaries[1]], &templateData); err == nil && templateData.Name != "" {
 			return templateData.Name
 		}
 	}

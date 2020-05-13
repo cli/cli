@@ -4,10 +4,26 @@
       "pullRequest": {
         "number": 12,
         "title": "Blueberries are from a fork",
+        "state": "OPEN",
         "body": "**blueberries taste good**",
         "url": "https://github.com/OWNER/REPO/pull/12",
         "author": {
           "login": "nobody"
+        },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
         },
         "commits": {
           "totalCount": 12
@@ -17,7 +33,8 @@
         "headRepositoryOwner": {
           "login": "hubot"
         },
-        "isCrossRepository": true
+        "isCrossRepository": true,
+        "isDraft": false
       }
     }
   }

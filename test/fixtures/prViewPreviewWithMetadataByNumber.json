@@ -1,0 +1,130 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "reviewRequests": {
+            "nodes": [
+                {
+                    "requestedReviewer": {
+                        "__typename": "User",
+                        "login": "1"
+                    }
+                }
+            ],
+            "totalcount": 1
+        },
+        "reviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "3"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "login": "2"
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": "1"
+              },
+              "state": "CHANGES_REQUESTED"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            },
+            {
+              "login": "monaco"
+            }
+          ],
+          "totalcount": 2
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "one"
+            },
+            {
+              "name": "two"
+            },
+            {
+              "name": "three"
+            },
+            {
+              "name": "four"
+            },
+            {
+              "name": "five"
+            }
+          ],
+          "totalcount": 5
+        },
+        "projectcards": {
+          "nodes": [
+            {
+              "project": {
+                "name": "Project 1"
+              },
+              "column": {
+                "name": "column A"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 2"
+              },
+              "column": {
+                "name": "column B"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 3"
+              },
+              "column": {
+                "name": "column C"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 4"
+              },
+              "column": {
+                "name": ""
+              }
+            }
+          ],
+          "totalcount": 3
+        },
+        "milestone": {
+          "title": "uluru"
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false
+      }
+    }
+  }
+}

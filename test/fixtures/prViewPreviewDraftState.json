@@ -1,0 +1,26 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": true
+      }
+    }
+  }
+}

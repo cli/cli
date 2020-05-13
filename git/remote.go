@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
 )
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
@@ -71,34 +71,32 @@ func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 	return
 }
 
-// AddRemote adds a new git remote. The initURL is the remote URL with which the
-// automatic fetch is made and finalURL, if non-blank, is set as the remote URL
-// after the fetch.
-func AddRemote(name, initURL, finalURL string) (*Remote, error) {
-	addCmd := exec.Command("git", "remote", "add", "-f", name, initURL)
-	err := utils.PrepareCmd(addCmd).Run()
+// AddRemote adds a new git remote and auto-fetches objects from it
+func AddRemote(name, u string) (*Remote, error) {
+	addCmd := exec.Command("git", "remote", "add", "-f", name, u)
+	err := run.PrepareCmd(addCmd).Run()
 	if err != nil {
 		return nil, err
 	}
 
-	if finalURL == "" {
-		finalURL = initURL
-	} else {
-		setCmd := exec.Command("git", "remote", "set-url", name, finalURL)
-		err := utils.PrepareCmd(setCmd).Run()
+	var urlParsed *url.URL
+	if strings.HasPrefix(u, "https") {
+		urlParsed, err = url.Parse(u)
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	finalURLParsed, err := url.Parse(finalURL)
-	if err != nil {
-		return nil, err
+	} else {
+		urlParsed, err = ParseURL(u)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return &Remote{
 		Name:     name,
-		FetchURL: finalURLParsed,
-		PushURL:  finalURLParsed,
+		FetchURL: urlParsed,
+		PushURL:  urlParsed,
 	}, nil
 }

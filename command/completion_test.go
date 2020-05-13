@@ -6,7 +6,7 @@ import (
 )
 
 func TestCompletion_bash(t *testing.T) {
-	output, err := RunCommand(completionCmd, `completion`)
+	output, err := RunCommand(`completion`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -17,7 +17,7 @@ func TestCompletion_bash(t *testing.T) {
 }
 
 func TestCompletion_zsh(t *testing.T) {
-	output, err := RunCommand(completionCmd, `completion -s zsh`)
+	output, err := RunCommand(`completion -s zsh`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestCompletion_zsh(t *testing.T) {
 }
 
 func TestCompletion_fish(t *testing.T) {
-	output, err := RunCommand(completionCmd, `completion -s fish`)
+	output, err := RunCommand(`completion -s fish`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +38,19 @@ func TestCompletion_fish(t *testing.T) {
 	}
 }
 
+func TestCompletion_powerShell(t *testing.T) {
+	output, err := RunCommand(`completion -s powershell`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(output.String(), "Register-ArgumentCompleter") {
+		t.Errorf("problem in powershell completion:\n%s", output)
+	}
+}
+
 func TestCompletion_unsupported(t *testing.T) {
-	_, err := RunCommand(completionCmd, `completion -s csh`)
+	_, err := RunCommand(`completion -s csh`)
 	if err == nil || err.Error() != `unsupported shell type "csh"` {
 		t.Fatal(err)
 	}

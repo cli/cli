@@ -1,0 +1,50 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 12,
+            "title": "Blueberries are from a fork",
+            "state": "OPEN",
+            "body": "yeah",
+            "url": "https://github.com/OWNER/REPO/pull/12",
+            "headRefName": "blueberries",
+            "baseRefName": "master",
+            "headRepositoryOwner": {
+              "login": "hubot"
+            },
+            "commits": {
+              "totalCount": 12
+            },
+            "author": {
+              "login": "nobody"
+            },
+            "isCrossRepository": true,
+            "isDraft": false
+          },
+          {
+            "number": 10,
+            "title": "Blueberries are a good fruit",
+            "state": "OPEN",
+            "body": "**blueberries taste good**",
+            "url": "https://github.com/OWNER/REPO/pull/10",
+            "baseRefName": "master",
+            "headRefName": "blueberries",
+            "author": {
+              "login": "nobody"
+            },
+            "headRepositoryOwner": {
+              "login": "OWNER"
+            },
+            "commits": {
+              "totalCount": 8
+            },
+            "isCrossRepository": false,
+            "isDraft": true
+          }
+        ]
+      }
+    }
+  }
+}

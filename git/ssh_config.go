@@ -57,7 +57,7 @@ func ParseSSHConfig() SSHAliasMap {
 		configFiles = append([]string{userConfig}, configFiles...)
 	}
 
-	openFiles := []io.Reader{}
+	openFiles := make([]io.Reader, 0, len(configFiles))
 	for _, file := range configFiles {
 		f, err := os.Open(file)
 		if err != nil {
@@ -70,9 +70,9 @@ func ParseSSHConfig() SSHAliasMap {
 }
 
 func sshParse(r ...io.Reader) SSHAliasMap {
-	config := SSHAliasMap{}
+	config := make(SSHAliasMap)
 	for _, file := range r {
-		sshParseConfig(config, file)
+		_ = sshParseConfig(config, file)
 	}
 	return config
 }

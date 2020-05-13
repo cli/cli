@@ -1,14 +1,24 @@
 package context
 
 import (
+	"bytes"
 	"errors"
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/httpmock"
 )
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
@@ -61,6 +71,14 @@ func Test_translateRemotes(t *testing.T) {
 }
 
 func Test_resolvedRemotes_triangularSetup(t *testing.T) {
+	http := &httpmock.Registry{}
+	apiClient := api.NewClient(api.ReplaceTripper(http))
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+
 	resolved := ResolvedRemotes{
 		BaseOverride: nil,
 		Remotes: Remotes{
@@ -89,6 +107,7 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 				},
 			},
 		},
+		apiClient: apiClient,
 	}
 
 	baseRepo, err := resolved.BaseRepo()
@@ -115,6 +134,53 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 	}
 	if headRemote.Name != "fork" {
 		t.Errorf("got remote %q", headRemote.Name)
+	}
+}
+
+func Test_resolvedRemotes_forkLookup(t *testing.T) {
+	http := &httpmock.Registry{}
+	apiClient := api.NewClient(api.ReplaceTripper(http))
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+		{ "id": "FORKID",
+		  "url": "https://github.com/FORKOWNER/REPO",
+		  "name": "REPO",
+		  "owner": { "login": "FORKOWNER" },
+		  "viewerPermission": "WRITE"
+		}
+	] } } } }
+	`))
+
+	resolved := ResolvedRemotes{
+		BaseOverride: nil,
+		Remotes: Remotes{
+			&Remote{
+				Remote: &git.Remote{Name: "origin"},
+				Owner:  "OWNER",
+				Repo:   "REPO",
+			},
+		},
+		Network: api.RepoNetworkResult{
+			Repositories: []*api.Repository{
+				&api.Repository{
+					Name:             "NEWNAME",
+					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
+					ViewerPermission: "READ",
+				},
+			},
+		},
+		apiClient: apiClient,
+	}
+
+	headRepo, err := resolved.HeadRepo()
+	if err != nil {
+		t.Fatalf("got %v", err)
+	}
+	eq(t, ghrepo.FullName(headRepo), "FORKOWNER/REPO")
+	_, err = resolved.RemoteForRepo(headRepo)
+	if err == nil {
+		t.Fatal("expected to not find a matching remote")
 	}
 }
 

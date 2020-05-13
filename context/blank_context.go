@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 )
 
@@ -22,12 +23,24 @@ type blankContext struct {
 	remotes   Remotes
 }
 
+func (c *blankContext) Config() (config.Config, error) {
+	cfg, err := config.ParseConfig("boom.txt")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse config during tests. did you remember to stub? error: %s", err))
+	}
+	return cfg, nil
+}
+
 func (c *blankContext) AuthToken() (string, error) {
 	return c.authToken, nil
 }
 
 func (c *blankContext) SetAuthToken(t string) {
 	c.authToken = t
+}
+
+func (c *blankContext) SetAuthLogin(login string) {
+	c.authLogin = login
 }
 
 func (c *blankContext) AuthLogin() (string, error) {
@@ -53,7 +66,7 @@ func (c *blankContext) Remotes() (Remotes, error) {
 }
 
 func (c *blankContext) SetRemotes(stubs map[string]string) {
-	c.remotes = Remotes{}
+	c.remotes = make([]*Remote, 0, len(stubs))
 	for remoteName, repo := range stubs {
 		ownerWithName := strings.SplitN(repo, "/", 2)
 		c.remotes = append(c.remotes, &Remote{

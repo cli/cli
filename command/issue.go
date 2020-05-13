@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
-	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -23,7 +22,6 @@ import (
 func init() {
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
-	issueCmd.AddCommand(issueViewCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
@@ -31,14 +29,23 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
+	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
-	issueListCmd.Flags().StringP("state", "s", "", "Filter by state: {open|closed|all}")
+	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
+	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
-	issueViewCmd.Flags().BoolP("preview", "p", false, "Display preview of issue content")
+	issueCmd.AddCommand(issueViewCmd)
+	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
+
+	issueCmd.AddCommand(issueCloseCmd)
+	issueCmd.AddCommand(issueReopenCmd)
 }
 
 var issueCmd = &cobra.Command{
@@ -66,15 +73,30 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url> | <branch>}",
+	Use: "view {<number> | <url>}",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return FlagError{errors.New("issue required as argument")}
+			return FlagError{errors.New("issue number or URL required as argument")}
 		}
 		return nil
 	},
-	Short: "View an issue in the browser",
-	RunE:  issueView,
+	Short: "View an issue",
+	Long: `Display the title, body, and other information about an issue.
+
+With '--web', open the issue in a web browser instead.`,
+	RunE: issueView,
+}
+var issueCloseCmd = &cobra.Command{
+	Use:   "close {<number> | <url>}",
+	Short: "close issue",
+	Args:  cobra.ExactArgs(1),
+	RunE:  issueClose,
+}
+var issueReopenCmd = &cobra.Command{
+	Use:   "reopen {<number> | <url>}",
+	Short: "reopen issue",
+	Args:  cobra.ExactArgs(1),
+	RunE:  issueReopen,
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -109,45 +131,31 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "\nIssues for %s\n\n", ghrepo.FullName(baseRepo))
-
-	issues, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit)
+	author, err := cmd.Flags().GetString("author")
 	if err != nil {
 		return err
 	}
 
-	if len(issues) == 0 {
-		colorErr := colorableErr(cmd) // Send to stderr because otherwise when piping this command it would seem like the "no open issues" message is actually an issue
-		msg := "There are no open issues"
-
-		userSetFlags := false
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			userSetFlags = true
-		})
-		if userSetFlags {
-			msg = "No issues match your search"
-		}
-		printMessage(colorErr, msg)
-		return nil
+	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
+	if err != nil {
+		return err
 	}
+
+	hasFilters := false
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		switch f.Name {
+		case "state", "label", "assignee", "author":
+			hasFilters = true
+		}
+	})
+
+	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+	// TODO: avoid printing header if piped to a script
+	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 
 	out := cmd.OutOrStdout()
-	table := utils.NewTablePrinter(out)
-	for _, issue := range issues {
-		issueNum := strconv.Itoa(issue.Number)
-		if table.IsTTY() {
-			issueNum = "#" + issueNum
-		}
-		labels := labelList(issue)
-		if labels != "" && table.IsTTY() {
-			labels = fmt.Sprintf("(%s)", labels)
-		}
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, utils.Gray)
-		table.EndRow()
-	}
-	table.Render()
+
+	printIssues(out, "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }
@@ -184,7 +192,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
-		message := fmt.Sprintf("  There are no issues assigned to you")
+		message := "  There are no issues assigned to you"
 		printMessage(out, message)
 	}
 	fmt.Fprintln(out)
@@ -227,35 +235,79 @@ func issueView(cmd *cobra.Command, args []string) error {
 	}
 	openURL := issue.URL
 
-	preview, err := cmd.Flags().GetBool("preview")
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
 
-	if preview {
-		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
-	} else {
+	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
+	} else {
+		out := colorableOut(cmd)
+		return printIssuePreview(out, issue)
 	}
 
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
-	coloredLabels := labelList(*issue)
-	if coloredLabels != "" {
-		coloredLabels = utils.Gray(fmt.Sprintf("(%s)", coloredLabels))
+func issueStateTitleWithColor(state string) string {
+	colorFunc := colorFuncForState(state)
+	return colorFunc(strings.Title(strings.ToLower(state)))
+}
+
+func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
+	if totalMatchCount == 0 {
+		if hasFilters {
+			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
+		}
+		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
 	}
 
+	if hasFilters {
+		matchVerb := "match"
+		if totalMatchCount == 1 {
+			matchVerb = "matches"
+		}
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+	}
+
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
+}
+
+func printIssuePreview(out io.Writer, issue *api.Issue) error {
+	now := time.Now()
+	ago := now.Sub(issue.CreatedAt)
+
+	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(issue.Title))
+	fmt.Fprint(out, issueStateTitleWithColor(issue.State))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		"opened by %s. %s. %s",
+		" • %s opened %s • %s",
 		issue.Author.Login,
+		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
-		coloredLabels,
 	)))
 
+	// Metadata
+	fmt.Fprintln(out)
+	if assignees := issueAssigneeList(*issue); assignees != "" {
+		fmt.Fprint(out, utils.Bold("Assignees: "))
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := issueLabelList(*issue); labels != "" {
+		fmt.Fprint(out, utils.Bold("Labels: "))
+		fmt.Fprintln(out, labels)
+	}
+	if projects := issueProjectList(*issue); projects != "" {
+		fmt.Fprint(out, utils.Bold("Projects: "))
+		fmt.Fprintln(out, projects)
+	}
+	if issue.Milestone.Title != "" {
+		fmt.Fprint(out, utils.Bold("Milestone: "))
+		fmt.Fprintln(out, issue.Milestone.Title)
+	}
+
+	// Body
 	if issue.Body != "" {
 		fmt.Fprintln(out)
 		md, err := utils.RenderMarkdown(issue.Body)
@@ -263,9 +315,10 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 			return err
 		}
 		fmt.Fprintln(out, md)
-		fmt.Fprintln(out)
 	}
+	fmt.Fprintln(out)
 
+	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
 }
@@ -273,7 +326,7 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
 
 func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(arg); err == nil {
+	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
 	}
 
@@ -316,6 +369,25 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	if err != nil {
+		return fmt.Errorf("could not parse assignees: %w", err)
+	}
+	labelNames, err := cmd.Flags().GetStringSlice("label")
+	if err != nil {
+		return fmt.Errorf("could not parse labels: %w", err)
+	}
+	projectNames, err := cmd.Flags().GetStringSlice("project")
+	if err != nil {
+		return fmt.Errorf("could not parse projects: %w", err)
+	}
+	var milestoneTitles []string
+	if milestoneTitle, err := cmd.Flags().GetString("milestone"); err != nil {
+		return fmt.Errorf("could not parse milestone: %w", err)
+	} else if milestoneTitle != "" {
+		milestoneTitles = append(milestoneTitles, milestoneTitle)
+	}
+
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
@@ -348,11 +420,17 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	action := SubmitAction
+	tb := issueMetadataState{
+		Assignees:  assignees,
+		Labels:     labelNames,
+		Projects:   projectNames,
+		Milestones: milestoneTitles,
+	}
 
-	interactive := title == "" || body == ""
+	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		tb, err := titleBodySurvey(cmd, title, body, templateFiles)
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -370,6 +448,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 		if body == "" {
 			body = tb.Body
+		}
+	} else {
+		if title == "" {
+			return fmt.Errorf("title can't be blank")
 		}
 	}
 
@@ -389,6 +471,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			"body":  body,
 		}
 
+		err = addMetadataToIssueParams(apiClient, baseRepo, params, &tb)
+		if err != nil {
+			return err
+		}
+
 		newIssue, err := api.IssueCreate(apiClient, repo, params)
 		if err != nil {
 			return err
@@ -402,34 +489,132 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
-	for _, issue := range issues {
-		number := utils.Green("#" + strconv.Itoa(issue.Number))
-		coloredLabels := labelList(issue)
-		if coloredLabels != "" {
-			coloredLabels = utils.Gray(fmt.Sprintf("  (%s)", coloredLabels))
+func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {
+	if !tb.HasMetadata() {
+		return nil
+	}
+
+	if tb.MetadataResult == nil {
+		resolveInput := api.RepoResolveInput{
+			Reviewers:  tb.Reviewers,
+			Assignees:  tb.Assignees,
+			Labels:     tb.Labels,
+			Projects:   tb.Projects,
+			Milestones: tb.Milestones,
 		}
 
+		var err error
+		tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
+		if err != nil {
+			return err
+		}
+	}
+
+	assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
+	if err != nil {
+		return fmt.Errorf("could not assign user: %w", err)
+	}
+	params["assigneeIds"] = assigneeIDs
+
+	labelIDs, err := tb.MetadataResult.LabelsToIDs(tb.Labels)
+	if err != nil {
+		return fmt.Errorf("could not add label: %w", err)
+	}
+	params["labelIds"] = labelIDs
+
+	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
+	if err != nil {
+		return fmt.Errorf("could not add to project: %w", err)
+	}
+	params["projectIds"] = projectIDs
+
+	if len(tb.Milestones) > 0 {
+		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])
+		if err != nil {
+			return fmt.Errorf("could not add to milestone '%s': %w", tb.Milestones[0], err)
+		}
+		params["milestoneId"] = milestoneID
+	}
+
+	if len(tb.Reviewers) == 0 {
+		return nil
+	}
+
+	var userReviewers []string
+	var teamReviewers []string
+	for _, r := range tb.Reviewers {
+		if strings.ContainsRune(r, '/') {
+			teamReviewers = append(teamReviewers, r)
+		} else {
+			userReviewers = append(userReviewers, r)
+		}
+	}
+
+	userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
+	if err != nil {
+		return fmt.Errorf("could not request reviewer: %w", err)
+	}
+	params["userReviewerIds"] = userReviewerIDs
+
+	teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
+	if err != nil {
+		return fmt.Errorf("could not request reviewer: %w", err)
+	}
+	params["teamReviewerIds"] = teamReviewerIDs
+
+	return nil
+}
+
+func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
+	table := utils.NewTablePrinter(w)
+	for _, issue := range issues {
+		issueNum := strconv.Itoa(issue.Number)
+		if table.IsTTY() {
+			issueNum = "#" + issueNum
+		}
+		issueNum = prefix + issueNum
+		labels := issueLabelList(issue)
+		if labels != "" && table.IsTTY() {
+			labels = fmt.Sprintf("(%s)", labels)
+		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-
-		fmt.Fprintf(w, "%s%s %s%s %s\n", prefix, number,
-			text.Truncate(70, replaceExcessiveWhitespace(issue.Title)),
-			coloredLabels,
-			utils.Gray(utils.FuzzyAgo(ago)))
+		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(labels, nil, utils.Gray)
+		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		table.EndRow()
 	}
+	_ = table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
 		fmt.Fprintf(w, utils.Gray("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 
-func labelList(issue api.Issue) string {
+func issueAssigneeList(issue api.Issue) string {
+	if len(issue.Assignees.Nodes) == 0 {
+		return ""
+	}
+
+	AssigneeNames := make([]string, 0, len(issue.Assignees.Nodes))
+	for _, assignee := range issue.Assignees.Nodes {
+		AssigneeNames = append(AssigneeNames, assignee.Login)
+	}
+
+	list := strings.Join(AssigneeNames, ", ")
+	if issue.Assignees.TotalCount > len(issue.Assignees.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func issueLabelList(issue api.Issue) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
 	}
 
-	labelNames := []string{}
+	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
 		labelNames = append(labelNames, label.Name)
 	}
@@ -439,6 +624,97 @@ func labelList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func issueProjectList(issue api.Issue) string {
+	if len(issue.ProjectCards.Nodes) == 0 {
+		return ""
+	}
+
+	projectNames := make([]string, 0, len(issue.ProjectCards.Nodes))
+	for _, project := range issue.ProjectCards.Nodes {
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
+	}
+
+	list := strings.Join(projectNames, ", ")
+	if issue.ProjectCards.TotalCount > len(issue.ProjectCards.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func issueClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	var idErr *api.IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+	}
+
+	if issue.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already closed\n", utils.Yellow("!"), issue.Number)
+		return nil
+	}
+
+	err = api.IssueClose(apiClient, baseRepo, *issue)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d\n", utils.Red("✔"), issue.Number)
+
+	return nil
+}
+
+func issueReopen(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	var idErr *api.IssuesDisabledError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
+	} else if err != nil {
+		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+	}
+
+	if !issue.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already open\n", utils.Yellow("!"), issue.Number)
+		return nil
+	}
+
+	err = api.IssueReopen(apiClient, baseRepo, *issue)
+	if err != nil {
+		return fmt.Errorf("API call failed:%w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Green("✔"), issue.Number)
+
+	return nil
 }
 
 func displayURL(urlStr string) string {

@@ -11,12 +11,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Set up Go 1.13
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v2-beta
         with:
-          go-version: 1.13
+          go-version: 1.14
       - name: Generate changelog
         run: |
+          echo ::set-env name=GORELEASER_CURRENT_TAG::${GITHUB_REF#refs/tags/}
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
@@ -26,6 +27,35 @@ jobs:
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')" # skip prereleases
+        with:
+          formula-name: gh
+        env:
+          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
+      - name: Checkout documentation site
+        if: "!contains(github.ref, '-')" # skip prereleases
+        uses: actions/checkout@v2
+        with:
+          repository: github/cli.github.com
+          path: site
+          fetch-depth: 0
+          token: ${{secrets.SITE_GITHUB_TOKEN}}
+      - name: Publish documentation site
+        if: "!contains(github.ref, '-')" # skip prereleases
+        run: make site-publish
+      - name: Move project cards
+        if: "!contains(github.ref, '-')" # skip prereleases
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          PENDING_COLUMN: 8189733
+          DONE_COLUMN: 7110130
+        run: |
+          curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
+          api() { bin/hub api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
+          cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
+          for card in $cards; do api projects/columns/cards/$card/moves --field position=top --field column_id=$DONE_COLUMN; done
   msi:
     needs: goreleaser
     runs-on: windows-latest

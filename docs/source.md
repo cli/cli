@@ -1,9 +1,9 @@
 # Installation from source
 
-0. Verify that you have Go 1.13+ installed
+0. Verify that you have Go 1.14+ installed
 ```
 $ go version
-go version go1.13.7
+go version go1.14
 ```
 
 1. Clone cli into `~/.githubcli`

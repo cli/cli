@@ -1,0 +1,54 @@
+name: Lint
+on:
+  push:
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v2-beta
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Verify dependencies
+        run: |
+          go mod verify
+          go mod download
+
+          LINT_VERSION=1.26.0
+          curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
+            tar xz --strip-components 1 --wildcards \*/golangci-lint
+          mkdir -p bin && mv golangci-lint bin/
+
+      - name: Run checks
+        run: |
+          STATUS=0
+          assert-nothing-changed() {
+            local diff
+            "$@" >/dev/null || return 1
+            if ! diff="$(git diff -U1 --color --exit-code)"; then
+              printf '\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n\n' "$*" "$diff" >&2
+              git checkout -- .
+              STATUS=1
+            fi
+          }
+
+          assert-nothing-changed go fmt ./...
+          assert-nothing-changed go mod tidy
+
+          while read -r file linter msg; do
+            IFS=: read -ra f <<<"$file"
+            printf '::error file=%s,line=%s,col=%s::%s\n' "${f[0]}" "${f[1]}" "${f[2]}" "[$linter] $msg"
+            STATUS=1
+          done < <(bin/golangci-lint run --out-format tab)
+
+          exit $STATUS

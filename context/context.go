@@ -3,14 +3,16 @@ package context
 import (
 	"errors"
 	"fmt"
-	"path"
 	"sort"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/mitchellh/go-homedir"
 )
+
+// TODO these are sprinkled across command, context, config, and ghrepo
+const defaultHostname = "github.com"
 
 // Context represents the interface for querying information about the current environment
 type Context interface {
@@ -22,10 +24,11 @@ type Context interface {
 	Remotes() (Remotes, error)
 	BaseRepo() (ghrepo.Interface, error)
 	SetBaseRepo(string)
+	Config() (config.Config, error)
 }
 
 // cap the number of git remotes looked up, since the user might have an
-// unusally large number of git remotes
+// unusually large number of git remotes
 const maxRemotesForLookup = 5
 
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
@@ -38,7 +41,7 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 	hasBaseOverride := base != ""
 	baseOverride := ghrepo.FromFullName(base)
 	foundBaseOverride := false
-	repos := []ghrepo.Interface{}
+	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
 	for _, r := range remotes[:lenRemotesForLookup] {
 		repos = append(repos, r)
 		if ghrepo.IsSame(r, baseOverride) {
@@ -51,7 +54,10 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 		repos = append(repos, baseOverride)
 	}
 
-	result := ResolvedRemotes{Remotes: remotes}
+	result := ResolvedRemotes{
+		Remotes:   remotes,
+		apiClient: client,
+	}
 	if hasBaseOverride {
 		result.BaseOverride = baseOverride
 	}
@@ -67,6 +73,7 @@ type ResolvedRemotes struct {
 	BaseOverride ghrepo.Interface
 	Remotes      Remotes
 	Network      api.RepoNetworkResult
+	apiClient    *api.Client
 }
 
 // BaseRepo is the first found repository in the "upstream", "github", "origin"
@@ -95,8 +102,30 @@ func (r ResolvedRemotes) BaseRepo() (*api.Repository, error) {
 	return nil, errors.New("not found")
 }
 
-// HeadRepo is the first found repository that has push access
+// HeadRepo is a fork of base repo (if any), or the first found repository that
+// has push access
 func (r ResolvedRemotes) HeadRepo() (*api.Repository, error) {
+	baseRepo, err := r.BaseRepo()
+	if err != nil {
+		return nil, err
+	}
+
+	// try to find a pushable fork among existing remotes
+	for _, repo := range r.Network.Repositories {
+		if repo != nil && repo.Parent != nil && repo.ViewerCanPush() && ghrepo.IsSame(repo.Parent, baseRepo) {
+			return repo, nil
+		}
+	}
+
+	// a fork might still exist on GitHub, so let's query for it
+	var notFound *api.NotFoundError
+	if repo, err := api.RepoFindFork(r.apiClient, baseRepo); err == nil {
+		return repo, nil
+	} else if !errors.As(err, &notFound) {
+		return nil, err
+	}
+
+	// fall back to any listed repository that has push access
 	for _, repo := range r.Network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
 			return repo, nil
@@ -125,29 +154,20 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config    *configEntry
+	config    config.Config
 	remotes   Remotes
 	branch    string
 	baseRepo  ghrepo.Interface
 	authToken string
 }
 
-func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
-	return dir
-}
-
-func configFile() string {
-	return path.Join(ConfigDir(), "config.yml")
-}
-
-func (c *fsContext) getConfig() (*configEntry, error) {
+func (c *fsContext) Config() (config.Config, error) {
 	if c.config == nil {
-		entry, err := parseOrSetupConfigFile(configFile())
+		config, err := config.ParseOrSetupConfigFile(config.ConfigFile())
 		if err != nil {
 			return nil, err
 		}
-		c.config = entry
+		c.config = config
 		c.authToken = ""
 	}
 	return c.config, nil
@@ -158,11 +178,17 @@ func (c *fsContext) AuthToken() (string, error) {
 		return c.authToken, nil
 	}
 
-	config, err := c.getConfig()
+	cfg, err := c.Config()
 	if err != nil {
 		return "", err
 	}
-	return config.Token, nil
+
+	token, err := cfg.Get(defaultHostname, "oauth_token")
+	if token == "" || err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (c *fsContext) SetAuthToken(t string) {
@@ -170,11 +196,17 @@ func (c *fsContext) SetAuthToken(t string) {
 }
 
 func (c *fsContext) AuthLogin() (string, error) {
-	config, err := c.getConfig()
+	config, err := c.Config()
 	if err != nil {
 		return "", err
 	}
-	return config.User, nil
+
+	login, err := config.Get(defaultHostname, "user")
+	if login == "" || err != nil {
+		return "", err
+	}
+
+	return login, nil
 }
 
 func (c *fsContext) Branch() (string, error) {
@@ -184,7 +216,7 @@ func (c *fsContext) Branch() (string, error) {
 
 	currentBranch, err := git.CurrentBranch()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not determine current branch: %w", err)
 	}
 
 	c.branch = currentBranch

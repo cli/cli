@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/cli/cli/pkg/browser"
 )
@@ -29,6 +30,7 @@ type OAuthFlow struct {
 	Hostname         string
 	ClientID         string
 	ClientSecret     string
+	Scopes           []string
 	WriteSuccessHTML func(io.Writer)
 	VerboseStream    io.Writer
 }
@@ -45,21 +47,31 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 
+	scopes := "repo"
+	if oa.Scopes != nil {
+		scopes = strings.Join(oa.Scopes, " ")
+	}
+
 	q := url.Values{}
 	q.Set("client_id", oa.ClientID)
-	q.Set("redirect_uri", fmt.Sprintf("http://localhost:%d/callback", port))
-	// TODO: make scopes configurable
-	q.Set("scope", "repo, gist")
+	q.Set("redirect_uri", fmt.Sprintf("http://127.0.0.1:%d/callback", port))
+	q.Set("scope", scopes)
 	q.Set("state", state)
 
 	startURL := fmt.Sprintf("https://%s/login/oauth/authorize?%s", oa.Hostname, q.Encode())
 	oa.logf("open %s\n", startURL)
 	if err := openInBrowser(startURL); err != nil {
 		fmt.Fprintf(os.Stderr, "error opening web browser: %s\n", err)
+		fmt.Fprintf(os.Stderr, "")
 		fmt.Fprintf(os.Stderr, "Please open the following URL manually:\n%s\n", startURL)
+		fmt.Fprintf(os.Stderr, "")
+		// TODO: Temporary workaround for https://github.com/cli/cli/issues/297
+		fmt.Fprintf(os.Stderr, "If you are on a server or other headless system, use this workaround instead:")
+		fmt.Fprintf(os.Stderr, "  1. Complete authentication on a GUI system")
+		fmt.Fprintf(os.Stderr, "  2. Copy the contents of ~/.config/gh/config.yml to this system")
 	}
 
-	http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		oa.logf("server handler: %s\n", r.URL.Path)
 		if r.URL.Path != "/callback" {
 			w.WriteHeader(404)

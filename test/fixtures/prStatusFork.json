@@ -1,0 +1,33 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 1,
+        "edges": [
+          {
+            "node": {
+              "number": 10,
+              "title": "Blueberries are a good fruit",
+              "state": "OPEN",
+              "url": "https://github.com/PARENT/REPO/pull/10",
+              "headRefName": "blueberries",
+              "isDraft": false,
+              "headRepositoryOwner": {
+                "login": "OWNER"
+              },
+              "isCrossRepository": true
+            }
+          }
+        ]
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 0,
+      "edges": []
+    },
+    "reviewRequested": {
+      "totalCount": 0,
+      "edges": []
+    }
+  }
+}

@@ -69,7 +69,7 @@ func (t *ttyTablePrinter) AddField(s string, truncateFunc func(int, string) stri
 		truncateFunc = text.Truncate
 	}
 	if t.rows == nil {
-		t.rows = [][]tableField{[]tableField{}}
+		t.rows = make([][]tableField, 1)
 	}
 	rowI := len(t.rows) - 1
 	field := tableField{

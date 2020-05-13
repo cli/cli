@@ -1,0 +1,61 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 3,
+        "edges": [
+          {
+            "node": {
+              "number": 10,
+              "title": "Blueberries are certainly a good fruit",
+              "state": "OPEN",
+              "url": "https://github.com/PARENT/REPO/pull/10",
+              "headRefName": "blueberries",
+              "isDraft": false,
+              "headRepositoryOwner": {
+                "login": "OWNER"
+              },
+              "isCrossRepository": false
+            }
+          },
+          {
+            "node": {
+              "number": 9,
+              "title": "Blueberries are a good fruit",
+              "state": "MERGED",
+              "url": "https://github.com/PARENT/REPO/pull/9",
+              "headRefName": "blueberries",
+              "isDraft": false,
+              "headRepositoryOwner": {
+                "login": "OWNER"
+              },
+              "isCrossRepository": false
+            }
+          },
+          {
+            "node": {
+              "number": 8,
+              "title": "Blueberries are probably a good fruit",
+              "state": "CLOSED",
+              "url": "https://github.com/PARENT/REPO/pull/8",
+              "headRefName": "blueberries",
+              "isDraft": false,
+              "headRepositoryOwner": {
+                "login": "OWNER"
+              },
+              "isCrossRepository": false
+            }
+          }
+        ]
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 0,
+      "edges": []
+    },
+    "reviewRequested": {
+      "totalCount": 0,
+      "edges": []
+    }
+  }
+}

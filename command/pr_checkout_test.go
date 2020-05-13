@@ -2,12 +2,15 @@ package command
 
 import (
 	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/test"
 )
 
 func TestPRCheckout_sameRepo(t *testing.T) {
@@ -20,6 +23,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -40,18 +44,18 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify --quiet refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/feature":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -92,23 +96,85 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify --quiet refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/feature":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout https://github.com/OWNER/REPO/pull/123/files`)
+	output, err := RunCommand(`pr checkout https://github.com/OWNER/REPO/pull/123/files`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
 	eq(t, len(ranCommands), 4)
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
+}
+
+func TestPRCheckout_urlArg_differentBase(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "POE",
+			"defaultBranchRef": {
+				"name": "master"
+			}
+		},
+		"isCrossRepository": false,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify -- refs/heads/feature":
+			return &errorStub{"exit status: 1"}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(`pr checkout https://github.com/OTHER/POE/pull/123/files`)
+	eq(t, err, nil)
+	eq(t, output.String(), "")
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := struct {
+		Variables struct {
+			Owner string
+			Repo  string
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Owner, "OTHER")
+	eq(t, reqBody.Variables.Repo, "POE")
+
+	eq(t, len(ranCommands), 5)
+	eq(t, strings.Join(ranCommands[1], " "), "git fetch https://github.com/OTHER/POE.git refs/pull/123/head:feature")
+	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.remote https://github.com/OTHER/POE.git")
 }
 
 func TestPRCheckout_branchArg(t *testing.T) {
@@ -121,6 +187,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -141,18 +208,18 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify --quiet refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/feature":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout hubot:feature`)
+	output, err := RunCommand(`pr checkout hubot:feature`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -170,6 +237,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -190,18 +258,18 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify --quiet refs/heads/feature":
-			return &outputStub{}
+		case "git show-ref --verify -- refs/heads/feature":
+			return &test.OutputStub{}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -222,6 +290,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -242,18 +311,18 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
-		case "git show-ref --verify --quiet refs/heads/feature":
+		case "git show-ref --verify -- refs/heads/feature":
 			return &errorStub{"exit status: 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -274,6 +343,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -294,18 +364,18 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -326,6 +396,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -346,18 +417,18 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &outputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{Out: []byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -376,6 +447,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -396,18 +468,18 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
-			return &outputStub{[]byte("refs/heads/feature\n")}
+			return &test.OutputStub{Out: []byte("refs/heads/feature\n")}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
@@ -426,6 +498,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -446,18 +519,18 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
-	restoreCmd := utils.SetPrepareCmd(func(cmd *exec.Cmd) utils.Runnable {
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
 			return &errorStub{"exit status 1"}
 		default:
 			ranCommands = append(ranCommands, cmd.Args)
-			return &outputStub{}
+			return &test.OutputStub{}
 		}
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(prCheckoutCmd, `pr checkout 123`)
+	output, err := RunCommand(`pr checkout 123`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 

@@ -41,7 +41,7 @@ func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersio
 		return &stateEntry.LatestRelease, nil
 	}
 
-	latestRelease := ReleaseInfo{}
+	var latestRelease ReleaseInfo
 	err = client.REST("GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(stateFilePath, content, 0600)
+	_ = ioutil.WriteFile(stateFilePath, content, 0600)
 
 	return nil
 }

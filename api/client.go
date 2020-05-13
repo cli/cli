@@ -37,6 +37,16 @@ func AddHeader(name, value string) ClientOption {
 	}
 }
 
+// AddHeaderFunc is an AddHeader that gets the string value from a function
+func AddHeaderFunc(name string, value func() string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			req.Header.Add(name, value())
+			return tr.RoundTrip(req)
+		}}
+	}
+}
+
 // VerboseLog enables request/response logging within a RoundTripper
 func VerboseLog(out io.Writer, logTraffic bool, colorize bool) ClientOption {
 	logger := &httpretty.Logger{
@@ -60,6 +70,40 @@ func VerboseLog(out io.Writer, logTraffic bool, colorize bool) ClientOption {
 func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	return func(http.RoundTripper) http.RoundTripper {
 		return tr
+	}
+}
+
+var issuedScopesWarning bool
+
+// CheckScopes checks whether an OAuth scope is present in a response
+func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			res, err := tr.RoundTrip(req)
+			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
+				return res, err
+			}
+
+			appID := res.Header.Get("X-Oauth-Client-Id")
+			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+
+			hasWanted := false
+			for _, s := range hasScopes {
+				if wantedScope == strings.TrimSpace(s) {
+					hasWanted = true
+					break
+				}
+			}
+
+			if !hasWanted {
+				if err := cb(appID); err != nil {
+					return res, err
+				}
+				issuedScopesWarning = true
+			}
+
+			return res, nil
+		}}
 	}
 }
 
@@ -144,6 +188,10 @@ func (c Client) REST(method string, p string, body io.Reader, data interface{}) 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
 		return handleHTTPError(resp)
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)

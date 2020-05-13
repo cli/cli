@@ -2,10 +2,13 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/glamour"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/browser"
 )
 
@@ -15,17 +18,15 @@ func OpenInBrowser(url string) error {
 	if err != nil {
 		return err
 	}
-	return PrepareCmd(browseCmd).Run()
-}
-
-func normalizeNewlines(s string) string {
-	s = strings.Replace(s, "\r\n", "\n", -1)
-	s = strings.Replace(s, "\r", "\n", -1)
-	return s
+	return run.PrepareCmd(browseCmd).Run()
 }
 
 func RenderMarkdown(text string) (string, error) {
-	return glamour.Render(normalizeNewlines(text), "dark")
+	style := "notty"
+	if isColorEnabled() {
+		style = "dark"
+	}
+	return glamour.Render(text, style)
 }
 
 func Pluralize(num int, thing string) string {
@@ -58,4 +59,31 @@ func FuzzyAgo(ago time.Duration) string {
 	}
 
 	return fmtDuration(int(ago.Hours()/24/365), "year")
+}
+
+func Humanize(s string) string {
+	// Replaces - and _ with spaces.
+	replace := "_-"
+	h := func(r rune) rune {
+		if strings.ContainsRune(replace, r) {
+			return ' '
+		}
+		return r
+	}
+
+	return strings.Map(h, s)
+}
+
+// We do this so we can stub out the spinner in tests -- it made things really flakey. this is not
+// an elegant solution.
+var StartSpinner = func(s *spinner.Spinner) {
+	s.Start()
+}
+
+var StopSpinner = func(s *spinner.Spinner) {
+	s.Stop()
+}
+
+func Spinner(w io.Writer) *spinner.Spinner {
+	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
 }
