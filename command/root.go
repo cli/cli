@@ -141,7 +141,6 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	}
 
 	getAuthValue := func() string {
-		fmt.Println("GITTIN MY AUTH", token)
 		return fmt.Sprintf("token %s", token)
 	}
 
