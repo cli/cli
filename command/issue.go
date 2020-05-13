@@ -381,9 +381,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
-	milestoneTitle, err := cmd.Flags().GetString("milestone")
-	if err != nil {
+	var milestoneTitles []string
+	if milestoneTitle, err := cmd.Flags().GetString("milestone"); err != nil {
 		return fmt.Errorf("could not parse milestone: %w", err)
+	} else if milestoneTitle != "" {
+		milestoneTitles = append(milestoneTitles, milestoneTitle)
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
@@ -419,10 +421,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	action := SubmitAction
 	tb := issueMetadataState{
-		Assignees: assignees,
-		Labels:    labelNames,
-		Projects:  projectNames,
-		Milestone: milestoneTitle,
+		Assignees:  assignees,
+		Labels:     labelNames,
+		Projects:   projectNames,
+		Milestones: milestoneTitles,
 	}
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
@@ -469,26 +471,9 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			"body":  body,
 		}
 
-		if tb.HasMetadata() {
-			if tb.MetadataResult == nil {
-				metadataInput := api.RepoMetadataInput{
-					Assignees:  len(tb.Assignees) > 0,
-					Labels:     len(tb.Labels) > 0,
-					Projects:   len(tb.Projects) > 0,
-					Milestones: tb.Milestone != "",
-				}
-
-				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
-				tb.MetadataResult, err = api.RepoMetadata(apiClient, baseRepo, metadataInput)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
-			if err != nil {
-				return err
-			}
+		err = addMetadataToIssueParams(apiClient, baseRepo, params, &tb)
+		if err != nil {
+			return err
 		}
 
 		newIssue, err := api.IssueCreate(apiClient, repo, params)
@@ -504,32 +489,78 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addMetadataToIssueParams(params map[string]interface{}, metadata *api.RepoMetadataResult, assignees, labelNames, projectNames []string, milestoneTitle string) error {
-	assigneeIDs, err := metadata.MembersToIDs(assignees)
+func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {
+	if !tb.HasMetadata() {
+		return nil
+	}
+
+	if tb.MetadataResult == nil {
+		resolveInput := api.RepoResolveInput{
+			Reviewers:  tb.Reviewers,
+			Assignees:  tb.Assignees,
+			Labels:     tb.Labels,
+			Projects:   tb.Projects,
+			Milestones: tb.Milestones,
+		}
+
+		var err error
+		tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
+		if err != nil {
+			return err
+		}
+	}
+
+	assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
 	if err != nil {
 		return fmt.Errorf("could not assign user: %w", err)
 	}
 	params["assigneeIds"] = assigneeIDs
 
-	labelIDs, err := metadata.LabelsToIDs(labelNames)
+	labelIDs, err := tb.MetadataResult.LabelsToIDs(tb.Labels)
 	if err != nil {
 		return fmt.Errorf("could not add label: %w", err)
 	}
 	params["labelIds"] = labelIDs
 
-	projectIDs, err := metadata.ProjectsToIDs(projectNames)
+	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
 	if err != nil {
 		return fmt.Errorf("could not add to project: %w", err)
 	}
 	params["projectIds"] = projectIDs
 
-	if milestoneTitle != "" {
-		milestoneID, err := metadata.MilestoneToID(milestoneTitle)
+	if len(tb.Milestones) > 0 {
+		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])
 		if err != nil {
-			return fmt.Errorf("could not add to milestone '%s': %w", milestoneTitle, err)
+			return fmt.Errorf("could not add to milestone '%s': %w", tb.Milestones[0], err)
 		}
 		params["milestoneId"] = milestoneID
 	}
+
+	if len(tb.Reviewers) == 0 {
+		return nil
+	}
+
+	var userReviewers []string
+	var teamReviewers []string
+	for _, r := range tb.Reviewers {
+		if strings.ContainsRune(r, '/') {
+			teamReviewers = append(teamReviewers, r)
+		} else {
+			userReviewers = append(userReviewers, r)
+		}
+	}
+
+	userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
+	if err != nil {
+		return fmt.Errorf("could not request reviewer: %w", err)
+	}
+	params["userReviewerIds"] = userReviewerIDs
+
+	teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
+	if err != nil {
+		return fmt.Errorf("could not request reviewer: %w", err)
+	}
+	params["teamReviewerIds"] = teamReviewerIDs
 
 	return nil
 }
