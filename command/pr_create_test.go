@@ -184,6 +184,7 @@ func TestPRCreate_metadata(t *testing.T) {
 			eq(t, inputs["pullRequestId"], "NEWPULLID")
 			eq(t, inputs["userIds"], []interface{}{"HUBOTID"})
 			eq(t, inputs["teamIds"], []interface{}{"COREID"})
+			eq(t, inputs["union"], true)
 		}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
