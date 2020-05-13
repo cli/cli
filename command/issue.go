@@ -546,7 +546,7 @@ func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		if strings.ContainsRune(r, '/') {
 			teamReviewers = append(teamReviewers, r)
 		} else {
-			userReviewers = append(teamReviewers, r)
+			userReviewers = append(userReviewers, r)
 		}
 	}
 

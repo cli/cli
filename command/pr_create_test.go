@@ -97,7 +97,8 @@ func TestPRCreate_metadata(t *testing.T) {
 				"l001": { "name": "TODO", "id": "TODOID" }
 			},
 			"organization": {
-				"t000": { "slug": "core", "id": "COREID" }
+				"t000": { "slug": "core", "id": "COREID" },
+				"t001": { "slug": "robots", "id": "ROBOTID" }
 			}
 		} }
 		`))
@@ -169,8 +170,8 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } }
 	`, func(inputs map[string]interface{}) {
 			eq(t, inputs["pullRequestId"], "NEWPULLID")
-			eq(t, inputs["userIds"], []interface{}{"HUBOTID"})
-			eq(t, inputs["teamIds"], []interface{}{"COREID"})
+			eq(t, inputs["userIds"], []interface{}{"HUBOTID", "MONAID"})
+			eq(t, inputs["teamIds"], []interface{}{"COREID", "ROBOTID"})
 		}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -182,7 +183,7 @@ func TestPRCreate_metadata(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(`pr create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r /core`)
+	output, err := RunCommand(`pr create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
