@@ -76,11 +76,11 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 var issuedScopesWarning bool
 
 // CheckScopes checks whether an OAuth scope is present in a response
-func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
+func CheckScopes(wantedScope string, cb func(string, string) error) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
+			if err != nil || (res.StatusCode > 299 && req.URL.Path == "/graphql") || issuedScopesWarning {
 				return res, err
 			}
 
@@ -96,9 +96,10 @@ func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 			}
 
 			if !hasWanted {
-				if err := cb(appID); err != nil {
+				if err := cb(wantedScope, appID); err != nil {
 					return res, err
 				}
+				// TODO seems like we should call RoundTrip again? I tried but it didn't work
 				issuedScopesWarning = true
 			}
 
