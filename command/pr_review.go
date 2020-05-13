@@ -296,8 +296,9 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	type Hunk struct {
-		File string
-		Diff string
+		File    string
+		Diff    string
+		Comment string
 	}
 
 	hunks := []Hunk{
@@ -431,7 +432,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 		fmt.Fprintln(out, rendered)
 
-		fmt.Fprint(out, "s: skip, f: skip file, c: comment, u: suggest, q: quit ")
+		fmt.Fprint(out, "s: skip, f: skip file, c: comment, q: quit ")
 
 		action, err := patchSurvey()
 		if err != nil {
@@ -439,7 +440,40 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		}
 
 		if action == HunkActionComment {
-			// TODO collect via survey's editor widget. it's bootleg but does a lot for us.
+			editorCommand, err := determineEditor(cmd)
+			if err != nil {
+				return nil, err
+			}
+			bodyAnswers := struct {
+				Body string
+			}{}
+
+			preseed := fmt.Sprintf(
+				"\n\n======= everything below this line will be discarded =======\n%s\n%s",
+				hunk.File,
+				hunk.Diff)
+
+			bodyQs := []*survey.Question{
+				&survey.Question{
+					Name: "body",
+					Prompt: &surveyext.GhEditor{
+						BlankAllowed:  false,
+						EditorCommand: editorCommand,
+						Editor: &survey.Editor{
+							Message:       "Comment",
+							FileName:      "*.md",
+							Default:       preseed,
+							HideDefault:   true,
+							AppendDefault: true,
+						},
+					},
+				},
+			}
+			err = SurveyAsk(bodyQs, &bodyAnswers)
+			if err != nil {
+				return nil, err
+			}
+			hunk.Comment = bodyAnswers.Body
 		}
 
 		if action == HunkActionQuit {
@@ -459,7 +493,6 @@ const (
 	HunkActionSkip = iota
 	HunkActionSkipFile
 	HunkActionComment
-	HunkActionSuggest
 	HunkActionQuit
 )
 
@@ -489,8 +522,6 @@ func patchSurvey() (HunkAction, error) {
 			return HunkActionSkipFile, nil
 		case r == 'c':
 			return HunkActionComment, nil
-		case r == 'u':
-			return HunkActionSuggest, nil
 		case r == 'q':
 			return HunkActionQuit, nil
 		case r == sterm.KeyInterrupt:
