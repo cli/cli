@@ -43,15 +43,15 @@ func httpRequest(client *http.Client, method string, p string, params interface{
 		return nil, err
 	}
 
-	if bodyIsJSON {
-		req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	}
 	for _, h := range headers {
 		idx := strings.IndexRune(h, ':')
 		if idx == -1 {
 			return nil, fmt.Errorf("header %q requires a value separated by ':'", h)
 		}
-		req.Header.Set(h[0:idx], strings.TrimSpace(h[idx+1:]))
+		req.Header.Add(h[0:idx], strings.TrimSpace(h[idx+1:]))
+	}
+	if bodyIsJSON && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	}
 
 	return client.Do(req)
