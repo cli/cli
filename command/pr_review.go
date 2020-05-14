@@ -153,7 +153,6 @@ func prReview(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		// for now just return
-		fmt.Fprintln(out, "done with patch mode, stopping here for now")
 		return nil
 	}
 
@@ -429,7 +428,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 				skipFile = false
 			}
 		}
-		fmt.Fprintf(out, "%s\n\n", utils.Bold(hunk.File))
+		fmt.Fprintf(out, "\n%s\n", utils.Bold(hunk.File))
 		md := fmt.Sprintf("```diff\n%s\n```", hunk.Diff)
 		rendered, err := utils.RenderMarkdown(md)
 		if err != nil {
@@ -497,8 +496,8 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		}
 	}
 
-	// TODO commentsMade ending up at 0, debug the string helpers.
-	fmt.Fprintf(out, "\nWrapping up a review with %s comments.\n", utils.Bold(fmt.Sprintf("%d", commentsMade)))
+	fmt.Fprintf(out, "\n\nWrapping up a review with %s.\n",
+		utils.Bold(utils.Pluralize(commentsMade, "comment")))
 
 	reviewData, err := reviewSurvey(cmd)
 
@@ -573,6 +572,6 @@ func trimBody(body string) string {
 
 func isBlank(body string) bool {
 	fmt.Println(body)
-	r := regexp.MustCompile(`(?s)\w*`)
+	r := regexp.MustCompile(`(?s)^\s*$`)
 	return r.MatchString(body)
 }
