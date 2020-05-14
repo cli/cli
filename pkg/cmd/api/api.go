@@ -76,24 +76,9 @@ on the format of the value:
 }
 
 func apiRun(opts *ApiOptions) error {
-	params := make(map[string]interface{})
-	for _, f := range opts.RawFields {
-		key, value, err := parseField(f)
-		if err != nil {
-			return err
-		}
-		params[key] = value
-	}
-	for _, f := range opts.MagicFields {
-		key, strValue, err := parseField(f)
-		if err != nil {
-			return err
-		}
-		value, err := magicFieldValue(strValue)
-		if err != nil {
-			return fmt.Errorf("error parsing %q value: %w", key, err)
-		}
-		params[key] = value
+	params, err := parseFields(opts)
+	if err != nil {
+		return err
 	}
 
 	method := opts.RequestMethod
@@ -130,6 +115,29 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	return nil
+}
+
+func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
+	params := make(map[string]interface{})
+	for _, f := range opts.RawFields {
+		key, value, err := parseField(f)
+		if err != nil {
+			return params, err
+		}
+		params[key] = value
+	}
+	for _, f := range opts.MagicFields {
+		key, strValue, err := parseField(f)
+		if err != nil {
+			return params, err
+		}
+		value, err := magicFieldValue(strValue)
+		if err != nil {
+			return params, fmt.Errorf("error parsing %q value: %w", key, err)
+		}
+		params[key] = value
+	}
+	return params, nil
 }
 
 func parseField(f string) (string, string, error) {
