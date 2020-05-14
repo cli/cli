@@ -92,5 +92,6 @@ func (c *blankContext) BaseRepo() (ghrepo.Interface, error) {
 }
 
 func (c *blankContext) SetBaseRepo(nwo string) {
-	c.baseRepo = ghrepo.FromFullName(nwo)
+	repo, _ := ghrepo.FromFullName(nwo)
+	c.baseRepo = repo
 }
