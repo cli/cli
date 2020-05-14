@@ -304,10 +304,10 @@ func prView(cmd *cobra.Command, args []string) error {
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", pr.URL)
 		return utils.OpenInBrowser(pr.URL)
+	} else {
+		out := colorableOut(cmd)
+		return printPrPreview(out, pr)
 	}
-
-	out := colorableOut(cmd)
-	return printPrPreview(out, pr)
 }
 
 func prClose(cmd *cobra.Command, args []string) error {
