@@ -295,7 +295,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 }
 
 func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
-	hunks := []Hunk{
+	hunks := []*Hunk{
 		{"diff --git a/command/pr_review.go b/command/pr_review.go",
 			`@@ -11,7 +11,8 @@ import (
  )
@@ -395,7 +395,9 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	out := colorableOut(cmd)
 
 	fmt.Fprintln(out, "- starting review ~/.config/gh/reviews/0001.json")
-	fmt.Fprintln(out, "You are going to review 9 changes across 3 files")
+	fmt.Fprintf(out, "You are going to review %s across %s.\n",
+		utils.Bold(utils.Pluralize(9, "change")),
+		utils.Bold(utils.Pluralize(3, "file")))
 
 	cont := false
 	continueQs := []*survey.Question{
@@ -461,7 +463,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 			preseed := fmt.Sprintf(
 				"\n\n======= everything below this line will be discarded =======\n%s\n%s",
 				hunk.File,
-				hunk.Diff)
+				fmt.Sprintf("```\n%s\n```", hunk.Diff))
 
 			bodyQs := []*survey.Question{
 				&survey.Question{
@@ -485,7 +487,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 			}
 			body := trimBody(bodyAnswers.Body)
 			if !isBlank(body) {
-				hunk.Comment = bodyAnswers.Body
+				hunk.Comment = body
 				commentsMade++
 			}
 		}
@@ -499,7 +501,25 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	fmt.Fprintf(out, "\n\nWrapping up a review with %s.\n",
 		utils.Bold(utils.Pluralize(commentsMade, "comment")))
 
-	reviewData, err := reviewSurvey(cmd)
+	reviewBody := `
+	
+======= everything below this line will be discarded =======
+	
+`
+
+	for _, h := range hunks {
+		if isBlank(h.Comment) {
+			continue
+		}
+		reviewBody += "-----------------------------------\n"
+		reviewBody += h.Comment
+		reviewBody += "\n```\n"
+		reviewBody += h.Diff
+		reviewBody += "\n```\n"
+	}
+
+	reviewData, err := reviewSurveyPreBody(cmd, reviewBody)
+	reviewData.Body = trimBody(reviewData.Body)
 
 	if err != nil {
 		return nil, err
@@ -571,7 +591,108 @@ func trimBody(body string) string {
 }
 
 func isBlank(body string) bool {
-	fmt.Println(body)
 	r := regexp.MustCompile(`(?s)^\s*$`)
 	return r.MatchString(body)
+}
+
+func reviewSurveyPreBody(cmd *cobra.Command, body string) (*api.PullRequestReviewInput, error) {
+	editorCommand, err := determineEditor(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	typeAnswers := struct {
+		ReviewType string
+	}{}
+	typeQs := []*survey.Question{
+		{
+			Name: "reviewType",
+			Prompt: &survey.Select{
+				Message: "What kind of review do you want to give?",
+				Options: []string{
+					"Comment",
+					"Approve",
+					"Request changes",
+				},
+			},
+		},
+	}
+
+	err = SurveyAsk(typeQs, &typeAnswers)
+	if err != nil {
+		return nil, err
+	}
+
+	var reviewState api.PullRequestReviewState
+
+	switch typeAnswers.ReviewType {
+	case "Approve":
+		reviewState = api.ReviewApprove
+	case "Request changes":
+		reviewState = api.ReviewRequestChanges
+	case "Comment":
+		reviewState = api.ReviewComment
+	default:
+		panic("unreachable state")
+	}
+
+	bodyAnswers := struct {
+		Body string
+	}{}
+
+	blankAllowed := false
+	if reviewState == api.ReviewApprove {
+		blankAllowed = true
+	}
+
+	bodyQs := []*survey.Question{
+		&survey.Question{
+			Name: "body",
+			Prompt: &surveyext.GhEditor{
+				BlankAllowed:  blankAllowed,
+				EditorCommand: editorCommand,
+				Editor: &survey.Editor{
+					Message:       "Review body",
+					FileName:      "*.md",
+					AppendDefault: true,
+					Default:       body,
+					HideDefault:   true,
+				},
+			},
+		},
+	}
+
+	err = SurveyAsk(bodyQs, &bodyAnswers)
+	if err != nil {
+		return nil, err
+	}
+
+	if bodyAnswers.Body == "" && (reviewState == api.ReviewComment || reviewState == api.ReviewRequestChanges) {
+		return nil, errors.New("this type of review cannot be blank")
+	}
+
+	confirm := false
+	confirmQs := []*survey.Question{
+		{
+			Name: "confirm",
+			Prompt: &survey.Confirm{
+				Message: "Submit?",
+				Default: true,
+			},
+		},
+	}
+
+	err = SurveyAsk(confirmQs, &confirm)
+	if err != nil {
+		return nil, err
+	}
+
+	if !confirm {
+		return nil, nil
+	}
+
+	return &api.PullRequestReviewInput{
+		Body:  bodyAnswers.Body,
+		State: reviewState,
+	}, nil
 }
