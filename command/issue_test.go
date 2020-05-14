@@ -500,27 +500,15 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`\bu000:`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "labels": {
-			"nodes": [
-				{ "name": "feature", "id": "FEATUREID" },
-				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			}
+		} }
 		`))
 	http.Register(
 		httpmock.GraphQL(`\bmilestones\(`),
@@ -568,6 +556,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
 			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
 			eq(t, inputs["milestoneId"], "BIGONEID")
+			if v, ok := inputs["userIds"]; ok {
+				t.Errorf("did not expect userIds: %v", v)
+			}
+			if v, ok := inputs["teamIds"]; ok {
+				t.Errorf("did not expect teamIds: %v", v)
+			}
 		}))
 
 	output, err := RunCommand(`issue create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`)

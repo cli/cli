@@ -140,9 +140,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
-	milestoneTitle, err := cmd.Flags().GetString("milestone")
-	if err != nil {
+	var milestoneTitles []string
+	if milestoneTitle, err := cmd.Flags().GetString("milestone"); err != nil {
 		return fmt.Errorf("could not parse milestone: %w", err)
+	} else if milestoneTitle != "" {
+		milestoneTitles = append(milestoneTitles, milestoneTitle)
 	}
 
 	baseTrackingBranch := baseBranch
@@ -201,11 +203,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	tb := issueMetadataState{
-		Reviewers: reviewers,
-		Assignees: assignees,
-		Labels:    labelNames,
-		Projects:  projectNames,
-		Milestone: milestoneTitle,
+		Reviewers:  reviewers,
+		Assignees:  assignees,
+		Labels:     labelNames,
+		Projects:   projectNames,
+		Milestones: milestoneTitles,
 	}
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
@@ -323,49 +325,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"headRefName": headBranchLabel,
 		}
 
-		if tb.HasMetadata() {
-			if tb.MetadataResult == nil {
-				metadataInput := api.RepoMetadataInput{
-					Reviewers:  len(tb.Reviewers) > 0,
-					Assignees:  len(tb.Assignees) > 0,
-					Labels:     len(tb.Labels) > 0,
-					Projects:   len(tb.Projects) > 0,
-					Milestones: tb.Milestone != "",
-				}
-
-				// TODO: for non-interactive mode, only translate given objects to GraphQL IDs
-				tb.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = addMetadataToIssueParams(params, tb.MetadataResult, tb.Assignees, tb.Labels, tb.Projects, tb.Milestone)
-			if err != nil {
-				return err
-			}
-
-			var userReviewers []string
-			var teamReviewers []string
-			for _, r := range tb.Reviewers {
-				if strings.ContainsRune(r, '/') {
-					teamReviewers = append(teamReviewers, r)
-				} else {
-					userReviewers = append(teamReviewers, r)
-				}
-			}
-
-			userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
-			if err != nil {
-				return fmt.Errorf("could not request reviewer: %w", err)
-			}
-			params["userReviewerIds"] = userReviewerIDs
-
-			teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
-			if err != nil {
-				return fmt.Errorf("could not request reviewer: %w", err)
-			}
-			params["teamReviewerIds"] = teamReviewerIDs
+		err = addMetadataToIssueParams(client, baseRepo, params, &tb)
+		if err != nil {
+			return err
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)

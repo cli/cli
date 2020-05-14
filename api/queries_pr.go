@@ -667,6 +667,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			requestReviews(input: $input) { clientMutationId }
 		}`
 		reviewParams["pullRequestId"] = pr.ID
+		reviewParams["union"] = true
 		variables := map[string]interface{}{
 			"input": reviewParams,
 		}
