@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
@@ -289,28 +287,9 @@ func colorFuncForState(state string) func(string) string {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-
-	apiClient, err := apiClientForContext(ctx)
+	pr, err := getPr(cmd, args[0])
 	if err != nil {
 		return err
-	}
-
-	var baseRepo ghrepo.Interface
-	var prArg string
-	if len(args) > 0 {
-		prArg = args[0]
-		if prNum, repo := prFromURL(prArg); repo != nil {
-			prArg = prNum
-			baseRepo = repo
-		}
-	}
-
-	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(cmd, ctx)
-		if err != nil {
-			return err
-		}
 	}
 
 	web, err := cmd.Flags().GetBool("web")
@@ -318,45 +297,13 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var openURL string
-	var pr *api.PullRequest
-	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, prArg)
-		if err != nil {
-			return err
-		}
-		openURL = pr.URL
-	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if !web {
-				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-			if err != nil {
-				return err
-			}
-
-			openURL = pr.URL
-		}
-	}
-
 	if web {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
-		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", pr.URL)
+		return utils.OpenInBrowser(pr.URL)
 	}
+
+	out := colorableOut(cmd)
+	return printPrPreview(out, pr)
 }
 
 func prClose(cmd *cobra.Command, args []string) error {
@@ -371,7 +318,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	pr, err := getPr(cmd, args[0])
 	if err != nil {
 		return err
 	}
@@ -406,7 +353,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	pr, err := getPr(cmd, args[0])
 	if err != nil {
 		return err
 	}
@@ -443,26 +390,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var pr *api.PullRequest
-	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
-		if err != nil {
-			return err
-		}
-	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		if prNumber != 0 {
-			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		}
-		if err != nil {
-			return err
-		}
+	pr, err := getPr(cmd, args[0])
+	if err != nil {
+		return err
 	}
 
 	if pr.State == "MERGED" {
@@ -717,62 +647,6 @@ func prProjectList(pr api.PullRequest) string {
 }
 
 var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
-
-func prFromURL(arg string) (string, ghrepo.Interface) {
-	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		return m[3], ghrepo.New(m[1], m[2])
-	}
-	return "", nil
-}
-
-func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
-}
-
-func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
-	prHeadRef, err = ctx.Branch()
-	if err != nil {
-		return
-	}
-	branchConfig := git.ReadBranchConfig(prHeadRef)
-
-	// the branch is configured to merge a special PR head ref
-	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		prNumber, _ = strconv.Atoi(m[1])
-		return
-	}
-
-	var branchOwner string
-	if branchConfig.RemoteURL != nil {
-		// the branch merges from a remote specified by URL
-		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	} else if branchConfig.RemoteName != "" {
-		// the branch merges from a remote specified by name
-		rem, _ := ctx.Remotes()
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	}
-
-	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
-			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
-		}
-		// prepend `OWNER:` if this branch is pushed to a fork
-		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			prHeadRef = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
-		}
-	}
-
-	return
-}
 
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {

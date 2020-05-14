@@ -30,7 +30,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 		"number": 123,
 		"headRefName": "feature",
 		"headRepositoryOwner": {
-			"login": "hubot"
+			"login": "OWNER"
 		},
 		"headRepository": {
 			"name": "REPO",

@@ -26,26 +26,20 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	prArg := args[0]
-	if prNum, repo := prFromURL(prArg); repo != nil {
-		prArg = prNum
-		baseRepo = repo
-	}
-
-	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(cmd, ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	pr, err := prFromArg(apiClient, baseRepo, prArg)
+	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return err
 	}
 
+	pr, err := prFromString(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	baseRepo = repoFromPr(pr)
+
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	fmt.Printf("🌭 baseRemote: %+v\n", baseRemote)
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
 	baseURLOrName := formatRemoteURL(cmd, ghrepo.FullName(baseRepo))
 	if baseRemote != nil {
@@ -57,6 +51,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
+	fmt.Printf("🌭 headRemote: %+v\n", headRemote)
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
 	if headRemote != nil {
