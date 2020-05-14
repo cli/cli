@@ -1,20 +1,17 @@
-package command
+package api
 
 import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
 	"github.com/spf13/cobra"
 )
-
-func init() {
-	RootCmd.AddCommand(makeApiCommand())
-}
 
 type ApiOptions struct {
 	RequestMethod       string
@@ -24,9 +21,11 @@ type ApiOptions struct {
 	RawFields           []string
 	RequestHeaders      []string
 	ShowResponseHeaders bool
+
+	HttpClient func() (*http.Client, error)
 }
 
-func makeApiCommand() *cobra.Command {
+func NewCmdApi() *cobra.Command {
 	opts := ApiOptions{}
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
@@ -55,13 +54,16 @@ on the format of the value:
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
-			ctx := contextForCommand(c)
-			client, err := apiClientForContext(ctx)
-			if err != nil {
-				return err
+			opts.HttpClient = func() (*http.Client, error) {
+				ctx := context.New()
+				token, err := ctx.AuthLogin()
+				if err != nil {
+					return nil, err
+				}
+				return apiClientFromContext(token), nil
 			}
 
-			return apiRun(&opts, client)
+			return apiRun(&opts)
 		},
 	}
 
@@ -73,7 +75,7 @@ on the format of the value:
 	return cmd
 }
 
-func apiRun(opts *ApiOptions, client *api.Client) error {
+func apiRun(opts *ApiOptions) error {
 	params := make(map[string]interface{})
 	for _, f := range opts.RawFields {
 		key, value, err := parseField(f)
@@ -99,7 +101,12 @@ func apiRun(opts *ApiOptions, client *api.Client) error {
 		method = "POST"
 	}
 
-	resp, err := client.DirectRequest(method, opts.RequestPath, params, opts.RequestHeaders)
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	resp, err := httpRequest(httpClient, method, opts.RequestPath, params, opts.RequestHeaders)
 	if err != nil {
 		return err
 	}

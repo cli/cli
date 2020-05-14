@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
@@ -61,6 +62,8 @@ func init() {
 		}
 		return &FlagError{Err: err}
 	})
+
+	RootCmd.AddCommand(apiCmd.NewCmdApi())
 }
 
 // FlagError is the kind of error raised in flag processing

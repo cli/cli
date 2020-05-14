@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -17,14 +16,18 @@ import (
 // ClientOption represents an argument to NewClient
 type ClientOption = func(http.RoundTripper) http.RoundTripper
 
-// NewClient initializes a Client
-func NewClient(opts ...ClientOption) *Client {
+// NewHTTPClient initializes an http.Client
+func NewHTTPClient(opts ...ClientOption) *http.Client {
 	tr := http.DefaultTransport
 	for _, opt := range opts {
 		tr = opt(tr)
 	}
-	http := &http.Client{Transport: tr}
-	client := &Client{http: http}
+	return &http.Client{Transport: tr}
+}
+
+// NewClient initializes a Client
+func NewClient(opts ...ClientOption) *Client {
+	client := &Client{http: NewHTTPClient(opts...)}
 	return client
 }
 
@@ -206,102 +209,6 @@ func (c Client) REST(method string, p string, body io.Reader, data interface{}) 
 	}
 
 	return nil
-}
-
-// DirectRequest is a low-level interface to making generic API requests
-func (c Client) DirectRequest(method string, p string, params interface{}, headers []string) (*http.Response, error) {
-	url := "https://api.github.com/" + p
-	var body io.Reader
-	var bodyIsJSON bool
-	isGraphQL := p == "graphql"
-
-	switch pp := params.(type) {
-	case map[string]interface{}:
-		if strings.EqualFold(method, "GET") {
-			url = addQuery(url, pp)
-		} else {
-			if isGraphQL {
-				pp = groupGraphQLVariables(pp)
-			}
-			b, err := json.Marshal(pp)
-			if err != nil {
-				return nil, fmt.Errorf("error serializing parameters: %w", err)
-			}
-			body = bytes.NewBuffer(b)
-			bodyIsJSON = true
-		}
-	case io.Reader:
-		body = pp
-	default:
-		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
-	}
-
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	if bodyIsJSON {
-		req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	}
-	for _, h := range headers {
-		idx := strings.IndexRune(h, ':')
-		if idx == -1 {
-			return nil, fmt.Errorf("header %q requires a value separated by ':'", h)
-		}
-		req.Header.Set(h[0:idx], strings.TrimSpace(h[idx+1:]))
-	}
-
-	return c.http.Do(req)
-}
-
-func groupGraphQLVariables(params map[string]interface{}) map[string]interface{} {
-	topLevel := make(map[string]interface{})
-	variables := make(map[string]interface{})
-
-	for key, val := range params {
-		switch key {
-		case "query":
-			topLevel[key] = val
-		default:
-			variables[key] = val
-		}
-	}
-
-	if len(variables) > 0 {
-		topLevel["variables"] = variables
-	}
-	return topLevel
-}
-
-func addQuery(path string, params map[string]interface{}) string {
-	if len(params) == 0 {
-		return path
-	}
-
-	query := url.Values{}
-	for key, value := range params {
-		switch v := value.(type) {
-		case string:
-			query.Add(key, v)
-		case []byte:
-			query.Add(key, string(v))
-		case nil:
-			query.Add(key, "")
-		case int:
-			query.Add(key, fmt.Sprintf("%d", v))
-		case bool:
-			query.Add(key, fmt.Sprintf("%v", v))
-		default:
-			panic(fmt.Sprintf("unknown type %v", v))
-		}
-	}
-
-	sep := "?"
-	if strings.ContainsRune(path, '?') {
-		sep = "&"
-	}
-	return path + sep + query.Encode()
 }
 
 func handleResponse(resp *http.Response, data interface{}) error {
