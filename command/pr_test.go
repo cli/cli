@@ -3,7 +3,6 @@ package command
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -722,7 +721,7 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 func TestPRView_web_urlArg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"url": "https://github.com/OWNER/REPO/pull/23"
@@ -852,7 +851,7 @@ func TestPrClose(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
 			"pullRequest": { "number": 96 }
@@ -877,7 +876,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
 			"pullRequest": { "number": 101, "closed": true }
@@ -902,7 +901,7 @@ func TestPRReopen(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"pullRequest": { "number": 666, "closed": true}
@@ -927,7 +926,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"pullRequest": { "number": 666, "closed": false}
@@ -952,7 +951,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"pullRequest": { "number": 666, "closed": true, "state": "MERGED"}
@@ -973,28 +972,15 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	}
 }
 
-type stubResponse struct {
-	ResponseCode int
-	ResponseBody io.Reader
-}
-
-func initWithStubs(branch string, stubs ...stubResponse) {
-	initBlankContext("", "OWNER/REPO", branch)
+func TestPrMerge(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	for _, s := range stubs {
-		http.StubResponse(s.ResponseCode, s.ResponseBody)
-	}
-}
-
-func TestPrMerge(t *testing.T) {
-	initWithStubs("master",
-		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
-		} } }`)},
-		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
-	)
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand("pr merge 1")
 	if err != nil {
@@ -1017,10 +1003,12 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewWithMetadataByBranch.json")
 	defer jsonFile.Close()
 
-	initWithStubs("blueberries",
-		stubResponse{200, jsonFile},
-		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
-	)
+	initBlankContext("", "OWNER/REPO", "blueberries")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, jsonFile)
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand("pr merge")
 	if err != nil {
@@ -1035,12 +1023,14 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 }
 
 func TestPrMerge_rebase(t *testing.T) {
-	initWithStubs("master",
-		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
-		} } }`)},
-		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
-	)
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand("pr merge 2 --rebase")
 	if err != nil {
@@ -1055,12 +1045,14 @@ func TestPrMerge_rebase(t *testing.T) {
 }
 
 func TestPrMerge_squash(t *testing.T) {
-	initWithStubs("master",
-		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
-		} } }`)},
-		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
-	)
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand("pr merge 3 --squash")
 	if err != nil {
@@ -1075,12 +1067,14 @@ func TestPrMerge_squash(t *testing.T) {
 }
 
 func TestPrMerge_alreadyMerged(t *testing.T) {
-	initWithStubs("master",
-		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
 			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
-		} } }`)},
-		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
-	)
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	output, err := RunCommand("pr merge 4")
 	if err == nil {

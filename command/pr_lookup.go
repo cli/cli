@@ -20,7 +20,6 @@ func getPr(cmd *cobra.Command, prString string) (*api.PullRequest, error) {
 		return nil, err
 	}
 
-	fmt.Printf("🌭 %+v\n", "NEA")
 	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return nil, err
