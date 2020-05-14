@@ -28,7 +28,7 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-// FromFullName extracts the GitHub repository inforation from an "OWNER/REPO" string
+// FromFullName extracts the GitHub repository information from an "OWNER/REPO" string
 func FromFullName(nwo string) (Interface, error) {
 	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
