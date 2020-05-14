@@ -287,7 +287,11 @@ func colorFuncForState(state string) func(string) string {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	pr, err := getPr(cmd, args[0])
+	var prString string
+	if len(args) > 0 {
+		prString = args[0]
+	}
+	pr, err := getPr(cmd, prString)
 	if err != nil {
 		return err
 	}
@@ -318,7 +322,11 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := getPr(cmd, args[0])
+	var prString string
+	if len(args) > 0 {
+		prString = args[0]
+	}
+	pr, err := getPr(cmd, prString)
 	if err != nil {
 		return err
 	}
@@ -353,7 +361,11 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := getPr(cmd, args[0])
+	var prString string
+	if len(args) > 0 {
+		prString = args[0]
+	}
+	pr, err := getPr(cmd, prString)
 	if err != nil {
 		return err
 	}
@@ -390,7 +402,11 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := getPr(cmd, args[0])
+	var prString string
+	if len(args) > 0 {
+		prString = args[0]
+	}
+	pr, err := getPr(cmd, prString)
 	if err != nil {
 		return err
 	}

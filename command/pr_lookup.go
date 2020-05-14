@@ -13,27 +13,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func getPr(cmd *cobra.Command, prNumber string) (*api.PullRequest, error) {
+func getPr(cmd *cobra.Command, prString string) (*api.PullRequest, error) {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("🌭 %+v\n", "NEA")
 	baseRepo, err := determineBaseRepo(cmd, ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// This assumes the first arg is the pr number
-	if prNumber != "" {
-		pr, err := prFromString(apiClient, baseRepo, prNumber)
-		return pr, err
-	} else {
-		pr, err := prFromContext(ctx, baseRepo)
+	if prString != "" {
+		pr, err := prFromString(apiClient, baseRepo, prString)
 		return pr, err
 	}
-	return nil, nil
+
+	pr, err := prFromContext(ctx, baseRepo)
+	return pr, err
+}
+
+func prFromString(apiClient *api.Client, baseRepo ghrepo.Interface, prString string) (*api.PullRequest, error) {
+	if prNumber, repo := prNumberAndRepoFromURL(prString); prNumber != 0 {
+		return api.PullRequestByNumber(apiClient, repo, prNumber)
+	} else if prNumber, err := strconv.Atoi(strings.TrimPrefix(prString, "#")); err == nil {
+		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+	} else if prNumber, r := prNumberAndRepoFromURL(prString); r != nil {
+		return api.PullRequestByNumber(apiClient, r, prNumber)
+	}
+
+	return api.PullRequestForBranch(apiClient, baseRepo, "", prString)
 }
 
 func prNumberAndRepoFromURL(url string) (int, ghrepo.Interface) {
@@ -44,20 +56,6 @@ func prNumberAndRepoFromURL(url string) (int, ghrepo.Interface) {
 		}
 	}
 	return 0, nil
-}
-
-func prFromString(apiClient *api.Client, baseRepo ghrepo.Interface, prString string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(strings.TrimPrefix(prString, "#")); err == nil {
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	} else if prNumber, r := prNumberAndRepoFromURL(prString); r != nil {
-		return api.PullRequestByNumber(apiClient, r, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, "", prString)
-}
-
-func repoFromPr(pr *api.PullRequest) ghrepo.Interface {
-	return ghrepo.New(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 }
 
 func prFromContext(ctx context.Context, baseRepo ghrepo.Interface) (*api.PullRequest, error) {

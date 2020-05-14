@@ -95,7 +95,11 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	pr, err := getPr(cmd, args[0])
+	var prString string
+	if len(args) > 0 {
+		prString = args[0]
+	}
+	pr, err := getPr(cmd, prString)
 	if err != nil {
 		return err
 	}

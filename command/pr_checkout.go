@@ -36,10 +36,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo = repoFromPr(pr)
-
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
-	fmt.Printf("🌭 baseRemote: %+v\n", baseRemote)
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
 	baseURLOrName := formatRemoteURL(cmd, ghrepo.FullName(baseRepo))
 	if baseRemote != nil {
@@ -51,7 +48,6 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
-	fmt.Printf("🌭 headRemote: %+v\n", headRemote)
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
 	if headRemote != nil {
