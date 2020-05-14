@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -970,5 +971,125 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
+}
 
+type stubResponse struct {
+	ResponseCode int
+	ResponseBody io.Reader
+}
+
+func initWithStubs(branch string, stubs ...stubResponse) {
+	initBlankContext("", "OWNER/REPO", branch)
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	for _, s := range stubs {
+		http.StubResponse(s.ResponseCode, s.ResponseBody)
+	}
+}
+
+func TestPrMerge(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 1")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_noPrNumberGiven(t *testing.T) {
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+
+	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewWithMetadataByBranch.json")
+	defer jsonFile.Close()
+
+	initWithStubs("blueberries",
+		stubResponse{200, jsonFile},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #10`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_rebase(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 2 --rebase")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Rebased and merged pull request #2`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_squash(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 3 --squash")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Squashed and merged pull request #3`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_alreadyMerged(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	output, err := RunCommand("pr merge 4")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #4 was already merged`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
 }

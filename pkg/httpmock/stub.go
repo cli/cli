@@ -88,6 +88,22 @@ func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	}
 }
 
+func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		var bodyData struct {
+			Query     string
+			Variables map[string]interface{}
+		}
+		err := decodeJSONBody(req, &bodyData)
+		if err != nil {
+			return nil, err
+		}
+		cb(bodyData.Query, bodyData.Variables)
+
+		return httpResponse(200, bytes.NewBufferString(body)), nil
+	}
+}
+
 func httpResponse(status int, body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: status,
