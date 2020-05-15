@@ -190,8 +190,10 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Printf("%s The repository was not created.", utils.Yellow("!"))
-		return nil
+		if !remoteExist {
+			fmt.Printf("%s The repository was not created.", utils.Yellow("!"))
+			return nil
+		}
 	}
 
 	orgName := ""
@@ -286,7 +288,8 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if projectDirErr == nil {
 		_, err = git.AddRemote("origin", remoteURL)
 		if err != nil {
-			return err
+			fmt.Printf("%s The remote wasn't configured for this repository.", utils.Yellow("!"))
+			return nil
 		}
 		if isTTY {
 			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
