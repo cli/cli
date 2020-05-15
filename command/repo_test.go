@@ -529,6 +529,14 @@ func TestRepoCreate(t *testing.T) {
 	} } }
 	`))
 
+	doConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+
+	defer func() { Confirm = doConfirm }()
+
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
@@ -598,6 +606,14 @@ func TestRepoCreate_org(t *testing.T) {
 	} } }
 	`))
 
+	doConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+
+	defer func() { Confirm = doConfirm }()
+
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
@@ -666,6 +682,14 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		}
 	} } }
 	`))
+
+	doConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+
+	defer func() { Confirm = doConfirm }()
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {

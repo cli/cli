@@ -100,3 +100,14 @@ func AddRemote(name, u string) (*Remote, error) {
 		PushURL:  urlParsed,
 	}, nil
 }
+
+//CheckRemoteExist it's will verify with there is a remote configured at directory
+func CheckRemoteExist() (bool, error) {
+	out, err := exec.Command("git", "remote", "-v").Output()
+
+	if err != nil || out != nil {
+		return false, nil
+	}
+
+	return true, nil
+}
