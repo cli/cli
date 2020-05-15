@@ -33,7 +33,7 @@ func FromFullName(nwo string) (Interface, error) {
 	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
 	if len(parts) != 2 {
-		return &r, fmt.Errorf("argument must be in format of OWNER/REPO")
+		return &r, fmt.Errorf("expected OWNER/REPO format, got \"%s\"", nwo)
 	}
 	r.owner, r.name = parts[0], parts[1]
 	return &r, nil

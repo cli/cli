@@ -511,7 +511,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 			var err error
 			toView, err = ghrepo.FromFullName(repoArg)
 			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
+				return fmt.Errorf("argument error: %w", err)
 			}
 		}
 	}
