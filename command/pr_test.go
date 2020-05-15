@@ -982,10 +982,10 @@ func initWithStubs(branch string, stubs ...stubResponse) {
 	initBlankContext("", "OWNER/REPO", branch)
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
 	for _, s := range stubs {
 		http.StubResponse(s.ResponseCode, s.ResponseBody)
 	}
+	http.StubRepoResponse("OWNER", "REPO")
 }
 
 func TestPrMerge(t *testing.T) {
