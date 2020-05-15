@@ -32,7 +32,7 @@ func FullName(r Interface) string {
 func FromFullName(nwo string) (Interface, error) {
 	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return &r, fmt.Errorf("expected OWNER/REPO format, got \"%s\"", nwo)
 	}
 	r.owner, r.name = parts[0], parts[1]
