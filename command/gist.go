@@ -34,6 +34,9 @@ func gistCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// TODO ??
+	ok, err := client.EnsureScope("gist")
+
 	description, err := cmd.Flags().GetString("description")
 	if err != nil {
 		return err
@@ -61,6 +64,7 @@ func gistCreate(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(colorableErr(cmd), "\nCreating a Gist for %s\n\n", user)
 
+	// Need a prior request (or a change to the reauth code)
 	gist, err := api.GistCreate(client, description, public, filename)
 	if err != nil {
 		return fmt.Errorf("Failed to create a gist: %w", err)

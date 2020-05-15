@@ -174,7 +174,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 
 	opts = append(opts,
 		api.CheckScopes("read:org", checkScopesFunc),
-		api.CheckScopes("gist", checkScopesFunc),
+		api.CheckScopes("gist", checkScopesFunc), // TODO take this out and rely on per-gist-invocation reauth
 		api.AddHeaderFunc("Authorization", getAuthValue),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks
