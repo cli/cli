@@ -23,7 +23,7 @@ func TestGistCreate(t *testing.T) {
 	}
 	`))
 
-	output, err := RunCommand(gistCreateCmd, `gist create -f "../test/fixtures/gistCreate.json" -d "Gist description" -p=false`)
+	output, err := RunCommand(`gist create -f "../test/fixtures/gistCreate.json" -d "Gist description" -p=false`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)

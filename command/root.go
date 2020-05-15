@@ -184,7 +184,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	return api.NewClient(opts...), nil
 }
 
-func ensureScopes(ctx context.Context, client *api.Client, wantedScopes ...string) (*api.Client, error) {
+var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ...string) (*api.Client, error) {
 	hasScopes, appID, err := client.HasScopes(wantedScopes...)
 	if err != nil {
 		return client, err
