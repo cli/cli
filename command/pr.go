@@ -481,21 +481,21 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	// Ensure only one merge method is specified
-	flagCount := 0
+	enabledFlagCount := 0
 	isInteractive := false
 	if b, _ := cmd.Flags().GetBool("merge"); b {
-		flagCount++
+		enabledFlagCount++
 	}
 	if b, _ := cmd.Flags().GetBool("rebase"); b {
-		flagCount++
+		enabledFlagCount++
 	}
 	if b, _ := cmd.Flags().GetBool("squash"); b {
-		flagCount++
+		enabledFlagCount++
 	}
 
-	if flagCount == 0 {
+	if enabledFlagCount == 0 {
 		isInteractive = true
-	} else if flagCount > 1 {
+	} else if enabledFlagCount > 1 {
 		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
 	}
 
