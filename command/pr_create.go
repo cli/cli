@@ -336,6 +336,11 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+
+		open, _ := cmd.Flags().GetBool("open")
+		if open {
+			return utils.OpenInBrowser(pr.URL)
+		}
 	} else if action == PreviewAction {
 		openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body)
 		// TODO could exceed max url length for explorer
@@ -422,6 +427,7 @@ func init() {
 		"The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
+	prCreateCmd.Flags().BoolP("open", "o", false, "Open the pull request in the browser after creation")
 
 	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
 	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
