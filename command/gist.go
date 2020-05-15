@@ -34,8 +34,10 @@ func gistCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// TODO ??
-	ok, err := client.EnsureScope("gist")
+	client, err = ensureScopes(ctx, client, "gist")
+	if err != nil {
+		return err
+	}
 
 	description, err := cmd.Flags().GetString("description")
 	if err != nil {
