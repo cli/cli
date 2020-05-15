@@ -145,7 +145,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		return fmt.Sprintf("token %s", token)
 	}
 
-	checkScopesFunc := func(wantedScope, appID string) error {
+	checkScopesFunc := func(appID string) error {
 		if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
 			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
 			if err != nil {
@@ -166,7 +166,7 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 			token = newToken
 			config.AuthFlowComplete()
 		} else {
-			fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires the `%s` OAuth scope.", wantedScope))
+			fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
 			fmt.Fprintln(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable `read:org`")
 			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
 		}
@@ -175,7 +175,6 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 
 	opts = append(opts,
 		api.CheckScopes("read:org", checkScopesFunc),
-		api.CheckScopes("gist", checkScopesFunc), // TODO take this out and rely on per-gist-invocation reauth
 		api.AddHeaderFunc("Authorization", getAuthValue),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
 		// antiope-preview: Checks
