@@ -439,7 +439,7 @@ func patchReview(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 		fmt.Fprintln(out, rendered)
 
-		fmt.Fprint(out, "s: skip, f: skip file, c: comment, q: quit ")
+		fmt.Fprint(out, "s: skip, f: skip file, v: view diff, c: comment, q: quit ")
 
 		action, err := patchSurvey()
 		if err != nil {
