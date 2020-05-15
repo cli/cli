@@ -223,17 +223,16 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 		return ghrepo.FromFullName(repo), nil
 	}
 
-	baseOverride, err := cmd.Flags().GetString("repo")
-	if err != nil {
-		return nil, err
-	}
+	// TODO check to see if the git config has a default repo set; if it seems like an interactive
+	// environment, ask which of the resolved remotes the user wants to use as the base. if none, let
+	// them type one in. save in git config and then skip git resolution next time.
 
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return nil, err
 	}
