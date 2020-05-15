@@ -30,7 +30,7 @@ func init() {
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
 	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local branch after merge")
-	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
+	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 
