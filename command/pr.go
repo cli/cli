@@ -546,11 +546,21 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
 
 	if deleteBranch {
-		branch, err := prDeleteCurrentBranch(baseRepo.(*api.Repository))
+		repo, err := convertRepoInterfaceToRepository(ctx, baseRepo)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(colorableOut(cmd), "%s Deleted local branch %s\n", utils.Red("✔"), utils.Cyan(branch))
+
+		err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+		if err != nil {
+			return err
+		}
+
+		err = git.DeleteLocalBranch(pr.HeadRefName)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted local branch %s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName))
 	}
 
 	return nil
@@ -598,21 +608,6 @@ func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
 
 	deleteBranch := answers.DeleteBranch
 	return mergeMethod, deleteBranch, nil
-}
-
-func prDeleteCurrentBranch(repo *api.Repository) (string, error) {
-	branch, err := git.CurrentBranch()
-	if err != nil {
-		return "", err
-	}
-
-	err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
-	if err != nil {
-		return "", err
-	}
-
-	err = git.DeleteLocalBranch(branch)
-	return branch, err
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
