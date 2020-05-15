@@ -580,7 +580,7 @@ func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
 	deleteBranchQuestion := &survey.Question{
 		Name: "deleteBranch",
 		Prompt: &survey.Confirm{
-			Message: "Delete the branch locally and on GitHub?",
+			Message: "Delete the branch locally?",
 			Default: true,
 		},
 	}
