@@ -179,6 +179,21 @@ func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir
 func repoCreate(cmd *cobra.Command, args []string) error {
 	projectDir, projectDirErr := git.ToplevelDir()
 
+	if projectDirErr == nil {
+		remoteExist, err := git.CheckRemoteExist()
+		if err != nil {
+			return err
+		}
+
+		err = Confirm(fmt.Sprintf("There is a remote URL configured for directory, would like to create the repository?"), &remoteExist)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("%s The repository was not created.", utils.Yellow("!"))
+		return nil
+	}
+
 	orgName := ""
 	teamSlug, err := cmd.Flags().GetString("team")
 	if err != nil {
