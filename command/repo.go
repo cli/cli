@@ -369,9 +369,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			repoToFork, _ = ghrepo.FromFullName(repoArg)
-			if repoToFork.RepoName() == "" || repoToFork.RepoOwner() == "" {
-				return fmt.Errorf("could not parse owner or repo name from %s", repoArg)
+			repoToFork, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
 			}
 		}
 	}
