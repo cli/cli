@@ -189,7 +189,6 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		name = args[0]
 		if strings.Contains(name, "/") {
-			var err error
 			newRepo, err := ghrepo.FromFullName(name)
 			if err != nil {
 				return fmt.Errorf("argument error: %w", err)
