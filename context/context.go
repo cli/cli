@@ -39,7 +39,6 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 	}
 
 	hasBaseOverride := base != ""
-	var err error
 	baseOverride, _ := ghrepo.FromFullName(base)
 	foundBaseOverride := false
 	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
