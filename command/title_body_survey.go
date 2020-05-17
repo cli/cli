@@ -13,8 +13,16 @@ import (
 )
 
 type Action int
+type metadataStateType int
+
+const (
+	issueMetadata metadataStateType = 0
+	prMetadata    metadataStateType = 1
+)
 
 type issueMetadataState struct {
+	Type metadataStateType
+
 	Body   string
 	Title  string
 	Action Action
@@ -99,30 +107,36 @@ func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-func selectTemplate(templatePaths []string) (string, error) {
+func selectTemplate(templatePaths []string, metadataType metadataStateType) (string, error) {
 	templateResponse := struct {
 		Index int
 	}{}
-	if len(templatePaths) > 1 {
-		templateNames := make([]string, 0, len(templatePaths))
-		for _, p := range templatePaths {
-			templateNames = append(templateNames, githubtemplate.ExtractName(p))
-		}
-
-		selectQs := []*survey.Question{
-			{
-				Name: "index",
-				Prompt: &survey.Select{
-					Message: "Choose a template",
-					Options: templateNames,
-				},
-			},
-		}
-		if err := SurveyAsk(selectQs, &templateResponse); err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
-		}
+	templateNames := make([]string, 0, len(templatePaths))
+	for _, p := range templatePaths {
+		templateNames = append(templateNames, githubtemplate.ExtractName(p))
+	}
+	if metadataType == issueMetadata {
+		templateNames = append(templateNames, "Open a blank issue")
+	} else if metadataType == prMetadata {
+		templateNames = append(templateNames, "Open a blank PR")
 	}
 
+	selectQs := []*survey.Question{
+		{
+			Name: "index",
+			Prompt: &survey.Select{
+				Message: "Choose a template",
+				Options: templateNames,
+			},
+		},
+	}
+	if err := SurveyAsk(selectQs, &templateResponse); err != nil {
+		return "", fmt.Errorf("could not prompt: %w", err)
+	}
+
+	if templateResponse.Index == len(templatePaths) { // the user has selected the blank template
+		return "", nil
+	}
 	templateContents := githubtemplate.ExtractContents(templatePaths[templateResponse.Index])
 	return string(templateContents), nil
 }
@@ -139,7 +153,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	if providedBody == "" {
 		if len(templatePaths) > 0 {
 			var err error
-			templateContents, err = selectTemplate(templatePaths)
+			templateContents, err = selectTemplate(templatePaths, issueState.Type)
 			if err != nil {
 				return err
 			}

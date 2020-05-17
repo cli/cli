@@ -203,6 +203,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	tb := issueMetadataState{
+		Type:       prMetadata,
 		Reviewers:  reviewers,
 		Assignees:  assignees,
 		Labels:     labelNames,
