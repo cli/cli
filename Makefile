@@ -23,7 +23,7 @@ test:
 .PHONY: test
 
 site:
-	git clone https://github.com/github/cli.github.com.git "$@"
+	(which gh 2>/dev/null && gh repo clone github/cli.github.com "$@") || git clone https://github.com/github/cli.github.com.git "$@"
 
 site-docs: site
 	git -C site pull
