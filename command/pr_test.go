@@ -1156,7 +1156,7 @@ func TestPRReady_closed(t *testing.T) {
 		t.Fatalf("expected an error running command `pr ready` on a review that is closed!: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #446 is closed and can't be marked "ready for review"`)
+	r := regexp.MustCompile(`Pull request #446 is closed. Only draft pull requests can be marked as "ready for review"`)
 
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, err.Error())
