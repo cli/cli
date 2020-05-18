@@ -10,10 +10,14 @@ import (
 	"strings"
 
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
 type ApiOptions struct {
+	IO *iostreams.IOStreams
+
 	RequestMethod       string
 	RequestMethodPassed bool
 	RequestPath         string
@@ -54,9 +58,12 @@ on the format of the value:
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
+			// TODO: pass in via caller
+			opts.IO = iostreams.System()
+
 			opts.HttpClient = func() (*http.Client, error) {
 				ctx := context.New()
-				token, err := ctx.AuthLogin()
+				token, err := ctx.AuthToken()
 				if err != nil {
 					return nil, err
 				}
@@ -108,10 +115,14 @@ func apiRun(opts *ApiOptions) error {
 	}
 	defer resp.Body.Close()
 
-	// TODO: make stdout configurable for tests
-	_, err = io.Copy(os.Stdout, resp.Body)
+	_, err = io.Copy(opts.IO.Out, resp.Body)
 	if err != nil {
 		return err
+	}
+
+	// TODO: detect GraphQL errors
+	if resp.StatusCode > 299 {
+		return cmdutil.SilentError
 	}
 
 	return nil
@@ -131,7 +142,7 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 		if err != nil {
 			return params, err
 		}
-		value, err := magicFieldValue(strValue)
+		value, err := magicFieldValue(strValue, opts.IO.In)
 		if err != nil {
 			return params, fmt.Errorf("error parsing %q value: %w", key, err)
 		}
@@ -148,12 +159,12 @@ func parseField(f string) (string, string, error) {
 	return f[0:idx], f[idx+1:], nil
 }
 
-func magicFieldValue(v string) (interface{}, error) {
+func magicFieldValue(v string, stdin io.ReadCloser) (interface{}, error) {
 	if strings.HasPrefix(v, "@") {
-		return readUserFile(v[1:])
+		return readUserFile(v[1:], stdin)
 	}
 
-	if n, err := strconv.Atoi(v); err != nil {
+	if n, err := strconv.Atoi(v); err == nil {
 		return n, nil
 	}
 
@@ -169,18 +180,17 @@ func magicFieldValue(v string) (interface{}, error) {
 	}
 }
 
-func readUserFile(fn string) ([]byte, error) {
+func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
 	var r io.ReadCloser
 	if fn == "-" {
-		// TODO: make stdin configurable for tests
-		r = os.Stdin
+		r = stdin
 	} else {
 		var err error
 		r, err = os.Open(fn)
 		if err != nil {
 			return nil, err
 		}
-		defer r.Close()
 	}
+	defer r.Close()
 	return ioutil.ReadAll(r)
 }

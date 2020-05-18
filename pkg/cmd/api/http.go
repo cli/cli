@@ -34,6 +34,8 @@ func httpRequest(client *http.Client, method string, p string, params interface{
 		}
 	case io.Reader:
 		body = pp
+	case nil:
+		body = nil
 	default:
 		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
 	}
