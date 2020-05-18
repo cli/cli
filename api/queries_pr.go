@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 
 	"github.com/shurcooL/githubv4"
@@ -199,6 +201,30 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		summary.Total++
 	}
 	return
+}
+
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
+		ghrepo.FullName(baseRepo), prNum)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {

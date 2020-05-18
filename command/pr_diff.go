@@ -3,10 +3,12 @@ package command
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +36,7 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
+	// begin pr resolution boilerplate
 	var prNum int
 	branchWithOwner := ""
 
@@ -68,8 +71,44 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		}
 		prNum = pr.Number
 	}
+	// end pr resolution boilerplate
 
-	fmt.Println(pr.Title)
+	diff, err := apiClient.PullRequestDiff(baseRepo, prNum)
+	if err != nil {
+		return err
+	}
+
+	color, err := cmd.Flags().GetString("color")
+	if err != nil {
+		return err
+	}
+
+	out := cmd.OutOrStdout()
+	if color == "auto" {
+		color = "never"
+		isTTY := false
+		if outFile, isFile := out.(*os.File); isFile {
+			isTTY = utils.IsTerminal(outFile)
+			if isTTY {
+				color = "always"
+			}
+		}
+	}
+
+	switch color {
+	case "always":
+		out = colorableOut(cmd)
+		rendered, err := utils.RenderMarkdown(fmt.Sprintf("```diff\n%s\n```", diff))
+		fmt.Fprintf(out, rendered)
+		if err != nil {
+			return fmt.Errorf("failed to colorize diff: %w", err)
+		}
+	case "never":
+		out := cmd.OutOrStdout()
+		fmt.Fprintf(out, diff)
+	default:
+		return fmt.Errorf("did not understand color setting %q", color)
+	}
 
 	return nil
 }
