@@ -82,6 +82,9 @@ func prDiff(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if !validColor(color) {
+		return fmt.Errorf("did not understand color: %q. Expected one of always, never, or auto", color)
+	}
 
 	out := cmd.OutOrStdout()
 	if color == "auto" {
@@ -95,27 +98,24 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	switch color {
-	case "always":
-		out = colorableOut(cmd)
-		for _, diffLine := range strings.Split(diff, "\n") {
-			output := diffLine
-			switch {
-			case bold(diffLine):
-				output = utils.Bold(diffLine)
-			case green(diffLine):
-				output = utils.Green(diffLine)
-			case red(diffLine):
-				output = utils.Red(diffLine)
-			}
+	if color == "never" {
+		fmt.Fprint(out, diff)
+		return nil
+	}
 
-			fmt.Fprintln(out, output)
+	out = colorableOut(cmd)
+	for _, diffLine := range strings.Split(diff, "\n") {
+		output := diffLine
+		switch {
+		case bold(diffLine):
+			output = utils.Bold(diffLine)
+		case green(diffLine):
+			output = utils.Green(diffLine)
+		case red(diffLine):
+			output = utils.Red(diffLine)
 		}
-	case "never":
-		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, diff)
-	default:
-		return fmt.Errorf("did not understand color setting %q", color)
+
+		fmt.Fprintln(out, output)
 	}
 
 	return nil
@@ -137,4 +137,8 @@ func red(dl string) bool {
 
 func green(dl string) bool {
 	return strings.HasPrefix(dl, "+")
+}
+
+func validColor(c string) bool {
+	return c == "auto" || c == "always" || c == "never"
 }
