@@ -98,10 +98,18 @@ func prDiff(cmd *cobra.Command, args []string) error {
 	switch color {
 	case "always":
 		out = colorableOut(cmd)
-		rendered, err := utils.RenderMarkdown(fmt.Sprintf("```diff\n%s\n```", diff))
-		fmt.Fprintf(out, rendered)
-		if err != nil {
-			return fmt.Errorf("failed to colorize diff: %w", err)
+		for _, diffLine := range strings.Split(diff, "\n") {
+			output := diffLine
+			switch {
+			case bold(diffLine):
+				output = utils.Bold(diffLine)
+			case green(diffLine):
+				output = utils.Green(diffLine)
+			case red(diffLine):
+				output = utils.Red(diffLine)
+			}
+
+			fmt.Fprintln(out, output)
 		}
 	case "never":
 		out := cmd.OutOrStdout()
@@ -111,4 +119,22 @@ func prDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func bold(dl string) bool {
+	prefixes := []string{"+++", "---", "diff", "index"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(dl, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func red(dl string) bool {
+	return strings.HasPrefix(dl, "-")
+}
+
+func green(dl string) bool {
+	return strings.HasPrefix(dl, "+")
 }
