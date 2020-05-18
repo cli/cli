@@ -1093,3 +1093,26 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
+
+func TestPRReady(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 444, "closed": true}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr ready 444")
+	if err != nil {
+		t.Fatalf("error running command `pr ready`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #444 is marked ready for review`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
