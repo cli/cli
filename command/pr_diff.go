@@ -25,6 +25,14 @@ func init() {
 }
 
 func prDiff(cmd *cobra.Command, args []string) error {
+	color, err := cmd.Flags().GetString("color")
+	if err != nil {
+		return err
+	}
+	if !validColor(color) {
+		return fmt.Errorf("did not understand color: %q. Expected one of always, never, or auto", color)
+	}
+
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -76,14 +84,6 @@ func prDiff(cmd *cobra.Command, args []string) error {
 	diff, err := apiClient.PullRequestDiff(baseRepo, prNum)
 	if err != nil {
 		return err
-	}
-
-	color, err := cmd.Flags().GetString("color")
-	if err != nil {
-		return err
-	}
-	if !validColor(color) {
-		return fmt.Errorf("did not understand color: %q. Expected one of always, never, or auto", color)
 	}
 
 	out := cmd.OutOrStdout()
