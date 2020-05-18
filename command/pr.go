@@ -29,6 +29,7 @@ func init() {
 	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
+	prCmd.AddCommand(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -84,12 +85,17 @@ var prReopenCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
 }
-
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
 	Short: "Merge a pull request",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prMerge,
+}
+var prReadyCmd = &cobra.Command{
+	Use:   "ready [<number> | <url> | <branch>]",
+	Short: "Make a pull request as ready for review",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  prReady,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -548,6 +554,41 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	return nil
+}
+
+func prReady(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		return err
+	}
+
+	// if pr.State == "MERGED" {
+	// 	err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+	// 	return err
+	// } else if pr.Closed {
+	// 	fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
+	// 	return nil
+	// }
+
+	err = api.PullRequestReady(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is marked ready for review\n", utils.Green("✔"), pr.Number)
+
 	return nil
 }
 
