@@ -962,12 +962,11 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		} `graphql:"markPullRequestReadyForReview(input: $input)"`
 	}
 
-	input := struct {
-		// ID of the pull request to be reopened. (Required.)
+	type MarkPullRequestReadyForReviewInput struct {
 		PullRequestID githubv4.ID `json:"pullRequestId"`
-	}{
-		PullRequestID: pr.ID,
 	}
+
+	input := MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
 
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Mutate(context.Background(), &mutation, input, nil)

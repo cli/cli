@@ -569,9 +569,26 @@ func prReady(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
-	if err != nil {
-		return err
+	var pr *api.PullRequest
+	if len(args) > 0 {
+		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		if err != nil {
+			return err
+		}
+	} else {
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		if prNumber != 0 {
+			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+		} else {
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	// if pr.State == "MERGED" {
