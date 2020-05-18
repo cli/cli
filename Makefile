@@ -22,8 +22,8 @@ test:
 	go test ./...
 .PHONY: test
 
-site:
-	git clone https://github.com/github/cli.github.com.git "$@"
+site: bin/gh
+	bin/gh repo clone github/cli.github.com "$@"
 
 site-docs: site
 	git -C site pull
