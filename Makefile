@@ -23,7 +23,7 @@ test:
 .PHONY: test
 
 site: bin/gh
-	gh repo clone github/cli.github.com "$@"
+	bin/gh repo clone github/cli.github.com "$@"
 
 site-docs: site
 	git -C site pull
