@@ -1133,7 +1133,7 @@ func TestPRReady_alreadyReady(t *testing.T) {
 		t.Fatalf("error running command `pr ready`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #445 was already marked as "ready for review"`)
+	r := regexp.MustCompile(`Pull request #445 is already "ready for review"`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
