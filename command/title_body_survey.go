@@ -159,6 +159,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	bodyQuestion := &survey.Question{
 		Name: "body",
 		Prompt: &surveyext.GhEditor{
+			BlankAllowed:  true,
 			EditorCommand: editorCommand,
 			Editor: &survey.Editor{
 				Message:       "Body",
