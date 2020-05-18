@@ -50,7 +50,7 @@ func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
-	repo := ghrepo.FromFullName("OWNER/REPO")
+	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoMetadataInput{
 		Assignees:  true,
 		Reviewers:  true,
@@ -181,7 +181,7 @@ func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
-	repo := ghrepo.FromFullName("OWNER/REPO")
+	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoResolveInput{
 		Assignees: []string{"monalisa", "hubot"},
 		Reviewers: []string{"monalisa", "octocat", "OWNER/core", "/robots"},

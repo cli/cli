@@ -189,7 +189,10 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		name = args[0]
 		if strings.Contains(name, "/") {
-			newRepo := ghrepo.FromFullName(name)
+			newRepo, err := ghrepo.FromFullName(name)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 			orgName = newRepo.RepoOwner()
 			name = newRepo.RepoName()
 		}
@@ -366,9 +369,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			repoToFork = ghrepo.FromFullName(repoArg)
-			if repoToFork.RepoName() == "" || repoToFork.RepoOwner() == "" {
-				return fmt.Errorf("could not parse owner or repo name from %s", repoArg)
+			repoToFork, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
 			}
 		}
 	}
@@ -508,7 +511,11 @@ func repoView(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			toView = ghrepo.FromFullName(repoArg)
+			var err error
+			toView, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 		}
 	}
 
