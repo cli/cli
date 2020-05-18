@@ -66,14 +66,8 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var pr *api.PullRequest
-	if prNum > 0 {
-		pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNum)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-	} else {
-		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+	if prNum < 1 {
+		pr, err := api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
 		if err != nil {
 			return fmt.Errorf("could not find pull request: %w", err)
 		}
