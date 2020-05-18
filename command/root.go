@@ -216,7 +216,7 @@ func changelogURL(version string) string {
 	return url
 }
 
-func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
+func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
 	repo, err := cmd.Flags().GetString("repo")
 	if err == nil && repo != "" {
 		baseRepo, err := ghrepo.FromFullName(repo)
@@ -224,11 +224,6 @@ func determineBaseRepo(cmd *cobra.Command, ctx context.Context) (ghrepo.Interfac
 			return nil, fmt.Errorf("argument error: %w", err)
 		}
 		return baseRepo, nil
-	}
-
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return nil, err
 	}
 
 	baseOverride, err := cmd.Flags().GetString("repo")

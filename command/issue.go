@@ -106,7 +106,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -340,9 +340,13 @@ func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) 
 
 func issueCreate(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	// NB no auto forking like over in pr create
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -405,11 +409,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
-
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
 
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
@@ -654,7 +653,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -689,7 +688,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(cmd, ctx)
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(cmd, ctx)
+		baseRepo, err = determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return err
 		}
