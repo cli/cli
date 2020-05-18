@@ -592,7 +592,7 @@ func prReady(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.Closed {
-		err := fmt.Errorf("%s Pull request #%d is closed and can't be marked \"ready for review\"", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", utils.Red("!"), pr.Number)
 		return err
 	} else if !pr.IsDraft {
 		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d was already marked as \"ready for review\"\n", utils.Yellow("!"), pr.Number)
