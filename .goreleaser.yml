@@ -36,7 +36,7 @@ archives:
       darwin: macOS
     format: tar.gz
     files:
-      - manpage/gh*.1
+      - ./share/man/man1/gh*.1
   - id: windows
     builds: [windows]
     <<: *archive_defaults
@@ -61,7 +61,7 @@ brews:
     install: |
       system "make" if build.head?
       bin.install "bin/gh"
-      man1.install Dir["manpages/*.1"]
+      man1.install Dir["./share/man/man1/gh*.1"]
       (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
       (zsh_completion/"_gh").write `#{bin}/gh completion -s zsh`
       (fish_completion/"gh.fish").write `#{bin}/gh completion -s fish`
@@ -80,7 +80,7 @@ nfpms:
       - deb
       - rpm
     files:
-      "./manpage/gh*.1": "/usr/share/man/man1"
+      "./share/man/man1/gh*.1": "/usr/share/man/man1"
 
 scoop:
   bucket:
