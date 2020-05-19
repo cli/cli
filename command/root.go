@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
@@ -60,23 +61,10 @@ func init() {
 		if err == pflag.ErrHelp {
 			return err
 		}
-		return &FlagError{Err: err}
+		return &cmdutil.FlagError{Err: err}
 	})
 
 	RootCmd.AddCommand(apiCmd.NewCmdApi())
-}
-
-// FlagError is the kind of error raised in flag processing
-type FlagError struct {
-	Err error
-}
-
-func (fe FlagError) Error() string {
-	return fe.Err.Error()
-}
-
-func (fe FlagError) Unwrap() error {
-	return fe.Err
 }
 
 // RootCmd is the entry point of command-line execution
