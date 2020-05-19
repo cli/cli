@@ -45,6 +45,7 @@ type PullRequest struct {
 	BaseRefName string
 	HeadRefName string
 	Body        string
+	Mergeable   string
 
 	Author struct {
 		Login string
@@ -228,6 +229,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		state
 		url
 		headRefName
+		mergeable
 		headRepositoryOwner {
 			login
 		}
@@ -382,6 +384,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				state
 				closed
 				body
+				mergeable
 				author {
 				  login
 				}
@@ -490,6 +493,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					title
 					state
 					body
+					mergeable
 					author {
 						login
 					}

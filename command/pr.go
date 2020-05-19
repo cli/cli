@@ -449,7 +449,15 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		var prNumber string
+		n, _ := prFromURL(args[0])
+		if n != "" {
+			prNumber = n
+		} else {
+			prNumber = args[0]
+		}
+
+		pr, err = prFromArg(apiClient, baseRepo, prNumber)
 		if err != nil {
 			return err
 		}
@@ -469,7 +477,13 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if pr.State == "MERGED" {
+	if pr.Mergeable == "CONFLICTING" {
+		err := fmt.Errorf("%s Pull request #%d has conflicts and isn't mergeable ", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.Mergeable == "UNKNOWN" {
+		err := fmt.Errorf("%s Pull request #%d can't be merged right now", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.State == "MERGED" {
 		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
 		return err
 	}
