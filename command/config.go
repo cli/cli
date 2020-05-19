@@ -32,7 +32,7 @@ Current respected settings:
 
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
-	Short: "Prints the value of a given configuration key.",
+	Short: "Prints the value of a given configuration key",
 	Long: `Get the value for a given configuration key.
 
 Examples:
@@ -45,7 +45,7 @@ Examples:
 
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
-	Short: "Updates configuration with the value of a given key.",
+	Short: "Updates configuration with the value of a given key",
 	Long: `Update the configuration by setting a key to a value.
 
 Examples:
