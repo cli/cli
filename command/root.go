@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
+	"github.com/google/shlex"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -461,4 +462,38 @@ func determineEditor(cmd *cobra.Command) (string, error) {
 	}
 
 	return editorCommand, nil
+}
+
+func ExpandAlias(args []string) ([]string, error) {
+	// TODO i don't love that context is being init'd twice. My reading of the code is that it is
+	// idempotent and okay but I don't know if that's ok to depend on.
+	if len(args) == 1 {
+		// the command is lacking a subcommand
+		return []string{}, nil
+	}
+
+	ctx := initContext()
+	cfg, err := ctx.Config()
+	if err != nil {
+		return []string{}, err
+	}
+	aliases, err := cfg.Aliases()
+	if err != nil {
+		return []string{}, err
+	}
+
+	if aliases.Exists(args[1]) {
+		expansion := aliases.Get(args[1])
+		if strings.Contains(expansion, "$") {
+			for i, a := range args[2:] {
+				expansion = strings.Replace(expansion, fmt.Sprintf("$%d", i+1), a, 1)
+			}
+			if strings.Contains(expansion, "$") {
+				return []string{}, fmt.Errorf("not enough arguments for alias: %s", expansion)
+			}
+		}
+		return shlex.Split(expansion)
+	}
+
+	return args[1:], nil
 }
