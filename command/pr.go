@@ -571,7 +571,15 @@ func prReady(cmd *cobra.Command, args []string) error {
 
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		var prNumber string
+		n, _ := prFromURL(args[0])
+		if n != "" {
+			prNumber = n
+		} else {
+			prNumber = args[0]
+		}
+
+		pr, err = prFromArg(apiClient, baseRepo, prNumber)
 		if err != nil {
 			return err
 		}
