@@ -953,6 +953,27 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 	return err
 }
 
+func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		MarkPullRequestReadyForReviewInput struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"markPullRequestReadyForReview(input: $input)"`
+	}
+
+	type MarkPullRequestReadyForReviewInput struct {
+		PullRequestID githubv4.ID `json:"pullRequestId"`
+	}
+
+	input := MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
