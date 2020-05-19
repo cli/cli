@@ -481,7 +481,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		err := fmt.Errorf("%s Pull request #%d has conflicts and isn't mergeable ", utils.Red("!"), pr.Number)
 		return err
 	} else if pr.Mergeable == "UNKNOWN" {
-		err := fmt.Errorf("%s Pull request #%d can't be merged right now", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number)
 		return err
 	} else if pr.State == "MERGED" {
 		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
