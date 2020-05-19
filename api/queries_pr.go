@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -224,7 +225,16 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, e
 		return "", err
 	}
 
-	return string(b), nil
+	if resp.StatusCode == 200 {
+		return string(b), nil
+	}
+
+	if resp.StatusCode == 404 {
+		return "", &NotFoundError{errors.New("pull request not found")}
+	}
+
+	return "", errors.New("pull request diff lookup failed")
+
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
