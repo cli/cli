@@ -61,6 +61,7 @@ brews:
     install: |
       system "make" if build.head?
       bin.install "bin/gh"
+      man1.install Dir["manpages/*.1"]
       (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
       (zsh_completion/"_gh").write `#{bin}/gh completion -s zsh`
       (fish_completion/"gh.fish").write `#{bin}/gh completion -s fish`
