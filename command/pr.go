@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -549,8 +548,8 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		action = "Merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
 	} else {
-		fmt.Fprintf(os.Stderr, "Unknown merge method used\n")
-		os.Exit(1)
+		err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
+		return err
 	}
 
 	if err != nil {
