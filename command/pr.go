@@ -28,7 +28,7 @@ func init() {
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
-	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local branch after merge")
+	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
 	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -560,7 +560,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
+		var branchToSwitchTo string
 		if currentBranch == pr.HeadRefName {
+			branchToSwitchTo = repo.DefaultBranchRef.Name
 			err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
 			if err != nil {
 				return err
@@ -569,10 +571,21 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		err = git.DeleteLocalBranch(pr.HeadRefName)
 		if err != nil {
-			fmt.Fprintf(colorableErr(cmd), "%s Could not deleted local branch %s: %s\n", utils.Red("!"), utils.Cyan(pr.HeadRefName), err)
+			fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 			return err
 		}
-		fmt.Fprintf(colorableOut(cmd), "%s Deleted local branch %s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName))
+
+		err = git.DeleteRemoteBranch(pr.HeadRefName)
+		if err != nil {
+			fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+			return err
+		}
+
+		branchSwitchString := ""
+		if branchToSwitchTo != "" {
+			branchSwitchString = fmt.Sprintf("and switched to branch %s", utils.Cyan(branchToSwitchTo))
+		}
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s %s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil
@@ -591,7 +604,7 @@ func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
 	deleteBranchQuestion := &survey.Question{
 		Name: "deleteBranch",
 		Prompt: &survey.Confirm{
-			Message: "Delete the branch locally?",
+			Message: "Delete the branch locally and on GitHub?",
 			Default: true,
 		},
 	}
