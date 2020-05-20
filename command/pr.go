@@ -29,6 +29,7 @@ func init() {
 	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
+	prCmd.AddCommand(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
@@ -84,12 +85,17 @@ var prReopenCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
 }
-
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
 	Short: "Merge a pull request",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prMerge,
+}
+var prReadyCmd = &cobra.Command{
+	Use:   "ready [<number> | <url> | <branch>]",
+	Short: "Make a pull request as ready for review",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  prReady,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -548,6 +554,66 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	return nil
+}
+
+func prReady(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	var pr *api.PullRequest
+	if len(args) > 0 {
+		var prNumber string
+		n, _ := prFromURL(args[0])
+		if n != "" {
+			prNumber = n
+		} else {
+			prNumber = args[0]
+		}
+
+		pr, err = prFromArg(apiClient, baseRepo, prNumber)
+		if err != nil {
+			return err
+		}
+	} else {
+		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		if prNumber != 0 {
+			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
+		} else {
+			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if pr.Closed {
+		err := fmt.Errorf("%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", utils.Red("!"), pr.Number)
+		return err
+	} else if !pr.IsDraft {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already \"ready for review\"\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+	err = api.PullRequestReady(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is marked as \"ready for review\"\n", utils.Green("✔"), pr.Number)
+
 	return nil
 }
 
