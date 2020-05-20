@@ -17,10 +17,14 @@ builds:
     id: macos
     goos: [darwin]
     goarch: [amd64]
+    hooks:
+      pre: make manpages
+
   - <<: *build_defaults
     id: linux
     goos: [linux]
     goarch: [386, amd64, arm64]
+
   - <<: *build_defaults
     id: windows
     goos: [windows]
