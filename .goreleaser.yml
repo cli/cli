@@ -39,12 +39,15 @@ archives:
       darwin: macOS
     format: tar.gz
     files:
+      - LICENSE
       - ./share/man/man1/gh*.1
   - id: windows
     builds: [windows]
     <<: *archive_defaults
     wrap_in_directory: false
     format: zip
+    files:
+      - LICENSE
 
 brews:
   - name: gh
