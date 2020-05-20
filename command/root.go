@@ -249,30 +249,6 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
-func convertRepoInterfaceToRepository(ctx context.Context, repo ghrepo.Interface) (*api.Repository, error) {
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	remotes, err := ctx.Remotes()
-	if err != nil {
-		return nil, err
-	}
-
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
-	if err != nil {
-		return nil, err
-	}
-
-	baseRepo, err := repoContext.BaseRepo()
-	if err != nil {
-		return nil, err
-	}
-
-	return baseRepo, nil
-}
-
 func rootHelpFunc(command *cobra.Command, s []string) {
 	if command != RootCmd {
 		cobraDefaultHelpFunc(command, s)

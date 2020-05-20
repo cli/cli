@@ -526,7 +526,6 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return nil
 		}
-
 	}
 
 	var action string
@@ -551,7 +550,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
 
 	if deleteBranch {
-		repo, err := convertRepoInterfaceToRepository(ctx, baseRepo)
+		repo, err := api.GitHubRepo(apiClient, baseRepo)
 		if err != nil {
 			return err
 		}
