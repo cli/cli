@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"strings"
 	"testing"
 )
 
@@ -38,4 +39,14 @@ func TestGistCreate(t *testing.T) {
 	eq(t, reqBody.Public, true)
 	eq(t, reqBody.Files["gistCreate.json"].Content, "{}")
 	eq(t, output.String(), "https://gist.github.com/aa5a315d61ae9438b18d\n")
+}
+
+func TestGistCreate_stdin(t *testing.T) {
+	fakeStdin := strings.NewReader("hey cool how is it going")
+	files, err := processFiles(fakeStdin, []string{"-"})
+	if err != nil {
+		t.Fatalf("unexpected error processing files: %s", err)
+	}
+
+	eq(t, files["gistfile0.txt"], "hey cool how is it going")
 }

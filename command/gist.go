@@ -45,8 +45,6 @@ Examples
 	RunE: gistCreate,
 }
 
-type files *map[string]string
-
 type Opts struct {
 	Description string
 	Public      bool
@@ -120,12 +118,12 @@ func processOpts(cmd *cobra.Command) (*Opts, error) {
 	}, err
 }
 
-func processFiles(stdin io.Reader, filenames []string) (files, error) {
-	if len(filenames) == 0 {
-		return nil, errors.New("no filenames passed and nothing on STDIN")
-	}
-
+func processFiles(stdin io.Reader, filenames []string) (map[string]string, error) {
 	fs := map[string]string{}
+
+	if len(filenames) == 0 {
+		return fs, errors.New("no filenames passed and nothing on STDIN")
+	}
 
 	for i, f := range filenames {
 		var filename string
@@ -135,12 +133,12 @@ func processFiles(stdin io.Reader, filenames []string) (files, error) {
 			filename = fmt.Sprintf("gistfile%d.txt", i)
 			content, err = ioutil.ReadAll(stdin)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read from stdin: %w", err)
+				return fs, fmt.Errorf("failed to read from stdin: %w", err)
 			}
 		} else {
 			content, err = ioutil.ReadFile(f)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read file %s: %w", f, err)
+				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 			filename = path.Base(f)
 		}
@@ -148,5 +146,5 @@ func processFiles(stdin io.Reader, filenames []string) (files, error) {
 		fs[filename] = string(content)
 	}
 
-	return &fs, nil
+	return fs, nil
 }

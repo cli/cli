@@ -22,10 +22,10 @@ type GistFile struct {
 // Create a gist for authenticated user.
 //
 // GitHub API docs: https://developer.github.com/v3/gists/#create-a-gist
-func GistCreate(client *Client, description string, public bool, files *map[string]string) (*Gist, error) {
+func GistCreate(client *Client, description string, public bool, files map[string]string) (*Gist, error) {
 	gistFiles := map[GistFilename]GistFile{}
 
-	for filename, content := range *files {
+	for filename, content := range files {
 		gistFiles[GistFilename(filename)] = GistFile{content}
 	}
 
