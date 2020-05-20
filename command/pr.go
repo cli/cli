@@ -504,12 +504,15 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	isInteractive := false
 	if b, _ := cmd.Flags().GetBool("merge"); b {
 		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodMerge
 	}
 	if b, _ := cmd.Flags().GetBool("rebase"); b {
 		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodRebase
 	}
 	if b, _ := cmd.Flags().GetBool("squash"); b {
 		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodSquash
 	}
 
 	if enabledFlagCount == 0 {
@@ -524,23 +527,6 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-	} else {
-		rebase, err := cmd.Flags().GetBool("rebase")
-		if err != nil {
-			return err
-		}
-		squash, err := cmd.Flags().GetBool("squash")
-		if err != nil {
-			return err
-		}
-
-		if rebase {
-			mergeMethod = api.PullRequestMergeMethodRebase
-		} else if squash {
-			mergeMethod = api.PullRequestMergeMethodSquash
-		} else {
-			mergeMethod = api.PullRequestMergeMethodMerge
-		}
 	}
 
 	var action string
