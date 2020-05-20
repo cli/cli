@@ -62,17 +62,25 @@ func gistCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand arguments: %w", err)
 	}
 
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to check STDIN: %w", err)
+	}
+	if (info.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
+		args = append(args, "-")
+	}
+
 	files, err := processFiles(os.Stdin, args)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
 	errOut := colorableErr(cmd)
-	fmt.Fprintf(errOut, "%s Creating a Gist...\n", utils.Gray("-"))
+	fmt.Fprintf(errOut, "%s Creating gist...\n", utils.Gray("-"))
 
 	gist, err := api.GistCreate(client, opts.Description, opts.Public, files)
 	if err != nil {
-		return fmt.Errorf("%s Failed to create a gist: %w", utils.Red("X"), err)
+		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
 	}
 
 	fmt.Fprintf(errOut, "%s Created gist\n", utils.Green("✓"))
@@ -100,7 +108,6 @@ func processOpts(cmd *cobra.Command) (*Opts, error) {
 }
 
 func processFiles(stdin io.Reader, filenames []string) (files, error) {
-	// TODO handle stdin being piped in
 	if len(filenames) == 0 {
 		return nil, errors.New("no filenames passed and nothing on STDIN")
 	}
