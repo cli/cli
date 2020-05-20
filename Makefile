@@ -46,9 +46,6 @@ endif
 .PHONY: site-publish
 
 
-share/man/man1:
-	mkdir -p $@
-
 .PHONY: manpages
-manpages: share/man/man1
+manpages:
 	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/
