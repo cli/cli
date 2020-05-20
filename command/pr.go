@@ -570,9 +570,16 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+		currentBranch, err := ctx.Branch()
 		if err != nil {
 			return err
+		}
+
+		if currentBranch == pr.HeadRefName {
+			err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+			if err != nil {
+				return err
+			}
 		}
 
 		err = git.DeleteLocalBranch(pr.HeadRefName)

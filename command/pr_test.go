@@ -1041,6 +1041,30 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
 }
 
+func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "another-branch")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+	] } } } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+	// We don't expect the default branch to be checked out, just that blueberries is deleted
+	cs.Stub("") // git branch -d blueberries
+
+	output, err := RunCommand(`pr merge --merge --delete-branch blueberries`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+}
+
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
