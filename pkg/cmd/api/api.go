@@ -99,9 +99,9 @@ func apiRun(opts *ApiOptions) error {
 
 	if opts.ShowResponseHeaders {
 		for name, vals := range resp.Header {
-			fmt.Printf("%s: %s\r\n", name, strings.Join(vals, ", "))
+			fmt.Fprintf(opts.IO.Out, "%s: %s\r\n", name, strings.Join(vals, ", "))
 		}
-		fmt.Print("\r\n")
+		fmt.Fprint(opts.IO.Out, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {

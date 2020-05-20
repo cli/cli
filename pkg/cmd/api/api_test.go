@@ -115,6 +115,7 @@ func Test_NewCmdApi(t *testing.T) {
 func Test_apiRun(t *testing.T) {
 	tests := []struct {
 		name         string
+		options      ApiOptions
 		httpResponse *http.Response
 		err          error
 		stdout       string
@@ -128,6 +129,20 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    nil,
 			stdout: `bam!`,
+			stderr: ``,
+		},
+		{
+			name: "show response headers",
+			options: ApiOptions{
+				ShowResponseHeaders: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "Content-Type: text/plain\r\n\r\nbody",
 			stderr: ``,
 		},
 		{
@@ -156,22 +171,17 @@ func Test_apiRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
 
-			opts := ApiOptions{
-				IO: io,
-				HttpClient: func() (*http.Client, error) {
-					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-						resp := tt.httpResponse
-						resp.Request = req
-						return resp, nil
-					}
-					return &http.Client{Transport: tr}, nil
-				},
-
-				RawFields:   []string{},
-				MagicFields: []string{},
+			tt.options.IO = io
+			tt.options.HttpClient = func() (*http.Client, error) {
+				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+					resp := tt.httpResponse
+					resp.Request = req
+					return resp, nil
+				}
+				return &http.Client{Transport: tr}, nil
 			}
 
-			err := apiRun(&opts)
+			err := apiRun(&tt.options)
 			if err != tt.err {
 				t.Errorf("expected error %v, got %v", tt.err, err)
 			}
