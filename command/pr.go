@@ -569,10 +569,13 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		err = git.DeleteLocalBranch(pr.HeadRefName)
-		if err != nil {
-			fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-			return err
+		localBranchExists := git.DoesLocalBranchExist(pr.HeadRefName)
+		if localBranchExists {
+			err = git.DeleteLocalBranch(pr.HeadRefName)
+			if err != nil {
+				fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				return err
+			}
 		}
 
 		err = git.DeleteRemoteBranch(pr.HeadRefName)
@@ -583,9 +586,10 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		branchSwitchString := ""
 		if branchToSwitchTo != "" {
-			branchSwitchString = fmt.Sprintf("and switched to branch %s", utils.Cyan(branchToSwitchTo))
+			branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
 		}
-		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s %s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil
