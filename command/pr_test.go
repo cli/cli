@@ -1206,3 +1206,72 @@ func TestPrMerge_multipleMergeMethods(t *testing.T) {
 		t.Fatal("expected error running `pr merge` with multiple merge methods")
 	}
 }
+
+func TestPRReady(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 444, "closed": false, "isDraft": true}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr ready 444")
+	if err != nil {
+		t.Fatalf("error running command `pr ready`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #444 is marked as "ready for review"`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReady_alreadyReady(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 445, "closed": false, "isDraft": false}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr ready 445")
+	if err != nil {
+		t.Fatalf("error running command `pr ready`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #445 is already "ready for review"`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReady_closed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 446, "closed": true, "isDraft": true}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	_, err := RunCommand("pr ready 446")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr ready` on a review that is closed!: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #446 is closed. Only draft pull requests can be marked as "ready for review"`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, err.Error())
+	}
+}

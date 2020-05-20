@@ -39,7 +39,7 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 	}
 
 	hasBaseOverride := base != ""
-	baseOverride := ghrepo.FromFullName(base)
+	baseOverride, _ := ghrepo.FromFullName(base)
 	foundBaseOverride := false
 	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
 	for _, r := range remotes[:lenRemotesForLookup] {
@@ -266,5 +266,5 @@ func (c *fsContext) BaseRepo() (ghrepo.Interface, error) {
 }
 
 func (c *fsContext) SetBaseRepo(nwo string) {
-	c.baseRepo = ghrepo.FromFullName(nwo)
+	c.baseRepo, _ = ghrepo.FromFullName(nwo)
 }

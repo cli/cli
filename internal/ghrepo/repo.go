@@ -28,14 +28,15 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-// FromFullName extracts the GitHub repository inforation from an "OWNER/REPO" string
-func FromFullName(nwo string) Interface {
+// FromFullName extracts the GitHub repository information from an "OWNER/REPO" string
+func FromFullName(nwo string) (Interface, error) {
 	var r ghRepo
 	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) == 2 {
-		r.owner, r.name = parts[0], parts[1]
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return &r, fmt.Errorf("expected OWNER/REPO format, got %q", nwo)
 	}
-	return &r
+	r.owner, r.name = parts[0], parts[1]
+	return &r, nil
 }
 
 // FromURL extracts the GitHub repository information from a URL

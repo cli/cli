@@ -86,14 +86,14 @@ func processReviewOpt(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 func prReview(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
+	}
+
+	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
 	var prNum int
