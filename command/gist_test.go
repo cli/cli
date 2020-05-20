@@ -5,25 +5,19 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"testing"
-
-	"github.com/cli/cli/context"
 )
 
 func TestGistCreate(t *testing.T) {
-	ctx := context.NewBlank()
-	initContext = func() context.Context {
-		return ctx
-	}
+	initBlankContext("", "OWNER/REPO", "trunk")
 
 	http := initFakeHTTP()
-
 	http.StubResponse(200, bytes.NewBufferString(`
 	{
 		"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"
 	}
 	`))
 
-	output, err := RunCommand(`gist create -f "../test/fixtures/gistCreate.json" -d "Gist description" -p=false`)
+	output, err := RunCommand(`gist create "../test/fixtures/gistCreate.json" -d "Gist description" --public`)
 	eq(t, err, nil)
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
@@ -38,7 +32,7 @@ func TestGistCreate(t *testing.T) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	eq(t, reqBody.Description, "Gist description")
-	eq(t, reqBody.Public, false)
+	eq(t, reqBody.Public, true)
 	eq(t, reqBody.Files["gistCreate.json"].Content, "{}")
 	eq(t, output.String(), "https://gist.github.com/aa5a315d61ae9438b18d\n")
 }
