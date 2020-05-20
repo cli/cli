@@ -29,7 +29,10 @@ func TestGistCreate(t *testing.T) {
 		}
 	}{}
 
-	json.Unmarshal(bodyBytes, &reqBody)
+	err = json.Unmarshal(bodyBytes, &reqBody)
+	if err != nil {
+		t.Fatalf("unexpected json error: %s", err)
+	}
 
 	eq(t, reqBody.Description, "Gist description")
 	eq(t, reqBody.Public, true)
