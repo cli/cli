@@ -1,30 +1,42 @@
 package command
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path"
+
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	RootCmd.AddCommand(gistCmd)
 	gistCmd.AddCommand(gistCreateCmd)
-	gistCreateCmd.Flags().StringP("description", "d", "", "Required. The filenames and content of each file in the gist. The keys in the files object represent the filename and have the type string.")
-	gistCreateCmd.Flags().StringP("filename", "f", "", "A descriptive name for this gist.")
-	gistCreateCmd.Flags().BoolP("public", "p", false, "When true, the gist will be public and available for anyone to see. Default: false.")
+	gistCreateCmd.Flags().StringP("desc", "d", "", "A description for this gist")
+	gistCreateCmd.Flags().BoolP("public", "p", false, "When true, the gist will be public and available for anyone to see (default: private)")
 }
 
 var gistCmd = &cobra.Command{
 	Use:   "gist",
 	Short: "Create gists",
-	Long: `Work with GitHub gists.
-	`,
+	Long:  `Work with GitHub gists.`,
 }
 
 var gistCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new gist",
 	RunE:  gistCreate,
+}
+
+type files *map[string]string
+
+type Opts struct {
+	Description string
+	Public      bool
 }
 
 func gistCreate(cmd *cobra.Command, args []string) error {
@@ -34,45 +46,87 @@ func gistCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// This performs a dummy query, checks what scopes we have, and then asks for a user to reauth
+	// with expanded scopes. it introduces latency whenever this command is run: a trade-off to avoid
+	// having every single user reauth as a result of this feature even if they never once use gists.
+	//
+	// In the future we'd rather have the ability to detect a "reauth needed" scenario and replay
+	// failed requests but some short spikes indicated that that would be a fair bit of work.
 	client, err = ensureScopes(ctx, client, "gist")
 	if err != nil {
 		return err
 	}
 
-	description, err := cmd.Flags().GetString("description")
+	opts, err := processOpts(cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("did not understand arguments: %w", err)
 	}
 
-	public, err := cmd.Flags().GetBool("public")
+	files, err := processFiles(os.Stdin, args)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
-	filename, err := cmd.Flags().GetString("filename")
+	errOut := colorableErr(cmd)
+	fmt.Fprintf(errOut, "%s Creating a Gist...\n", utils.Gray("-"))
+
+	gist, err := api.GistCreate(client, opts.Description, opts.Public, files)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s Failed to create a gist: %w", utils.Red("X"), err)
 	}
 
-	if filename == "" {
-		fmt.Fprintf(colorableErr(cmd), "\n<filename> is required\n\n")
-		return nil
-	}
-
-	user, err := ctx.AuthLogin()
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(colorableErr(cmd), "\nCreating a Gist for %s\n\n", user)
-
-	// Need a prior request (or a change to the reauth code)
-	gist, err := api.GistCreate(client, description, public, filename)
-	if err != nil {
-		return fmt.Errorf("Failed to create a gist: %w", err)
-	}
+	fmt.Fprintf(errOut, "%s Created gist\n", utils.Green("✓"))
 
 	fmt.Fprintln(cmd.OutOrStdout(), gist.HTMLURL)
 
 	return nil
+}
+
+func processOpts(cmd *cobra.Command) (*Opts, error) {
+	description, err := cmd.Flags().GetString("desc")
+	if err != nil {
+		return nil, err
+	}
+
+	public, err := cmd.Flags().GetBool("public")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Opts{
+		Description: description,
+		Public:      public,
+	}, err
+}
+
+func processFiles(stdin io.Reader, filenames []string) (files, error) {
+	// TODO handle stdin being piped in
+	if len(filenames) == 0 {
+		return nil, errors.New("no filenames passed and nothing on STDIN")
+	}
+
+	fs := map[string]string{}
+
+	for i, f := range filenames {
+		var filename string
+		var content []byte
+		var err error
+		if f == "-" {
+			filename = fmt.Sprintf("gistfile%d.txt", i)
+			content, err = ioutil.ReadAll(stdin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read from stdin: %w", err)
+			}
+		} else {
+			content, err = ioutil.ReadFile(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read file %s: %w", f, err)
+			}
+			filename = path.Base(f)
+		}
+
+		fs[filename] = string(content)
+	}
+
+	return &fs, nil
 }
