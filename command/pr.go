@@ -573,14 +573,14 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		if localBranchExists {
 			err = git.DeleteLocalBranch(pr.HeadRefName)
 			if err != nil {
-				fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 				return err
 			}
 		}
 
 		err = git.DeleteRemoteBranch(pr.HeadRefName)
 		if err != nil {
-			fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+			err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 			return err
 		}
 
