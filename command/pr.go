@@ -586,7 +586,7 @@ func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
 		Prompt: &survey.Select{
 			Message: "What merge method would you like to use?",
 			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
-			Default: "Merge",
+			Default: "Create a merge commit",
 		},
 	}
 
