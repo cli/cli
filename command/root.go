@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"runtime/debug"
@@ -14,6 +15,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
@@ -64,7 +66,19 @@ func init() {
 		return &cmdutil.FlagError{Err: err}
 	})
 
-	RootCmd.AddCommand(apiCmd.NewCmdApi())
+	// TODO: iron out how a factory incorporates context
+	cmdFactory := &cmdutil.Factory{
+		IOStreams: iostreams.System(),
+		HttpClient: func() (*http.Client, error) {
+			ctx := context.New()
+			token, err := ctx.AuthToken()
+			if err != nil {
+				return nil, err
+			}
+			return httpClient(token), nil
+		},
+	}
+	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
@@ -117,6 +131,19 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 		ctx.SetBaseRepo(repo)
 	}
 	return ctx
+}
+
+// for cmdutil-powered commands
+func httpClient(token string) *http.Client {
+	var opts []api.ClientOption
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
+	}
+	opts = append(opts,
+		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
+		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+	)
+	return api.NewHTTPClient(opts...)
 }
 
 // overridden in tests

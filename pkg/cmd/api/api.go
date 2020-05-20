@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -29,8 +28,12 @@ type ApiOptions struct {
 	HttpClient func() (*http.Client, error)
 }
 
-func NewCmdApi() *cobra.Command {
-	opts := ApiOptions{}
+func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
+	opts := ApiOptions{
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+	}
+
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
 		Short: "Make an authenticated GitHub API request",
@@ -58,18 +61,9 @@ on the format of the value:
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
-			// TODO: pass in via caller
-			opts.IO = iostreams.System()
-
-			opts.HttpClient = func() (*http.Client, error) {
-				ctx := context.New()
-				token, err := ctx.AuthToken()
-				if err != nil {
-					return nil, err
-				}
-				return apiClientFromContext(token), nil
+			if runF != nil {
+				return runF(&opts)
 			}
-
 			return apiRun(&opts)
 		},
 	}
