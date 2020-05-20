@@ -14,6 +14,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -28,6 +29,9 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 func TestPRStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
@@ -56,6 +60,9 @@ func TestPRStatus(t *testing.T) {
 func TestPRStatus_fork(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusFork.json")
@@ -86,6 +93,9 @@ branch.blueberries.merge refs/heads/blueberries`)}
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
@@ -113,6 +123,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
@@ -145,6 +158,9 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
@@ -166,6 +182,9 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
 	defer jsonFile.Close()
@@ -186,6 +205,9 @@ func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
@@ -207,6 +229,9 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
@@ -228,6 +253,9 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
@@ -249,6 +277,9 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json")
@@ -270,6 +301,9 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`

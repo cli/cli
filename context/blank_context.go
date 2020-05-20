@@ -39,14 +39,6 @@ func (c *blankContext) SetAuthToken(t string) {
 	c.authToken = t
 }
 
-func (c *blankContext) SetAuthLogin(login string) {
-	c.authLogin = login
-}
-
-func (c *blankContext) AuthLogin() (string, error) {
-	return c.authLogin, nil
-}
-
 func (c *blankContext) Branch() (string, error) {
 	if c.branch == "" {
 		return "", fmt.Errorf("branch was not initialized")

@@ -105,7 +105,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentUser, err := ctx.AuthLogin()
+	currentUser, err := api.CurrentLoginName(apiClient)
 	if err != nil {
 		return err
 	}

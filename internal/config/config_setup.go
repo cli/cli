@@ -116,14 +116,7 @@ func setupConfigFile(filename string) (Config, error) {
 
 func getViewer(token string) (string, error) {
 	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-
-	response := struct {
-		Viewer struct {
-			Login string
-		}
-	}{}
-	err := http.GraphQL("{ viewer { login } }", nil, &response)
-	return response.Viewer.Login, err
+	return api.CurrentLoginName(http)
 }
 
 func waitForEnter(r io.Reader) error {
