@@ -17,7 +17,6 @@ func NewBlank() *blankContext {
 // A Context implementation that queries the filesystem
 type blankContext struct {
 	authToken string
-	authLogin string
 	branch    string
 	baseRepo  ghrepo.Interface
 	remotes   Remotes
