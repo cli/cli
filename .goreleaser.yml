@@ -6,6 +6,7 @@ release:
 before:
   hooks:
     - go mod tidy
+    - make manpages
 
 builds:
   - <<: &build_defaults
@@ -17,8 +18,6 @@ builds:
     id: macos
     goos: [darwin]
     goarch: [amd64]
-    hooks:
-      pre: make manpages
 
   - <<: *build_defaults
     id: linux
@@ -63,7 +62,7 @@ brews:
         depends_on "go"
       end
     install: |
-      system "make" if build.head?
+      system "make", "bin/gh", "manpages" if build.head?
       bin.install "bin/gh"
       man1.install Dir["./share/man/man1/gh*.1"]
       (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
