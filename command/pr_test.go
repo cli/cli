@@ -1029,16 +1029,17 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	defer cmdTeardown()
 
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
 	cs.Stub("") // git checkout master
+	cs.Stub("") // git rev-parse --verify blueberries`
 	cs.Stub("") // git branch -d
+	cs.Stub("") // git push origin --delete blueberries
 
 	output, err := RunCommand(`pr merge --merge --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
 }
 
 func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
@@ -1055,14 +1056,16 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 	// We don't expect the default branch to be checked out, just that blueberries is deleted
+	cs.Stub("") // git rev-parse --verify blueberries
 	cs.Stub("") // git branch -d blueberries
+	cs.Stub("") // git push origin --delete blueberries
 
 	output, err := RunCommand(`pr merge --merge --delete-branch blueberries`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
 }
 
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
@@ -1193,6 +1196,7 @@ func TestPRMerge_interactive(t *testing.T) {
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("") // git symbolic-ref --quiet --short HEAD
 	cs.Stub("") // git checkout master
+	cs.Stub("") // git push origin --delete blueberries
 	cs.Stub("") // git branch -d
 
 	as, surveyTeardown := initAskStubber()
@@ -1214,7 +1218,7 @@ func TestPRMerge_interactive(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted local branch")
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
 }
 
 func TestPrMerge_multipleMergeMethods(t *testing.T) {

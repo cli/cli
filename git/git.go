@@ -217,8 +217,7 @@ func DeleteRemoteBranch(branch string) error {
 
 func DoesLocalBranchExist(branch string) bool {
 	configCmd := GitCommand("rev-parse", "--verify", branch)
-	x, err := run.PrepareCmd(configCmd).Output()
-	fmt.Printf("🌭 %+v|%+v\n", x, err != nil)
+	_, err := run.PrepareCmd(configCmd).Output()
 	return err == nil
 }
 
