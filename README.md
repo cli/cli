@@ -58,7 +58,7 @@ Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [scoop][], [Chocolatey][], [WinGet][] and as downloadable MSI.
 
 #### scoop
 
@@ -83,6 +83,14 @@ Upgrade:
 
 ```
 choco upgrade gh
+```
+
+#### WinGet
+
+Install:
+
+```
+winget install github.cli
 ```
 
 #### Signed MSI
@@ -134,6 +142,7 @@ Install a prebuilt binary from the [releases page][]
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
+[WinGet]: https://github.com/microsoft/winget-cli/
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
