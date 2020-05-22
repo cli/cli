@@ -549,7 +549,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
 
-	if deleteBranch && !cmd.Flags().Changed("repo") {
+	if deleteBranch {
 		repo, err := api.GitHubRepo(apiClient, baseRepo)
 		if err != nil {
 			return err
@@ -560,21 +560,29 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		var branchToSwitchTo string
-		if currentBranch == pr.HeadRefName {
-			branchToSwitchTo = repo.DefaultBranchRef.Name
-			err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
-			if err != nil {
-				return err
-			}
-		}
+		branchSwitchString := ""
 
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-		if localBranchExists {
-			err = git.DeleteLocalBranch(pr.HeadRefName)
-			if err != nil {
-				err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-				return err
+		if !cmd.Flags().Changed("repo") {
+			var branchToSwitchTo string
+			if currentBranch == pr.HeadRefName {
+				branchToSwitchTo = repo.DefaultBranchRef.Name
+				err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+				if err != nil {
+					return err
+				}
+			}
+
+			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+			if localBranchExists {
+				err = git.DeleteLocalBranch(pr.HeadRefName)
+				if err != nil {
+					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					return err
+				}
+			}
+
+			if branchToSwitchTo != "" {
+				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
 			}
 		}
 
@@ -582,11 +590,6 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 			return err
-		}
-
-		branchSwitchString := ""
-		if branchToSwitchTo != "" {
-			branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
 		}
 
 		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
