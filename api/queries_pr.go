@@ -1019,7 +1019,7 @@ func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) er
 		NodeID string `json:"node_id"`
 	}
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
-	return client.REST("GET", path, nil, &response)
+	return client.REST("DELETE", path, nil, &response)
 }
 
 func min(a, b int) int {
