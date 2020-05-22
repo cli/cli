@@ -28,7 +28,7 @@ func init() {
 	repoCreateCmd.Flags().StringP("team", "t", "", "The name of the organization team to be granted access")
 	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
 	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
-	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
+	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public (default: private)")
 
 	repoCmd.AddCommand(repoForkCmd)
 	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
@@ -189,7 +189,10 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		name = args[0]
 		if strings.Contains(name, "/") {
-			newRepo := ghrepo.FromFullName(name)
+			newRepo, err := ghrepo.FromFullName(name)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 			orgName = newRepo.RepoOwner()
 			name = newRepo.RepoName()
 		}
@@ -336,7 +339,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	var repoToFork ghrepo.Interface
 	inParent := false // whether or not we're forking the repo we're currently "in"
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(cmd, ctx)
+		baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
@@ -366,9 +369,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			repoToFork = ghrepo.FromFullName(repoArg)
-			if repoToFork.RepoName() == "" || repoToFork.RepoOwner() == "" {
-				return fmt.Errorf("could not parse owner or repo name from %s", repoArg)
+			repoToFork, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
 			}
 		}
 	}
@@ -487,11 +490,15 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
-		toView, err = determineBaseRepo(cmd, ctx)
+		toView, err = determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return err
 		}
@@ -508,14 +515,14 @@ func repoView(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			toView = ghrepo.FromFullName(repoArg)
+			var err error
+			toView, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 		}
 	}
 
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
 	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err

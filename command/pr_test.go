@@ -477,7 +477,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},
@@ -1091,5 +1091,74 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReady(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 444, "closed": false, "isDraft": true}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr ready 444")
+	if err != nil {
+		t.Fatalf("error running command `pr ready`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #444 is marked as "ready for review"`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReady_alreadyReady(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 445, "closed": false, "isDraft": false}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	output, err := RunCommand("pr ready 445")
+	if err != nil {
+		t.Fatalf("error running command `pr ready`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #445 is already "ready for review"`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRReady_closed(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 446, "closed": true, "isDraft": true}
+	} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	_, err := RunCommand("pr ready 446")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr ready` on a review that is closed!: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #446 is closed. Only draft pull requests can be marked as "ready for review"`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, err.Error())
 	}
 }

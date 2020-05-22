@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 
 	"github.com/shurcooL/githubv4"
@@ -199,6 +202,39 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		summary.Total++
 	}
 	return
+}
+
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
+		ghrepo.FullName(baseRepo), prNum)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode == 200 {
+		return string(b), nil
+	}
+
+	if resp.StatusCode == 404 {
+		return "", &NotFoundError{errors.New("pull request not found")}
+	}
+
+	return "", errors.New("pull request diff lookup failed")
+
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
@@ -667,6 +703,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			requestReviews(input: $input) { clientMutationId }
 		}`
 		reviewParams["pullRequestId"] = pr.ID
+		reviewParams["union"] = true
 		variables := map[string]interface{}{
 			"input": reviewParams,
 		}
@@ -945,6 +982,27 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		PullRequestID: pr.ID,
 		MergeMethod:   &mergeMethod,
 	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
+func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		MarkPullRequestReadyForReviewInput struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"markPullRequestReadyForReview(input: $input)"`
+	}
+
+	type MarkPullRequestReadyForReviewInput struct {
+		PullRequestID githubv4.ID `json:"pullRequestId"`
+	}
+
+	input := MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
 
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Mutate(context.Background(), &mutation, input, nil)

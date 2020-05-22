@@ -87,27 +87,20 @@ func TestPRCreate_metadata(t *testing.T) {
 		] } } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`\bteam\(`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "labels": {
-			"nodes": [
-				{ "name": "feature", "id": "FEATUREID" },
-				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"u001": { "login": "hubot", "id": "HUBOTID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			},
+			"organization": {
+				"t000": { "slug": "core", "id": "COREID" },
+				"t001": { "slug": "robots", "id": "ROBOTID" }
+			}
+		} }
 		`))
 	http.Register(
 		httpmock.GraphQL(`\bmilestones\(`),
@@ -140,17 +133,6 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
-		httpmock.StringResponse(`
-		{ "data": { "organization": { "teams": {
-			"nodes": [
-				{ "slug": "owners", "id": "OWNERSID" },
-				{ "slug": "Core", "id": "COREID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
 		httpmock.GraphQL(`\bcreatePullRequest\(`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
@@ -160,6 +142,12 @@ func TestPRCreate_metadata(t *testing.T) {
 	`, func(inputs map[string]interface{}) {
 			eq(t, inputs["title"], "TITLE")
 			eq(t, inputs["body"], "BODY")
+			if v, ok := inputs["assigneeIds"]; ok {
+				t.Errorf("did not expect assigneeIds: %v", v)
+			}
+			if v, ok := inputs["userIds"]; ok {
+				t.Errorf("did not expect userIds: %v", v)
+			}
 		}))
 	http.Register(
 		httpmock.GraphQL(`\bupdatePullRequest\(`),
@@ -182,8 +170,9 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } }
 	`, func(inputs map[string]interface{}) {
 			eq(t, inputs["pullRequestId"], "NEWPULLID")
-			eq(t, inputs["userIds"], []interface{}{"HUBOTID"})
-			eq(t, inputs["teamIds"], []interface{}{"COREID"})
+			eq(t, inputs["userIds"], []interface{}{"HUBOTID", "MONAID"})
+			eq(t, inputs["teamIds"], []interface{}{"COREID", "ROBOTID"})
+			eq(t, inputs["union"], true)
 		}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -195,7 +184,7 @@ func TestPRCreate_metadata(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 	cs.Stub("")                                         // git push
 
-	output, err := RunCommand(`pr create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r /core`)
+	output, err := RunCommand(`pr create -t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
