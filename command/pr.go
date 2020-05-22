@@ -623,6 +623,8 @@ const (
 	approvedReviewState         = "APPROVED"
 	changesRequestedReviewState = "CHANGES_REQUESTED"
 	commentedReviewState        = "COMMENTED"
+	dismissedReviewState        = "DISMISSED"
+	pendingReviewState          = "PENDING"
 )
 
 type reviewerState struct {
@@ -648,8 +650,14 @@ func colorFuncForReviewerState(state string) func(string) string {
 
 // formattedReviewerState formats a reviewerState with state color
 func formattedReviewerState(reviewer *reviewerState) string {
-	stateColorFunc := colorFuncForReviewerState(reviewer.State)
-	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " ")))
+	state := reviewer.State
+	if state == dismissedReviewState {
+		// Show "DISMISSED" review as "COMMENTED", since "dimissed" only makes
+		// sense when displayed in an events timeline but not in the final tally.
+		state = commentedReviewState
+	}
+	stateColorFunc := colorFuncForReviewerState(state)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
 }
 
 // prReviewerList generates a reviewer list with their last state
@@ -705,6 +713,9 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 	// Convert map to slice for ease of sort
 	result := make([]*reviewerState, 0, len(reviewerStates))
 	for _, reviewer := range reviewerStates {
+		if reviewer.State == pendingReviewState {
+			continue
+		}
 		result = append(result, reviewer)
 	}
 
