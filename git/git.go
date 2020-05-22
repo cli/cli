@@ -204,7 +204,7 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 }
 
 func DeleteLocalBranch(branch string) error {
-	configCmd := GitCommand("branch", "-d", branch)
+	configCmd := GitCommand("branch", "-D", branch)
 	_, err := run.PrepareCmd(configCmd).Output()
 	return err
 }
