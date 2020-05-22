@@ -217,7 +217,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		var templateFiles []string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+			templateFiles = githubtemplate.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
 
 		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true, baseRepo.ViewerCanTriage())

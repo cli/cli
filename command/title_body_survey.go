@@ -16,8 +16,8 @@ type Action int
 type metadataStateType int
 
 const (
-	issueMetadata metadataStateType = 0
-	prMetadata    metadataStateType = 1
+	issueMetadata metadataStateType = iota
+	prMetadata
 )
 
 type issueMetadataState struct {
@@ -118,7 +118,7 @@ func selectTemplate(templatePaths []string, metadataType metadataStateType) (str
 	if metadataType == issueMetadata {
 		templateNames = append(templateNames, "Open a blank issue")
 	} else if metadataType == prMetadata {
-		templateNames = append(templateNames, "Open a blank PR")
+		templateNames = append(templateNames, "Open a blank pull request")
 	}
 
 	selectQs := []*survey.Question{

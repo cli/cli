@@ -356,7 +356,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+			templateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
