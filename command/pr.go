@@ -105,11 +105,6 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentUser, err := api.CurrentLoginName(apiClient)
-	if err != nil {
-		return err
-	}
-
 	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
@@ -122,6 +117,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
 
+	// the `@me` macro is available because the API lookup is ElasticSearch-based
+	currentUser := "@me"
 	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
