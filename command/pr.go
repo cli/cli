@@ -569,7 +569,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		localBranchExists := git.DoesLocalBranchExist(pr.HeadRefName)
+		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
 		if localBranchExists {
 			err = git.DeleteLocalBranch(pr.HeadRefName)
 			if err != nil {
