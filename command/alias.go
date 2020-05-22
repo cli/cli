@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/cli/cli/utils"
@@ -12,6 +13,7 @@ import (
 func init() {
 	RootCmd.AddCommand(aliasCmd)
 	aliasCmd.AddCommand(aliasSetCmd)
+	aliasCmd.AddCommand(aliasListCmd)
 }
 
 var aliasCmd = &cobra.Command{
@@ -111,4 +113,54 @@ func processArgs(args []string) []string {
 	}
 
 	return newArgs
+}
+
+var aliasListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List your aliases",
+	Long:  `This command prints out all of the aliases gh is configured to use.`,
+	Example: `$ gh alias list
+co:   pr checkout
+bugs: issue list --label="bugs"`,
+	Args: cobra.ExactArgs(0),
+	RunE: aliasList,
+}
+
+func aliasList(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	cfg, err := ctx.Config()
+	if err != nil {
+		return fmt.Errorf("couldn't read config: %w", err)
+	}
+
+	aliasCfg, err := cfg.Aliases()
+	if err != nil {
+		return fmt.Errorf("couldn't read aliases config: %w", err)
+	}
+
+	stderr := colorableErr(cmd)
+
+	if aliasCfg.Empty() {
+		fmt.Fprintf(stderr, "no aliases configured\n")
+		return nil
+	}
+
+	stdout := colorableOut(cmd)
+
+	tp := utils.NewTablePrinter(stdout)
+
+	aliasMap := aliasCfg.All()
+	keys := []string{}
+	for alias := range aliasMap {
+		keys = append(keys, alias)
+	}
+	sort.Strings(keys)
+
+	for _, alias := range keys {
+		tp.AddField(alias+":", nil, nil)
+		tp.AddField(aliasMap[alias], nil, nil)
+		tp.EndRow()
+	}
+
+	return tp.Render()
 }
