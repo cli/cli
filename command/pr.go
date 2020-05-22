@@ -569,7 +569,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		err = git.DeleteLocalBranch(pr.HeadRefName)
 		if err != nil {
-			fmt.Fprintf(colorableErr(cmd), "%s Could not deleted local branch %s: %s\n", utils.Red("!"), utils.Cyan(pr.HeadRefName), err)
+			fmt.Fprintf(colorableErr(cmd), "%s Could not delete local branch %s: %s\n", utils.Red("!"), utils.Cyan(pr.HeadRefName), err)
 			return err
 		}
 		fmt.Fprintf(colorableOut(cmd), "%s Deleted local branch %s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName))
