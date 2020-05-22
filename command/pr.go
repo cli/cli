@@ -521,8 +521,10 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
 	}
 
+	deleteLocalBranch := !cmd.Flags().Changed("repo")
+
 	if isInteractive {
-		mergeMethod, deleteBranch, err = prInteractiveMerge()
+		mergeMethod, deleteBranch, err = prInteractiveMerge(deleteLocalBranch)
 		if err != nil {
 			return nil
 		}
@@ -562,7 +564,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		branchSwitchString := ""
 
-		if !cmd.Flags().Changed("repo") {
+		if deleteLocalBranch {
 			var branchToSwitchTo string
 			if currentBranch == pr.HeadRefName {
 				branchToSwitchTo = repo.DefaultBranchRef.Name
@@ -598,7 +600,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
+func prInteractiveMerge(deleteLocalBranch bool) (api.PullRequestMergeMethod, bool, error) {
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
@@ -608,10 +610,17 @@ func prInteractiveMerge() (api.PullRequestMergeMethod, bool, error) {
 		},
 	}
 
+	var message string
+	if deleteLocalBranch {
+		message = "Delete the branch locally and on GitHub?"
+	} else {
+		message = "Delete the branch on GitHub?"
+	}
+
 	deleteBranchQuestion := &survey.Question{
 		Name: "deleteBranch",
 		Prompt: &survey.Confirm{
-			Message: "Delete the branch locally and on GitHub?",
+			Message: message,
 			Default: true,
 		},
 	}
