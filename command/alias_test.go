@@ -177,3 +177,5 @@ func TestAliasSet_invalid_command(t *testing.T) {
 
 	eq(t, err.Error(), "could not create alias: pe checkout does not correspond to a gh command")
 }
+
+// TODO test for alias list
