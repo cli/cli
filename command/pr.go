@@ -586,7 +586,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		err = git.DeleteRemoteBranch(pr.HeadRefName)
+		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		if err != nil {
 			err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 			return err

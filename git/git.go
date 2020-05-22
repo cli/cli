@@ -209,12 +209,6 @@ func DeleteLocalBranch(branch string) error {
 	return err
 }
 
-func DeleteRemoteBranch(branch string) error {
-	configCmd := GitCommand("push", "origin", "--delete", branch)
-	_, err := run.PrepareCmd(configCmd).Output()
-	return err
-}
-
 func HasLocalBranch(branch string) bool {
 	configCmd := GitCommand("rev-parse", "--verify", "refs/heads/"+branch)
 	_, err := run.PrepareCmd(configCmd).Output()

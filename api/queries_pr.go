@@ -1014,6 +1014,14 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	return err
 }
 
+func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
+	var response struct {
+		NodeID string `json:"node_id"`
+	}
+	path := fmt.Sprintf("/repos/%s/%s/git/refs/heads/%s", repo.RepoOwner, repo.RepoName, branch)
+	return client.REST("GET", path, nil, &response)
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
