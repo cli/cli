@@ -352,11 +352,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var templateFiles []string
+	var nonLegacyTemplateFiles []string
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
+			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
@@ -397,7 +397,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 				url.QueryEscape(title),
 				url.QueryEscape(body),
 			)
-		} else if len(templateFiles) > 1 {
+		} else if len(nonLegacyTemplateFiles) > 1 {
 			openURL += "/choose"
 		}
 		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
@@ -431,7 +431,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
+		var legacyTemplateFile *string
+		if baseOverride == "" {
+			if rootDir, err := git.ToplevelDir(); err == nil {
+				// TODO: figure out how to stub this in tests
+				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+			}
+		}
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
