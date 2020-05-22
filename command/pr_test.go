@@ -1017,6 +1017,31 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_withRepoFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	eq(t, len(cs.Calls), 0)
+
+	output, err := RunCommand("pr merge 1 --merge -R stinky/boi")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestPrMerge_deleteBranch(t *testing.T) {
 	initWithStubs("blueberries",
 		stubResponse{200, bytes.NewBufferString(`

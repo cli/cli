@@ -549,7 +549,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
 
-	if deleteBranch {
+	if deleteBranch && !cmd.Flags().Changed("repo") {
 		repo, err := api.GitHubRepo(apiClient, baseRepo)
 		if err != nil {
 			return err
