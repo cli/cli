@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
@@ -639,6 +641,78 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
 	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+}
+
+func TestIssueCreate_interactiveSubmitWithTemplate(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+
+	var templateFiles []string
+	if rootDir, err := git.ToplevelDir(); err == nil {
+		templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+	}
+
+	as, teardown := initAskStubber()
+	defer teardown()
+
+	expectedBody := ""
+	if len(templateFiles) > 0 { // necessary, otherwise the tests will break if there are no issue template files
+		as.Stub([]*QuestionStub{
+			{
+				Name:  "index",
+				Value: 0,
+			},
+		})
+		expectedBody = string(githubtemplate.ExtractContents(templateFiles[0]))
+	}
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "title",
+			Value: "a cool story",
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: "Submit",
+		},
+	})
+
+	output, err := RunCommand(`issue create`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "a cool story")
+	eq(t, reqBody.Variables.Input.Body, expectedBody)
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
 func Test_listHeader(t *testing.T) {
