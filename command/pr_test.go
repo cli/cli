@@ -994,6 +994,7 @@ func TestPrMerge(t *testing.T) {
 			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -1021,9 +1022,11 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
-			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
 		} } }`))
-	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{"node_id": "THE-ID"}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -1048,7 +1051,9 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
 		] } } } }`)},
-		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
+		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
+	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -1076,6 +1081,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
 	] } } } }`))
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"node_id": "THE-ID"}`))
 	http.StubRepoResponse("OWNER", "REPO")
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -1109,6 +1115,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	initWithStubs("blueberries",
 		stubResponse{200, jsonFile},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
 	output, err := RunCommand("pr merge --merge")
@@ -1129,6 +1136,7 @@ func TestPrMerge_rebase(t *testing.T) {
 			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -1157,6 +1165,7 @@ func TestPrMerge_squash(t *testing.T) {
 			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -1185,6 +1194,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -1213,6 +1223,7 @@ func TestPRMerge_interactive(t *testing.T) {
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
 		] } } } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
 
 	cs, cmdTeardown := test.InitCmdStubber()
