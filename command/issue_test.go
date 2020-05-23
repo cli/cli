@@ -611,7 +611,7 @@ func TestIssueCreate_web(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new?")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 	eq(t, output.Stderr(), "")
 }

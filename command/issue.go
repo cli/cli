@@ -29,14 +29,14 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
-	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
-	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
-	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringSliceP("assignees", "a", nil, "Assign people by their `login`")
+	issueCreateCmd.Flags().StringSliceP("labels", "l", nil, "Add labels by `name`")
+	issueCreateCmd.Flags().StringSliceP("projects", "p", nil, "Add the issue to projects by `name`")
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringSliceP("labels", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
@@ -116,7 +116,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	labels, err := cmd.Flags().GetStringSlice("label")
+	labels, err := cmd.Flags().GetStringSlice("labels")
 	if err != nil {
 		return err
 	}
@@ -373,15 +373,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
-	assignees, err := cmd.Flags().GetStringSlice("assignee")
+	assignees, err := cmd.Flags().GetStringSlice("assignees")
 	if err != nil {
 		return fmt.Errorf("could not parse assignees: %w", err)
 	}
-	labelNames, err := cmd.Flags().GetStringSlice("label")
+	labelNames, err := cmd.Flags().GetStringSlice("labels")
 	if err != nil {
 		return fmt.Errorf("could not parse labels: %w", err)
 	}
-	projectNames, err := cmd.Flags().GetStringSlice("project")
+	projectNames, err := cmd.Flags().GetStringSlice("projects")
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
@@ -394,13 +394,13 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new?", ghrepo.FullName(baseRepo))
 		if title != "" || body != "" {
-			openURL += fmt.Sprintf(
-				"?title=%s&body=%s",
-				url.QueryEscape(title),
-				url.QueryEscape(body),
-			)
+			milestone := ""
+			if len(milestoneTitles) > 0 {
+				milestone = milestoneTitles[0]
+			}
+			openURL += getPrAndIssueQueryParams(title, body, assignees, labelNames, projectNames, milestone)
 		} else if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
@@ -456,11 +456,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	if action == PreviewAction {
 		openURL := fmt.Sprintf(
-			"https://github.com/%s/issues/new/?title=%s&body=%s",
+			"https://github.com/%s/issues/new/?",
 			ghrepo.FullName(baseRepo),
-			url.QueryEscape(title),
-			url.QueryEscape(body),
 		)
+		milestone := ""
+		if len(milestoneTitles) > 0 {
+			milestone = milestoneTitles[0]
+		}
+		openURL += getPrAndIssueQueryParams(title, body, assignees, labelNames, projectNames, milestone)
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
