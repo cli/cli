@@ -29,14 +29,14 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
-	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
-	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
-	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign people by their `login`")
+	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add labels by `name`")
+	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to projects by `name`")
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
