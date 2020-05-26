@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -27,10 +28,11 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	var baseRepo ghrepo.Interface
-	prArg := args[0]
-	if prNum, repo := prFromURL(prArg); repo != nil {
-		prArg = prNum
-		baseRepo = repo
+	prString := args[0]
+	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+	if m := r.FindStringSubmatch(prString); m != nil {
+		prString = m[3]
+		baseRepo = ghrepo.New(m[1], m[2])
 	}
 
 	if baseRepo == nil {
@@ -40,7 +42,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pr, err := prFromArg(apiClient, baseRepo, prArg)
+	pr, err := prFromArgs(ctx, baseRepo, prString)
 	if err != nil {
 		return err
 	}

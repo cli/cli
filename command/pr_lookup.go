@@ -12,7 +12,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func prFromArguments(ctx context.Context, repo ghrepo.Interface, args []string) (*api.PullRequest, error) {
+func prFromArgs(ctx context.Context, repo ghrepo.Interface, args ...string) (*api.PullRequest, error) {
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func prFromNumberString(ctx context.Context, repo ghrepo.Interface, s string) (*
 }
 
 func prFromURL(ctx context.Context, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
-	var r = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
+	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 	if m := r.FindStringSubmatch(s); m != nil {
 		prNumberString := m[3]
 		return prFromNumberString(ctx, repo, prNumberString)
