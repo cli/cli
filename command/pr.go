@@ -499,6 +499,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	deleteLocalBranch := !cmd.Flags().Changed("repo")
+	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+
 	// Ensure only one merge method is specified
 	enabledFlagCount := 0
 	isInteractive := false
@@ -521,10 +524,8 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
 	}
 
-	deleteLocalBranch := !cmd.Flags().Changed("repo")
-
 	if isInteractive {
-		mergeMethod, deleteBranch, err = prInteractiveMerge(deleteLocalBranch)
+		mergeMethod, deleteBranch, err = prInteractiveMerge(deleteLocalBranch, crossRepoPR)
 		if err != nil {
 			return nil
 		}
@@ -564,7 +565,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		branchSwitchString := ""
 
-		if deleteLocalBranch {
+		if deleteLocalBranch && !crossRepoPR {
 			var branchToSwitchTo string
 			if currentBranch == pr.HeadRefName {
 				branchToSwitchTo = repo.DefaultBranchRef.Name
@@ -588,10 +589,12 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-		if err != nil {
-			err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-			return err
+		if !crossRepoPR {
+			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
+			if err != nil {
+				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				return err
+			}
 		}
 
 		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
@@ -600,7 +603,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prInteractiveMerge(deleteLocalBranch bool) (api.PullRequestMergeMethod, bool, error) {
+func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
@@ -610,22 +613,25 @@ func prInteractiveMerge(deleteLocalBranch bool) (api.PullRequestMergeMethod, boo
 		},
 	}
 
-	var message string
-	if deleteLocalBranch {
-		message = "Delete the branch locally and on GitHub?"
-	} else {
-		message = "Delete the branch on GitHub?"
-	}
+	qs := []*survey.Question{mergeMethodQuestion}
 
-	deleteBranchQuestion := &survey.Question{
-		Name: "deleteBranch",
-		Prompt: &survey.Confirm{
-			Message: message,
-			Default: true,
-		},
-	}
+	if !crossRepoPR {
+		var message string
+		if deleteLocalBranch {
+			message = "Delete the branch locally and on GitHub?"
+		} else {
+			message = "Delete the branch on GitHub?"
+		}
 
-	qs := []*survey.Question{mergeMethodQuestion, deleteBranchQuestion}
+		deleteBranchQuestion := &survey.Question{
+			Name: "deleteBranch",
+			Prompt: &survey.Confirm{
+				Message: message,
+				Default: true,
+			},
+		}
+		qs = append(qs, deleteBranchQuestion)
+	}
 
 	answers := struct {
 		MergeMethod  int
