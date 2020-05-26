@@ -1,12 +1,15 @@
 name: Lint
 on:
-  push: &paths
+  push:
     paths:
       - "**.go"
       - go.mod
       - go.sum
   pull_request:
-    <<: *paths
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
 
 jobs:
   lint:
