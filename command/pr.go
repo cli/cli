@@ -944,16 +944,14 @@ func prProjectList(pr api.PullRequest) string {
 	return list
 }
 
-var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
-
-func prFromURL(arg string) (string, ghrepo.Interface) {
+func prFromURL_old(arg string) (string, ghrepo.Interface) {
 	if m := prURLRE.FindStringSubmatch(arg); m != nil {
 		return m[3], ghrepo.New(m[1], m[2])
 	}
 	return "", nil
 }
 
-func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
+func prFromArg_old(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
 		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
 	}
