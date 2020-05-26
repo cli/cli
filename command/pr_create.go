@@ -124,19 +124,19 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not parse body: %w", err)
 	}
 
-	reviewers, err := cmd.Flags().GetStringSlice("reviewers")
+	reviewers, err := cmd.Flags().GetStringSlice("reviewer")
 	if err != nil {
 		return fmt.Errorf("could not parse reviewers: %w", err)
 	}
-	assignees, err := cmd.Flags().GetStringSlice("assignees")
+	assignees, err := cmd.Flags().GetStringSlice("assignee")
 	if err != nil {
 		return fmt.Errorf("could not parse assignees: %w", err)
 	}
-	labelNames, err := cmd.Flags().GetStringSlice("labels")
+	labelNames, err := cmd.Flags().GetStringSlice("label")
 	if err != nil {
 		return fmt.Errorf("could not parse labels: %w", err)
 	}
-	projectNames, err := cmd.Flags().GetStringSlice("projects")
+	projectNames, err := cmd.Flags().GetStringSlice("project")
 	if err != nil {
 		return fmt.Errorf("could not parse projects: %w", err)
 	}
@@ -178,17 +178,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if !isWeb {
-		headBranchRef := headBranch
+		headBranchLabel := headBranch
 		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
-			headBranchRef = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 		}
-		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchRef)
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
 		}
 		if err == nil {
-			return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s", headBranchRef, baseBranch, existingPR.URL)
+			return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s", headBranchLabel, baseBranch, existingPR.URL)
 		}
 	}
 
@@ -268,9 +268,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		didForkRepo = true
 	}
 
-	headBranchRef := headBranch
+	headBranchLabel := headBranch
 	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchRef = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 	}
 
 	if headRemote == nil {
@@ -325,7 +325,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			"body":        body,
 			"draft":       isDraft,
 			"baseRefName": baseBranch,
-			"headRefName": headBranchRef,
+			"headRefName": headBranchLabel,
 		}
 
 		err = addMetadataToIssueParams(client, baseRepo, params, &tb)
@@ -344,7 +344,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if len(milestoneTitles) > 0 {
 			milestone = milestoneTitles[0]
 		}
-		openURL := generateCompareURL(baseRepo, baseBranch, headBranchRef, title, body, assignees, labelNames, projectNames, milestone)
+		openURL := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body, assignees, labelNames, projectNames, milestone)
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
@@ -451,9 +451,9 @@ func init() {
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
 
-	prCreateCmd.Flags().StringSliceP("reviewers", "r", nil, "Request reviews from people by their `login`")
-	prCreateCmd.Flags().StringSliceP("assignees", "a", nil, "Assign people by their `login`")
-	prCreateCmd.Flags().StringSliceP("labels", "l", nil, "Add labels by `name`")
-	prCreateCmd.Flags().StringSliceP("projects", "p", nil, "Add the pull request to projects by `name`")
+	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
+	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
+	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
+	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to a project by `name`")
 	prCreateCmd.Flags().StringP("milestone", "m", "", "Add the pull request to a milestone by `name`")
 }
