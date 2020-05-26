@@ -16,12 +16,11 @@ jobs:
         id: obtain_cert
         env:
           DESKTOP_CERT_TOKEN: ${{ secrets.DESKTOP_CERT_TOKEN }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: ./script/setup-macos-certificate.sh
       - name: Build binary
         run: make bin/gh
       - name: Sign binary
-        env:
-          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: ./script/sign-macos.sh bin/gh ${{ steps.obtain_cert.outputs.keychain }}
       - name: Test binary
         run: bin/gh version
