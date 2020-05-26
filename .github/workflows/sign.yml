@@ -1,0 +1,27 @@
+name: sign
+
+on: push
+
+jobs:
+  sign:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v2-beta
+        with:
+          go-version: 1.14
+      - name: Obtain signing cert
+        id: obtain_cert
+        env:
+          DESKTOP_CERT_TOKEN: ${{ secrets.DESKTOP_CERT_TOKEN }}
+        run: ./script/setup-macos-certificate.sh
+      - name: Build binary
+        run: make bin/gh
+      - name: Sign binary
+        env:
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: ./script/sign-macos.sh bin/gh ${{ steps.obtain_cert.outputs.keychain }}
+      - name: Test binary
+        run: bin/gh version
