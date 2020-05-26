@@ -1221,7 +1221,7 @@ func TestPRMerge_interactive(t *testing.T) {
 	initWithStubs("blueberries",
 		stubResponse{200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
-			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+			{ "headRefName": "blueberries", "headRepositoryOwner": {"login": "OWNER"}, "id": "THE-ID", "number": 3}
 		] } } } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
