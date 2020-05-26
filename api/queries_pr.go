@@ -265,7 +265,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		state
 		url
 		headRefName
-		mergeable
 		headRepositoryOwner {
 			login
 		}
