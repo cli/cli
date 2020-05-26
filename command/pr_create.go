@@ -3,7 +3,6 @@ package command
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -403,7 +402,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 func withPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, projects []string, milestone string) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		log.Fatal(err)
+		return "", nil
 	}
 	q := u.Query()
 	if title != "" {
