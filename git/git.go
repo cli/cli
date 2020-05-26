@@ -209,6 +209,12 @@ func DeleteLocalBranch(branch string) error {
 	return err
 }
 
+func HasLocalBranch(branch string) bool {
+	configCmd := GitCommand("rev-parse", "--verify", "refs/heads/"+branch)
+	_, err := run.PrepareCmd(configCmd).Output()
+	return err == nil
+}
+
 func CheckoutBranch(branch string) error {
 	configCmd := GitCommand("checkout", branch)
 	err := run.PrepareCmd(configCmd).Run()

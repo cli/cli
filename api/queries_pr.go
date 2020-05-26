@@ -265,7 +265,6 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		state
 		url
 		headRefName
-		mergeable
 		headRepositoryOwner {
 			login
 		}
@@ -1012,6 +1011,14 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	err := v4.Mutate(context.Background(), &mutation, input, nil)
 
 	return err
+}
+
+func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
+	var response struct {
+		NodeID string `json:"node_id"`
+	}
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	return client.REST("DELETE", path, nil, &response)
 }
 
 func min(a, b int) int {
