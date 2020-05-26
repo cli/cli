@@ -136,4 +136,4 @@ Install a prebuilt binary from the [releases page][]
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
-[contributing page]: https://github.com/cli/cli/blob/master/.github/CONTRIBUTING.md
+[contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
