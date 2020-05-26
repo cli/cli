@@ -96,7 +96,7 @@ var prMergeCmd = &cobra.Command{
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
-	Short: "Make a pull request as ready for review",
+	Short: "Mark a pull request as ready for review",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prReady,
 }
