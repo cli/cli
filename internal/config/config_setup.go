@@ -11,10 +11,6 @@ import (
 	"github.com/cli/cli/auth"
 )
 
-const (
-	oauthHost = "github.com"
-)
-
 var (
 	// The "GitHub CLI" OAuth app
 	oauthClientID = "178c6fc778ccc68e1d6a"
@@ -29,7 +25,31 @@ func IsGitHubApp(id string) bool {
 	return id == "178c6fc778ccc68e1d6a" || id == "4d747ba5675d5d66553f"
 }
 
-func AuthFlow(notice string) (string, string, error) {
+func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
+	token, userLogin, err := AuthFlow(hostname, notice)
+	if err != nil {
+		return "", err
+	}
+
+	err = cfg.Set(hostname, "user", userLogin)
+	if err != nil {
+		return "", err
+	}
+	err = cfg.Set(hostname, "oauth_token", token)
+	if err != nil {
+		return "", err
+	}
+
+	err = cfg.Write()
+	if err != nil {
+		return "", err
+	}
+
+	AuthFlowComplete()
+	return token, nil
+}
+
+func AuthFlow(oauthHost, notice string) (string, string, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
@@ -65,29 +85,6 @@ func AuthFlow(notice string) (string, string, error) {
 func AuthFlowComplete() {
 	fmt.Fprintln(os.Stderr, "Authentication complete. Press Enter to continue... ")
 	_ = waitForEnter(os.Stdin)
-}
-
-// FIXME: make testable
-func setupConfigFile(filename string) (Config, error) {
-	token, userLogin, err := AuthFlow("Notice: authentication required")
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := NewBlankConfig()
-	err = cfg.Set(oauthHost, "user", userLogin)
-	if err != nil {
-		return nil, err
-	}
-	err = cfg.Set(oauthHost, "oauth_token", token)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = cfg.Write(); err == nil {
-		AuthFlowComplete()
-	}
-	return cfg, err
 }
 
 func getViewer(token string) (string, error) {
