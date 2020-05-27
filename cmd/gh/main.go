@@ -32,10 +32,18 @@ func main() {
 
 	stderr := utils.NewColorable(os.Stderr)
 
-	expandedArgs, err := command.ExpandAlias(os.Args)
-	if err != nil {
-		fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
-		os.Exit(2)
+	expandedArgs := []string{}
+	if len(os.Args) > 0 {
+		expandedArgs = os.Args[1:]
+	}
+
+	cmd, _, err := command.RootCmd.Traverse(expandedArgs)
+	if err != nil || cmd == command.RootCmd {
+		expandedArgs, err = command.ExpandAlias(os.Args)
+		if err != nil {
+			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
+			os.Exit(2)
+		}
 	}
 
 	command.RootCmd.SetArgs(expandedArgs)
