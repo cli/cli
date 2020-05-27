@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -26,7 +28,8 @@ func init() {
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
-	prMergeCmd.Flags().BoolP("merge", "m", true, "Merge the commits with the base branch")
+	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
+	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 	prCmd.AddCommand(prReadyCmd)
@@ -93,7 +96,7 @@ var prMergeCmd = &cobra.Command{
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
-	Short: "Make a pull request as ready for review",
+	Short: "Mark a pull request as ready for review",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prReady,
 }
@@ -101,11 +104,6 @@ var prReadyCmd = &cobra.Command{
 func prStatus(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	currentUser, err := ctx.AuthLogin()
 	if err != nil {
 		return err
 	}
@@ -122,6 +120,8 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
 
+	// the `@me` macro is available because the API lookup is ElasticSearch-based
+	currentUser := "@me"
 	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
 	if err != nil {
 		return err
@@ -451,7 +451,15 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 	var pr *api.PullRequest
 	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, args[0])
+		var prNumber string
+		n, _ := prFromURL(args[0])
+		if n != "" {
+			prNumber = n
+		} else {
+			prNumber = args[0]
+		}
+
+		pr, err = prFromArg(apiClient, baseRepo, prNumber)
 		if err != nil {
 			return err
 		}
@@ -471,39 +479,179 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if pr.State == "MERGED" {
+	if pr.Mergeable == "CONFLICTING" {
+		err := fmt.Errorf("%s Pull request #%d has conflicts and isn't mergeable ", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.Mergeable == "UNKNOWN" {
+		err := fmt.Errorf("%s Pull request #%d can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.State == "MERGED" {
 		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
 		return err
 	}
 
-	rebase, err := cmd.Flags().GetBool("rebase")
-	if err != nil {
-		return err
-	}
-	squash, err := cmd.Flags().GetBool("squash")
+	var mergeMethod api.PullRequestMergeMethod
+	deleteBranch, err := cmd.Flags().GetBool("delete-branch")
 	if err != nil {
 		return err
 	}
 
-	var output string
-	if rebase {
-		output = fmt.Sprintf("%s Rebased and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	deleteLocalBranch := !cmd.Flags().Changed("repo")
+	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+
+	// Ensure only one merge method is specified
+	enabledFlagCount := 0
+	isInteractive := false
+	if b, _ := cmd.Flags().GetBool("merge"); b {
+		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodMerge
+	}
+	if b, _ := cmd.Flags().GetBool("rebase"); b {
+		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodRebase
+	}
+	if b, _ := cmd.Flags().GetBool("squash"); b {
+		enabledFlagCount++
+		mergeMethod = api.PullRequestMergeMethodSquash
+	}
+
+	if enabledFlagCount == 0 {
+		isInteractive = true
+	} else if enabledFlagCount > 1 {
+		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
+	}
+
+	if isInteractive {
+		mergeMethod, deleteBranch, err = prInteractiveMerge(deleteLocalBranch, crossRepoPR)
+		if err != nil {
+			return nil
+		}
+	}
+
+	var action string
+	if mergeMethod == api.PullRequestMergeMethodRebase {
+		action = "Rebased and merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
-	} else if squash {
-		output = fmt.Sprintf("%s Squashed and merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	} else if mergeMethod == api.PullRequestMergeMethodSquash {
+		action = "Squashed and merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
-	} else {
-		output = fmt.Sprintf("%s Merged pull request #%d\n", utils.Green("✔"), pr.Number)
+	} else if mergeMethod == api.PullRequestMergeMethodMerge {
+		action = "Merged"
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+	} else {
+		err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
+		return err
 	}
 
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprint(colorableOut(cmd), output)
+	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
+
+	if deleteBranch {
+		repo, err := api.GitHubRepo(apiClient, baseRepo)
+		if err != nil {
+			return err
+		}
+
+		currentBranch, err := ctx.Branch()
+		if err != nil {
+			return err
+		}
+
+		branchSwitchString := ""
+
+		if deleteLocalBranch && !crossRepoPR {
+			var branchToSwitchTo string
+			if currentBranch == pr.HeadRefName {
+				branchToSwitchTo = repo.DefaultBranchRef.Name
+				err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+				if err != nil {
+					return err
+				}
+			}
+
+			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+			if localBranchExists {
+				err = git.DeleteLocalBranch(pr.HeadRefName)
+				if err != nil {
+					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					return err
+				}
+			}
+
+			if branchToSwitchTo != "" {
+				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
+			}
+		}
+
+		if !crossRepoPR {
+			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
+			if err != nil {
+				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				return err
+			}
+		}
+
+		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+	}
 
 	return nil
+}
+
+func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
+	mergeMethodQuestion := &survey.Question{
+		Name: "mergeMethod",
+		Prompt: &survey.Select{
+			Message: "What merge method would you like to use?",
+			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
+			Default: "Create a merge commit",
+		},
+	}
+
+	qs := []*survey.Question{mergeMethodQuestion}
+
+	if !crossRepoPR {
+		var message string
+		if deleteLocalBranch {
+			message = "Delete the branch locally and on GitHub?"
+		} else {
+			message = "Delete the branch on GitHub?"
+		}
+
+		deleteBranchQuestion := &survey.Question{
+			Name: "deleteBranch",
+			Prompt: &survey.Confirm{
+				Message: message,
+				Default: true,
+			},
+		}
+		qs = append(qs, deleteBranchQuestion)
+	}
+
+	answers := struct {
+		MergeMethod  int
+		DeleteBranch bool
+	}{}
+
+	err := SurveyAsk(qs, &answers)
+	if err != nil {
+		return 0, false, fmt.Errorf("could not prompt: %w", err)
+	}
+
+	var mergeMethod api.PullRequestMergeMethod
+	switch answers.MergeMethod {
+	case 0:
+		mergeMethod = api.PullRequestMergeMethodMerge
+	case 1:
+		mergeMethod = api.PullRequestMergeMethodRebase
+	case 2:
+		mergeMethod = api.PullRequestMergeMethodSquash
+	}
+
+	deleteBranch := answers.DeleteBranch
+	return mergeMethod, deleteBranch, nil
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {
@@ -623,6 +771,8 @@ const (
 	approvedReviewState         = "APPROVED"
 	changesRequestedReviewState = "CHANGES_REQUESTED"
 	commentedReviewState        = "COMMENTED"
+	dismissedReviewState        = "DISMISSED"
+	pendingReviewState          = "PENDING"
 )
 
 type reviewerState struct {
@@ -648,8 +798,14 @@ func colorFuncForReviewerState(state string) func(string) string {
 
 // formattedReviewerState formats a reviewerState with state color
 func formattedReviewerState(reviewer *reviewerState) string {
-	stateColorFunc := colorFuncForReviewerState(reviewer.State)
-	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(reviewer.State)), "_", " ")))
+	state := reviewer.State
+	if state == dismissedReviewState {
+		// Show "DISMISSED" review as "COMMENTED", since "dimissed" only makes
+		// sense when displayed in an events timeline but not in the final tally.
+		state = commentedReviewState
+	}
+	stateColorFunc := colorFuncForReviewerState(state)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
 }
 
 // prReviewerList generates a reviewer list with their last state
@@ -705,6 +861,9 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 	// Convert map to slice for ease of sort
 	result := make([]*reviewerState, 0, len(reviewerStates))
 	for _, reviewer := range reviewerStates {
+		if reviewer.State == pendingReviewState {
+			continue
+		}
 		result = append(result, reviewer)
 	}
 

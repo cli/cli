@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -105,6 +106,9 @@ var initContext = func() context.Context {
 	if repo := os.Getenv("GH_REPO"); repo != "" {
 		ctx.SetBaseRepo(repo)
 	}
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		ctx.SetAuthToken(token)
+	}
 	return ctx
 }
 
@@ -117,10 +121,14 @@ func BasicClient() (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)))
 
-	if c, err := config.ParseDefaultConfig(); err == nil {
-		if token, _ := c.Get(defaultHostname, "oauth_token"); token != "" {
-			opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		if c, err := config.ParseDefaultConfig(); err == nil {
+			token, _ = c.Get(defaultHostname, "oauth_token")
 		}
+	}
+	if token != "" {
+		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
 	}
 	return api.NewClient(opts...), nil
 }
@@ -162,8 +170,12 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		return fmt.Sprintf("token %s", token)
 	}
 
+	tokenFromEnv := func() bool {
+		return os.Getenv("GITHUB_TOKEN") == token
+	}
+
 	checkScopesFunc := func(appID string) error {
-		if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
+		if config.IsGitHubApp(appID) && !tokenFromEnv() && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
 			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
 			if err != nil {
 				return err
@@ -185,7 +197,11 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 		} else {
 			fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
 			fmt.Fprintln(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable `read:org`")
-			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+			if tokenFromEnv() {
+				fmt.Fprintln(os.Stderr, "or generate a new token for the GITHUB_TOKEN environment variable")
+			} else {
+				fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+			}
 		}
 		return nil
 	}
@@ -199,6 +215,55 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	)
 
 	return api.NewClient(opts...), nil
+}
+
+var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ...string) (*api.Client, error) {
+	hasScopes, appID, err := client.HasScopes(wantedScopes...)
+	if err != nil {
+		return client, err
+	}
+
+	if hasScopes {
+		return client, nil
+	}
+
+	tokenFromEnv := len(os.Getenv("GITHUB_TOKEN")) > 0
+
+	if config.IsGitHubApp(appID) && !tokenFromEnv && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
+		newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
+		if err != nil {
+			return client, err
+		}
+		cfg, err := ctx.Config()
+		if err != nil {
+			return client, err
+		}
+		_ = cfg.Set(defaultHostname, "oauth_token", newToken)
+		_ = cfg.Set(defaultHostname, "user", loginHandle)
+		// update config file on disk
+		err = cfg.Write()
+		if err != nil {
+			return client, err
+		}
+		// update configuration in memory
+		config.AuthFlowComplete()
+		reloadedClient, err := apiClientForContext(ctx)
+		if err != nil {
+			return client, err
+		}
+
+		return reloadedClient, nil
+	} else {
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires %s OAuth scopes.", wantedScopes))
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Visit https://github.com/settings/tokens and edit your token to enable %s", wantedScopes))
+		if tokenFromEnv {
+			fmt.Fprintln(os.Stderr, "or generate a new token for the GITHUB_TOKEN environment variable")
+		} else {
+			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+		}
+		return client, errors.New("Unable to reauthenticate")
+	}
+
 }
 
 func apiVerboseLog() api.ClientOption {

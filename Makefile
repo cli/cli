@@ -22,13 +22,13 @@ test:
 	go test ./...
 .PHONY: test
 
-site: bin/gh
-	bin/gh repo clone github/cli.github.com "$@"
+site:
+	git clone https://github.com/github/cli.github.com.git "$@"
 
 site-docs: site
 	git -C site pull
 	git -C site rm 'manual/gh*.md' 2>/dev/null || true
-	go run ./cmd/gen-docs site/manual
+	go run ./cmd/gen-docs --website --doc-path site/manual
 	for f in site/manual/gh*.md; do sed -i.bak -e '/^### SEE ALSO/,$$d' "$$f"; done
 	rm -f site/manual/*.bak
 	git -C site add 'manual/gh*.md'
@@ -44,3 +44,8 @@ endif
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 	git -C site push
 .PHONY: site-publish
+
+
+.PHONY: manpages
+manpages:
+	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/

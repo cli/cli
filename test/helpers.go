@@ -68,6 +68,7 @@ func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
 		if call >= len(cs.Stubs) {
 			panic(fmt.Sprintf("more execs than stubs. most recent call: %v", cmd))
 		}
+		// fmt.Printf("Called stub for `%v`\n", cmd) // Helpful for debugging
 		return cs.Stubs[call]
 	}
 }

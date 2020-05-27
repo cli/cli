@@ -84,6 +84,9 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			hasIssuesEnabled
 			description
 			viewerPermission
+			defaultBranchRef {
+				name
+			}
 		}
 	}`
 	variables := map[string]interface{}{

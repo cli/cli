@@ -18,7 +18,6 @@ const defaultHostname = "github.com"
 type Context interface {
 	AuthToken() (string, error)
 	SetAuthToken(string)
-	AuthLogin() (string, error)
 	Branch() (string, error)
 	SetBranch(string)
 	Remotes() (Remotes, error)
@@ -193,20 +192,6 @@ func (c *fsContext) AuthToken() (string, error) {
 
 func (c *fsContext) SetAuthToken(t string) {
 	c.authToken = t
-}
-
-func (c *fsContext) AuthLogin() (string, error) {
-	config, err := c.Config()
-	if err != nil {
-		return "", err
-	}
-
-	login, err := config.Get(defaultHostname, "user")
-	if login == "" || err != nil {
-		return "", err
-	}
-
-	return login, nil
 }
 
 func (c *fsContext) Branch() (string, error) {
