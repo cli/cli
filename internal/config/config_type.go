@@ -73,6 +73,32 @@ func (cm *ConfigMap) SetStringValue(key, value string) error {
 	return nil
 }
 
+type ConfigEntry struct {
+	KeyNode   *yaml.Node
+	ValueNode *yaml.Node
+	Index     int
+}
+
+func (cm *ConfigMap) FindEntryPrime(key string) (ce *ConfigEntry, err error) {
+	err = nil
+
+	ce = &ConfigEntry{}
+
+	topLevelKeys := cm.Root.Content
+	for i, v := range topLevelKeys {
+		if v.Value == key {
+			ce.KeyNode = v
+			ce.Index = i
+			if i+1 < len(topLevelKeys) {
+				ce.ValueNode = topLevelKeys[i+1]
+			}
+			return
+		}
+	}
+
+	return ce, &NotFoundError{errors.New("not found")}
+}
+
 func (cm *ConfigMap) FindEntry(key string) (keyNode, valueNode *yaml.Node, err error) {
 	err = nil
 
@@ -195,7 +221,9 @@ func (c *fileConfig) Aliases() (*AliasConfig, error) {
 
 func (c *fileConfig) parseAliasConfig(aliasesEntry *yaml.Node) (*AliasConfig, error) {
 	if aliasesEntry.Kind != yaml.MappingNode {
-		return nil, errors.New("expected aliases to be a map")
+		return &AliasConfig{
+			Parent: c,
+		}, nil
 	}
 
 	aliasConfig := AliasConfig{

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -10,14 +11,6 @@ type AliasConfig struct {
 	ConfigMap
 	Parent Config
 }
-
-// TODO at what point should the alias top level be added? Lazily on first write, I think;
-// but then we aren't initializing the default aliases that we want. also want to ensure that we
-// don't re-add the default aliases if people delete them.
-//
-// I think I'm not going to worry about it for now; config setup will add the aliases and existing
-// users can take some step later on to add them if they want them. we'll otherwise lazily create
-// the aliases: section on first write.
 
 func (a *AliasConfig) Exists(alias string) bool {
 	if a.Empty() {
@@ -36,10 +29,13 @@ func (a *AliasConfig) Get(alias string) string {
 
 func (a *AliasConfig) Add(alias, expansion string) error {
 	if a.Root == nil {
-		// then we don't actually have an aliases stanza in the config yet.
-		keyNode := &yaml.Node{
-			Kind:  yaml.ScalarNode,
-			Value: "aliases",
+		// TODO awful hack bad type conversion i'm sorry
+		entry, err := a.Parent.(*fileConfig).FindEntryPrime("aliases")
+
+		var notFound *NotFoundError
+
+		if err != nil && !errors.As(err, &notFound) {
+			return err
 		}
 		valueNode := &yaml.Node{
 			Kind:  yaml.MappingNode,
@@ -47,7 +43,29 @@ func (a *AliasConfig) Add(alias, expansion string) error {
 		}
 
 		a.Root = valueNode
-		a.Parent.Root().Content = append(a.Parent.Root().Content, keyNode, valueNode)
+		if errors.As(err, &notFound) {
+			// No aliases: key; just append new aliases key and empty map to end
+			keyNode := &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: "aliases",
+			}
+			a.Parent.Root().Content = append(a.Parent.Root().Content, keyNode, valueNode)
+		} else {
+			// Empty aliases; inject new value node after existing aliases key
+			newContent := []*yaml.Node{}
+			for i := 0; i < len(a.Parent.Root().Content); i++ {
+				node := a.Parent.Root().Content[i]
+				if i == entry.Index {
+				}
+				if i == entry.Index {
+					newContent = append(newContent, entry.KeyNode, valueNode)
+					i++
+				} else {
+					newContent = append(newContent, a.Parent.Root().Content[i])
+				}
+			}
+			a.Parent.Root().Content = newContent
+		}
 	}
 
 	err := a.SetStringValue(alias, expansion)
