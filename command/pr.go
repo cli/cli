@@ -268,12 +268,27 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func prStateTitleWithColorXXX(pr api.PullRequestXXXLarge) string {
+	prStateColorFunc := colorFuncForPRXXX(pr)
+	if pr.State == "OPEN" && pr.IsDraft {
+		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+	}
+	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+}
+
 func prStateTitleWithColor(pr api.PullRequest) string {
 	prStateColorFunc := colorFuncForPR(pr)
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
 	}
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+}
+
+func colorFuncForPRXXX(pr api.PullRequestXXXLarge) func(string) string {
+	if pr.State == "OPEN" && pr.IsDraft {
+		return utils.Gray
+	}
+	return colorFuncForState(pr.State)
 }
 
 func colorFuncForPR(pr api.PullRequest) func(string) string {
@@ -315,7 +330,8 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr := api.PullRequestXXXLarge{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -326,7 +342,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	} else {
 		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
+		return printPrPreviewXXX(out, pr)
 	}
 }
 
@@ -592,6 +608,60 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 
 	deleteBranch := answers.DeleteBranch
 	return mergeMethod, deleteBranch, nil
+}
+
+func printPrPreviewXXX(out io.Writer, pr api.PullRequestXXXLarge) error {
+	// Header (Title and State)
+	fmt.Fprintln(out, utils.Bold(pr.Title))
+	fmt.Fprintf(out, "%s", prStateTitleWithColorXXX(pr))
+	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+		" • %s wants to merge %s into %s from %s",
+		pr.Author.Login,
+		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		pr.BaseRefName,
+		pr.HeadRefName,
+	)))
+	fmt.Fprintln(out)
+
+	// Metadata
+
+	// TODO!!!
+	// Corey commented this part out to get to a compile state
+	// if reviewers := prReviewerList(pr); reviewers != "" {
+	// 	fmt.Fprint(out, utils.Bold("Reviewers: "))
+	// 	fmt.Fprintln(out, reviewers)
+	// }
+	// if assignees := prAssigneeList(pr); assignees != "" {
+	// 	fmt.Fprint(out, utils.Bold("Assignees: "))
+	// 	fmt.Fprintln(out, assignees)
+	// }
+	// if labels := prLabelList(pr); labels != "" {
+	// 	fmt.Fprint(out, utils.Bold("Labels: "))
+	// 	fmt.Fprintln(out, labels)
+	// }
+	// if projects := prProjectList(pr); projects != "" {
+	// 	fmt.Fprint(out, utils.Bold("Projects: "))
+	// 	fmt.Fprintln(out, projects)
+	// }
+	// if pr.Milestone.Title != "" {
+	// 	fmt.Fprint(out, utils.Bold("Milestone: "))
+	// 	fmt.Fprintln(out, pr.Milestone.Title)
+	// }
+
+	// Body
+	if pr.Body != "" {
+		fmt.Fprintln(out)
+		md, err := utils.RenderMarkdown(pr.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, md)
+	}
+	fmt.Fprintln(out)
+
+	// Footer
+	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	return nil
 }
 
 func printPrPreview(out io.Writer, pr *api.PullRequest) error {

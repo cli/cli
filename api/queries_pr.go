@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/shurcooL/githubv4"
@@ -505,6 +506,60 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	}
 
 	return &resp.Repository.PullRequest, nil
+}
+
+type PullRequestXXXTiny struct {
+	Number  int
+	Title   string
+	State   string
+	Body    string
+	URL     string
+	IsDraft bool
+
+	Author struct {
+		Login string
+	}
+
+	BaseRefName string
+	HeadRefName string
+}
+
+type PullRequestXXXLarge struct {
+	PullRequestXXXTiny
+
+	Commits struct {
+		TotalCount int
+	}
+}
+
+func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) error {
+	query := reflect.New(reflect.StructOf([]reflect.StructField{
+		{
+			Name: "Repository", Type: reflect.StructOf([]reflect.StructField{
+				{
+					Name: "PullRequest", Type: reflect.TypeOf(pr).Elem(), Tag: `graphql:"pullRequest(number: $pr_number)"`,
+				},
+			}), Tag: `graphql:"repository(owner: $owner, name: $repo)"`,
+		},
+	})).Elem()
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"repo":      githubv4.String(repo.RepoName()),
+		"pr_number": githubv4.Int(number),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), query.Addr().Interface(), variables)
+	if err != nil {
+		return err
+	}
+	repoField := query.FieldByName("Repository")
+	foundPr := repoField.FieldByName("PullRequest")
+	prReturn := reflect.ValueOf(pr)
+	reflect.Indirect(prReturn).Set(reflect.Indirect(foundPr))
+
+	return nil
 }
 
 func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
