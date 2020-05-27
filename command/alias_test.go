@@ -12,6 +12,9 @@ import (
 func TestAliasSet_gh_command(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
 
+	buf := bytes.NewBufferString("")
+	defer config.StubWriteConfig(buf)()
+
 	_, err := RunCommand("alias set pr pr status")
 	if err == nil {
 		t.Fatal("expected error")
@@ -31,6 +34,8 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
+	buf := bytes.NewBufferString("")
+	defer config.StubWriteConfig(buf)()
 	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
 
 	if err != nil {
