@@ -99,7 +99,6 @@ func NewBlankConfig() Config {
 type fileConfig struct {
 	ConfigMap
 	documentRoot *yaml.Node
-	hosts        []*HostConfig
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
@@ -177,23 +176,12 @@ func (c *fileConfig) Write() error {
 }
 
 func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
-	if len(c.hosts) > 0 {
-		return c.hosts, nil
-	}
-
 	_, hostsEntry, err := c.FindEntry("hosts")
 	if err != nil {
 		return nil, fmt.Errorf("could not find hosts config: %w", err)
 	}
 
-	hostConfigs, err := c.parseHosts(hostsEntry)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse hosts config: %w", err)
-	}
-
-	c.hosts = hostConfigs
-
-	return hostConfigs, nil
+	return c.parseHosts(hostsEntry)
 }
 
 func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
