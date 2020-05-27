@@ -80,7 +80,7 @@ func prForCurrentBranch(ctx context.Context, apiClient *api.Client, repo ghrepo.
 		}
 	}
 
-	if branchOwner == "" {
+	if branchOwner != "" {
 		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		}

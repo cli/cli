@@ -615,7 +615,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	for _, pr := range resp.Repository.PullRequests.Nodes {
-		fmt.Printf("🌭 %+v : %+v\n", pr.HeadLabel(), headBranch)
 		if pr.HeadLabel() == headBranch {
 			if baseBranch != "" {
 				if pr.BaseRefName != baseBranch {
