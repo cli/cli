@@ -27,8 +27,7 @@ var aliasSetCmd = &cobra.Command{
 	// checked if this is fixed in a new cobra.
 	DisableFlagParsing: true,
 	Short:              "Create a shortcut for a gh command",
-	Long: `gh alias set <alias> <expansion>
-
+	Long: `
 This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
 	Example: `
 	gh alias set pv 'pr view'
