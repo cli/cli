@@ -73,14 +73,9 @@ var issueStatusCmd = &cobra.Command{
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url>}",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return FlagError{errors.New("issue number or URL required as argument")}
-		}
-		return nil
-	},
+	Use:   "view {<number> | <url>}",
 	Short: "View an issue",
+	Args:  cobra.ExactArgs(1),
 	Long: `Display the title, body, and other information about an issue.
 
 With '--web', open the issue in a web browser instead.`,

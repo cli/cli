@@ -11,6 +11,7 @@ import (
 
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
 	"github.com/mgutz/ansi"
@@ -48,6 +49,10 @@ func main() {
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
+	if err == cmdutil.SilentError {
+		return
+	}
+
 	var dnsError *net.DNSError
 	if errors.As(err, &dnsError) {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
@@ -60,7 +65,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 
 	fmt.Fprintln(out, err)
 
-	var flagError *command.FlagError
+	var flagError *cmdutil.FlagError
 	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
 		if !strings.HasSuffix(err.Error(), "\n") {
 			fmt.Fprintln(out)

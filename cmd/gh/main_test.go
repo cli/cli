@@ -7,7 +7,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/cli/cli/command"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +49,7 @@ check your internet connection or githubstatus.com
 		{
 			name: "Cobra flag error",
 			args: args{
-				err:   &command.FlagError{Err: errors.New("unknown flag --foo")},
+				err:   &cmdutil.FlagError{Err: errors.New("unknown flag --foo")},
 				cmd:   cmd,
 				debug: false,
 			},

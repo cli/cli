@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"runtime/debug"
@@ -13,6 +14,9 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	apiCmd "github.com/cli/cli/pkg/cmd/api"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 
 	"github.com/spf13/cobra"
@@ -60,21 +64,26 @@ func init() {
 		if err == pflag.ErrHelp {
 			return err
 		}
-		return &FlagError{Err: err}
+		return &cmdutil.FlagError{Err: err}
 	})
-}
 
-// FlagError is the kind of error raised in flag processing
-type FlagError struct {
-	Err error
-}
-
-func (fe FlagError) Error() string {
-	return fe.Err.Error()
-}
-
-func (fe FlagError) Unwrap() error {
-	return fe.Err
+	// TODO: iron out how a factory incorporates context
+	cmdFactory := &cmdutil.Factory{
+		IOStreams: iostreams.System(),
+		HttpClient: func() (*http.Client, error) {
+			token := os.Getenv("GITHUB_TOKEN")
+			if len(token) == 0 {
+				ctx := context.New()
+				var err error
+				token, err = ctx.AuthToken()
+				if err != nil {
+					return nil, err
+				}
+			}
+			return httpClient(token), nil
+		},
+	}
+	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
@@ -134,6 +143,19 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 		ctx.SetBaseRepo(repo)
 	}
 	return ctx
+}
+
+// for cmdutil-powered commands
+func httpClient(token string) *http.Client {
+	var opts []api.ClientOption
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
+	}
+	opts = append(opts,
+		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
+		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+	)
+	return api.NewHTTPClient(opts...)
 }
 
 // overridden in tests
