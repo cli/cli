@@ -54,6 +54,7 @@ func (cm *ConfigMap) SetStringValue(key, value string) error {
 		}
 		valueNode = &yaml.Node{
 			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
 			Value: "",
 		}
 
@@ -168,16 +169,42 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 }
 
 func (c *fileConfig) Write() error {
-	marshalled, err := yaml.Marshal(c.documentRoot)
+	mainData := yaml.Node{Kind: yaml.MappingNode}
+	hostsData := yaml.Node{Kind: yaml.MappingNode}
+
+	nodes := c.documentRoot.Content[0].Content
+	for i := 0; i < len(nodes)-1; i += 2 {
+		if nodes[i].Value == "hosts" {
+			hostsData.Content = append(hostsData.Content, nodes[i+1].Content...)
+		} else {
+			mainData.Content = append(mainData.Content, nodes[i], nodes[i+1])
+		}
+	}
+
+	mainBytes, err := yaml.Marshal(&mainData)
 	if err != nil {
 		return err
 	}
 
-	if bytes.Equal(marshalled, []byte("{}\n")) {
-		marshalled = []byte{}
+	fn := ConfigFile()
+	err = WriteConfigFile(fn, yamlNormalize(mainBytes))
+	if err != nil {
+		return err
 	}
 
-	return WriteConfigFile(ConfigFile(), marshalled)
+	hostsBytes, err := yaml.Marshal(&hostsData)
+	if err != nil {
+		return err
+	}
+
+	return WriteConfigFile(hostsConfigFile(fn), yamlNormalize(hostsBytes))
+}
+
+func yamlNormalize(b []byte) []byte {
+	if bytes.Equal(b, []byte("{}\n")) {
+		return []byte{}
+	}
+	return b
 }
 
 func (c *fileConfig) hostEntries() ([]*HostConfig, error) {

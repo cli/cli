@@ -19,7 +19,7 @@ import (
 const defaultTestConfig = `hosts:
   github.com:
     user: OWNER
-    oauth_token: 1234567890
+    oauth_token: "1234567890"
 `
 
 type askStubber struct {

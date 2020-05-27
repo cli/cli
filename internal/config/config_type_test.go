@@ -8,8 +8,9 @@ import (
 )
 
 func Test_fileConfig_Set(t *testing.T) {
-	cb := bytes.Buffer{}
-	StubWriteConfig(&cb, nil)
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	c := NewBlankConfig()
 	assert.NoError(t, c.Set("", "editor", "nano"))
@@ -18,22 +19,23 @@ func Test_fileConfig_Set(t *testing.T) {
 	assert.NoError(t, c.Set("github.com", "user", "hubot"))
 	assert.NoError(t, c.Write())
 
-	assert.Equal(t, `editor: nano
-hosts:
-    github.com:
-        git_protocol: ssh
-        user: hubot
-    example.com:
-        editor: vim
-`, cb.String())
+	assert.Equal(t, "editor: nano\n", mainBuf.String())
+	assert.Equal(t, `github.com:
+    git_protocol: ssh
+    user: hubot
+example.com:
+    editor: vim
+`, hostsBuf.String())
 }
 
 func Test_fileConfig_Write(t *testing.T) {
-	cb := bytes.Buffer{}
-	StubWriteConfig(&cb, nil)
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	c := NewBlankConfig()
 	assert.NoError(t, c.Write())
 
-	assert.Equal(t, "", cb.String())
+	assert.Equal(t, "", mainBuf.String())
+	assert.Equal(t, "", hostsBuf.String())
 }

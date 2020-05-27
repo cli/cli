@@ -54,6 +54,22 @@ hosts:
 	eq(t, token, "OTOKEN")
 }
 
+func Test_parseConfig_hostsFile(t *testing.T) {
+	defer StubConfig("", `---
+github.com:
+  user: monalisa
+  oauth_token: OTOKEN
+`)()
+	config, err := ParseConfig("config.yml")
+	eq(t, err, nil)
+	user, err := config.Get("github.com", "user")
+	eq(t, err, nil)
+	eq(t, user, "monalisa")
+	token, err := config.Get("github.com", "oauth_token")
+	eq(t, err, nil)
+	eq(t, token, "OTOKEN")
+}
+
 func Test_parseConfig_notFound(t *testing.T) {
 	defer StubConfig(`---
 hosts:
@@ -67,33 +83,29 @@ hosts:
 	eq(t, err, &NotFoundError{errors.New(`could not find config entry for "github.com"`)})
 }
 
-func Test_migrateConfig(t *testing.T) {
-	oldStyle := `---
+func Test_ParseConfig_migrateConfig(t *testing.T) {
+	defer StubConfig(`---
 github.com:
   - user: keiyuri
-    oauth_token: 123456`
+    oauth_token: 123456
+`, "")()
 
-	var root yaml.Node
-	err := yaml.Unmarshal([]byte(oldStyle), &root)
-	if err != nil {
-		panic("failed to parse test yaml")
-	}
-
-	buf := bytes.NewBufferString("")
-	defer StubWriteConfig(buf, nil)()
-
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 	defer StubBackupConfig()()
 
-	err = migrateConfig("config.yml", &root)
+	_, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 
-	expected := `hosts:
-    github.com:
-        oauth_token: "123456"
-        user: keiyuri
+	expectedMain := ""
+	expectedHosts := `github.com:
+    user: keiyuri
+    oauth_token: "123456"
 `
 
-	eq(t, buf.String(), expected)
+	eq(t, mainBuf.String(), expectedMain)
+	eq(t, hostsBuf.String(), expectedHosts)
 }
 
 func Test_parseConfigFile(t *testing.T) {

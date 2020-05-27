@@ -49,23 +49,31 @@ func TestConfigGet_not_found(t *testing.T) {
 func TestConfigSet(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf, nil)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
 	output, err := RunCommand("config set editor ed")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	if len(output.String()) > 0 {
+		t.Errorf("expected output to be blank: %q", output.String())
+	}
 
-	expected := `hosts:
-    github.com:
-        user: OWNER
-        oauth_token: 1234567890
-editor: ed
+	expectedMain := "editor: ed\n"
+	expectedHosts := `github.com:
+    user: OWNER
+    oauth_token: "1234567890"
 `
 
-	eq(t, buf.String(), expected)
+	if mainBuf.String() != expectedMain {
+		t.Errorf("expected config.yml to be %q, got %q", expectedMain, mainBuf.String())
+	}
+	if hostsBuf.String() != expectedHosts {
+		t.Errorf("expected hosts.yml to be %q, got %q", expectedHosts, hostsBuf.String())
+	}
 }
 
 func TestConfigSet_update(t *testing.T) {
@@ -79,23 +87,31 @@ editor: ed
 
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf, nil)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	output, err := RunCommand("config set editor vim")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	if len(output.String()) > 0 {
+		t.Errorf("expected output to be blank: %q", output.String())
+	}
 
-	expected := `hosts:
-    github.com:
-        user: OWNER
-        oauth_token: MUSTBEHIGHCUZIMATOKEN
-editor: vim
+	expectedMain := "editor: vim\n"
+	expectedHosts := `github.com:
+    user: OWNER
+    oauth_token: MUSTBEHIGHCUZIMATOKEN
 `
-	eq(t, buf.String(), expected)
+
+	if mainBuf.String() != expectedMain {
+		t.Errorf("expected config.yml to be %q, got %q", expectedMain, mainBuf.String())
+	}
+	if hostsBuf.String() != expectedHosts {
+		t.Errorf("expected hosts.yml to be %q, got %q", expectedHosts, hostsBuf.String())
+	}
 }
 
 func TestConfigGetHost(t *testing.T) {
@@ -141,23 +157,32 @@ git_protocol: ssh
 func TestConfigSetHost(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf, nil)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
 	output, err := RunCommand("config set -hgithub.com git_protocol ssh")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	if len(output.String()) > 0 {
+		t.Errorf("expected output to be blank: %q", output.String())
+	}
 
-	expected := `hosts:
-    github.com:
-        user: OWNER
-        oauth_token: 1234567890
-        git_protocol: ssh
+	expectedMain := ""
+	expectedHosts := `github.com:
+    user: OWNER
+    oauth_token: "1234567890"
+    git_protocol: ssh
 `
 
-	eq(t, buf.String(), expected)
+	if mainBuf.String() != expectedMain {
+		t.Errorf("expected config.yml to be %q, got %q", expectedMain, mainBuf.String())
+	}
+	if hostsBuf.String() != expectedHosts {
+		t.Errorf("expected hosts.yml to be %q, got %q", expectedHosts, hostsBuf.String())
+	}
 }
 
 func TestConfigSetHost_update(t *testing.T) {
@@ -171,21 +196,30 @@ hosts:
 
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf, nil)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	output, err := RunCommand("config set -hgithub.com git_protocol https")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	if len(output.String()) > 0 {
+		t.Errorf("expected output to be blank: %q", output.String())
+	}
 
-	expected := `hosts:
-    github.com:
-        git_protocol: https
-        user: OWNER
-        oauth_token: MUSTBEHIGHCUZIMATOKEN
+	expectedMain := ""
+	expectedHosts := `github.com:
+    git_protocol: https
+    user: OWNER
+    oauth_token: MUSTBEHIGHCUZIMATOKEN
 `
-	eq(t, buf.String(), expected)
+
+	if mainBuf.String() != expectedMain {
+		t.Errorf("expected config.yml to be %q, got %q", expectedMain, mainBuf.String())
+	}
+	if hostsBuf.String() != expectedHosts {
+		t.Errorf("expected hosts.yml to be %q, got %q", expectedHosts, hostsBuf.String())
+	}
 }

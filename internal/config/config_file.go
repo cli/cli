@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
@@ -20,6 +19,10 @@ func ConfigDir() string {
 
 func ConfigFile() string {
 	return path.Join(ConfigDir(), "config.yml")
+}
+
+func hostsConfigFile(fn string) string {
+	return path.Join(path.Dir(fn), "hosts.yml")
 }
 
 func ParseDefaultConfig() (Config, error) {
@@ -42,7 +45,7 @@ var ReadConfigFile = func(fn string) ([]byte, error) {
 }
 
 var WriteConfigFile = func(fn string, data []byte) error {
-	err := os.MkdirAll(filepath.Dir(fn), 0771)
+	err := os.MkdirAll(path.Dir(fn), 0771)
 	if err != nil {
 		return err
 	}
@@ -91,65 +94,36 @@ func parseConfigFile(fn string) ([]byte, *yaml.Node, error) {
 
 func isLegacy(root *yaml.Node) bool {
 	for _, v := range root.Content[0].Content {
-		if v.Value == "hosts" {
-			return false
+		if v.Value == "github.com" {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
-func migrateConfig(fn string, root *yaml.Node) error {
-	type ConfigEntry map[string]string
-	type ConfigHash map[string]ConfigEntry
-
-	newConfigData := map[string]ConfigHash{}
-	newConfigData["hosts"] = ConfigHash{}
-
-	topLevelKeys := root.Content[0].Content
-
-	for i, x := range topLevelKeys {
-		if x.Value == "" {
-			continue
-		}
-		if i+1 == len(topLevelKeys) {
-			break
-		}
-		hostname := x.Value
-		newConfigData["hosts"][hostname] = ConfigEntry{}
-
-		authKeys := topLevelKeys[i+1].Content[0].Content
-
-		for j, y := range authKeys {
-			if j+1 == len(authKeys) {
-				break
-			}
-			switch y.Value {
-			case "user":
-				newConfigData["hosts"][hostname]["user"] = authKeys[j+1].Value
-			case "oauth_token":
-				newConfigData["hosts"][hostname]["oauth_token"] = authKeys[j+1].Value
-			}
-		}
-	}
-
-	if _, ok := newConfigData["hosts"][defaultHostname]; !ok {
-		return errors.New("could not find default host configuration")
-	}
-
-	defaultHostConfig := newConfigData["hosts"][defaultHostname]
-
-	if _, ok := defaultHostConfig["user"]; !ok {
-		return errors.New("default host configuration missing user")
-	}
-
-	if _, ok := defaultHostConfig["oauth_token"]; !ok {
-		return errors.New("default host configuration missing oauth_token")
-	}
-
-	newConfig, err := yaml.Marshal(newConfigData)
+func migrateConfig(fn string) error {
+	b, err := ReadConfigFile(fn)
 	if err != nil {
 		return err
+	}
+
+	var hosts map[string][]map[string]string
+	err = yaml.Unmarshal(b, &hosts)
+	if err != nil {
+		return fmt.Errorf("error decoding legacy format: %w", err)
+	}
+
+	cfg := NewBlankConfig()
+	for hostname, entries := range hosts {
+		if len(entries) < 1 {
+			continue
+		}
+		for key, value := range entries[0] {
+			if err := cfg.Set(hostname, key, value); err != nil {
+				return err
+			}
+		}
 	}
 
 	err = BackupConfigFile(fn)
@@ -157,7 +131,7 @@ func migrateConfig(fn string, root *yaml.Node) error {
 		return fmt.Errorf("failed to back up existing config: %w", err)
 	}
 
-	return WriteConfigFile(fn, newConfig)
+	return cfg.Write()
 }
 
 func ParseConfig(fn string) (Config, error) {
@@ -167,14 +141,27 @@ func ParseConfig(fn string) (Config, error) {
 	}
 
 	if isLegacy(root) {
-		err = migrateConfig(fn, root)
+		err = migrateConfig(fn)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error migrating legacy config: %w", err)
 		}
 
 		_, root, err = parseConfigFile(fn)
 		if err != nil {
 			return nil, fmt.Errorf("failed to reparse migrated config: %w", err)
+		}
+	} else {
+		if _, hostsRoot, err := parseConfigFile(hostsConfigFile(fn)); err == nil {
+			if len(hostsRoot.Content[0].Content) > 0 {
+				newContent := []*yaml.Node{
+					{Value: "hosts"},
+					hostsRoot.Content[0],
+				}
+				restContent := root.Content[0].Content
+				root.Content[0].Content = append(newContent, restContent...)
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
 		}
 	}
 
