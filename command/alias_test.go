@@ -20,13 +20,13 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	_, err := RunCommand("alias set co pr checkout")
+	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
 
-	if err == nil {
-		t.Fatal("expected error")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
 	}
 
-	eq(t, err.Error(), "alias co already exists")
+	test.ExpectLines(t, output.String(), "Changed alias co from pr checkout to pr checkout -Rcool/repo")
 }
 
 func TestAliasSet_arg_processing(t *testing.T) {

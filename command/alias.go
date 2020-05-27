@@ -12,9 +12,9 @@ import (
 // TODO
 // - [ ] DEBUG support
 // - [ ] prevent overriding existing gh command
-// - [ ] allow overwriting alias
-// - [ ] forward extra arguments
-// - [ ] allow duplication of placeholder
+// - [x] allow overwriting alias
+// - [x] forward extra arguments
+// - [x] allow duplication of placeholder
 
 func init() {
 	RootCmd.AddCommand(aliasCmd)
@@ -68,12 +68,19 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	out := colorableOut(cmd)
 	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
 
-	if aliasCfg.Exists(alias) {
-		return fmt.Errorf("alias %s already exists", alias)
-	}
-
 	if !validCommand(expansion) {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", utils.Bold(expansion))
+	}
+
+	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
+
+	if aliasCfg.Exists(alias) {
+		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
+			utils.Green("✓"),
+			utils.Bold(alias),
+			utils.Bold(aliasCfg.Get(alias)),
+			utils.Bold(expansion),
+		)
 	}
 
 	err = aliasCfg.Add(alias, expansion)
@@ -81,7 +88,7 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not create alias: %s", err)
 	}
 
-	fmt.Fprintf(out, "%s Added alias.\n", utils.Green("✓"))
+	fmt.Fprintln(out, successMsg)
 
 	return nil
 }
