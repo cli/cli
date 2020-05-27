@@ -11,6 +11,7 @@ import (
 
 // TODO
 // - [ ] DEBUG support
+// - [ ] blank aliases stanza
 // - [x] give our commands precedence
 // - [x] prevent overriding existing gh command
 // - [x] allow overwriting alias
