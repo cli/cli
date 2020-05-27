@@ -9,6 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO
+// - [ ] DEBUG support
+// - [ ] prevent overriding existing gh command
+// - [ ] allow overwriting alias
+// - [ ] forward extra arguments
+// - [ ] allow duplication of placeholder
+
 func init() {
 	RootCmd.AddCommand(aliasCmd)
 	aliasCmd.AddCommand(aliasSetCmd)

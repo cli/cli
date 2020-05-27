@@ -138,6 +138,7 @@ hosts:
 aliases:
   co: pr checkout
   il: issue list --author="$1" --label="$2"
+  ia: issue list --author="$1" --assignee="$1"
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 	for _, c := range []struct {
@@ -150,6 +151,8 @@ aliases:
 		{"gh il vilmibm", nil, `not enough arguments for alias: issue list --author="vilmibm" --label="$2"`},
 		{"gh co 123", []string{"pr", "checkout", "123"}, ""},
 		{"gh il vilmibm epic", []string{"issue", "list", `--author=vilmibm`, `--label=epic`}, ""},
+		{"gh ia vilmibm", []string{"issue", "list", `--author=vilmibm`, `--assignee=vilmibm`}, ""},
+		{"gh ia $coolmoney$", []string{"issue", "list", `--author=$coolmoney$`, `--assignee=$coolmoney$`}, ""},
 		{"gh pr status", []string{"pr", "status"}, ""},
 		{"gh dne", []string{"dne"}, ""},
 		{"gh", []string{}, ""},

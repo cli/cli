@@ -490,7 +490,8 @@ func ExpandAlias(args []string) ([]string, error) {
 				expansion = strings.ReplaceAll(expansion, fmt.Sprintf("$%d", i+1), a)
 			}
 		}
-		if strings.Contains(expansion, "$") {
+		lingeringRE := regexp.MustCompile(`\$\d`)
+		if lingeringRE.MatchString(expansion) {
 			return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
 		}
 		return shlex.Split(expansion)
