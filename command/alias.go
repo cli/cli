@@ -17,7 +17,6 @@ func init() {
 var aliasCmd = &cobra.Command{
 	Use:   "alias",
 	Short: "Create shortcuts for gh commands",
-	Long:  `TODO`,
 }
 
 var aliasSetCmd = &cobra.Command{
@@ -30,10 +29,8 @@ var aliasSetCmd = &cobra.Command{
 	Short:              "Create a shortcut for a gh command",
 	Long: `gh alias set <alias> <expansion>
 
-This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.
-
-Examples:
-
+This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
+	Example: `
 	gh alias set pv 'pr view'
 	# gh pv -w 123 -> gh pr view -w 123.
 
