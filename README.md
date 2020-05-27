@@ -58,7 +58,15 @@ Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 
 ### Windows
 
-`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [winget][], [scoop][], [Chocolatey][], and as downloadable MSI.
+
+#### winget
+
+Install:
+
+```
+winget install gh
+```
 
 #### scoop
 
@@ -132,6 +140,7 @@ Install a prebuilt binary from the [releases page][]
 ### [Build from source](/docs/source.md)
 
 [docs]: https://cli.github.com/manual
+[winget]: https://docs.microsoft.com/en-us/windows/package-manager/winget/
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
