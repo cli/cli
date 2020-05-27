@@ -27,3 +27,13 @@ hosts:
         editor: vim
 `, cb.String())
 }
+
+func Test_fileConfig_Write(t *testing.T) {
+	cb := bytes.Buffer{}
+	StubWriteConfig(&cb, nil)
+
+	c := NewBlankConfig()
+	assert.NoError(t, c.Write())
+
+	assert.Equal(t, "", cb.String())
+}

@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -93,4 +94,17 @@ github.com:
 `
 
 	eq(t, buf.String(), expected)
+}
+
+func Test_parseConfigFile(t *testing.T) {
+	fileContents := []string{"", " ", "\n"}
+	for _, contents := range fileContents {
+		t.Run(fmt.Sprintf("contents: %q", contents), func(t *testing.T) {
+			defer StubConfig(contents, "")()
+			_, yamlRoot, err := parseConfigFile("config.yml")
+			eq(t, err, nil)
+			eq(t, yamlRoot.Content[0].Kind, yaml.MappingNode)
+			eq(t, len(yamlRoot.Content[0].Content), 0)
+		})
+	}
 }

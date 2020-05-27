@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -170,6 +171,10 @@ func (c *fileConfig) Write() error {
 	marshalled, err := yaml.Marshal(c.documentRoot)
 	if err != nil {
 		return err
+	}
+
+	if bytes.Equal(marshalled, []byte("{}\n")) {
+		marshalled = []byte{}
 	}
 
 	return WriteConfigFile(ConfigFile(), marshalled)

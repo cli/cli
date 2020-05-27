@@ -76,8 +76,11 @@ func parseConfigFile(fn string) ([]byte, *yaml.Node, error) {
 	if err != nil {
 		return data, nil, err
 	}
-	if len(root.Content) < 1 {
-		return data, &root, fmt.Errorf("malformed config")
+	if len(root.Content) == 0 {
+		return data, &yaml.Node{
+			Kind:    yaml.DocumentNode,
+			Content: []*yaml.Node{{Kind: yaml.MappingNode}},
+		}, nil
 	}
 	if root.Content[0].Kind != yaml.MappingNode {
 		return data, &root, fmt.Errorf("expected a top level map")
