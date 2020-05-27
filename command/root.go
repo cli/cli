@@ -465,21 +465,20 @@ func determineEditor(cmd *cobra.Command) (string, error) {
 }
 
 func ExpandAlias(args []string) ([]string, error) {
-	// TODO i don't love that context is being init'd twice. My reading of the code is that it is
-	// idempotent and okay but I don't know if that's ok to depend on.
-	if len(args) == 1 {
+	empty := []string{}
+	if len(args) < 2 {
 		// the command is lacking a subcommand
-		return []string{}, nil
+		return empty, nil
 	}
 
 	ctx := initContext()
 	cfg, err := ctx.Config()
 	if err != nil {
-		return []string{}, err
+		return empty, err
 	}
 	aliases, err := cfg.Aliases()
 	if err != nil {
-		return []string{}, err
+		return empty, err
 	}
 
 	if aliases.Exists(args[1]) {
@@ -489,7 +488,7 @@ func ExpandAlias(args []string) ([]string, error) {
 				expansion = strings.Replace(expansion, fmt.Sprintf("$%d", i+1), a, 1)
 			}
 			if strings.Contains(expansion, "$") {
-				return []string{}, fmt.Errorf("not enough arguments for alias: %s", expansion)
+				return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
 			}
 		}
 		return shlex.Split(expansion)
