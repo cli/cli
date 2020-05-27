@@ -71,10 +71,14 @@ func init() {
 	cmdFactory := &cmdutil.Factory{
 		IOStreams: iostreams.System(),
 		HttpClient: func() (*http.Client, error) {
-			ctx := context.New()
-			token, err := ctx.AuthToken()
-			if err != nil {
-				return nil, err
+			token := os.Getenv("GITHUB_TOKEN")
+			if len(token) == 0 {
+				ctx := context.New()
+				var err error
+				token, err = ctx.AuthToken()
+				if err != nil {
+					return nil, err
+				}
 			}
 			return httpClient(token), nil
 		},
