@@ -37,6 +37,11 @@ func TestPRDiff_argument_not_found(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"pullRequest": { "number": 123 }
+	} } }
+`))
 	http.StubResponse(404, bytes.NewBufferString(""))
 	_, err := RunCommand("pr diff 123")
 	if err == nil {
