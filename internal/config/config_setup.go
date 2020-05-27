@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -76,44 +74,20 @@ func setupConfigFile(filename string) (Config, error) {
 		return nil, err
 	}
 
-	// TODO this sucks. It precludes us laying out a nice config with comments and such.
-	type yamlConfig struct {
-		Hosts map[string]map[string]string
+	cfg := NewBlankConfig()
+	err = cfg.Set(oauthHost, "user", userLogin)
+	if err != nil {
+		return nil, err
 	}
-
-	yamlHosts := map[string]map[string]string{}
-	yamlHosts[oauthHost] = map[string]string{}
-	yamlHosts[oauthHost]["user"] = userLogin
-	yamlHosts[oauthHost]["oauth_token"] = token
-
-	defaultConfig := yamlConfig{
-		Hosts: yamlHosts,
-	}
-
-	err = os.MkdirAll(filepath.Dir(filename), 0771)
+	err = cfg.Set(oauthHost, "oauth_token", token)
 	if err != nil {
 		return nil, err
 	}
 
-	cfgFile, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return nil, err
+	if err = cfg.Write(); err == nil {
+		AuthFlowComplete()
 	}
-	defer cfgFile.Close()
-
-	yamlData, err := yaml.Marshal(defaultConfig)
-	if err != nil {
-		return nil, err
-	}
-	_, err = cfgFile.Write(yamlData)
-	if err != nil {
-		return nil, err
-	}
-
-	AuthFlowComplete()
-
-	// TODO cleaner error handling? this "should" always work given that we /just/ wrote the file...
-	return ParseConfig(filename)
+	return cfg, err
 }
 
 func getViewer(token string) (string, error) {

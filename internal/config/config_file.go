@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
@@ -49,7 +50,12 @@ var ReadConfigFile = func(fn string) ([]byte, error) {
 }
 
 var WriteConfigFile = func(fn string, data []byte) error {
-	cfgFile, err := os.OpenFile(ConfigFile(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // cargo coded from setup
+	err := os.MkdirAll(filepath.Dir(fn), 0771)
+	if err != nil {
+		return err
+	}
+
+	cfgFile, err := os.OpenFile(fn, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // cargo coded from setup
 	if err != nil {
 		return err
 	}

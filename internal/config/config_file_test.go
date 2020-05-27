@@ -63,7 +63,7 @@ hosts:
 	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	_, err = config.Get("github.com", "user")
-	eq(t, err, errors.New(`could not find config entry for "github.com"`))
+	eq(t, err, &NotFoundError{errors.New(`could not find config entry for "github.com"`)})
 }
 
 func Test_migrateConfig(t *testing.T) {

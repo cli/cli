@@ -88,6 +88,13 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+func NewBlankConfig() Config {
+	return NewConfig(&yaml.Node{
+		Kind:    yaml.DocumentNode,
+		Content: []*yaml.Node{{Kind: yaml.MappingNode}},
+	})
+}
+
 // This type implements a Config interface and represents a config file on disk.
 type fileConfig struct {
 	ConfigMap
@@ -136,7 +143,10 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 		return c.SetStringValue(key, value)
 	} else {
 		hostCfg, err := c.configForHost(hostname)
-		if err != nil {
+		var notFound *NotFoundError
+		if errors.As(err, &notFound) {
+			hostCfg = c.makeConfigForHost(hostname)
+		} else if err != nil {
 			return err
 		}
 		return hostCfg.SetStringValue(key, value)
@@ -154,7 +164,7 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 			return hc, nil
 		}
 	}
-	return nil, fmt.Errorf("could not find config entry for %q", hostname)
+	return nil, &NotFoundError{fmt.Errorf("could not find config entry for %q", hostname)}
 }
 
 func (c *fileConfig) Write() error {
@@ -184,6 +194,35 @@ func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	c.hosts = hostConfigs
 
 	return hostConfigs, nil
+}
+
+func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
+	hostRoot := &yaml.Node{Kind: yaml.MappingNode}
+	hostCfg := &HostConfig{
+		Host:      hostname,
+		ConfigMap: ConfigMap{Root: hostRoot},
+	}
+
+	var notFound *NotFoundError
+	_, hostsEntry, err := c.FindEntry("hosts")
+	if errors.As(err, &notFound) {
+		hostsEntry = &yaml.Node{Kind: yaml.MappingNode}
+		c.Root.Content = append(c.Root.Content,
+			&yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: "hosts",
+			}, hostsEntry)
+	} else if err != nil {
+		panic(err)
+	}
+
+	hostsEntry.Content = append(hostsEntry.Content,
+		&yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: hostname,
+		}, hostRoot)
+
+	return hostCfg
 }
 
 func (c *fileConfig) parseHosts(hostsEntry *yaml.Node) ([]*HostConfig, error) {
