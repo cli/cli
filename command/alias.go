@@ -11,7 +11,7 @@ import (
 
 // TODO
 // - [ ] DEBUG support
-// - [ ] prevent overriding existing gh command
+// - [x] prevent overriding existing gh command
 // - [x] allow overwriting alias
 // - [x] forward extra arguments
 // - [x] allow duplication of placeholder
@@ -67,6 +67,10 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 
 	out := colorableOut(cmd)
 	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
+
+	if validCommand(alias) {
+		return fmt.Errorf("could not create alias: %q is already a gh command", alias)
+	}
 
 	if !validCommand(expansion) {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", utils.Bold(expansion))

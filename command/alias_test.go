@@ -9,6 +9,17 @@ import (
 	"github.com/cli/cli/test"
 )
 
+func TestAliasSet_gh_command(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	_, err := RunCommand("alias set pr pr status")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	eq(t, err.Error(), `could not create alias: "pr" is already a gh command`)
+}
+
 func TestAliasSet_existing_alias(t *testing.T) {
 	cfg := `---
 hosts:
