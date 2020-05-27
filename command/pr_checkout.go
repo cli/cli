@@ -42,7 +42,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, prString)
+	pr, err := prFromArgs(ctx, apiClient, baseRepo, []string{prString})
 	if err != nil {
 		return err
 	}

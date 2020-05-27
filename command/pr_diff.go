@@ -41,7 +41,7 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args...)
+	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
 	if err != nil {
 		return fmt.Errorf("could not find pull request: %w", err)
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func prFromArgs(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args ...string) (*api.PullRequest, error) {
+func prFromArgs(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args []string) (*api.PullRequest, error) {
 	if len(args) == 0 {
 		return prForCurrentBranch(ctx, apiClient, repo)
 	}
