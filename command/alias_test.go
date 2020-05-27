@@ -152,8 +152,15 @@ aliases:
 		{"gh pr status", []string{"pr", "status"}, ""},
 		{"gh dne", []string{"dne"}, ""},
 		{"gh", []string{}, ""},
+		{"", []string{}, ""},
 	} {
-		out, err := ExpandAlias(strings.Split(c.Args, " "))
+		args := []string{}
+		if c.Args != "" {
+			args = strings.Split(c.Args, " ")
+		}
+
+		out, err := ExpandAlias(args)
+
 		if err == nil && c.Err != "" {
 			t.Errorf("expected error %s for %s", c.Err, c.Args)
 			continue
