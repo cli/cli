@@ -46,7 +46,7 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not find pull request: %w", err)
 	}
 
-	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number)
+	diff, err := apiClient.PullRequestDiff(baseRepo, pr)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}

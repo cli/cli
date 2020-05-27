@@ -205,9 +205,9 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, error) {
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, pr *PullRequest) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
-		ghrepo.FullName(baseRepo), prNum)
+		ghrepo.FullName(baseRepo), pr.Number)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err
@@ -235,7 +235,6 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, e
 	}
 
 	return "", errors.New("pull request diff lookup failed")
-
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
