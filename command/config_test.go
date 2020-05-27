@@ -50,7 +50,7 @@ func TestConfigSet(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 
 	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	defer config.StubWriteConfig(buf, nil)()
 	output, err := RunCommand("config set editor ed")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
@@ -80,7 +80,7 @@ editor: ed
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
 	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	defer config.StubWriteConfig(buf, nil)()
 
 	output, err := RunCommand("config set editor vim")
 	if err != nil {
@@ -142,7 +142,7 @@ func TestConfigSetHost(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 
 	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	defer config.StubWriteConfig(buf, nil)()
 	output, err := RunCommand("config set -hgithub.com git_protocol ssh")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
@@ -172,7 +172,7 @@ hosts:
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
 	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	defer config.StubWriteConfig(buf, nil)()
 
 	output, err := RunCommand("config set -hgithub.com git_protocol https")
 	if err != nil {

@@ -23,7 +23,7 @@ type blankContext struct {
 }
 
 func (c *blankContext) Config() (config.Config, error) {
-	cfg, err := config.ParseConfig("boom.txt")
+	cfg, err := config.ParseConfig("config.yml")
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse config during tests. did you remember to stub? error: %s", err))
 	}

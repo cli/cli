@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"path"
 )
 
 func StubBackupConfig() func() {
@@ -15,21 +18,41 @@ func StubBackupConfig() func() {
 	}
 }
 
-func StubWriteConfig(w io.Writer) func() {
+func StubWriteConfig(wc io.Writer, wh io.Writer) func() {
 	orig := WriteConfigFile
 	WriteConfigFile = func(fn string, data []byte) error {
-		_, err := w.Write(data)
-		return err
+		switch path.Base(fn) {
+		case "config.yml":
+			_, err := wc.Write(data)
+			return err
+		case "hosts.yml":
+			_, err := wh.Write(data)
+			return err
+		default:
+			return fmt.Errorf("write to unstubbed file: %q", fn)
+		}
 	}
 	return func() {
 		WriteConfigFile = orig
 	}
 }
 
-func StubConfig(content string) func() {
+func StubConfig(main, hosts string) func() {
 	orig := ReadConfigFile
 	ReadConfigFile = func(fn string) ([]byte, error) {
-		return []byte(content), nil
+		switch path.Base(fn) {
+		case "config.yml":
+			return []byte(main), nil
+		case "hosts.yml":
+			if hosts == "" {
+				return []byte(nil), os.ErrNotExist
+			} else {
+				return []byte(hosts), nil
+			}
+		default:
+			return []byte(nil), fmt.Errorf("read from unstubbed file: %q", fn)
+		}
+
 	}
 	return func() {
 		ReadConfigFile = orig

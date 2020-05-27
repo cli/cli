@@ -22,8 +22,8 @@ hosts:
   github.com:
     user: monalisa
     oauth_token: OTOKEN
-`)()
-	config, err := ParseConfig("filename")
+`, "")()
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
 	eq(t, err, nil)
@@ -42,8 +42,8 @@ hosts:
   github.com:
     user: monalisa
     oauth_token: OTOKEN
-`)()
-	config, err := ParseConfig("filename")
+`, "")()
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
 	eq(t, err, nil)
@@ -59,8 +59,8 @@ hosts:
   example.com:
     user: wronguser
     oauth_token: NOTTHIS
-`)()
-	config, err := ParseConfig("filename")
+`, "")()
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	_, err = config.Get("github.com", "user")
 	eq(t, err, errors.New(`could not find config entry for "github.com"`))
@@ -79,11 +79,11 @@ github.com:
 	}
 
 	buf := bytes.NewBufferString("")
-	defer StubWriteConfig(buf)()
+	defer StubWriteConfig(buf, nil)()
 
 	defer StubBackupConfig()()
 
-	err = migrateConfig("boom.txt", &root)
+	err = migrateConfig("config.yml", &root)
 	eq(t, err, nil)
 
 	expected := `hosts:

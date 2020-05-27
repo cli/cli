@@ -88,7 +88,7 @@ func initBlankContext(cfg, repo, branch string) {
 
 		// NOTE we are not restoring the original readConfig; we never want to touch the config file on
 		// disk during tests.
-		config.StubConfig(cfg)
+		config.StubConfig(cfg, "")
 
 		return ctx
 	}
