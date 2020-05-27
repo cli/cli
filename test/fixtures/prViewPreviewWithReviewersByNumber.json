@@ -70,6 +70,24 @@
                 "login": ""
               },
               "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": "hubot"
+              },
+              "state": "CHANGES_REQUESTED"
+            },
+            {
+              "author": {
+                "login": "hubot"
+              },
+              "state": "DISMISSED"
+            },
+            {
+              "author": {
+                "login": "monalisa"
+              },
+              "state": "PENDING"
             }
           ]
         },

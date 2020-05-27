@@ -96,6 +96,9 @@ func initBlankContext(cfg, repo, branch string) {
 
 func initFakeHTTP() *httpmock.Registry {
 	http := &httpmock.Registry{}
+	ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ...string) (*api.Client, error) {
+		return client, nil
+	}
 	apiClientForContext = func(context.Context) (*api.Client, error) {
 		return api.NewClient(api.ReplaceTripper(http)), nil
 	}

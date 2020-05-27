@@ -477,7 +477,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},
@@ -982,10 +982,10 @@ func initWithStubs(branch string, stubs ...stubResponse) {
 	initBlankContext("", "OWNER/REPO", branch)
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
 	for _, s := range stubs {
 		http.StubResponse(s.ResponseCode, s.ResponseBody)
 	}
+	http.StubRepoResponse("OWNER", "REPO")
 }
 
 func TestPrMerge(t *testing.T) {
@@ -994,9 +994,19 @@ func TestPrMerge(t *testing.T) {
 			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
-	output, err := RunCommand("pr merge 1")
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
+	cs.Stub("")                                                                                  // git checkout master
+	cs.Stub("")
+
+	output, err := RunCommand("pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1008,11 +1018,96 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_withRepoFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
+		"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		} } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`{"node_id": "THE-ID"}`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	eq(t, len(cs.Calls), 0)
+
+	output, err := RunCommand("pr merge 1 --merge -R stinky/boi")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_deleteBranch(t *testing.T) {
+	initWithStubs("blueberries",
+		stubResponse{200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+		] } } } }`)},
+		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
+	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git rev-parse --verify blueberries`
+	cs.Stub("") // git branch -d
+	cs.Stub("") // git push origin --delete blueberries
+
+	output, err := RunCommand(`pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+}
+
+func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "another-branch")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+	] } } } }`))
+	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
+	http.StubResponse(200, bytes.NewBufferString(`{"node_id": "THE-ID"}`))
+	http.StubRepoResponse("OWNER", "REPO")
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+	// We don't expect the default branch to be checked out, just that blueberries is deleted
+	cs.Stub("") // git rev-parse --verify blueberries
+	cs.Stub("") // git branch -d blueberries
+	cs.Stub("") // git push origin --delete blueberries
+
+	output, err := RunCommand(`pr merge --merge --delete-branch blueberries`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+}
+
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
 	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
+	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
+	cs.Stub("")                                                                                  // git checkout master
+	cs.Stub("")                                                                                  // git branch -d
 
 	jsonFile, _ := os.Open("../test/fixtures/prViewPreviewWithMetadataByBranch.json")
 	defer jsonFile.Close()
@@ -1020,9 +1115,10 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 	initWithStubs("blueberries",
 		stubResponse{200, jsonFile},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
 
-	output, err := RunCommand("pr merge")
+	output, err := RunCommand("pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1040,7 +1136,16 @@ func TestPrMerge_rebase(t *testing.T) {
 			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	output, err := RunCommand("pr merge 2 --rebase")
 	if err != nil {
@@ -1060,7 +1165,16 @@ func TestPrMerge_squash(t *testing.T) {
 			"pullRequest": { "number": 3, "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	output, err := RunCommand("pr merge 3 --squash")
 	if err != nil {
@@ -1080,7 +1194,16 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
 	)
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
 
 	output, err := RunCommand("pr merge 4")
 	if err == nil {
@@ -1091,6 +1214,60 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPRMerge_interactive(t *testing.T) {
+	initWithStubs("blueberries",
+		stubResponse{200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries", "headRepositoryOwner": {"login": "OWNER"}, "id": "THE-ID", "number": 3}
+		] } } } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
+		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)})
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git push origin --delete blueberries
+	cs.Stub("") // git branch -d
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "mergeMethod",
+			Value: 0,
+		},
+		{
+			Name:  "deleteBranch",
+			Value: true,
+		},
+	})
+
+	output, err := RunCommand(`pr merge`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+}
+
+func TestPrMerge_multipleMergeMethods(t *testing.T) {
+	initWithStubs("master",
+		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
+			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		} } }`)},
+		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
+	)
+
+	_, err := RunCommand("pr merge 1 --merge --squash")
+	if err == nil {
+		t.Fatal("expected error running `pr merge` with multiple merge methods")
 	}
 }
 

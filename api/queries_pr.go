@@ -48,6 +48,7 @@ type PullRequest struct {
 	BaseRefName string
 	HeadRefName string
 	Body        string
+	Mergeable   string
 
 	Author struct {
 		Login string
@@ -418,6 +419,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				state
 				closed
 				body
+				mergeable
 				author {
 				  login
 				}
@@ -526,6 +528,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					title
 					state
 					body
+					mergeable
 					author {
 						login
 					}
@@ -1008,6 +1011,14 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	err := v4.Mutate(context.Background(), &mutation, input, nil)
 
 	return err
+}
+
+func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
+	var response struct {
+		NodeID string `json:"node_id"`
+	}
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	return client.REST("DELETE", path, nil, &response)
 }
 
 func min(a, b int) int {
