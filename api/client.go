@@ -165,6 +165,10 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != 200 {
+		return false, "", handleHTTPError(res)
+	}
+
 	appID := res.Header.Get("X-Oauth-Client-Id")
 	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
 
