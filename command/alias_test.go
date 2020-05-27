@@ -148,6 +148,7 @@ aliases:
 		{"gh co", []string{"pr", "checkout"}, ""},
 		{"gh il", nil, `not enough arguments for alias: issue list --author="$1" --label="$2"`},
 		{"gh il vilmibm", nil, `not enough arguments for alias: issue list --author="vilmibm" --label="$2"`},
+		{"gh co 123", []string{"pr", "checkout", "123"}, ""},
 		{"gh il vilmibm epic", []string{"issue", "list", `--author=vilmibm`, `--label=epic`}, ""},
 		{"gh pr status", []string{"pr", "status"}, ""},
 		{"gh dne", []string{"dne"}, ""},

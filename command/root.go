@@ -483,13 +483,15 @@ func ExpandAlias(args []string) ([]string, error) {
 
 	if aliases.Exists(args[1]) {
 		expansion := aliases.Get(args[1])
+		for i, a := range args[2:] {
+			if !strings.Contains(expansion, "$") {
+				expansion += " " + a
+			} else {
+				expansion = strings.ReplaceAll(expansion, fmt.Sprintf("$%d", i+1), a)
+			}
+		}
 		if strings.Contains(expansion, "$") {
-			for i, a := range args[2:] {
-				expansion = strings.Replace(expansion, fmt.Sprintf("$%d", i+1), a, 1)
-			}
-			if strings.Contains(expansion, "$") {
-				return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
-			}
+			return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
 		}
 		return shlex.Split(expansion)
 	}
