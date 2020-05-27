@@ -22,9 +22,8 @@ func prFromArgs(ctx context.Context, repo ghrepo.Interface, args ...string) (*ap
 		return prForCurrentBranch(ctx, repo)
 	}
 
-	prString := args[0]
-
 	// First check to see if the prString is a url
+	prString := args[0]
 	pr, err := prFromURL(ctx, repo, prString)
 	if pr != nil || err != nil {
 		return pr, err
@@ -37,8 +36,7 @@ func prFromArgs(ctx context.Context, repo ghrepo.Interface, args ...string) (*ap
 	}
 
 	// Last see if it is a branch name
-	pr, err = api.PullRequestForBranch(apiClient, repo, "", prString)
-	return pr, err
+	return api.PullRequestForBranch(apiClient, repo, "", prString)
 }
 
 func prFromNumberString(ctx context.Context, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
