@@ -209,7 +209,9 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 		return client, nil
 	}
 
-	if config.IsGitHubApp(appID) && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
+	tokenFromEnv := len(os.Getenv("GITHUB_TOKEN")) > 0
+
+	if config.IsGitHubApp(appID) && !tokenFromEnv && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
 		newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
 		if err != nil {
 			return client, err
@@ -234,9 +236,13 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 
 		return reloadedClient, nil
 	} else {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires the `%s` OAuth scope(s).", wantedScopes))
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires %s OAuth scopes.", wantedScopes))
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("Visit https://github.com/settings/tokens and edit your token to enable %s", wantedScopes))
-		fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+		if tokenFromEnv {
+			fmt.Fprintln(os.Stderr, "or generate a new token for the GITHUB_TOKEN environment variable")
+		} else {
+			fmt.Fprintln(os.Stderr, "or generate a new token and paste it via `gh config set -h github.com oauth_token MYTOKEN`")
+		}
 		return client, errors.New("Unable to reauthenticate")
 	}
 
