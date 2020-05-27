@@ -12,7 +12,6 @@ const defaultGitProtocol = "https"
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
-	Hosts() ([]*HostConfig, error)
 	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
@@ -145,7 +144,7 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 }
 
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
-	hosts, err := c.Hosts()
+	hosts, err := c.hostEntries()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse hosts config: %w", err)
 	}
@@ -167,7 +166,7 @@ func (c *fileConfig) Write() error {
 	return WriteConfigFile(ConfigFile(), marshalled)
 }
 
-func (c *fileConfig) Hosts() ([]*HostConfig, error) {
+func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	if len(c.hosts) > 0 {
 		return c.hosts, nil
 	}
