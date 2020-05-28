@@ -35,15 +35,22 @@ hosts:
 
 	buf := bytes.NewBufferString("")
 	defer config.StubWriteConfig(buf)()
-	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
+	output, err := RunCommand("alias set co pr checkout")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "TODO")
+	test.ExpectLines(t, output.String(), "Added alias")
 
-	// TODO
+	expected := `aliases:
+    co: pr checkout
+hosts:
+    github.com:
+        user: OWNER
+        oauth_token: token123
+`
+	eq(t, buf.String(), expected)
 }
 
 func TestAliasSet_existing_alias(t *testing.T) {
