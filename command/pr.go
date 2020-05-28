@@ -332,6 +332,7 @@ func prView(cmd *cobra.Command, args []string) error {
 
 	pr := api.PullRequestXXXLarge{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	fmt.Printf("🌭 %+v\n", pr)
 	if err != nil {
 		return err
 	}

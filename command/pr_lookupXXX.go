@@ -25,7 +25,7 @@ func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Inter
 	// }
 
 	// Next see if the prString is a number and use that to look up the url
-	err := prFromNumberStringXXX(ctx, apiClient, repo, prString, &pr)
+	err := prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
 	if pr != nil || err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Inter
 
 func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) error {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(s, "#")); err == nil {
-		return api.PullRequestByNumberXXX(apiClient, repo, prNumber, &pr)
+		return api.PullRequestByNumberXXX(apiClient, repo, prNumber, pr)
 	}
 
 	return nil

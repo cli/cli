@@ -535,13 +535,17 @@ type PullRequestXXXLarge struct {
 func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) error {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
-			Name: "Repository", Type: reflect.StructOf([]reflect.StructField{
+			Name: "Repository",
+			Tag:  `graphql:"repository(owner: $owner, name: $repo)"`,
+			Type: reflect.StructOf([]reflect.StructField{
 				{
-					Name: "PullRequest", Type: reflect.TypeOf(pr).Elem(), Tag: `graphql:"pullRequest(number: $pr_number)"`,
+					Name: "PullRequest",
+					Tag:  `graphql:"pullRequest(number: $pr_number)"`,
+					Type: reflect.TypeOf(pr),
 				},
-			}), Tag: `graphql:"repository(owner: $owner, name: $repo)"`,
+			}),
 		},
-	})).Elem()
+	}))
 
 	variables := map[string]interface{}{
 		"owner":     githubv4.String(repo.RepoOwner()),
@@ -550,14 +554,13 @@ func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, p
 	}
 
 	v4 := githubv4.NewClient(client.http)
-	err := v4.Query(context.Background(), query.Addr().Interface(), variables)
+	err := v4.Query(context.Background(), query.Interface(), variables)
 	if err != nil {
 		return err
 	}
-	repoField := query.FieldByName("Repository")
-	foundPr := repoField.FieldByName("PullRequest")
-	prReturn := reflect.ValueOf(pr)
-	reflect.Indirect(prReturn).Set(reflect.Indirect(foundPr))
+
+	foundPr := query.Elem().FieldByName("Repository").FieldByName("PullRequest")
+	reflect.Indirect(reflect.ValueOf(pr)).Set(reflect.Indirect(foundPr))
 
 	return nil
 }
