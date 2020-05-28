@@ -29,7 +29,8 @@ func (a *AliasConfig) Get(alias string) string {
 
 func (a *AliasConfig) Add(alias, expansion string) error {
 	if a.Root == nil {
-		// TODO awful hack bad type conversion i'm sorry
+		// TODO awful hack bad type conversion i'm sorry. this is to support an empty aliases key and
+		// ought to be generalized into ConfigMap or fileConfig (via Config interface) itself.
 		entry, err := a.Parent.(*fileConfig).FindEntry("aliases")
 
 		var notFound *NotFoundError
