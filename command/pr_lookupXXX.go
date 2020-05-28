@@ -19,13 +19,13 @@ func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Inter
 
 	// // First check to see if the prString is a url
 	prString := args[0]
-	// pr, err := prFromURL(ctx, apiClient, repo, prString)
-	// if pr != nil || err != nil {
-	// 	return pr, err
-	// }
+	err := prFromURLXXX(ctx, apiClient, repo, prString, pr)
+	if pr != nil || err != nil {
+		return err
+	}
 
 	// Next see if the prString is a number and use that to look up the url
-	err := prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
+	err = prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
 	if pr != nil || err != nil {
 		return err
 	}
@@ -43,14 +43,14 @@ func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghre
 	return nil
 }
 
-func prFromURLXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
+func prFromURLXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) error {
 	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 	if m := r.FindStringSubmatch(s); m != nil {
 		prNumberString := m[3]
-		return prFromNumberString(ctx, apiClient, repo, prNumberString)
+		return prFromNumberStringXXX(ctx, apiClient, repo, prNumberString, pr)
 	}
 
-	return nil, nil
+	return nil
 }
 
 func prForCurrentBranchXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface) (*api.PullRequest, error) {
