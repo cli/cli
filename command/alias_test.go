@@ -23,6 +23,29 @@ func TestAliasSet_gh_command(t *testing.T) {
 	eq(t, err.Error(), `could not create alias: "pr" is already a gh command`)
 }
 
+func TestAliasSet_empty_aliases(t *testing.T) {
+	cfg := `---
+aliases:
+hosts:
+  github.com:
+    user: OWNER
+    oauth_token: token123
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	buf := bytes.NewBufferString("")
+	defer config.StubWriteConfig(buf)()
+	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "TODO")
+
+	// TODO
+}
+
 func TestAliasSet_existing_alias(t *testing.T) {
 	cfg := `---
 hosts:

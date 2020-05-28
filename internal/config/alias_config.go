@@ -30,7 +30,7 @@ func (a *AliasConfig) Get(alias string) string {
 func (a *AliasConfig) Add(alias, expansion string) error {
 	if a.Root == nil {
 		// TODO awful hack bad type conversion i'm sorry
-		entry, err := a.Parent.(*fileConfig).FindEntryPrime("aliases")
+		entry, err := a.Parent.(*fileConfig).FindEntry("aliases")
 
 		var notFound *NotFoundError
 
@@ -54,9 +54,6 @@ func (a *AliasConfig) Add(alias, expansion string) error {
 			// Empty aliases; inject new value node after existing aliases key
 			newContent := []*yaml.Node{}
 			for i := 0; i < len(a.Parent.Root().Content); i++ {
-				node := a.Parent.Root().Content[i]
-				if i == entry.Index {
-				}
 				if i == entry.Index {
 					newContent = append(newContent, entry.KeyNode, valueNode)
 					i++

@@ -41,17 +41,19 @@ func (cm *ConfigMap) Empty() bool {
 }
 
 func (cm *ConfigMap) GetStringValue(key string) (string, error) {
-	_, valueNode, err := cm.FindEntry(key)
+	entry, err := cm.FindEntry(key)
 	if err != nil {
 		return "", err
 	}
-	return valueNode.Value, nil
+	return entry.ValueNode.Value, nil
 }
 
 func (cm *ConfigMap) SetStringValue(key, value string) error {
-	_, valueNode, err := cm.FindEntry(key)
+	entry, err := cm.FindEntry(key)
 
 	var notFound *NotFoundError
+
+	valueNode := entry.ValueNode
 
 	if err != nil && errors.As(err, &notFound) {
 		keyNode := &yaml.Node{
@@ -79,7 +81,7 @@ type ConfigEntry struct {
 	Index     int
 }
 
-func (cm *ConfigMap) FindEntryPrime(key string) (ce *ConfigEntry, err error) {
+func (cm *ConfigMap) FindEntry(key string) (ce *ConfigEntry, err error) {
 	err = nil
 
 	ce = &ConfigEntry{}
@@ -97,21 +99,6 @@ func (cm *ConfigMap) FindEntryPrime(key string) (ce *ConfigEntry, err error) {
 	}
 
 	return ce, &NotFoundError{errors.New("not found")}
-}
-
-func (cm *ConfigMap) FindEntry(key string) (keyNode, valueNode *yaml.Node, err error) {
-	err = nil
-
-	topLevelKeys := cm.Root.Content
-	for i, v := range topLevelKeys {
-		if v.Value == key && i+1 < len(topLevelKeys) {
-			keyNode = v
-			valueNode = topLevelKeys[i+1]
-			return
-		}
-	}
-
-	return nil, nil, &NotFoundError{errors.New("not found")}
 }
 
 func NewConfig(root *yaml.Node) Config {
@@ -204,14 +191,14 @@ func (c *fileConfig) Write() error {
 }
 
 func (c *fileConfig) Aliases() (*AliasConfig, error) {
-	_, aliasesEntry, err := c.FindEntry("aliases")
+	entry, err := c.FindEntry("aliases")
 	var nfe *NotFoundError
 	if err != nil && errors.As(err, &nfe) {
 		// TODO does this make sense at all? want to simulate existing but empty key.
 		return &AliasConfig{Parent: c}, nil
 	}
 
-	aliasConfig, err := c.parseAliasConfig(aliasesEntry)
+	aliasConfig, err := c.parseAliasConfig(entry.ValueNode)
 	if err != nil {
 		return nil, err
 	}
@@ -239,12 +226,12 @@ func (c *fileConfig) Hosts() ([]*HostConfig, error) {
 		return c.hosts, nil
 	}
 
-	_, hostsEntry, err := c.FindEntry("hosts")
+	entry, err := c.FindEntry("hosts")
 	if err != nil {
 		return nil, fmt.Errorf("could not find hosts config: %w", err)
 	}
 
-	hostConfigs, err := c.parseHosts(hostsEntry)
+	hostConfigs, err := c.parseHosts(entry.ValueNode)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse hosts config: %w", err)
 	}
