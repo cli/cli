@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -58,4 +59,8 @@ func isColorEnabled() bool {
 		checkedNoColor = true
 	}
 	return _isColorEnabled
+}
+
+func RGB(r, g, b int, x string) string {
+	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, x)
 }

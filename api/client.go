@@ -220,6 +220,43 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	return handleResponse(resp, data)
 }
 
+func (c Client) RESTWithResponse(method string, p string, body io.Reader, data interface{}) (*http.Response, error) {
+	url := "https://api.github.com/" + p
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		return nil, handleHTTPError(resp)
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		return resp, nil
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 // REST performs a REST request and parses the response.
 func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
 	url := "https://api.github.com/" + p
