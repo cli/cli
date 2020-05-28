@@ -16,14 +16,18 @@ import (
 // ClientOption represents an argument to NewClient
 type ClientOption = func(http.RoundTripper) http.RoundTripper
 
-// NewClient initializes a Client
-func NewClient(opts ...ClientOption) *Client {
+// NewHTTPClient initializes an http.Client
+func NewHTTPClient(opts ...ClientOption) *http.Client {
 	tr := http.DefaultTransport
 	for _, opt := range opts {
 		tr = opt(tr)
 	}
-	http := &http.Client{Transport: tr}
-	client := &Client{http: http}
+	return &http.Client{Transport: tr}
+}
+
+// NewClient initializes a Client
+func NewClient(opts ...ClientOption) *Client {
+	client := &Client{http: NewHTTPClient(opts...)}
 	return client
 }
 
@@ -143,6 +147,41 @@ func (gr GraphQLErrorResponse) Error() string {
 		errorMessages = append(errorMessages, e.Message)
 	}
 	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
+}
+
+// Returns whether or not scopes are present, appID, and error
+func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
+	url := "https://api.github.com/user"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return false, "", err
+	}
+	defer res.Body.Close()
+
+	appID := res.Header.Get("X-Oauth-Client-Id")
+	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+
+	found := 0
+	for _, s := range hasScopes {
+		for _, w := range wantedScopes {
+			if w == strings.TrimSpace(s) {
+				found++
+			}
+		}
+	}
+
+	if found == len(wantedScopes) {
+		return true, appID, nil
+	}
+
+	return false, appID, nil
 }
 
 // GraphQL performs a GraphQL request and parses the response

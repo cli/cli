@@ -20,6 +20,9 @@ func TestIssueStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
@@ -49,6 +52,9 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -86,6 +92,9 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
