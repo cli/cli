@@ -520,8 +520,12 @@ type PullRequestXXXTiny struct {
 		Login string
 	}
 
-	BaseRefName string
-	HeadRefName string
+	BaseRefName         string
+	HeadRefName         string
+	IsCrossRepository   bool
+	HeadRepositoryOwner struct {
+		Login string
+	}
 }
 
 type PullRequestXXXLarge struct {
@@ -563,6 +567,72 @@ func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, p
 	reflect.Indirect(reflect.ValueOf(pr)).Set(reflect.Indirect(foundPr))
 
 	return nil
+}
+
+func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, pr interface{}) error {
+	query := reflect.New(reflect.StructOf([]reflect.StructField{
+		{
+			Name: "Repository",
+			Tag:  `graphql:"repository(owner: $owner, name: $repo)"`,
+			Type: reflect.StructOf([]reflect.StructField{
+				{
+					Name: "PullRequests",
+					Tag:  `graphql:"pullRequests(headRefName: $headRefName, baseRefName: $baseRefName, states: OPEN, first: 30)"`,
+					Type: reflect.StructOf([]reflect.StructField{
+						{
+							Name: "Nodes",
+							Type: reflect.SliceOf(reflect.TypeOf(pr)),
+						},
+					}),
+				},
+			}),
+		},
+	}))
+
+	branchWithoutOwner := headBranch
+	if idx := strings.Index(headBranch, ":"); idx >= 0 {
+		branchWithoutOwner = headBranch[idx+1:]
+	}
+	variables := map[string]interface{}{
+		"owner":       githubv4.String(repo.RepoOwner()),
+		"repo":        githubv4.String(repo.RepoName()),
+		"headRefName": githubv4.String(branchWithoutOwner),
+		"baseRefName": (*githubv4.String)(nil),
+	}
+	if baseBranch != "" {
+		variables["baseRefName"] = githubv4.String(baseBranch)
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), query.Interface(), variables)
+	if err != nil {
+		return err
+	}
+
+	prsValue := query.Elem().FieldByName("Repository").FieldByName("PullRequests").FieldByName("Nodes")
+	for i := 0; i < prsValue.Len(); i++ {
+		foundPr := prsValue.Index(i).Elem()
+		headLabel := ""
+		owner := foundPr.FieldByName("HeadRepositoryOwner").FieldByName("Login").String()
+		headRefName := foundPr.FieldByName("HeadRefName").String()
+		if foundPr.FieldByName("IsCrossRepository").Bool() {
+			headLabel = fmt.Sprintf("%s:%s", owner, headRefName)
+		} else {
+			headLabel = foundPr.FieldByName("HeadRefName").String()
+		}
+
+		if headLabel == headBranch {
+			if baseBranch != "" {
+				if foundPr.FieldByName("BaseRefName").String() != baseBranch {
+					continue
+				}
+			}
+			reflect.Indirect(reflect.ValueOf(pr)).Set(reflect.Indirect(foundPr))
+			return nil
+		}
+	}
+
+	return &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
 }
 
 func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
