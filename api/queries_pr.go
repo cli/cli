@@ -517,6 +517,7 @@ type PullRequestXXXTiny struct {
 	Body    string
 	URL     string
 	IsDraft bool
+	Closed  bool
 
 	Author struct {
 		Login string
@@ -1182,7 +1183,7 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 	return err
 }
 
-func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestReady(client *Client, repo ghrepo.Interface, pr PullRequestXXXTiny) error {
 	var mutation struct {
 		MarkPullRequestReadyForReviewInput struct {
 			PullRequest struct {

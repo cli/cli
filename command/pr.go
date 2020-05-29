@@ -727,7 +727,8 @@ func prReady(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr := api.PullRequestXXXTiny{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, pr)
 	if err != nil {
 		return err
 	}
