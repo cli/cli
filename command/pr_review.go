@@ -99,7 +99,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	pr := api.PullRequestXXXLarge{}
+	pr := api.PullRequestXXXComplex{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err

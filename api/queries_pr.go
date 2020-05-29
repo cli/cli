@@ -144,7 +144,7 @@ func (pr PullRequest) HeadLabel() string {
 	return pr.HeadRefName
 }
 
-func (pr PullRequestXXXLarge) HeadLabel() string {
+func (pr PullRequestXXXComplex) HeadLabel() string {
 	if pr.IsCrossRepository {
 		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
 	}
@@ -178,7 +178,7 @@ func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	return status
 }
 
-func (pr *PullRequestXXXLarge) ReviewStatus() PullRequestReviewStatus {
+func (pr *PullRequestXXXComplex) ReviewStatus() PullRequestReviewStatus {
 	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
 	case "CHANGES_REQUESTED":
@@ -198,7 +198,7 @@ type PullRequestChecksStatus struct {
 	Total   int
 }
 
-func (pr *PullRequestXXXLarge) ChecksStatus() (summary PullRequestChecksStatus) {
+func (pr *PullRequestXXXComplex) ChecksStatus() (summary PullRequestChecksStatus) {
 	if len(pr.Commits.Nodes) == 0 {
 		return
 	}
@@ -560,7 +560,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
-type PullRequestXXXTiny struct {
+type PullRequestMinimal struct {
 	ID      string
 	Number  int
 	Title   string
@@ -589,8 +589,8 @@ type PullRequestXXXTiny struct {
 	}
 }
 
-type PullRequestXXXLarge struct {
-	PullRequestXXXTiny
+type PullRequestXXXComplex struct {
+	PullRequestMinimal
 
 	ReviewDecision string
 
@@ -667,7 +667,7 @@ type PullRequestXXXLarge struct {
 }
 
 type PullRequestXXXMergable struct {
-	PullRequestXXXLarge
+	PullRequestXXXComplex
 
 	Mergeable string
 }
@@ -993,7 +993,7 @@ func isBlank(v interface{}) bool {
 	}
 }
 
-func AddReview(client *Client, pr PullRequestXXXLarge, input *PullRequestReviewInput) error {
+func AddReview(client *Client, pr PullRequestXXXComplex, input *PullRequestReviewInput) error {
 	var mutation struct {
 		AddPullRequestReview struct {
 			ClientMutationID string
@@ -1189,7 +1189,7 @@ loop:
 	return &res, nil
 }
 
-func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestClose(client *Client, repo ghrepo.Interface, pr PullRequestMinimal) error {
 	var mutation struct {
 		ClosePullRequest struct {
 			PullRequest struct {
@@ -1208,7 +1208,7 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	return err
 }
 
-func PullRequestReopen(client *Client, repo ghrepo.Interface, pr PullRequestXXXTiny) error {
+func PullRequestReopen(client *Client, repo ghrepo.Interface, pr PullRequestMinimal) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {
@@ -1255,7 +1255,7 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr PullRequestXXXMe
 	return err
 }
 
-func PullRequestReady(client *Client, repo ghrepo.Interface, pr PullRequestXXXTiny) error {
+func PullRequestReady(client *Client, repo ghrepo.Interface, pr PullRequestMinimal) error {
 	var mutation struct {
 		MarkPullRequestReadyForReviewInput struct {
 			PullRequest struct {

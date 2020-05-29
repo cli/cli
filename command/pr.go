@@ -268,7 +268,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prStateTitleWithColorXXX(pr api.PullRequestXXXLarge) string {
+func prStateTitleWithColorXXX(pr api.PullRequestXXXComplex) string {
 	prStateColorFunc := colorFuncForPRXXX(pr)
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
@@ -284,7 +284,7 @@ func prStateTitleWithColor(pr api.PullRequest) string {
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func colorFuncForPRXXX(pr api.PullRequestXXXLarge) func(string) string {
+func colorFuncForPRXXX(pr api.PullRequestXXXComplex) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	}
@@ -330,7 +330,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr := api.PullRequestXXXLarge{}
+	pr := api.PullRequestXXXComplex{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
@@ -358,7 +358,8 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr := api.PullRequestMinimal{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -393,7 +394,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr := api.PullRequestXXXTiny{}
+	pr := api.PullRequestMinimal{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
@@ -612,7 +613,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
-func printPrPreviewXXX(out io.Writer, pr api.PullRequestXXXLarge) error {
+func printPrPreviewXXX(out io.Writer, pr api.PullRequestXXXComplex) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", prStateTitleWithColorXXX(pr))
@@ -675,7 +676,7 @@ func prReady(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr := api.PullRequestXXXTiny{}
+	pr := api.PullRequestMinimal{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
@@ -743,7 +744,7 @@ func formattedReviewerState(reviewer *reviewerState) string {
 }
 
 // prReviewerList generates a reviewer list with their last state
-func prReviewerList(pr api.PullRequestXXXLarge) string {
+func prReviewerList(pr api.PullRequestXXXComplex) string {
 	reviewerStates := parseReviewers(pr)
 	reviewers := make([]string, 0, len(reviewerStates))
 
@@ -764,7 +765,7 @@ const teamTypeName = "Team"
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
-func parseReviewers(pr api.PullRequestXXXLarge) []*reviewerState {
+func parseReviewers(pr api.PullRequestXXXComplex) []*reviewerState {
 	reviewerStates := make(map[string]*reviewerState)
 
 	for _, review := range pr.Reviews.Nodes {
@@ -820,7 +821,7 @@ func sortReviewerStates(reviewerStates []*reviewerState) {
 	})
 }
 
-func prAssigneeList(pr api.PullRequestXXXLarge) string {
+func prAssigneeList(pr api.PullRequestXXXComplex) string {
 	if len(pr.Assignees.Nodes) == 0 {
 		return ""
 	}
@@ -837,7 +838,7 @@ func prAssigneeList(pr api.PullRequestXXXLarge) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequestXXXLarge) string {
+func prLabelList(pr api.PullRequestXXXComplex) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
@@ -854,7 +855,7 @@ func prLabelList(pr api.PullRequestXXXLarge) string {
 	return list
 }
 
-func prProjectList(pr api.PullRequestXXXLarge) string {
+func prProjectList(pr api.PullRequestXXXComplex) string {
 	if len(pr.ProjectCards.Nodes) == 0 {
 		return ""
 	}
@@ -916,7 +917,7 @@ func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) 
 	return
 }
 
-func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestXXXLarge) {
+func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestXXXComplex) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 

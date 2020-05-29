@@ -43,7 +43,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pr := api.PullRequestXXXTiny{}
+	pr := api.PullRequestMinimal{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, []string{prString}, &pr)
 	if err != nil {
 		return err
