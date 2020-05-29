@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -41,12 +42,13 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr := api.PullRequestXXXTiny{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return fmt.Errorf("could not find pull request: %w", err)
 	}
 
-	diff, err := apiClient.PullRequestDiff(baseRepo, pr)
+	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}

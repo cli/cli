@@ -331,11 +331,9 @@ func prView(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestXXXLarge{}
-	found, err := prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
-	} else if !found {
-		return fmt.Errorf("no open pull requests found")
 	}
 	openURL := pr.URL
 

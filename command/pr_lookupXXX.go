@@ -12,27 +12,41 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args []string, pr interface{}) (bool, error) {
+func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args []string, pr interface{}) error {
+	notFoundErr := fmt.Errorf("pull request not found")
 	if len(args) == 0 {
-		return prForCurrentBranchXXX(ctx, apiClient, repo, pr)
+		found, err := prForCurrentBranchXXX(ctx, apiClient, repo, pr)
+		if err != nil {
+			return err
+		} else if !found {
+			return notFoundErr
+		}
+
+		return nil
 	}
 
-	// // First check to see if the prString is a url
+	// First check to see if the prString is a url
 	prString := args[0]
 	found, err := prFromURLXXX(ctx, apiClient, repo, prString, pr)
 	if found || err != nil {
-		return found, err
+		return err
 	}
 
 	// Next see if the prString is a number and use that to look up the url
 	found, err = prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
 	if found || err != nil {
-		return found, err
+		return err
 	}
 
-	// // Last see if it is a branch name
+	// Last see if it is a branch name
 	found, err = api.PullRequestForBranchXXX(apiClient, repo, "", prString, pr)
-	return found, err
+	if err != nil {
+		return err
+	} else if !found {
+		return notFoundErr
+	}
+
+	return nil
 }
 
 func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) (bool, error) {

@@ -100,11 +100,9 @@ func prReview(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestXXXLarge{}
-	found, err := prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
-	} else if !found {
-		return fmt.Errorf("could not find pull request")
 	}
 
 	out := colorableOut(cmd)

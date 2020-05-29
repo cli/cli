@@ -646,7 +646,7 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	defer restoreCmd()
 
 	_, err := RunCommand("pr view -w")
-	if err == nil || err.Error() != "no open pull requests found" {
+	if err == nil || err.Error() != "pull request not found" {
 		t.Errorf("error running command `pr view`: %v", err)
 	}
 
