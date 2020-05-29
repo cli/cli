@@ -624,73 +624,19 @@ func printPrPreviewXXX(out io.Writer, pr api.PullRequestXXXLarge) error {
 	fmt.Fprintln(out)
 
 	// Metadata
-
-	// TODO!!!
-	// Corey commented this part out to get to a compile state
-	// if reviewers := prReviewerList(pr); reviewers != "" {
-	// 	fmt.Fprint(out, utils.Bold("Reviewers: "))
-	// 	fmt.Fprintln(out, reviewers)
-	// }
-	// if assignees := prAssigneeList(pr); assignees != "" {
-	// 	fmt.Fprint(out, utils.Bold("Assignees: "))
-	// 	fmt.Fprintln(out, assignees)
-	// }
-	// if labels := prLabelList(pr); labels != "" {
-	// 	fmt.Fprint(out, utils.Bold("Labels: "))
-	// 	fmt.Fprintln(out, labels)
-	// }
-	// if projects := prProjectList(pr); projects != "" {
-	// 	fmt.Fprint(out, utils.Bold("Projects: "))
-	// 	fmt.Fprintln(out, projects)
-	// }
-	// if pr.Milestone.Title != "" {
-	// 	fmt.Fprint(out, utils.Bold("Milestone: "))
-	// 	fmt.Fprintln(out, pr.Milestone.Title)
-	// }
-
-	// Body
-	if pr.Body != "" {
-		fmt.Fprintln(out)
-		md, err := utils.RenderMarkdown(pr.Body)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(out, md)
-	}
-	fmt.Fprintln(out)
-
-	// Footer
-	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
-	return nil
-}
-
-func printPrPreview(out io.Writer, pr *api.PullRequest) error {
-	// Header (Title and State)
-	fmt.Fprintln(out, utils.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
-	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
-		" • %s wants to merge %s into %s from %s",
-		pr.Author.Login,
-		utils.Pluralize(pr.Commits.TotalCount, "commit"),
-		pr.BaseRefName,
-		pr.HeadRefName,
-	)))
-	fmt.Fprintln(out)
-
-	// Metadata
-	if reviewers := prReviewerList(*pr); reviewers != "" {
+	if reviewers := prReviewerList(pr); reviewers != "" {
 		fmt.Fprint(out, utils.Bold("Reviewers: "))
 		fmt.Fprintln(out, reviewers)
 	}
-	if assignees := prAssigneeList(*pr); assignees != "" {
+	if assignees := prAssigneeList(pr); assignees != "" {
 		fmt.Fprint(out, utils.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := prLabelList(*pr); labels != "" {
+	if labels := prLabelList(pr); labels != "" {
 		fmt.Fprint(out, utils.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
-	if projects := prProjectList(*pr); projects != "" {
+	if projects := prProjectList(pr); projects != "" {
 		fmt.Fprint(out, utils.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
@@ -728,7 +674,7 @@ func prReady(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestXXXTiny{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, pr)
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -795,7 +741,7 @@ func formattedReviewerState(reviewer *reviewerState) string {
 }
 
 // prReviewerList generates a reviewer list with their last state
-func prReviewerList(pr api.PullRequest) string {
+func prReviewerList(pr api.PullRequestXXXLarge) string {
 	reviewerStates := parseReviewers(pr)
 	reviewers := make([]string, 0, len(reviewerStates))
 
@@ -816,7 +762,7 @@ const teamTypeName = "Team"
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
-func parseReviewers(pr api.PullRequest) []*reviewerState {
+func parseReviewers(pr api.PullRequestXXXLarge) []*reviewerState {
 	reviewerStates := make(map[string]*reviewerState)
 
 	for _, review := range pr.Reviews.Nodes {
@@ -834,9 +780,9 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.Login
-		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
-			name = reviewRequest.RequestedReviewer.Name
+		name := reviewRequest.RequestedReviewer.User.Login
+		if reviewRequest.RequestedReviewer.Typename == teamTypeName {
+			name = reviewRequest.RequestedReviewer.Team.Name
 		}
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
@@ -872,7 +818,7 @@ func sortReviewerStates(reviewerStates []*reviewerState) {
 	})
 }
 
-func prAssigneeList(pr api.PullRequest) string {
+func prAssigneeList(pr api.PullRequestXXXLarge) string {
 	if len(pr.Assignees.Nodes) == 0 {
 		return ""
 	}
@@ -889,7 +835,7 @@ func prAssigneeList(pr api.PullRequest) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequest) string {
+func prLabelList(pr api.PullRequestXXXLarge) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
@@ -906,7 +852,7 @@ func prLabelList(pr api.PullRequest) string {
 	return list
 }
 
-func prProjectList(pr api.PullRequest) string {
+func prProjectList(pr api.PullRequestXXXLarge) string {
 	if len(pr.ProjectCards.Nodes) == 0 {
 		return ""
 	}
@@ -966,6 +912,71 @@ func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) 
 	}
 
 	return
+}
+
+func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestXXXLarge) {
+	for _, pr := range prs {
+		prNumber := fmt.Sprintf("#%d", pr.Number)
+
+		prStateColorFunc := utils.Green
+		if pr.IsDraft {
+			prStateColorFunc = utils.Gray
+		} else if pr.State == "MERGED" {
+			prStateColorFunc = utils.Magenta
+		} else if pr.State == "CLOSED" {
+			prStateColorFunc = utils.Red
+		}
+
+		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+
+		checks := pr.ChecksStatus()
+		reviews := pr.ReviewStatus()
+
+		if pr.State == "OPEN" {
+			reviewStatus := reviews.ChangesRequested || reviews.Approved || reviews.ReviewRequired
+			if checks.Total > 0 || reviewStatus {
+				// show checks & reviews on their own line
+				fmt.Fprintf(w, "\n  ")
+			}
+
+			if checks.Total > 0 {
+				var summary string
+				if checks.Failing > 0 {
+					if checks.Failing == checks.Total {
+						summary = utils.Red("× All checks failing")
+					} else {
+						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
+					}
+				} else if checks.Pending > 0 {
+					summary = utils.Yellow("- Checks pending")
+				} else if checks.Passing == checks.Total {
+					summary = utils.Green("✓ Checks passing")
+				}
+				fmt.Fprint(w, summary)
+			}
+
+			if checks.Total > 0 && reviewStatus {
+				// add padding between checks & reviews
+				fmt.Fprint(w, " ")
+			}
+
+			if reviews.ChangesRequested {
+				fmt.Fprint(w, utils.Red("+ Changes requested"))
+			} else if reviews.ReviewRequired {
+				fmt.Fprint(w, utils.Yellow("- Review required"))
+			} else if reviews.Approved {
+				fmt.Fprint(w, utils.Green("✓ Approved"))
+			}
+		} else {
+			fmt.Fprintf(w, " - %s", prStateTitleWithColorXXX(pr))
+		}
+
+		fmt.Fprint(w, "\n")
+	}
+	remaining := totalCount - len(prs)
+	if remaining > 0 {
+		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
+	}
 }
 
 func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {

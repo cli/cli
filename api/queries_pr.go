@@ -81,11 +81,12 @@ type PullRequest struct {
 							Status     string
 							Conclusion string
 						}
-					}
+					} `graphql:"contexts(last: 100)"`
 				}
 			}
 		}
-	}
+	} `graphql:"commits(last: 1)"`
+
 	ReviewRequests struct {
 		Nodes []struct {
 			RequestedReviewer struct {
@@ -143,6 +144,13 @@ func (pr PullRequest) HeadLabel() string {
 	return pr.HeadRefName
 }
 
+func (pr PullRequestXXXLarge) HeadLabel() string {
+	if pr.IsCrossRepository {
+		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
+	}
+	return pr.HeadRefName
+}
+
 type PullRequestReviewStatus struct {
 	ChangesRequested bool
 	Approved         bool
@@ -170,11 +178,54 @@ func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	return status
 }
 
+func (pr *PullRequestXXXLarge) ReviewStatus() PullRequestReviewStatus {
+	var status PullRequestReviewStatus
+	switch pr.ReviewDecision {
+	case "CHANGES_REQUESTED":
+		status.ChangesRequested = true
+	case "APPROVED":
+		status.Approved = true
+	case "REVIEW_REQUIRED":
+		status.ReviewRequired = true
+	}
+	return status
+}
+
 type PullRequestChecksStatus struct {
 	Pending int
 	Failing int
 	Passing int
 	Total   int
+}
+
+func (pr *PullRequestXXXLarge) ChecksStatus() (summary PullRequestChecksStatus) {
+	if len(pr.Commits.Nodes) == 0 {
+		return
+	}
+	commit := pr.Commits.Nodes[0].Commit
+	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
+		state := c.State // StatusContext
+		if state == "" {
+			// CheckRun
+			if c.Status == "COMPLETED" {
+				state = c.Conclusion
+			} else {
+				state = c.Status
+			}
+		}
+		switch state {
+		case "SUCCESS", "NEUTRAL", "SKIPPED":
+			summary.Passing++
+		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
+			summary.Failing++
+		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
+			summary.Pending++
+		default:
+			panic(fmt.Errorf("unsupported status: %q", state))
+		}
+		summary.Total++
+	}
+	return
 }
 
 func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
@@ -541,8 +592,23 @@ type PullRequestXXXTiny struct {
 type PullRequestXXXLarge struct {
 	PullRequestXXXTiny
 
+	ReviewDecision string
+
 	Commits struct {
 		TotalCount int
+		Nodes      []struct {
+			Commit struct {
+				StatusCheckRollup struct {
+					Contexts struct {
+						Nodes []struct {
+							State      string
+							Status     string
+							Conclusion string
+						}
+					}
+				}
+			}
+		}
 	}
 
 	ReviewRequests struct {
