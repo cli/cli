@@ -525,8 +525,15 @@ type PullRequestXXXTiny struct {
 	BaseRefName         string
 	HeadRefName         string
 	IsCrossRepository   bool
+	MaintainerCanModify bool
 	HeadRepositoryOwner struct {
 		Login string
+	}
+	HeadRepository struct {
+		Name             string
+		DefaultBranchRef struct {
+			Name string
+		}
 	}
 }
 
@@ -536,15 +543,6 @@ type PullRequestXXXLarge struct {
 	Commits struct {
 		TotalCount int
 	}
-
-	HeadRepository struct {
-		Name             string
-		DefaultBranchRef struct {
-			Name string
-		}
-	}
-
-	MaintainerCanModify bool
 
 	ReviewRequests struct {
 		Nodes []struct {

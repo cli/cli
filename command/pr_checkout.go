@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -42,7 +43,8 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, []string{prString})
+	pr := api.PullRequestXXXTiny{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, []string{prString}, &pr)
 	if err != nil {
 		return err
 	}
