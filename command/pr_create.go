@@ -176,19 +176,17 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		title = defs.Title
 		body = defs.Body
 	}
-
 	if !isWeb {
 		headBranchLabel := headBranch
 		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
 			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 		}
-		var existingPR api.PullRequestXXXTiny
-		err := api.PullRequestForBranchXXX(client, baseRepo, baseBranch, headBranchLabel, existingPR)
-		var notFound *api.NotFoundError
-		if err != nil && !errors.As(err, &notFound) {
+		existingPR := api.PullRequestXXXTiny{}
+		found, err := api.PullRequestForBranchXXX(client, baseRepo, baseBranch, headBranchLabel, &existingPR)
+		if err != nil {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
 		}
-		if err == nil {
+		if found {
 			return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s", headBranchLabel, baseBranch, existingPR.URL)
 		}
 	}

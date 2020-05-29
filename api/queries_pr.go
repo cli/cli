@@ -509,6 +509,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 }
 
 type PullRequestXXXTiny struct {
+	ID      string
 	Number  int
 	Title   string
 	State   string
@@ -534,9 +535,17 @@ type PullRequestXXXLarge struct {
 	Commits struct {
 		TotalCount int
 	}
+
+	HeadRepository struct {
+		Name             string
+		DefaultBranchRef struct {
+			Name string
+		}
+	}
+	MaintainerCanModify bool
 }
 
-func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) error {
+func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) (bool, error) {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
 			Name: "Repository",
@@ -560,16 +569,16 @@ func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, p
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Query(context.Background(), query.Interface(), variables)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	foundPr := query.Elem().FieldByName("Repository").FieldByName("PullRequest")
 	reflect.Indirect(reflect.ValueOf(pr)).Set(reflect.Indirect(foundPr))
 
-	return nil
+	return true, nil
 }
 
-func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, pr interface{}) error {
+func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, pr interface{}) (bool, error) {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
 			Name: "Repository",
@@ -606,7 +615,7 @@ func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, 
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Query(context.Background(), query.Interface(), variables)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	prsValue := query.Elem().FieldByName("Repository").FieldByName("PullRequests").FieldByName("Nodes")
@@ -628,11 +637,11 @@ func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, 
 				}
 			}
 			reflect.Indirect(reflect.ValueOf(pr)).Set(reflect.Indirect(foundPr))
-			return nil
+			return true, nil
 		}
 	}
 
-	return &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
+	return false, nil
 }
 
 func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
@@ -857,7 +866,7 @@ func isBlank(v interface{}) bool {
 	}
 }
 
-func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
+func AddReview(client *Client, pr PullRequestXXXLarge, input *PullRequestReviewInput) error {
 	var mutation struct {
 		AddPullRequestReview struct {
 			ClientMutationID string

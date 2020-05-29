@@ -94,14 +94,15 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
-	if err != nil {
-		return err
-	}
-
 	reviewData, err := processReviewOpt(cmd)
 	if err != nil {
 		return fmt.Errorf("did not understand desired review action: %w", err)
+	}
+
+	pr := api.PullRequestXXXLarge{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	if err != nil {
+		return err
 	}
 
 	out := colorableOut(cmd)

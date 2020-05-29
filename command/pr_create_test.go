@@ -18,8 +18,8 @@ func TestPRCreate(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "forks": { "nodes": [
-	] } } } }
+		{ "data": { "repository": { "forks": { "nodes": [
+		] } } } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
@@ -693,6 +693,10 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	{ "data": { "repository": { "forks": { "nodes": [
 	] } } } }
 	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes" : [
+	] } } } }
+`))
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"

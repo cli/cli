@@ -14,48 +14,50 @@ import (
 
 func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args []string, pr interface{}) error {
 	if len(args) == 0 {
-		return prForCurrentBranchXXX(ctx, apiClient, repo, pr)
+		_, err := prForCurrentBranchXXX(ctx, apiClient, repo, pr)
+		return err
 	}
 
 	// // First check to see if the prString is a url
 	prString := args[0]
-	err := prFromURLXXX(ctx, apiClient, repo, prString, pr)
-	if pr != nil || err != nil {
+	found, err := prFromURLXXX(ctx, apiClient, repo, prString, pr)
+	if found || err != nil {
 		return err
 	}
 
 	// Next see if the prString is a number and use that to look up the url
-	err = prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
-	if pr != nil || err != nil {
+	found, err = prFromNumberStringXXX(ctx, apiClient, repo, prString, pr)
+	if found || err != nil {
 		return err
 	}
 
 	// // Last see if it is a branch name
-	return api.PullRequestForBranchXXX(apiClient, repo, "", prString, pr)
+	_, err = api.PullRequestForBranchXXX(apiClient, repo, "", prString, pr)
+	return err
 }
 
-func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) error {
+func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) (bool, error) {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(s, "#")); err == nil {
 		return api.PullRequestByNumberXXX(apiClient, repo, prNumber, pr)
 	}
 
-	return nil
+	return false, nil
 }
 
-func prFromURLXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) error {
+func prFromURLXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) (bool, error) {
 	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 	if m := r.FindStringSubmatch(s); m != nil {
 		prNumberString := m[3]
 		return prFromNumberStringXXX(ctx, apiClient, repo, prNumberString, pr)
 	}
 
-	return nil
+	return false, nil
 }
 
-func prForCurrentBranchXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, pr interface{}) error {
+func prForCurrentBranchXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, pr interface{}) (bool, error) {
 	prHeadRef, err := ctx.Branch()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	branchConfig := git.ReadBranchConfig(prHeadRef)
@@ -63,9 +65,9 @@ func prForCurrentBranchXXX(ctx context.Context, apiClient *api.Client, repo ghre
 	// the branch is configured to merge a special PR head ref
 	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
 	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		err := prFromNumberStringXXX(ctx, apiClient, repo, m[1], pr)
-		if pr != nil || err != nil {
-			return err
+		found, err := prFromNumberStringXXX(ctx, apiClient, repo, m[1], pr)
+		if found || err != nil {
+			return found, err
 		}
 	}
 
