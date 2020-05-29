@@ -1208,7 +1208,7 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	return err
 }
 
-func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestReopen(client *Client, repo ghrepo.Interface, pr PullRequestXXXTiny) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {
