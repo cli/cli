@@ -30,7 +30,7 @@ func TestPRDiff_no_current_pr(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error", err)
 	}
-	eq(t, err.Error(), `could not find pull request: no open pull requests found for branch "master"`)
+	eq(t, err.Error(), `could not find pull request: pull request not found`)
 }
 
 func TestPRDiff_argument_not_found(t *testing.T) {
