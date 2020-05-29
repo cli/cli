@@ -666,6 +666,12 @@ type PullRequestXXXLarge struct {
 	} `graphql:"reviews(last: 100)"`
 }
 
+type PullRequestXXXMergable struct {
+	PullRequestXXXLarge
+
+	Mergeable string
+}
+
 func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) (bool, error) {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
@@ -1221,7 +1227,7 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 	return err
 }
 
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr PullRequestXXXMergable, m PullRequestMergeMethod) error {
 	mergeMethod := githubv4.PullRequestMergeMethodMerge
 	switch m {
 	case PullRequestMergeMethodRebase:

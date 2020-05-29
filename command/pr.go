@@ -430,7 +430,8 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr := api.PullRequestXXXMergable{}
+	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
