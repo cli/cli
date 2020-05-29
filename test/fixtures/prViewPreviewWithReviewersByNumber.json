@@ -19,10 +19,10 @@
               }
             },
             {
-                "requestedReviewer": {
-                    "__typename": "Team",
-                    "name": "Team 1"
-                }
+              "requestedReviewer": {
+                "__typename": "Team",
+                "name": "Team 1"
+              }
             },
             {
               "requestedReviewer": {
@@ -104,14 +104,6 @@
           "totalcount": 0
         },
         "milestone": {},
-        "participants": {
-          "nodes": [
-            {
-              "login": "marseilles"
-            }
-          ],
-          "totalcount": 1
-        },
         "commits": {
           "totalCount": 12
         },

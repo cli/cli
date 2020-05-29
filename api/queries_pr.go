@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 
 	"github.com/cli/cli/internal/ghrepo"
 )
@@ -542,7 +543,62 @@ type PullRequestXXXLarge struct {
 			Name string
 		}
 	}
+
 	MaintainerCanModify bool
+
+	ReviewRequests struct {
+		Nodes []struct {
+			RequestedReviewer struct {
+				Typename graphql.String `graphql:"__typename"`
+				User     struct {
+					Login string
+				} `graphql:"... on User"`
+				Team struct {
+					Name string
+				} `graphql:"... on Team"`
+			}
+		}
+		TotalCount int
+	} `graphql:"reviewRequests(first: 100)"`
+
+	Assignees struct {
+		Nodes []struct {
+			Login string
+		}
+		TotalCount int
+	} `graphql:"assignees(first: 100)"`
+
+	Labels struct {
+		Nodes []struct {
+			Name string
+		}
+		TotalCount int
+	} `graphql:"labels(first: 100)"`
+
+	ProjectCards struct {
+		Nodes []struct {
+			Project struct {
+				Name string
+			}
+			Column struct {
+				Name string
+			}
+		}
+		TotalCount int
+	} `graphql:"projectcards(first: 100)"`
+
+	Milestone struct {
+		Title string
+	}
+
+	Reviews struct {
+		Nodes []struct {
+			Author struct {
+				Login string
+			}
+			State string
+		}
+	} `graphql:"reviews(last: 100)"`
 }
 
 func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) (bool, error) {

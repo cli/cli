@@ -1,15 +1,9 @@
-{"data":{
-  "repository": {
-    "pullRequests": {
-      "edges": []
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": []
+      }
     }
-  },
-  "viewerCreated": {
-    "edges": [],
-    "pageInfo": { "hasNextPage": false }
-  },
-  "reviewRequested": {
-    "edges": [],
-    "pageInfo": { "hasNextPage": false }
   }
-}}
+}
