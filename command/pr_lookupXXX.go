@@ -31,8 +31,7 @@ func prFromArgsXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Inter
 	}
 
 	// // Last see if it is a branch name
-	// return api.PullRequestForBranch(apiClient, repo, "", prString)
-	return nil
+	return api.PullRequestForBranchXXX(apiClient, repo, "", prString, pr)
 }
 
 func prFromNumberStringXXX(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) error {
