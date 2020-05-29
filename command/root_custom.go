@@ -83,10 +83,23 @@ func customCommandCompletion(cmd *cobra.Command, args []string, toComplete strin
 }
 
 func findCustomCommand(name string) (string, error) {
+	if strings.HasPrefix(name, "@") {
+		idx := strings.IndexRune(name, '/')
+		cmdName := "gh-" + stripPathComponent(name[idx+1:])
+		return path.Join(config.ConfigDir(), "gh-commands", name[1:idx], cmdName), nil
+	}
+
 	cmdName := "gh-" + stripPathComponent(name)
 
-	if found, _ := filepath.Glob(path.Join(config.ConfigDir(), "gh-commands", "*", cmdName)); len(found) > 0 {
+	found, _ := filepath.Glob(path.Join(config.ConfigDir(), "gh-commands", "*", cmdName))
+	if len(found) == 1 {
 		return found[0], nil
+	} else if len(found) > 1 {
+		namespaces := make([]string, len(found))
+		for i, f := range found {
+			namespaces[i] = filepath.Base(filepath.Dir(f))
+		}
+		return "", fmt.Errorf("duplicate command %q was found in the following namespaces: %v", name, namespaces)
 	}
 
 	if found, err := exec.LookPath(cmdName); err == nil {
