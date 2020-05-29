@@ -268,7 +268,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prStateTitleWithColorXXX(pr api.PullRequestXXXComplex) string {
+func prStateTitleWithColorXXX(pr api.PullRequestComplex) string {
 	prStateColorFunc := colorFuncForPRXXX(pr)
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
@@ -284,7 +284,7 @@ func prStateTitleWithColor(pr api.PullRequest) string {
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func colorFuncForPRXXX(pr api.PullRequestXXXComplex) func(string) string {
+func colorFuncForPRXXX(pr api.PullRequestComplex) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	}
@@ -330,7 +330,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr := api.PullRequestXXXComplex{}
+	pr := api.PullRequestComplex{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
@@ -432,7 +432,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr := api.PullRequestXXXMergable{}
+	pr := api.PullRequestMergable{}
 	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
@@ -613,7 +613,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
-func printPrPreviewXXX(out io.Writer, pr api.PullRequestXXXComplex) error {
+func printPrPreviewXXX(out io.Writer, pr api.PullRequestComplex) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", prStateTitleWithColorXXX(pr))
@@ -744,7 +744,7 @@ func formattedReviewerState(reviewer *reviewerState) string {
 }
 
 // prReviewerList generates a reviewer list with their last state
-func prReviewerList(pr api.PullRequestXXXComplex) string {
+func prReviewerList(pr api.PullRequestComplex) string {
 	reviewerStates := parseReviewers(pr)
 	reviewers := make([]string, 0, len(reviewerStates))
 
@@ -765,7 +765,7 @@ const teamTypeName = "Team"
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
-func parseReviewers(pr api.PullRequestXXXComplex) []*reviewerState {
+func parseReviewers(pr api.PullRequestComplex) []*reviewerState {
 	reviewerStates := make(map[string]*reviewerState)
 
 	for _, review := range pr.Reviews.Nodes {
@@ -821,7 +821,7 @@ func sortReviewerStates(reviewerStates []*reviewerState) {
 	})
 }
 
-func prAssigneeList(pr api.PullRequestXXXComplex) string {
+func prAssigneeList(pr api.PullRequestComplex) string {
 	if len(pr.Assignees.Nodes) == 0 {
 		return ""
 	}
@@ -838,7 +838,7 @@ func prAssigneeList(pr api.PullRequestXXXComplex) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequestXXXComplex) string {
+func prLabelList(pr api.PullRequestComplex) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
@@ -855,7 +855,7 @@ func prLabelList(pr api.PullRequestXXXComplex) string {
 	return list
 }
 
-func prProjectList(pr api.PullRequestXXXComplex) string {
+func prProjectList(pr api.PullRequestComplex) string {
 	if len(pr.ProjectCards.Nodes) == 0 {
 		return ""
 	}
@@ -917,7 +917,7 @@ func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) 
 	return
 }
 
-func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestXXXComplex) {
+func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestComplex) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 

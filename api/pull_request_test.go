@@ -6,7 +6,7 @@ import (
 )
 
 func TestPullRequest_ChecksStatus(t *testing.T) {
-	pr := PullRequest{}
+	pr := PullRequestComplex{}
 	payload := `
 	{ "commits": { "nodes": [{ "commit": {
 		"statusCheckRollup": {
