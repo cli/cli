@@ -31,7 +31,7 @@ type PullRequestReviewInput struct {
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPR       *PullRequestComplex
+	CurrentPR       *PullRequest
 	DefaultBranch   string
 }
 
