@@ -8,7 +8,7 @@
 
    ```
 
-   If "go" is not installed, follow instructions on ["go official Page"](https://golang.org/doc/install)
+   If "go" is not installed, follow instructions on ["go official Page"](https://golang.org/doc/install).
 
 
 1. Clone this repository
