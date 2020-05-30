@@ -5,7 +5,6 @@
    ```sh
    $ go version
    go version go1.14
-
    ```
    If "go" is not installed, follow instructions on ["go official Page"](https://golang.org/doc/install).
 
