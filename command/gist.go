@@ -33,7 +33,7 @@ var gistCreateCmd = &cobra.Command{
 
 Gists can be created from one or many files. This command can also read from STDIN. By default, gists are private; use --public to change this.
 
-Examples
+Examples:
 
     gh gist create hello.py                   # turn file hello.py into a gist
     gh gist create --public hello.py          # turn file hello.py into a public gist
