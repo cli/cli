@@ -24,7 +24,7 @@ func init() {
 }
 
 var prReviewCmd = &cobra.Command{
-	Use:   "review [{<number> | <url> | <branch>]",
+	Use:   "review [<number> | <url> | <branch>]",
 	Short: "Add a review to a pull request.",
 	Args:  cobra.MaximumNArgs(1),
 	Long: `Add a review to either a specified pull request or the pull request associated with the current branch.
