@@ -7,6 +7,8 @@
    go version go1.14
    ```
 
+   If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
+
 1. Clone this repository
 
    ```sh
