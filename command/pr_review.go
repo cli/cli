@@ -100,7 +100,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestComplex{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}

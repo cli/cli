@@ -268,15 +268,15 @@ func prList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prStateTitleWithColorXXX(pr api.PullRequestComplex) string {
-	prStateColorFunc := colorFuncForPRXXX(pr)
+func prStateTitleWithColor(pr api.PullRequestComplex) string {
+	prStateColorFunc := colorFuncForPR(pr)
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
 	}
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func colorFuncForPRXXX(pr api.PullRequestComplex) func(string) string {
+func colorFuncForPR(pr api.PullRequestComplex) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	}
@@ -323,7 +323,7 @@ func prView(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestComplex{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestMinimal{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestMinimal{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -425,7 +425,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestMergable{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -608,7 +608,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 func printPrPreviewXXX(out io.Writer, pr api.PullRequestComplex) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", prStateTitleWithColorXXX(pr))
+	fmt.Fprintf(out, "%s", prStateTitleWithColor(pr))
 	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
 		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
@@ -669,7 +669,7 @@ func prReady(cmd *cobra.Command, args []string) error {
 	}
 
 	pr := api.PullRequestMinimal{}
-	err = prFromArgsXXX(ctx, apiClient, baseRepo, args, &pr)
+	err = prFromArgs(ctx, apiClient, baseRepo, args, &pr)
 	if err != nil {
 		return err
 	}
@@ -909,7 +909,7 @@ func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) 
 	return
 }
 
-func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestComplex) {
+func printPrs(w io.Writer, totalCount int, prs ...api.PullRequestComplex) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
@@ -963,7 +963,7 @@ func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestComplex) {
 				fmt.Fprint(w, utils.Green("✓ Approved"))
 			}
 		} else {
-			fmt.Fprintf(w, " - %s", prStateTitleWithColorXXX(pr))
+			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
 		fmt.Fprint(w, "\n")

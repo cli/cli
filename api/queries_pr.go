@@ -343,7 +343,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	v4 := githubv4.NewClient(client.http)
 	err := v4.Query(context.Background(), &query, variables)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run graphql query to get pull requests: %s", err)
 	}
 
 	var viewerCreated []PullRequestComplex

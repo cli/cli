@@ -829,18 +829,19 @@ func TestReplaceExcessiveWhitespace(t *testing.T) {
 
 func TestPrStateTitleWithColor(t *testing.T) {
 	tests := map[string]struct {
-		pr   api.PullRequest
+		pr   api.PullRequestMinimal
 		want string
 	}{
-		"Format OPEN state":              {pr: api.PullRequest{State: "OPEN", IsDraft: false}, want: "Open"},
-		"Format OPEN state for Draft PR": {pr: api.PullRequest{State: "OPEN", IsDraft: true}, want: "Draft"},
-		"Format CLOSED state":            {pr: api.PullRequest{State: "CLOSED", IsDraft: false}, want: "Closed"},
-		"Format MERGED state":            {pr: api.PullRequest{State: "MERGED", IsDraft: false}, want: "Merged"},
+		"Format OPEN state":              {pr: api.PullRequestMinimal{State: "OPEN", IsDraft: false}, want: "Open"},
+		"Format OPEN state for Draft PR": {pr: api.PullRequestMinimal{State: "OPEN", IsDraft: true}, want: "Draft"},
+		"Format CLOSED state":            {pr: api.PullRequestMinimal{State: "CLOSED", IsDraft: false}, want: "Closed"},
+		"Format MERGED state":            {pr: api.PullRequestMinimal{State: "MERGED", IsDraft: false}, want: "Merged"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := prStateTitleWithColor(tc.pr)
+			p := api.PullRequestComplex{PullRequestMinimal: tc.pr}
+			got := prStateTitleWithColor(p)
 			diff := cmp.Diff(tc.want, got)
 			if diff != "" {
 				t.Fatalf(diff)
