@@ -6,6 +6,8 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestFind(t *testing.T) {
@@ -180,6 +182,111 @@ about: This is how you report bugs
 			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
 			if got := ExtractName(tt.args.filePath); got != tt.want {
 				t.Errorf("ExtractName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractMetadata(t *testing.T) {
+	tmpfile, err := ioutil.TempFile("", "gh-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpfile.Close()
+	defer os.Remove(tmpfile.Name())
+
+	type args struct {
+		filePath string
+	}
+	tests := []struct {
+		name    string
+		prepare string
+		args    args
+		want    *Metadata
+		wantErr bool
+	}{
+		{
+			name: "Complete front-matter",
+			prepare: `---
+name: Bug Report
+about: This is how you report bugs
+labels: bug, help-wanted
+---
+
+**Template contents**
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want: &Metadata{
+				Name:   "Bug Report",
+				Labels: []string{"bug", "help-wanted"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Name only front-matter",
+			prepare: `---
+name: Bug Report
+about: This is how you report bugs
+---
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want: &Metadata{
+				Name: "Bug Report",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Labels only front-matter",
+			prepare: `---
+about: This is how you report bugs
+labels: bug, help-wanted
+---
+
+**Template contents**
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Incomplete front-matter",
+			prepare: `---
+about: This is how you report bugs
+---
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "No front-matter",
+			prepare: `name: This is not yaml!`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+
+			got, err := ExtractMetadata(tt.args.filePath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractMetadata() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("(-want +got):\n%s", diff)
 			}
 		})
 	}

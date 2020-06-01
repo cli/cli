@@ -99,7 +99,7 @@ func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-func selectTemplate(templatePaths []string) (string, error) {
+func selectTemplate(templatePaths []string) (string, *githubtemplate.Metadata, error) {
 	templateResponse := struct {
 		Index int
 	}{}
@@ -119,12 +119,17 @@ func selectTemplate(templatePaths []string) (string, error) {
 			},
 		}
 		if err := SurveyAsk(selectQs, &templateResponse); err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
+			return "", nil, fmt.Errorf("could not prompt: %w", err)
 		}
 	}
 
 	templateContents := githubtemplate.ExtractContents(templatePaths[templateResponse.Index])
-	return string(templateContents), nil
+	templateMetadata, err := githubtemplate.ExtractMetadata(templatePaths[templateResponse.Index])
+	if err != nil {
+		return "", nil, err
+	}
+
+	return string(templateContents), templateMetadata, nil
 }
 
 func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers, allowMetadata bool) error {
@@ -134,16 +139,19 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	}
 
 	issueState.Title = defs.Title
-	templateContents := ""
+	var templateContents string
+	var templateLabels []string
 
 	if providedBody == "" {
 		if len(templatePaths) > 0 {
 			var err error
-			templateContents, err = selectTemplate(templatePaths)
+			var templateMetadata *githubtemplate.Metadata
+			templateContents, templateMetadata, err = selectTemplate(templatePaths)
 			if err != nil {
 				return err
 			}
 			issueState.Body = templateContents
+			templateLabels = templateMetadata.Labels
 		} else {
 			issueState.Body = defs.Body
 		}
@@ -351,6 +359,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			return fmt.Errorf("unable to confirm: %w", err)
 		}
 	}
+
+	issueState.Labels = append(issueState.Labels, templateLabels...)
 
 	issueState.Action = confirmA
 	return nil

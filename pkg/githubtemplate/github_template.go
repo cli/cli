@@ -1,6 +1,7 @@
 package githubtemplate
 
 import (
+	"errors"
 	"io/ioutil"
 	"path"
 	"regexp"
@@ -8,6 +9,19 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+)
+
+// Metadata represents metadata in a frontmatter of issue templates.
+type Metadata struct {
+	// Name is a template names.
+	Name string
+	// Labels is label names that are put when using templates.
+	Labels []string
+}
+
+var (
+	ErrFrontmatterNotFound = errors.New("frontmatter not found")
+	ErrFrontmatterInvalid  = errors.New("frontmatter is invalid")
 )
 
 // Find returns the list of template file paths
@@ -76,6 +90,45 @@ func ExtractName(filePath string) string {
 		}
 	}
 	return path.Base(filePath)
+}
+
+// ExtractMetadata returns the label names of the template from YAML front-matter
+func ExtractMetadata(filePath string) (*Metadata, error) {
+	contents, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	frontmatterBoundaries := detectFrontmatter(contents)
+	if frontmatterBoundaries[0] != 0 {
+		return nil, ErrFrontmatterNotFound
+	}
+
+	templateData := struct {
+		Name   string
+		Labels string
+	}{}
+	if err := yaml.Unmarshal(contents[0:frontmatterBoundaries[1]], &templateData); err != nil {
+		return nil, err
+	}
+
+	if templateData.Name == "" {
+		return nil, ErrFrontmatterInvalid
+	}
+	if templateData.Labels == "" {
+		return &Metadata{Name: templateData.Name}, nil
+	}
+
+	ss := strings.Split(templateData.Labels, ",")
+	labels := make([]string, 0, len(ss))
+	for _, s := range ss {
+		labels = append(labels, strings.TrimSpace(s))
+	}
+
+	return &Metadata{
+		Name:   templateData.Name,
+		Labels: labels,
+	}, nil
 }
 
 // ExtractContents returns the template contents without the YAML front-matter
