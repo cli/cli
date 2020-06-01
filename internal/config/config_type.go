@@ -191,34 +191,57 @@ func (c *fileConfig) Write() error {
 }
 
 func (c *fileConfig) Aliases() (*AliasConfig, error) {
+	// The complexity here is for dealing with either a missing or empty aliases key. It's something
+	// we'll likely want for other config sections at some point.
 	entry, err := c.FindEntry("aliases")
 	var nfe *NotFoundError
-	if err != nil && errors.As(err, &nfe) {
-		// TODO does this make sense at all? want to simulate existing but empty key.
-		return &AliasConfig{Parent: c}, nil
-	}
-
-	aliasConfig, err := c.parseAliasConfig(entry.ValueNode)
-	if err != nil {
+	notFound := errors.As(err, &nfe)
+	if err != nil && !notFound {
 		return nil, err
 	}
 
-	return aliasConfig, nil
-}
+	toInsert := []*yaml.Node{}
 
-func (c *fileConfig) parseAliasConfig(aliasesEntry *yaml.Node) (*AliasConfig, error) {
-	if aliasesEntry.Kind != yaml.MappingNode {
-		return &AliasConfig{
-			Parent: c,
-		}, nil
+	keyNode := entry.KeyNode
+	valueNode := entry.ValueNode
+
+	if keyNode == nil {
+		keyNode = &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: "aliases",
+		}
+		toInsert = append(toInsert, keyNode)
 	}
 
-	aliasConfig := AliasConfig{
+	if valueNode == nil || valueNode.Kind != yaml.MappingNode {
+		valueNode = &yaml.Node{
+			Kind:  yaml.MappingNode,
+			Value: "",
+		}
+		toInsert = append(toInsert, valueNode)
+	}
+
+	if len(toInsert) > 0 {
+		newContent := []*yaml.Node{}
+		if notFound {
+			newContent = append(c.Root().Content, keyNode, valueNode)
+		} else {
+			for i := 0; i < len(c.Root().Content); i++ {
+				if i == entry.Index {
+					newContent = append(newContent, keyNode, valueNode)
+					i++
+				} else {
+					newContent = append(newContent, c.Root().Content[i])
+				}
+			}
+		}
+		c.Root().Content = newContent
+	}
+
+	return &AliasConfig{
 		Parent:    c,
-		ConfigMap: ConfigMap{Root: aliasesEntry},
-	}
-
-	return &aliasConfig, nil
+		ConfigMap: ConfigMap{Root: valueNode},
+	}, nil
 }
 
 func (c *fileConfig) Hosts() ([]*HostConfig, error) {
