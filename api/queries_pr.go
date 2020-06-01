@@ -31,11 +31,16 @@ type PullRequestReviewInput struct {
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
-	CurrentPR       *PullRequest
+	CurrentPR       *PullRequestComplex
 	DefaultBranch   string
 }
 
 type PullRequestAndTotalCount struct {
+	TotalCount   int
+	PullRequests []PullRequestComplex
+}
+
+type LegacyPullRequestAndTotalCount struct {
 	TotalCount   int
 	PullRequests []PullRequest
 }
@@ -291,108 +296,32 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (string
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
-	type edges struct {
-		TotalCount int
-		Edges      []struct {
-			Node PullRequest
-		}
-	}
+	var query struct {
+		ViewerCreated struct {
+			TotalCount int `graphql:issueCount`
+			Edges      []struct {
+				Node PullRequestComplex
+			}
+		} `grahql:"search(query: $viewerQuery, type: ISSUE, first: $per_page)"`
 
-	type response struct {
+		ReviewRequested struct {
+			TotalCount int `graphql:issueCount`
+			Edges      []struct {
+				Node PullRequestComplex
+			}
+		} `graphql:search(query: $reviewerQuery, type: ISSUE, first: $per_page)`
+
 		Repository struct {
-			DefaultBranchRef struct {
-				Name string
-			}
-			PullRequests edges
-			PullRequest  *PullRequest
-		}
-		ViewerCreated   edges
-		ReviewRequested edges
-	}
-
-	fragments := `
-	fragment pr on PullRequest {
-		number
-		title
-		state
-		url
-		headRefName
-		headRepositoryOwner {
-			login
-		}
-		isCrossRepository
-		isDraft
-		commits(last: 1) {
-			nodes {
-				commit {
-					statusCheckRollup {
-						contexts(last: 100) {
-							nodes {
-								...on StatusContext {
-									state
-								}
-								...on CheckRun {
-									status
-									conclusion
-								}
-							}
-						}
-					}
+			DefaultBranchRef struct{ Name string }
+			PullRequests     struct {
+				TotalCount int
+				Edges      []struct {
+					Node PullRequestComplex
 				}
-			}
-		}
+			} `graphql:"pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) @skip(if: $number)"`
+			PullRequest PullRequestComplex `graphql:"pullRequest(number: $number) @include(if: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
-	fragment prWithReviews on PullRequest {
-		...pr
-		reviewDecision
-	}
-	`
-
-	queryPrefix := `
-	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { name }
-			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
-				totalCount
-				edges {
-					node {
-						...prWithReviews
-					}
-				}
-			}
-		}
-	`
-	if currentPRNumber > 0 {
-		queryPrefix = `
-		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { name }
-				pullRequest(number: $number) {
-					...prWithReviews
-				}
-			}
-		`
-	}
-
-	query := fragments + queryPrefix + `
-      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-       totalCount: issueCount
-        edges {
-          node {
-            ...prWithReviews
-          }
-        }
-      }
-      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-        totalCount: issueCount
-        edges {
-          node {
-            ...pr
-          }
-        }
-      }
-    }
-	`
 
 	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s state:open review-requested:%s", ghrepo.FullName(repo), currentUsername)
@@ -411,27 +340,27 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		"number":        currentPRNumber,
 	}
 
-	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), &query, variables)
 	if err != nil {
 		return nil, err
 	}
 
-	var viewerCreated []PullRequest
-	for _, edge := range resp.ViewerCreated.Edges {
+	var viewerCreated []PullRequestComplex
+	for _, edge := range query.ViewerCreated.Edges {
 		viewerCreated = append(viewerCreated, edge.Node)
 	}
 
-	var reviewRequested []PullRequest
-	for _, edge := range resp.ReviewRequested.Edges {
+	var reviewRequested []PullRequestComplex
+	for _, edge := range query.ReviewRequested.Edges {
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPR = resp.Repository.PullRequest
-	if currentPR == nil {
-		for _, edge := range resp.Repository.PullRequests.Edges {
+	var currentPR = query.Repository.PullRequest
+	if currentPR.ID != "" {
+		for _, edge := range query.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = &edge.Node
+				currentPR = edge.Node
 				break // Take the most recent PR for the current branch
 			}
 		}
@@ -440,14 +369,14 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	payload := PullRequestsPayload{
 		ViewerCreated: PullRequestAndTotalCount{
 			PullRequests: viewerCreated,
-			TotalCount:   resp.ViewerCreated.TotalCount,
+			TotalCount:   query.ViewerCreated.TotalCount,
 		},
 		ReviewRequested: PullRequestAndTotalCount{
 			PullRequests: reviewRequested,
-			TotalCount:   resp.ReviewRequested.TotalCount,
+			TotalCount:   query.ReviewRequested.TotalCount,
 		},
-		CurrentPR:     currentPR,
-		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
+		CurrentPR:     &currentPR,
+		DefaultBranch: query.Repository.DefaultBranchRef.Name,
 	}
 
 	return &payload, nil
@@ -794,7 +723,7 @@ func AddReview(client *Client, pr PullRequestComplex, input *PullRequestReviewIn
 	return v4.Mutate(context.Background(), &mutation, gqlInput, nil)
 }
 
-func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
+func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*LegacyPullRequestAndTotalCount, error) {
 	type prBlock struct {
 		Edges []struct {
 			Node PullRequest
@@ -867,7 +796,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 	var prs []PullRequest
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{}
-	res := PullRequestAndTotalCount{}
+	res := LegacyPullRequestAndTotalCount{}
 
 	// If assignee was specified, use the `search` API rather than
 	// `Repository.pullRequests`, but this mode doesn't support multiple labels

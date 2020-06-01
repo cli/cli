@@ -255,7 +255,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, colorFuncForPR(pr))
+		table.AddField(prNum, nil, legacyColorFuncForPR(pr))
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		table.EndRow()
@@ -276,14 +276,6 @@ func prStateTitleWithColorXXX(pr api.PullRequestComplex) string {
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func prStateTitleWithColor(pr api.PullRequest) string {
-	prStateColorFunc := colorFuncForPR(pr)
-	if pr.State == "OPEN" && pr.IsDraft {
-		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
-	}
-	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
-}
-
 func colorFuncForPRXXX(pr api.PullRequestComplex) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
@@ -291,7 +283,7 @@ func colorFuncForPRXXX(pr api.PullRequestComplex) func(string) string {
 	return colorFuncForState(pr.State)
 }
 
-func colorFuncForPR(pr api.PullRequest) func(string) string {
+func legacyColorFuncForPR(pr api.PullRequest) func(string) string {
 	if pr.State == "OPEN" && pr.IsDraft {
 		return utils.Gray
 	}
@@ -972,71 +964,6 @@ func printPrsXXX(w io.Writer, totalCount int, prs ...api.PullRequestComplex) {
 			}
 		} else {
 			fmt.Fprintf(w, " - %s", prStateTitleWithColorXXX(pr))
-		}
-
-		fmt.Fprint(w, "\n")
-	}
-	remaining := totalCount - len(prs)
-	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
-	}
-}
-
-func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
-	for _, pr := range prs {
-		prNumber := fmt.Sprintf("#%d", pr.Number)
-
-		prStateColorFunc := utils.Green
-		if pr.IsDraft {
-			prStateColorFunc = utils.Gray
-		} else if pr.State == "MERGED" {
-			prStateColorFunc = utils.Magenta
-		} else if pr.State == "CLOSED" {
-			prStateColorFunc = utils.Red
-		}
-
-		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
-
-		checks := pr.ChecksStatus()
-		reviews := pr.ReviewStatus()
-
-		if pr.State == "OPEN" {
-			reviewStatus := reviews.ChangesRequested || reviews.Approved || reviews.ReviewRequired
-			if checks.Total > 0 || reviewStatus {
-				// show checks & reviews on their own line
-				fmt.Fprintf(w, "\n  ")
-			}
-
-			if checks.Total > 0 {
-				var summary string
-				if checks.Failing > 0 {
-					if checks.Failing == checks.Total {
-						summary = utils.Red("× All checks failing")
-					} else {
-						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
-					}
-				} else if checks.Pending > 0 {
-					summary = utils.Yellow("- Checks pending")
-				} else if checks.Passing == checks.Total {
-					summary = utils.Green("✓ Checks passing")
-				}
-				fmt.Fprint(w, summary)
-			}
-
-			if checks.Total > 0 && reviewStatus {
-				// add padding between checks & reviews
-				fmt.Fprint(w, " ")
-			}
-
-			if reviews.ChangesRequested {
-				fmt.Fprint(w, utils.Red("+ Changes requested"))
-			} else if reviews.ReviewRequired {
-				fmt.Fprint(w, utils.Yellow("- Review required"))
-			} else if reviews.Approved {
-				fmt.Fprint(w, utils.Green("✓ Approved"))
-			}
-		} else {
-			fmt.Fprintf(w, " - %s", prStateTitleWithColor(pr))
 		}
 
 		fmt.Fprint(w, "\n")
