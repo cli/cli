@@ -209,13 +209,13 @@ func (pr *PullRequestComplex) ChecksStatus() (summary PullRequestChecksStatus) {
 	}
 	commit := pr.Commits.Nodes[0].Commit
 	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
-		state := c.State // StatusContext
+		state := c.StatusContext.State
 		if state == "" {
 			// CheckRun
-			if c.Status == "COMPLETED" {
-				state = c.Conclusion
+			if c.CheckRun.Status == "COMPLETED" {
+				state = c.CheckRun.Conclusion
 			} else {
-				state = c.Status
+				state = c.CheckRun.Status
 			}
 		}
 		switch state {
@@ -298,14 +298,14 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (string
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
 	var query struct {
 		ViewerCreated struct {
-			TotalCount int `graphql:issueCount`
+			TotalCount int `graphql:"issueCount"`
 			Edges      []struct {
 				Node PullRequestComplex
 			}
-		} `grahql:"search(query: $viewerQuery, type: ISSUE, first: $per_page)"`
+		} `graphql:"search(query: $viewerQuery, type: ISSUE, first: $per_page)"`
 
 		ReviewRequested struct {
-			TotalCount int `graphql:issueCount`
+			TotalCount int `graphql:"issueCount"`
 			Edges      []struct {
 				Node PullRequestComplex
 			}
@@ -314,7 +314,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		Repository struct {
 			DefaultBranchRef struct{ Name string }
 			PullRequests     struct {
-				TotalCount int
+				TotalCount int `graphql:"issueCount"`
 				Edges      []struct {
 					Node PullRequestComplex
 				}
@@ -332,12 +332,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	variables := map[string]interface{}{
-		"viewerQuery":   viewerQuery,
-		"reviewerQuery": reviewerQuery,
-		"owner":         repo.RepoOwner(),
-		"repo":          repo.RepoName(),
-		"headRefName":   branchWithoutOwner,
-		"number":        currentPRNumber,
+		"viewerQuery":   graphql.String(viewerQuery),
+		"reviewerQuery": graphql.String(reviewerQuery),
+		"owner":         graphql.String(repo.RepoOwner()),
+		"repo":          graphql.String(repo.RepoName()),
+		"headRefName":   graphql.String(branchWithoutOwner),
+		"number":        graphql.Int(currentPRNumber),
 	}
 
 	v4 := githubv4.NewClient(client.http)
@@ -423,9 +423,13 @@ type PullRequestComplex struct {
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
-							State      string
-							Status     string
-							Conclusion string
+							StatusContext struct {
+								State string
+							} `graphql:"... on StatusContext"`
+							CheckRun struct {
+								Status     string
+								Conclusion string
+							} `graphql:"... on CheckRun"`
 						}
 					}
 				}
