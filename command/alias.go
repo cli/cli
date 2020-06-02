@@ -21,10 +21,10 @@ var aliasCmd = &cobra.Command{
 
 var aliasSetCmd = &cobra.Command{
 	Use: "set <alias> <expansion>",
-	// TODO HACK: even when inside of a single-quoted string, cobra was noticing and parsing any flags
+	// NB: Even when inside of a single-quoted string, cobra was noticing and parsing any flags
 	// used in an alias expansion string argument. Since this command needs no flags, I disabled their
-	// parsing. If we ever want to add flags to alias set we'll have to figure this out. I haven't
-	// checked if this is fixed in a new cobra.
+	// parsing. If we ever want to add flags to alias set we'll have to figure this out. I tested on
+	// linux in various shells against cobra 1.0; others on macos did /not/ see the same behavior.
 	DisableFlagParsing: true,
 	Short:              "Create a shortcut for a gh command",
 	Long: `
