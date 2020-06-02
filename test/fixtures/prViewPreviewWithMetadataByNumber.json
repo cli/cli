@@ -11,15 +11,15 @@
           "login": "nobody"
         },
         "reviewRequests": {
-            "nodes": [
-                {
-                    "requestedReviewer": {
-                        "__typename": "User",
-                        "login": "1"
-                    }
-                }
-            ],
-            "totalcount": 1
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "User",
+                "login": "1"
+              }
+            }
+          ],
+          "totalcount": 1
         },
         "reviews": {
           "nodes": [
@@ -74,7 +74,7 @@
           ],
           "totalcount": 5
         },
-        "projectcards": {
+        "projectCards": {
           "nodes": [
             {
               "project": {

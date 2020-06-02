@@ -22,7 +22,7 @@
               "nodes": [],
               "totalcount": 0
             },
-            "projectcards": {
+            "projectCards": {
               "nodes": [],
               "totalcount": 0
             },
@@ -78,7 +78,7 @@
               ],
               "totalcount": 5
             },
-            "projectcards": {
+            "projectCards": {
               "nodes": [
                 {
                   "project": {

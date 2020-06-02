@@ -7,7 +7,7 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 3,
+      "issueCount": 3,
       "edges": [
         {
           "node": {
@@ -102,7 +102,7 @@
       ]
     },
     "reviewRequested": {
-      "totalCount": 0,
+      "issueCount": 0,
       "edges": []
     }
   }
