@@ -12,19 +12,19 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 		"statusCheckRollup": {
 			"contexts": {
 				"nodes": [
-					{ "state": "SUCCESS" },
-					{ "state": "PENDING" },
-					{ "state": "FAILURE" },
-					{ "status": "IN_PROGRESS",
-					  "conclusion": null },
-					{ "status": "COMPLETED",
-					  "conclusion": "SUCCESS" },
-					{ "status": "COMPLETED",
-					  "conclusion": "FAILURE" },
-					{ "status": "COMPLETED",
-					  "conclusion": "ACTION_REQUIRED" },
-					{ "status": "COMPLETED",
-					  "conclusion": "STALE" }
+					{ "StatusContext": {"state": "SUCCESS"} },
+					{ "StatusContext": {"state": "PENDING"} },
+					{ "StatusContext": {"state": "FAILURE"} },
+					{ "CheckRun": { "status": "IN_PROGRESS",
+					  "conclusion": null }},
+					{ "CheckRun": { "status": "COMPLETED",
+					  "conclusion": "SUCCESS" }},
+					{ "CheckRun": { "status": "COMPLETED",
+					  "conclusion": "FAILURE" }},
+					{ "CheckRun": { "status": "COMPLETED",
+					  "conclusion": "ACTION_REQUIRED" }},
+					{ "CheckRun": { "status": "COMPLETED",
+					  "conclusion": "STALE" }}
 				]
 			}
 		}

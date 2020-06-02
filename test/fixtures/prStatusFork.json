@@ -22,11 +22,11 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 0,
+      "issueCount": 0,
       "edges": []
     },
     "reviewRequested": {
-      "totalCount": 0,
+      "issueCount": 0,
       "edges": []
     }
   }
