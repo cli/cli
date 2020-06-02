@@ -502,7 +502,7 @@ type PullRequestComplex struct {
 	} `graphql:"reviews(last: 100)"`
 }
 
-type PullRequestMergable struct {
+type PullRequestComplexWithMergable struct {
 	PullRequestComplex
 
 	Mergeable string
@@ -943,7 +943,7 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr PullRequestMini
 	return err
 }
 
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr PullRequestMergable, m PullRequestMergeMethod) error {
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr PullRequestComplexWithMergable, m PullRequestMergeMethod) error {
 	mergeMethod := githubv4.PullRequestMergeMethodMerge
 	switch m {
 	case PullRequestMergeMethodRebase:
