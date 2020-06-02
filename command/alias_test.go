@@ -200,6 +200,7 @@ aliases:
 		{"gh ia vilmibm", []string{"issue", "list", `--author=vilmibm`, `--assignee=vilmibm`}, ""},
 		{"gh ia $coolmoney$", []string{"issue", "list", `--author=$coolmoney$`, `--assignee=$coolmoney$`}, ""},
 		{"gh pr status", []string{"pr", "status"}, ""},
+		{"gh il vilmibm epic -R vilmibm/testing", []string{"issue", "list", "--author=vilmibm", "--label=epic", "-R", "vilmibm/testing"}, ""},
 		{"gh dne", []string{"dne"}, ""},
 		{"gh", []string{}, ""},
 		{"", []string{}, ""},

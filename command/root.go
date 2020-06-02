@@ -482,10 +482,11 @@ func ExpandAlias(args []string) ([]string, error) {
 	}
 
 	if aliases.Exists(args[1]) {
+		extraArgs  := []string{}
 		expansion := aliases.Get(args[1])
 		for i, a := range args[2:] {
 			if !strings.Contains(expansion, "$") {
-				expansion += " " + a
+				extraArgs = append(extraArgs, a)
 			} else {
 				expansion = strings.ReplaceAll(expansion, fmt.Sprintf("$%d", i+1), a)
 			}
@@ -494,7 +495,15 @@ func ExpandAlias(args []string) ([]string, error) {
 		if lingeringRE.MatchString(expansion) {
 			return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
 		}
-		return shlex.Split(expansion)
+
+		newArgs, err := shlex.Split(expansion)
+		if err != nil {
+			return nil, err
+		}
+
+		newArgs = append(newArgs, extraArgs...)
+
+		return newArgs, nil
 	}
 
 	return args[1:], nil
