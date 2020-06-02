@@ -300,26 +300,30 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ViewerCreated struct {
 			TotalCount int `graphql:"issueCount"`
 			Edges      []struct {
-				Node PullRequestComplex
+				Node struct {
+					PullRequest PullRequestComplex `graphql:"...on PullRequest"`
+				}
 			}
-		} `graphql:"search(query: $viewerQuery, type: ISSUE, first: $per_page)"`
+		} `graphql:"viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $perPage)"`
 
 		ReviewRequested struct {
 			TotalCount int `graphql:"issueCount"`
 			Edges      []struct {
-				Node PullRequestComplex
+				Node struct {
+					PullRequest PullRequestComplex `graphql:"...on PullRequest"`
+				}
 			}
-		} `graphql:search(query: $reviewerQuery, type: ISSUE, first: $per_page)`
+		} `graphql:"reviewReqeusted: search(query: $reviewerQuery, type: ISSUE, first: $perPage)"`
 
 		Repository struct {
 			DefaultBranchRef struct{ Name string }
 			PullRequests     struct {
-				TotalCount int `graphql:"issueCount"`
+				TotalCount int
 				Edges      []struct {
 					Node PullRequestComplex
 				}
-			} `graphql:"pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) @skip(if: $number)"`
-			PullRequest PullRequestComplex `graphql:"pullRequest(number: $number) @include(if: $number)"`
+			} `graphql:"pullRequests(headRefName: $headRefName, first: $perPage, orderBy: { field: CREATED_AT, direction: DESC }) @skip(if: $singlePRSearch)"`
+			PullRequest PullRequestComplex `graphql:"pullRequest(number: $number) @include(if: $singlePRSearch)"`
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
@@ -332,12 +336,14 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	variables := map[string]interface{}{
-		"viewerQuery":   graphql.String(viewerQuery),
-		"reviewerQuery": graphql.String(reviewerQuery),
-		"owner":         graphql.String(repo.RepoOwner()),
-		"repo":          graphql.String(repo.RepoName()),
-		"headRefName":   graphql.String(branchWithoutOwner),
-		"number":        graphql.Int(currentPRNumber),
+		"viewerQuery":    graphql.String(viewerQuery),
+		"reviewerQuery":  graphql.String(reviewerQuery),
+		"owner":          graphql.String(repo.RepoOwner()),
+		"repo":           graphql.String(repo.RepoName()),
+		"headRefName":    graphql.String(branchWithoutOwner),
+		"number":         graphql.Int(currentPRNumber),
+		"singlePRSearch": graphql.Boolean(currentPRNumber != 0),
+		"perPage":        graphql.Int(10),
 	}
 
 	v4 := githubv4.NewClient(client.http)
@@ -348,12 +354,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 
 	var viewerCreated []PullRequestComplex
 	for _, edge := range query.ViewerCreated.Edges {
-		viewerCreated = append(viewerCreated, edge.Node)
+		viewerCreated = append(viewerCreated, edge.Node.PullRequest)
 	}
 
 	var reviewRequested []PullRequestComplex
 	for _, edge := range query.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, edge.Node)
+		reviewRequested = append(reviewRequested, edge.Node.PullRequest)
 	}
 
 	var currentPR = query.Repository.PullRequest
@@ -431,11 +437,11 @@ type PullRequestComplex struct {
 								Conclusion string
 							} `graphql:"... on CheckRun"`
 						}
-					}
+					} `graphql:"contexts(last: 100)"`
 				}
 			}
 		}
-	}
+	} `graphql:"commits(last: 1)"`
 
 	ReviewRequests struct {
 		Nodes []struct {
@@ -476,7 +482,7 @@ type PullRequestComplex struct {
 			}
 		}
 		TotalCount int
-	} `graphql:"projectcards(first: 100)"`
+	} `graphql:"projectCards(first: 100)"`
 
 	Milestone struct {
 		Title string
