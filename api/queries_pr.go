@@ -313,7 +313,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 					PullRequest PullRequestComplex `graphql:"...on PullRequest"`
 				}
 			}
-		} `graphql:"reviewReqeusted: search(query: $reviewerQuery, type: ISSUE, first: $perPage)"`
+		} `graphql:"reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $perPage)"`
 
 		Repository struct {
 			DefaultBranchRef struct{ Name string }

@@ -22,7 +22,7 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 1,
+      "issueCount": 1,
       "edges": [
         {
           "node": {
@@ -37,7 +37,7 @@
       ]
     },
     "reviewRequested": {
-      "totalCount": 2,
+      "issueCount": 2,
       "edges": [
         {
           "node": {
@@ -47,7 +47,9 @@
             "url": "https://github.com/cli/cli/pull/9",
             "headRefName": "apples",
             "isDraft": false
-          } }, {
+          }
+        },
+        {
           "node": {
             "number": 11,
             "title": "Figs are my favorite",
