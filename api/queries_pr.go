@@ -362,11 +362,15 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		reviewRequested = append(reviewRequested, edge.Node.PullRequest)
 	}
 
-	var currentPR = query.Repository.PullRequest
-	if currentPR.ID != "" {
+	var currentPR *PullRequestComplex
+
+	// Since query.Repository.PullRequest will never be nil, check instead for an empty ID
+	if query.Repository.PullRequest.ID != "" {
+		currentPR = &query.Repository.PullRequest
+	} else {
 		for _, edge := range query.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = edge.Node
+				currentPR = &edge.Node
 				break // Take the most recent PR for the current branch
 			}
 		}
@@ -381,7 +385,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   query.ReviewRequested.TotalCount,
 		},
-		CurrentPR:     &currentPR,
+		CurrentPR:     currentPR,
 		DefaultBranch: query.Repository.DefaultBranchRef.Name,
 	}
 

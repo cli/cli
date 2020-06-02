@@ -138,6 +138,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 
 	printHeader(out, "Current branch")
 	currentPR := prPayload.CurrentPR
+
 	currentBranch, _ := ctx.Branch()
 	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
 		currentPR = nil
