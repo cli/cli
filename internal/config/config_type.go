@@ -8,7 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const defaultHostname = "github.com"
 const defaultGitProtocol = "https"
 
 // This interface describes interacting with some persistent configuration for gh.
