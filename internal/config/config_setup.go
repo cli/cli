@@ -110,6 +110,8 @@ func setupConfigFile(filename string) (Config, error) {
 		return nil, err
 	}
 
+	AuthFlowComplete()
+
 	// TODO cleaner error handling? this "should" always work given that we /just/ wrote the file...
 	return ParseConfig(filename)
 }
