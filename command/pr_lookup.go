@@ -39,7 +39,7 @@ func prFromArgs(ctx context.Context, apiClient *api.Client, repo ghrepo.Interfac
 	}
 
 	// Last see if it is a branch name
-	found, err = api.PullRequestForBranchXXX(apiClient, repo, "", prString, pr)
+	found, err = api.PullRequestForBranch(apiClient, repo, "", prString, pr)
 	if err != nil {
 		return err
 	} else if !found {
@@ -51,7 +51,7 @@ func prFromArgs(ctx context.Context, apiClient *api.Client, repo ghrepo.Interfac
 
 func prFromNumberString(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string, pr interface{}) (bool, error) {
 	if prNumber, err := strconv.Atoi(strings.TrimPrefix(s, "#")); err == nil {
-		return api.PullRequestByNumberXXX(apiClient, repo, prNumber, pr)
+		return api.PullRequestByNumber(apiClient, repo, prNumber, pr)
 	}
 
 	return false, nil
@@ -108,5 +108,5 @@ func prForCurrentBranch(ctx context.Context, apiClient *api.Client, repo ghrepo.
 		}
 	}
 
-	return api.PullRequestForBranchXXX(apiClient, repo, "", prHeadRef, pr)
+	return api.PullRequestForBranch(apiClient, repo, "", prHeadRef, pr)
 }

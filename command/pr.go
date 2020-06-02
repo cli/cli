@@ -335,7 +335,7 @@ func prView(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	} else {
 		out := colorableOut(cmd)
-		return printPrPreviewXXX(out, pr)
+		return printPrPreview(out, pr)
 	}
 }
 
@@ -606,7 +606,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
-func printPrPreviewXXX(out io.Writer, pr api.PullRequestComplex) error {
+func printPrPreview(out io.Writer, pr api.PullRequestComplex) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", prStateTitleWithColor(pr))

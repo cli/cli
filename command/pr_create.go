@@ -182,7 +182,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
 		}
 		existingPR := api.PullRequestMinimal{}
-		found, err := api.PullRequestForBranchXXX(client, baseRepo, baseBranch, headBranchLabel, &existingPR)
+		found, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel, &existingPR)
 		if err != nil {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
 		}

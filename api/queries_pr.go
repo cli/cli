@@ -508,7 +508,7 @@ type PullRequestComplexWithMergable struct {
 	Mergeable string
 }
 
-func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, pr interface{}) (bool, error) {
+func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int, pr interface{}) (bool, error) {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
 			Name: "Repository",
@@ -541,7 +541,7 @@ func PullRequestByNumberXXX(client *Client, repo ghrepo.Interface, number int, p
 	return true, nil
 }
 
-func PullRequestForBranchXXX(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, pr interface{}) (bool, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, pr interface{}) (bool, error) {
 	query := reflect.New(reflect.StructOf([]reflect.StructField{
 		{
 			Name: "Repository",
