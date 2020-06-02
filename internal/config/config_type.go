@@ -12,7 +12,6 @@ const defaultGitProtocol = "https"
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
-	Root() *yaml.Node
 	Hosts() ([]*HostConfig, error)
 	Get(string, string) (string, error)
 	Set(string, string, string) error
