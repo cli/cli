@@ -336,9 +336,33 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
-func rootHelpFunc(command *cobra.Command, s []string) {
+func rootHelpFunc(command *cobra.Command, args []string) {
 	if command != RootCmd {
-		cobraDefaultHelpFunc(command, s)
+		// Display helpful error message in case subcommand name was mistyped.
+		// This matches Cobra's behavior for root command, which Cobra
+		// confusingly doesn't apply to nested commands.
+		if command.Parent() == RootCmd && len(args) >= 2 {
+			if command.SuggestionsMinimumDistance <= 0 {
+				command.SuggestionsMinimumDistance = 2
+			}
+			candidates := command.SuggestionsFor(args[1])
+
+			errOut := command.OutOrStderr()
+			fmt.Fprintf(errOut, "unknown command %q for %q\n", args[1], "gh "+args[0])
+
+			if len(candidates) > 0 {
+				fmt.Fprint(errOut, "\nDid you mean this?\n")
+				for _, c := range candidates {
+					fmt.Fprintf(errOut, "\t%s\n", c)
+				}
+				fmt.Fprint(errOut, "\n")
+			}
+
+			oldOut := command.OutOrStdout()
+			command.SetOut(errOut)
+			defer command.SetOut(oldOut)
+		}
+		cobraDefaultHelpFunc(command, args)
 		return
 	}
 

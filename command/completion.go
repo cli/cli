@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/internal/cobrafish"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +57,7 @@ Homebrew, see <https://docs.brew.sh/Shell-Completion>
 		case "powershell":
 			return RootCmd.GenPowerShellCompletion(cmd.OutOrStdout())
 		case "fish":
-			return cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
+			return RootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
 		default:
 			return fmt.Errorf("unsupported shell type %q", shellType)
 		}
