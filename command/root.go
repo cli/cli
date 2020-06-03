@@ -482,7 +482,7 @@ func ExpandAlias(args []string) ([]string, error) {
 	}
 
 	if aliases.Exists(args[1]) {
-		extraArgs  := []string{}
+		extraArgs := []string{}
 		expansion := aliases.Get(args[1])
 		for i, a := range args[2:] {
 			if !strings.Contains(expansion, "$") {
