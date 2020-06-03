@@ -15,6 +15,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
@@ -430,11 +431,6 @@ func TestRepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
-			name: "shorthand without username",
-			args: "repo clone REPO",
-			want: "git clone https://github.com/OWNER/REPO.git",
-		},
-		{
 			name: "shorthand with directory",
 			args: "repo clone OWNER/REPO target_directory",
 			want: "git clone https://github.com/OWNER/REPO.git target_directory",
@@ -462,11 +458,6 @@ func TestRepoClone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.NewBlank()
-			ctx.SetAuthLogin("OWNER")
-			initContext = func() context.Context {
-				return ctx
-			}
 			http := initFakeHTTP()
 			http.StubResponse(200, bytes.NewBufferString(`
 			{ "data": { "repository": {
@@ -516,6 +507,36 @@ func TestRepoClone_hasParent(t *testing.T) {
 
 	eq(t, cs.Count, 2)
 	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/hubot/ORIG.git")
+}
+
+func TestRepo_withoutUsername(t *testing.T) {
+	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": {
+			"login": "OWNER"
+		}}}`))
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": {
+		"parent": null
+	} } }
+	`))
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+
+	output, err := RunCommand("repo clone REPO")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "")
+	eq(t, cs.Count, 1)
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/OWNER/REPO.git")
 }
 
 func TestRepoCreate(t *testing.T) {

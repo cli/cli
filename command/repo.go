@@ -125,16 +125,20 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func repoClone(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
 		if !strings.Contains(cloneURL, "/") {
-			ctx := contextForCommand(cmd)
-			currentUsername, err := ctx.AuthLogin()
+			currentUser, err := api.CurrentLoginName(apiClient)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("currentUesrname: %s\n", currentUsername)
-			cloneURL = currentUsername + "/" + cloneURL
+			cloneURL = currentUser + "/" + cloneURL
 		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
@@ -149,12 +153,6 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if repo != nil {
-		ctx := contextForCommand(cmd)
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-
 		parentRepo, err = api.RepoParent(apiClient, repo)
 		if err != nil {
 			return err
