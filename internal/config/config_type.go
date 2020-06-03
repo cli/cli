@@ -185,8 +185,8 @@ func (c *fileConfig) Write() error {
 		return err
 	}
 
-	fn := ConfigFile()
-	err = WriteConfigFile(fn, yamlNormalize(mainBytes))
+	filename := ConfigFile()
+	err = WriteConfigFile(filename, yamlNormalize(mainBytes))
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func (c *fileConfig) Write() error {
 		return err
 	}
 
-	return WriteConfigFile(hostsConfigFile(fn), yamlNormalize(hostsBytes))
+	return WriteConfigFile(hostsConfigFile(filename), yamlNormalize(hostsBytes))
 }
 
 func yamlNormalize(b []byte) []byte {
