@@ -10,28 +10,36 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/spf13/cobra"
 )
 
-func prFromArgs(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, args []string) (*api.PullRequest, error) {
-	if len(args) == 0 {
-		return prForCurrentBranch(ctx, apiClient, repo)
+func prFromArgs(ctx context.Context, apiClient *api.Client, cmd *cobra.Command, args []string) (*api.PullRequest, ghrepo.Interface, error) {
+	repo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	// First check to see if the prString is a url
+	if len(args) == 0 {
+		pr, err := prForCurrentBranch(ctx, apiClient, repo)
+		return pr, repo, err
+	}
+
+	// First check to see if the prString is a url, return repo from url if found
 	prString := args[0]
-	pr, err := prFromURL(ctx, apiClient, repo, prString)
+	pr, r, err := prFromURL(ctx, apiClient, prString)
 	if pr != nil || err != nil {
-		return pr, err
+		return pr, r, err
 	}
 
 	// Next see if the prString is a number and use that to look up the url
 	pr, err = prFromNumberString(ctx, apiClient, repo, prString)
 	if pr != nil || err != nil {
-		return pr, err
+		return pr, repo, err
 	}
 
 	// Last see if it is a branch name
-	return api.PullRequestForBranch(apiClient, repo, "", prString)
+	pr, err = api.PullRequestForBranch(apiClient, repo, "", prString)
+	return pr, repo, err
 }
 
 func prFromNumberString(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
@@ -42,14 +50,16 @@ func prFromNumberString(ctx context.Context, apiClient *api.Client, repo ghrepo.
 	return nil, nil
 }
 
-func prFromURL(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
+func prFromURL(ctx context.Context, apiClient *api.Client, s string) (*api.PullRequest, ghrepo.Interface, error) {
 	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
 	if m := r.FindStringSubmatch(s); m != nil {
+		repo := ghrepo.New(m[1], m[2])
 		prNumberString := m[3]
-		return prFromNumberString(ctx, apiClient, repo, prNumberString)
+		pr, err := prFromNumberString(ctx, apiClient, repo, prNumberString)
+		return pr, repo, err
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func prForCurrentBranch(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface) (*api.PullRequest, error) {

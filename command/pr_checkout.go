@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -27,22 +26,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	prString := args[0]
-	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
-	if m := r.FindStringSubmatch(prString); m != nil {
-		prString = m[3]
-		baseRepo = ghrepo.New(m[1], m[2])
-	}
-
-	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(apiClient, cmd, ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, []string{prString})
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}
@@ -61,6 +45,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
+
 	if headRemote != nil {
 		// there is an existing git remote for PR head
 		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)

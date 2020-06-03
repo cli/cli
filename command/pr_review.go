@@ -89,12 +89,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	pr, err := prFromArgs(ctx, apiClient, baseRepo, args)
+	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}

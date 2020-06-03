@@ -76,6 +76,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	http.StubRepoResponse("hubot", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
@@ -125,7 +126,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-
+	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -160,7 +161,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Owner string

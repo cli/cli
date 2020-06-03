@@ -205,9 +205,9 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, pr *PullRequest) (string, error) {
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
-		ghrepo.FullName(baseRepo), pr.Number)
+		ghrepo.FullName(baseRepo), prNumber)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err
