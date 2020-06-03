@@ -27,7 +27,7 @@ var aliasSetCmd = &cobra.Command{
 	// linux in various shells against cobra 1.0; others on macos did /not/ see the same behavior.
 	DisableFlagParsing: true,
 	Short:              "Create a shortcut for a gh command",
-	Long: `This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
+	Long:               `This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
 	Example: `
 	gh alias set pv 'pr view'
 	# gh pv -w 123 -> gh pr view -w 123.
@@ -57,15 +57,17 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	alias := args[0]
 	expansion := processArgs(args[1:])
 
-	out := colorableOut(cmd)
-	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
+	expansionStr := strings.Join(expansion, " ")
 
-	if validCommand(alias) {
+	out := colorableOut(cmd)
+	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansionStr))
+
+	if validCommand([]string{alias}) {
 		return fmt.Errorf("could not create alias: %q is already a gh command", alias)
 	}
 
 	if !validCommand(expansion) {
-		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", utils.Bold(expansion))
+		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", utils.Bold(expansionStr))
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
@@ -75,11 +77,11 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 			utils.Green("✓"),
 			utils.Bold(alias),
 			utils.Bold(aliasCfg.Get(alias)),
-			utils.Bold(expansion),
+			utils.Bold(expansionStr),
 		)
 	}
 
-	err = aliasCfg.Add(alias, expansion)
+	err = aliasCfg.Add(alias, expansionStr)
 	if err != nil {
 		return fmt.Errorf("could not create alias: %s", err)
 	}
@@ -89,16 +91,24 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func validCommand(expansion string) bool {
-	split, _ := shlex.Split(expansion)
-	cmd, _, err := RootCmd.Traverse(split)
+func validCommand(expansion []string) bool {
+	cmd, _, err := RootCmd.Traverse(expansion)
 	return err == nil && cmd != RootCmd
 }
 
-func processArgs(args []string) string {
+func processArgs(args []string) []string {
 	if len(args) == 1 {
-		return args[0]
+		split, _ := shlex.Split(args[0])
+		return split
 	}
 
-	return strings.Join(args, " ")
+	newArgs := []string{}
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") && strings.Contains(a, " ") {
+			a = fmt.Sprintf("%q", a)
+		}
+		newArgs = append(newArgs, a)
+	}
+
+	return newArgs
 }

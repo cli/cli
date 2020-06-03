@@ -75,6 +75,23 @@ aliases:
 	test.ExpectLines(t, output.String(), "Changed alias co from pr checkout to pr checkout -Rcool/repo")
 }
 
+func TestAliasSet_space_args(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	buf := bytes.NewBufferString("")
+	defer config.StubWriteConfig(buf)()
+
+	output, err := RunCommand(`alias set il issue list -l 'cool story'`)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), `Adding alias for il: issue list -l "cool story"`)
+
+	test.ExpectLines(t, buf.String(), `il: issue list -l "cool story"`)
+}
+
 func TestAliasSet_arg_processing(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
 	cases := []struct {
@@ -93,8 +110,8 @@ func TestAliasSet_arg_processing(t *testing.T) {
 			`iy: issue list --author=\$1 --label=\$2`},
 
 		{`alias set ii 'issue list --author="$1" --label="$2"'`,
-			`- Adding alias for ii: issue list --author="\$1" --label="\$2"`,
-			`ii: issue list --author="\$1" --label="\$2"`},
+			`- Adding alias for ii: issue list --author=\$1 --label=\$2`,
+			`ii: issue list --author=\$1 --label=\$2`},
 
 		{`alias set ix issue list --author='$1' --label='$2'`,
 			`- Adding alias for ix: issue list --author=\$1 --label=\$2`,
