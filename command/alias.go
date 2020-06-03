@@ -14,6 +14,7 @@ func init() {
 	RootCmd.AddCommand(aliasCmd)
 	aliasCmd.AddCommand(aliasSetCmd)
 	aliasCmd.AddCommand(aliasListCmd)
+	aliasCmd.AddCommand(aliasDeleteCmd)
 }
 
 var aliasCmd = &cobra.Command{
@@ -23,10 +24,8 @@ var aliasCmd = &cobra.Command{
 
 var aliasSetCmd = &cobra.Command{
 	Use: "set <alias> <expansion>",
-	// NB: Even when inside of a single-quoted string, cobra was noticing and parsing any flags
-	// used in an alias expansion string argument. Since this command needs no flags, I disabled their
-	// parsing. If we ever want to add flags to alias set we'll have to figure this out. I tested on
-	// linux in various shells against cobra 1.0; others on macos did /not/ see the same behavior.
+	// NB: this allows a user to eschew quotes when specifiying an alias expansion. We'll have to
+	// revisit it if we ever want to add flags to alias set but we have no current plans for that.
 	DisableFlagParsing: true,
 	Short:              "Create a shortcut for a gh command",
 	Long:               `This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
@@ -165,4 +164,44 @@ func aliasList(cmd *cobra.Command, args []string) error {
 	}
 
 	return tp.Render()
+}
+
+var aliasDeleteCmd = &cobra.Command{
+	Use:     "delete <alias>",
+	Short:   "Delete an alias.",
+	Args:    cobra.ExactArgs(1),
+	Example: "gh alias delete co",
+	RunE:    aliasDelete,
+}
+
+func aliasDelete(cmd *cobra.Command, args []string) error {
+	alias := args[0]
+
+	ctx := contextForCommand(cmd)
+	cfg, err := ctx.Config()
+	if err != nil {
+		return fmt.Errorf("couldn't read config: %w", err)
+	}
+
+	aliasCfg, err := cfg.Aliases()
+	if err != nil {
+		return fmt.Errorf("couldn't read aliases config: %w", err)
+	}
+
+	if !aliasCfg.Exists(alias) {
+		return fmt.Errorf("no such alias %s", alias)
+	}
+
+	expansion := aliasCfg.Get(alias)
+
+	err = aliasCfg.Delete(alias)
+	if err != nil {
+		return fmt.Errorf("failed to delete alias %s: %w", alias, err)
+	}
+
+	out := colorableOut(cmd)
+	redCheck := utils.Red("✓")
+	fmt.Fprintf(out, "%s Deleted alias %s; was %s\n", redCheck, alias, expansion)
+
+	return nil
 }

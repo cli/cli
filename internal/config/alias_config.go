@@ -39,7 +39,13 @@ func (a *AliasConfig) Add(alias, expansion string) error {
 }
 
 func (a *AliasConfig) Delete(alias string) error {
-	// TODO when we get to gh alias delete
+	a.RemoveEntry(alias)
+
+	err := a.Parent.Write()
+	if err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
 	return nil
 }
 
