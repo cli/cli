@@ -26,7 +26,7 @@ func IsGitHubApp(id string) bool {
 }
 
 func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
-	token, userLogin, err := AuthFlow(hostname, notice)
+	token, userLogin, err := authFlow(hostname, notice)
 	if err != nil {
 		return "", err
 	}
@@ -49,7 +49,7 @@ func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
 	return token, nil
 }
 
-func AuthFlow(oauthHost, notice string) (string, string, error) {
+func authFlow(oauthHost, notice string) (string, string, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
