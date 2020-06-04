@@ -51,6 +51,7 @@ var creditsCmd = &cobra.Command{
 `,
 	Args: cobra.ExactArgs(0),
 	RunE: ghCredits,
+	Annotations: map[string]string{"hidden":"true"},
 }
 
 func ghCredits(cmd *cobra.Command, args []string) error {

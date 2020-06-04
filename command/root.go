@@ -363,9 +363,10 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 			continue
 		}
 		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
+		_, hidden := c.Annotations["hidden"]
 		if includes(coreCommandNames, c.Name()) {
 			coreCommands = append(coreCommands, s)
-		} else if c != creditsCmd {
+		} else if !hidden {
 			additionalCommands = append(additionalCommands, s)
 		}
 	}
