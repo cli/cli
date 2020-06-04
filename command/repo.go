@@ -93,7 +93,7 @@ With '--web', open the repository in a web browser instead.`,
 }
 
 var repoCreditsCmd = &cobra.Command{
-	Use: "credits [repository]",
+	Use:   "credits [repository]",
 	Short: "View credits for a repository",
 	Example: `$ gh repo credits           # view credits for the current repository
 $ gh repo credits cool/repo # view credits for cool/repo
@@ -103,7 +103,7 @@ $ gh repo credits | cat     # pipe to just print the contributors, one per line
 	Args: cobra.MaximumNArgs(1),
 	RunE: repoCredits,
 	// NB will actually be hidden once https://github.com/cli/cli/pull/1106 is in
-	Annotations: map[string]string{"hidden":"true"},
+	Annotations: map[string]string{"hidden": "true"},
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
