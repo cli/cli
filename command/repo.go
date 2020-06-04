@@ -38,6 +38,9 @@ func init() {
 
 	repoCmd.AddCommand(repoViewCmd)
 	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
+
+	repoCmd.AddCommand(repoCreditsCmd)
+	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
 }
 
 var repoCmd = &cobra.Command{
@@ -87,6 +90,18 @@ With no argument, the repository for the current directory is displayed.
 
 With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
+}
+
+var repoCreditsCmd = &cobra.Command{
+	Use: "credits [repository]",
+	Short: "View credits for a repository",
+	Example: `$ gh repo credits           # view credits for the current repository
+$ gh repo credits cool/repo # view credits for cool/repo
+$ gh repo credits -s        # print a non-animated thank you
+$ gh repo credits | cat     # pipe to just print the contributors, one per line
+`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: repoCredits,
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
@@ -586,4 +601,8 @@ func repoView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func repoCredits(cmd *cobra.Command, args []string) error {
+	return credits(cmd, args)
 }
