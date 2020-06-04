@@ -108,7 +108,7 @@ func migrateConfig(filename string) error {
 		return err
 	}
 
-	var hosts map[string][]map[string]string
+	var hosts map[string][]yaml.Node
 	err = yaml.Unmarshal(b, &hosts)
 	if err != nil {
 		return fmt.Errorf("error decoding legacy format: %w", err)
@@ -119,8 +119,9 @@ func migrateConfig(filename string) error {
 		if len(entries) < 1 {
 			continue
 		}
-		for key, value := range entries[0] {
-			if err := cfg.Set(hostname, key, value); err != nil {
+		mapContent := entries[0].Content
+		for i := 0; i < len(mapContent)-1; i += 2 {
+			if err := cfg.Set(hostname, mapContent[i].Value, mapContent[i+1].Value); err != nil {
 				return err
 			}
 		}
