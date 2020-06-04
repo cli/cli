@@ -722,8 +722,6 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 func TestPRView_web_urlArg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
 			"url": "https://github.com/OWNER/REPO/pull/23"

@@ -50,7 +50,6 @@ func TestPRReview_bad_body(t *testing.T) {
 func TestPRReview_url_arg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
 			"id": "foobar123",
@@ -77,7 +76,7 @@ func TestPRReview_url_arg(t *testing.T) {
 
 	test.ExpectLines(t, output.String(), "Approved pull request #123")
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {

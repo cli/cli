@@ -14,32 +14,37 @@ import (
 )
 
 func prFromArgs(ctx context.Context, apiClient *api.Client, cmd *cobra.Command, args []string) (*api.PullRequest, ghrepo.Interface, error) {
+	if len(args) == 1 {
+		// First check to see if the prString is a url, return repo from url if found. This
+		// is run first because we don't need to run determineBaseRepo for this path
+		prString := args[0]
+		pr, r, err := prFromURL(ctx, apiClient, prString)
+		if pr != nil || err != nil {
+			return pr, r, err
+		}
+	}
+
 	repo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 	}
 
+	// If there are no args see if we can guess the PR from the current branch
 	if len(args) == 0 {
 		pr, err := prForCurrentBranch(ctx, apiClient, repo)
 		return pr, repo, err
-	}
+	} else {
+		prString := args[0]
+		// Next see if the prString is a number and use that to look up the url
+		pr, err := prFromNumberString(ctx, apiClient, repo, prString)
+		if pr != nil || err != nil {
+			return pr, repo, err
+		}
 
-	// First check to see if the prString is a url, return repo from url if found
-	prString := args[0]
-	pr, r, err := prFromURL(ctx, apiClient, prString)
-	if pr != nil || err != nil {
-		return pr, r, err
-	}
-
-	// Next see if the prString is a number and use that to look up the url
-	pr, err = prFromNumberString(ctx, apiClient, repo, prString)
-	if pr != nil || err != nil {
+		// Last see if it is a branch name
+		pr, err = api.PullRequestForBranch(apiClient, repo, "", prString)
 		return pr, repo, err
 	}
-
-	// Last see if it is a branch name
-	pr, err = api.PullRequestForBranch(apiClient, repo, "", prString)
-	return pr, repo, err
 }
 
 func prFromNumberString(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface, s string) (*api.PullRequest, error) {
