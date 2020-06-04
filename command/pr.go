@@ -302,59 +302,16 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	var prArg string
-	if len(args) > 0 {
-		prArg = args[0]
-		if prNum, repo := prFromURL(prArg); repo != nil {
-			prArg = prNum
-			baseRepo = repo
-		}
-	}
-
-	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(apiClient, cmd, ctx)
-		if err != nil {
-			return err
-		}
-	}
-
 	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
 
-	var openURL string
-	var pr *api.PullRequest
-	if len(args) > 0 {
-		pr, err = prFromArg(apiClient, baseRepo, prArg)
-		if err != nil {
-			return err
-		}
-		openURL = pr.URL
-	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		if prNumber > 0 {
-			openURL = fmt.Sprintf("https://github.com/%s/pull/%d", ghrepo.FullName(baseRepo), prNumber)
-			if !web {
-				pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-			if err != nil {
-				return err
-			}
-
-			openURL = pr.URL
-		}
+	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
+	if err != nil {
+		return err
 	}
+	openURL := pr.URL
 
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
@@ -372,12 +329,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}
@@ -407,12 +359,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	pr, err := prFromArg(apiClient, baseRepo, args[0])
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}
@@ -444,39 +391,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
-	}
-
-	var pr *api.PullRequest
-	if len(args) > 0 {
-		var prNumber string
-		n, _ := prFromURL(args[0])
-		if n != "" {
-			prNumber = n
-		} else {
-			prNumber = args[0]
-		}
-
-		pr, err = prFromArg(apiClient, baseRepo, prNumber)
-		if err != nil {
-			return err
-		}
-	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		if prNumber != 0 {
-			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		}
-		if err != nil {
-			return err
-		}
 	}
 
 	if pr.Mergeable == "CONFLICTING" {
@@ -712,39 +629,9 @@ func prReady(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
-	}
-
-	var pr *api.PullRequest
-	if len(args) > 0 {
-		var prNumber string
-		n, _ := prFromURL(args[0])
-		if n != "" {
-			prNumber = n
-		} else {
-			prNumber = args[0]
-		}
-
-		pr, err = prFromArg(apiClient, baseRepo, prNumber)
-		if err != nil {
-			return err
-		}
-	} else {
-		prNumber, branchWithOwner, err := prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		if prNumber != 0 {
-			pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-		} else {
-			pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		}
-		if err != nil {
-			return err
-		}
 	}
 
 	if pr.Closed {
@@ -939,23 +826,6 @@ func prProjectList(pr api.PullRequest) string {
 		list += ", …"
 	}
 	return list
-}
-
-var prURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
-
-func prFromURL(arg string) (string, ghrepo.Interface) {
-	if m := prURLRE.FindStringSubmatch(arg); m != nil {
-		return m[3], ghrepo.New(m[1], m[2])
-	}
-	return "", nil
-}
-
-func prFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.PullRequest, error) {
-	if prNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
-		return api.PullRequestByNumber(apiClient, baseRepo, prNumber)
-	}
-
-	return api.PullRequestForBranch(apiClient, baseRepo, "", arg)
 }
 
 func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
