@@ -14,6 +14,7 @@ const defaultGitProtocol = "https"
 type Config interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
+	Aliases() (*AliasConfig, error)
 	Write() error
 }
 
@@ -33,18 +34,24 @@ type ConfigMap struct {
 	Root *yaml.Node
 }
 
+func (cm *ConfigMap) Empty() bool {
+	return cm.Root == nil || len(cm.Root.Content) == 0
+}
+
 func (cm *ConfigMap) GetStringValue(key string) (string, error) {
-	_, valueNode, err := cm.FindEntry(key)
+	entry, err := cm.FindEntry(key)
 	if err != nil {
 		return "", err
 	}
-	return valueNode.Value, nil
+	return entry.ValueNode.Value, nil
 }
 
 func (cm *ConfigMap) SetStringValue(key, value string) error {
-	_, valueNode, err := cm.FindEntry(key)
+	entry, err := cm.FindEntry(key)
 
 	var notFound *NotFoundError
+
+	valueNode := entry.ValueNode
 
 	if err != nil && errors.As(err, &notFound) {
 		keyNode := &yaml.Node{
@@ -67,19 +74,30 @@ func (cm *ConfigMap) SetStringValue(key, value string) error {
 	return nil
 }
 
-func (cm *ConfigMap) FindEntry(key string) (keyNode, valueNode *yaml.Node, err error) {
+type ConfigEntry struct {
+	KeyNode   *yaml.Node
+	ValueNode *yaml.Node
+	Index     int
+}
+
+func (cm *ConfigMap) FindEntry(key string) (ce *ConfigEntry, err error) {
 	err = nil
+
+	ce = &ConfigEntry{}
 
 	topLevelKeys := cm.Root.Content
 	for i, v := range topLevelKeys {
-		if v.Value == key && i+1 < len(topLevelKeys) {
-			keyNode = v
-			valueNode = topLevelKeys[i+1]
+		if v.Value == key {
+			ce.KeyNode = v
+			ce.Index = i
+			if i+1 < len(topLevelKeys) {
+				ce.ValueNode = topLevelKeys[i+1]
+			}
 			return
 		}
 	}
 
-	return nil, nil, &NotFoundError{errors.New("not found")}
+	return ce, &NotFoundError{errors.New("not found")}
 }
 
 func NewConfig(root *yaml.Node) Config {
@@ -100,6 +118,10 @@ func NewBlankConfig() Config {
 type fileConfig struct {
 	ConfigMap
 	documentRoot *yaml.Node
+}
+
+func (c *fileConfig) Root() *yaml.Node {
+	return c.ConfigMap.Root
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
@@ -206,13 +228,72 @@ func yamlNormalize(b []byte) []byte {
 	return b
 }
 
+func (c *fileConfig) Aliases() (*AliasConfig, error) {
+	// The complexity here is for dealing with either a missing or empty aliases key. It's something
+	// we'll likely want for other config sections at some point.
+	entry, err := c.FindEntry("aliases")
+	var nfe *NotFoundError
+	notFound := errors.As(err, &nfe)
+	if err != nil && !notFound {
+		return nil, err
+	}
+
+	toInsert := []*yaml.Node{}
+
+	keyNode := entry.KeyNode
+	valueNode := entry.ValueNode
+
+	if keyNode == nil {
+		keyNode = &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: "aliases",
+		}
+		toInsert = append(toInsert, keyNode)
+	}
+
+	if valueNode == nil || valueNode.Kind != yaml.MappingNode {
+		valueNode = &yaml.Node{
+			Kind:  yaml.MappingNode,
+			Value: "",
+		}
+		toInsert = append(toInsert, valueNode)
+	}
+
+	if len(toInsert) > 0 {
+		newContent := []*yaml.Node{}
+		if notFound {
+			newContent = append(c.Root().Content, keyNode, valueNode)
+		} else {
+			for i := 0; i < len(c.Root().Content); i++ {
+				if i == entry.Index {
+					newContent = append(newContent, keyNode, valueNode)
+					i++
+				} else {
+					newContent = append(newContent, c.Root().Content[i])
+				}
+			}
+		}
+		c.Root().Content = newContent
+	}
+
+	return &AliasConfig{
+		Parent:    c,
+		ConfigMap: ConfigMap{Root: valueNode},
+	}, nil
+}
+
 func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
-	_, hostsEntry, err := c.FindEntry("hosts")
+	entry, err := c.FindEntry("hosts")
 	if err != nil {
 		return nil, fmt.Errorf("could not find hosts config: %w", err)
 	}
 
-	return c.parseHosts(hostsEntry)
+	hostConfigs, err := c.parseHosts(entry.ValueNode)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse hosts config: %w", err)
+	}
+
+	return hostConfigs, nil
 }
 
 func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
@@ -223,19 +304,20 @@ func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
 	}
 
 	var notFound *NotFoundError
-	_, hostsEntry, err := c.FindEntry("hosts")
+	hostsEntry, err := c.FindEntry("hosts")
 	if errors.As(err, &notFound) {
-		hostsEntry = &yaml.Node{Kind: yaml.MappingNode}
-		c.Root.Content = append(c.Root.Content,
-			&yaml.Node{
-				Kind:  yaml.ScalarNode,
-				Value: "hosts",
-			}, hostsEntry)
+		hostsEntry.KeyNode = &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: "hosts",
+		}
+		hostsEntry.ValueNode = &yaml.Node{Kind: yaml.MappingNode}
+		root := c.Root()
+		root.Content = append(root.Content, hostsEntry.KeyNode, hostsEntry.ValueNode)
 	} else if err != nil {
 		panic(err)
 	}
 
-	hostsEntry.Content = append(hostsEntry.Content,
+	hostsEntry.ValueNode.Content = append(hostsEntry.ValueNode.Content,
 		&yaml.Node{
 			Kind:  yaml.ScalarNode,
 			Value: hostname,
