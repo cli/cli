@@ -43,15 +43,15 @@ func init() {
 var creditsCmd = &cobra.Command{
 	Use:   "credits",
 	Short: "View credits for this tool",
-	Long: `View animated credits for gh, the tool you are currently using :)`,
+	Long:  `View animated credits for gh, the tool you are currently using :)`,
 	Example: `gh credits            # see a credits animation for this project
   gh credits owner/repo # see a credits animation for owner/repo
   gh credits -s         # display a non-animated thank you
   gh credits | cat      # just print the contributors, one per line
 `,
-	Args: cobra.ExactArgs(0),
-	RunE: ghCredits,
-	Annotations: map[string]string{"hidden":"true"},
+	Args:        cobra.ExactArgs(0),
+	RunE:        ghCredits,
+	Annotations: map[string]string{"hidden": "true"},
 }
 
 func ghCredits(cmd *cobra.Command, args []string) error {
@@ -71,13 +71,13 @@ func credits(cmd *cobra.Command, args []string) error {
 	var repo string
 
 	if len(args) == 0 {
-	  baseRepo, err := determineBaseRepo(client, cmd, ctx)
-	  if err != nil {
+		baseRepo, err := determineBaseRepo(client, cmd, ctx)
+		if err != nil {
 			return err
-	  }
+		}
 
-	  owner = baseRepo.RepoOwner()
-	  repo = baseRepo.RepoName()
+		owner = baseRepo.RepoOwner()
+		repo = baseRepo.RepoName()
 	} else {
 		parts := strings.SplitN(args[0], "/", 2)
 		owner = parts[0]
