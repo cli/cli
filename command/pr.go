@@ -56,9 +56,10 @@ A pull request can be supplied as argument in any of the following formats:
 - by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
 }
 var prListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List and filter pull requests in this repository",
-	RunE:  prList,
+	Use:         "list",
+	Short:       "List and filter pull requests in this repository",
+	RunE:        prList,
+	Annotations: map[string]string{"IsCore": "true"},
 }
 var prStatusCmd = &cobra.Command{
 	Use:   "status",
