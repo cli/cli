@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -68,6 +69,16 @@ func JSONResponse(body interface{}) Responder {
 	return func(*http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
 		return httpResponse(200, bytes.NewBuffer(b)), nil
+	}
+}
+
+func FileResponse(filename string) Responder {
+	return func(*http.Request) (*http.Response, error) {
+		f, err := os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		return httpResponse(200, f), nil
 	}
 }
 

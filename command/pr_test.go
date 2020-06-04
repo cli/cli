@@ -14,6 +14,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -29,10 +30,8 @@ func TestPRStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatus.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -57,10 +56,8 @@ func TestPRStatus_fork(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusFork.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusFork.json"))
 
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
@@ -87,10 +84,8 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusChecks.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -114,10 +109,8 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranch.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -146,10 +139,8 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranch.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -166,10 +157,8 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json"))
 
 	output, err := RunCommand("pr status -R OWNER/REPO")
 	if err != nil {
@@ -187,10 +176,8 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranchClosed.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -208,10 +195,8 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -229,10 +214,8 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranchMerged.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -250,10 +233,8 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
-
-	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json"))
 
 	output, err := RunCommand("pr status")
 	if err != nil {
@@ -271,6 +252,7 @@ func TestPRStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "blueberries")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prIntrospection.json"))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": {} }

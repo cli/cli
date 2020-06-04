@@ -1,0 +1,10 @@
+{
+  "data": {
+    "PullRequest": {
+      "fields": [{ "name": "isDraft" }, { "name": "reviewDecision" }]
+    },
+    "Commit": {
+      "fields": [{ "name": "statusCheckRollup" }]
+    }
+  }
+}

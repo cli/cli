@@ -239,6 +239,62 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, e
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
+	var featureDetection struct {
+		PullRequest struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+		Commit struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Commit: __type(name: \"Commit\")"`
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Query(context.Background(), &featureDetection, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var field_isDraft string
+	var field_reviewDecision string
+	var fragment_statusCheckRollup string
+	for _, field := range featureDetection.PullRequest.Fields {
+		switch field.Name {
+		case "isDraft":
+			field_isDraft = "isDraft"
+		case "reviewDecision":
+			field_reviewDecision = "reviewDecision"
+		}
+	}
+	for _, field := range featureDetection.Commit.Fields {
+		switch field.Name {
+		case "statusCheckRollup":
+			fragment_statusCheckRollup = `
+			commits(last: 1) {
+				nodes {
+					commit {
+						statusCheckRollup {
+							contexts(last: 100) {
+								nodes {
+									...on StatusContext {
+										state
+									}
+									...on CheckRun {
+										status
+										conclusion
+									}
+								}
+							}
+						}
+					}
+				}
+			}`
+		}
+	}
+
 	type edges struct {
 		TotalCount int
 		Edges      []struct {
@@ -258,7 +314,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ReviewRequested edges
 	}
 
-	fragments := `
+	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {
 		number
 		title
@@ -269,35 +325,17 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			login
 		}
 		isCrossRepository
-		isDraft
-		commits(last: 1) {
-			nodes {
-				commit {
-					statusCheckRollup {
-						contexts(last: 100) {
-							nodes {
-								...on StatusContext {
-									state
-								}
-								...on CheckRun {
-									status
-									conclusion
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		%s
+		%s
 	}
 	fragment prWithReviews on PullRequest {
 		...pr
-		reviewDecision
+		%s
 	}
-	`
+	`, field_isDraft, fragment_statusCheckRollup, field_reviewDecision)
 
 	queryPrefix := `
-	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			defaultBranchRef { name }
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
@@ -312,7 +350,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	`
 	if currentPRNumber > 0 {
 		queryPrefix = `
-		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
 				defaultBranchRef { name }
 				pullRequest(number: $number) {
@@ -360,7 +398,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err = client.GraphQL(query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
