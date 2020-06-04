@@ -181,24 +181,16 @@ var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
 
 	checkScopesFunc := func(appID string) error {
 		if config.IsGitHubApp(appID) && !tokenFromEnv() && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
-			newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
-			if err != nil {
-				return err
-			}
 			cfg, err := ctx.Config()
 			if err != nil {
 				return err
 			}
-			_ = cfg.Set(defaultHostname, "oauth_token", newToken)
-			_ = cfg.Set(defaultHostname, "user", loginHandle)
-			// update config file on disk
-			err = cfg.Write()
+			newToken, err := config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: additional authorization required")
 			if err != nil {
 				return err
 			}
 			// update configuration in memory
 			token = newToken
-			config.AuthFlowComplete()
 		} else {
 			fmt.Fprintln(os.Stderr, "Warning: gh now requires the `read:org` OAuth scope.")
 			fmt.Fprintln(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable `read:org`")
@@ -235,28 +227,19 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 	tokenFromEnv := len(os.Getenv("GITHUB_TOKEN")) > 0
 
 	if config.IsGitHubApp(appID) && !tokenFromEnv && utils.IsTerminal(os.Stdin) && utils.IsTerminal(os.Stderr) {
-		newToken, loginHandle, err := config.AuthFlow("Notice: additional authorization required")
-		if err != nil {
-			return client, err
-		}
 		cfg, err := ctx.Config()
 		if err != nil {
-			return client, err
+			return nil, err
 		}
-		_ = cfg.Set(defaultHostname, "oauth_token", newToken)
-		_ = cfg.Set(defaultHostname, "user", loginHandle)
-		// update config file on disk
-		err = cfg.Write()
+		_, err = config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: additional authorization required")
 		if err != nil {
-			return client, err
+			return nil, err
 		}
-		// update configuration in memory
-		config.AuthFlowComplete()
+
 		reloadedClient, err := apiClientForContext(ctx)
 		if err != nil {
 			return client, err
 		}
-
 		return reloadedClient, nil
 	} else {
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires %s OAuth scopes.", wantedScopes))

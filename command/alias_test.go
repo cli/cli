@@ -12,8 +12,9 @@ import (
 func TestAliasSet_gh_command(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	_, err := RunCommand("alias set pr pr status")
 	if err == nil {
@@ -26,15 +27,14 @@ func TestAliasSet_gh_command(t *testing.T) {
 func TestAliasSet_empty_aliases(t *testing.T) {
 	cfg := `---
 aliases:
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: token123
+editor: vim
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
 	output, err := RunCommand("alias set co pr checkout")
 
 	if err != nil {
@@ -45,12 +45,9 @@ hosts:
 
 	expected := `aliases:
     co: pr checkout
-hosts:
-    github.com:
-        user: OWNER
-        oauth_token: token123
+editor: vim
 `
-	eq(t, buf.String(), expected)
+	eq(t, mainBuf.String(), expected)
 }
 
 func TestAliasSet_existing_alias(t *testing.T) {
@@ -64,8 +61,10 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
 	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
 
 	if err != nil {
@@ -78,8 +77,9 @@ aliases:
 func TestAliasSet_space_args(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	output, err := RunCommand(`alias set il issue list -l 'cool story'`)
 
@@ -89,7 +89,7 @@ func TestAliasSet_space_args(t *testing.T) {
 
 	test.ExpectLines(t, output.String(), `Adding alias for il: issue list -l "cool story"`)
 
-	test.ExpectLines(t, buf.String(), `il: issue list -l "cool story"`)
+	test.ExpectLines(t, mainBuf.String(), `il: issue list -l "cool story"`)
 }
 
 func TestAliasSet_arg_processing(t *testing.T) {
@@ -118,77 +118,66 @@ func TestAliasSet_arg_processing(t *testing.T) {
 			`ix: issue list --author=\$1 --label=\$2`},
 	}
 
-	var buf *bytes.Buffer
 	for _, c := range cases {
-		buf = bytes.NewBufferString("")
-		defer config.StubWriteConfig(buf)()
+		mainBuf := bytes.Buffer{}
+		hostsBuf := bytes.Buffer{}
+		defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
 		output, err := RunCommand(c.Cmd)
 		if err != nil {
 			t.Fatalf("got unexpected error running %s: %s", c.Cmd, err)
 		}
 
 		test.ExpectLines(t, output.String(), c.ExpectedOutputLine)
-		test.ExpectLines(t, buf.String(), c.ExpectedConfigLine)
+		test.ExpectLines(t, mainBuf.String(), c.ExpectedConfigLine)
 	}
 }
 
 func TestAliasSet_init_alias_cfg(t *testing.T) {
 	cfg := `---
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: token123
+editor: vim
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	output, err := RunCommand("alias set diff pr diff")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	expected := `hosts:
-    github.com:
-        user: OWNER
-        oauth_token: token123
+	expected := `editor: vim
 aliases:
     diff: pr diff
 `
 
 	test.ExpectLines(t, output.String(), "Adding alias for diff: pr diff", "Added alias.")
-	eq(t, buf.String(), expected)
+	eq(t, mainBuf.String(), expected)
 }
 
 func TestAliasSet_existing_aliases(t *testing.T) {
 	cfg := `---
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: token123
 aliases:
     foo: bar
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	buf := bytes.NewBufferString("")
-	defer config.StubWriteConfig(buf)()
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 	output, err := RunCommand("alias set view pr view")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	expected := `hosts:
-    github.com:
-        user: OWNER
-        oauth_token: token123
-aliases:
+	expected := `aliases:
     foo: bar
     view: pr view
 `
 
 	test.ExpectLines(t, output.String(), "Adding alias for view: pr view", "Added alias.")
-	eq(t, buf.String(), expected)
+	eq(t, mainBuf.String(), expected)
 
 }
 

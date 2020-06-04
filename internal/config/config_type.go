@@ -1,18 +1,17 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
 
-const defaultHostname = "github.com"
 const defaultGitProtocol = "https"
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
-	Hosts() ([]*HostConfig, error)
 	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Aliases() (*AliasConfig, error)
@@ -61,6 +60,7 @@ func (cm *ConfigMap) SetStringValue(key, value string) error {
 		}
 		valueNode = &yaml.Node{
 			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
 			Value: "",
 		}
 
@@ -107,11 +107,17 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+func NewBlankConfig() Config {
+	return NewConfig(&yaml.Node{
+		Kind:    yaml.DocumentNode,
+		Content: []*yaml.Node{{Kind: yaml.MappingNode}},
+	})
+}
+
 // This type implements a Config interface and represents a config file on disk.
 type fileConfig struct {
 	ConfigMap
 	documentRoot *yaml.Node
-	hosts        []*HostConfig
 }
 
 func (c *fileConfig) Root() *yaml.Node {
@@ -159,7 +165,10 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 		return c.SetStringValue(key, value)
 	} else {
 		hostCfg, err := c.configForHost(hostname)
-		if err != nil {
+		var notFound *NotFoundError
+		if errors.As(err, &notFound) {
+			hostCfg = c.makeConfigForHost(hostname)
+		} else if err != nil {
 			return err
 		}
 		return hostCfg.SetStringValue(key, value)
@@ -167,7 +176,7 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 }
 
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
-	hosts, err := c.Hosts()
+	hosts, err := c.hostEntries()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse hosts config: %w", err)
 	}
@@ -177,16 +186,46 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 			return hc, nil
 		}
 	}
-	return nil, fmt.Errorf("could not find config entry for %q", hostname)
+	return nil, &NotFoundError{fmt.Errorf("could not find config entry for %q", hostname)}
 }
 
 func (c *fileConfig) Write() error {
-	marshalled, err := yaml.Marshal(c.documentRoot)
+	mainData := yaml.Node{Kind: yaml.MappingNode}
+	hostsData := yaml.Node{Kind: yaml.MappingNode}
+
+	nodes := c.documentRoot.Content[0].Content
+	for i := 0; i < len(nodes)-1; i += 2 {
+		if nodes[i].Value == "hosts" {
+			hostsData.Content = append(hostsData.Content, nodes[i+1].Content...)
+		} else {
+			mainData.Content = append(mainData.Content, nodes[i], nodes[i+1])
+		}
+	}
+
+	mainBytes, err := yaml.Marshal(&mainData)
 	if err != nil {
 		return err
 	}
 
-	return WriteConfigFile(ConfigFile(), marshalled)
+	filename := ConfigFile()
+	err = WriteConfigFile(filename, yamlNormalize(mainBytes))
+	if err != nil {
+		return err
+	}
+
+	hostsBytes, err := yaml.Marshal(&hostsData)
+	if err != nil {
+		return err
+	}
+
+	return WriteConfigFile(hostsConfigFile(filename), yamlNormalize(hostsBytes))
+}
+
+func yamlNormalize(b []byte) []byte {
+	if bytes.Equal(b, []byte("{}\n")) {
+		return []byte{}
+	}
+	return b
 }
 
 func (c *fileConfig) Aliases() (*AliasConfig, error) {
@@ -243,11 +282,7 @@ func (c *fileConfig) Aliases() (*AliasConfig, error) {
 	}, nil
 }
 
-func (c *fileConfig) Hosts() ([]*HostConfig, error) {
-	if len(c.hosts) > 0 {
-		return c.hosts, nil
-	}
-
+func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	entry, err := c.FindEntry("hosts")
 	if err != nil {
 		return nil, fmt.Errorf("could not find hosts config: %w", err)
@@ -258,9 +293,37 @@ func (c *fileConfig) Hosts() ([]*HostConfig, error) {
 		return nil, fmt.Errorf("could not parse hosts config: %w", err)
 	}
 
-	c.hosts = hostConfigs
-
 	return hostConfigs, nil
+}
+
+func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
+	hostRoot := &yaml.Node{Kind: yaml.MappingNode}
+	hostCfg := &HostConfig{
+		Host:      hostname,
+		ConfigMap: ConfigMap{Root: hostRoot},
+	}
+
+	var notFound *NotFoundError
+	hostsEntry, err := c.FindEntry("hosts")
+	if errors.As(err, &notFound) {
+		hostsEntry.KeyNode = &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: "hosts",
+		}
+		hostsEntry.ValueNode = &yaml.Node{Kind: yaml.MappingNode}
+		root := c.Root()
+		root.Content = append(root.Content, hostsEntry.KeyNode, hostsEntry.ValueNode)
+	} else if err != nil {
+		panic(err)
+	}
+
+	hostsEntry.ValueNode.Content = append(hostsEntry.ValueNode.Content,
+		&yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: hostname,
+		}, hostRoot)
+
+	return hostCfg
 }
 
 func (c *fileConfig) parseHosts(hostsEntry *yaml.Node) ([]*HostConfig, error) {

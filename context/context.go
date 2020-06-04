@@ -3,6 +3,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/cli/cli/api"
@@ -162,11 +163,13 @@ type fsContext struct {
 
 func (c *fsContext) Config() (config.Config, error) {
 	if c.config == nil {
-		config, err := config.ParseOrSetupConfigFile(config.ConfigFile())
-		if err != nil {
+		cfg, err := config.ParseDefaultConfig()
+		if errors.Is(err, os.ErrNotExist) {
+			cfg = config.NewBlankConfig()
+		} else if err != nil {
 			return nil, err
 		}
-		c.config = config
+		c.config = cfg
 		c.authToken = ""
 	}
 	return c.config, nil
@@ -182,8 +185,12 @@ func (c *fsContext) AuthToken() (string, error) {
 		return "", err
 	}
 
+	var notFound *config.NotFoundError
 	token, err := cfg.Get(defaultHostname, "oauth_token")
-	if token == "" || err != nil {
+	if token == "" || errors.As(err, &notFound) {
+		// interactive OAuth flow
+		return config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: authentication required")
+	} else if err != nil {
 		return "", err
 	}
 
