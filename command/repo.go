@@ -56,6 +56,8 @@ var repoCloneCmd = &cobra.Command{
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
+Without username, e.g. "gh repo clone REPO", clones a presonal repository.
+
 To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
 }
