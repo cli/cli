@@ -40,6 +40,7 @@ func init() {
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
 	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	prListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
@@ -199,6 +200,10 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	author, err := cmd.Flags().GetString("author")
+	if err != nil {
+		return err
+	}
 
 	var graphqlState []string
 	switch state {
@@ -227,6 +232,9 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 	if assignee != "" {
 		params["assignee"] = assignee
+	}
+	if author != "" {
+		params["author"] = author
 	}
 
 	listResult, err := api.PullRequestList(apiClient, params, limit)

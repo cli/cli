@@ -2,9 +2,7 @@ package command
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
@@ -285,10 +283,8 @@ func TestPRList(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prList.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prListIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestList`), httpmock.FileResponse("../test/fixtures/prList.json"))
 
 	output, err := RunCommand("pr list")
 	if err != nil {
@@ -309,8 +305,15 @@ func TestPRList_filtering(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prListIntrospection.json"))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList`),
+		httpmock.GraphQLQuery(`{ "data": {} }`, func(_ string, variables map[string]interface{}) {
+			eq(t, variables["state"], []interface{}{"OPEN", "CLOSED", "MERGED"})
+			eq(t, variables["labels"], []interface{}{"one", "two", "three"})
+		}))
 
-	respBody := bytes.NewBufferString(`{ "data": {} }`)
+	respBody := bytes.NewBufferString(``)
 	http.StubResponse(200, respBody)
 
 	output, err := RunCommand(`pr list -s all -l one,two -l three`)
@@ -323,28 +326,14 @@ func TestPRList_filtering(t *testing.T) {
 No pull requests match your search in OWNER/REPO
 
 `)
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			State  []string
-			Labels []string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.State, []string{"OPEN", "CLOSED", "MERGED"})
-	eq(t, reqBody.Variables.Labels, []string{"one", "two", "three"})
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/prListWithDuplicates.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prListIntrospection.json"))
+	http.Register(httpmock.GraphQL(`query PullRequestList`), httpmock.FileResponse("../test/fixtures/prListWithDuplicates.json"))
 
 	output, err := RunCommand("pr list -l one,two")
 	if err != nil {
@@ -361,60 +350,35 @@ func TestPRList_filteringClosed(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	respBody := bytes.NewBufferString(`{ "data": {} }`)
-	http.StubResponse(200, respBody)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prListIntrospection.json"))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList`),
+		httpmock.GraphQLQuery(`{ "data": {} }`, func(_ string, variables map[string]interface{}) {
+			eq(t, variables["state"], []interface{}{"CLOSED", "MERGED"})
+		}))
 
 	_, err := RunCommand(`pr list -s closed`)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			State []string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.State, []string{"CLOSED", "MERGED"})
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	respBody := bytes.NewBufferString(`{ "data": {} }`)
-	http.StubResponse(200, respBody)
+	http.Register(httpmock.GraphQL(`\b__type\b`), httpmock.FileResponse("../test/fixtures/prListIntrospection.json"))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList`),
+		httpmock.GraphQLQuery(`{ "data": {} }`, func(query string, variables map[string]interface{}) {
+			eq(t, variables["assignee"], "hubot")
+			if !strings.Contains(query, "filterBy") {
+				t.Errorf("expected query contains filterBy: %q", query)
+			}
+		}))
 
 	_, err := RunCommand(`pr list -s merged -l "needs tests" -a hubot -B develop`)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Q string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Q, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`)
-}
-
-func TestPRList_filteringAssigneeLabels(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	respBody := bytes.NewBufferString(`{ "data": {} }`)
-	http.StubResponse(200, respBody)
-
-	_, err := RunCommand(`pr list -l one,two -a hubot`)
-	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
 		t.Fatal(err)
 	}
 }

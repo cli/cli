@@ -1,0 +1,15 @@
+{
+  "data": {
+    "PullRequest": {
+      "fields": [{ "name": "isDraft" }]
+    },
+    "PullRequestFilters": {
+      "inputFields": [
+        { "name": "assignee" },
+        { "name": "author" },
+        { "name": "labels" },
+        { "name": "state" }
+      ]
+    }
+  }
+}
