@@ -391,11 +391,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
 		if title != "" || body != "" {
-			openURL += fmt.Sprintf(
-				"?title=%s&body=%s",
-				url.QueryEscape(title),
-				url.QueryEscape(body),
-			)
+			milestone := ""
+			if len(milestoneTitles) > 0 {
+				milestone = milestoneTitles[0]
+			}
+			openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+			if err != nil {
+				return err
+			}
 		} else if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
@@ -450,12 +453,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := fmt.Sprintf(
-			"https://github.com/%s/issues/new/?title=%s&body=%s",
-			ghrepo.FullName(baseRepo),
-			url.QueryEscape(title),
-			url.QueryEscape(body),
-		)
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new/", ghrepo.FullName(baseRepo))
+		milestone := ""
+		if len(milestoneTitles) > 0 {
+			milestone = milestoneTitles[0]
+		}
+		openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+		if err != nil {
+			return err
+		}
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
