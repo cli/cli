@@ -28,4 +28,4 @@
    $ sudo mv ./bin/gh /usr/local/bin/
    ```
 
-4. Run `gh version` to check if it worked.
+4. Run `gh version` to check if it worked..
