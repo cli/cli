@@ -94,7 +94,7 @@ MSI installers are available for download on the [releases page][].
 Install and upgrade:
 
 1. Download the `.deb` file from the [releases page][]
-2. `sudo apt install ./gh_*_linux_amd64.deb` install the downloaded file
+2. `sudo apt install ./gh_*_linux_amd64.deb` install the downloaded file or `sudo dpkg -i gh_*_linux_amd64.deb`
 
 ### Fedora Linux
 
