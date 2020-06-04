@@ -54,8 +54,8 @@ var creditsCmd = &cobra.Command{
 	Annotations: map[string]string{"hidden": "true"},
 }
 
-func ghCredits(cmd *cobra.Command, args []string) error {
-	args = []string{"cli/cli"}
+func ghCredits(cmd *cobra.Command, _ []string) error {
+	args := []string{"cli/cli"}
 	return credits(cmd, args)
 }
 
