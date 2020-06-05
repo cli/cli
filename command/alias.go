@@ -154,7 +154,12 @@ func aliasList(cmd *cobra.Command, args []string) error {
 	sort.Strings(keys)
 
 	for _, alias := range keys {
-		tp.AddField(alias+":", nil, nil)
+		if tp.IsTTY() {
+			// ensure that screen readers pause
+			tp.AddField(alias+":", nil, nil)
+		} else {
+			tp.AddField(alias, nil, nil)
+		}
 		tp.AddField(aliasMap[alias], nil, nil)
 		tp.EndRow()
 	}
