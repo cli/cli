@@ -100,6 +100,21 @@ func (cm *ConfigMap) FindEntry(key string) (ce *ConfigEntry, err error) {
 	return ce, &NotFoundError{errors.New("not found")}
 }
 
+func (cm *ConfigMap) RemoveEntry(key string) {
+	newContent := []*yaml.Node{}
+
+	content := cm.Root.Content
+	for i := 0; i < len(content); i++ {
+		if content[i].Value == key {
+			i++ // skip the next node which is this key's value
+		} else {
+			newContent = append(newContent, content[i])
+		}
+	}
+
+	cm.Root.Content = newContent
+}
+
 func NewConfig(root *yaml.Node) Config {
 	return &fileConfig{
 		ConfigMap:    ConfigMap{Root: root.Content[0]},
