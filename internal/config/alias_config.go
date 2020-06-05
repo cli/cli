@@ -9,19 +9,13 @@ type AliasConfig struct {
 	Parent Config
 }
 
-func (a *AliasConfig) Exists(alias string) bool {
+func (a *AliasConfig) Get(alias string) (string, bool) {
 	if a.Empty() {
-		return false
+		return "", false
 	}
 	value, _ := a.GetStringValue(alias)
 
-	return value != ""
-}
-
-func (a *AliasConfig) Get(alias string) string {
-	value, _ := a.GetStringValue(alias)
-
-	return value
+	return value, value != ""
 }
 
 func (a *AliasConfig) Add(alias, expansion string) error {

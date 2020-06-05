@@ -73,11 +73,12 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 
 	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
 
-	if aliasCfg.Exists(alias) {
+	oldExpansion, ok := aliasCfg.Get(alias)
+	if ok {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
 			utils.Green("✓"),
 			utils.Bold(alias),
-			utils.Bold(aliasCfg.Get(alias)),
+			utils.Bold(oldExpansion),
 			utils.Bold(expansionStr),
 		)
 	}
@@ -188,11 +189,11 @@ func aliasDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("couldn't read aliases config: %w", err)
 	}
 
-	if !aliasCfg.Exists(alias) {
+	expansion, ok := aliasCfg.Get(alias)
+	if !ok {
 		return fmt.Errorf("no such alias %s", alias)
-	}
 
-	expansion := aliasCfg.Get(alias)
+	}
 
 	err = aliasCfg.Delete(alias)
 	if err != nil {
