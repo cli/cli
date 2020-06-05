@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -109,24 +111,57 @@ func apiRun(opts *ApiOptions) error {
 	if resp.StatusCode == 204 {
 		return nil
 	}
+	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
 
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
+	var serverError string
+	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
+		bodyCopy := &bytes.Buffer{}
+		b, err := ioutil.ReadAll(io.TeeReader(responseBody, bodyCopy))
+		if err != nil {
+			return err
+		}
+		var respData struct {
+			Message string
+			Errors  []struct {
+				Message string
+			}
+		}
+		err = json.Unmarshal(b, &respData)
+		if err != nil {
+			return err
+		}
+		if respData.Message != "" {
+			serverError = fmt.Sprintf("%s (HTTP %d)", respData.Message, resp.StatusCode)
+		} else if len(respData.Errors) > 0 {
+			msgs := make([]string, len(respData.Errors))
+			for i, e := range respData.Errors {
+				msgs[i] = e.Message
+			}
+			serverError = strings.Join(msgs, "\n")
+		}
+		responseBody = bodyCopy
+	}
+
 	if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, resp.Body, "  ")
+		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err = io.Copy(opts.IO.Out, resp.Body)
+		_, err = io.Copy(opts.IO.Out, responseBody)
 		if err != nil {
 			return err
 		}
 	}
 
-	// TODO: detect GraphQL errors
-	if resp.StatusCode > 299 {
+	if serverError != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+		return cmdutil.SilentError
+	} else if resp.StatusCode > 299 {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
 		return cmdutil.SilentError
 	}
 
