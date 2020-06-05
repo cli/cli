@@ -517,11 +517,12 @@ func TestRepo_withoutUsername(t *testing.T) {
 		{ "data": { "viewer": {
 			"login": "OWNER"
 		}}}`))
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"parent": null
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"parent": null
+		} } }`))
 
 	cs, restore := test.InitCmdStubber()
 	defer restore()
