@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/jsoncolor"
 	"github.com/spf13/cobra"
 )
 
@@ -109,9 +111,18 @@ func apiRun(opts *ApiOptions) error {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(opts.IO.Out, resp.Body)
-	if err != nil {
-		return err
+	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+
+	if isJSON && opts.IO.ColorEnabled() {
+		err = jsoncolor.Write(opts.IO.Out, resp.Body, "  ")
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = io.Copy(opts.IO.Out, resp.Body)
+		if err != nil {
+			return err
+		}
 	}
 
 	// TODO: detect GraphQL errors
