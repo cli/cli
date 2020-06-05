@@ -50,10 +50,7 @@ func (a *AliasConfig) All() map[string]string {
 		return out
 	}
 
-	for i := 0; i < len(a.Root.Content); i += 2 {
-		if i+1 == len(a.Root.Content) {
-			break
-		}
+	for i := 0; i < len(a.Root.Content)-1; i += 2 {
 		key := a.Root.Content[i].Value
 		value := a.Root.Content[i+1].Value
 		out[key] = value

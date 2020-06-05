@@ -256,10 +256,6 @@ func TestAliasList_empty(t *testing.T) {
 
 func TestAliasList(t *testing.T) {
 	cfg := `---
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: token123
 aliases:
   co: pr checkout
   il: issue list --author=$1 --label=$2
@@ -275,10 +271,12 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	test.ExpectLines(t, output.String(),
-		"clone:\trepo clone",
-		"co:\tpr checkout",
-		"il:\tissue list --author=\\$1 --label=\\$2",
-		"prs:\tpr status",
-		"cs:\tconfig set editor 'quoted path'")
+	expected := `clone	repo clone
+co	pr checkout
+cs	config set editor 'quoted path'
+il	issue list --author=$1 --label=$2
+prs	pr status
+`
+
+	eq(t, output.String(), expected)
 }
