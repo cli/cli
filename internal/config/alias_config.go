@@ -42,3 +42,19 @@ func (a *AliasConfig) Delete(alias string) error {
 	// TODO when we get to gh alias delete
 	return nil
 }
+
+func (a *AliasConfig) All() map[string]string {
+	out := map[string]string{}
+
+	if a.Empty() {
+		return out
+	}
+
+	for i := 0; i < len(a.Root.Content)-1; i += 2 {
+		key := a.Root.Content[i].Value
+		value := a.Root.Content[i+1].Value
+		out[key] = value
+	}
+
+	return out
+}

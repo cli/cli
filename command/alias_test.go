@@ -241,3 +241,42 @@ func TestAliasSet_invalid_command(t *testing.T) {
 
 	eq(t, err.Error(), "could not create alias: pe checkout does not correspond to a gh command")
 }
+
+func TestAliasList_empty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	output, err := RunCommand("alias list")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	eq(t, output.String(), "")
+}
+
+func TestAliasList(t *testing.T) {
+	cfg := `---
+aliases:
+  co: pr checkout
+  il: issue list --author=$1 --label=$2
+  clone: repo clone
+  prs: pr status
+  cs: config set editor 'quoted path'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	output, err := RunCommand("alias list")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	expected := `clone	repo clone
+co	pr checkout
+cs	config set editor 'quoted path'
+il	issue list --author=$1 --label=$2
+prs	pr status
+`
+
+	eq(t, output.String(), expected)
+}
