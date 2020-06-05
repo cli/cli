@@ -15,6 +15,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 )
@@ -506,6 +507,37 @@ func TestRepoClone_hasParent(t *testing.T) {
 
 	eq(t, cs.Count, 2)
 	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/hubot/ORIG.git")
+}
+
+func TestRepo_withoutUsername(t *testing.T) {
+	http := initFakeHTTP()
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": {
+			"login": "OWNER"
+		}}}`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"parent": null
+		} } }`))
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+
+	output, err := RunCommand("repo clone REPO")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "")
+	eq(t, cs.Count, 1)
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/OWNER/REPO.git")
 }
 
 func TestRepoCreate(t *testing.T) {
