@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+        "bufio" // used to hit "e" to comment
+        "os" // used to hit "e" to comment
+
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
@@ -341,6 +344,51 @@ func prClose(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
 		return nil
 	}
+
+        pr.Body = ""
+        fmt.Println("Body comment (optional).")
+        fmt.Println("Let empty to skip or type EXIT at end.")
+
+        reader := bufio.NewReader(os.Stdin)
+ 
+        var texto string
+        texto = ""
+        for {
+           fmt.Print("-> ")
+           text, _ := reader.ReadString('\n')
+           if strings.Compare("\n", text) == 0 && strings.Compare("", texto) == 0 {
+              break
+           }
+           if strings.Compare("EXIT\n", text) == 0 {
+              fmt.Println(texto)
+              for {
+                 fmt.Println("Hit ENTER, to confirm or CANCEL, to cancel")
+                 text, _ = reader.ReadString('\n')
+                 if strings.Compare("\n", text) == 0 {
+                    pr.Body = texto
+                    err = api.PullRequestComment(apiClient, baseRepo, pr)
+         	       if err != nil {
+		          return fmt.Errorf("API call failed: %w", err)
+	               }
+                    fmt.Fprintf(colorableErr(cmd), "%s Commented on pull request #%d\n", utils.Green("✔"), pr.Number)
+                    break;
+                 }      
+                 if strings.Compare("CANCEL\n", text) == 0 {
+                    pr.Body = ""; 
+                    texto = "";
+                    text = "";
+                    fmt.Println("Comment cancelled.")
+                    fmt.Println("Body comment (optional).")
+                    fmt.Println("Let empty to skip or type EXIT at end.")
+                    break;
+                 }
+              }
+           }
+           texto += text
+           if strings.Compare("", pr.Body) != 0 {
+              break
+           }
+        }
 
 	err = api.PullRequestClose(apiClient, baseRepo, pr)
 	if err != nil {
