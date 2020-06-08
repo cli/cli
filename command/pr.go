@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-        "bufio" // used to hit "e" to comment
-        "os" // used to hit "e" to comment
+        "bufio" // used to input comment
+        "os" // used to input comment
 
 
 	"github.com/AlecAivazis/survey/v2"
@@ -419,7 +419,10 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-        prComment(cmd, args) // Ask user for comment (optional)
+        err = prComment(cmd, args) // Ask user for comment (optional) 
+        if err != nil {
+		return fmt.Errorf("Error on add comment: %w", err)
+	}
 
 	err = api.PullRequestClose(apiClient, baseRepo, pr)
 	if err != nil {
@@ -453,7 +456,10 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-        prComment(cmd, args) // Ask user for comment (optional) 
+        err = prComment(cmd, args) // Ask user for comment (optional) 
+        if err != nil {
+		return fmt.Errorf("Error on add comment: %w", err)
+	}
 
 	err = api.PullRequestReopen(apiClient, baseRepo, pr)
 	if err != nil {
