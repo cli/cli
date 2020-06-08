@@ -118,31 +118,10 @@ func apiRun(opts *ApiOptions) error {
 
 	var serverError string
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
-		bodyCopy := &bytes.Buffer{}
-		b, err := ioutil.ReadAll(io.TeeReader(responseBody, bodyCopy))
+		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
 			return err
 		}
-		var respData struct {
-			Message string
-			Errors  []struct {
-				Message string
-			}
-		}
-		err = json.Unmarshal(b, &respData)
-		if err != nil {
-			return err
-		}
-		if respData.Message != "" {
-			serverError = fmt.Sprintf("%s (HTTP %d)", respData.Message, resp.StatusCode)
-		} else if len(respData.Errors) > 0 {
-			msgs := make([]string, len(respData.Errors))
-			for i, e := range respData.Errors {
-				msgs[i] = e.Message
-			}
-			serverError = strings.Join(msgs, "\n")
-		}
-		responseBody = bodyCopy
 	}
 
 	if isJSON && opts.IO.ColorEnabled() {
@@ -233,4 +212,35 @@ func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
+}
+
+func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
+	bodyCopy := &bytes.Buffer{}
+	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	if err != nil {
+		return r, "", err
+	}
+
+	var parsedBody struct {
+		Message string
+		Errors  []struct {
+			Message string
+		}
+	}
+	err = json.Unmarshal(b, &parsedBody)
+	if err != nil {
+		return r, "", err
+	}
+
+	if parsedBody.Message != "" {
+		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
+	} else if len(parsedBody.Errors) > 0 {
+		msgs := make([]string, len(parsedBody.Errors))
+		for i, e := range parsedBody.Errors {
+			msgs[i] = e.Message
+		}
+		return bodyCopy, strings.Join(msgs, "\n"), nil
+	}
+
+	return bodyCopy, "", nil
 }
