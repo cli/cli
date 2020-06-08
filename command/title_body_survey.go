@@ -259,6 +259,13 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			milestones = append(milestones, m.Title)
 		}
 
+		type metadataValues struct {
+			Reviewers []string
+			Assignees []string
+			Labels    []string
+			Projects  []string
+			Milestone string
+		}
 		var mqs []*survey.Question
 		if isChosen("Reviewers") {
 			if len(users) > 0 || len(teams) > 0 {
@@ -318,7 +325,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		}
 		if isChosen("Milestone") {
 			if len(milestones) > 1 {
-				var milestoneDefault interface{}
+				var milestoneDefault string
 				if len(issueState.Milestones) > 0 {
 					milestoneDefault = issueState.Milestones[0]
 				}
@@ -334,11 +341,16 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 				cmd.PrintErrln("warning: no milestones in the repository")
 			}
 		}
-
-		err = SurveyAsk(mqs, issueState, survey.WithKeepFilter(true))
+		values := metadataValues{}
+		err = SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+		issueState.Reviewers = values.Reviewers
+		issueState.Assignees = values.Assignees
+		issueState.Labels = values.Labels
+		issueState.Projects = values.Projects
+		issueState.Milestones = []string{values.Milestone}
 
 		if len(issueState.Milestones) > 0 && issueState.Milestones[0] == noMilestone {
 			issueState.Milestones = issueState.Milestones[0:0]
