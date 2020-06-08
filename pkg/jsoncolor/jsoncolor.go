@@ -15,6 +15,7 @@ const (
 	colorBool   = "33"   // yellow
 )
 
+// Write colorized JSON output parsed from reader
 func Write(w io.Writer, r io.Reader, indent string) error {
 	dec := json.NewDecoder(r)
 	dec.UseNumber()
