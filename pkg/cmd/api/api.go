@@ -100,8 +100,13 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	if opts.ShowResponseHeaders {
+		var headerColor, headerColorReset string
+		if opts.IO.ColorEnabled() {
+			headerColor = "\x1b[1;34m" // bright blue
+			headerColorReset = "\x1b[m"
+		}
 		for name, vals := range resp.Header {
-			fmt.Fprintf(opts.IO.Out, "%s: %s\r\n", name, strings.Join(vals, ", "))
+			fmt.Fprintf(opts.IO.Out, "%s%s%s: %s\r\n", headerColor, name, headerColorReset, strings.Join(vals, ", "))
 		}
 		fmt.Fprint(opts.IO.Out, "\r\n")
 	}
