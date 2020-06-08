@@ -93,7 +93,7 @@ With '--web', open the repository in a web browser instead.`,
 }
 
 var repoCreditsCmd = &cobra.Command{
-	Use:   "credits [repository]",
+	Use:   "credits [<repository>]",
 	Short: "View credits for a repository",
 	Example: `$ gh repo credits           # view credits for the current repository
 $ gh repo credits cool/repo # view credits for cool/repo
