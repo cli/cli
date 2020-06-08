@@ -46,6 +46,8 @@ func init() {
 
 	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
+
+        prCmd.AddCommand(prAddCommentCmd) 
 }
 
 var prCmd = &cobra.Command{
@@ -102,6 +104,13 @@ var prReadyCmd = &cobra.Command{
 	Short: "Mark a pull request as ready for review",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prReady,
+}
+
+var prAddCommentCmd = &cobra.Command{
+	Use:   "addcomment {<number> | <url> | <branch>}",
+	Short: "Add comment on a pull request",
+	Args:  cobra.ExactArgs(1),
+	RunE:  prAddComment,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -325,8 +334,13 @@ func prView(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func prClose(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+func prAddComment(cmd *cobra.Command, args []string) error {
+prComment(cmd, args) 
+return nil	
+}
+
+func prComment(cmd *cobra.Command, args []string) error {
+ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -335,14 +349,6 @@ func prClose(cmd *cobra.Command, args []string) error {
 	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
-	}
-
-	if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
-		return err
-	} else if pr.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
-		return nil
 	}
 
         pr.Body = ""
@@ -390,6 +396,31 @@ func prClose(cmd *cobra.Command, args []string) error {
            }
         }
 
+	return nil
+}
+
+func prClose(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
+	if err != nil {
+		return err
+	}
+
+	if pr.State == "MERGED" {
+		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+		return err
+	} else if pr.Closed {
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
+		return nil
+	}
+
+        prComment(cmd, args) // Ask user for comment (optional)
+
 	err = api.PullRequestClose(apiClient, baseRepo, pr)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
@@ -421,6 +452,8 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already open\n", utils.Yellow("!"), pr.Number)
 		return nil
 	}
+
+        prComment(cmd, args) // Ask user for comment (optional) 
 
 	err = api.PullRequestReopen(apiClient, baseRepo, pr)
 	if err != nil {
