@@ -29,6 +29,10 @@ And if you spot bugs or have features that you'd really like to see in `gh`, ple
 
 Read the [official docs](https://cli.github.com/manual/) for more information.
 
+## A Request to Users
+We understand that you may be eager to try out/test GitHub CLI, but please don't make fake/demo/test PRs/issues/comments on this repository itself.  
+You can easily create a new (private) repo using `gh repo create <name>`, and can use that for trials and testing.
+
 ## Comparison with hub
 
 For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new project for us to explore
