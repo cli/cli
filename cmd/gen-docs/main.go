@@ -19,12 +19,6 @@ func main() {
 	dir := docCmd.StringP("doc-path", "", "", "Path directory where you want generate doc files")
 	help := docCmd.BoolP("help", "h", false, "Help about any command")
 
-	for _, cmd := range command.RootCmd.Commands() {
-		if _, hidden := cmd.Annotations["hidden"]; hidden {
-			command.RootCmd.RemoveCommand(cmd)
-		}
-	}
-
 	if err := docCmd.Parse(os.Args); err != nil {
 		os.Exit(1)
 	}

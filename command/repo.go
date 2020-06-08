@@ -100,10 +100,9 @@ $ gh repo credits cool/repo # view credits for cool/repo
 $ gh repo credits -s        # print a non-animated thank you
 $ gh repo credits | cat     # pipe to just print the contributors, one per line
 `,
-	Args: cobra.MaximumNArgs(1),
-	RunE: repoCredits,
-	// NB will actually be hidden once https://github.com/cli/cli/pull/1106 is in
-	Annotations: map[string]string{"hidden": "true"},
+	Args:   cobra.MaximumNArgs(1),
+	RunE:   repoCredits,
+	Hidden: true,
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {

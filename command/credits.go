@@ -49,9 +49,9 @@ var creditsCmd = &cobra.Command{
   gh credits -s         # display a non-animated thank you
   gh credits | cat      # just print the contributors, one per line
 `,
-	Args:        cobra.ExactArgs(0),
-	RunE:        ghCredits,
-	Annotations: map[string]string{"hidden": "true"},
+	Args:   cobra.ExactArgs(0),
+	RunE:   ghCredits,
+	Hidden: true,
 }
 
 func ghCredits(cmd *cobra.Command, _ []string) error {
