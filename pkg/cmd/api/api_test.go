@@ -140,12 +140,14 @@ func Test_apiRun(t *testing.T) {
 				ShowResponseHeaders: true,
 			},
 			httpResponse: &http.Response{
+				Proto:      "HTTP/1.1",
+				Status:     "200 Okey-dokey",
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
 				Header:     http.Header{"Content-Type": []string{"text/plain"}},
 			},
 			err:    nil,
-			stdout: "Content-Type: text/plain\r\n\r\nbody",
+			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\nbody",
 			stderr: ``,
 		},
 		{

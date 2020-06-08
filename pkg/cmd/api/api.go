@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -100,14 +101,8 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	if opts.ShowResponseHeaders {
-		var headerColor, headerColorReset string
-		if opts.IO.ColorEnabled() {
-			headerColor = "\x1b[1;34m" // bright blue
-			headerColorReset = "\x1b[m"
-		}
-		for name, vals := range resp.Header {
-			fmt.Fprintf(opts.IO.Out, "%s%s%s: %s\r\n", headerColor, name, headerColorReset, strings.Join(vals, ", "))
-		}
+		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
+		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
 		fmt.Fprint(opts.IO.Out, "\r\n")
 	}
 
@@ -136,6 +131,26 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	return nil
+}
+
+func printHeaders(w io.Writer, headers http.Header, colorize bool) {
+	var names []string
+	for name := range headers {
+		if name == "Status" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var headerColor, headerColorReset string
+	if colorize {
+		headerColor = "\x1b[1;34m" // bright blue
+		headerColorReset = "\x1b[m"
+	}
+	for _, name := range names {
+		fmt.Fprintf(w, "%s%s%s: %s\r\n", headerColor, name, headerColorReset, strings.Join(headers[name], ", "))
+	}
 }
 
 func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
