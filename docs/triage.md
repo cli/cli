@@ -26,7 +26,7 @@ just imagine a flowchart
   - ping billy if producty
 - does it need more info?
   - ask the user for that
-  - add user input label
+  - add `needs-user-input` label
 - is it a user asking for help and you have all the info you need to help?
   - try and help
 
