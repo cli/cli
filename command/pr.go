@@ -377,16 +377,16 @@ ctx := contextForCommand(cmd)
 		          return fmt.Errorf("API call failed: %w", err)
 	               }
                     fmt.Fprintf(colorableErr(cmd), "%s Commented on pull request #%d\n", utils.Green("✔"), pr.Number)
-                    break;
+                    break
                  }      
                  if strings.Compare("CANCEL\n", text) == 0 {
-                    pr.Body = ""; 
-                    texto = "";
-                    text = "";
+                    pr.Body = ""
+                    texto = ""
+                    text = ""
                     fmt.Println("Comment cancelled.")
                     fmt.Println("Body comment (optional).")
                     fmt.Println("Let empty to skip or type EXIT at end.")
-                    break;
+                    break
                  }
               }
            }
