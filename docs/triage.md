@@ -22,9 +22,10 @@ just imagine a flowchart
   - add to project TODO column if appropriate, otherwise just leave it labeled
 - is it intriguing but needs discussion?
   - label `needs-design` if design input is needed, ping
+  - label `needs-investigation` if engineering research is required before action can be taken
   - ping engineers if eng needed
-  - ping billy if producty
-- does it need more info?
+  - ping product if it's about future directions/roadamp/big changes
+- does it need more info from the issue author?
   - ask the user for that
   - add `needs-user-input` label
 - is it a user asking for help and you have all the info you need to help?
