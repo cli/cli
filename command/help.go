@@ -32,7 +32,7 @@ func rootDisplayCommandTypoHelp(command *cobra.Command, args []string) {
 
 			oldOut := command.OutOrStdout()
 			command.SetOut(errOut)
-			defer command.SetOut(oldOut)
+			command.SetOut(oldOut)
 		}
 	}
 }
@@ -65,11 +65,13 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 		Body  string
 	}
 
-	helpEntries := []helpEntry{
-		{"", command.Long},
-		{"USAGE", command.Use},
+	helpEntries := []helpEntry{}
+	if command.Long != "" {
+		helpEntries = append(helpEntries, helpEntry{"", command.Long})
+	} else if command.Short != "" {
+		helpEntries = append(helpEntries, helpEntry{"", command.Short})
 	}
-
+	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 	if len(coreCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"CORE COMMANDS", strings.Join(coreCommands, "\n")})
 	}
@@ -98,11 +100,8 @@ Read the manual at <http://cli.github.com/manual>`})
 			// If there is a title, add indentation to each line in the body
 			fmt.Fprintln(out, utils.Bold(e.Title))
 
-			for _, l := range strings.Split(e.Body, "\n") {
+			for _, l := range strings.Split(strings.Trim(e.Body, "\n\r"), "\n") {
 				l = strings.Trim(l, " \n\r")
-				if l == "" {
-					continue
-				}
 				fmt.Fprintln(out, "  "+l)
 			}
 		} else {

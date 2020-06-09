@@ -41,7 +41,7 @@ func init() {
 }
 
 var repoCmd = &cobra.Command{
-	Use:   "repo <command> [flags]",
+	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
 	Long:  `Work with GitHub repositories`,
 	Example: `$ gh repo create
@@ -69,9 +69,18 @@ To pass 'git clone' flags, separate them with '--'.`,
 var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
-	Long: `Create a new GitHub repository.
+	Long:  `Create a new GitHub repository`,
+	Example: utils.Bold("$ gh repo create") + `
+Will create a repository on your account using the name of your current directory
 
-Use the "ORG/NAME" syntax to create a repository within your organization.`,
+` + utils.Bold("$ gh repo create my-project") + `
+Will create a repository on your account using the name 'my-project'
+
+` + utils.Bold("$ gh repo create cli/my-project") + `
+Will create a repository in the organization 'cli' using the name 'my-project'`,
+	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
+- <OWNER/REPO>
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 	RunE: repoCreate,
 }
 

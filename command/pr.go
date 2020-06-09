@@ -46,7 +46,7 @@ func init() {
 }
 
 var prCmd = &cobra.Command{
-	Use:   "pr <command> [flags]",
+	Use:   "pr <command>",
 	Short: "Create, view, and checkout pull requests",
 	Long:  `Work with GitHub pull requests`,
 	Example: `$ gh pr checkout 353
@@ -63,7 +63,10 @@ $ gh pr view --web`,
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
-	RunE:  prList,
+	Example: `$ gh pr list --limit all
+$ gh pr list --state closed
+$ gh pr list --label “priority 1” “bug”`,
+	RunE: prList,
 }
 var prStatusCmd = &cobra.Command{
 	Use:   "status",

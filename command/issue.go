@@ -49,7 +49,7 @@ func init() {
 }
 
 var issueCmd = &cobra.Command{
-	Use:   "issue <command> [flags]",
+	Use:   "issue <command>",
 	Short: "Create and view issues",
 	Long:  `Work with GitHub issues`,
 	Example: `$ gh issue list
