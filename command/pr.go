@@ -48,7 +48,7 @@ func init() {
 var prCmd = &cobra.Command{
 	Use:   "pr <command> [flags]",
 	Short: "Create, view, and checkout pull requests",
-	Long:  `Work with GitHub pull requests.`,
+	Long:  `Work with GitHub pull requests`,
 	Example: `$ gh pr checkout 353
 $ gh pr checkout bug-fix-branch
 $ gh pr create --fill

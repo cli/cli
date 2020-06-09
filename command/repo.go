@@ -41,14 +41,19 @@ func init() {
 }
 
 var repoCmd = &cobra.Command{
-	Use:   "repo",
+	Use:   "repo <command> [flags]",
 	Short: "Create, clone, fork, and view repositories",
-	Long: `Work with GitHub repositories.
-
+	Long:  `Work with GitHub repositories`,
+	Example: `$ gh repo create
+$ gh repo clone cli/cli 
+$ gh repo view --web
+`,
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
-- by URL, e.g. "https://github.com/OWNER/REPO"`,
-	Annotations: map[string]string{"IsCore": "true"},
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 }
 
 var repoCloneCmd = &cobra.Command{
