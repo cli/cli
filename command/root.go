@@ -93,12 +93,10 @@ var RootCmd = &cobra.Command{
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
-
-	Annotations: map[string]string{
-		"help:examples": `
-$ gh issue create
+	Example: `$ gh issue create
 $ gh repo clone
 $ gh pr checkout 321`,
+	Annotations: map[string]string{
 		"help:learnmore": `
 Use "gh <command> <subcommand> --help" for more information about a command.
 Read the manual at <http://cli.github.com/manual>`,

@@ -79,8 +79,8 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	if command.HasLocalFlags() {
 		helpEntries = append(helpEntries, helpEntry{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")})
 	}
-	if _, ok := command.Annotations["help:examples"]; ok {
-		helpEntries = append(helpEntries, helpEntry{"EXAMPLES", command.Annotations["help:examples"]})
+	if command.Example != "" {
+		helpEntries = append(helpEntries, helpEntry{"EXAMPLES", command.Example})
 	}
 	if _, ok := command.Annotations["help:learnmore"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"LEARN MORE", command.Annotations["help:learnmore"]})
