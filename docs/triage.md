@@ -18,7 +18,7 @@ just imagine a flowchart
 - do we want to do it? 
   - e.g. bugs or things we have discussed before
   - comment acknowledging it
-  - label appropriately
+  - label appropriately (examples include `enhancement` or `bug`)
   - add to project TODO column if appropriate, otherwise just leave it labeled
 - is it intriguing but needs discussion?
   - label `needs-design` if design input is needed, ping
