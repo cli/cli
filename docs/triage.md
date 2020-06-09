@@ -21,7 +21,7 @@ just imagine a flowchart
   - label appropriately
   - add to project TODO column if appropriate, otherwise just leave it labeled
 - is it intriguing but needs discussion?
-  - label design-needed if amanda is needed, ping
+  - label `needs-design` if design input is needed, ping
   - ping engineers if eng needed
   - ping billy if producty
 - does it need more info?
