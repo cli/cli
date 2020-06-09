@@ -15,7 +15,7 @@ just imagine a flowchart
   - e.g. have already discussed not wanting to do or duplicate issue
   - comment acknowledging receipt
   - close
-- do we want to do it? 
+- do we want to do it?
   - e.g. bugs or things we have discussed before
   - comment acknowledging it
   - label appropriately (examples include `enhancement` or `bug`)
@@ -50,7 +50,7 @@ just imagine a flowchart
 
 # Weekly PR audit
 
-In the interest of not letting our open PR list get out of hand (20+ total PRs _or_  multiple PRs
+In the interest of not letting our open PR list get out of hand (20+ total PRs _or_ multiple PRs
 over a few months old), try to audit open PRs each week with the goal of getting them merged and/or
 closed. It's likely too much work to deal with every PR, but even getting a few closer to done is
 helpful.
