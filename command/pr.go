@@ -54,12 +54,12 @@ A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
 - by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
 - by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
+	Annotations: map[string]string{"IsCore": "true"},
 }
 var prListCmd = &cobra.Command{
-	Use:         "list",
-	Short:       "List and filter pull requests in this repository",
-	RunE:        prList,
-	Annotations: map[string]string{"IsCore": "true"},
+	Use:   "list",
+	Short: "List and filter pull requests in this repository",
+	RunE:  prList,
 }
 var prStatusCmd = &cobra.Command{
 	Use:   "status",

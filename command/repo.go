@@ -48,6 +48,7 @@ var repoCmd = &cobra.Command{
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
 - by URL, e.g. "https://github.com/OWNER/REPO"`,
+	Annotations: map[string]string{"IsCore": "true"},
 }
 
 var repoCloneCmd = &cobra.Command{
