@@ -97,9 +97,6 @@ var RootCmd = &cobra.Command{
 $ gh repo clone
 $ gh pr checkout 321`,
 	Annotations: map[string]string{
-		"help:learnmore": `
-Use "gh <command> <subcommand> --help" for more information about a command.
-Read the manual at <http://cli.github.com/manual>`,
 		"help:feedback": `
 Fill out our feedback form <https://forms.gle/umxd3h31c7aMQFKG7>
 Open an issue using “gh issue create -R cli/cli”`},

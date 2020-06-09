@@ -49,14 +49,17 @@ func init() {
 }
 
 var issueCmd = &cobra.Command{
-	Use:   "issue",
+	Use:   "issue <command> [flags]",
 	Short: "Create and view issues",
-	Long: `Work with GitHub issues.
-
-An issue can be supplied as argument in any of the following formats:
+	Long:  `Work with GitHub issues.`,
+	Example: `$ gh issue list
+$ gh issue create --fill
+$ gh issue view --web`,
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `An issue can be supplied as argument in any of the following formats:
 - by number, e.g. "123"; or
-- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`,
-	Annotations: map[string]string{"IsCore": "true"},
+- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`},
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
