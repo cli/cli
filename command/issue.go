@@ -61,6 +61,17 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
+	Long: `Create a new issue in a repository
+
+Examples:
+  $ gh issue create
+  $ gh issue create -t "Issue With Title And Body" -b "This is the issue body"
+  $ gh issue create -t OpenAWebBrowserToCreateThisIssue --web
+  $ gh issue create -t IssueWithLabels -b IssueBody -l label1,label2
+  $ gh issue create -t IssueWithAssignees -b IssueBody -a user1Login,user2Login
+  $ gh issue create -t IssueWithProjects -b IssueBody -p cli/1,cli/2
+  $ gh issue create -t IssueWithMilestone -b IssueBody -m someMilestone
+`,
 }
 var issueListCmd = &cobra.Command{
 	Use:   "list",
