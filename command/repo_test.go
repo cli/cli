@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"os/exec"
@@ -459,11 +458,13 @@ func TestRepoClone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			http := initFakeHTTP()
-			http.StubResponse(200, bytes.NewBufferString(`
-			{ "data": { "repository": {
-				"parent": null
-			} } }
-			`))
+			http.Register(
+				httpmock.GraphQL(`\brepository\(`),
+				httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"parent": null
+				} } }
+				`))
 
 			cs, restore := test.InitCmdStubber()
 			defer restore()
@@ -485,14 +486,16 @@ func TestRepoClone(t *testing.T) {
 
 func TestRepoClone_hasParent(t *testing.T) {
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"parent": {
-			"owner": {"login": "hubot"},
-			"name": "ORIG"
-		}
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`\brepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"parent": {
+				"owner": {"login": "hubot"},
+				"name": "ORIG"
+			}
+		} } }
+		`))
 
 	cs, restore := test.InitCmdStubber()
 	defer restore()
@@ -548,18 +551,19 @@ func TestRepoCreate(t *testing.T) {
 	}
 
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "createRepository": {
-		"repository": {
-			"id": "REPOID",
-			"url": "https://github.com/OWNER/REPO",
-			"name": "REPO",
-			"owner": {
-				"login": "OWNER"
+	http.Register(
+		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "createRepository": {
+			"repository": {
+				"id": "REPOID",
+				"url": "https://github.com/OWNER/REPO",
+				"name": "REPO",
+				"owner": {
+					"login": "OWNER"
+				}
 			}
-		}
-	} } }
-	`))
+		} } }`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -613,22 +617,24 @@ func TestRepoCreate_org(t *testing.T) {
 	}
 
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "node_id": "ORGID"
-	}
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "createRepository": {
-		"repository": {
-			"id": "REPOID",
-			"url": "https://github.com/ORG/REPO",
-			"name": "REPO",
-			"owner": {
-				"login": "ORG"
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
+		{ "node_id": "ORGID"
+		}`))
+	http.Register(
+		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "createRepository": {
+			"repository": {
+				"id": "REPOID",
+				"url": "https://github.com/ORG/REPO",
+				"name": "REPO",
+				"owner": {
+					"login": "ORG"
+				}
 			}
-		}
-	} } }
-	`))
+		} } }`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -681,23 +687,25 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "node_id": "TEAMID",
-	  "organization": { "node_id": "ORGID" }
-	}
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "createRepository": {
-		"repository": {
-			"id": "REPOID",
-			"url": "https://github.com/ORG/REPO",
-			"name": "REPO",
-			"owner": {
-				"login": "ORG"
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
+		{ "node_id": "TEAMID",
+			"organization": { "node_id": "ORGID" }
+		}`))
+	http.Register(
+		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.StringResponse(`
+		{ "data": { "createRepository": {
+			"repository": {
+				"id": "REPOID",
+				"url": "https://github.com/ORG/REPO",
+				"name": "REPO",
+				"owner": {
+					"login": "ORG"
+				}
 			}
-		}
-	} } }
-	`))
+		} } }`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -746,9 +754,10 @@ func TestRepoView_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ }
-	`))
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
+		{ }`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -779,9 +788,10 @@ func TestRepoView_web_ownerRepo(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ }
-	`))
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
+		{ }`))
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -812,9 +822,10 @@ func TestRepoView_web_fullURL(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ }
-	`))
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
+		{ }`))
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
@@ -841,16 +852,18 @@ func TestRepoView(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(
+		httpmock.GraphQL(`\brepository\(`),
+		httpmock.StringResponse(`
 		{ "data": {
-				"repository": {
-		      "description": "social distancing"
-		}}}
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+			"repository": {
+			"description": "social distancing"
+		} } }`))
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
 		{ "name": "readme.md",
-		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
-	`))
+		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
 	output, err := RunCommand("repo view")
 	if err != nil {
@@ -869,16 +882,18 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(
+		httpmock.GraphQL(`\brepository\(`),
+		httpmock.StringResponse(`
 		{ "data": {
 				"repository": {
-		      "description": "social distancing"
-		}}}
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+				"description": "social distancing"
+		} } }`))
+	http.Register(
+		httpmock.MatchAny,
+		httpmock.StringResponse(`
 		{ "name": "readme.org",
-		  "content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}
-	`))
+		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
 	output, err := RunCommand("repo view")
 	if err != nil {
@@ -896,8 +911,8 @@ func TestRepoView_blanks(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.StubResponse(200, bytes.NewBufferString("{}"))
-	http.StubResponse(200, bytes.NewBufferString("{}"))
+	http.Register(httpmock.MatchAny, httpmock.StringResponse("{}"))
+	http.Register(httpmock.MatchAny, httpmock.StringResponse("{}"))
 
 	output, err := RunCommand("repo view")
 	if err != nil {
