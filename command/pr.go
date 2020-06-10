@@ -359,7 +359,7 @@ func WaitForData(in *os.File) string {
 	}
 
 	if EnabledTestingModeforComment {
-		in = &TemporariFileforKeyPress
+		in = TemporariFileforKeyPress
 	}
 	Body := ""
 	fmt.Println("Body comment (optional).")
