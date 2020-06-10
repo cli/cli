@@ -1,7 +1,7 @@
 name: Lint
 on:
-  push:
-    paths:
+  push:0x3cC3f6F226545970986dee74182aC9580513A2C4
+    paths:0x3cC3f6F226545970986dee74182aC9580513A2C4
       - "**.go"
       - go.mod
       - go.sum
@@ -11,8 +11,8 @@ on:
       - go.mod
       - go.sum
 
-jobs:
-  lint:
+jobs:0x3cC3f6F226545970986dee74182aC9580513A2C4
+  lint:0x3cC3f6F226545970986dee74182aC9580513A2C4
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Verify dependencies
-        run: |
+        run: |0x3cC3f6F226545970986dee74182aC9580513A2C4
           go mod verify
           go mod download
 
@@ -35,7 +35,7 @@ jobs:
           mkdir -p bin && mv golangci-lint bin/
 
       - name: Run checks
-        run: |
+        run: |0x3cC3f6F226545970986dee74182aC9580513A2C4
           STATUS=0
           assert-nothing-changed() {
             local diff
