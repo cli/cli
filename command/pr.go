@@ -1,16 +1,15 @@
 package command
 
 import (
+	"bufio" // used to input comment
 	"errors"
 	"fmt"
 	"io"
+	"os" // used to input comment
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-        "bufio" // used to input comment
-        "os" // used to input comment
-
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
@@ -47,7 +46,7 @@ func init() {
 	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
 
-        prCmd.AddCommand(prAddCommentCmd) 
+	prCmd.AddCommand(prAddCommentCmd)
 }
 
 var prCmd = &cobra.Command{
@@ -335,15 +334,7 @@ func prView(cmd *cobra.Command, args []string) error {
 }
 
 func prAddComment(cmd *cobra.Command, args []string) error {
-        err := prComment(cmd, args) // Ask user for comment (optional) 
-        if err != nil {
-		return fmt.Errorf("Error on add comment: %w", err)
-	}
-        return nil	
-}
-
-func prComment(cmd *cobra.Command, args []string) error {
-        ctx := contextForCommand(cmd)
+	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
@@ -354,50 +345,76 @@ func prComment(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-        pr.Body = ""
-        fmt.Println("Body comment (optional).")
-        fmt.Println("Let empty to skip or type EXIT at end.")
+	err = prComment(cmd, args, apiClient, pr, baseRepo) // Ask user for comment (optional)
+	if err != nil {
+		return fmt.Errorf("Error on add comment: %w", err)
+	}
+	return nil
+}
 
-        reader := bufio.NewReader(os.Stdin)
- 
-        var texto string
-        texto = ""
-        for {
-           fmt.Print("-> ")
-           text, _ := reader.ReadString('\n')
-           if strings.Compare("\n", text) == 0 && strings.Compare("", texto) == 0 {
-              break
-           }
-           if strings.Compare("EXIT\n", text) == 0 {
-              fmt.Println(texto)
-              for {
-                 fmt.Println("Hit ENTER, to confirm or CANCEL, to cancel")
-                 text, _ = reader.ReadString('\n')
-                 if strings.Compare("\n", text) == 0 {
-                    pr.Body = texto
-                    err = api.PullRequestComment(apiClient, baseRepo, pr)
-         	       if err != nil {
-		          return fmt.Errorf("API call failed: %w", err)
-	               }
-                    fmt.Fprintf(colorableErr(cmd), "%s Commented on pull request #%d\n", utils.Green("✔"), pr.Number)
-                    break
-                 }      
-                 if strings.Compare("CANCEL\n", text) == 0 {
-                    pr.Body = ""
-                    texto = ""
-                    text = ""
-                    fmt.Println("Comment cancelled.")
-                    fmt.Println("Body comment (optional).")
-                    fmt.Println("Let empty to skip or type EXIT at end.")
-                    break
-                 }
-              }
-           }
-           texto += text
-           if strings.Compare("", pr.Body) != 0 {
-              break
-           }
-        }
+// WaitForData Simulate key press on comment input
+func WaitForData(in *os.File) string {
+	if in == nil {
+		in = os.Stdin
+	}
+
+	if EnabledTestingModeforComment == true {
+		in = &TemporariFileforKeyPress
+	}
+	Body := ""
+	fmt.Println("Body comment (optional).")
+	fmt.Println("Let empty to skip or type EXIT at end.")
+
+	reader := bufio.NewReader(in)
+
+	var texto string
+	texto = ""
+	for {
+		fmt.Print("-> ")
+		text, _ := reader.ReadString('\n')
+		if strings.Compare("\n", text) == 0 && strings.Compare("", texto) == 0 {
+			break
+		}
+		if strings.Compare("EXIT\n", text) == 0 {
+			fmt.Println(texto)
+			for {
+				fmt.Println("Hit ENTER, to confirm or CANCEL, to cancel")
+				text, _ = reader.ReadString('\n')
+				if strings.Compare("\n", text) == 0 {
+					Body = texto
+					break
+				}
+				if strings.Compare("CANCEL\n", text) == 0 {
+					Body = ""
+					texto = ""
+					text = ""
+					fmt.Println("Comment cancelled.")
+					fmt.Println("Body comment (optional).")
+					fmt.Println("Let empty to skip or type EXIT at end.")
+					break
+				}
+			}
+		}
+		texto += text
+		if strings.Compare("", Body) != 0 {
+			break
+		}
+	}
+	return Body
+}
+
+func prComment(cmd *cobra.Command, args []string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface) error {
+
+	tmpbody := WaitForData(nil)
+
+	if tmpbody != "" {
+		pr.Body = tmpbody
+		err := api.PullRequestComment(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+		fmt.Fprintf(colorableErr(cmd), "%s Commented on pull request #%d\n", utils.Green("✔"), pr.Number)
+	}
 
 	return nil
 }
@@ -422,8 +439,8 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-        err = prComment(cmd, args) // Ask user for comment (optional) 
-        if err != nil {
+	err = prComment(cmd, args, apiClient, pr, baseRepo) // Ask user for comment (optional)
+	if err != nil {
 		return fmt.Errorf("Error on add comment: %w", err)
 	}
 
@@ -459,8 +476,8 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-        err = prComment(cmd, args) // Ask user for comment (optional) 
-        if err != nil {
+	err = prComment(cmd, args, apiClient, pr, baseRepo) // Ask user for comment (optional)
+	if err != nil {
 		return fmt.Errorf("Error on add comment: %w", err)
 	}
 

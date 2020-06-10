@@ -860,10 +860,17 @@ func TestPrClose(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
+	//Sending empty line to skip comments, if you want to create a comment use "EXIT\n\n"
+	EnableTestingModeforComment()
+	SimulateUserInput("\n")
+
 	output, err := RunCommand("pr close 96")
 	if err != nil {
 		t.Fatalf("error running command `pr close`: %v", err)
+
 	}
+	//Disabling Testing mode Comment
+	DisableTestingModeforComment()
 
 	r := regexp.MustCompile(`Closed pull request #96`)
 
@@ -910,10 +917,17 @@ func TestPRReopen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
+	//Sending empty line to skip comments, if you want to create a comment use "EXIT\n\n"
+	EnableTestingModeforComment()
+	SimulateUserInput("\n")
+
 	output, err := RunCommand("pr reopen 666")
 	if err != nil {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
+
+	//Disabling Testing mode Comment
+	DisableTestingModeforComment()
 
 	r := regexp.MustCompile(`Reopened pull request #666`)
 
