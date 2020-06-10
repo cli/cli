@@ -65,7 +65,17 @@ var issueCreateCmd = &cobra.Command{
 var issueListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter issues in this repository",
-	RunE:  issueList,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			return fmt.Errorf("unknown command %q for %q. Please include whitespace separated issue names within quotes if necessary", args[0], cmd.CommandPath())
+		}
+		return nil
+	},
+	Example: `
+	gh issue list
+	gh issue list -l "help wanted"
+	`,
+	RunE: issueList,
 }
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
