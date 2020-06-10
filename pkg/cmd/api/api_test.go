@@ -140,12 +140,14 @@ func Test_apiRun(t *testing.T) {
 				ShowResponseHeaders: true,
 			},
 			httpResponse: &http.Response{
+				Proto:      "HTTP/1.1",
+				Status:     "200 Okey-dokey",
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
 				Header:     http.Header{"Content-Type": []string{"text/plain"}},
 			},
 			err:    nil,
-			stdout: "Content-Type: text/plain\r\n\r\nbody",
+			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\nbody",
 			stderr: ``,
 		},
 		{
@@ -159,6 +161,31 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 		},
 		{
+			name: "REST error",
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
+		{
+			name: "GraphQL error",
+			options: ApiOptions{
+				RequestPath: "graphql",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`,
+			stderr: "gh: AGAIN\nFINE\n",
+		},
+		{
 			name: "failure",
 			httpResponse: &http.Response{
 				StatusCode: 502,
@@ -166,7 +193,7 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    cmdutil.SilentError,
 			stdout: `gateway timeout`,
-			stderr: ``,
+			stderr: "gh: HTTP 502\n",
 		},
 	}
 
