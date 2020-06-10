@@ -247,41 +247,78 @@ func Test_apiRun(t *testing.T) {
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
-	io, stdin, _, _ := iostreams.Test()
-	resp := &http.Response{StatusCode: 204}
+	tests := []struct {
+		name          string
+		inputFile     string
+		inputContents []byte
 
-	options := ApiOptions{
-		RequestPath:      "hello",
-		RequestInputFile: "-",
-		RawFields:        []string{"a=b", "c=d"},
-
-		IO: io,
-		HttpClient: func() (*http.Client, error) {
-			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-				resp.Request = req
-				return resp, nil
-			}
-			return &http.Client{Transport: tr}, nil
+		contentLength    int64
+		expectedContents []byte
+	}{
+		{
+			name:          "stdin",
+			inputFile:     "-",
+			inputContents: []byte("I WORK OUT"),
+			contentLength: 0,
+		},
+		{
+			name:          "from file",
+			inputFile:     "gh-test-file",
+			inputContents: []byte("I WORK OUT"),
+			contentLength: 10,
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, _, _ := iostreams.Test()
+			resp := &http.Response{StatusCode: 204}
 
-	fmt.Fprintln(stdin, "I WORK OUT")
+			inputFile := tt.inputFile
+			if tt.inputFile == "-" {
+				_, _ = stdin.Write(tt.inputContents)
+			} else {
+				f, err := ioutil.TempFile("", tt.inputFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _ = f.Write(tt.inputContents)
+				f.Close()
+				t.Cleanup(func() { os.Remove(f.Name()) })
+				inputFile = f.Name()
+			}
 
-	err := apiRun(&options)
-	if err != nil {
-		t.Errorf("got error %v", err)
+			var bodyBytes []byte
+			options := ApiOptions{
+				RequestPath:      "hello",
+				RequestInputFile: inputFile,
+				RawFields:        []string{"a=b", "c=d"},
+
+				IO: io,
+				HttpClient: func() (*http.Client, error) {
+					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+						var err error
+						if bodyBytes, err = ioutil.ReadAll(req.Body); err != nil {
+							return nil, err
+						}
+						resp.Request = req
+						return resp, nil
+					}
+					return &http.Client{Transport: tr}, nil
+				},
+			}
+
+			err := apiRun(&options)
+			if err != nil {
+				t.Errorf("got error %v", err)
+			}
+
+			assert.Equal(t, "POST", resp.Request.Method)
+			assert.Equal(t, "/hello?a=b&c=d", resp.Request.URL.RequestURI())
+			assert.Equal(t, tt.contentLength, resp.Request.ContentLength)
+			assert.Equal(t, "", resp.Request.Header.Get("Content-Type"))
+			assert.Equal(t, tt.inputContents, bodyBytes)
+		})
 	}
-
-	assert.Equal(t, "POST", resp.Request.Method)
-	assert.Equal(t, "/hello?a=b&c=d", resp.Request.URL.RequestURI())
-	assert.Equal(t, "", resp.Request.Header.Get("Content-Length"))
-	assert.Equal(t, "", resp.Request.Header.Get("Content-Type"))
-
-	bb, err := ioutil.ReadAll(resp.Request.Body)
-	if err != nil {
-		t.Errorf("got error %v", err)
-	}
-	assert.Equal(t, "I WORK OUT\n", string(bb))
 }
 
 func Test_parseFields(t *testing.T) {
@@ -400,7 +437,7 @@ func Test_openUserFile(t *testing.T) {
 	f.Close()
 	t.Cleanup(func() { os.Remove(f.Name()) })
 
-	file, err := openUserFile(f.Name(), nil)
+	file, length, err := openUserFile(f.Name(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,5 +448,6 @@ func Test_openUserFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assert.Equal(t, int64(13), length)
 	assert.Equal(t, "file contents", string(fb))
 }
