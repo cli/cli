@@ -122,6 +122,63 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+func InitDefaultConfig() (Config, error) {
+	cfg := NewConfig(&yaml.Node{
+		Kind: yaml.DocumentNode,
+		Content: []*yaml.Node{
+			{
+				Kind: yaml.MappingNode,
+				Content: []*yaml.Node{
+					{
+						HeadComment: "What protocol to use when performing git operations. Supported values: ssh, https",
+						Kind:        yaml.ScalarNode,
+						Value:       "git_protocol",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "https",
+					},
+					{
+						HeadComment: "What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.",
+						Kind:        yaml.ScalarNode,
+						Value:       "editor",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "",
+					},
+					{
+						HeadComment: "Aliases allow you to create nicknames for gh commands",
+						Kind:        yaml.ScalarNode,
+						Value:       "aliases",
+					},
+					{
+						Kind: yaml.MappingNode,
+						Content: []*yaml.Node{
+							{
+								Kind:  yaml.ScalarNode,
+								Value: "co",
+							},
+							{
+								Kind:  yaml.ScalarNode,
+								Value: "pr checkout",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	err := cfg.Write()
+	if err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+
+}
+
 func NewBlankConfig() Config {
 	return NewConfig(&yaml.Node{
 		Kind:    yaml.DocumentNode,

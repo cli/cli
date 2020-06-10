@@ -165,7 +165,10 @@ func (c *fsContext) Config() (config.Config, error) {
 	if c.config == nil {
 		cfg, err := config.ParseDefaultConfig()
 		if errors.Is(err, os.ErrNotExist) {
-			cfg = config.NewBlankConfig()
+			cfg, err = config.InitDefaultConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not create default config: %w", err)
+			}
 		} else if err != nil {
 			return nil, err
 		}
