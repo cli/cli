@@ -307,8 +307,28 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to a PullRequest with the number of ") {
+			// it could be an Issue
+			issue, err1 := issueFromArg(apiClient, baseRepo, args[0])
+			if err1 != nil {
+				if strings.HasPrefix(err1.Error(), "graphql error: 'Could not resolve to an Issue with the number of ") {
+					return errors.New("no such pull request or issue")
+				}
+				return err
+			}
+
+			cmd.PrintErrln(fmt.Sprintf("warning: %s is an issue, not a pull request\n", args[0]))
+			if web {
+				openURL := issue.URL
+				fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+				return utils.OpenInBrowser(openURL)
+			} else {
+				out := colorableOut(cmd)
+				return printIssuePreview(out, issue)
+			}
+		}
 		return err
 	}
 	openURL := pr.URL

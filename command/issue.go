@@ -224,16 +224,35 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	if err != nil {
-		return err
-	}
-	openURL := issue.URL
-
 	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
+
+	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to an Issue with the number of ") {
+			// it could be a Pull Request
+			pr, _, err1 := prFromArgs(ctx, apiClient, cmd, args)
+			if err1 != nil {
+				if strings.HasPrefix(err1.Error(), "graphql error: 'Could not resolve to a PullRequest with the number of ") {
+					return errors.New("no such issue or pull request")
+				}
+				return err
+			}
+
+			if web {
+				openURL := pr.URL
+				fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+				return utils.OpenInBrowser(openURL)
+			} else {
+				out := colorableOut(cmd)
+				return printPrPreview(out, pr)
+			}
+		}
+		return err
+	}
+	openURL := issue.URL
 
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
