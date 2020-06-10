@@ -40,8 +40,8 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 		out.Title = utils.Humanize(headRef)
 
 		body := ""
-		for _, c := range commits {
-			body += fmt.Sprintf("- %s\n", c.Title)
+		for i := len(commits) - 1; i >= 0; i-- {
+			body += fmt.Sprintf("- %s\n", commits[i].Title)
 		}
 		out.Body = body
 	}
