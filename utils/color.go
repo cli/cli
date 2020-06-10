@@ -9,10 +9,20 @@ import (
 	"github.com/mgutz/ansi"
 )
 
-var _isColorEnabled = true
-var _isStdoutTerminal = false
-var checkedTerminal = false
-var checkedNoColor = false
+var (
+	_isColorEnabled bool = true
+	_isStdoutTerminal, checkedTerminal, checkedNoColor bool
+
+	// Outputs ANSI color if stdout is a tty
+	Magenta = makeColorFunc("magenta")
+	Cyan    = makeColorFunc("cyan")
+	Red     = makeColorFunc("red")
+	Yellow  = makeColorFunc("yellow")
+	Blue    = makeColorFunc("blue")
+	Green   = makeColorFunc("green")
+	Gray    = makeColorFunc("black+h")
+	Bold    = makeColorFunc("default+b")
+)
 
 func isStdoutTerminal() bool {
 	if !checkedTerminal {
@@ -42,34 +52,10 @@ func makeColorFunc(color string) func(string) string {
 	}
 }
 
-func isColorEnabled() bool {
+func isColorEnabled() bool {	
 	if !checkedNoColor {
 		_isColorEnabled = os.Getenv("NO_COLOR") == ""
 		checkedNoColor = true
 	}
 	return _isColorEnabled
 }
-
-// Magenta outputs ANSI color if stdout is a tty
-var Magenta = makeColorFunc("magenta")
-
-// Cyan outputs ANSI color if stdout is a tty
-var Cyan = makeColorFunc("cyan")
-
-// Red outputs ANSI color if stdout is a tty
-var Red = makeColorFunc("red")
-
-// Yellow outputs ANSI color if stdout is a tty
-var Yellow = makeColorFunc("yellow")
-
-// Blue outputs ANSI color if stdout is a tty
-var Blue = makeColorFunc("blue")
-
-// Green outputs ANSI color if stdout is a tty
-var Green = makeColorFunc("green")
-
-// Gray outputs ANSI color if stdout is a tty
-var Gray = makeColorFunc("black+h")
-
-// Bold outputs ANSI color if stdout is a tty
-var Bold = makeColorFunc("default+b")
