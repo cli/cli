@@ -861,8 +861,15 @@ func TestPrClose(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	//Sending empty line to skip comments, if you want to create a comment use "EXIT\n\n"
-	EnableTestingModeforComment()
-	SimulateUserInput("\n")
+	err := EnableTestingModeforComment()
+	if err != nil {
+		t.Fatalf("error on EnableTestingModeforComment :%v", err)
+	}
+
+	err = SimulateUserInput("\n")
+	if err != nil {
+		t.Fatalf("error on SimulateUserInput :%v", err)
+	}
 
 	output, err := RunCommand("pr close 96")
 	if err != nil {
@@ -870,7 +877,10 @@ func TestPrClose(t *testing.T) {
 
 	}
 	//Disabling Testing mode Comment
-	DisableTestingModeforComment()
+	err = DisableTestingModeforComment()
+	if err != nil {
+		t.Fatalf("error on DisableTestingModeforComment :%v", err)
+	}
 
 	r := regexp.MustCompile(`Closed pull request #96`)
 
@@ -918,8 +928,16 @@ func TestPRReopen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
 
 	//Sending empty line to skip comments, if you want to create a comment use "EXIT\n\n"
-	EnableTestingModeforComment()
-	SimulateUserInput("\n")
+	err := EnableTestingModeforComment()
+	if err != nil {
+		t.Fatalf("error on EnableTestingModeforComment :%v", err)
+	}
+
+	err = SimulateUserInput("\n")
+
+	if err != nil {
+		t.Fatalf("error on SimulateUserInput :%v", err)
+	}
 
 	output, err := RunCommand("pr reopen 666")
 	if err != nil {
@@ -927,7 +945,10 @@ func TestPRReopen(t *testing.T) {
 	}
 
 	//Disabling Testing mode Comment
-	DisableTestingModeforComment()
+	err = DisableTestingModeforComment()
+	if err != nil {
+		t.Fatalf("error on DisableTestingModeforComment :%v", err)
+	}
 
 	r := regexp.MustCompile(`Reopened pull request #666`)
 

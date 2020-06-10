@@ -13,9 +13,10 @@ var EnabledTestingModeforComment bool = false
 var TemporariFileforKeyPress os.File
 
 //DisableTestingModeforComment will disable simulate keypress
-func DisableTestingModeforComment() {
+func DisableTestingModeforComment() error {
 	EnabledTestingModeforComment = false
 	defer TemporariFileforKeyPress.Close()
+	return nil
 }
 
 //EnableTestingModeforComment will enable simulate keypress
@@ -38,9 +39,10 @@ func SimulateUserInput(text string) error {
 		return (err)
 	}
 
-	_, err = TemporariFileforKeyPress.Seek(0, os.SEEK_SET)
+	_, err = TemporariFileforKeyPress.Seek(io.SeekStart, 0)
 	if err != nil {
-		return (err)
+		return err
 	}
+
 	return nil
 }
