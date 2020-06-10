@@ -41,7 +41,7 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 
 		body := ""
 		for _, c := range commits {
-			body += fmt.Sprintf("- %s\n", c.Title)
+			body = fmt.Sprintf("- %s\n", c.Title) + body
 		}
 		out.Body = body
 	}
