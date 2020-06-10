@@ -8,11 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func rootDisplayCommandTypoHelp(command *cobra.Command, args []string) {
+func rootHelpFunc(command *cobra.Command, args []string) {
+	// Display helpful error message in case subcommand name was mistyped.
+	// This matches Cobra's behavior for root command, which Cobra
+	// confusingly doesn't apply to nested commands.
 	if command != RootCmd {
-		// Display helpful error message in case subcommand name was mistyped.
-		// This matches Cobra's behavior for root command, which Cobra
-		// confusingly doesn't apply to nested commands.
 		if command.Parent() == RootCmd && len(args) >= 2 {
 			if command.SuggestionsMinimumDistance <= 0 {
 				command.SuggestionsMinimumDistance = 2
@@ -32,13 +32,9 @@ func rootDisplayCommandTypoHelp(command *cobra.Command, args []string) {
 
 			oldOut := command.OutOrStdout()
 			command.SetOut(errOut)
-			command.SetOut(oldOut)
+			defer command.SetOut(oldOut)
 		}
 	}
-}
-
-func rootHelpFunc(command *cobra.Command, args []string) {
-	rootDisplayCommandTypoHelp(command, args)
 
 	coreCommands := []string{}
 	additionalCommands := []string{}
