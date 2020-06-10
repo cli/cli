@@ -335,7 +335,7 @@ func prView(cmd *cobra.Command, args []string) error {
 }
 
 func prAddComment(cmd *cobra.Command, args []string) error {
-        err = prComment(cmd, args) // Ask user for comment (optional) 
+        err := prComment(cmd, args) // Ask user for comment (optional) 
         if err != nil {
 		return fmt.Errorf("Error on add comment: %w", err)
 	}
