@@ -207,7 +207,11 @@ func (c *fsContext) Branch() (string, error) {
 	}
 
 	currentBranch, err := git.CurrentBranch()
-	if err != nil {
+	switch err {
+	case nil:
+	case git.ErrNotOnAnyBranch:
+		return "", err
+	default:
 		return "", fmt.Errorf("could not determine current branch: %w", err)
 	}
 

@@ -67,9 +67,8 @@ func Test_CurrentBranch_detached_head(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected an error")
 	}
-	expectedError := "git: not on any branch"
-	if err.Error() != expectedError {
-		t.Errorf("got unexpected error: %s instead of %s", err.Error(), expectedError)
+	if err != ErrNotOnAnyBranch {
+		t.Errorf("got unexpected error: %s instead of %s", err, ErrNotOnAnyBranch)
 	}
 	if len(cs.Calls) != 1 {
 		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
