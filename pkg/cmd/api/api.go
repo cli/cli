@@ -98,16 +98,13 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	if opts.RequestInputFile != "" {
-		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
+		file, err := openUserFile(opts.RequestInputFile, opts.IO.In)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 		requestPath = addQuery(requestPath, params)
 		requestBody = file
-		if size > 0 {
-			requestHeaders = append(requestHeaders, fmt.Sprintf("Content-Length: %d", size))
-		}
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -198,34 +195,17 @@ func magicFieldValue(v string, stdin io.ReadCloser) (interface{}, error) {
 }
 
 func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
-	var r io.ReadCloser
-	if fn == "-" {
-		r = stdin
-	} else {
-		var err error
-		r, err = os.Open(fn)
-		if err != nil {
-			return nil, err
-		}
+	r, err := openUserFile(fn, stdin)
+	if err != nil {
+		return nil, err
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
 }
 
-func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) {
+func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, error) {
 	if fn == "-" {
-		return stdin, 0, nil
+		return stdin, nil
 	}
-
-	r, err := os.Open(fn)
-	if err != nil {
-		return r, 0, err
-	}
-
-	s, err := os.Stat(fn)
-	if err != nil {
-		return r, 0, err
-	}
-
-	return r, s.Size(), nil
+	return os.Open(fn)
 }

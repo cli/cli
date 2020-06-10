@@ -373,7 +373,7 @@ func Test_openUserFile(t *testing.T) {
 	f.Close()
 	t.Cleanup(func() { os.Remove(f.Name()) })
 
-	file, length, err := openUserFile(f.Name(), nil)
+	file, err := openUserFile(f.Name(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,6 +384,5 @@ func Test_openUserFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, int64(13), length)
 	assert.Equal(t, "file contents", string(fb))
 }
