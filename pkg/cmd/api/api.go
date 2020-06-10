@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -109,24 +111,36 @@ func apiRun(opts *ApiOptions) error {
 	if resp.StatusCode == 204 {
 		return nil
 	}
+	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
 
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
-	if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, resp.Body, "  ")
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err = io.Copy(opts.IO.Out, resp.Body)
+	var serverError string
+	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
+		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
 			return err
 		}
 	}
 
-	// TODO: detect GraphQL errors
-	if resp.StatusCode > 299 {
+	if isJSON && opts.IO.ColorEnabled() {
+		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = io.Copy(opts.IO.Out, responseBody)
+		if err != nil {
+			return err
+		}
+	}
+
+	if serverError != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+		return cmdutil.SilentError
+	} else if resp.StatusCode > 299 {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
 		return cmdutil.SilentError
 	}
 
@@ -218,4 +232,35 @@ func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
+}
+
+func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
+	bodyCopy := &bytes.Buffer{}
+	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	if err != nil {
+		return r, "", err
+	}
+
+	var parsedBody struct {
+		Message string
+		Errors  []struct {
+			Message string
+		}
+	}
+	err = json.Unmarshal(b, &parsedBody)
+	if err != nil {
+		return r, "", err
+	}
+
+	if parsedBody.Message != "" {
+		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
+	} else if len(parsedBody.Errors) > 0 {
+		msgs := make([]string, len(parsedBody.Errors))
+		for i, e := range parsedBody.Errors {
+			msgs[i] = e.Message
+		}
+		return bodyCopy, strings.Join(msgs, "\n"), nil
+	}
+
+	return bodyCopy, "", nil
 }

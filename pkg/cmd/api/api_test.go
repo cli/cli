@@ -161,6 +161,31 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 		},
 		{
+			name: "REST error",
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
+		{
+			name: "GraphQL error",
+			options: ApiOptions{
+				RequestPath: "graphql",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`,
+			stderr: "gh: AGAIN\nFINE\n",
+		},
+		{
 			name: "failure",
 			httpResponse: &http.Response{
 				StatusCode: 502,
@@ -168,7 +193,7 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    cmdutil.SilentError,
 			stdout: `gateway timeout`,
-			stderr: ``,
+			stderr: "gh: HTTP 502\n",
 		},
 	}
 
