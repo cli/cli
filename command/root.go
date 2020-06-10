@@ -59,6 +59,9 @@ func init() {
 
 	RootCmd.SetHelpFunc(rootHelpFunc)
 
+	// This will silence the usage func on error
+	RootCmd.SetUsageFunc(func(_ *cobra.Command) error { return nil })
+
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
