@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestFind(t *testing.T) {
+func TestFindNonLegacy(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "gh-cli")
 	if err != nil {
 		t.Fatal(err)
@@ -25,52 +25,69 @@ func TestFind(t *testing.T) {
 		want    []string
 	}{
 		{
-			name: "Template in root",
+			name: "Legacy templates ignored",
 			prepare: []string{
 				"README.md",
 				"ISSUE_TEMPLATE",
 				"issue_template.md",
 				"issue_template.txt",
 				"pull_request_template.md",
-			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{
-				path.Join(tmpdir, "issue_template.md"),
-			},
-		},
-		{
-			name: "Template in .github takes precedence",
-			prepare: []string{
-				"ISSUE_TEMPLATE.md",
 				".github/issue_template.md",
-			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{
-				path.Join(tmpdir, ".github/issue_template.md"),
-			},
-		},
-		{
-			name: "Template in docs",
-			prepare: []string{
-				"README.md",
 				"docs/issue_template.md",
 			},
 			args: args{
 				rootDir: tmpdir,
 				name:    "ISSUE_TEMPLATE",
 			},
+			want: []string{},
+		},
+		{
+			name: "Template folder in .github takes precedence",
+			prepare: []string{
+				"ISSUE_TEMPLATE.md",
+				"docs/ISSUE_TEMPLATE/abc.md",
+				"ISSUE_TEMPLATE/abc.md",
+				".github/ISSUE_TEMPLATE/abc.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
 			want: []string{
-				path.Join(tmpdir, "docs/issue_template.md"),
+				path.Join(tmpdir, ".github/ISSUE_TEMPLATE/abc.md"),
 			},
 		},
 		{
-			name: "Multiple templates",
+			name: "Template folder in root",
+			prepare: []string{
+				"ISSUE_TEMPLATE.md",
+				"docs/ISSUE_TEMPLATE/abc.md",
+				"ISSUE_TEMPLATE/abc.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
+			want: []string{
+				path.Join(tmpdir, "ISSUE_TEMPLATE/abc.md"),
+			},
+		},
+		{
+			name: "Template folder in docs",
+			prepare: []string{
+				"ISSUE_TEMPLATE.md",
+				"docs/ISSUE_TEMPLATE/abc.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
+			want: []string{
+				path.Join(tmpdir, "docs/ISSUE_TEMPLATE/abc.md"),
+			},
+		},
+		{
+			name: "Multiple templates in template folder",
 			prepare: []string{
 				".github/ISSUE_TEMPLATE/nope.md",
 				".github/PULL_REQUEST_TEMPLATE.md",
@@ -90,18 +107,17 @@ func TestFind(t *testing.T) {
 			},
 		},
 		{
-			name: "Empty multiple templates directory",
+			name: "Empty template directories",
 			prepare: []string{
-				".github/issue_template.md",
-				".github/issue_template/.keep",
+				".github/ISSUE_TEMPLATE/.keep",
+				".docs/ISSUE_TEMPLATE/.keep",
+				"ISSUE_TEMPLATE/.keep",
 			},
 			args: args{
 				rootDir: tmpdir,
 				name:    "ISSUE_TEMPLATE",
 			},
-			want: []string{
-				path.Join(tmpdir, ".github/issue_template.md"),
-			},
+			want: []string{},
 		},
 	}
 	for _, tt := range tests {
@@ -116,7 +132,99 @@ func TestFind(t *testing.T) {
 				file.Close()
 			}
 
-			if got := Find(tt.args.rootDir, tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := FindNonLegacy(tt.args.rootDir, tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Find() = %v, want %v", got, tt.want)
+			}
+		})
+		os.RemoveAll(tmpdir)
+	}
+}
+
+func TestFindLegacy(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "gh-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type args struct {
+		rootDir string
+		name    string
+	}
+	tests := []struct {
+		name    string
+		prepare []string
+		args    args
+		want    string
+	}{
+		{
+			name: "Template in root",
+			prepare: []string{
+				"README.md",
+				"ISSUE_TEMPLATE",
+				"issue_template.md",
+				"issue_template.txt",
+				"pull_request_template.md",
+				"docs/issue_template.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
+			want: path.Join(tmpdir, "issue_template.md"),
+		},
+		{
+			name: "Template in .github takes precedence",
+			prepare: []string{
+				"ISSUE_TEMPLATE.md",
+				".github/issue_template.md",
+				"docs/issue_template.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
+			want: path.Join(tmpdir, ".github/issue_template.md"),
+		},
+		{
+			name: "Template in docs",
+			prepare: []string{
+				"README.md",
+				"docs/issue_template.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "ISSUE_TEMPLATE",
+			},
+			want: path.Join(tmpdir, "docs/issue_template.md"),
+		},
+		{
+			name: "Non legacy templates ignored",
+			prepare: []string{
+				".github/PULL_REQUEST_TEMPLATE/abc.md",
+				"PULL_REQUEST_TEMPLATE/abc.md",
+				"docs/PULL_REQUEST_TEMPLATE/abc.md",
+				".github/PULL_REQUEST_TEMPLATE.md",
+			},
+			args: args{
+				rootDir: tmpdir,
+				name:    "PuLl_ReQuEsT_TeMpLaTe",
+			},
+			want: path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE.md"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, p := range tt.prepare {
+				fp := path.Join(tmpdir, p)
+				_ = os.MkdirAll(path.Dir(fp), 0700)
+				file, err := os.Create(fp)
+				if err != nil {
+					t.Fatal(err)
+				}
+				file.Close()
+			}
+
+			if got := FindLegacy(tt.args.rootDir, tt.args.name); *got != tt.want {
 				t.Errorf("Find() = %v, want %v", got, tt.want)
 			}
 		})
