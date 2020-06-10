@@ -248,7 +248,6 @@ func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
 	return ioutil.ReadAll(r)
 }
 
-
 func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, error) {
 	if fn == "-" {
 		return stdin, nil
