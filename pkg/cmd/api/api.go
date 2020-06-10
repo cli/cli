@@ -25,6 +25,7 @@ type ApiOptions struct {
 	RequestMethod       string
 	RequestMethodPassed bool
 	RequestPath         string
+	RequestInputFile    string
 	MagicFields         []string
 	RawFields           []string
 	RequestHeaders      []string
@@ -60,6 +61,10 @@ on the format of the value:
   appropriate JSON types;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
+
+Raw request body may be passed from the outside via a file specified by '--input'.
+Pass "-" to read from standard input. In this mode, parameters specified via
+'--field' flags are serialized into URL query parameters.
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -78,6 +83,7 @@ on the format of the value:
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
 	return cmd
 }
 
@@ -88,8 +94,22 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	method := opts.RequestMethod
-	if len(params) > 0 && !opts.RequestMethodPassed {
+	requestPath := opts.RequestPath
+	requestHeaders := opts.RequestHeaders
+	var requestBody interface{} = params
+
+	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
+	}
+
+	if opts.RequestInputFile != "" {
+		file, err := openUserFile(opts.RequestInputFile, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		requestPath = addQuery(requestPath, params)
+		requestBody = file
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -97,7 +117,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	resp, err := httpRequest(httpClient, method, opts.RequestPath, params, opts.RequestHeaders)
+	resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
 	if err != nil {
 		return err
 	}
@@ -220,18 +240,19 @@ func magicFieldValue(v string, stdin io.ReadCloser) (interface{}, error) {
 }
 
 func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
-	var r io.ReadCloser
-	if fn == "-" {
-		r = stdin
-	} else {
-		var err error
-		r, err = os.Open(fn)
-		if err != nil {
-			return nil, err
-		}
+	r, err := openUserFile(fn, stdin)
+	if err != nil {
+		return nil, err
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
+}
+
+func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, error) {
+	if fn == "-" {
+		return stdin, nil
+	}
+	return os.Open(fn)
 }
 
 func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
