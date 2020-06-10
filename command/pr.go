@@ -358,7 +358,7 @@ func WaitForData(in *os.File) string {
 		in = os.Stdin
 	}
 
-	if EnabledTestingModeforComment == true {
+	if EnabledTestingModeforComment {
 		in = &TemporariFileforKeyPress
 	}
 	Body := ""
