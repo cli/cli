@@ -46,6 +46,10 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 		if c.Short == "" {
 			continue
 		}
+		if c.Hidden {
+			continue
+		}
+
 		s := rpad(c.Name()+":", c.NamePadding()) + c.Short
 		if _, ok := c.Annotations["IsCore"]; ok {
 			coreCommands = append(coreCommands, s)
