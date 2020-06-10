@@ -11,8 +11,8 @@ endif
 LDFLAGS := -X github.com/cli/cli/command.Version=$(GH_VERSION) $(LDFLAGS)
 LDFLAGS := -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE) $(LDFLAGS)
 ifdef GH_OAUTH_CLIENT_SECRET
-	LDFLAGS := -X github.com/cli/cli/context.oauthClientID=$(GH_OAUTH_CLIENT_ID) $(LDFLAGS)
-	LDFLAGS := -X github.com/cli/cli/context.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(LDFLAGS)
+	LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientID=$(GH_OAUTH_CLIENT_ID) $(LDFLAGS)
+	LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(LDFLAGS)
 endif
 
 bin/gh: $(BUILD_FILES)
@@ -28,7 +28,7 @@ site:
 site-docs: site
 	git -C site pull
 	git -C site rm 'manual/gh*.md' 2>/dev/null || true
-	go run ./cmd/gen-docs site/manual
+	go run ./cmd/gen-docs --website --doc-path site/manual
 	for f in site/manual/gh*.md; do sed -i.bak -e '/^### SEE ALSO/,$$d' "$$f"; done
 	rm -f site/manual/*.bak
 	git -C site add 'manual/gh*.md'
@@ -44,3 +44,8 @@ endif
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 	git -C site push
 .PHONY: site-publish
+
+
+.PHONY: manpages
+manpages:
+	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/

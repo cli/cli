@@ -5,16 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
-	"gopkg.in/yaml.v3"
-)
-
-const (
-	oauthHost = "github.com"
 )
 
 var (
@@ -31,7 +25,31 @@ func IsGitHubApp(id string) bool {
 	return id == "178c6fc778ccc68e1d6a" || id == "4d747ba5675d5d66553f"
 }
 
-func AuthFlow(notice string) (string, string, error) {
+func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
+	token, userLogin, err := authFlow(hostname, notice)
+	if err != nil {
+		return "", err
+	}
+
+	err = cfg.Set(hostname, "user", userLogin)
+	if err != nil {
+		return "", err
+	}
+	err = cfg.Set(hostname, "oauth_token", token)
+	if err != nil {
+		return "", err
+	}
+
+	err = cfg.Write()
+	if err != nil {
+		return "", err
+	}
+
+	AuthFlowComplete()
+	return token, nil
+}
+
+func authFlow(oauthHost, notice string) (string, string, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
@@ -41,7 +59,7 @@ func AuthFlow(notice string) (string, string, error) {
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
-		Scopes:       []string{"repo", "read:org"},
+		Scopes:       []string{"repo", "read:org", "gist"},
 		WriteSuccessHTML: func(w io.Writer) {
 			fmt.Fprintln(w, oauthSuccessPage)
 		},
@@ -69,61 +87,9 @@ func AuthFlowComplete() {
 	_ = waitForEnter(os.Stdin)
 }
 
-// FIXME: make testable
-func setupConfigFile(filename string) (Config, error) {
-	token, userLogin, err := AuthFlow("Notice: authentication required")
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO this sucks. It precludes us laying out a nice config with comments and such.
-	type yamlConfig struct {
-		Hosts map[string]map[string]string
-	}
-
-	yamlHosts := map[string]map[string]string{}
-	yamlHosts[oauthHost] = map[string]string{}
-	yamlHosts[oauthHost]["user"] = userLogin
-	yamlHosts[oauthHost]["oauth_token"] = token
-
-	defaultConfig := yamlConfig{
-		Hosts: yamlHosts,
-	}
-
-	err = os.MkdirAll(filepath.Dir(filename), 0771)
-	if err != nil {
-		return nil, err
-	}
-
-	cfgFile, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return nil, err
-	}
-	defer cfgFile.Close()
-
-	yamlData, err := yaml.Marshal(defaultConfig)
-	if err != nil {
-		return nil, err
-	}
-	_, err = cfgFile.Write(yamlData)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO cleaner error handling? this "should" always work given that we /just/ wrote the file...
-	return ParseConfig(filename)
-}
-
 func getViewer(token string) (string, error) {
 	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-
-	response := struct {
-		Viewer struct {
-			Login string
-		}
-	}{}
-	err := http.GraphQL("{ viewer { login } }", nil, &response)
-	return response.Viewer.Login, err
+	return api.CurrentLoginName(http)
 }
 
 func waitForEnter(r io.Reader) error {

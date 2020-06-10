@@ -20,6 +20,9 @@ func TestIssueStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
@@ -49,6 +52,9 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -86,6 +92,9 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -637,7 +646,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
 

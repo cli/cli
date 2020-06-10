@@ -26,21 +26,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	prArg := args[0]
-	if prNum, repo := prFromURL(prArg); repo != nil {
-		prArg = prNum
-		baseRepo = repo
-	}
-
-	if baseRepo == nil {
-		baseRepo, err = determineBaseRepo(cmd, ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	pr, err := prFromArg(apiClient, baseRepo, prArg)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}
@@ -59,6 +45,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
+
 	if headRemote != nil {
 		// there is an existing git remote for PR head
 		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)

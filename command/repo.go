@@ -38,6 +38,9 @@ func init() {
 
 	repoCmd.AddCommand(repoViewCmd)
 	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
+
+	repoCmd.AddCommand(repoCreditsCmd)
+	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
 }
 
 var repoCmd = &cobra.Command{
@@ -55,6 +58,9 @@ var repoCloneCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
+
+If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
+defaults to the name of the authenticating user.
 
 To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
@@ -87,6 +93,19 @@ With no argument, the repository for the current directory is displayed.
 
 With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
+}
+
+var repoCreditsCmd = &cobra.Command{
+	Use:   "credits [<repository>]",
+	Short: "View credits for a repository",
+	Example: `$ gh repo credits           # view credits for the current repository
+$ gh repo credits cool/repo # view credits for cool/repo
+$ gh repo credits -s        # print a non-animated thank you
+$ gh repo credits | cat     # pipe to just print the contributors, one per line
+`,
+	Args:   cobra.MaximumNArgs(1),
+	RunE:   repoCredits,
+	Hidden: true,
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
@@ -125,8 +144,21 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func repoClone(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
+		if !strings.Contains(cloneURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient)
+			if err != nil {
+				return err
+			}
+			cloneURL = currentUser + "/" + cloneURL
+		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 
@@ -140,12 +172,6 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if repo != nil {
-		ctx := contextForCommand(cmd)
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-
 		parentRepo, err = api.RepoParent(apiClient, repo)
 		if err != nil {
 			return err
@@ -189,7 +215,10 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		name = args[0]
 		if strings.Contains(name, "/") {
-			newRepo := ghrepo.FromFullName(name)
+			newRepo, err := ghrepo.FromFullName(name)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 			orgName = newRepo.RepoOwner()
 			name = newRepo.RepoName()
 		}
@@ -336,7 +365,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	var repoToFork ghrepo.Interface
 	inParent := false // whether or not we're forking the repo we're currently "in"
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(cmd, ctx)
+		baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
@@ -366,9 +395,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			repoToFork = ghrepo.FromFullName(repoArg)
-			if repoToFork.RepoName() == "" || repoToFork.RepoOwner() == "" {
-				return fmt.Errorf("could not parse owner or repo name from %s", repoArg)
+			repoToFork, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
 			}
 		}
 	}
@@ -487,11 +516,15 @@ var Confirm = func(prompt string, result *bool) error {
 
 func repoView(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	var toView ghrepo.Interface
 	if len(args) == 0 {
 		var err error
-		toView, err = determineBaseRepo(cmd, ctx)
+		toView, err = determineBaseRepo(apiClient, cmd, ctx)
 		if err != nil {
 			return err
 		}
@@ -508,14 +541,14 @@ func repoView(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
 		} else {
-			toView = ghrepo.FromFullName(repoArg)
+			var err error
+			toView, err = ghrepo.FromFullName(repoArg)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
 		}
 	}
 
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
 	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err
@@ -579,4 +612,8 @@ func repoView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func repoCredits(cmd *cobra.Command, args []string) error {
+	return credits(cmd, args)
 }

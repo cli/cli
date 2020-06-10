@@ -6,6 +6,7 @@ release:
 before:
   hooks:
     - go mod tidy
+    - make manpages
 
 builds:
   - <<: &build_defaults
@@ -17,10 +18,12 @@ builds:
     id: macos
     goos: [darwin]
     goarch: [amd64]
+
   - <<: *build_defaults
     id: linux
     goos: [linux]
     goarch: [386, amd64, arm64]
+
   - <<: *build_defaults
     id: windows
     goos: [windows]
@@ -35,11 +38,16 @@ archives:
     replacements:
       darwin: macOS
     format: tar.gz
+    files:
+      - LICENSE
+      - ./share/man/man1/gh*.1
   - id: windows
     builds: [windows]
     <<: *archive_defaults
     wrap_in_directory: false
     format: zip
+    files:
+      - LICENSE
 
 brews:
   - name: gh
@@ -57,8 +65,9 @@ brews:
         depends_on "go"
       end
     install: |
-      system "make" if build.head?
+      system "make", "bin/gh", "manpages" if build.head?
       bin.install "bin/gh"
+      man1.install Dir["./share/man/man1/gh*.1"]
       (bash_completion/"gh.sh").write `#{bin}/gh completion -s bash`
       (zsh_completion/"_gh").write `#{bin}/gh completion -s zsh`
       (fish_completion/"gh.fish").write `#{bin}/gh completion -s fish`
@@ -76,6 +85,8 @@ nfpms:
     formats:
       - deb
       - rpm
+    files:
+      "./share/man/man1/gh*.1": "/usr/share/man/man1"
 
 scoop:
   bucket:

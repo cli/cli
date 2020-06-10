@@ -76,7 +76,6 @@ func TestPRCheckout_urlArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -125,7 +124,6 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,

@@ -3,8 +3,6 @@ package command
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -24,7 +22,7 @@ func init() {
 }
 
 var prReviewCmd = &cobra.Command{
-	Use:   "review [{<number> | <url> | <branch>]",
+	Use:   "review [<number> | <url> | <branch>]",
 	Short: "Add a review to a pull request.",
 	Args:  cobra.MaximumNArgs(1),
 	Long: `Add a review to either a specified pull request or the pull request associated with the current branch.
@@ -86,54 +84,19 @@ func processReviewOpt(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 
 func prReview(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
-	baseRepo, err := determineBaseRepo(cmd, ctx)
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	var prNum int
-	branchWithOwner := ""
-
-	if len(args) == 0 {
-		prNum, branchWithOwner, err = prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
-		}
-	} else {
-		prArg, repo := prFromURL(args[0])
-		if repo != nil {
-			baseRepo = repo
-		} else {
-			prArg = strings.TrimPrefix(args[0], "#")
-		}
-		prNum, err = strconv.Atoi(prArg)
-		if err != nil {
-			return errors.New("could not parse pull request argument")
-		}
+	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
+	if err != nil {
+		return err
 	}
 
 	reviewData, err := processReviewOpt(cmd)
 	if err != nil {
 		return fmt.Errorf("did not understand desired review action: %w", err)
-	}
-
-	var pr *api.PullRequest
-	if prNum > 0 {
-		pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNum)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-	} else {
-		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-		prNum = pr.Number
 	}
 
 	out := colorableOut(cmd)
@@ -156,11 +119,11 @@ func prReview(cmd *cobra.Command, args []string) error {
 
 	switch reviewData.State {
 	case api.ReviewComment:
-		fmt.Fprintf(out, "%s Reviewed pull request #%d\n", utils.Gray("-"), prNum)
+		fmt.Fprintf(out, "%s Reviewed pull request #%d\n", utils.Gray("-"), pr.Number)
 	case api.ReviewApprove:
-		fmt.Fprintf(out, "%s Approved pull request #%d\n", utils.Green("✓"), prNum)
+		fmt.Fprintf(out, "%s Approved pull request #%d\n", utils.Green("✓"), pr.Number)
 	case api.ReviewRequestChanges:
-		fmt.Fprintf(out, "%s Requested changes to pull request #%d\n", utils.Red("+"), prNum)
+		fmt.Fprintf(out, "%s Requested changes to pull request #%d\n", utils.Red("+"), pr.Number)
 	}
 
 	return nil

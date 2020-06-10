@@ -3,6 +3,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/cli/cli/api"
@@ -18,7 +19,6 @@ const defaultHostname = "github.com"
 type Context interface {
 	AuthToken() (string, error)
 	SetAuthToken(string)
-	AuthLogin() (string, error)
 	Branch() (string, error)
 	SetBranch(string)
 	Remotes() (Remotes, error)
@@ -39,7 +39,7 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 	}
 
 	hasBaseOverride := base != ""
-	baseOverride := ghrepo.FromFullName(base)
+	baseOverride, _ := ghrepo.FromFullName(base)
 	foundBaseOverride := false
 	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
 	for _, r := range remotes[:lenRemotesForLookup] {
@@ -163,11 +163,13 @@ type fsContext struct {
 
 func (c *fsContext) Config() (config.Config, error) {
 	if c.config == nil {
-		config, err := config.ParseOrSetupConfigFile(config.ConfigFile())
-		if err != nil {
+		cfg, err := config.ParseDefaultConfig()
+		if errors.Is(err, os.ErrNotExist) {
+			cfg = config.NewBlankConfig()
+		} else if err != nil {
 			return nil, err
 		}
-		c.config = config
+		c.config = cfg
 		c.authToken = ""
 	}
 	return c.config, nil
@@ -183,8 +185,12 @@ func (c *fsContext) AuthToken() (string, error) {
 		return "", err
 	}
 
+	var notFound *config.NotFoundError
 	token, err := cfg.Get(defaultHostname, "oauth_token")
-	if token == "" || err != nil {
+	if token == "" || errors.As(err, &notFound) {
+		// interactive OAuth flow
+		return config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: authentication required")
+	} else if err != nil {
 		return "", err
 	}
 
@@ -193,20 +199,6 @@ func (c *fsContext) AuthToken() (string, error) {
 
 func (c *fsContext) SetAuthToken(t string) {
 	c.authToken = t
-}
-
-func (c *fsContext) AuthLogin() (string, error) {
-	config, err := c.Config()
-	if err != nil {
-		return "", err
-	}
-
-	login, err := config.Get(defaultHostname, "user")
-	if login == "" || err != nil {
-		return "", err
-	}
-
-	return login, nil
 }
 
 func (c *fsContext) Branch() (string, error) {
@@ -266,5 +258,5 @@ func (c *fsContext) BaseRepo() (ghrepo.Interface, error) {
 }
 
 func (c *fsContext) SetBaseRepo(nwo string) {
-	c.baseRepo = ghrepo.FromFullName(nwo)
+	c.baseRepo, _ = ghrepo.FromFullName(nwo)
 }
