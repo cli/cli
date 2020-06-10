@@ -953,7 +953,7 @@ func PullRequestComment(client *Client, repo ghrepo.Interface, pr *PullRequest) 
 
 	input := githubv4.AddCommentInput{
 		SubjectID: pr.ID,
-                Body: githubv4.String(pr.Body),
+		Body:      githubv4.String(pr.Body),
 	}
 
 	v4 := githubv4.NewClient(client.http)
