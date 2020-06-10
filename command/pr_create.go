@@ -409,20 +409,17 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
 	RunE:  prCreate,
-	Long: `Create a pull request in a repository
-
-Examples:
-  $ gh pr create
-  $ gh pr create --fill
-  $ gh pr create -t "PR With Title And Body" -b "This is the pull request body"
-  $ gh pr create -t OpenAWebBrowserToCreateThisPR --web
-  $ gh pr create -t DraftPR --draft
-  $ gh pr create -t PRWithBaseBranch -b PRBody -B branchName
-  $ gh pr create -t PRWithReviewers -b PRBody -r user1Login,user2Login
-  $ gh pr create -t PRWithLabels -b PRBody -l label1,label2
-  $ gh pr create -t PRWithProjects -b PRBody -p cli/1,cli/2
-  $ gh pr create -t PRWithAssignees -b PRBody -a user1Login,user2Login
-  $ gh pr create -t PRWithMilestone -b PRBody -m someMilestone
+	Example: `$ gh pr create
+$ gh pr create --fill
+$ gh pr create -t "PR With Title And Body" -b "This is the pull request body"
+$ gh pr create -t OpenAWebBrowserToCreateThisPR --web
+$ gh pr create -t DraftPR --draft
+$ gh pr create -t PRWithBaseBranch -b PRBody -B branchName
+$ gh pr create -t PRWithReviewers -b PRBody -r user1Login,user2Login
+$ gh pr create -t PRWithLabels -b PRBody -l label1,label2
+$ gh pr create -t PRWithProjects -b PRBody -p cli/1,cli/2
+$ gh pr create -t PRWithAssignees -b PRBody -a user1Login,user2Login
+$ gh pr create -t PRWithMilestone -b PRBody -m someMilestone
 `,
 }
 
