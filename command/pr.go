@@ -335,12 +335,15 @@ func prView(cmd *cobra.Command, args []string) error {
 }
 
 func prAddComment(cmd *cobra.Command, args []string) error {
-prComment(cmd, args) 
-return nil	
+        err = prComment(cmd, args) // Ask user for comment (optional) 
+        if err != nil {
+		return fmt.Errorf("Error on add comment: %w", err)
+	}
+        return nil	
 }
 
 func prComment(cmd *cobra.Command, args []string) error {
-ctx := contextForCommand(cmd)
+        ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
