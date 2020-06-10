@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/internal/cobrafish"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +28,7 @@ For example, for bash you could add this to your '~/.bash_profile':
 
 When installing GitHub CLI through a package manager, however, it's possible that
 no additional shell configuration is necessary to gain completion support. For
-Homebrew, see <https://docs.brew.sh/Shell-Completion>
+Homebrew, see https://docs.brew.sh/Shell-Completion
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		shellType, err := cmd.Flags().GetString("shell")
@@ -58,7 +57,7 @@ Homebrew, see <https://docs.brew.sh/Shell-Completion>
 		case "powershell":
 			return RootCmd.GenPowerShellCompletion(cmd.OutOrStdout())
 		case "fish":
-			return cobrafish.GenCompletion(RootCmd, cmd.OutOrStdout())
+			return RootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
 		default:
 			return fmt.Errorf("unsupported shell type %q", shellType)
 		}

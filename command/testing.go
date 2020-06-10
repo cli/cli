@@ -19,7 +19,7 @@ import (
 const defaultTestConfig = `hosts:
   github.com:
     user: OWNER
-    oauth_token: 1234567890
+    oauth_token: "1234567890"
 `
 
 type askStubber struct {
@@ -88,7 +88,7 @@ func initBlankContext(cfg, repo, branch string) {
 
 		// NOTE we are not restoring the original readConfig; we never want to touch the config file on
 		// disk during tests.
-		config.StubConfig(cfg)
+		config.StubConfig(cfg, "")
 
 		return ctx
 	}

@@ -1,13 +1,10 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -39,43 +36,12 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return fmt.Errorf("could not find pull request: %w", err)
 	}
 
-	// begin pr resolution boilerplate
-	var prNum int
-	branchWithOwner := ""
-
-	if len(args) == 0 {
-		prNum, branchWithOwner, err = prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
-		}
-	} else {
-		prArg, repo := prFromURL(args[0])
-		if repo != nil {
-			baseRepo = repo
-		} else {
-			prArg = strings.TrimPrefix(args[0], "#")
-		}
-		prNum, err = strconv.Atoi(prArg)
-		if err != nil {
-			return errors.New("could not parse pull request argument")
-		}
-	}
-
-	if prNum < 1 {
-		pr, err := api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-		prNum = pr.Number
-	}
-	// end pr resolution boilerplate
-
-	diff, err := apiClient.PullRequestDiff(baseRepo, prNum)
+	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}

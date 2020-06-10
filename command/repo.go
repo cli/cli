@@ -38,16 +38,25 @@ func init() {
 
 	repoCmd.AddCommand(repoViewCmd)
 	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
+
+	repoCmd.AddCommand(repoCreditsCmd)
+	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
 }
 
 var repoCmd = &cobra.Command{
-	Use:   "repo",
+	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
-	Long: `Work with GitHub repositories.
-
+	Long:  `Work with GitHub repositories`,
+	Example: `$ gh repo create
+$ gh repo clone cli/cli 
+$ gh repo view --web
+`,
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
-- by URL, e.g. "https://github.com/OWNER/REPO"`,
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 }
 
 var repoCloneCmd = &cobra.Command{
@@ -56,6 +65,9 @@ var repoCloneCmd = &cobra.Command{
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
+If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
+defaults to the name of the authenticating user.
+
 To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
 }
@@ -63,9 +75,18 @@ To pass 'git clone' flags, separate them with '--'.`,
 var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
-	Long: `Create a new GitHub repository.
+	Long:  `Create a new GitHub repository`,
+	Example: utils.Bold("$ gh repo create") + `
+Will create a repository on your account using the name of your current directory
 
-Use the "ORG/NAME" syntax to create a repository within your organization.`,
+` + utils.Bold("$ gh repo create my-project") + `
+Will create a repository on your account using the name 'my-project'
+
+` + utils.Bold("$ gh repo create cli/my-project") + `
+Will create a repository in the organization 'cli' using the name 'my-project'`,
+	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
+- <OWNER/REPO>
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 	RunE: repoCreate,
 }
 
@@ -87,6 +108,19 @@ With no argument, the repository for the current directory is displayed.
 
 With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
+}
+
+var repoCreditsCmd = &cobra.Command{
+	Use:   "credits [<repository>]",
+	Short: "View credits for a repository",
+	Example: `$ gh repo credits           # view credits for the current repository
+$ gh repo credits cool/repo # view credits for cool/repo
+$ gh repo credits -s        # print a non-animated thank you
+$ gh repo credits | cat     # pipe to just print the contributors, one per line
+`,
+	Args:   cobra.MaximumNArgs(1),
+	RunE:   repoCredits,
+	Hidden: true,
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
@@ -125,8 +159,21 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func repoClone(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
+		if !strings.Contains(cloneURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient)
+			if err != nil {
+				return err
+			}
+			cloneURL = currentUser + "/" + cloneURL
+		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 
@@ -140,12 +187,6 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if repo != nil {
-		ctx := contextForCommand(cmd)
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-
 		parentRepo, err = api.RepoParent(apiClient, repo)
 		if err != nil {
 			return err
@@ -586,4 +627,8 @@ func repoView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func repoCredits(cmd *cobra.Command, args []string) error {
+	return credits(cmd, args)
 }
