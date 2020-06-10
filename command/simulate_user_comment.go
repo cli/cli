@@ -10,7 +10,7 @@ import (
 var EnabledTestingModeforComment bool = false
 
 //TemporariFileforKeyPress is a tmpfile to simulate input text for Testing
-var TemporariFileforKeyPress os.File
+var TemporariFileforKeyPress *os.File
 
 //DisableTestingModeforComment will disable simulate keypress
 func DisableTestingModeforComment() error {
@@ -27,21 +27,19 @@ func EnableTestingModeforComment() error {
 		return err
 	}
 
-	TemporariFileforKeyPress = *in
+	TemporariFileforKeyPress = in
 
 	return nil
 }
 
 //SimulateUserInput is to simulate keypress on comments for Testing
 func SimulateUserInput(text string) error {
-	_, err := io.WriteString(&TemporariFileforKeyPress, text)
+	_, err := io.WriteString(TemporariFileforKeyPress, text)
 	if err != nil {
 		return (err)
 	}
 
-	tmpio := &TemporariFileforKeyPress
-
-	_, err = tmpio.Seek(io.SeekStart, 0)
+	_, err = TemporariFileforKeyPress.Seek(io.SeekStart, 0)
 	if err != nil {
 		return err
 	}
