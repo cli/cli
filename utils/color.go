@@ -52,7 +52,7 @@ func makeColorFunc(color string) func(string) string {
 	}
 }
 
-func isColorEnabled() bool {	
+func isColorEnabled() bool {
 	if !checkedNoColor {
 		_isColorEnabled = os.Getenv("NO_COLOR") == ""
 		checkedNoColor = true
