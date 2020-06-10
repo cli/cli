@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/cli/cli/utils"
@@ -12,6 +13,8 @@ import (
 func init() {
 	RootCmd.AddCommand(aliasCmd)
 	aliasCmd.AddCommand(aliasSetCmd)
+	aliasCmd.AddCommand(aliasListCmd)
+	aliasCmd.AddCommand(aliasDeleteCmd)
 }
 
 var aliasCmd = &cobra.Command{
@@ -21,10 +24,8 @@ var aliasCmd = &cobra.Command{
 
 var aliasSetCmd = &cobra.Command{
 	Use: "set <alias> <expansion>",
-	// NB: Even when inside of a single-quoted string, cobra was noticing and parsing any flags
-	// used in an alias expansion string argument. Since this command needs no flags, I disabled their
-	// parsing. If we ever want to add flags to alias set we'll have to figure this out. I tested on
-	// linux in various shells against cobra 1.0; others on macos did /not/ see the same behavior.
+	// NB: this allows a user to eschew quotes when specifiying an alias expansion. We'll have to
+	// revisit it if we ever want to add flags to alias set but we have no current plans for that.
 	DisableFlagParsing: true,
 	Short:              "Create a shortcut for a gh command",
 	Long:               `This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
@@ -72,11 +73,12 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 
 	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
 
-	if aliasCfg.Exists(alias) {
+	oldExpansion, ok := aliasCfg.Get(alias)
+	if ok {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
 			utils.Green("✓"),
 			utils.Bold(alias),
-			utils.Bold(aliasCfg.Get(alias)),
+			utils.Bold(oldExpansion),
 			utils.Bold(expansionStr),
 		)
 	}
@@ -111,4 +113,96 @@ func processArgs(args []string) []string {
 	}
 
 	return newArgs
+}
+
+var aliasListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List your aliases",
+	Long:  `This command prints out all of the aliases gh is configured to use.`,
+	Args:  cobra.ExactArgs(0),
+	RunE:  aliasList,
+}
+
+func aliasList(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	cfg, err := ctx.Config()
+	if err != nil {
+		return fmt.Errorf("couldn't read config: %w", err)
+	}
+
+	aliasCfg, err := cfg.Aliases()
+	if err != nil {
+		return fmt.Errorf("couldn't read aliases config: %w", err)
+	}
+
+	stderr := colorableErr(cmd)
+
+	if aliasCfg.Empty() {
+		fmt.Fprintf(stderr, "no aliases configured\n")
+		return nil
+	}
+
+	stdout := colorableOut(cmd)
+
+	tp := utils.NewTablePrinter(stdout)
+
+	aliasMap := aliasCfg.All()
+	keys := []string{}
+	for alias := range aliasMap {
+		keys = append(keys, alias)
+	}
+	sort.Strings(keys)
+
+	for _, alias := range keys {
+		if tp.IsTTY() {
+			// ensure that screen readers pause
+			tp.AddField(alias+":", nil, nil)
+		} else {
+			tp.AddField(alias, nil, nil)
+		}
+		tp.AddField(aliasMap[alias], nil, nil)
+		tp.EndRow()
+	}
+
+	return tp.Render()
+}
+
+var aliasDeleteCmd = &cobra.Command{
+	Use:     "delete <alias>",
+	Short:   "Delete an alias.",
+	Args:    cobra.ExactArgs(1),
+	Example: "gh alias delete co",
+	RunE:    aliasDelete,
+}
+
+func aliasDelete(cmd *cobra.Command, args []string) error {
+	alias := args[0]
+
+	ctx := contextForCommand(cmd)
+	cfg, err := ctx.Config()
+	if err != nil {
+		return fmt.Errorf("couldn't read config: %w", err)
+	}
+
+	aliasCfg, err := cfg.Aliases()
+	if err != nil {
+		return fmt.Errorf("couldn't read aliases config: %w", err)
+	}
+
+	expansion, ok := aliasCfg.Get(alias)
+	if !ok {
+		return fmt.Errorf("no such alias %s", alias)
+
+	}
+
+	err = aliasCfg.Delete(alias)
+	if err != nil {
+		return fmt.Errorf("failed to delete alias %s: %w", alias, err)
+	}
+
+	out := colorableOut(cmd)
+	redCheck := utils.Red("✓")
+	fmt.Fprintf(out, "%s Deleted alias %s; was %s\n", redCheck, alias, expansion)
+
+	return nil
 }

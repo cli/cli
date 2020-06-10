@@ -646,7 +646,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
 

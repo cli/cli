@@ -355,11 +355,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var templateFiles []string
+	var nonLegacyTemplateFiles []string
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
@@ -395,12 +395,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
 		if title != "" || body != "" {
-			openURL += fmt.Sprintf(
-				"?title=%s&body=%s",
-				url.QueryEscape(title),
-				url.QueryEscape(body),
-			)
-		} else if len(templateFiles) > 1 {
+			milestone := ""
+			if len(milestoneTitles) > 0 {
+				milestone = milestoneTitles[0]
+			}
+			openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+			if err != nil {
+				return err
+			}
+		} else if len(nonLegacyTemplateFiles) > 1 {
 			openURL += "/choose"
 		}
 		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
@@ -419,6 +422,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	action := SubmitAction
 	tb := issueMetadataState{
+		Type:       issueMetadata,
 		Assignees:  assignees,
 		Labels:     labelNames,
 		Projects:   projectNames,
@@ -428,7 +432,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
+		var legacyTemplateFile *string
+		if baseOverride == "" {
+			if rootDir, err := git.ToplevelDir(); err == nil {
+				// TODO: figure out how to stub this in tests
+				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+			}
+		}
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -454,12 +465,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := fmt.Sprintf(
-			"https://github.com/%s/issues/new/?title=%s&body=%s",
-			ghrepo.FullName(baseRepo),
-			url.QueryEscape(title),
-			url.QueryEscape(body),
-		)
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new/", ghrepo.FullName(baseRepo))
+		milestone := ""
+		if len(milestoneTitles) > 0 {
+			milestone = milestoneTitles[0]
+		}
+		openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+		if err != nil {
+			return err
+		}
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)

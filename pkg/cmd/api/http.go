@@ -11,8 +11,14 @@ import (
 )
 
 func httpRequest(client *http.Client, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+	var requestURL string
 	// TODO: GHE support
-	url := "https://api.github.com/" + p
+	if strings.Contains(p, "://") {
+		requestURL = p
+	} else {
+		requestURL = "https://api.github.com/" + p
+	}
+
 	var body io.Reader
 	var bodyIsJSON bool
 	isGraphQL := p == "graphql"
@@ -20,7 +26,7 @@ func httpRequest(client *http.Client, method string, p string, params interface{
 	switch pp := params.(type) {
 	case map[string]interface{}:
 		if strings.EqualFold(method, "GET") {
-			url = addQuery(url, pp)
+			requestURL = addQuery(requestURL, pp)
 		} else {
 			for key, value := range pp {
 				switch vv := value.(type) {
@@ -46,7 +52,7 @@ func httpRequest(client *http.Client, method string, p string, params interface{
 		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
 	}
 
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequest(method, requestURL, body)
 	if err != nil {
 		return nil, err
 	}

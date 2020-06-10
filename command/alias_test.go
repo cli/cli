@@ -183,10 +183,6 @@ aliases:
 
 func TestExpandAlias(t *testing.T) {
 	cfg := `---
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: token123
 aliases:
   co: pr checkout
   il: issue list --author="$1" --label="$2"
@@ -240,4 +236,86 @@ func TestAliasSet_invalid_command(t *testing.T) {
 	}
 
 	eq(t, err.Error(), "could not create alias: pe checkout does not correspond to a gh command")
+}
+
+func TestAliasList_empty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	output, err := RunCommand("alias list")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	eq(t, output.String(), "")
+}
+
+func TestAliasList(t *testing.T) {
+	cfg := `---
+aliases:
+  co: pr checkout
+  il: issue list --author=$1 --label=$2
+  clone: repo clone
+  prs: pr status
+  cs: config set editor 'quoted path'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	output, err := RunCommand("alias list")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	expected := `clone	repo clone
+co	pr checkout
+cs	config set editor 'quoted path'
+il	issue list --author=$1 --label=$2
+prs	pr status
+`
+
+	eq(t, output.String(), expected)
+}
+
+func TestAliasDelete_nonexistent_command(t *testing.T) {
+	cfg := `---
+aliases:
+  co: pr checkout
+  il: issue list --author="$1" --label="$2"
+  ia: issue list --author="$1" --assignee="$1"
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	_, err := RunCommand("alias delete cool")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	eq(t, err.Error(), "no such alias cool")
+}
+
+func TestAliasDelete(t *testing.T) {
+	cfg := `---
+aliases:
+  co: pr checkout
+  il: issue list --author="$1" --label="$2"
+  ia: issue list --author="$1" --assignee="$1"
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
+	output, err := RunCommand("alias delete co")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Deleted alias co; was pr checkout")
+
+	expected := `aliases:
+    il: issue list --author="$1" --label="$2"
+    ia: issue list --author="$1" --assignee="$1"
+`
+
+	eq(t, mainBuf.String(), expected)
 }

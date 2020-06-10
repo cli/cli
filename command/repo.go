@@ -38,6 +38,9 @@ func init() {
 
 	repoCmd.AddCommand(repoViewCmd)
 	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
+
+	repoCmd.AddCommand(repoCreditsCmd)
+	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
 }
 
 var repoCmd = &cobra.Command{
@@ -61,6 +64,9 @@ var repoCloneCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
+
+If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
+defaults to the name of the authenticating user.
 
 To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
@@ -104,6 +110,19 @@ With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
 }
 
+var repoCreditsCmd = &cobra.Command{
+	Use:   "credits [<repository>]",
+	Short: "View credits for a repository",
+	Example: `$ gh repo credits           # view credits for the current repository
+$ gh repo credits cool/repo # view credits for cool/repo
+$ gh repo credits -s        # print a non-animated thank you
+$ gh repo credits | cat     # pipe to just print the contributors, one per line
+`,
+	Args:   cobra.MaximumNArgs(1),
+	RunE:   repoCredits,
+	Hidden: true,
+}
+
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
 	args = extraArgs
 
@@ -140,8 +159,21 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func repoClone(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
+		if !strings.Contains(cloneURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient)
+			if err != nil {
+				return err
+			}
+			cloneURL = currentUser + "/" + cloneURL
+		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 
@@ -155,12 +187,6 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if repo != nil {
-		ctx := contextForCommand(cmd)
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-
 		parentRepo, err = api.RepoParent(apiClient, repo)
 		if err != nil {
 			return err
@@ -601,4 +627,8 @@ func repoView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func repoCredits(cmd *cobra.Command, args []string) error {
+	return credits(cmd, args)
 }
