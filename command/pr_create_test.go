@@ -519,7 +519,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	expectedBody := "- commit 0\n- commit 1\n"
+	expectedBody := "- commit 1\n- commit 0\n"
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "cool bug fixes")

@@ -40,8 +40,8 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 		out.Title = utils.Humanize(headRef)
 
 		body := ""
-		for _, c := range commits {
-			body += fmt.Sprintf("- %s\n", c.Title)
+		for i := len(commits) - 1; i >= 0; i-- {
+			body += fmt.Sprintf("- %s\n", commits[i].Title)
 		}
 		out.Body = body
 	}
@@ -203,6 +203,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	tb := issueMetadataState{
+		Type:       prMetadata,
 		Reviewers:  reviewers,
 		Assignees:  assignees,
 		Labels:     labelNames,
@@ -213,13 +214,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if !isWeb && !autofill && interactive {
-		var templateFiles []string
+		var nonLegacyTemplateFiles []string
+		var legacyTemplateFile *string
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "PULL_REQUEST_TEMPLATE")
+			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
+			legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
-
-		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, templateFiles, true, baseRepo.ViewerCanTriage())
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
