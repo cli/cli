@@ -38,8 +38,9 @@ func SimulateUserInput(text string) error {
 	if err != nil {
 		return (err)
 	}
+	var tempio *os.File = TemporariFileforKeyPress
 
-	_, err = TemporariFileforKeyPress.Seek(io.SeekStart, 0)
+	_, err = tempio.Seek(io.SeekStart, 0)
 	if err != nil {
 		return err
 	}
