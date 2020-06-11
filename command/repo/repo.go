@@ -30,7 +30,11 @@ A repository can be supplied as an argument in any of the following formats:
 }
 
 func init() {
-	// root repo cmd here ...
+	repoCmd.AddCommand(RepoCloneCmd())
+	repoCmd.AddCommand(RepoCreateCmd())
+	repoCmd.AddCommand(RepoCreditsCmd())
+	repoCmd.AddCommand(RepoForkCmd())
+	repoCmd.AddCommand(RepoViewCmd())
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
