@@ -180,7 +180,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	}
 
 	bodyQs := []*survey.Question{
-		&survey.Question{
+		{
 			Name: "body",
 			Prompt: &surveyext.GhEditor{
 				BlankAllowed:  blankAllowed,
