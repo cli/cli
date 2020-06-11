@@ -122,8 +122,8 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
-func InitDefaultConfig() (Config, error) {
-	cfg := NewConfig(&yaml.Node{
+func NewBlankConfig() Config {
+	return NewConfig(&yaml.Node{
 		Kind: yaml.DocumentNode,
 		Content: []*yaml.Node{
 			{
@@ -168,21 +168,6 @@ func InitDefaultConfig() (Config, error) {
 				},
 			},
 		},
-	})
-
-	err := cfg.Write()
-	if err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
-
-}
-
-func NewBlankConfig() Config {
-	return NewConfig(&yaml.Node{
-		Kind:    yaml.DocumentNode,
-		Content: []*yaml.Node{{Kind: yaml.MappingNode}},
 	})
 }
 
