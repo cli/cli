@@ -16,7 +16,7 @@ import (
 func prFromArgs(ctx context.Context, apiClient *api.Client, cmd *cobra.Command, args []string) (*api.PullRequest, ghrepo.Interface, error) {
 	if len(args) == 1 {
 		// First check to see if the prString is a url, return repo from url if found. This
-		// is run first because we don't need to run determineBaseRepo for this path
+		// is run first because we don't need to run DetermineBaseRepo for this path
 		prString := args[0]
 		pr, r, err := prFromURL(ctx, apiClient, prString)
 		if pr != nil || err != nil {
@@ -24,7 +24,7 @@ func prFromArgs(ctx context.Context, apiClient *api.Client, cmd *cobra.Command, 
 		}
 	}
 
-	repo, err := determineBaseRepo(apiClient, cmd, ctx)
+	repo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 	}

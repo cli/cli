@@ -14,8 +14,8 @@ import (
 )
 
 func TestPRCreate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -67,8 +67,8 @@ func TestPRCreate(t *testing.T) {
 }
 
 func TestPRCreate_metadata(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	defer http.Verify(t)
 
 	http.Register(
@@ -191,8 +191,8 @@ func TestPRCreate_metadata(t *testing.T) {
 }
 
 func TestPRCreate_withForking(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponseWithPermission("OWNER", "REPO", "READ")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "forks": { "nodes": [
@@ -234,8 +234,8 @@ func TestPRCreate_withForking(t *testing.T) {
 }
 
 func TestPRCreate_alreadyExists(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -267,8 +267,8 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 }
 
 func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -299,8 +299,8 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 }
 
 func TestPRCreate_web(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -330,8 +330,8 @@ func TestPRCreate_web(t *testing.T) {
 }
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -374,10 +374,10 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 		"origin": "OWNER/REPO",
 		"fork":   "MYSELF/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repo_000": {
 									"id": "REPOID0",
@@ -455,8 +455,8 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 }
 
 func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "cool_bug-fixes")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "cool_bug-fixes")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -531,8 +531,8 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 }
 
 func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`\bviewerPermission\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
 	http.Register(httpmock.GraphQL(`\bforks\(`), httpmock.StringResponse(`
@@ -592,8 +592,8 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 }
 
 func TestPRCreate_survey_autofill(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [
@@ -650,8 +650,8 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_autofill(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -668,8 +668,8 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_web(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -686,8 +686,8 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 }
 
 func TestPRCreate_defaults_error_interactive(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "forks": { "nodes": [

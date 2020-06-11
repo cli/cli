@@ -9,9 +9,9 @@ import (
 )
 
 func TestGistCreate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 	{
 		"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"

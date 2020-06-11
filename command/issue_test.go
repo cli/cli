@@ -17,8 +17,8 @@ import (
 )
 
 func TestIssueStatus(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`\bviewer\b`),
@@ -49,8 +49,8 @@ func TestIssueStatus(t *testing.T) {
 }
 
 func TestIssueStatus_blankSlate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`\bviewer\b`),
@@ -89,8 +89,8 @@ Issues opened by you
 }
 
 func TestIssueStatus_disabledIssues(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`\bviewer\b`),
@@ -109,8 +109,8 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
@@ -142,8 +142,8 @@ Showing 3 of 3 issues in OWNER/REPO
 }
 
 func TestIssueList_withFlags(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -182,8 +182,8 @@ No issues match your search in OWNER/REPO
 }
 
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -211,8 +211,8 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 }
 
 func TestIssueList_disabledIssues(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -228,8 +228,8 @@ func TestIssueList_disabledIssues(t *testing.T) {
 }
 
 func TestIssueView_web(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -262,8 +262,8 @@ func TestIssueView_web(t *testing.T) {
 }
 
 func TestIssueView_web_numberArgWithHash(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -352,8 +352,8 @@ func TestIssueView_Preview(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
-			http := initFakeHTTP()
+			InitBlankContext("", "OWNER/REPO", tc.ownerRepo)
+			http := InitFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
 
 			jsonFile, _ := os.Open(tc.fixture)
@@ -373,8 +373,8 @@ func TestIssueView_Preview(t *testing.T) {
 }
 
 func TestIssueView_web_notFound(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "errors": [
@@ -400,8 +400,8 @@ func TestIssueView_web_notFound(t *testing.T) {
 }
 
 func TestIssueView_disabledIssues(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -418,8 +418,8 @@ func TestIssueView_disabledIssues(t *testing.T) {
 }
 
 func TestIssueView_web_urlArg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -451,8 +451,8 @@ func TestIssueView_web_urlArg(t *testing.T) {
 }
 
 func TestIssueCreate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -492,8 +492,8 @@ func TestIssueCreate(t *testing.T) {
 }
 
 func TestIssueCreate_metadata(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	defer http.Verify(t)
 
 	http.Register(
@@ -582,8 +582,8 @@ func TestIssueCreate_metadata(t *testing.T) {
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -600,8 +600,8 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 }
 
 func TestIssueCreate_web(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
@@ -626,8 +626,8 @@ func TestIssueCreate_web(t *testing.T) {
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	var seenCmd *exec.Cmd
@@ -782,8 +782,8 @@ func TestIssueStateTitleWithColor(t *testing.T) {
 }
 
 func TestIssueClose(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -808,8 +808,8 @@ func TestIssueClose(t *testing.T) {
 }
 
 func TestIssueClose_alreadyClosed(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -834,8 +834,8 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 }
 
 func TestIssueClose_issuesDisabled(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -855,8 +855,8 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 }
 
 func TestIssueReopen(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -881,8 +881,8 @@ func TestIssueReopen(t *testing.T) {
 }
 
 func TestIssueReopen_alreadyOpen(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -907,8 +907,8 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 }
 
 func TestIssueReopen_issuesDisabled(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`

@@ -19,10 +19,10 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -72,10 +72,10 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -120,10 +120,10 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -181,10 +181,10 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -231,10 +231,10 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -284,10 +284,10 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 		"origin":     "OWNER/REPO",
 		"robot-fork": "hubot/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -337,10 +337,10 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -390,10 +390,10 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -441,10 +441,10 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -492,10 +492,10 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	ctx.SetRemotes(map[string]string{
 		"origin": "OWNER/REPO",
 	})
-	initContext = func() context.Context {
+	InitContext = func() context.Context {
 		return ctx
 	}
-	http := initFakeHTTP()
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`

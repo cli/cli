@@ -14,14 +14,14 @@ import (
 )
 
 func prCheckout(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 	currentBranch, _ := ctx.Branch()
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
 	}
 
-	apiClient, err := apiClientForContext(ctx)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
-	baseURLOrName := formatRemoteURL(cmd, ghrepo.FullName(baseRepo))
+	baseURLOrName := FormatRemoteURL(cmd, ghrepo.FullName(baseRepo))
 	if baseRemote != nil {
 		baseURLOrName = baseRemote.Name
 	}
@@ -84,7 +84,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseURLOrName
 		mergeRef := ref
 		if pr.MaintainerCanModify {
-			remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
+			remote = FormatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
 		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {

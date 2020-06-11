@@ -10,7 +10,7 @@ import (
 )
 
 func TestAliasSet_gh_command(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -29,7 +29,7 @@ func TestAliasSet_empty_aliases(t *testing.T) {
 aliases:
 editor: vim
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -59,7 +59,7 @@ hosts:
 aliases:
   co: pr checkout
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -75,7 +75,7 @@ aliases:
 }
 
 func TestAliasSet_space_args(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -93,7 +93,7 @@ func TestAliasSet_space_args(t *testing.T) {
 }
 
 func TestAliasSet_arg_processing(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 	cases := []struct {
 		Cmd                string
 		ExpectedOutputLine string
@@ -137,7 +137,7 @@ func TestAliasSet_init_alias_cfg(t *testing.T) {
 	cfg := `---
 editor: vim
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -161,7 +161,7 @@ func TestAliasSet_existing_aliases(t *testing.T) {
 aliases:
     foo: bar
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -188,7 +188,7 @@ aliases:
   il: issue list --author="$1" --label="$2"
   ia: issue list --author="$1" --assignee="$1"
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 	for _, c := range []struct {
 		Args         string
 		ExpectedArgs []string
@@ -229,7 +229,7 @@ aliases:
 }
 
 func TestAliasSet_invalid_command(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 	_, err := RunCommand("alias set co pe checkout")
 	if err == nil {
 		t.Fatal("expected error")
@@ -239,7 +239,7 @@ func TestAliasSet_invalid_command(t *testing.T) {
 }
 
 func TestAliasList_empty(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "trunk")
+	InitBlankContext("", "OWNER/REPO", "trunk")
 
 	output, err := RunCommand("alias list")
 
@@ -259,7 +259,7 @@ aliases:
   prs: pr status
   cs: config set editor 'quoted path'
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	output, err := RunCommand("alias list")
 	if err != nil {
@@ -282,7 +282,7 @@ aliases:
   il: issue list --author="$1" --label="$2"
   ia: issue list --author="$1" --assignee="$1"
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	_, err := RunCommand("alias delete cool")
 	if err == nil {
@@ -299,7 +299,7 @@ aliases:
   il: issue list --author="$1" --label="$2"
   ia: issue list --author="$1" --assignee="$1"
 `
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
+	InitBlankContext(cfg, "OWNER/REPO", "trunk")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}

@@ -114,7 +114,7 @@ var versionCmd = &cobra.Command{
 }
 
 // overridden in tests
-var initContext = func() context.Context {
+var InitContext = func() context.Context {
 	ctx := context.New()
 	if repo := os.Getenv("GH_REPO"); repo != "" {
 		ctx.SetBaseRepo(repo)
@@ -146,8 +146,8 @@ func BasicClient() (*api.Client, error) {
 	return api.NewClient(opts...), nil
 }
 
-func contextForCommand(cmd *cobra.Command) context.Context {
-	ctx := initContext()
+func ContextForCommand(cmd *cobra.Command) context.Context {
+	ctx := InitContext()
 	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {
 		ctx.SetBaseRepo(repo)
 	}
@@ -168,7 +168,7 @@ func httpClient(token string) *http.Client {
 }
 
 // overridden in tests
-var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
+var ApiClientForContext = func(ctx context.Context) (*api.Client, error) {
 	token, err := ctx.AuthToken()
 	if err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 			return nil, err
 		}
 
-		reloadedClient, err := apiClientForContext(ctx)
+		reloadedClient, err := ApiClientForContext(ctx)
 		if err != nil {
 			return client, err
 		}
@@ -268,7 +268,7 @@ func apiVerboseLog() api.ClientOption {
 	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
 }
 
-func colorableOut(cmd *cobra.Command) io.Writer {
+func ColorableOut(cmd *cobra.Command) io.Writer {
 	out := cmd.OutOrStdout()
 	if outFile, isFile := out.(*os.File); isFile {
 		return utils.NewColorable(outFile)
@@ -295,7 +295,7 @@ func changelogURL(version string) string {
 	return url
 }
 
-func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
+func DetermineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
 	repo, err := cmd.Flags().GetString("repo")
 	if err == nil && repo != "" {
 		baseRepo, err := ghrepo.FromFullName(repo)
@@ -328,8 +328,8 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
-func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
-	ctx := contextForCommand(cmd)
+func FormatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
+	ctx := ContextForCommand(cmd)
 
 	protocol := "https"
 	cfg, err := ctx.Config()
@@ -350,7 +350,7 @@ func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
 func determineEditor(cmd *cobra.Command) (string, error) {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
-		ctx := contextForCommand(cmd)
+		ctx := ContextForCommand(cmd)
 		cfg, err := ctx.Config()
 		if err != nil {
 			return "", fmt.Errorf("could not read config: %w", err)
@@ -368,7 +368,7 @@ func ExpandAlias(args []string) ([]string, error) {
 		return empty, nil
 	}
 
-	ctx := initContext()
+	ctx := InitContext()
 	cfg, err := ctx.Config()
 	if err != nil {
 		return empty, err

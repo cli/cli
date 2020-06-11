@@ -99,13 +99,13 @@ var issueReopenCmd = &cobra.Command{
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -160,13 +160,13 @@ func issueList(cmd *cobra.Command, args []string) error {
 }
 
 func issueStatus(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	out := colorableOut(cmd)
+	out := ColorableOut(cmd)
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
@@ -216,14 +216,14 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 }
 
 func issueView(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 
-	apiClient, err := apiClientForContext(ctx)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	} else {
-		out := colorableOut(cmd)
+		out := ColorableOut(cmd)
 		return printIssuePreview(out, issue)
 	}
 
@@ -338,14 +338,14 @@ func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) 
 }
 
 func issueCreate(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
 	// NB no auto forking like over in pr create
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		} else if len(nonLegacyTemplateFiles) > 1 {
 			openURL += "/choose"
 		}
-		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
+		cmd.Printf("Opening %s in your browser.\n", DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	}
 
@@ -475,7 +475,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else if action == SubmitAction {
 		params := map[string]interface{}{
@@ -660,13 +660,13 @@ func issueProjectList(issue api.Issue) string {
 }
 
 func issueClose(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -695,13 +695,13 @@ func issueClose(cmd *cobra.Command, args []string) error {
 }
 
 func issueReopen(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -729,7 +729,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func displayURL(urlStr string) string {
+func DisplayURL(urlStr string) string {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return urlStr

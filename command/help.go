@@ -94,7 +94,7 @@ Read the manual at http://cli.github.com/manual`})
 		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
 	}
 
-	out := colorableOut(command)
+	out := ColorableOut(command)
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body

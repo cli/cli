@@ -51,8 +51,8 @@ type Opts struct {
 }
 
 func gistCreate(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	client, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}

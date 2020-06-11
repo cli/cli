@@ -50,13 +50,13 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 }
 
 func prCreate(cmd *cobra.Command, _ []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return err
 	}
 
-	client, err := apiClientForContext(ctx)
+	client, err := ApiClientForContext(ctx)
 	if err != nil {
 		return fmt.Errorf("could not initialize API client: %w", err)
 	}
@@ -287,7 +287,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
 	if headRemote == nil {
-		headRepoURL := formatRemoteURL(cmd, ghrepo.FullName(headRepo))
+		headRepoURL := FormatRemoteURL(cmd, ghrepo.FullName(headRepo))
 
 		// TODO: prevent clashes with another remote of a same name
 		gitRemote, err := git.AddRemote("fork", headRepoURL)
@@ -351,7 +351,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else {
 		panic("Unreachable state")

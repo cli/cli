@@ -14,8 +14,8 @@ func TestPRDiff_validation(t *testing.T) {
 }
 
 func TestPRDiff_no_current_pr(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -34,8 +34,8 @@ func TestPRDiff_no_current_pr(t *testing.T) {
 }
 
 func TestPRDiff_argument_not_found(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -51,8 +51,8 @@ func TestPRDiff_argument_not_found(t *testing.T) {
 }
 
 func TestPRDiff(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [

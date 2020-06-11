@@ -110,13 +110,13 @@ var prReadyCmd = &cobra.Command{
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	out := colorableOut(cmd)
+	out := ColorableOut(cmd)
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
@@ -176,13 +176,13 @@ func prStatus(cmd *cobra.Command, args []string) error {
 }
 
 func prList(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err := DetermineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
 		return err
 	}
@@ -303,9 +303,9 @@ func colorFuncForState(state string) func(string) string {
 }
 
 func prView(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 
-	apiClient, err := apiClientForContext(ctx)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -325,14 +325,14 @@ func prView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	} else {
-		out := colorableOut(cmd)
+		out := ColorableOut(cmd)
 		return printPrPreview(out, pr)
 	}
 }
 
 func prClose(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -361,8 +361,8 @@ func prClose(cmd *cobra.Command, args []string) error {
 }
 
 func prReopen(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -393,8 +393,8 @@ func prReopen(cmd *cobra.Command, args []string) error {
 }
 
 func prMerge(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -472,7 +472,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
+	fmt.Fprintf(ColorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
 
 	if deleteBranch {
 		repo, err := api.GitHubRepo(apiClient, baseRepo)
@@ -519,7 +519,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+		fmt.Fprintf(ColorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil
@@ -631,8 +631,8 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 }
 
 func prReady(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}

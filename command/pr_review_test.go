@@ -11,8 +11,8 @@ import (
 )
 
 func TestPRReview_validation(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	for _, cmd := range []string{
 		`pr review --approve --comment 123`,
 		`pr review --approve --comment -b"hey" 123`,
@@ -32,8 +32,8 @@ func TestPRReview_validation(t *testing.T) {
 }
 
 func TestPRReview_bad_body(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -48,8 +48,8 @@ func TestPRReview_bad_body(t *testing.T) {
 }
 
 func TestPRReview_url_arg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
 			"id": "foobar123",
@@ -94,8 +94,8 @@ func TestPRReview_url_arg(t *testing.T) {
 }
 
 func TestPRReview_number_arg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
@@ -141,8 +141,8 @@ func TestPRReview_number_arg(t *testing.T) {
 }
 
 func TestPRReview_no_arg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -179,8 +179,8 @@ func TestPRReview_no_arg(t *testing.T) {
 }
 
 func TestPRReview_blank_comment(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -193,8 +193,8 @@ func TestPRReview_blank_comment(t *testing.T) {
 }
 
 func TestPRReview_blank_request_changes(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
@@ -220,8 +220,8 @@ func TestPRReview(t *testing.T) {
 	}
 
 	for _, kase := range cases {
-		initBlankContext("", "OWNER/REPO", "feature")
-		http := initFakeHTTP()
+		InitBlankContext("", "OWNER/REPO", "feature")
+		http := InitFakeHTTP()
 		http.StubRepoResponse("OWNER", "REPO")
 		http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -255,8 +255,8 @@ func TestPRReview(t *testing.T) {
 }
 
 func TestPRReview_interactive(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -316,8 +316,8 @@ func TestPRReview_interactive(t *testing.T) {
 }
 
 func TestPRReview_interactive_no_body(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -358,8 +358,8 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 }
 
 func TestPRReview_interactive_blank_approve(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "feature")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "feature")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [

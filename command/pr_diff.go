@@ -30,8 +30,8 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand color: %q. Expected one of always, never, or auto", color)
 	}
 
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func prDiff(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	out = colorableOut(cmd)
+	out = ColorableOut(cmd)
 	for _, diffLine := range strings.Split(diff, "\n") {
 		output := diffLine
 		switch {

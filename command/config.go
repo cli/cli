@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +63,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 
 	cfg, err := ctx.Config()
 	if err != nil {
@@ -75,7 +76,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 	}
 
 	if val != "" {
-		out := colorableOut(cmd)
+		out := ColorableOut(cmd)
 		fmt.Fprintf(out, "%s\n", val)
 	}
 
@@ -91,7 +92,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 
 	cfg, err := ctx.Config()
 	if err != nil {

@@ -26,8 +26,8 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func TestPRStatus(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatus.json")
@@ -54,8 +54,8 @@ func TestPRStatus(t *testing.T) {
 }
 
 func TestPRStatus_fork(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubForkedRepoResponse("OWNER/REPO", "PARENT/REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusFork.json")
@@ -84,8 +84,8 @@ branch.blueberries.merge refs/heads/blueberries`)}
 }
 
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusChecks.json")
@@ -111,8 +111,8 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
@@ -143,8 +143,8 @@ func TestPRStatus_currentBranch_showTheMostRecentPR(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranch.json")
@@ -164,8 +164,8 @@ func TestPRStatus_currentBranch_defaultBranch(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
 	defer jsonFile.Close()
@@ -184,8 +184,8 @@ func TestPRStatus_currentBranch_defaultBranch_repoFlag(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Closed(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosed.json")
@@ -205,8 +205,8 @@ func TestPRStatus_currentBranch_Closed(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchClosedOnDefaultBranch.json")
@@ -226,8 +226,8 @@ func TestPRStatus_currentBranch_Closed_defaultBranch(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Merged(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMerged.json")
@@ -247,8 +247,8 @@ func TestPRStatus_currentBranch_Merged(t *testing.T) {
 }
 
 func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponseWithDefaultBranch("OWNER", "REPO", "blueberries")
 
 	jsonFile, _ := os.Open("../test/fixtures/prStatusCurrentBranchMergedOnDefaultBranch.json")
@@ -268,8 +268,8 @@ func TestPRStatus_currentBranch_Merged_defaultBranch(t *testing.T) {
 }
 
 func TestPRStatus_blankSlate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -300,8 +300,8 @@ Requesting a code review from you
 }
 
 func TestPRList(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prList.json")
@@ -324,8 +324,8 @@ Showing 3 of 3 pull requests in OWNER/REPO
 }
 
 func TestPRList_filtering(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
@@ -356,8 +356,8 @@ No pull requests match your search in OWNER/REPO
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prListWithDuplicates.json")
@@ -376,8 +376,8 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 }
 
 func TestPRList_filteringClosed(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
@@ -400,8 +400,8 @@ func TestPRList_filteringClosed(t *testing.T) {
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
@@ -424,8 +424,8 @@ func TestPRList_filteringAssignee(t *testing.T) {
 }
 
 func TestPRList_filteringAssigneeLabels(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	respBody := bytes.NewBufferString(`{ "data": {} }`)
@@ -566,8 +566,8 @@ func TestPRView_Preview(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
-			http := initFakeHTTP()
+			InitBlankContext("", "OWNER/REPO", tc.ownerRepo)
+			http := InitFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
 
 			jsonFile, _ := os.Open(tc.fixture)
@@ -587,8 +587,8 @@ func TestPRView_Preview(t *testing.T) {
 }
 
 func TestPRView_web_currentBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView.json")
@@ -625,8 +625,8 @@ func TestPRView_web_currentBranch(t *testing.T) {
 }
 
 func TestPRView_web_noResultsForBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "blueberries")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "blueberries")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	jsonFile, _ := os.Open("../test/fixtures/prView_NoActiveBranch.json")
@@ -656,8 +656,8 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 }
 
 func TestPRView_web_numberArg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -688,8 +688,8 @@ func TestPRView_web_numberArg(t *testing.T) {
 }
 
 func TestPRView_web_numberArgWithHash(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -720,8 +720,8 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 }
 
 func TestPRView_web_urlArg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
 			"url": "https://github.com/OWNER/REPO/pull/23"
@@ -750,8 +750,8 @@ func TestPRView_web_urlArg(t *testing.T) {
 }
 
 func TestPRView_web_branchArg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -784,8 +784,8 @@ func TestPRView_web_branchArg(t *testing.T) {
 }
 
 func TestPRView_web_branchWithOwnerArg(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -848,8 +848,8 @@ func TestPrStateTitleWithColor(t *testing.T) {
 }
 
 func TestPrClose(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -873,8 +873,8 @@ func TestPrClose(t *testing.T) {
 }
 
 func TestPrClose_alreadyClosed(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -898,8 +898,8 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 }
 
 func TestPRReopen(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -923,8 +923,8 @@ func TestPRReopen(t *testing.T) {
 }
 
 func TestPRReopen_alreadyOpen(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -948,8 +948,8 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 }
 
 func TestPRReopen_alreadyMerged(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -978,8 +978,8 @@ type stubResponse struct {
 }
 
 func initWithStubs(branch string, stubs ...stubResponse) {
-	initBlankContext("", "OWNER/REPO", branch)
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", branch)
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	for _, s := range stubs {
 		http.StubResponse(s.ResponseCode, s.ResponseBody)
@@ -1018,8 +1018,8 @@ func TestPrMerge(t *testing.T) {
 }
 
 func TestPrMerge_withRepoFlag(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
 		"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
 		} } }`))
@@ -1072,8 +1072,8 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 }
 
 func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "another-branch")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "another-branch")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
@@ -1271,8 +1271,8 @@ func TestPrMerge_multipleMergeMethods(t *testing.T) {
 }
 
 func TestPRReady(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -1294,8 +1294,8 @@ func TestPRReady(t *testing.T) {
 }
 
 func TestPRReady_alreadyReady(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -1317,8 +1317,8 @@ func TestPRReady_alreadyReady(t *testing.T) {
 }
 
 func TestPRReady_closed(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
+	InitBlankContext("", "OWNER/REPO", "master")
+	http := InitFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {

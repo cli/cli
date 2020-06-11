@@ -44,7 +44,7 @@ var aliasSetCmd = &cobra.Command{
 }
 
 func aliasSet(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 	cfg, err := ctx.Config()
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 
 	expansionStr := strings.Join(expansion, " ")
 
-	out := colorableOut(cmd)
+	out := ColorableOut(cmd)
 	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansionStr))
 
 	if validCommand([]string{alias}) {
@@ -124,7 +124,7 @@ var aliasListCmd = &cobra.Command{
 }
 
 func aliasList(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 	cfg, err := ctx.Config()
 	if err != nil {
 		return fmt.Errorf("couldn't read config: %w", err)
@@ -142,7 +142,7 @@ func aliasList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	stdout := colorableOut(cmd)
+	stdout := ColorableOut(cmd)
 
 	tp := utils.NewTablePrinter(stdout)
 
@@ -178,7 +178,7 @@ var aliasDeleteCmd = &cobra.Command{
 func aliasDelete(cmd *cobra.Command, args []string) error {
 	alias := args[0]
 
-	ctx := contextForCommand(cmd)
+	ctx := ContextForCommand(cmd)
 	cfg, err := ctx.Config()
 	if err != nil {
 		return fmt.Errorf("couldn't read config: %w", err)
@@ -200,7 +200,7 @@ func aliasDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to delete alias %s: %w", alias, err)
 	}
 
-	out := colorableOut(cmd)
+	out := ColorableOut(cmd)
 	redCheck := utils.Red("✓")
 	fmt.Fprintf(out, "%s Deleted alias %s; was %s\n", redCheck, alias, expansion)
 

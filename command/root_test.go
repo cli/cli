@@ -2,6 +2,8 @@ package command
 
 import (
 	"testing"
+
+	"github.com/cli/cli/command/repo"
 )
 
 func TestChangelogURL(t *testing.T) {
@@ -42,8 +44,8 @@ func TestChangelogURL(t *testing.T) {
 }
 
 func TestRemoteURLFormatting_no_config(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	result := formatRemoteURL(repoForkCmd, "OWNER/REPO")
+	InitBlankContext("", "OWNER/REPO", "master")
+	result := FormatRemoteURL(repo.RepoForkCmd(), "OWNER/REPO")
 	eq(t, result, "https://github.com/OWNER/REPO.git")
 }
 
@@ -55,7 +57,7 @@ hosts:
     oauth_token: MUSTBEHIGHCUZIMATOKEN
 git_protocol: ssh
 `
-	initBlankContext(cfg, "OWNER/REPO", "master")
-	result := formatRemoteURL(repoForkCmd, "OWNER/REPO")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
+	result := FormatRemoteURL(repo.RepoForkCmd(), "OWNER/REPO")
 	eq(t, result, "git@github.com:OWNER/REPO.git")
 }

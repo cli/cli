@@ -56,13 +56,13 @@ var creditsCmd = &cobra.Command{
 
 func ghCredits(cmd *cobra.Command, _ []string) error {
 	args := []string{"cli/cli"}
-	return credits(cmd, args)
+	return Credits(cmd, args)
 }
 
-func credits(cmd *cobra.Command, args []string) error {
+func Credits(cmd *cobra.Command, args []string) error {
 	isWindows := runtime.GOOS == "windows"
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	client, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func credits(cmd *cobra.Command, args []string) error {
 	var repo string
 
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(client, cmd, ctx)
+		baseRepo, err := DetermineBaseRepo(client, cmd, ctx)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func credits(cmd *cobra.Command, args []string) error {
 	if isFile {
 		isTTY = utils.IsTerminal(outFile)
 		if isTTY {
-			// FIXME: duplicates colorableOut
+			// FIXME: duplicates ColorableOut
 			out = utils.NewColorable(outFile)
 		}
 	}

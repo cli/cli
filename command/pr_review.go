@@ -83,8 +83,8 @@ func processReviewOpt(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 }
 
 func prReview(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
+	ctx := ContextForCommand(cmd)
+	apiClient, err := ApiClientForContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	out := colorableOut(cmd)
+	out := ColorableOut(cmd)
 
 	if reviewData == nil {
 		reviewData, err = reviewSurvey(cmd)
@@ -203,7 +203,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	}
 
 	if len(bodyAnswers.Body) > 0 {
-		out := colorableOut(cmd)
+		out := ColorableOut(cmd)
 		renderedBody, err := utils.RenderMarkdown(bodyAnswers.Body)
 		if err != nil {
 			return nil, err

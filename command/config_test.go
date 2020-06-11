@@ -15,7 +15,7 @@ hosts:
     oauth_token: MUSTBEHIGHCUZIMATOKEN
 editor: ed
 `
-	initBlankContext(cfg, "OWNER/REPO", "master")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
 
 	output, err := RunCommand("config get editor")
 	if err != nil {
@@ -26,7 +26,7 @@ editor: ed
 }
 
 func TestConfigGet_default(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
+	InitBlankContext("", "OWNER/REPO", "master")
 	output, err := RunCommand("config get git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get git_protocol`: %v", err)
@@ -36,7 +36,7 @@ func TestConfigGet_default(t *testing.T) {
 }
 
 func TestConfigGet_not_found(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
+	InitBlankContext("", "OWNER/REPO", "master")
 
 	output, err := RunCommand("config get missing")
 	if err != nil {
@@ -47,7 +47,7 @@ func TestConfigGet_not_found(t *testing.T) {
 }
 
 func TestConfigSet(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
+	InitBlankContext("", "OWNER/REPO", "master")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -85,7 +85,7 @@ hosts:
 editor: ed
 `
 
-	initBlankContext(cfg, "OWNER/REPO", "master")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -124,7 +124,7 @@ hosts:
 editor: ed
 git_protocol: https
 `
-	initBlankContext(cfg, "OWNER/REPO", "master")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
 
 	output, err := RunCommand("config get -hgithub.com git_protocol")
 	if err != nil {
@@ -144,7 +144,7 @@ hosts:
 editor: ed
 git_protocol: ssh
 `
-	initBlankContext(cfg, "OWNER/REPO", "master")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
 
 	output, err := RunCommand("config get -hgithub.com git_protocol")
 	if err != nil {
@@ -155,7 +155,7 @@ git_protocol: ssh
 }
 
 func TestConfigSetHost(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
+	InitBlankContext("", "OWNER/REPO", "master")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
@@ -194,7 +194,7 @@ hosts:
     oauth_token: MUSTBEHIGHCUZIMATOKEN
 `
 
-	initBlankContext(cfg, "OWNER/REPO", "master")
+	InitBlankContext(cfg, "OWNER/REPO", "master")
 
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
