@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ var aliasSetCmd = &cobra.Command{
 The expansion may specify additional arguments and flags. If the expansion
 includes positional placeholders such as '$1', '$2', etc., any extra arguments
 that follow the invocation of an alias will be inserted appropriately.`,
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh alias set pv 'pr view'
 	$ gh pv -w 123
 	#=> gh pr view -w 123
@@ -40,7 +41,7 @@ that follow the invocation of an alias will be inserted appropriately.`,
 	$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
 	$ gh epicsBy vilmibm
 	#=> gh issue list --author="vilmibm" --label="epic"
-`,
+	`),
 	Args: cobra.MinimumNArgs(2),
 	RunE: aliasSet,
 

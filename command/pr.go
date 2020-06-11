@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -49,11 +50,11 @@ var prCmd = &cobra.Command{
 	Use:   "pr <command>",
 	Short: "Create, view, and checkout pull requests",
 	Long:  `Work with GitHub pull requests`,
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh pr checkout 353
 	$ gh pr create --fill
 	$ gh pr view --web
-`,
+	`),
 	Annotations: map[string]string{
 		"IsCore": "true",
 		"help:arguments": `A pull request can be supplied as argument in any of the following formats:
@@ -64,11 +65,11 @@ var prCmd = &cobra.Command{
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh pr list --limit 999
 	$ gh pr list --state closed
 	$ gh pr list --label "priority 1" --label "bug"
-`,
+	`),
 	RunE: prList,
 }
 var prStatusCmd = &cobra.Command{

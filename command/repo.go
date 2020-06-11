@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
@@ -47,11 +48,11 @@ var repoCmd = &cobra.Command{
 	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
 	Long:  `Work with GitHub repositories`,
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh repo create
 	$ gh repo clone cli/cli
 	$ gh repo view --web
-`,
+	`),
 	Annotations: map[string]string{
 		"IsCore": "true",
 		"help:arguments": `
@@ -77,7 +78,7 @@ var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
 	Long:  `Create a new GitHub repository.`,
-	Example: `
+	Example: heredoc.Doc(`
 	# create a repository under your account using the current directory name
 	$ gh repo create
 
@@ -86,7 +87,7 @@ var repoCreateCmd = &cobra.Command{
 
 	# create a repository in an organization
 	$ gh repo create cli/my-project
-`,
+	`),
 	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
 - <OWNER/REPO>
 - by URL, e.g. "https://github.com/OWNER/REPO"`},
@@ -116,7 +117,7 @@ With '--web', open the repository in a web browser instead.`,
 var repoCreditsCmd = &cobra.Command{
 	Use:   "credits [<repository>]",
 	Short: "View credits for a repository",
-	Example: `
+	Example: heredoc.Doc(`
 	# view credits for the current repository
 	$ gh repo credits
 	
@@ -128,7 +129,7 @@ var repoCreditsCmd = &cobra.Command{
 	
 	# pipe to just print the contributors, one per line
 	$ gh repo credits | cat
-`,
+	`),
 	Args:   cobra.MaximumNArgs(1),
 	RunE:   repoCredits,
 	Hidden: true,

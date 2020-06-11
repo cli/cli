@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ Gists can be created from one or multiple files. Alternatively, pass "-" as
 file name to read from standard input.
 
 By default, gists are private; use '--public' to make publicly listed ones.`,
-	Example: `
+	Example: heredoc.Doc(`
 	# publish file 'hello.py' as a public gist
 	$ gh gist create --public hello.py
 	
@@ -50,7 +51,7 @@ By default, gists are private; use '--public' to make publicly listed ones.`,
 	
 	# create a gist from output piped from another command
 	$ cat cool.txt | gh gist create
-`,
+	`),
 	RunE: gistCreate,
 }
 

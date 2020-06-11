@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/cli/cli/utils"
@@ -78,7 +79,8 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	if len(additionalCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
 	}
-	flagUsages := strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")
+	dedent := regexp.MustCompile(`(?m)^  `)
+	flagUsages := dedent.ReplaceAllString(command.LocalFlags().FlagUsages(), "")
 	if flagUsages != "" {
 		helpEntries = append(helpEntries, helpEntry{"FLAGS", flagUsages})
 	}
@@ -102,9 +104,6 @@ Read the manual at http://cli.github.com/manual`})
 			fmt.Fprintln(out, utils.Bold(e.Title))
 
 			for _, l := range strings.Split(strings.Trim(e.Body, "\n\r"), "\n") {
-				if e.Title == "EXAMPLES" {
-					l = strings.TrimPrefix(l, "\t")
-				}
 				fmt.Fprintln(out, "  "+l)
 			}
 		} else {

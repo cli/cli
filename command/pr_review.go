@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
@@ -27,7 +28,7 @@ var prReviewCmd = &cobra.Command{
 	Long: `Add a review to a pull request.
 
 Without an argument, the pull request that belongs to the current branch is reviewed.`,
-	Example: `
+	Example: heredoc.Doc(`
 	# approve the pull request of the current branch
 	$ gh pr review --approve
 	
@@ -39,7 +40,7 @@ Without an argument, the pull request that belongs to the current branch is revi
 	
 	# request changes on a specific pull request
 	$ gh pr review 123 -r -b "needs more ASCII art"
-`,
+	`),
 	Args: cobra.MaximumNArgs(1),
 	RunE: prReview,
 }
