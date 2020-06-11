@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
 
@@ -34,10 +35,10 @@ Current respected settings:
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Print the value of a given configuration key",
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh config get git_protocol
 	https
-`,
+	`),
 	Args: cobra.ExactArgs(1),
 	RunE: configGet,
 }
@@ -45,9 +46,9 @@ var configGetCmd = &cobra.Command{
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
 	Short: "Update configuration with a value for the given key",
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh config set editor vim
-`,
+	`),
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
 }

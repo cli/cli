@@ -79,10 +79,11 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	if len(additionalCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
 	}
-	dedent := regexp.MustCompile(`(?m)^  `)
-	flagUsages := dedent.ReplaceAllString(command.LocalFlags().FlagUsages(), "")
+
+	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		helpEntries = append(helpEntries, helpEntry{"FLAGS", flagUsages})
+		dedent := regexp.MustCompile(`(?m)^  `)
+		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent.ReplaceAllString(flagUsages, "")})
 	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
