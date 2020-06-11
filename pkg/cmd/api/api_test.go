@@ -7,8 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
@@ -450,4 +452,106 @@ func Test_openUserFile(t *testing.T) {
 
 	assert.Equal(t, int64(13), length)
 	assert.Equal(t, "file contents", string(fb))
+}
+
+func Test_fillPlaceholders(t *testing.T) {
+	type args struct {
+		opts   *ApiOptions
+		params map[string]interface{}
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantPath   string
+		wantParams map[string]interface{}
+		wantErr    bool
+	}{
+		{
+			name: "no changes",
+			args: args{
+				opts: &ApiOptions{
+					RequestPath: "repos/owner/repo/releases",
+					BaseRepo:    nil,
+				},
+				params: map[string]interface{}{
+					"query": "{owner}/{repo}",
+				},
+			},
+			wantPath: "repos/owner/repo/releases",
+			wantParams: map[string]interface{}{
+				"query": "{owner}/{repo}",
+			},
+			wantErr: false,
+		},
+		{
+			name: "REST path substitute",
+			args: args{
+				opts: &ApiOptions{
+					RequestPath: "repos/{owner}/{repo}/releases",
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+				params: map[string]interface{}{
+					"query": "{owner}/{repo}",
+				},
+			},
+			wantPath: "repos/hubot/robot-uprising/releases",
+			wantParams: map[string]interface{}{
+				"query": "{owner}/{repo}",
+			},
+			wantErr: false,
+		},
+		{
+			name: "GraphQL query substitute",
+			args: args{
+				opts: &ApiOptions{
+					RequestPath: "graphql",
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+				params: map[string]interface{}{
+					"query": "{owner}/{repo}/pulls/{owner}",
+				},
+			},
+			wantPath: "graphql",
+			wantParams: map[string]interface{}{
+				"query": "hubot/robot-uprising/pulls/hubot",
+			},
+			wantErr: false,
+		},
+		{
+			name: "GraphQL no query",
+			args: args{
+				opts: &ApiOptions{
+					RequestPath: "graphql",
+					BaseRepo:    nil,
+				},
+				params: map[string]interface{}{
+					"foo": "{owner}/{repo}",
+				},
+			},
+			wantPath: "graphql",
+			wantParams: map[string]interface{}{
+				"foo": "{owner}/{repo}",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := fillPlaceholders(tt.args.opts, tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("fillPlaceholders() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantPath {
+				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.wantPath)
+			}
+			if !reflect.DeepEqual(got1, tt.wantParams) {
+				t.Errorf("fillPlaceholders() got1 = %v, want %v", got1, tt.wantParams)
+			}
+		})
+	}
 }

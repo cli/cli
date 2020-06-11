@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
@@ -32,12 +33,14 @@ type ApiOptions struct {
 	ShowResponseHeaders bool
 
 	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -93,8 +96,11 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	requestPath, params, err := fillPlaceholders(opts, params)
+	if err != nil {
+		return fmt.Errorf("unable to expand `{...}` placeholders in query: %w", err)
+	}
 	method := opts.RequestMethod
-	requestPath := opts.RequestPath
 	requestHeaders := opts.RequestHeaders
 	var requestBody interface{} = params
 
@@ -168,6 +174,37 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	return nil
+}
+
+// fillPlaceholders replaces `{owner}` and `{repo}` placeholders with values from the current repository
+func fillPlaceholders(opts *ApiOptions, params map[string]interface{}) (string, map[string]interface{}, error) {
+	query := opts.RequestPath
+	isGraphQL := opts.RequestPath == "graphql"
+
+	if isGraphQL {
+		if q, ok := params["query"].(string); ok {
+			query = q
+		}
+	}
+
+	if !strings.Contains(query, "{owner}") && !strings.Contains(query, "{repo}") {
+		return opts.RequestPath, params, nil
+	}
+
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return opts.RequestPath, params, err
+	}
+
+	query = strings.ReplaceAll(query, "{owner}", baseRepo.RepoOwner())
+	query = strings.ReplaceAll(query, "{repo}", baseRepo.RepoName())
+
+	if isGraphQL {
+		params["query"] = query
+		return opts.RequestPath, params, nil
+	}
+
+	return query, params, nil
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {

@@ -75,14 +75,21 @@ func init() {
 		HttpClient: func() (*http.Client, error) {
 			token := os.Getenv("GITHUB_TOKEN")
 			if len(token) == 0 {
+				// TODO: decouple from `context`
 				ctx := context.New()
 				var err error
+				// TODO: pass IOStreams to this so that the auth flow knows if it's interactive or not
 				token, err = ctx.AuthToken()
 				if err != nil {
 					return nil, err
 				}
 			}
 			return httpClient(token), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			// TODO: decouple from `context`
+			ctx := context.New()
+			return ctx.BaseRepo()
 		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
