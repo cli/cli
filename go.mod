@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
+	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.11.1
 	github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058
 	github.com/dlclark/regexp2 v1.2.0 // indirect

@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
@@ -96,9 +97,11 @@ var RootCmd = &cobra.Command{
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	Example: `$ gh issue create
-$ gh repo clone
-$ gh pr checkout 321`,
+	Example: heredoc.Doc(`
+	$ gh issue create
+	$ gh repo clone cli/cli
+	$ gh pr checkout 321
+	`),
 	Annotations: map[string]string{
 		"help:feedback": `
 Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7

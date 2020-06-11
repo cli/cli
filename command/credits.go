@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -44,11 +45,16 @@ var creditsCmd = &cobra.Command{
 	Use:   "credits",
 	Short: "View credits for this tool",
 	Long:  `View animated credits for gh, the tool you are currently using :)`,
-	Example: `gh credits            # see a credits animation for this project
-  gh credits owner/repo # see a credits animation for owner/repo
-  gh credits -s         # display a non-animated thank you
-  gh credits | cat      # just print the contributors, one per line
-`,
+	Example: heredoc.Doc(`
+	# see a credits animation for this project
+	$ gh credits
+	
+	# display a non-animated thank you
+	$ gh credits -s
+	
+	# just print the contributors, one per line
+	$ gh credits | cat
+	`),
 	Args:   cobra.ExactArgs(0),
 	RunE:   ghCredits,
 	Hidden: true,

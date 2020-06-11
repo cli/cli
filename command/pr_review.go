@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
@@ -23,18 +24,24 @@ func init() {
 
 var prReviewCmd = &cobra.Command{
 	Use:   "review [<number> | <url> | <branch>]",
-	Short: "Add a review to a pull request.",
-	Args:  cobra.MaximumNArgs(1),
-	Long: `Add a review to either a specified pull request or the pull request associated with the current branch.
+	Short: "Add a review to a pull request",
+	Long: `Add a review to a pull request.
 
-Examples:
-
-	gh pr review                                  # add a review for the current branch's pull request
-	gh pr review 123                              # add a review for pull request 123
-	gh pr review -a                               # mark the current branch's pull request as approved
-	gh pr review -c -b "interesting"              # comment on the current branch's pull request
-	gh pr review 123 -r -b "needs more ascii art" # request changes on pull request 123
-	`,
+Without an argument, the pull request that belongs to the current branch is reviewed.`,
+	Example: heredoc.Doc(`
+	# approve the pull request of the current branch
+	$ gh pr review --approve
+	
+	# leave a review comment for the current branch
+	$ gh pr review --comment -b "interesting"
+	
+	# add a review for a specific pull request
+	$ gh pr review 123
+	
+	# request changes on a specific pull request
+	$ gh pr review 123 -r -b "needs more ASCII art"
+	`),
+	Args: cobra.MaximumNArgs(1),
 	RunE: prReview,
 }
 
