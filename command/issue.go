@@ -52,9 +52,11 @@ var issueCmd = &cobra.Command{
 	Use:   "issue <command>",
 	Short: "Create and view issues",
 	Long:  `Work with GitHub issues`,
-	Example: `$ gh issue list
-$ gh issue create --fill
-$ gh issue view --web`,
+	Example: `
+	$ gh issue list
+	$ gh issue create --label bug
+	$ gh issue view --web
+`,
 	Annotations: map[string]string{
 		"IsCore": "true",
 		"help:arguments": `An issue can be supplied as argument in any of the following formats:

@@ -27,20 +27,29 @@ var gistCmd = &cobra.Command{
 }
 
 var gistCreateCmd = &cobra.Command{
-	Use:   `create {<filename>|-}...`,
+	Use:   `create [<filename>... | -]`,
 	Short: "Create a new gist",
-	Long: `gh gist create: create gists
+	Long: `Create a new GitHub gist with given contents.
 
-Gists can be created from one or many files. This command can also read from STDIN. By default, gists are private; use --public to change this.
+Gists can be created from one or multiple files. Alternatively, pass "-" as
+file name to read from standard input.
 
-Examples
+By default, gists are private; use '--public' to make publicly listed ones.`,
+	Example: `
+	# publish file 'hello.py' as a public gist
+	$ gh gist create --public hello.py
+	
+	# create a gist with a description
+	$ gh gist create hello.py -d "my Hello-World program in Python"
 
-    gh gist create hello.py                   # turn file hello.py into a gist
-    gh gist create --public hello.py          # turn file hello.py into a public gist
-    gh gist create -d"a file!" hello.py       # turn file hello.py into a gist, with description
-    gh gist create hello.py world.py cool.txt # make a gist out of several files
-    gh gist create -                          # read from STDIN to create a gist
-    cat cool.txt | gh gist create             # read the output of another command and make a gist out of it
+	# create a gist containing several files
+	$ gh gist create hello.py world.py cool.txt
+	
+	# read from standard input to create a gist
+	$ gh gist create -
+	
+	# create a gist from output piped from another command
+	$ cat cool.txt | gh gist create
 `,
 	RunE: gistCreate,
 }

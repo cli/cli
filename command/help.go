@@ -101,7 +101,9 @@ Read the manual at http://cli.github.com/manual`})
 			fmt.Fprintln(out, utils.Bold(e.Title))
 
 			for _, l := range strings.Split(strings.Trim(e.Body, "\n\r"), "\n") {
-				l = strings.Trim(l, " \n\r")
+				if e.Title == "EXAMPLES" {
+					l = strings.TrimPrefix(l, "\t")
+				}
 				fmt.Fprintln(out, "  "+l)
 			}
 		} else {

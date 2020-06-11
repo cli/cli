@@ -47,9 +47,10 @@ var repoCmd = &cobra.Command{
 	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
 	Long:  `Work with GitHub repositories`,
-	Example: `$ gh repo create
-$ gh repo clone cli/cli 
-$ gh repo view --web
+	Example: `
+	$ gh repo create
+	$ gh repo clone cli/cli
+	$ gh repo view --web
 `,
 	Annotations: map[string]string{
 		"IsCore": "true",
@@ -75,15 +76,17 @@ To pass 'git clone' flags, separate them with '--'.`,
 var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
-	Long:  `Create a new GitHub repository`,
-	Example: utils.Bold("$ gh repo create") + `
-Will create a repository on your account using the name of your current directory
+	Long:  `Create a new GitHub repository.`,
+	Example: `
+	# create a repository under your account using the current directory name
+	$ gh repo create
 
-` + utils.Bold("$ gh repo create my-project") + `
-Will create a repository on your account using the name 'my-project'
+	# create a repository with a specific name
+	$ gh repo create my-project
 
-` + utils.Bold("$ gh repo create cli/my-project") + `
-Will create a repository in the organization 'cli' using the name 'my-project'`,
+	# create a repository in an organization
+	$ gh repo create cli/my-project
+`,
 	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
 - <OWNER/REPO>
 - by URL, e.g. "https://github.com/OWNER/REPO"`},
@@ -113,10 +116,18 @@ With '--web', open the repository in a web browser instead.`,
 var repoCreditsCmd = &cobra.Command{
 	Use:   "credits [<repository>]",
 	Short: "View credits for a repository",
-	Example: `$ gh repo credits           # view credits for the current repository
-$ gh repo credits cool/repo # view credits for cool/repo
-$ gh repo credits -s        # print a non-animated thank you
-$ gh repo credits | cat     # pipe to just print the contributors, one per line
+	Example: `
+	# view credits for the current repository
+	$ gh repo credits
+	
+	# view credits for a specific repository
+	$ gh repo credits cool/repo
+
+	# print a non-animated thank you
+	$ gh repo credits -s
+	
+	# pipe to just print the contributors, one per line
+	$ gh repo credits | cat
 `,
 	Args:   cobra.MaximumNArgs(1),
 	RunE:   repoCredits,

@@ -49,10 +49,11 @@ var prCmd = &cobra.Command{
 	Use:   "pr <command>",
 	Short: "Create, view, and checkout pull requests",
 	Long:  `Work with GitHub pull requests`,
-	Example: `$ gh pr checkout 353
-$ gh pr checkout bug-fix-branch
-$ gh pr create --fill
-$ gh pr view --web`,
+	Example: `
+	$ gh pr checkout 353
+	$ gh pr create --fill
+	$ gh pr view --web
+`,
 	Annotations: map[string]string{
 		"IsCore": "true",
 		"help:arguments": `A pull request can be supplied as argument in any of the following formats:
@@ -63,9 +64,11 @@ $ gh pr view --web`,
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
-	Example: `$ gh pr list --limit all
-$ gh pr list --state closed
-$ gh pr list --label “priority 1” “bug”`,
+	Example: `
+	$ gh pr list --limit 999
+	$ gh pr list --state closed
+	$ gh pr list --label "priority 1" --label "bug"
+`,
 	RunE: prList,
 }
 var prStatusCmd = &cobra.Command{
