@@ -195,6 +195,10 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if limit <= 0 {
+		return fmt.Errorf("invalid limit: %v", limit)
+	}
+
 	state, err := cmd.Flags().GetString("state")
 	if err != nil {
 		return err
@@ -328,10 +332,9 @@ func prView(cmd *cobra.Command, args []string) error {
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
 	}
+	out := colorableOut(cmd)
+	return printPrPreview(out, pr)
 }
 
 func prClose(cmd *cobra.Command, args []string) error {

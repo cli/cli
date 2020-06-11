@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -21,23 +22,21 @@ func init() {
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Set and get gh settings",
-	Long: `Get and set key/value strings.
+	Short: "Manage configuration for gh",
+	Long: `Display or change configuration settings for gh.
 
 Current respected settings:
-- git_protocol: https or ssh. Default is https.
+- git_protocol: "https" or "ssh". Default is "https".
 - editor: if unset, defaults to environment variables.
 `,
 }
 
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
-	Short: "Prints the value of a given configuration key",
-	Long: `Get the value for a given configuration key.
-
-Examples:
-  $ gh config get git_protocol
-  https
+	Short: "Print the value of a given configuration key",
+	Example: `
+	$ gh config get git_protocol
+	https
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: configGet,
@@ -45,11 +44,9 @@ Examples:
 
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
-	Short: "Updates configuration with the value of a given key",
-	Long: `Update the configuration by setting a key to a value.
-
-Examples:
-  $ gh config set editor vim
+	Short: "Update configuration with a value for the given key",
+	Example: `
+	$ gh config set editor vim
 `,
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,

@@ -371,10 +371,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		issueState.Assignees = values.Assignees
 		issueState.Labels = values.Labels
 		issueState.Projects = values.Projects
-		issueState.Milestones = []string{values.Milestone}
-
-		if len(issueState.Milestones) > 0 && issueState.Milestones[0] == noMilestone {
-			issueState.Milestones = issueState.Milestones[0:0]
+		if values.Milestone != "" && values.Milestone != noMilestone {
+			issueState.Milestones = []string{values.Milestone}
 		}
 
 		allowPreview = !issueState.HasMetadata()
