@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -21,11 +22,11 @@ func init() {
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Set and get gh settings",
-	Long: `Get and set key/value strings.
+	Short: "Manage configuration for gh",
+	Long: `Display or change configuration settings for gh.
 
 Current respected settings:
-- git_protocol: https or ssh. Default is https.
+- git_protocol: "https" or "ssh". Default is "https".
 - editor: if unset, defaults to environment variables.
 `,
 }
