@@ -1,11 +1,11 @@
 package command
 
 import (
-	"bufio" // used to input comment
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
-	"os" // used to input comment
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -45,8 +45,6 @@ func init() {
 
 	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
-
-	prCmd.AddCommand(prAddCommentCmd)
 }
 
 var prCmd = &cobra.Command{
@@ -103,13 +101,6 @@ var prReadyCmd = &cobra.Command{
 	Short: "Mark a pull request as ready for review",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prReady,
-}
-
-var prAddCommentCmd = &cobra.Command{
-	Use:   "addcomment {<number> | <url> | <branch>}",
-	Short: "Add comment on a pull request",
-	Args:  cobra.ExactArgs(1),
-	RunE:  prAddComment,
 }
 
 func prStatus(cmd *cobra.Command, args []string) error {
@@ -331,25 +322,6 @@ func prView(cmd *cobra.Command, args []string) error {
 		out := colorableOut(cmd)
 		return printPrPreview(out, pr)
 	}
-}
-
-func prAddComment(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
-	if err != nil {
-		return err
-	}
-
-	err = prComment(cmd, args, apiClient, pr, baseRepo) // Ask user for comment (optional)
-	if err != nil {
-		return fmt.Errorf("Error on add comment: %w", err)
-	}
-	return nil
 }
 
 // WaitForData Simulate key press on comment input
