@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
@@ -96,16 +97,16 @@ github.com:
 	defer StubBackupConfig()()
 
 	_, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	assert.Nil(t, err)
 
-	expectedMain := ""
+	expectedMain := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
 	expectedHosts := `github.com:
     user: keiyuri
     oauth_token: "123456"
 `
 
-	eq(t, mainBuf.String(), expectedMain)
-	eq(t, hostsBuf.String(), expectedHosts)
+	assert.Equal(t, expectedMain, mainBuf.String())
+	assert.Equal(t, expectedHosts, hostsBuf.String())
 }
 
 func Test_parseConfigFile(t *testing.T) {

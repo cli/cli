@@ -19,7 +19,8 @@ func Test_fileConfig_Set(t *testing.T) {
 	assert.NoError(t, c.Set("github.com", "user", "hubot"))
 	assert.NoError(t, c.Write())
 
-	assert.Equal(t, "editor: nano\n", mainBuf.String())
+	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor: nano\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, `github.com:
     git_protocol: ssh
     user: hubot
@@ -28,14 +29,29 @@ example.com:
 `, hostsBuf.String())
 }
 
-func Test_fileConfig_Write(t *testing.T) {
+func Test_defaultConfig(t *testing.T) {
 	mainBuf := bytes.Buffer{}
 	hostsBuf := bytes.Buffer{}
 	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	c := NewBlankConfig()
-	assert.NoError(t, c.Write())
+	cfg := NewBlankConfig()
+	assert.NoError(t, cfg.Write())
 
-	assert.Equal(t, "", mainBuf.String())
+	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, "", hostsBuf.String())
+
+	proto, err := cfg.Get("", "git_protocol")
+	assert.Nil(t, err)
+	assert.Equal(t, "https", proto)
+
+	editor, err := cfg.Get("", "editor")
+	assert.Nil(t, err)
+	assert.Equal(t, "", editor)
+
+	aliases, err := cfg.Aliases()
+	assert.Nil(t, err)
+	assert.Equal(t, len(aliases.All()), 1)
+	expansion, _ := aliases.Get("co")
+	assert.Equal(t, expansion, "pr checkout")
 }
