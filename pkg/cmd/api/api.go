@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
@@ -32,12 +34,14 @@ type ApiOptions struct {
 	ShowResponseHeaders bool
 
 	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -45,13 +49,16 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		Short: "Make an authenticated GitHub API request",
 		Long: `Makes an authenticated HTTP request to the GitHub API and prints the response.
 
-The <endpoint> argument should either be a path of a GitHub API v3 endpoint, or
+The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 "graphql" to access the GitHub API v4.
+
+Placeholder values ":owner" and ":repo" in the endpoint argument will get replaced
+with values from the repository of the current directory.
 
 The default HTTP request method is "GET" normally and "POST" if any parameters
 were added. Override the method with '--method'.
 
-Pass one or more '--raw-field' values in "<key>=<value>" format to add
+Pass one or more '--raw-field' values in "key=value" format to add
 JSON-encoded string parameters to the POST body.
 
 The '--field' flag behaves like '--raw-field' with magic type conversion based
@@ -59,6 +66,8 @@ on the format of the value:
 
 - literal values "true", "false", "null", and integer numbers get converted to
   appropriate JSON types;
+- placeholder values ":owner" and ":repo" get populated with values from the
+  repository of the current directory;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
 
@@ -66,6 +75,19 @@ Raw request body may be passed from the outside via a file specified by '--input
 Pass "-" to read from standard input. In this mode, parameters specified via
 '--field' flags are serialized into URL query parameters.
 `,
+		Example: heredoc.Doc(`
+			$ gh api repos/:owner/:repo/releases
+
+			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
+				query($name: String!, $owner: String!) {
+					repository(owner: $owner, name: $name) {
+						releases(last: 3) {
+							nodes { tagName }
+						}
+					}
+				}
+			'
+		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
@@ -93,8 +115,11 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
+	if err != nil {
+		return fmt.Errorf("unable to expand placeholder in path: %w", err)
+	}
 	method := opts.RequestMethod
-	requestPath := opts.RequestPath
 	requestHeaders := opts.RequestHeaders
 	var requestBody interface{} = params
 
@@ -170,6 +195,33 @@ func apiRun(opts *ApiOptions) error {
 	return nil
 }
 
+var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
+
+// fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
+func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
+	if !placeholderRE.MatchString(value) {
+		return value, nil
+	}
+
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return value, err
+	}
+
+	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+		switch m {
+		case ":owner":
+			return baseRepo.RepoOwner()
+		case ":repo":
+			return baseRepo.RepoName()
+		default:
+			panic(fmt.Sprintf("invalid placeholder: %q", m))
+		}
+	})
+
+	return value, nil
+}
+
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
 	var names []string
 	for name := range headers {
@@ -204,7 +256,7 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 		if err != nil {
 			return params, err
 		}
-		value, err := magicFieldValue(strValue, opts.IO.In)
+		value, err := magicFieldValue(strValue, opts)
 		if err != nil {
 			return params, fmt.Errorf("error parsing %q value: %w", key, err)
 		}
@@ -221,9 +273,9 @@ func parseField(f string) (string, string, error) {
 	return f[0:idx], f[idx+1:], nil
 }
 
-func magicFieldValue(v string, stdin io.ReadCloser) (interface{}, error) {
+func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	if strings.HasPrefix(v, "@") {
-		return readUserFile(v[1:], stdin)
+		return readUserFile(v[1:], opts.IO.In)
 	}
 
 	if n, err := strconv.Atoi(v); err == nil {
@@ -238,7 +290,7 @@ func magicFieldValue(v string, stdin io.ReadCloser) (interface{}, error) {
 	case "null":
 		return nil, nil
 	default:
-		return v, nil
+		return fillPlaceholders(v, opts)
 	}
 }
 
