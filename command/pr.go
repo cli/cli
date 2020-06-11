@@ -46,19 +46,27 @@ func init() {
 }
 
 var prCmd = &cobra.Command{
-	Use:   "pr",
+	Use:   "pr <command>",
 	Short: "Create, view, and checkout pull requests",
-	Long: `Work with GitHub pull requests.
-
-A pull request can be supplied as argument in any of the following formats:
+	Long:  `Work with GitHub pull requests`,
+	Example: `$ gh pr checkout 353
+$ gh pr checkout bug-fix-branch
+$ gh pr create --fill
+$ gh pr view --web`,
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
 - by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
-- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
+- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`},
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
-	RunE:  prList,
+	Example: `$ gh pr list --limit all
+$ gh pr list --state closed
+$ gh pr list --label “priority 1” “bug”`,
+	RunE: prList,
 }
 var prStatusCmd = &cobra.Command{
 	Use:   "status",

@@ -1,16 +1,21 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/jsoncolor"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +25,7 @@ type ApiOptions struct {
 	RequestMethod       string
 	RequestMethodPassed bool
 	RequestPath         string
+	RequestInputFile    string
 	MagicFields         []string
 	RawFields           []string
 	RequestHeaders      []string
@@ -55,6 +61,10 @@ on the format of the value:
   appropriate JSON types;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
+
+Raw request body may be passed from the outside via a file specified by '--input'.
+Pass "-" to read from standard input. In this mode, parameters specified via
+'--field' flags are serialized into URL query parameters.
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -73,6 +83,7 @@ on the format of the value:
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
 	return cmd
 }
 
@@ -83,8 +94,25 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	method := opts.RequestMethod
-	if len(params) > 0 && !opts.RequestMethodPassed {
+	requestPath := opts.RequestPath
+	requestHeaders := opts.RequestHeaders
+	var requestBody interface{} = params
+
+	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
+	}
+
+	if opts.RequestInputFile != "" {
+		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		requestPath = addQuery(requestPath, params)
+		requestBody = file
+		if size >= 0 {
+			requestHeaders = append([]string{fmt.Sprintf("Content-Length: %d", size)}, requestHeaders...)
+		}
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -92,34 +120,74 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	resp, err := httpRequest(httpClient, method, opts.RequestPath, params, opts.RequestHeaders)
+	resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
 	if err != nil {
 		return err
 	}
 
 	if opts.ShowResponseHeaders {
-		for name, vals := range resp.Header {
-			fmt.Fprintf(opts.IO.Out, "%s: %s\r\n", name, strings.Join(vals, ", "))
-		}
+		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
+		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
 		fmt.Fprint(opts.IO.Out, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
 		return nil
 	}
+	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
 
-	_, err = io.Copy(opts.IO.Out, resp.Body)
-	if err != nil {
-		return err
+	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+
+	var serverError string
+	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
+		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
+		if err != nil {
+			return err
+		}
 	}
 
-	// TODO: detect GraphQL errors
-	if resp.StatusCode > 299 {
+	if isJSON && opts.IO.ColorEnabled() {
+		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = io.Copy(opts.IO.Out, responseBody)
+		if err != nil {
+			return err
+		}
+	}
+
+	if serverError != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+		return cmdutil.SilentError
+	} else if resp.StatusCode > 299 {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
 		return cmdutil.SilentError
 	}
 
 	return nil
+}
+
+func printHeaders(w io.Writer, headers http.Header, colorize bool) {
+	var names []string
+	for name := range headers {
+		if name == "Status" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var headerColor, headerColorReset string
+	if colorize {
+		headerColor = "\x1b[1;34m" // bright blue
+		headerColorReset = "\x1b[m"
+	}
+	for _, name := range names {
+		fmt.Fprintf(w, "%s%s%s: %s\r\n", headerColor, name, headerColorReset, strings.Join(headers[name], ", "))
+	}
 }
 
 func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
@@ -187,4 +255,53 @@ func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
+}
+
+func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) {
+	if fn == "-" {
+		return stdin, -1, nil
+	}
+
+	r, err := os.Open(fn)
+	if err != nil {
+		return r, -1, err
+	}
+
+	s, err := os.Stat(fn)
+	if err != nil {
+		return r, -1, err
+	}
+
+	return r, s.Size(), nil
+}
+
+func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
+	bodyCopy := &bytes.Buffer{}
+	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	if err != nil {
+		return r, "", err
+	}
+
+	var parsedBody struct {
+		Message string
+		Errors  []struct {
+			Message string
+		}
+	}
+	err = json.Unmarshal(b, &parsedBody)
+	if err != nil {
+		return r, "", err
+	}
+
+	if parsedBody.Message != "" {
+		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
+	} else if len(parsedBody.Errors) > 0 {
+		msgs := make([]string, len(parsedBody.Errors))
+		for i, e := range parsedBody.Errors {
+			msgs[i] = e.Message
+		}
+		return bodyCopy, strings.Join(msgs, "\n"), nil
+	}
+
+	return bodyCopy, "", nil
 }
