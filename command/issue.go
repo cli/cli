@@ -229,39 +229,35 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	if err != nil {
-		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to an Issue with the number of ") {
+	issue, issueError := issueFromArg(apiClient, baseRepo, args[0])
+	if issueError != nil {
+		if _, ok := issueError.(*api.NotFoundError); ok {
 			// it could be a Pull Request
-			pr, _, err1 := prFromArgs(ctx, apiClient, cmd, args)
-			if err1 != nil {
-				if strings.HasPrefix(err1.Error(), "graphql error: 'Could not resolve to a PullRequest with the number of ") {
+			pr, _, prError := prFromArgs(ctx, apiClient, cmd, args)
+			if prError != nil {
+				if prError, ok := prError.(*api.PRNotFoundError); ok && !prError.UsingBranch {
 					return errors.New("no such issue or pull request")
 				}
-				return err
+				return issueError
 			}
-
 			if web {
 				openURL := pr.URL
 				fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 				return utils.OpenInBrowser(openURL)
-			} else {
-				out := colorableOut(cmd)
-				return printPrPreview(out, pr)
 			}
+			out := colorableOut(cmd)
+			return printPrPreview(out, pr)
 		}
-		return err
+		return issueError
 	}
-	openURL := issue.URL
 
 	if web {
+		openURL := issue.URL
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
 	}
-
+	out := colorableOut(cmd)
+	return printIssuePreview(out, issue)
 }
 
 func issueStateTitleWithColor(state string) string {

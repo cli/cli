@@ -307,16 +307,16 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
-	if err != nil {
-		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to a PullRequest with the number of ") {
+	pr, baseRepo, prError := prFromArgs(ctx, apiClient, cmd, args)
+	if prError != nil {
+		if prError, ok := prError.(*api.PRNotFoundError); ok && !prError.UsingBranch {
 			// it could be an Issue
-			issue, err1 := issueFromArg(apiClient, baseRepo, args[0])
-			if err1 != nil {
-				if strings.HasPrefix(err1.Error(), "graphql error: 'Could not resolve to an Issue with the number of ") {
+			issue, issueError := issueFromArg(apiClient, baseRepo, args[0])
+			if issueError != nil {
+				if _, ok := issueError.(*api.NotFoundError); ok {
 					return errors.New("no such pull request or issue")
 				}
-				return err
+				return prError
 			}
 
 			cmd.PrintErrln(fmt.Sprintf("warning: %s is an issue, not a pull request\n", args[0]))
@@ -329,11 +329,11 @@ func prView(cmd *cobra.Command, args []string) error {
 				return printIssuePreview(out, issue)
 			}
 		}
-		return err
+		return prError
 	}
-	openURL := pr.URL
 
 	if web {
+		openURL := pr.URL
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	} else {

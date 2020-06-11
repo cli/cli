@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -357,6 +359,9 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	var resp response
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to an Issue with the number of ") {
+			return nil, &NotFoundError{errors.New("no such issue")}
+		}
 		return nil, err
 	}
 

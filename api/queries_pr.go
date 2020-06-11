@@ -134,6 +134,11 @@ type NotFoundError struct {
 	error
 }
 
+type PRNotFoundError struct {
+	error
+	UsingBranch bool
+}
+
 func (pr PullRequest) HeadLabel() string {
 	if pr.IsCrossRepository {
 		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
@@ -501,6 +506,9 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	var resp response
 	err := client.GraphQL(query, variables, &resp)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "graphql error: 'Could not resolve to a PullRequest with the number of ") {
+			return nil, &PRNotFoundError{errors.New("no such pull request"), false}
+		}
 		return nil, err
 	}
 
@@ -624,7 +632,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		}
 	}
 
-	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
+	return nil, &PRNotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch), true}
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
