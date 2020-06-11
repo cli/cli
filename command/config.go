@@ -36,6 +36,7 @@ var configGetCmd = &cobra.Command{
 	Long: `Get the value for a given configuration key.
 
 Examples:
+
   $ gh config get git_protocol
   https
 `,
@@ -49,6 +50,7 @@ var configSetCmd = &cobra.Command{
 	Long: `Update the configuration by setting a key to a value.
 
 Examples:
+
   $ gh config set editor vim
 `,
 	Args: cobra.ExactArgs(2),
