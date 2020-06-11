@@ -3,11 +3,9 @@ package api
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -368,9 +366,11 @@ func Test_magicFieldValue(t *testing.T) {
 	f.Close()
 	t.Cleanup(func() { os.Remove(f.Name()) })
 
+	io, _, _, _ := iostreams.Test()
+
 	type args struct {
-		v     string
-		stdin io.ReadCloser
+		v    string
+		opts *ApiOptions
 	}
 	tests := []struct {
 		name    string
@@ -403,21 +403,41 @@ func Test_magicFieldValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "file",
-			args:    args{v: "@" + f.Name()},
+			name: "placeholder",
+			args: args{
+				v: ":owner",
+				opts: &ApiOptions{
+					IO: io,
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "hubot",
+			wantErr: false,
+		},
+		{
+			name: "file",
+			args: args{
+				v:    "@" + f.Name(),
+				opts: &ApiOptions{IO: io},
+			},
 			want:    []byte("file contents"),
 			wantErr: false,
 		},
 		{
-			name:    "file error",
-			args:    args{v: "@"},
+			name: "file error",
+			args: args{
+				v:    "@",
+				opts: &ApiOptions{IO: io},
+			},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := magicFieldValue(tt.args.v, tt.args.stdin)
+			got, err := magicFieldValue(tt.args.v, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -456,101 +476,60 @@ func Test_openUserFile(t *testing.T) {
 
 func Test_fillPlaceholders(t *testing.T) {
 	type args struct {
-		opts   *ApiOptions
-		params map[string]interface{}
+		value string
+		opts  *ApiOptions
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantPath   string
-		wantParams map[string]interface{}
-		wantErr    bool
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "no changes",
 			args: args{
+				value: "repos/owner/repo/releases",
 				opts: &ApiOptions{
-					RequestPath: "repos/owner/repo/releases",
-					BaseRepo:    nil,
-				},
-				params: map[string]interface{}{
-					"query": "{owner}/{repo}",
+					BaseRepo: nil,
 				},
 			},
-			wantPath: "repos/owner/repo/releases",
-			wantParams: map[string]interface{}{
-				"query": "{owner}/{repo}",
-			},
+			want:    "repos/owner/repo/releases",
 			wantErr: false,
 		},
 		{
-			name: "REST path substitute",
+			name: "has substitutes",
 			args: args{
+				value: "repos/:owner/:repo/releases",
 				opts: &ApiOptions{
-					RequestPath: "repos/{owner}/{repo}/releases",
 					BaseRepo: func() (ghrepo.Interface, error) {
 						return ghrepo.New("hubot", "robot-uprising"), nil
 					},
 				},
-				params: map[string]interface{}{
-					"query": "{owner}/{repo}",
-				},
 			},
-			wantPath: "repos/hubot/robot-uprising/releases",
-			wantParams: map[string]interface{}{
-				"query": "{owner}/{repo}",
-			},
+			want:    "repos/hubot/robot-uprising/releases",
 			wantErr: false,
 		},
 		{
-			name: "GraphQL query substitute",
+			name: "no greedy substitutes",
 			args: args{
+				value: ":ownership/:repository",
 				opts: &ApiOptions{
-					RequestPath: "graphql",
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
-					},
-				},
-				params: map[string]interface{}{
-					"query": "{owner}/{repo}/pulls/{owner}",
+					BaseRepo: nil,
 				},
 			},
-			wantPath: "graphql",
-			wantParams: map[string]interface{}{
-				"query": "hubot/robot-uprising/pulls/hubot",
-			},
-			wantErr: false,
-		},
-		{
-			name: "GraphQL no query",
-			args: args{
-				opts: &ApiOptions{
-					RequestPath: "graphql",
-					BaseRepo:    nil,
-				},
-				params: map[string]interface{}{
-					"foo": "{owner}/{repo}",
-				},
-			},
-			wantPath: "graphql",
-			wantParams: map[string]interface{}{
-				"foo": "{owner}/{repo}",
-			},
+			want:    ":ownership/:repository",
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := fillPlaceholders(tt.args.opts, tt.args.params)
+			got, err := fillPlaceholders(tt.args.value, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("fillPlaceholders() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.wantPath {
-				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.wantPath)
-			}
-			if !reflect.DeepEqual(got1, tt.wantParams) {
-				t.Errorf("fillPlaceholders() got1 = %v, want %v", got1, tt.wantParams)
+			if got != tt.want {
+				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
