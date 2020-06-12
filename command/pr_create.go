@@ -339,8 +339,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create pull request: %w", err)
 		}
-
+		fmt.Println("***-------------------------------***")
 		fmt.Fprintln(cmd.OutOrStdout(), pr.URL)
+		fmt.Println("***-------------------------------***")
 	} else if action == PreviewAction {
 		milestone := ""
 		if len(milestoneTitles) > 0 {
