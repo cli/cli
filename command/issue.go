@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -250,7 +251,14 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return utils.OpenInBrowser(openURL)
 	}
 	out := colorableOut(cmd)
-	return printIssuePreview(out, issue)
+	outFile, _ := out.(*os.File)
+	isTerminal := utils.IsTerminal(outFile)
+
+	if isTerminal {
+		return printIssuePreviewColorable(out, issue)
+	}
+
+	return printIssuePreviewPlainText(out, issue)
 }
 
 func issueStateTitleWithColor(state string) string {
@@ -277,7 +285,7 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
+func printIssuePreviewColorable(out io.Writer, issue *api.Issue) error {
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
@@ -323,6 +331,52 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	return nil
+}
+
+func printIssuePreviewPlainText(out io.Writer, issue *api.Issue) error {
+	now := time.Now()
+	ago := now.Sub(issue.CreatedAt)
+
+	// Header (Title and State)
+	fmt.Fprintln(out, issue.Title)
+	fmt.Fprint(out, strings.Title(strings.ToLower(issue.State)))
+	fmt.Fprintln(out, fmt.Sprintf(
+		" • %s opened %s • %s",
+		issue.Author.Login,
+		utils.FuzzyAgo(ago),
+		utils.Pluralize(issue.Comments.TotalCount, "comment"),
+	))
+
+	// Metadata
+	fmt.Fprintln(out)
+	if assignees := issueAssigneeList(*issue); assignees != "" {
+		fmt.Fprint(out, "Assignees: ")
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := issueLabelList(*issue); labels != "" {
+		fmt.Fprint(out, "Labels: ")
+		fmt.Fprintln(out, labels)
+	}
+	if projects := issueProjectList(*issue); projects != "" {
+		fmt.Fprint(out, "Projects: ")
+		fmt.Fprintln(out, projects)
+	}
+	if issue.Milestone.Title != "" {
+		fmt.Fprint(out, "Milestone: ")
+		fmt.Fprintln(out, issue.Milestone.Title)
+	}
+
+	// Body
+	if issue.Body != "" {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, issue.Body)
+
+	}
+	fmt.Fprintln(out)
+
+	// Footer
+	fmt.Fprintf(out, "View this issue on GitHub: %s\n", issue.URL)
 	return nil
 }
 

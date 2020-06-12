@@ -280,7 +280,9 @@ func apiVerboseLog() api.ClientOption {
 
 func colorableOut(cmd *cobra.Command) io.Writer {
 	out := cmd.OutOrStdout()
-	if outFile, isFile := out.(*os.File); isFile {
+	outFile, isFile := out.(*os.File)
+	isTerminal := utils.IsTerminal(outFile)
+	if (isFile) && (isTerminal) {
 		return utils.NewColorable(outFile)
 	}
 	return out

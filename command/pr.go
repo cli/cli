@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -333,8 +334,15 @@ func prView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
+
 	out := colorableOut(cmd)
-	return printPrPreview(out, pr)
+	outFile, _ := out.(*os.File)
+	isTerminal := utils.IsTerminal(outFile)
+
+	if isTerminal {
+		return printPrPreviewColorable(out, pr)
+	}
+	return printPrPreviewPlainText(out, pr)
 }
 
 func prClose(cmd *cobra.Command, args []string) error {
@@ -586,7 +594,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
-func printPrPreview(out io.Writer, pr *api.PullRequest) error {
+func printPrPreviewColorable(out io.Writer, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
@@ -634,6 +642,53 @@ func printPrPreview(out io.Writer, pr *api.PullRequest) error {
 
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	return nil
+}
+
+func printPrPreviewPlainText(out io.Writer, pr *api.PullRequest) error {
+	// Header (Title and State)
+	fmt.Fprintln(out, pr.Title)
+	fmt.Fprintf(out, "%s", prStateTitleWithColor(*pr))
+	fmt.Fprintln(out, fmt.Sprintf(
+		" • %s wants to merge %s into %s from %s",
+		pr.Author.Login,
+		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		pr.BaseRefName,
+		pr.HeadRefName,
+	))
+	fmt.Fprintln(out)
+
+	// Metadata
+	if reviewers := prReviewerList(*pr); reviewers != "" {
+		fmt.Fprint(out, "Reviewers: ")
+		fmt.Fprintln(out, reviewers)
+	}
+	if assignees := prAssigneeList(*pr); assignees != "" {
+		fmt.Fprint(out, "Assignees: ")
+		fmt.Fprintln(out, assignees)
+	}
+	if labels := prLabelList(*pr); labels != "" {
+		fmt.Fprint(out, "Labels: ")
+		fmt.Fprintln(out, labels)
+	}
+	if projects := prProjectList(*pr); projects != "" {
+		fmt.Fprint(out, "Projects: ")
+		fmt.Fprintln(out, projects)
+	}
+	if pr.Milestone.Title != "" {
+		fmt.Fprint(out, "Milestone: ")
+		fmt.Fprintln(out, pr.Milestone.Title)
+	}
+
+	// Body
+	if pr.Body != "" {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, pr.Body)
+	}
+	fmt.Fprintln(out)
+
+	// Footer
+	fmt.Fprintf(out, "View this pull request on GitHub: %s\n", pr.URL)
 	return nil
 }
 
