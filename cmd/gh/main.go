@@ -45,6 +45,12 @@ func main() {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			os.Exit(2)
 		}
+
+		if expandedArgs == nil && err == nil {
+			// It was an external alias; we ran it and are now done.
+			os.Exit(0)
+		}
+
 		if hasDebug {
 			fmt.Fprintf(stderr, "%v -> %v\n", originalArgs, expandedArgs)
 		}

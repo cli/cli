@@ -16,21 +16,35 @@ func init() {
 	aliasCmd.AddCommand(aliasSetCmd)
 	aliasCmd.AddCommand(aliasListCmd)
 	aliasCmd.AddCommand(aliasDeleteCmd)
+
+	aliasSetCmd.Flags().BoolP("shell", "s", false, "Declare an alias to be passed through a shell interpreter")
 }
 
 var aliasCmd = &cobra.Command{
 	Use:   "alias",
-	Short: "Create shortcuts for gh commands",
+	Short: "Create command shortcuts",
+	Long: heredoc.Doc(`
+	Aliases can be used to make shortcuts for gh commands or to compose multiple commands.
+
+	Run "gh help alias set" to learn more.
+	`),
 }
 
 var aliasSetCmd = &cobra.Command{
 	Use:   "set <alias> <expansion>",
 	Short: "Create a shortcut for a gh command",
-	Long: `Declare a word as a command alias that will expand to the specified command.
+	Long: heredoc.Doc(`
+	Declare a word as a command alias that will expand to the specified command(s).
 
-The expansion may specify additional arguments and flags. If the expansion
-includes positional placeholders such as '$1', '$2', etc., any extra arguments
-that follow the invocation of an alias will be inserted appropriately.`,
+	The expansion may specify additional arguments and flags. If the expansion
+	includes positional placeholders such as '$1', '$2', etc., any extra arguments
+	that follow the invocation of an alias will be inserted appropriately.
+
+	If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
+	to compose commands with "|" or redirect output with ">". Note that extra arguments are not passed
+	to shell-interpreted aliases; only placeholders ("$1", "$2", etc) are supported.
+
+	Quotes must always be used when defining a command as in the examples.`),
 	Example: heredoc.Doc(`
 	$ gh alias set pv 'pr view'
 	$ gh pv -w 123
@@ -41,13 +55,12 @@ that follow the invocation of an alias will be inserted appropriately.`,
 	$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
 	$ gh epicsBy vilmibm
 	#=> gh issue list --author="vilmibm" --label="epic"
-	`),
-	Args: cobra.MinimumNArgs(2),
-	RunE: aliasSet,
 
-	// NB: this allows a user to eschew quotes when specifying an alias expansion. We'll have to
-	// revisit it if we ever want to add flags to alias set but we have no current plans for that.
-	DisableFlagParsing: true,
+	$ gh alias set --shell igrep 'gh issue list --label="$1" | grep $2'
+	$ gh igrep epic foo
+	#=> gh issue list --label="epic" | grep "foo"`),
+	Args: cobra.ExactArgs(2),
+	RunE: aliasSet,
 }
 
 func aliasSet(cmd *cobra.Command, args []string) error {
@@ -63,19 +76,26 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	}
 
 	alias := args[0]
-	expansion := processArgs(args[1:])
-
-	expansionStr := strings.Join(expansion, " ")
+	expansion := args[1]
 
 	out := colorableOut(cmd)
-	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansionStr))
+	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
 
-	if validCommand([]string{alias}) {
+	shell, err := cmd.Flags().GetBool("shell")
+	if err != nil {
+		return err
+	}
+	if shell && !strings.HasPrefix(expansion, "!") {
+		expansion = "!" + expansion
+	}
+	isExternal := strings.HasPrefix(expansion, "!")
+
+	if validCommand(alias) {
 		return fmt.Errorf("could not create alias: %q is already a gh command", alias)
 	}
 
-	if !validCommand(expansion) {
-		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", utils.Bold(expansionStr))
+	if !isExternal && !validCommand(expansion) {
+		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
@@ -86,11 +106,11 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 			utils.Green("✓"),
 			utils.Bold(alias),
 			utils.Bold(oldExpansion),
-			utils.Bold(expansionStr),
+			utils.Bold(expansion),
 		)
 	}
 
-	err = aliasCfg.Add(alias, expansionStr)
+	err = aliasCfg.Add(alias, expansion)
 	if err != nil {
 		return fmt.Errorf("could not create alias: %s", err)
 	}
@@ -100,26 +120,13 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func validCommand(expansion []string) bool {
-	cmd, _, err := RootCmd.Traverse(expansion)
+func validCommand(expansion string) bool {
+	split, err := shlex.Split(expansion)
+	if err != nil {
+		return false
+	}
+	cmd, _, err := RootCmd.Traverse(split)
 	return err == nil && cmd != RootCmd
-}
-
-func processArgs(args []string) []string {
-	if len(args) == 1 {
-		split, _ := shlex.Split(args[0])
-		return split
-	}
-
-	newArgs := []string{}
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") && strings.Contains(a, " ") {
-			a = fmt.Sprintf("%q", a)
-		}
-		newArgs = append(newArgs, a)
-	}
-
-	return newArgs
 }
 
 var aliasListCmd = &cobra.Command{

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -364,24 +366,43 @@ func determineEditor(cmd *cobra.Command) (string, error) {
 }
 
 func ExpandAlias(args []string) ([]string, error) {
-	empty := []string{}
 	if len(args) < 2 {
 		// the command is lacking a subcommand
-		return empty, nil
+		return []string{}, nil
 	}
 
 	ctx := initContext()
 	cfg, err := ctx.Config()
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 	aliases, err := cfg.Aliases()
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 
 	expansion, ok := aliases.Get(args[1])
 	if ok {
+		if strings.HasPrefix(expansion, "!") {
+			shellArgs := []string{"-c", expansion[1:]}
+			if len(args[2:]) > 0 {
+				shellArgs = append(shellArgs, "--")
+				shellArgs = append(shellArgs, args[2:]...)
+			}
+			externalCmd := exec.Command("sh", shellArgs...)
+			externalCmd.Stderr = os.Stderr
+			externalCmd.Stdout = os.Stdout
+			externalCmd.Stdin = os.Stdin
+			preparedCmd := run.PrepareCmd(externalCmd)
+
+			err := preparedCmd.Run()
+			if err != nil {
+				return nil, fmt.Errorf("failed to run external command: %w", err)
+			}
+
+			return nil, nil
+		}
+
 		extraArgs := []string{}
 		for i, a := range args[2:] {
 			if !strings.Contains(expansion, "$") {
@@ -392,7 +413,7 @@ func ExpandAlias(args []string) ([]string, error) {
 		}
 		lingeringRE := regexp.MustCompile(`\$\d`)
 		if lingeringRE.MatchString(expansion) {
-			return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
+			return nil, fmt.Errorf("not enough arguments for alias: %s", expansion)
 		}
 
 		newArgs, err := shlex.Split(expansion)
@@ -400,9 +421,8 @@ func ExpandAlias(args []string) ([]string, error) {
 			return nil, err
 		}
 
-		newArgs = append(newArgs, extraArgs...)
+		return append(newArgs, extraArgs...), nil
 
-		return newArgs, nil
 	}
 
 	return args[1:], nil

@@ -2,11 +2,13 @@ package command
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAliasSet_gh_command(t *testing.T) {
@@ -16,7 +18,7 @@ func TestAliasSet_gh_command(t *testing.T) {
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	_, err := RunCommand("alias set pr pr status")
+	_, err := RunCommand("alias set pr 'pr status'")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -35,7 +37,7 @@ editor: vim
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("alias set co pr checkout")
+	output, err := RunCommand("alias set co 'pr checkout'")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -65,7 +67,7 @@ aliases:
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("alias set co pr checkout -Rcool/repo")
+	output, err := RunCommand("alias set co 'pr checkout -Rcool/repo'")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -81,7 +83,7 @@ func TestAliasSet_space_args(t *testing.T) {
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand(`alias set il issue list -l 'cool story'`)
+	output, err := RunCommand(`alias set il 'issue list -l "cool story"'`)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -99,23 +101,17 @@ func TestAliasSet_arg_processing(t *testing.T) {
 		ExpectedOutputLine string
 		ExpectedConfigLine string
 	}{
-		{"alias set co pr checkout", "- Adding alias for co: pr checkout", "co: pr checkout"},
-
 		{`alias set il "issue list"`, "- Adding alias for il: issue list", "il: issue list"},
 
 		{`alias set iz 'issue list'`, "- Adding alias for iz: issue list", "iz: issue list"},
 
-		{`alias set iy issue list --author=\$1 --label=\$2`,
-			`- Adding alias for iy: issue list --author=\$1 --label=\$2`,
-			`iy: issue list --author=\$1 --label=\$2`},
-
 		{`alias set ii 'issue list --author="$1" --label="$2"'`,
-			`- Adding alias for ii: issue list --author=\$1 --label=\$2`,
-			`ii: issue list --author=\$1 --label=\$2`},
+			`- Adding alias for ii: issue list --author="\$1" --label="\$2"`,
+			`ii: issue list --author="\$1" --label="\$2"`},
 
-		{`alias set ix issue list --author='$1' --label='$2'`,
-			`- Adding alias for ix: issue list --author=\$1 --label=\$2`,
-			`ix: issue list --author=\$1 --label=\$2`},
+		{`alias set ix "issue list --author='\$1' --label='\$2'"`,
+			`- Adding alias for ix: issue list --author='\$1' --label='\$2'`,
+			`ix: issue list --author='\$1' --label='\$2'`},
 	}
 
 	for _, c := range cases {
@@ -143,7 +139,7 @@ editor: vim
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("alias set diff pr diff")
+	output, err := RunCommand("alias set diff 'pr diff'")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -167,7 +163,7 @@ aliases:
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("alias set view pr view")
+	output, err := RunCommand("alias set view 'pr view'")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -179,6 +175,35 @@ aliases:
 	test.ExpectLines(t, output.String(), "Adding alias for view: pr view", "Added alias.")
 	eq(t, mainBuf.String(), expected)
 
+}
+
+func TestExpandAlias_external(t *testing.T) {
+	cfg := `---
+aliases:
+  co: pr checkout
+  il: issue list --author="$1" --label="$2"
+  ia: issue list --author="$1" --assignee="$1"
+  ig: '!gh issue list --label=$1 | grep'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+	cs.Stub("")
+
+	_, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	assert.Equal(t, 1, len(cs.Calls))
+
+	fmt.Printf("DEBUG %#v\n", cs.Calls[0])
+
+	expected := []string{"sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
+
+	assert.Equal(t, expected, cs.Calls[0].Args)
 }
 
 func TestExpandAlias(t *testing.T) {
@@ -230,7 +255,7 @@ aliases:
 
 func TestAliasSet_invalid_command(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
-	_, err := RunCommand("alias set co pe checkout")
+	_, err := RunCommand("alias set co 'pe checkout'")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -315,6 +340,46 @@ aliases:
 	expected := `aliases:
     il: issue list --author="$1" --label="$2"
     ia: issue list --author="$1" --assignee="$1"
+`
+
+	eq(t, mainBuf.String(), expected)
+}
+
+func TestShellAlias_flag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
+	output, err := RunCommand("alias set --shell igrep 'gh issue list | grep'")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Adding alias for igrep")
+	expected := `aliases:
+    igrep: '!gh issue list | grep'
+`
+
+	eq(t, mainBuf.String(), expected)
+}
+
+func TestShellAlias_bang(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "trunk")
+
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
+
+	output, err := RunCommand("alias set igrep '!gh issue list | grep'")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	test.ExpectLines(t, output.String(), "Adding alias for igrep")
+	expected := `aliases:
+    igrep: '!gh issue list | grep'
 `
 
 	eq(t, mainBuf.String(), expected)
