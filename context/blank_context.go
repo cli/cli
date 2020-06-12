@@ -18,7 +18,6 @@ func NewBlank() *blankContext {
 type blankContext struct {
 	authToken string
 	branch    string
-	branchErr error
 	baseRepo  ghrepo.Interface
 	remotes   Remotes
 }
