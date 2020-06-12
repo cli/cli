@@ -38,7 +38,7 @@ just imagine a flowchart
   - label `needs-design` if design input is needed, ping
   - label `needs-investigation` if engineering research is required before action can be taken
   - ping engineers if eng needed
-  - ping product if it's about future directions/roadamp/big changes
+  - ping product if it's about future directions/roadmap/big changes
 - does it need more info from the issue author?
   - ask the user for that
   - add `needs-user-input` label
@@ -82,7 +82,7 @@ of how to empathetically respond to or close an issue/PR:
 
 [Closing a quality PR its scope is too large](https://github.com/cli/cli/pull/1161)
 [Closing a stale PR](https://github.com/cli/cli/pull/557#issuecomment-639077269)
-[Closing a PR that doesn't follow our CONTRIUBUTING policy](https://github.com/cli/cli/pull/864)
+[Closing a PR that doesn't follow our CONTRIBUTING policy](https://github.com/cli/cli/pull/864)
 [Responding to a bug report](https://github.com/desktop/desktop/issues/9195#issuecomment-592243129)
 [Closing an issue that out of scope](https://github.com/cli/cli/issues/777#issuecomment-612926229)
 [Closing an issue with a feature request](https://github.com/desktop/desktop/issues/9722#issuecomment-625461766)
