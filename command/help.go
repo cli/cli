@@ -14,7 +14,9 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	// This matches Cobra's behavior for root command, which Cobra
 	// confusingly doesn't apply to nested commands.
 	if command != RootCmd {
-		if command.Parent() == RootCmd && len(args) >= 2 {
+		helpVal, _ := command.Flags().GetBool("help")
+
+		if !helpVal && command.Parent() == RootCmd && len(args) >= 2 {
 			if command.SuggestionsMinimumDistance <= 0 {
 				command.SuggestionsMinimumDistance = 2
 			}
