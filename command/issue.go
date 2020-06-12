@@ -67,13 +67,13 @@ var issueListCmd = &cobra.Command{
 	Short: "List and filter issues in this repository",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
-			return fmt.Errorf("unknown command %q for %q. Please include whitespace separated issue names within quotes if necessary", args[0], cmd.CommandPath())
+			return fmt.Errorf("unknown argument %q for %q: Please quote all flag values that contain spaces.", args[0], cmd.CommandPath())
 		}
 		return nil
 	},
 	Example: `
-	gh issue list
-	gh issue list -l "help wanted"
+	$ gh issue list -l "help wanted"
+	$ gh issue list -A "some author"
 	`,
 	RunE: issueList,
 }
