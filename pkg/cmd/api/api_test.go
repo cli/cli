@@ -3,12 +3,12 @@ package api
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
@@ -366,9 +366,11 @@ func Test_magicFieldValue(t *testing.T) {
 	f.Close()
 	t.Cleanup(func() { os.Remove(f.Name()) })
 
+	io, _, _, _ := iostreams.Test()
+
 	type args struct {
-		v     string
-		stdin io.ReadCloser
+		v    string
+		opts *ApiOptions
 	}
 	tests := []struct {
 		name    string
@@ -401,21 +403,41 @@ func Test_magicFieldValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "file",
-			args:    args{v: "@" + f.Name()},
+			name: "placeholder",
+			args: args{
+				v: ":owner",
+				opts: &ApiOptions{
+					IO: io,
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "hubot",
+			wantErr: false,
+		},
+		{
+			name: "file",
+			args: args{
+				v:    "@" + f.Name(),
+				opts: &ApiOptions{IO: io},
+			},
 			want:    []byte("file contents"),
 			wantErr: false,
 		},
 		{
-			name:    "file error",
-			args:    args{v: "@"},
+			name: "file error",
+			args: args{
+				v:    "@",
+				opts: &ApiOptions{IO: io},
+			},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := magicFieldValue(tt.args.v, tt.args.stdin)
+			got, err := magicFieldValue(tt.args.v, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -450,4 +472,65 @@ func Test_openUserFile(t *testing.T) {
 
 	assert.Equal(t, int64(13), length)
 	assert.Equal(t, "file contents", string(fb))
+}
+
+func Test_fillPlaceholders(t *testing.T) {
+	type args struct {
+		value string
+		opts  *ApiOptions
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "no changes",
+			args: args{
+				value: "repos/owner/repo/releases",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+				},
+			},
+			want:    "repos/owner/repo/releases",
+			wantErr: false,
+		},
+		{
+			name: "has substitutes",
+			args: args{
+				value: "repos/:owner/:repo/releases",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/releases",
+			wantErr: false,
+		},
+		{
+			name: "no greedy substitutes",
+			args: args{
+				value: ":ownership/:repository",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+				},
+			},
+			want:    ":ownership/:repository",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := fillPlaceholders(tt.args.value, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("fillPlaceholders() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
