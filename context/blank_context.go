@@ -18,6 +18,7 @@ func NewBlank() *blankContext {
 type blankContext struct {
 	authToken string
 	branch    string
+	branchErr error
 	baseRepo  ghrepo.Interface
 	remotes   Remotes
 }
@@ -40,7 +41,7 @@ func (c *blankContext) SetAuthToken(t string) {
 
 func (c *blankContext) Branch() (string, error) {
 	if c.branch == "" {
-		return "", fmt.Errorf("branch was not initialized")
+		return "", fmt.Errorf("branch was not initialized: %w", git.ErrNotOnAnyBranch)
 	}
 	return c.branch, nil
 }
