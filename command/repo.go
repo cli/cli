@@ -25,7 +25,7 @@ func init() {
 
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
-	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
+	repoCreateCmd.Flags().StringP("website", "w", "", "Repository home page URL")
 	repoCreateCmd.Flags().StringP("team", "t", "", "The name of the organization team to be granted access")
 	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
 	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
@@ -272,7 +272,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	homepage, err := cmd.Flags().GetString("homepage")
+	website, err := cmd.Flags().GetString("website")
 	if err != nil {
 		return err
 	}
@@ -289,7 +289,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		OwnerID:          orgName,
 		TeamID:           teamSlug,
 		Description:      description,
-		HomepageURL:      homepage,
+		HomepageURL:      website,
 		HasIssuesEnabled: hasIssuesEnabled,
 		HasWikiEnabled:   hasWikiEnabled,
 	}
