@@ -126,7 +126,7 @@ git_protocol: https
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	output, err := RunCommand("config get -hgithub.com git_protocol")
+	output, err := RunCommand("config get --host=github.com git_protocol")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
@@ -146,9 +146,9 @@ git_protocol: ssh
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
 
-	output, err := RunCommand("config get -hgithub.com git_protocol")
+	output, err := RunCommand("config get --host=github.com git_protocol")
 	if err != nil {
-		t.Fatalf("error running command `config get -hgithub.com git_protocol`: %v", err)
+		t.Fatalf("error running command `config get --host=github.com git_protocol`: %v", err)
 	}
 
 	eq(t, output.String(), "ssh\n")
@@ -161,7 +161,7 @@ func TestConfigSetHost(t *testing.T) {
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("config set -hgithub.com git_protocol ssh")
+	output, err := RunCommand("config set --host=github.com git_protocol ssh")
 	if err != nil {
 		t.Fatalf("error running command `config set editor ed`: %v", err)
 	}
@@ -200,7 +200,7 @@ hosts:
 	hostsBuf := bytes.Buffer{}
 	defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-	output, err := RunCommand("config set -hgithub.com git_protocol https")
+	output, err := RunCommand("config set --host=github.com git_protocol https")
 	if err != nil {
 		t.Fatalf("error running command `config get editor`: %v", err)
 	}
