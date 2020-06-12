@@ -53,7 +53,7 @@ func init() {
 	RootCmd.SetVersionTemplate(versionOutput)
 
 	RootCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
-	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
+	RootCmd.PersistentFlags().BoolP("help", "h", false, "Show help for command")
 	RootCmd.Flags().Bool("version", false, "Show gh version")
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
