@@ -2,7 +2,17 @@
 
 As we get more issues and pull requests opened on the GitHub CLI, we've decided on a weekly rotation
 triage role. The initial expectation is that the person in the role for the week spends no more than
-1-2 hours a day on this work; we can refine that as needed.
+1-2 hours a day on this work; we can refine that as needed. Below is a basic timeline for a typical
+triage day.
+
+1. Note the time
+2. Open every new [issue](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue)/[pr](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afals) in a tab
+3. Go through each one and look for things that should be closed outright (See the PR and Issue section below for more details.)
+4. Go through again and look for issues that are worth keeping around, update each one with labels/pings
+5. Go through again and look for PRs that solve a useful problem but lack obvious things like tests or passing builds; request changes on those
+6. Mark any remaining PRs (ie ones that look worth merging with a cursory glance) as community PRs and move to Needs Review
+7. Look for [issues](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue) and [PRs](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse+sort%3Aupdated-desc) updated in the last day and see if they need a response.
+8. Check the clock at each step and just bail out when an hour passe
 
 # Incoming issues
 
@@ -15,10 +25,14 @@ just imagine a flowchart
   - e.g. have already discussed not wanting to do or duplicate issue
   - comment acknowledging receipt
   - close
+- do we want to do it, but not in the next year?
+  - comment acknowledging it, but that we don't plan on working on it this year.
+  - label appropriately (examples include `enhancement` or `bug`)
+  - close
 - do we want to do it?
   - e.g. bugs or things we have discussed before
   - comment acknowledging it
-  - label appropriately (examples include `enhancement` or `bug`)
+  - label appropriately
   - add to project TODO column if appropriate, otherwise just leave it labeled
 - is it intriguing but needs discussion?
   - label `needs-design` if design input is needed, ping
@@ -57,6 +71,18 @@ helpful.
 
 For each PR, ask:
 
-- is this too stale? close with comment
+- is this too stale (more than two months old or too many conflicts)? close with comment
 - is this really close but author is absent? push commits to finish, request review
 - is this waiting on triage? go through the PR triage flow
+
+# Examples
+
+We want the cli/cli repo to be a safe and encouraging open-source environment. Below are some examples
+of how to empathetically respond to or close an issue/PR:
+
+[Closing a quality PR its scope is too large](https://github.com/cli/cli/pull/1161)
+[Closing a stale PR](https://github.com/cli/cli/pull/557#issuecomment-639077269)
+[Closing a PR that doesn't follow our CONTRIUBUTING policy](https://github.com/cli/cli/pull/864)
+[Responding to a bug report](https://github.com/desktop/desktop/issues/9195#issuecomment-592243129)
+[Closing an issue that out of scope](https://github.com/cli/cli/issues/777#issuecomment-612926229)
+[Closing an issue with a feature request](https://github.com/desktop/desktop/issues/9722#issuecomment-625461766)
