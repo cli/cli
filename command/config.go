@@ -12,8 +12,8 @@ func init() {
 	configCmd.AddCommand(configGetCmd)
 	configCmd.AddCommand(configSetCmd)
 
-	configGetCmd.Flags().StringP("host", "h", "", "Get per-host setting")
-	configSetCmd.Flags().StringP("host", "h", "", "Set per-host setting")
+	configGetCmd.Flags().String("host", "", "Get per-host setting")
+	configSetCmd.Flags().String("host", "", "Set per-host setting")
 
 	// TODO reveal and add usage once we properly support multiple hosts
 	_ = configGetCmd.Flags().MarkHidden("host")
