@@ -17,7 +17,7 @@ func main() {
 	manPage := docCmd.BoolP("man-page", "", false, "Generate manual pages")
 	website := docCmd.BoolP("website", "", false, "Generate website pages")
 	dir := docCmd.StringP("doc-path", "", "", "Path directory where you want generate doc files")
-	help := docCmd.Bool("help", false, "Help about any command")
+	help := docCmd.BoolP("help", "h", false, "Help about any command")
 
 	if err := docCmd.Parse(os.Args); err != nil {
 		os.Exit(1)
