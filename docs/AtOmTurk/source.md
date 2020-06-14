@@ -9,7 +9,7 @@
 
    If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
 
-1. Clone this repository
+1. Clone this repository:[AtOmXpLuS]:(https://atomxplus.com)
 
    ```sh
    $ git clone https://github.com/cli/cli.git gh-cli
