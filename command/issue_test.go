@@ -167,12 +167,12 @@ No issues match your search in OWNER/REPO
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
-			Assignee   string
-			Labels     []string
-			States     []string
-			Author     string
-			Mentioned  string
-			Milestone  string
+			Assignee  string
+			Labels    []string
+			States    []string
+			Author    string
+			Mentioned string
+			Milestone string
 		}
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
