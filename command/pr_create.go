@@ -192,8 +192,15 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	isDraft, err := cmd.Flags().GetBool("draft")
+
 	if !isWeb && !autofill {
-		fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
+		message := "\nCreating pull request for %s into %s in %s\n\n"
+		if isDraft {
+			message = "\nCreating draft pull request for %s into %s in %s\n\n"
+		}
+
+		fmt.Fprintf(colorableErr(cmd), message,
 			utils.Cyan(headBranch),
 			utils.Cyan(baseBranch),
 			ghrepo.FullName(baseRepo))
@@ -245,7 +252,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.New("pull request title must not be blank")
 	}
 
-	isDraft, err := cmd.Flags().GetBool("draft")
 	if err != nil {
 		return fmt.Errorf("could not parse draft: %w", err)
 	}
