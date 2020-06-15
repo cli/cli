@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -67,21 +68,17 @@ var issueCmd = &cobra.Command{
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueCreate,
 }
 var issueListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter issues in this repository",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			return fmt.Errorf("unknown argument %q for %q: Please quote all flag values that contain spaces.", args[0], cmd.CommandPath())
-		}
-		return nil
-	},
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh issue list -l "help wanted"
-	$ gh issue list -A "some author"
-	`,
+	$ gh issue list -A monalisa
+	`),
+	Args: cmdutil.NoArgsQuoteReminder,
 	RunE: issueList,
 }
 var issueStatusCmd = &cobra.Command{

@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -452,6 +453,7 @@ func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assi
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  prCreate,
 }
 
