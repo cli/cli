@@ -41,7 +41,7 @@ func init() {
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
-	issueListCmd.Flags().StringP("mentioned", "", "", "Filter by mention")
+	issueListCmd.Flags().StringP("mention", "", "", "Filter by mention")
 	issueListCmd.Flags().StringP("milestone", "", "", "Filter by milestone")
 
 	issueCmd.AddCommand(issueViewCmd)
@@ -143,7 +143,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	mentioned, err := cmd.Flags().GetString("mentioned")
+	mention, err := cmd.Flags().GetString("mention")
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author, mentioned, milestone)
+	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author, mention, milestone)
 	if err != nil {
 		return err
 	}
