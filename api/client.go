@@ -35,7 +35,11 @@ func NewClient(opts ...ClientOption) *Client {
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			req.Header.Add(name, value)
+			// prevent the token from leaking to non-GitHub hosts
+			// TODO: GHE support
+			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
+				req.Header.Add(name, value)
+			}
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -45,7 +49,11 @@ func AddHeader(name, value string) ClientOption {
 func AddHeaderFunc(name string, value func() string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			req.Header.Add(name, value())
+			// prevent the token from leaking to non-GitHub hosts
+			// TODO: GHE support
+			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
+				req.Header.Add(name, value())
+			}
 			return tr.RoundTrip(req)
 		}}
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -46,19 +47,30 @@ func init() {
 }
 
 var prCmd = &cobra.Command{
-	Use:   "pr",
+	Use:   "pr <command>",
 	Short: "Create, view, and checkout pull requests",
-	Long: `Work with GitHub pull requests.
-
-A pull request can be supplied as argument in any of the following formats:
+	Long:  `Work with GitHub pull requests`,
+	Example: heredoc.Doc(`
+	$ gh pr checkout 353
+	$ gh pr create --fill
+	$ gh pr view --web
+	`),
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `A pull request can be supplied as argument in any of the following formats:
 - by number, e.g. "123";
 - by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
-- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`,
+- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".`},
 }
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
-	RunE:  prList,
+	Example: heredoc.Doc(`
+	$ gh pr list --limit 999
+	$ gh pr list --state closed
+	$ gh pr list --label "priority 1" --label "bug"
+	`),
+	RunE: prList,
 }
 var prStatusCmd = &cobra.Command{
 	Use:   "status",
@@ -183,6 +195,10 @@ func prList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if limit <= 0 {
+		return fmt.Errorf("invalid limit: %v", limit)
+	}
+
 	state, err := cmd.Flags().GetString("state")
 	if err != nil {
 		return err
@@ -316,10 +332,9 @@ func prView(cmd *cobra.Command, args []string) error {
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printPrPreview(out, pr)
 	}
+	out := colorableOut(cmd)
+	return printPrPreview(out, pr)
 }
 
 func prClose(cmd *cobra.Command, args []string) error {

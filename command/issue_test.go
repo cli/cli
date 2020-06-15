@@ -181,6 +181,18 @@ No issues match your search in OWNER/REPO
 	eq(t, reqBody.Variables.Author, "foo")
 }
 
+func TestIssueList_withInvalidLimitFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	_, err := RunCommand("issue list --limit=0")
+
+	if err == nil || err.Error() != "invalid limit: 0" {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+}
+
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()

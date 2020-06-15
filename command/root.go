@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
@@ -34,7 +35,6 @@ var Version = "DEV"
 var BuildDate = "" // YYYY-MM-DD
 
 var versionOutput = ""
-var cobraDefaultHelpFunc func(*cobra.Command, []string)
 
 func init() {
 	if Version == "DEV" {
@@ -58,8 +58,10 @@ func init() {
 	// TODO:
 	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
 
-	cobraDefaultHelpFunc = RootCmd.HelpFunc()
 	RootCmd.SetHelpFunc(rootHelpFunc)
+
+	// This will silence the usage func on error
+	RootCmd.SetUsageFunc(func(_ *cobra.Command) error { return nil })
 
 	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
@@ -74,14 +76,21 @@ func init() {
 		HttpClient: func() (*http.Client, error) {
 			token := os.Getenv("GITHUB_TOKEN")
 			if len(token) == 0 {
+				// TODO: decouple from `context`
 				ctx := context.New()
 				var err error
+				// TODO: pass IOStreams to this so that the auth flow knows if it's interactive or not
 				token, err = ctx.AuthToken()
 				if err != nil {
 					return nil, err
 				}
 			}
 			return httpClient(token), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			// TODO: decouple from `context`
+			ctx := context.New()
+			return ctx.BaseRepo()
 		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
@@ -95,6 +104,15 @@ var RootCmd = &cobra.Command{
 
 	SilenceErrors: true,
 	SilenceUsage:  true,
+	Example: heredoc.Doc(`
+	$ gh issue create
+	$ gh repo clone cli/cli
+	$ gh pr checkout 321
+	`),
+	Annotations: map[string]string{
+		"help:feedback": `
+Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
+Open an issue using “gh issue create -R cli/cli”`},
 }
 
 var versionCmd = &cobra.Command{
@@ -318,100 +336,6 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	}
 
 	return baseRepo, nil
-}
-
-func rootHelpFunc(command *cobra.Command, args []string) {
-	if command != RootCmd {
-		// Display helpful error message in case subcommand name was mistyped.
-		// This matches Cobra's behavior for root command, which Cobra
-		// confusingly doesn't apply to nested commands.
-		if command.Parent() == RootCmd && len(args) >= 2 {
-			if command.SuggestionsMinimumDistance <= 0 {
-				command.SuggestionsMinimumDistance = 2
-			}
-			candidates := command.SuggestionsFor(args[1])
-
-			errOut := command.OutOrStderr()
-			fmt.Fprintf(errOut, "unknown command %q for %q\n", args[1], "gh "+args[0])
-
-			if len(candidates) > 0 {
-				fmt.Fprint(errOut, "\nDid you mean this?\n")
-				for _, c := range candidates {
-					fmt.Fprintf(errOut, "\t%s\n", c)
-				}
-				fmt.Fprint(errOut, "\n")
-			}
-
-			oldOut := command.OutOrStdout()
-			command.SetOut(errOut)
-			defer command.SetOut(oldOut)
-		}
-		cobraDefaultHelpFunc(command, args)
-		return
-	}
-
-	type helpEntry struct {
-		Title string
-		Body  string
-	}
-
-	coreCommandNames := []string{"issue", "pr", "repo"}
-	var coreCommands []string
-	var additionalCommands []string
-	for _, c := range command.Commands() {
-		if c.Short == "" {
-			continue
-		}
-		s := "  " + rpad(c.Name()+":", c.NamePadding()) + c.Short
-		if includes(coreCommandNames, c.Name()) {
-			coreCommands = append(coreCommands, s)
-		} else if !c.Hidden {
-			additionalCommands = append(additionalCommands, s)
-		}
-	}
-
-	helpEntries := []helpEntry{
-		{
-			"",
-			command.Long},
-		{"USAGE", command.Use},
-		{"CORE COMMANDS", strings.Join(coreCommands, "\n")},
-		{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")},
-		{"FLAGS", strings.TrimRight(command.LocalFlags().FlagUsages(), "\n")},
-		{"EXAMPLES", `
-  $ gh issue create
-  $ gh repo clone
-  $ gh pr checkout 321`},
-		{"LEARN MORE", `
-  Use "gh <command> <subcommand> --help" for more information about a command.
-  Read the manual at http://cli.github.com/manual`},
-		{"FEEDBACK", `
-  Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
-  Open an issue using “gh issue create -R cli/cli”`},
-	}
-
-	out := colorableOut(command)
-	for _, e := range helpEntries {
-		if e.Title != "" {
-			fmt.Fprintln(out, utils.Bold(e.Title))
-		}
-		fmt.Fprintln(out, strings.TrimLeft(e.Body, "\n")+"\n")
-	}
-}
-
-// rpad adds padding to the right of a string.
-func rpad(s string, padding int) string {
-	template := fmt.Sprintf("%%-%ds ", padding)
-	return fmt.Sprintf(template, s)
-}
-
-func includes(a []string, s string) bool {
-	for _, x := range a {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {

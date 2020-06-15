@@ -437,6 +437,17 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	}
 }
 
+func TestPRList_withInvalidLimitFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	_, err := RunCommand(`pr list --limit=0`)
+	if err == nil && err.Error() != "invalid limit: 0" {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+}
+
 func TestPRView_Preview(t *testing.T) {
 	tests := map[string]struct {
 		ownerRepo       string

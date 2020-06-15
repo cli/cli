@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -23,24 +24,30 @@ var aliasCmd = &cobra.Command{
 }
 
 var aliasSetCmd = &cobra.Command{
-	Use: "set <alias> <expansion>",
+	Use:   "set <alias> <expansion>",
+	Short: "Create a shortcut for a gh command",
+	Long: `Declare a word as a command alias that will expand to the specified command.
+
+The expansion may specify additional arguments and flags. If the expansion
+includes positional placeholders such as '$1', '$2', etc., any extra arguments
+that follow the invocation of an alias will be inserted appropriately.`,
+	Example: heredoc.Doc(`
+	$ gh alias set pv 'pr view'
+	$ gh pv -w 123
+	#=> gh pr view -w 123
+	
+	$ gh alias set bugs 'issue list --label="bugs"'
+
+	$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
+	$ gh epicsBy vilmibm
+	#=> gh issue list --author="vilmibm" --label="epic"
+	`),
+	Args: cobra.MinimumNArgs(2),
+	RunE: aliasSet,
+
 	// NB: this allows a user to eschew quotes when specifiying an alias expansion. We'll have to
 	// revisit it if we ever want to add flags to alias set but we have no current plans for that.
 	DisableFlagParsing: true,
-	Short:              "Create a shortcut for a gh command",
-	Long:               `This command lets you write your own shortcuts for running gh. They can be simple strings or accept placeholder arguments.`,
-	Example: `
-	gh alias set pv 'pr view'
-	# gh pv -w 123 -> gh pr view -w 123.
-
-	gh alias set bugs 'issue list --label="bugs"'
-	# gh bugs -> gh issue list --label="bugs".
-
-	gh alias set epicsBy 'issue list --author="$1" --label="epic"'
-	# gh epicsBy vilmibm -> gh issue list --author="$1" --label="epic"
-`,
-	Args: cobra.MinimumNArgs(2),
-	RunE: aliasSet,
 }
 
 func aliasSet(cmd *cobra.Command, args []string) error {
@@ -168,11 +175,10 @@ func aliasList(cmd *cobra.Command, args []string) error {
 }
 
 var aliasDeleteCmd = &cobra.Command{
-	Use:     "delete <alias>",
-	Short:   "Delete an alias.",
-	Args:    cobra.ExactArgs(1),
-	Example: "gh alias delete co",
-	RunE:    aliasDelete,
+	Use:   "delete <alias>",
+	Short: "Delete an alias.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  aliasDelete,
 }
 
 func aliasDelete(cmd *cobra.Command, args []string) error {

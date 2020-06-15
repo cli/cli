@@ -3,12 +3,12 @@ package api
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
@@ -31,6 +31,7 @@ func Test_NewCmdApi(t *testing.T) {
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "graphql",
+				RequestInputFile:    "",
 				RawFields:           []string(nil),
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string(nil),
@@ -45,6 +46,7 @@ func Test_NewCmdApi(t *testing.T) {
 				RequestMethod:       "DELETE",
 				RequestMethodPassed: true,
 				RequestPath:         "repos/octocat/Spoon-Knife",
+				RequestInputFile:    "",
 				RawFields:           []string(nil),
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string(nil),
@@ -59,6 +61,7 @@ func Test_NewCmdApi(t *testing.T) {
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "graphql",
+				RequestInputFile:    "",
 				RawFields:           []string{"query=QUERY"},
 				MagicFields:         []string{"body=@file.txt"},
 				RequestHeaders:      []string(nil),
@@ -73,10 +76,26 @@ func Test_NewCmdApi(t *testing.T) {
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "user",
+				RequestInputFile:    "",
 				RawFields:           []string(nil),
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string{"accept: text/plain"},
 				ShowResponseHeaders: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with request body from file",
+			cli:  "user --input myfile",
+			wants: ApiOptions{
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "myfile",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
 			},
 			wantsErr: false,
 		},
@@ -92,6 +111,7 @@ func Test_NewCmdApi(t *testing.T) {
 				assert.Equal(t, tt.wants.RequestMethod, o.RequestMethod)
 				assert.Equal(t, tt.wants.RequestMethodPassed, o.RequestMethodPassed)
 				assert.Equal(t, tt.wants.RequestPath, o.RequestPath)
+				assert.Equal(t, tt.wants.RequestInputFile, o.RequestInputFile)
 				assert.Equal(t, tt.wants.RawFields, o.RawFields)
 				assert.Equal(t, tt.wants.MagicFields, o.MagicFields)
 				assert.Equal(t, tt.wants.RequestHeaders, o.RequestHeaders)
@@ -140,12 +160,14 @@ func Test_apiRun(t *testing.T) {
 				ShowResponseHeaders: true,
 			},
 			httpResponse: &http.Response{
+				Proto:      "HTTP/1.1",
+				Status:     "200 Okey-dokey",
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
 				Header:     http.Header{"Content-Type": []string{"text/plain"}},
 			},
 			err:    nil,
-			stdout: "Content-Type: text/plain\r\n\r\nbody",
+			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\nbody",
 			stderr: ``,
 		},
 		{
@@ -159,6 +181,31 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 		},
 		{
+			name: "REST error",
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
+		{
+			name: "GraphQL error",
+			options: ApiOptions{
+				RequestPath: "graphql",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`,
+			stderr: "gh: AGAIN\nFINE\n",
+		},
+		{
 			name: "failure",
 			httpResponse: &http.Response{
 				StatusCode: 502,
@@ -166,7 +213,7 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    cmdutil.SilentError,
 			stdout: `gateway timeout`,
-			stderr: ``,
+			stderr: "gh: HTTP 502\n",
 		},
 	}
 
@@ -195,6 +242,81 @@ func Test_apiRun(t *testing.T) {
 			if stderr.String() != tt.stderr {
 				t.Errorf("expected error output %q, got %q", tt.stderr, stderr.String())
 			}
+		})
+	}
+}
+
+func Test_apiRun_inputFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		inputFile     string
+		inputContents []byte
+
+		contentLength    int64
+		expectedContents []byte
+	}{
+		{
+			name:          "stdin",
+			inputFile:     "-",
+			inputContents: []byte("I WORK OUT"),
+			contentLength: 0,
+		},
+		{
+			name:          "from file",
+			inputFile:     "gh-test-file",
+			inputContents: []byte("I WORK OUT"),
+			contentLength: 10,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, _, _ := iostreams.Test()
+			resp := &http.Response{StatusCode: 204}
+
+			inputFile := tt.inputFile
+			if tt.inputFile == "-" {
+				_, _ = stdin.Write(tt.inputContents)
+			} else {
+				f, err := ioutil.TempFile("", tt.inputFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _ = f.Write(tt.inputContents)
+				f.Close()
+				t.Cleanup(func() { os.Remove(f.Name()) })
+				inputFile = f.Name()
+			}
+
+			var bodyBytes []byte
+			options := ApiOptions{
+				RequestPath:      "hello",
+				RequestInputFile: inputFile,
+				RawFields:        []string{"a=b", "c=d"},
+
+				IO: io,
+				HttpClient: func() (*http.Client, error) {
+					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+						var err error
+						if bodyBytes, err = ioutil.ReadAll(req.Body); err != nil {
+							return nil, err
+						}
+						resp.Request = req
+						return resp, nil
+					}
+					return &http.Client{Transport: tr}, nil
+				},
+			}
+
+			err := apiRun(&options)
+			if err != nil {
+				t.Errorf("got error %v", err)
+			}
+
+			assert.Equal(t, "POST", resp.Request.Method)
+			assert.Equal(t, "/hello?a=b&c=d", resp.Request.URL.RequestURI())
+			assert.Equal(t, tt.contentLength, resp.Request.ContentLength)
+			assert.Equal(t, "", resp.Request.Header.Get("Content-Type"))
+			assert.Equal(t, tt.inputContents, bodyBytes)
 		})
 	}
 }
@@ -244,9 +366,11 @@ func Test_magicFieldValue(t *testing.T) {
 	f.Close()
 	t.Cleanup(func() { os.Remove(f.Name()) })
 
+	io, _, _, _ := iostreams.Test()
+
 	type args struct {
-		v     string
-		stdin io.ReadCloser
+		v    string
+		opts *ApiOptions
 	}
 	tests := []struct {
 		name    string
@@ -279,21 +403,41 @@ func Test_magicFieldValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "file",
-			args:    args{v: "@" + f.Name()},
+			name: "placeholder",
+			args: args{
+				v: ":owner",
+				opts: &ApiOptions{
+					IO: io,
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "hubot",
+			wantErr: false,
+		},
+		{
+			name: "file",
+			args: args{
+				v:    "@" + f.Name(),
+				opts: &ApiOptions{IO: io},
+			},
 			want:    []byte("file contents"),
 			wantErr: false,
 		},
 		{
-			name:    "file error",
-			args:    args{v: "@"},
+			name: "file error",
+			args: args{
+				v:    "@",
+				opts: &ApiOptions{IO: io},
+			},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := magicFieldValue(tt.args.v, tt.args.stdin)
+			got, err := magicFieldValue(tt.args.v, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -302,6 +446,91 @@ func Test_magicFieldValue(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_openUserFile(t *testing.T) {
+	f, err := ioutil.TempFile("", "gh-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprint(f, "file contents")
+	f.Close()
+	t.Cleanup(func() { os.Remove(f.Name()) })
+
+	file, length, err := openUserFile(f.Name(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	fb, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, int64(13), length)
+	assert.Equal(t, "file contents", string(fb))
+}
+
+func Test_fillPlaceholders(t *testing.T) {
+	type args struct {
+		value string
+		opts  *ApiOptions
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "no changes",
+			args: args{
+				value: "repos/owner/repo/releases",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+				},
+			},
+			want:    "repos/owner/repo/releases",
+			wantErr: false,
+		},
+		{
+			name: "has substitutes",
+			args: args{
+				value: "repos/:owner/:repo/releases",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/releases",
+			wantErr: false,
+		},
+		{
+			name: "no greedy substitutes",
+			args: args{
+				value: ":ownership/:repository",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+				},
+			},
+			want:    ":ownership/:repository",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := fillPlaceholders(tt.args.value, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("fillPlaceholders() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

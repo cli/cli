@@ -13,8 +13,16 @@ import (
 )
 
 type Action int
+type metadataStateType int
+
+const (
+	issueMetadata metadataStateType = iota
+	prMetadata
+)
 
 type issueMetadataState struct {
+	Type metadataStateType
+
 	Body   string
 	Title  string
 	Action Action
@@ -99,35 +107,46 @@ func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-func selectTemplate(templatePaths []string) (string, error) {
+func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string, metadataType metadataStateType) (string, error) {
 	templateResponse := struct {
 		Index int
 	}{}
-	if len(templatePaths) > 1 {
-		templateNames := make([]string, 0, len(templatePaths))
-		for _, p := range templatePaths {
-			templateNames = append(templateNames, githubtemplate.ExtractName(p))
-		}
-
-		selectQs := []*survey.Question{
-			{
-				Name: "index",
-				Prompt: &survey.Select{
-					Message: "Choose a template",
-					Options: templateNames,
-				},
-			},
-		}
-		if err := SurveyAsk(selectQs, &templateResponse); err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
-		}
+	templateNames := make([]string, 0, len(nonLegacyTemplatePaths))
+	for _, p := range nonLegacyTemplatePaths {
+		templateNames = append(templateNames, githubtemplate.ExtractName(p))
+	}
+	if metadataType == issueMetadata {
+		templateNames = append(templateNames, "Open a blank issue")
+	} else if metadataType == prMetadata {
+		templateNames = append(templateNames, "Open a blank pull request")
 	}
 
-	templateContents := githubtemplate.ExtractContents(templatePaths[templateResponse.Index])
+	selectQs := []*survey.Question{
+		{
+			Name: "index",
+			Prompt: &survey.Select{
+				Message: "Choose a template",
+				Options: templateNames,
+			},
+		},
+	}
+	if err := SurveyAsk(selectQs, &templateResponse); err != nil {
+		return "", fmt.Errorf("could not prompt: %w", err)
+	}
+
+	if templateResponse.Index == len(nonLegacyTemplatePaths) { // the user has selected the blank template
+		if legacyTemplatePath != nil {
+			templateContents := githubtemplate.ExtractContents(*legacyTemplatePath)
+			return string(templateContents), nil
+		} else {
+			return "", nil
+		}
+	}
+	templateContents := githubtemplate.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, templatePaths []string, allowReviewers, allowMetadata bool) error {
+func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
 	editorCommand, err := determineEditor(cmd)
 	if err != nil {
 		return err
@@ -137,13 +156,15 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	templateContents := ""
 
 	if providedBody == "" {
-		if len(templatePaths) > 0 {
+		if len(nonLegacyTemplatePaths) > 0 {
 			var err error
-			templateContents, err = selectTemplate(templatePaths)
+			templateContents, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type)
 			if err != nil {
 				return err
 			}
 			issueState.Body = templateContents
+		} else if legacyTemplatePath != nil {
+			issueState.Body = string(githubtemplate.ExtractContents(*legacyTemplatePath))
 		} else {
 			issueState.Body = defs.Body
 		}
@@ -350,10 +371,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		issueState.Assignees = values.Assignees
 		issueState.Labels = values.Labels
 		issueState.Projects = values.Projects
-		issueState.Milestones = []string{values.Milestone}
-
-		if len(issueState.Milestones) > 0 && issueState.Milestones[0] == noMilestone {
-			issueState.Milestones = issueState.Milestones[0:0]
+		if values.Milestone != "" && values.Milestone != noMilestone {
+			issueState.Milestones = []string{values.Milestone}
 		}
 
 		allowPreview = !issueState.HasMetadata()

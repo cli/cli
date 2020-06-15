@@ -213,10 +213,10 @@ func TestPRReview(t *testing.T) {
 		ExpectedBody  string
 	}
 	cases := []c{
-		c{`pr review --request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
-		c{`pr review --approve`, "APPROVE", ""},
-		c{`pr review --approve -b"hot damn"`, "APPROVE", "hot damn"},
-		c{`pr review --comment --body "i donno"`, "COMMENT", "i donno"},
+		{`pr review --request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
+		{`pr review --approve`, "APPROVE", ""},
+		{`pr review --approve -b"hot damn"`, "APPROVE", "hot damn"},
+		{`pr review --comment --body "i donno"`, "COMMENT", "i donno"},
 	}
 
 	for _, kase := range cases {
