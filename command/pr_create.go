@@ -254,7 +254,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if action == SubmitAction && title == "" {
 		return errors.New("pull request title must not be blank")
 	}
-	
+
 	if isDraft && isWeb {
 		return errors.New("the --draft flag is not supported with --web")
 	}
