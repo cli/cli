@@ -82,6 +82,7 @@ nfpms:
     bindir: /usr/local
     dependencies:
       - git
+    description: GitHub’s official command line tool.
     formats:
       - deb
       - rpm
