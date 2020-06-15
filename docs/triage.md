@@ -11,8 +11,8 @@ triage day.
 4. Go through again and look for issues that are worth keeping around, update each one with labels/pings
 5. Go through again and look for PRs that solve a useful problem but lack obvious things like tests or passing builds; request changes on those
 6. Mark any remaining PRs (i.e. ones that look worth merging with a cursory glance) as `community` PRs and move to Needs Review
-7. Look for updated [issues](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue) and [PRs](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse+sort%3Aupdated-desc) and see if they need a response.
-8. Check the clock at each step and just bail out when an hour passe
+7. Look for [issues](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue) and [PRs](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse+sort%3Aupdated-desc) updated in the last day and see if they need a response.
+8. Check the clock at each step and just bail out when an hour passes
 
 # Incoming issues
 
