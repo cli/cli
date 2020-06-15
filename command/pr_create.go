@@ -193,6 +193,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	isDraft, err := cmd.Flags().GetBool("draft")
+	if err != nil {
+		return fmt.Errorf("could not parse draft: %w", err)
+	}
 
 	if !isWeb && !autofill {
 		message := "\nCreating pull request for %s into %s in %s\n\n"
@@ -251,10 +254,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	if action == SubmitAction && title == "" {
 		return errors.New("pull request title must not be blank")
 	}
-
-	if err != nil {
-		return fmt.Errorf("could not parse draft: %w", err)
-	}
+	
 	if isDraft && isWeb {
 		return errors.New("the --draft flag is not supported with --web")
 	}
