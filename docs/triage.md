@@ -6,7 +6,7 @@ triage role. The initial expectation is that the person in the role for the week
 triage day.
 
 1. Note the time
-2. Open every new [issue](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue)/[pr](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afals) in a tab
+2. Open every new [issue](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue)/[pr](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse) in a tab
 3. Go through each one and look for things that should be closed outright (See the PR and Issue section below for more details.)
 4. Go through again and look for issues that are worth keeping around, update each one with labels/pings
 5. Go through again and look for PRs that solve a useful problem but lack obvious things like tests or passing builds; request changes on those
