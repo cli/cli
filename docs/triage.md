@@ -75,7 +75,7 @@ For each PR, ask:
 - is this really close but author is absent? push commits to finish, request review
 - is this waiting on triage? go through the PR triage flow
 
-# Examples
+## Examples
 
 We want the cli/cli repo to be a safe and encouraging open-source environment. Below are some examples
 of how to empathetically respond to or close an issue/PR:
