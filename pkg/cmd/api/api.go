@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ type ApiOptions struct {
 	RawFields           []string
 	RequestHeaders      []string
 	ShowResponseHeaders bool
+	Paginate            bool
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -93,6 +95,13 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
+			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported for non-GET requests`)}
+			}
+			if opts.Paginate && opts.RequestInputFile != "" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
+			}
+
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -105,6 +114,7 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
 	return cmd
 }
@@ -145,11 +155,46 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
-	if err != nil {
-		return err
+	hasNextPage := true
+	for hasNextPage {
+		resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
+		if err != nil {
+			return err
+		}
+
+		err = processResponse(resp, opts)
+		if err != nil {
+			return err
+		}
+
+		if !opts.Paginate {
+			break
+		}
+		requestPath, hasNextPage = findNextPage(resp)
+
+		if hasNextPage && opts.ShowResponseHeaders {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
 	}
 
+	return nil
+}
+
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+
+func findNextPage(resp *http.Response) (string, bool) {
+	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
+		if len(m) < 2 {
+			continue
+		}
+		if m[2] == "next" {
+			return m[1], true
+		}
+	}
+	return "", false
+}
+
+func processResponse(resp *http.Response, opts *ApiOptions) error {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
 		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
@@ -164,6 +209,7 @@ func apiRun(opts *ApiOptions) error {
 
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
+	var err error
 	var serverError string
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
 		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)

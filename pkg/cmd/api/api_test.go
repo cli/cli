@@ -36,6 +36,7 @@ func Test_NewCmdApi(t *testing.T) {
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string(nil),
 				ShowResponseHeaders: false,
+				Paginate:            false,
 			},
 			wantsErr: false,
 		},
@@ -51,6 +52,7 @@ func Test_NewCmdApi(t *testing.T) {
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string(nil),
 				ShowResponseHeaders: false,
+				Paginate:            false,
 			},
 			wantsErr: false,
 		},
@@ -66,6 +68,7 @@ func Test_NewCmdApi(t *testing.T) {
 				MagicFields:         []string{"body=@file.txt"},
 				RequestHeaders:      []string(nil),
 				ShowResponseHeaders: false,
+				Paginate:            false,
 			},
 			wantsErr: false,
 		},
@@ -81,8 +84,51 @@ func Test_NewCmdApi(t *testing.T) {
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string{"accept: text/plain"},
 				ShowResponseHeaders: true,
+				Paginate:            false,
 			},
 			wantsErr: false,
+		},
+		{
+			name: "with pagination",
+			cli:  "repos/OWNER/REPO/issues --paginate",
+			wants: ApiOptions{
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "repos/OWNER/REPO/issues",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "POST pagination",
+			cli:      "-XPOST repos/OWNER/REPO/issues --paginate",
+			wantsErr: true,
+		},
+		{
+			name: "GraphQL pagination",
+			cli:  "-XPOST graphql --paginate",
+			wants: ApiOptions{
+				RequestMethod:       "POST",
+				RequestMethodPassed: true,
+				RequestPath:         "graphql",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "input pagination",
+			cli:      "--input repos/OWNER/REPO/issues --paginate",
+			wantsErr: true,
 		},
 		{
 			name: "with request body from file",
@@ -96,6 +142,7 @@ func Test_NewCmdApi(t *testing.T) {
 				MagicFields:         []string(nil),
 				RequestHeaders:      []string(nil),
 				ShowResponseHeaders: false,
+				Paginate:            false,
 			},
 			wantsErr: false,
 		},
@@ -244,6 +291,57 @@ func Test_apiRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_apiRun_pagination(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":1}`)),
+			Header: http.Header{
+				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":2}`)),
+			Header: http.Header{
+				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":3}`)),
+			Header:     http.Header{},
+		},
+	}
+
+	options := ApiOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+
+		Paginate: true,
+	}
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
