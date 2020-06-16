@@ -203,6 +203,24 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	return
 }
 
+func DeleteLocalBranch(branch string) error {
+	branchCmd := GitCommand("branch", "-D", branch)
+	err := run.PrepareCmd(branchCmd).Run()
+	return err
+}
+
+func HasLocalBranch(branch string) bool {
+	configCmd := GitCommand("rev-parse", "--verify", "refs/heads/"+branch)
+	_, err := run.PrepareCmd(configCmd).Output()
+	return err == nil
+}
+
+func CheckoutBranch(branch string) error {
+	configCmd := GitCommand("checkout", branch)
+	err := run.PrepareCmd(configCmd).Run()
+	return err
+}
+
 func isFilesystemPath(p string) bool {
 	return p == "." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "/")
 }

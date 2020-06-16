@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -41,19 +42,27 @@ func init() {
 }
 
 var creditsCmd = &cobra.Command{
-	Use:   "credits [repository]",
-	Short: "View project's credits",
-	Long: `View animated credits for this or another project.
+	Use:   "credits",
+	Short: "View credits for this tool",
+	Long:  `View animated credits for gh, the tool you are currently using :)`,
+	Example: heredoc.Doc(`
+	# see a credits animation for this project
+	$ gh credits
+	
+	# display a non-animated thank you
+	$ gh credits -s
+	
+	# just print the contributors, one per line
+	$ gh credits | cat
+	`),
+	Args:   cobra.ExactArgs(0),
+	RunE:   ghCredits,
+	Hidden: true,
+}
 
-Examples:
-
-  gh credits            # see a credits animation for this project
-  gh credits owner/repo # see a credits animation for owner/repo
-  gh credits -s         # display a non-animated thank you
-  gh credits | cat      # just print the contributors, one per line
-`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: credits,
+func ghCredits(cmd *cobra.Command, _ []string) error {
+	args := []string{"cli/cli"}
+	return credits(cmd, args)
 }
 
 func credits(cmd *cobra.Command, args []string) error {
@@ -64,9 +73,18 @@ func credits(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	owner := "cli"
-	repo := "cli"
-	if len(args) > 0 {
+	var owner string
+	var repo string
+
+	if len(args) == 0 {
+		baseRepo, err := determineBaseRepo(client, cmd, ctx)
+		if err != nil {
+			return err
+		}
+
+		owner = baseRepo.RepoOwner()
+		repo = baseRepo.RepoName()
+	} else {
 		parts := strings.SplitN(args[0], "/", 2)
 		owner = parts[0]
 		repo = parts[1]

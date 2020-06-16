@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -49,17 +51,24 @@ func init() {
 }
 
 var issueCmd = &cobra.Command{
-	Use:   "issue",
+	Use:   "issue <command>",
 	Short: "Create and view issues",
-	Long: `Work with GitHub issues.
-
-An issue can be supplied as argument in any of the following formats:
+	Long:  `Work with GitHub issues`,
+	Example: heredoc.Doc(`
+	$ gh issue list
+	$ gh issue create --label bug
+	$ gh issue view --web
+	`),
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `An issue can be supplied as argument in any of the following formats:
 - by number, e.g. "123"; or
-- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`,
+- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".`},
 }
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueCreate,
 	Example: heredoc.Doc(`
 	$ gh issue create --title "I found a bug" --body "Nothing works"
@@ -72,22 +81,23 @@ var issueCreateCmd = &cobra.Command{
 var issueListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter issues in this repository",
-	RunE:  issueList,
+	Example: heredoc.Doc(`
+	$ gh issue list -l "help wanted"
+	$ gh issue list -A monalisa
+	`),
+	Args: cmdutil.NoArgsQuoteReminder,
+	RunE: issueList,
 }
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant issues",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
-	Use: "view {<number> | <url>}",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return FlagError{errors.New("issue number or URL required as argument")}
-		}
-		return nil
-	},
+	Use:   "view {<number> | <url>}",
 	Short: "View an issue",
+	Args:  cobra.ExactArgs(1),
 	Long: `Display the title, body, and other information about an issue.
 
 With '--web', open the issue in a web browser instead.`,
@@ -137,6 +147,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if limit <= 0 {
+		return fmt.Errorf("invalid limit: %v", limit)
+	}
 
 	author, err := cmd.Flags().GetString("author")
 	if err != nil {
@@ -179,7 +192,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentUser, err := ctx.AuthLogin()
+	currentUser, err := api.CurrentLoginName(apiClient)
 	if err != nil {
 		return err
 	}
@@ -250,11 +263,9 @@ func issueView(cmd *cobra.Command, args []string) error {
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
-	} else {
-		out := colorableOut(cmd)
-		return printIssuePreview(out, issue)
 	}
-
+	out := colorableOut(cmd)
+	return printIssuePreview(out, issue)
 }
 
 func issueStateTitleWithColor(state string) string {
@@ -363,11 +374,11 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var templateFiles []string
+	var nonLegacyTemplateFiles []string
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			templateFiles = githubtemplate.Find(rootDir, "ISSUE_TEMPLATE")
+			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
@@ -403,12 +414,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		// TODO: move URL generation into GitHubRepository
 		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
 		if title != "" || body != "" {
-			openURL += fmt.Sprintf(
-				"?title=%s&body=%s",
-				url.QueryEscape(title),
-				url.QueryEscape(body),
-			)
-		} else if len(templateFiles) > 1 {
+			milestone := ""
+			if len(milestoneTitles) > 0 {
+				milestone = milestoneTitles[0]
+			}
+			openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+			if err != nil {
+				return err
+			}
+		} else if len(nonLegacyTemplateFiles) > 1 {
 			openURL += "/choose"
 		}
 		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
@@ -427,6 +441,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	action := SubmitAction
 	tb := issueMetadataState{
+		Type:       issueMetadata,
 		Assignees:  assignees,
 		Labels:     labelNames,
 		Projects:   projectNames,
@@ -436,7 +451,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive {
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, templateFiles, false, repo.ViewerCanTriage())
+		var legacyTemplateFile *string
+		if baseOverride == "" {
+			if rootDir, err := git.ToplevelDir(); err == nil {
+				// TODO: figure out how to stub this in tests
+				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+			}
+		}
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -462,12 +484,15 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := fmt.Sprintf(
-			"https://github.com/%s/issues/new/?title=%s&body=%s",
-			ghrepo.FullName(baseRepo),
-			url.QueryEscape(title),
-			url.QueryEscape(body),
-		)
+		openURL := fmt.Sprintf("https://github.com/%s/issues/new/", ghrepo.FullName(baseRepo))
+		milestone := ""
+		if len(milestoneTitles) > 0 {
+			milestone = milestoneTitles[0]
+		}
+		openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+		if err != nil {
+			return err
+		}
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)

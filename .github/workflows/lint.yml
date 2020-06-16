@@ -1,12 +1,15 @@
 name: Lint
 on:
-  push: &paths
+  push:
     paths:
       - "**.go"
       - go.mod
       - go.sum
   pull_request:
-    <<: *paths
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
 
 jobs:
   lint:
@@ -14,7 +17,7 @@ jobs:
 
     steps:
       - name: Set up Go 1.14
-        uses: actions/setup-go@v2-beta
+        uses: actions/setup-go@v2
         with:
           go-version: 1.14
 

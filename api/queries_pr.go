@@ -48,6 +48,7 @@ type PullRequest struct {
 	BaseRefName string
 	HeadRefName string
 	Body        string
+	Mergeable   string
 
 	Author struct {
 		Login string
@@ -204,9 +205,9 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, error) {
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
-		ghrepo.FullName(baseRepo), prNum)
+		ghrepo.FullName(baseRepo), prNumber)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err
@@ -234,7 +235,6 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNum int) (string, e
 	}
 
 	return "", errors.New("pull request diff lookup failed")
-
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
@@ -418,6 +418,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				state
 				closed
 				body
+				mergeable
 				author {
 				  login
 				}
@@ -526,6 +527,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					title
 					state
 					body
+					mergeable
 					author {
 						login
 					}
@@ -991,23 +993,25 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 
 func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
 	var mutation struct {
-		MarkPullRequestReadyForReviewInput struct {
+		MarkPullRequestReadyForReview struct {
 			PullRequest struct {
 				ID githubv4.ID
 			}
 		} `graphql:"markPullRequestReadyForReview(input: $input)"`
 	}
 
-	type MarkPullRequestReadyForReviewInput struct {
-		PullRequestID githubv4.ID `json:"pullRequestId"`
-	}
-
-	input := MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
+	input := githubv4.MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
 
 	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	return v4.Mutate(context.Background(), &mutation, input, nil)
+}
 
-	return err
+func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
+	var response struct {
+		NodeID string `json:"node_id"`
+	}
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	return client.REST("DELETE", path, nil, &response)
 }
 
 func min(a, b int) int {

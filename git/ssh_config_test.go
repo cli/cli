@@ -36,9 +36,9 @@ func Test_Translator(t *testing.T) {
 	tr := m.Translator()
 
 	cases := [][]string{
-		[]string{"ssh://gh/o/r", "ssh://github.com/o/r"},
-		[]string{"ssh://github.com/o/r", "ssh://github.com/o/r"},
-		[]string{"https://gh/o/r", "https://gh/o/r"},
+		{"ssh://gh/o/r", "ssh://github.com/o/r"},
+		{"ssh://github.com/o/r", "ssh://github.com/o/r"},
+		{"https://gh/o/r", "https://gh/o/r"},
 	}
 	for _, c := range cases {
 		u, _ := url.Parse(c[0])

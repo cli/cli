@@ -16,14 +16,18 @@ import (
 // ClientOption represents an argument to NewClient
 type ClientOption = func(http.RoundTripper) http.RoundTripper
 
-// NewClient initializes a Client
-func NewClient(opts ...ClientOption) *Client {
+// NewHTTPClient initializes an http.Client
+func NewHTTPClient(opts ...ClientOption) *http.Client {
 	tr := http.DefaultTransport
 	for _, opt := range opts {
 		tr = opt(tr)
 	}
-	http := &http.Client{Transport: tr}
-	client := &Client{http: http}
+	return &http.Client{Transport: tr}
+}
+
+// NewClient initializes a Client
+func NewClient(opts ...ClientOption) *Client {
+	client := &Client{http: NewHTTPClient(opts...)}
 	return client
 }
 
@@ -31,7 +35,11 @@ func NewClient(opts ...ClientOption) *Client {
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			req.Header.Add(name, value)
+			// prevent the token from leaking to non-GitHub hosts
+			// TODO: GHE support
+			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
+				req.Header.Add(name, value)
+			}
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -41,7 +49,11 @@ func AddHeader(name, value string) ClientOption {
 func AddHeaderFunc(name string, value func() string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			req.Header.Add(name, value())
+			// prevent the token from leaking to non-GitHub hosts
+			// TODO: GHE support
+			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
+				req.Header.Add(name, value())
+			}
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -160,6 +172,10 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 		return false, "", err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return false, "", handleHTTPError(res)
+	}
 
 	appID := res.Header.Get("X-Oauth-Client-Id")
 	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")

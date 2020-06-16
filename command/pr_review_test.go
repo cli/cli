@@ -18,6 +18,11 @@ func TestPRReview_validation(t *testing.T) {
 		`pr review --approve --comment -b"hey" 123`,
 	} {
 		http.StubRepoResponse("OWNER", "REPO")
+		http.StubResponse(200, bytes.NewBufferString(`
+			{ "data": { "repository": {
+				"pullRequest": { "number": 123 }
+			} } }
+		`))
 		_, err := RunCommand(cmd)
 		if err == nil {
 			t.Fatal("expected error")
@@ -30,7 +35,12 @@ func TestPRReview_bad_body(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	_, err := RunCommand(`pr review -b "radical"`)
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 123 }
+		} } }
+	`))
+	_, err := RunCommand(`pr review 123 -b "radical"`)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -40,7 +50,6 @@ func TestPRReview_bad_body(t *testing.T) {
 func TestPRReview_url_arg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
 			"id": "foobar123",
@@ -67,7 +76,7 @@ func TestPRReview_url_arg(t *testing.T) {
 
 	test.ExpectLines(t, output.String(), "Approved pull request #123")
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
 			Input struct {
@@ -173,6 +182,11 @@ func TestPRReview_blank_comment(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 123 }
+		} } }
+	`))
 
 	_, err := RunCommand(`pr review --comment 123`)
 	eq(t, err.Error(), "did not understand desired review action: body cannot be blank for comment review")
@@ -182,6 +196,11 @@ func TestPRReview_blank_request_changes(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 123 }
+		} } }
+	`))
 
 	_, err := RunCommand(`pr review -r 123`)
 	eq(t, err.Error(), "did not understand desired review action: body cannot be blank for request-changes review")
@@ -194,10 +213,10 @@ func TestPRReview(t *testing.T) {
 		ExpectedBody  string
 	}
 	cases := []c{
-		c{`pr review --request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
-		c{`pr review --approve`, "APPROVE", ""},
-		c{`pr review --approve -b"hot damn"`, "APPROVE", "hot damn"},
-		c{`pr review --comment --body "i donno"`, "COMMENT", "i donno"},
+		{`pr review --request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
+		{`pr review --approve`, "APPROVE", ""},
+		{`pr review --approve -b"hot damn"`, "APPROVE", "hot damn"},
+		{`pr review --comment --body "i donno"`, "COMMENT", "i donno"},
 	}
 
 	for _, kase := range cases {

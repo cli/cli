@@ -3,10 +3,9 @@ package command
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
@@ -24,19 +23,25 @@ func init() {
 }
 
 var prReviewCmd = &cobra.Command{
-	Use:   "review [{<number> | <url> | <branch>]",
-	Short: "Add a review to a pull request.",
-	Args:  cobra.MaximumNArgs(1),
-	Long: `Add a review to either a specified pull request or the pull request associated with the current branch.
+	Use:   "review [<number> | <url> | <branch>]",
+	Short: "Add a review to a pull request",
+	Long: `Add a review to a pull request.
 
-Examples:
-
-	gh pr review                                  # add a review for the current branch's pull request
-	gh pr review 123                              # add a review for pull request 123
-	gh pr review -a                               # mark the current branch's pull request as approved
-	gh pr review -c -b "interesting"              # comment on the current branch's pull request
-	gh pr review 123 -r -b "needs more ascii art" # request changes on pull request 123
-	`,
+Without an argument, the pull request that belongs to the current branch is reviewed.`,
+	Example: heredoc.Doc(`
+	# approve the pull request of the current branch
+	$ gh pr review --approve
+	
+	# leave a review comment for the current branch
+	$ gh pr review --comment -b "interesting"
+	
+	# add a review for a specific pull request
+	$ gh pr review 123
+	
+	# request changes on a specific pull request
+	$ gh pr review 123 -r -b "needs more ASCII art"
+	`),
+	Args: cobra.MaximumNArgs(1),
 	RunE: prReview,
 }
 
@@ -91,49 +96,14 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	var prNum int
-	branchWithOwner := ""
-
-	if len(args) == 0 {
-		prNum, branchWithOwner, err = prSelectorForCurrentBranch(ctx, baseRepo)
-		if err != nil {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
-		}
-	} else {
-		prArg, repo := prFromURL(args[0])
-		if repo != nil {
-			baseRepo = repo
-		} else {
-			prArg = strings.TrimPrefix(args[0], "#")
-		}
-		prNum, err = strconv.Atoi(prArg)
-		if err != nil {
-			return errors.New("could not parse pull request argument")
-		}
+		return err
 	}
 
 	reviewData, err := processReviewOpt(cmd)
 	if err != nil {
 		return fmt.Errorf("did not understand desired review action: %w", err)
-	}
-
-	var pr *api.PullRequest
-	if prNum > 0 {
-		pr, err = api.PullRequestByNumber(apiClient, baseRepo, prNum)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-	} else {
-		pr, err = api.PullRequestForBranch(apiClient, baseRepo, "", branchWithOwner)
-		if err != nil {
-			return fmt.Errorf("could not find pull request: %w", err)
-		}
-		prNum = pr.Number
 	}
 
 	out := colorableOut(cmd)
@@ -156,11 +126,11 @@ func prReview(cmd *cobra.Command, args []string) error {
 
 	switch reviewData.State {
 	case api.ReviewComment:
-		fmt.Fprintf(out, "%s Reviewed pull request #%d\n", utils.Gray("-"), prNum)
+		fmt.Fprintf(out, "%s Reviewed pull request #%d\n", utils.Gray("-"), pr.Number)
 	case api.ReviewApprove:
-		fmt.Fprintf(out, "%s Approved pull request #%d\n", utils.Green("✓"), prNum)
+		fmt.Fprintf(out, "%s Approved pull request #%d\n", utils.Green("✓"), pr.Number)
 	case api.ReviewRequestChanges:
-		fmt.Fprintf(out, "%s Requested changes to pull request #%d\n", utils.Red("+"), prNum)
+		fmt.Fprintf(out, "%s Requested changes to pull request #%d\n", utils.Red("+"), pr.Number)
 	}
 
 	return nil
@@ -217,7 +187,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 	}
 
 	bodyQs := []*survey.Question{
-		&survey.Question{
+		{
 			Name: "body",
 			Prompt: &surveyext.GhEditor{
 				BlankAllowed:  blankAllowed,

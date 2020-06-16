@@ -15,9 +15,9 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		Output   string
 	}
 	cases := []c{
-		c{Label: "no changes", Expected: 0, Output: ""},
-		c{Label: "one change", Expected: 1, Output: " M poem.txt"},
-		c{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
+		{Label: "no changes", Expected: 0, Output: ""},
+		{Label: "one change", Expected: 1, Output: " M poem.txt"},
+		{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
 	}
 
 	teardown := run.SetPrepareCmd(func(*exec.Cmd) run.Runnable {

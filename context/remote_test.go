@@ -95,12 +95,12 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 		},
 		Network: api.RepoNetworkResult{
 			Repositories: []*api.Repository{
-				&api.Repository{
+				{
 					Name:             "NEWNAME",
 					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
 					ViewerPermission: "READ",
 				},
-				&api.Repository{
+				{
 					Name:             "REPO",
 					Owner:            api.RepositoryOwner{Login: "MYSELF"},
 					ViewerPermission: "ADMIN",
@@ -163,7 +163,7 @@ func Test_resolvedRemotes_forkLookup(t *testing.T) {
 		},
 		Network: api.RepoNetworkResult{
 			Repositories: []*api.Repository{
-				&api.Repository{
+				{
 					Name:             "NEWNAME",
 					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
 					ViewerPermission: "READ",
@@ -196,7 +196,7 @@ func Test_resolvedRemotes_clonedFork(t *testing.T) {
 		},
 		Network: api.RepoNetworkResult{
 			Repositories: []*api.Repository{
-				&api.Repository{
+				{
 					Name:             "REPO",
 					Owner:            api.RepositoryOwner{Login: "OWNER"},
 					ViewerPermission: "ADMIN",

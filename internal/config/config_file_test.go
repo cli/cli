@@ -3,9 +3,11 @@ package config
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,8 +24,8 @@ hosts:
   github.com:
     user: monalisa
     oauth_token: OTOKEN
-`)()
-	config, err := ParseConfig("filename")
+`, "")()
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
 	eq(t, err, nil)
@@ -42,8 +44,24 @@ hosts:
   github.com:
     user: monalisa
     oauth_token: OTOKEN
+`, "")()
+	config, err := ParseConfig("config.yml")
+	eq(t, err, nil)
+	user, err := config.Get("github.com", "user")
+	eq(t, err, nil)
+	eq(t, user, "monalisa")
+	token, err := config.Get("github.com", "oauth_token")
+	eq(t, err, nil)
+	eq(t, token, "OTOKEN")
+}
+
+func Test_parseConfig_hostsFile(t *testing.T) {
+	defer StubConfig("", `---
+github.com:
+  user: monalisa
+  oauth_token: OTOKEN
 `)()
-	config, err := ParseConfig("filename")
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
 	eq(t, err, nil)
@@ -59,38 +77,47 @@ hosts:
   example.com:
     user: wronguser
     oauth_token: NOTTHIS
-`)()
-	config, err := ParseConfig("filename")
+`, "")()
+	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
 	_, err = config.Get("github.com", "user")
-	eq(t, err, errors.New(`could not find config entry for "github.com"`))
+	eq(t, err, &NotFoundError{errors.New(`could not find config entry for "github.com"`)})
 }
 
-func Test_migrateConfig(t *testing.T) {
-	oldStyle := `---
+func Test_ParseConfig_migrateConfig(t *testing.T) {
+	defer StubConfig(`---
 github.com:
   - user: keiyuri
-    oauth_token: 123456`
+    oauth_token: 123456
+`, "")()
 
-	var root yaml.Node
-	err := yaml.Unmarshal([]byte(oldStyle), &root)
-	if err != nil {
-		panic("failed to parse test yaml")
-	}
-
-	buf := bytes.NewBufferString("")
-	defer StubWriteConfig(buf)()
-
+	mainBuf := bytes.Buffer{}
+	hostsBuf := bytes.Buffer{}
+	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 	defer StubBackupConfig()()
 
-	err = migrateConfig("boom.txt", &root)
-	eq(t, err, nil)
+	_, err := ParseConfig("config.yml")
+	assert.Nil(t, err)
 
-	expected := `hosts:
-    github.com:
-        oauth_token: "123456"
-        user: keiyuri
+	expectedMain := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	expectedHosts := `github.com:
+    user: keiyuri
+    oauth_token: "123456"
 `
 
-	eq(t, buf.String(), expected)
+	assert.Equal(t, expectedMain, mainBuf.String())
+	assert.Equal(t, expectedHosts, hostsBuf.String())
+}
+
+func Test_parseConfigFile(t *testing.T) {
+	fileContents := []string{"", " ", "\n"}
+	for _, contents := range fileContents {
+		t.Run(fmt.Sprintf("contents: %q", contents), func(t *testing.T) {
+			defer StubConfig(contents, "")()
+			_, yamlRoot, err := parseConfigFile("config.yml")
+			eq(t, err, nil)
+			eq(t, yamlRoot.Content[0].Kind, yaml.MappingNode)
+			eq(t, len(yamlRoot.Content[0].Content), 0)
+		})
+	}
 }

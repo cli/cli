@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
@@ -38,16 +39,26 @@ func init() {
 
 	repoCmd.AddCommand(repoViewCmd)
 	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
+
+	repoCmd.AddCommand(repoCreditsCmd)
+	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
 }
 
 var repoCmd = &cobra.Command{
-	Use:   "repo",
+	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
-	Long: `Work with GitHub repositories.
-
+	Long:  `Work with GitHub repositories`,
+	Example: heredoc.Doc(`
+	$ gh repo create
+	$ gh repo clone cli/cli
+	$ gh repo view --web
+	`),
+	Annotations: map[string]string{
+		"IsCore": "true",
+		"help:arguments": `
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
-- by URL, e.g. "https://github.com/OWNER/REPO"`,
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 }
 
 var repoCloneCmd = &cobra.Command{
@@ -56,6 +67,9 @@ var repoCloneCmd = &cobra.Command{
 	Short: "Clone a repository locally",
 	Long: `Clone a GitHub repository locally.
 
+If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
+defaults to the name of the authenticating user.
+
 To pass 'git clone' flags, separate them with '--'.`,
 	RunE: repoClone,
 }
@@ -63,9 +77,20 @@ To pass 'git clone' flags, separate them with '--'.`,
 var repoCreateCmd = &cobra.Command{
 	Use:   "create [<name>]",
 	Short: "Create a new repository",
-	Long: `Create a new GitHub repository.
+	Long:  `Create a new GitHub repository.`,
+	Example: heredoc.Doc(`
+	# create a repository under your account using the current directory name
+	$ gh repo create
 
-Use the "ORG/NAME" syntax to create a repository within your organization.`,
+	# create a repository with a specific name
+	$ gh repo create my-project
+
+	# create a repository in an organization
+	$ gh repo create cli/my-project
+	`),
+	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
+- <OWNER/REPO>
+- by URL, e.g. "https://github.com/OWNER/REPO"`},
 	RunE: repoCreate,
 }
 
@@ -87,6 +112,27 @@ With no argument, the repository for the current directory is displayed.
 
 With '--web', open the repository in a web browser instead.`,
 	RunE: repoView,
+}
+
+var repoCreditsCmd = &cobra.Command{
+	Use:   "credits [<repository>]",
+	Short: "View credits for a repository",
+	Example: heredoc.Doc(`
+	# view credits for the current repository
+	$ gh repo credits
+	
+	# view credits for a specific repository
+	$ gh repo credits cool/repo
+
+	# print a non-animated thank you
+	$ gh repo credits -s
+	
+	# pipe to just print the contributors, one per line
+	$ gh repo credits | cat
+	`),
+	Args:   cobra.MaximumNArgs(1),
+	RunE:   repoCredits,
+	Hidden: true,
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
@@ -125,8 +171,21 @@ func runClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func repoClone(cmd *cobra.Command, args []string) error {
+	ctx := contextForCommand(cmd)
+	apiClient, err := apiClientForContext(ctx)
+	if err != nil {
+		return err
+	}
+
 	cloneURL := args[0]
 	if !strings.Contains(cloneURL, ":") {
+		if !strings.Contains(cloneURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient)
+			if err != nil {
+				return err
+			}
+			cloneURL = currentUser + "/" + cloneURL
+		}
 		cloneURL = formatRemoteURL(cmd, cloneURL)
 	}
 
@@ -140,12 +199,6 @@ func repoClone(cmd *cobra.Command, args []string) error {
 	}
 
 	if repo != nil {
-		ctx := contextForCommand(cmd)
-		apiClient, err := apiClientForContext(ctx)
-		if err != nil {
-			return err
-		}
-
 		parentRepo, err = api.RepoParent(apiClient, repo)
 		if err != nil {
 			return err
@@ -586,4 +639,8 @@ func repoView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func repoCredits(cmd *cobra.Command, args []string) error {
+	return credits(cmd, args)
 }

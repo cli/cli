@@ -20,6 +20,9 @@ func TestIssueStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
 	defer jsonFile.Close()
@@ -49,6 +52,9 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -86,6 +92,9 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
@@ -170,6 +179,18 @@ No issues match your search in OWNER/REPO
 	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
 	eq(t, reqBody.Variables.States, []string{"OPEN"})
 	eq(t, reqBody.Variables.Author, "foo")
+}
+
+func TestIssueList_withInvalidLimitFlag(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	_, err := RunCommand("issue list --limit=0")
+
+	if err == nil || err.Error() != "invalid limit: 0" {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
 }
 
 func TestIssueList_nullAssigneeLabels(t *testing.T) {
@@ -637,7 +658,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new?title=mytitle&body=mybody")
+	eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
 
