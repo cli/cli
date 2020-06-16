@@ -61,13 +61,13 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	RunE:  issueCreate,
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh issue create --title "I found a bug" --body "Nothing works"
-	$ gh issue create --label label1,label2
-	$ gh issue create --label label1 --label label2
-	$ gh issue create --assignee user1Login,user2Login
-	$ gh issue create --project "Our Awesome Project"
-`,
+	$ gh issue create --label "bug,help wanted"
+	$ gh issue create --label bug --label "help wanted"
+	$ gh issue create --assignee monalisa,hubot
+	$ gh issue create --project "Roadmap"
+	`),
 }
 var issueListCmd = &cobra.Command{
 	Use:   "list",

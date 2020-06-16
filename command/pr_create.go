@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -409,14 +410,14 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
 	RunE:  prCreate,
-	Example: `
+	Example: heredoc.Doc(`
 	$ gh pr create --title "The bug is fixed" --body "Everything works again"
-	$ gh pr create --label label1,label2
-	$ gh pr create --label label1 --label label2
-	$ gh pr create --reviewer user1Login,user2Login
-	$ gh pr create --project "Our Awesome Project"
-	$ gh pr create --assignee user1Login,user2Login
-`,
+	$ gh issue create --label "bug,help wanted"
+	$ gh issue create --label bug --label "help wanted"
+	$ gh pr create --reviewer monalisa,hubot
+	$ gh pr create --project "Roadmap"
+	$ gh pr create --base develop
+	`),
 }
 
 func init() {
