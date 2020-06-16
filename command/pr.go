@@ -77,6 +77,7 @@ var prListCmd = &cobra.Command{
 var prStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant pull requests",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{

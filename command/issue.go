@@ -84,6 +84,7 @@ var issueListCmd = &cobra.Command{
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant issues",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{
