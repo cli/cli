@@ -42,21 +42,26 @@ func HasFailed() bool {
 // This matches Cobra's behavior for root command, which Cobra
 // confusingly doesn't apply to nested commands.
 func nestedSuggestFunc(command *cobra.Command, arg string) {
-	command.Printf("unknown command %q for `%s`\n", arg, command.UseLine())
+	command.Printf("unknown command %q for %q\n", arg, command.CommandPath())
 
-	if command.SuggestionsMinimumDistance <= 0 {
-		command.SuggestionsMinimumDistance = 2
+	var candidates []string
+	if arg == "help" {
+		candidates = []string{"--help"}
+	} else {
+		if command.SuggestionsMinimumDistance <= 0 {
+			command.SuggestionsMinimumDistance = 2
+		}
+		candidates = command.SuggestionsFor(arg)
 	}
-	candidates := command.SuggestionsFor(arg)
 
 	if len(candidates) > 0 {
 		command.Print("\nDid you mean this?\n")
 		for _, c := range candidates {
 			command.Printf("\t%s\n", c)
 		}
-		command.Print("\n")
 	}
 
+	command.Print("\n")
 	_ = rootUsageFunc(command)
 }
 
