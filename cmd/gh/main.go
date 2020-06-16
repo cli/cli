@@ -56,6 +56,9 @@ func main() {
 		printError(os.Stderr, err, cmd, hasDebug)
 		os.Exit(1)
 	}
+	if command.HasFailed() {
+		os.Exit(1)
+	}
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
