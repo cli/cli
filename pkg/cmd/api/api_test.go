@@ -331,7 +331,8 @@ func Test_apiRun_pagination(t *testing.T) {
 			return &http.Client{Transport: tr}, nil
 		},
 
-		Paginate: true,
+		RequestPath: "issues",
+		Paginate:    true,
 	}
 
 	err := apiRun(&options)
@@ -340,6 +341,7 @@ func Test_apiRun_pagination(t *testing.T) {
 	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
+	assert.Equal(t, "https://api.github.com/issues", responses[0].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
 }
