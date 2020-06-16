@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -65,6 +66,7 @@ var prCmd = &cobra.Command{
 var prListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter pull requests in this repository",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	Example: heredoc.Doc(`
 	$ gh pr list --limit 999
 	$ gh pr list --state closed
@@ -75,6 +77,7 @@ var prListCmd = &cobra.Command{
 var prStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant pull requests",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  prStatus,
 }
 var prViewCmd = &cobra.Command{
