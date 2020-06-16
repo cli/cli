@@ -9,6 +9,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func rootUsageFunc(command *cobra.Command) error {
+	command.Printf("Usage:  %s", command.UseLine())
+
+	flagUsages := command.LocalFlags().FlagUsages()
+	if flagUsages != "" {
+		command.Printf("\n\nFlags:\n%s", flagUsages)
+	}
+	return nil
+}
+
 func rootHelpFunc(command *cobra.Command, args []string) {
 	// Display helpful error message in case subcommand name was mistyped.
 	// This matches Cobra's behavior for root command, which Cobra
