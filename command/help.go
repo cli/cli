@@ -95,6 +95,11 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 		dedent := regexp.MustCompile(`(?m)^  `)
 		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent.ReplaceAllString(flagUsages, "")})
 	}
+	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
+	if inheritedFlagUsages != "" {
+		dedent := regexp.MustCompile(`(?m)^  `)
+		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent.ReplaceAllString(inheritedFlagUsages, "")})
+	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
 	}
