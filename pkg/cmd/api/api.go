@@ -76,7 +76,11 @@ on the format of the value:
 Raw request body may be passed from the outside via a file specified by '--input'.
 Pass "-" to read from standard input. In this mode, parameters specified via
 '--field' flags are serialized into URL query parameters.
-`,
+
+In '--paginate' mode, all pages of results will sequentially be requested until
+there are no more pages of results. For GraphQL requests, this requires that the
+original query accepts an '$endCursor: String' variable and that it fetches the
+'pageInfo{ hasNextPage, endCursor }' set of fields from a collection.`,
 		Example: heredoc.Doc(`
 			$ gh api repos/:owner/:repo/releases
 
@@ -85,6 +89,20 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 					repository(owner: $owner, name: $name) {
 						releases(last: 3) {
 							nodes { tagName }
+						}
+					}
+				}
+			'
+			
+			$ gh api graphql --paginate -f query='
+				query($endCursor: String) {
+					viewer {
+						repositories(first: 100, after: $endCursor) {
+							nodes { nameWithOwner }
+							pageInfo {
+								hasNextPage
+								endCursor
+							}
 						}
 					}
 				}
@@ -162,7 +180,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		err = processResponse(resp, opts)
+		endCursor, err := processResponse(resp, opts)
 		if err != nil {
 			return err
 		}
@@ -170,7 +188,15 @@ func apiRun(opts *ApiOptions) error {
 		if !opts.Paginate {
 			break
 		}
-		requestPath, hasNextPage = findNextPage(resp)
+
+		if opts.RequestPath == "graphql" {
+			hasNextPage = endCursor != ""
+			if hasNextPage {
+				params["endCursor"] = endCursor
+			}
+		} else {
+			requestPath, hasNextPage = findNextPage(resp)
+		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
 			fmt.Fprint(opts.IO.Out, "\n")
@@ -180,21 +206,7 @@ func apiRun(opts *ApiOptions) error {
 	return nil
 }
 
-var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
-
-func findNextPage(resp *http.Response) (string, bool) {
-	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
-		if len(m) < 2 {
-			continue
-		}
-		if m[2] == "next" {
-			return m[1], true
-		}
-	}
-	return "", false
-}
-
-func processResponse(resp *http.Response, opts *ApiOptions) error {
+func processResponse(resp *http.Response, opts *ApiOptions) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
 		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
@@ -202,43 +214,55 @@ func processResponse(resp *http.Response, opts *ApiOptions) error {
 	}
 
 	if resp.StatusCode == 204 {
-		return nil
+		return
 	}
 	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
 
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
-	var err error
 	var serverError string
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
 		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
-			return err
+			return
 		}
+	}
+
+	var bodyCopy *bytes.Buffer
+	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
+	if isGraphQLPaginate {
+		bodyCopy = &bytes.Buffer{}
+		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
 	if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 		if err != nil {
-			return err
+			return
 		}
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	} else if resp.StatusCode > 299 {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	}
 
-	return nil
+	if isGraphQLPaginate {
+		endCursor = findEndCursor(bodyCopy)
+	}
+
+	return
 }
 
 var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)

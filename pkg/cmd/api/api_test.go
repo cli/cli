@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_NewCmdApi(t *testing.T) {
@@ -293,7 +295,7 @@ func Test_apiRun(t *testing.T) {
 	}
 }
 
-func Test_apiRun_pagination(t *testing.T) {
+func Test_apiRun_paginationREST(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 
 	requestCount := 0
@@ -344,6 +346,83 @@ func Test_apiRun_pagination(t *testing.T) {
 	assert.Equal(t, "https://api.github.com/issues", responses[0].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
+}
+
+func Test_apiRun_paginationGraphQL(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+				"data": {
+					"nodes": ["page one"],
+					"pageInfo": {
+						"endCursor": "PAGE1_END",
+						"hasNextPage": true
+					}
+				}
+			}`)),
+		},
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+				"data": {
+					"nodes": ["page two"],
+					"pageInfo": {
+						"endCursor": "PAGE2_END",
+						"hasNextPage": false
+					}
+				}
+			}`)),
+		},
+	}
+
+	options := ApiOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+
+		RequestMethod: "POST",
+		RequestPath:   "graphql",
+		Paginate:      true,
+	}
+
+	err := apiRun(&options)
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout.String(), `"page one"`)
+	assert.Contains(t, stdout.String(), `"page two"`)
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	var requestData struct {
+		Variables map[string]interface{}
+	}
+
+	bb, err := ioutil.ReadAll(responses[0].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	_, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, false, hasCursor)
+
+	bb, err = ioutil.ReadAll(responses[1].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, true, hasCursor)
+	assert.Equal(t, "PAGE1_END", endCursor)
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
