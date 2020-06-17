@@ -27,7 +27,8 @@ just imagine a flowchart
   - close
 - do we want to do it, but not in the next year?
   - comment acknowledging it, but that we don't plan on working on it this year.
-  - label appropriately (examples include `enhancement` or `bug`)
+  - add `future` label
+  - add additional labels as needed(examples include `enhancement` or `bug`)
   - close
 - do we want to do it?
   - e.g. bugs or things we have discussed before
