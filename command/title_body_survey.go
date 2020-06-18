@@ -164,7 +164,8 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			}
 			issueState.Body = templateContents
 		} else if legacyTemplatePath != nil {
-			issueState.Body = string(githubtemplate.ExtractContents(*legacyTemplatePath))
+			templateContents = string(githubtemplate.ExtractContents(*legacyTemplatePath))
+			issueState.Body = templateContents
 		} else {
 			issueState.Body = defs.Body
 		}
