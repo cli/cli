@@ -458,14 +458,10 @@ var prCreateCmd = &cobra.Command{
 }
 
 func init() {
-	prCreateCmd.Flags().BoolP("draft", "d", false,
-		"Mark pull request as a draft")
-	prCreateCmd.Flags().StringP("title", "t", "",
-		"Supply a title. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringP("body", "b", "",
-		"Supply a body. Will prompt for one otherwise.")
-	prCreateCmd.Flags().StringP("base", "B", "",
-		"The branch into which you want your code merged")
+	prCreateCmd.Flags().BoolP("draft", "d", false, "Mark pull request as a draft")
+	prCreateCmd.Flags().StringP("title", "t", "", "Supply a title. Will prompt for one otherwise.")
+	prCreateCmd.Flags().StringP("body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	prCreateCmd.Flags().StringP("base", "B", "", "The branch into which you want your code merged")
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
 

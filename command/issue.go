@@ -26,10 +26,8 @@ func init() {
 	issueCmd.AddCommand(issueStatusCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
-	issueCreateCmd.Flags().StringP("title", "t", "",
-		"Supply a title. Will prompt for one otherwise.")
-	issueCreateCmd.Flags().StringP("body", "b", "",
-		"Supply a body. Will prompt for one otherwise.")
+	issueCreateCmd.Flags().StringP("title", "t", "", "Supply a title. Will prompt for one otherwise.")
+	issueCreateCmd.Flags().StringP("body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
 	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
 	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
