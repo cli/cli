@@ -69,6 +69,10 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		fmt.Fprintf(os.Stderr, "If you are on a server or other headless system, use this workaround instead:\n")
 		fmt.Fprintf(os.Stderr, "  1. Complete authentication on a GUI system;\n")
 		fmt.Fprintf(os.Stderr, "  2. Copy the contents of `~/.config/gh/hosts.yml` to this system.\n")
+		fmt.Fprintf(os.Stderr, "Or you can add following content to `~/.config/gh/config.yml`:\n")
+		fmt.Fprintf(os.Stderr, "github.com:\n")
+		fmt.Fprintf(os.Stderr, "  - user: GITHUB_USERNAME")
+		fmt.Fprintf(os.Stderr, "    oauth_token: GITHUB_PERSONAL_ACCESS_TOKEN\n")
 	}
 
 	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
