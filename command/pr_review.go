@@ -15,6 +15,7 @@ import (
 
 func init() {
 	prCmd.AddCommand(prReviewCmd)
+	includeRepoFlag(prCmd)
 
 	prReviewCmd.Flags().BoolP("approve", "a", false, "Approve pull request")
 	prReviewCmd.Flags().BoolP("request-changes", "r", false, "Request changes on a pull request")

@@ -27,16 +27,22 @@ func init() {
 	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
+	includeRepoFlag(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
+	includeRepoFlag(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
+	includeRepoFlag(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
+	includeRepoFlag(prMergeCmd)
 	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
 	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 	prCmd.AddCommand(prReadyCmd)
+	includeRepoFlag(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
+	includeRepoFlag(prListCmd)
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
@@ -44,6 +50,7 @@ func init() {
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 
 	prCmd.AddCommand(prViewCmd)
+	includeRepoFlag(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
 }
 

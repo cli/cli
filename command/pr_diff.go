@@ -19,6 +19,7 @@ func init() {
 	prDiffCmd.Flags().StringP("color", "c", "auto", "Whether or not to output color: {always|never|auto}")
 
 	prCmd.AddCommand(prDiffCmd)
+	includeRepoFlag(prDiffCmd)
 }
 
 func prDiff(cmd *cobra.Command, args []string) error {
