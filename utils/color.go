@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	_isColorEnabled                    bool = true
 	_isStdoutTerminal, checkedTerminal bool
 
 	// Outputs ANSI color if stdout is a tty
