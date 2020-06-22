@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_isColorEnabled                                    bool = true
-	_isStdoutTerminal, checkedTerminal, checkedNoColor bool
+	_isColorEnabled                    bool = true
+	_isStdoutTerminal, checkedTerminal bool
 
 	// Outputs ANSI color if stdout is a tty
 	Magenta = makeColorFunc("magenta")
@@ -45,7 +45,7 @@ func NewColorable(f *os.File) io.Writer {
 func makeColorFunc(color string) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
-		if isColorEnabled() && isStdoutTerminal() {
+		if isColorEnabled() {
 			return cf(arg)
 		}
 		return arg
@@ -53,13 +53,9 @@ func makeColorFunc(color string) func(string) string {
 }
 
 func isColorEnabled() bool {
-	if !isStdoutTerminal() {
+	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
 
-	if !checkedNoColor {
-		_isColorEnabled = os.Getenv("NO_COLOR") == ""
-		checkedNoColor = true
-	}
-	return _isColorEnabled
+	return isStdoutTerminal()
 }
