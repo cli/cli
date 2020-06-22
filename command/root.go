@@ -303,8 +303,8 @@ func changelogURL(version string) string {
 }
 
 func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
-	repo, err := cmd.Flags().GetString("repo")
-	if err == nil && repo != "" {
+	repo, _ := cmd.Flags().GetString("repo")
+	if repo != "" {
 		baseRepo, err := ghrepo.FromFullName(repo)
 		if err != nil {
 			return nil, fmt.Errorf("argument error: %w", err)
@@ -312,17 +312,12 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 		return baseRepo, nil
 	}
 
-	baseOverride, err := cmd.Flags().GetString("repo")
-	if err != nil {
-		return nil, err
-	}
-
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, repo)
 	if err != nil {
 		return nil, err
 	}
