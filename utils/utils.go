@@ -23,10 +23,6 @@ func OpenInBrowser(url string) error {
 
 func RenderMarkdown(text string) (string, error) {
 	style := "notty"
-	if !isColorEnabled() {
-		return text, nil
-	}
-
 	if isColorEnabled() {
 		style = "dark"
 	}
