@@ -45,7 +45,7 @@ that follow the invocation of an alias will be inserted appropriately.`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: aliasSet,
 
-	// NB: this allows a user to eschew quotes when specifiying an alias expansion. We'll have to
+	// NB: this allows a user to eschew quotes when specifying an alias expansion. We'll have to
 	// revisit it if we ever want to add flags to alias set but we have no current plans for that.
 	DisableFlagParsing: true,
 }
