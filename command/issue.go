@@ -18,11 +18,9 @@ import (
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func init() {
-	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
@@ -35,13 +33,6 @@ func init() {
 	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add labels by `name`")
 	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to projects by `name`")
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
-
-	issueCmd.AddCommand(issueListCmd)
-	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
-	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
-	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
-	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
@@ -78,16 +69,13 @@ var issueCreateCmd = &cobra.Command{
 	$ gh issue create --project "Roadmap"
 	`),
 }
-var issueListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List and filter issues in this repository",
-	Example: heredoc.Doc(`
-	$ gh issue list -l "help wanted"
-	$ gh issue list -A monalisa
-	`),
-	Args: cmdutil.NoArgsQuoteReminder,
-	RunE: issueList,
+
+// This is a temp function. It allows us to use the new command format in pkg/cmd/issue while
+// keeping the existing issue commands in this file
+func GetLegacyIssueCmd() *cobra.Command {
+	return issueCmd
 }
+
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant issues",
@@ -114,70 +102,6 @@ var issueReopenCmd = &cobra.Command{
 	Short: "Reopen issue",
 	Args:  cobra.ExactArgs(1),
 	RunE:  issueReopen,
-}
-
-func issueList(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	state, err := cmd.Flags().GetString("state")
-	if err != nil {
-		return err
-	}
-
-	labels, err := cmd.Flags().GetStringSlice("label")
-	if err != nil {
-		return err
-	}
-
-	assignee, err := cmd.Flags().GetString("assignee")
-	if err != nil {
-		return err
-	}
-
-	limit, err := cmd.Flags().GetInt("limit")
-	if err != nil {
-		return err
-	}
-	if limit <= 0 {
-		return fmt.Errorf("invalid limit: %v", limit)
-	}
-
-	author, err := cmd.Flags().GetString("author")
-	if err != nil {
-		return err
-	}
-
-	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)
-	if err != nil {
-		return err
-	}
-
-	hasFilters := false
-	cmd.Flags().Visit(func(f *pflag.Flag) {
-		switch f.Name {
-		case "state", "label", "assignee", "author":
-			hasFilters = true
-		}
-	})
-
-	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
-	// TODO: avoid printing header if piped to a script
-	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
-
-	out := cmd.OutOrStdout()
-
-	printIssues(out, "", len(listResult.Issues), listResult.Issues)
-
-	return nil
 }
 
 func issueStatus(cmd *cobra.Command, args []string) error {
