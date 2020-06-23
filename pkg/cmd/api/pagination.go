@@ -2,9 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 )
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
@@ -84,4 +87,22 @@ loop:
 		return endCursor
 	}
 	return ""
+}
+
+func addPerPage(p string, perPage int, params map[string]interface{}) string {
+	if _, hasPerPage := params["per_page"]; hasPerPage {
+		return p
+	}
+
+	idx := strings.IndexRune(p, '?')
+	sep := "?"
+
+	if idx >= 0 {
+		if qp, err := url.ParseQuery(p[idx+1:]); err == nil && qp.Get("per_page") != "" {
+			return p
+		}
+		sep = "&"
+	}
+
+	return fmt.Sprintf("%s%sper_page=%d", p, sep, perPage)
 }

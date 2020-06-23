@@ -143,6 +143,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	isGraphQL := opts.RequestPath == "graphql"
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -153,6 +154,10 @@ func apiRun(opts *ApiOptions) error {
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
+	}
+
+	if opts.Paginate && !isGraphQL {
+		requestPath = addPerPage(requestPath, 100, params)
 	}
 
 	if opts.RequestInputFile != "" {
@@ -189,7 +194,7 @@ func apiRun(opts *ApiOptions) error {
 			break
 		}
 
-		if opts.RequestPath == "graphql" {
+		if isGraphQL {
 			hasNextPage = endCursor != ""
 			if hasNextPage {
 				params["endCursor"] = endCursor
