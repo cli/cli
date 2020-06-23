@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -455,6 +456,14 @@ var prCreateCmd = &cobra.Command{
 	Short: "Create a pull request",
 	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  prCreate,
+	Example: heredoc.Doc(`
+	$ gh pr create --title "The bug is fixed" --body "Everything works again"
+	$ gh issue create --label "bug,help wanted"
+	$ gh issue create --label bug --label "help wanted"
+	$ gh pr create --reviewer monalisa,hubot
+	$ gh pr create --project "Roadmap"
+	$ gh pr create --base develop
+	`),
 }
 
 func init() {
@@ -469,9 +478,9 @@ func init() {
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
 
-	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
-	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
-	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
-	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to a project by `name`")
+	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request reviews from people by their `login`")
+	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign people by their `login`")
+	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add labels by `name`")
+	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to projects by `name`")
 	prCreateCmd.Flags().StringP("milestone", "m", "", "Add the pull request to a milestone by `name`")
 }
