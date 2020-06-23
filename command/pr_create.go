@@ -295,7 +295,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
 	if headRemote == nil {
-		headRepoURL := formatRemoteURL(cmd, ghrepo.FullName(headRepo))
+		headRepoURL := formatRemoteURL(cmd, headRepo)
 
 		// TODO: prevent clashes with another remote of a same name
 		gitRemote, err := git.AddRemote("fork", headRepoURL)

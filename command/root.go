@@ -336,23 +336,22 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
-func formatRemoteURL(cmd *cobra.Command, fullRepoName string) string {
+func formatRemoteURL(cmd *cobra.Command, repo ghrepo.Interface) string {
 	ctx := contextForCommand(cmd)
 
-	protocol := "https"
+	var protocol string
 	cfg, err := ctx.Config()
 	if err != nil {
 		fmt.Fprintf(colorableErr(cmd), "%s failed to load config: %s. using defaults\n", utils.Yellow("!"), err)
 	} else {
-		cfgProtocol, _ := cfg.Get(defaultHostname, "git_protocol")
-		protocol = cfgProtocol
+		protocol, _ = cfg.Get(repo.RepoHost(), "git_protocol")
 	}
 
 	if protocol == "ssh" {
-		return fmt.Sprintf("git@%s:%s.git", defaultHostname, fullRepoName)
+		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
 
-	return fmt.Sprintf("https://%s/%s.git", defaultHostname, fullRepoName)
+	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 }
 
 func determineEditor(cmd *cobra.Command) (string, error) {
