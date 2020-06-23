@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ type ApiOptions struct {
 	RawFields           []string
 	RequestHeaders      []string
 	ShowResponseHeaders bool
+	Paginate            bool
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -74,7 +76,11 @@ on the format of the value:
 Raw request body may be passed from the outside via a file specified by '--input'.
 Pass "-" to read from standard input. In this mode, parameters specified via
 '--field' flags are serialized into URL query parameters.
-`,
+
+In '--paginate' mode, all pages of results will sequentially be requested until
+there are no more pages of results. For GraphQL requests, this requires that the
+original query accepts an '$endCursor: String' variable and that it fetches the
+'pageInfo{ hasNextPage, endCursor }' set of fields from a collection.`,
 		Example: heredoc.Doc(`
 			$ gh api repos/:owner/:repo/releases
 
@@ -87,11 +93,32 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 					}
 				}
 			'
+			
+			$ gh api graphql --paginate -f query='
+				query($endCursor: String) {
+					viewer {
+						repositories(first: 100, after: $endCursor) {
+							nodes { nameWithOwner }
+							pageInfo {
+								hasNextPage
+								endCursor
+							}
+						}
+					}
+				}
+			'
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
+
+			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported for non-GET requests`)}
+			}
+			if opts.Paginate && opts.RequestInputFile != "" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
+			}
 
 			if runF != nil {
 				return runF(&opts)
@@ -105,6 +132,7 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
 	return cmd
 }
@@ -115,6 +143,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	isGraphQL := opts.RequestPath == "graphql"
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -125,6 +154,10 @@ func apiRun(opts *ApiOptions) error {
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
+	}
+
+	if opts.Paginate && !isGraphQL {
+		requestPath = addPerPage(requestPath, 100, params)
 	}
 
 	if opts.RequestInputFile != "" {
@@ -145,11 +178,40 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
-	if err != nil {
-		return err
+	hasNextPage := true
+	for hasNextPage {
+		resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
+		if err != nil {
+			return err
+		}
+
+		endCursor, err := processResponse(resp, opts)
+		if err != nil {
+			return err
+		}
+
+		if !opts.Paginate {
+			break
+		}
+
+		if isGraphQL {
+			hasNextPage = endCursor != ""
+			if hasNextPage {
+				params["endCursor"] = endCursor
+			}
+		} else {
+			requestPath, hasNextPage = findNextPage(resp)
+		}
+
+		if hasNextPage && opts.ShowResponseHeaders {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
 	}
 
+	return nil
+}
+
+func processResponse(resp *http.Response, opts *ApiOptions) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
 		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
@@ -157,7 +219,7 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	if resp.StatusCode == 204 {
-		return nil
+		return
 	}
 	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
@@ -168,31 +230,44 @@ func apiRun(opts *ApiOptions) error {
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
 		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
-			return err
+			return
 		}
+	}
+
+	var bodyCopy *bytes.Buffer
+	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
+	if isGraphQLPaginate {
+		bodyCopy = &bytes.Buffer{}
+		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
 	if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 		if err != nil {
-			return err
+			return
 		}
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	} else if resp.StatusCode > 299 {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	}
 
-	return nil
+	if isGraphQLPaginate {
+		endCursor = findEndCursor(bodyCopy)
+	}
+
+	return
 }
 
 var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
