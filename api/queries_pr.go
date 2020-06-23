@@ -540,8 +540,12 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					headRepositoryOwner {
 						login
 					}
+					headRepository {
+						name
+					}
 					isCrossRepository
 					isDraft
+					maintainerCanModify
 					reviewRequests(first: 100) {
 						nodes {
 							requestedReviewer {
