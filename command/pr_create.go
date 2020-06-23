@@ -304,8 +304,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		headRemote = &context.Remote{
 			Remote: gitRemote,
-			Owner:  headRepo.RepoOwner(),
-			Repo:   headRepo.RepoName(),
+			Repo:   headRepo,
 		}
 	}
 

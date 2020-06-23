@@ -51,6 +51,12 @@ func (r Repository) RepoName() string {
 	return r.Name
 }
 
+// RepoHost is the GitHub hostname of the repository
+func (r Repository) RepoHost() string {
+	// FIXME: inherit hostname from the server
+	return "github.com"
+}
+
 // IsFork is true when this repository has a parent repository
 func (r Repository) IsFork() bool {
 	return r.Parent != nil

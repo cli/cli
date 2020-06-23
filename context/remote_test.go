@@ -22,9 +22,9 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
-		&Remote{Remote: &git.Remote{Name: "mona"}, Owner: "monalisa", Repo: "myfork"},
-		&Remote{Remote: &git.Remote{Name: "origin"}, Owner: "monalisa", Repo: "octo-cat"},
-		&Remote{Remote: &git.Remote{Name: "upstream"}, Owner: "hubot", Repo: "tools"},
+		&Remote{Remote: &git.Remote{Name: "mona"}, Repo: ghrepo.New("monalisa", "myfork")},
+		&Remote{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("monalisa", "octo-cat")},
+		&Remote{Remote: &git.Remote{Name: "upstream"}, Repo: ghrepo.New("hubot", "tools")},
 	}
 
 	r, err := list.FindByName("upstream", "origin")
@@ -84,13 +84,11 @@ func Test_resolvedRemotes_triangularSetup(t *testing.T) {
 		Remotes: Remotes{
 			&Remote{
 				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
+				Repo:   ghrepo.New("OWNER", "REPO"),
 			},
 			&Remote{
 				Remote: &git.Remote{Name: "fork"},
-				Owner:  "MYSELF",
-				Repo:   "REPO",
+				Repo:   ghrepo.New("MYSELF", "REPO"),
 			},
 		},
 		Network: api.RepoNetworkResult{
@@ -157,8 +155,7 @@ func Test_resolvedRemotes_forkLookup(t *testing.T) {
 		Remotes: Remotes{
 			&Remote{
 				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
+				Repo:   ghrepo.New("OWNER", "REPO"),
 			},
 		},
 		Network: api.RepoNetworkResult{
@@ -190,8 +187,7 @@ func Test_resolvedRemotes_clonedFork(t *testing.T) {
 		Remotes: Remotes{
 			&Remote{
 				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
+				Repo:   ghrepo.New("OWNER", "REPO"),
 			},
 		},
 		Network: api.RepoNetworkResult{

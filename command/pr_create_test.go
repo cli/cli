@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 )
@@ -759,13 +760,11 @@ func Test_determineTrackingBranch_noMatch(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 		&context.Remote{
 			Remote: &git.Remote{Name: "upstream"},
-			Owner:  "octocat",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
 	}
 
@@ -786,13 +785,11 @@ func Test_determineTrackingBranch_hasMatch(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 		&context.Remote{
 			Remote: &git.Remote{Name: "upstream"},
-			Owner:  "octocat",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
 	}
 
@@ -819,8 +816,7 @@ func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 	}
 
