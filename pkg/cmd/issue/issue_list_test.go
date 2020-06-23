@@ -129,40 +129,48 @@ func TestIssueList_parsing(t *testing.T) {
 	}
 }
 
-// func TestIssueList(t *testing.T) {
-// 	f := &cmdutil.Factory{}
-// 	cmd := issue.newListCmd(f)
-// 	initBlankContext("", "OWNER/REPO", "master")
-// 	http := initFakeHTTP()
-// 	http.StubRepoResponse("OWNER", "REPO")
+func TestIssueList(t *testing.T) {
+	opts = ListOptions{
+		SharedOptions{
+			HttpClient: func() (*http.Client, error) {
+				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+					// Return the stubbed repo response
+					// http.StubRepoResponse("OWNER", "REPO")
+	
+					jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+					defer jsonFile.Close()
+					// Return the stubbed json response
+					// http.StubResponse(200, jsonFile)
+	
+					return resp, nil
+				}
+				return &http.Client{Transport: tr}, nil,
+		},
+	}
+	
+	output, err := list(opts)
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
 
-// 	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
-// 	defer jsonFile.Close()
-// 	http.StubResponse(200, jsonFile)
+	eq(t, output.Stderr(), `
+Showing 3 of 3 issues in OWNER/REPO
 
-// 	output, err := RunCommand("issue list")
-// 	if err != nil {
-// 		t.Errorf("error running command `issue list`: %v", err)
-// 	}
+`)
 
-// 	eq(t, output.Stderr(), `
-// Showing 3 of 3 issues in OWNER/REPO
+	expectedIssues := []*regexp.Regexp{
+		regexp.MustCompile(`(?m)^1\t.*won`),
+		regexp.MustCompile(`(?m)^2\t.*too`),
+		regexp.MustCompile(`(?m)^4\t.*fore`),
+	}
 
-// `)
-
-// 	expectedIssues := []*regexp.Regexp{
-// 		regexp.MustCompile(`(?m)^1\t.*won`),
-// 		regexp.MustCompile(`(?m)^2\t.*too`),
-// 		regexp.MustCompile(`(?m)^4\t.*fore`),
-// 	}
-
-// 	for _, r := range expectedIssues {
-// 		if !r.MatchString(output.String()) {
-// 			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-// 			return
-// 		}
-// 	}
-// }
+	for _, r := range expectedIssues {
+		if !r.MatchString(output.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+			return
+		}
+	}
+}
 
 // func TestIssueList_withFlags(t *testing.T) {
 // 	initBlankContext("", "OWNER/REPO", "master")
