@@ -1,9 +1,17 @@
 package issue
 
 import (
+	"fmt"
+	"net/http"
+	"os"
+	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/alecthomas/assert"
+	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 )
 
@@ -129,31 +137,39 @@ func TestIssueList_parsing(t *testing.T) {
 	}
 }
 
-func TestIssueList(t *testing.T) {
-	opts = ListOptions{
-		SharedOptions{
-			HttpClient: func() (*http.Client, error) {
-				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-					// Return the stubbed repo response
-					// http.StubRepoResponse("OWNER", "REPO")
-	
-					jsonFile, _ := os.Open("../test/fixtures/issueList.json")
-					defer jsonFile.Close()
-					// Return the stubbed json response
-					// http.StubResponse(200, jsonFile)
-	
-					return resp, nil
-				}
-				return &http.Client{Transport: tr}, nil,
+func TestIssueList_success(t *testing.T) {
+	tr := &httpmock.Registry{}
+	tr.StubRepoResponse("OWNER", "REPO")
+	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
+	defer jsonFile.Close()
+	tr.StubResponse(200, jsonFile)
+
+	io, _, stdout, stderr := iostreams.Test()
+	opts := ListOptions{
+		State:      "open",
+		Assignee:   "",
+		Limit:      30,
+		Labels:     []string{},
+		Author:     "",
+		HasFilters: false,
+		SharedOptions: SharedOptions{
+			IO:             io,
+			BaseRepo:       func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
+			HttpClient:     func() (*http.Client, error) { return &http.Client{Transport: tr}, nil },
+			ColorableErr:   io.ErrOut,
+			ColorableWrite: io.Out,
 		},
 	}
-	
-	output, err := list(opts)
+
+	fmt.Printf("🌭 err %+v\n", stderr.String())
+	fmt.Printf("🌭 out %+v\n", stdout.String())
+
+	err := list(opts)
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.Stderr(), `
+	eq(t, stderr.String(), `
 Showing 3 of 3 issues in OWNER/REPO
 
 `)
@@ -165,8 +181,8 @@ Showing 3 of 3 issues in OWNER/REPO
 	}
 
 	for _, r := range expectedIssues {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+		if !r.MatchString(stdout.String()) {
+			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, stdout.String())
 			return
 		}
 	}
@@ -269,3 +285,10 @@ Showing 3 of 3 issues in OWNER/REPO
 // 		t.Errorf("error running command `issue list`: %v", err)
 // 	}
 // }
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
