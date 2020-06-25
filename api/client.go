@@ -31,6 +31,11 @@ func NewClient(opts ...ClientOption) *Client {
 	return client
 }
 
+func ClientFromHttpClient(c *http.Client) *Client {
+	client := &Client{http: c}
+	return client
+}
+
 // AddHeader turns a RoundTripper into one that adds a request header
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
