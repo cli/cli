@@ -58,7 +58,7 @@ func newlygit(client *http.Client, baseRepo ghrepo.Interface) error {
 	rand.Seed(time.Now().UnixNano())
 	right := 0
 	wrong := 0
-	isCorrect, err := pr_author(client, baseRepo)
+	isCorrect, err := commit_pr(client, baseRepo)
 	if err != nil {
 		return err
 	}

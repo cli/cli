@@ -57,15 +57,27 @@ func allContributors(client *http.Client, baseRepo ghrepo.Interface) ([]string, 
 	return contributors, nil
 }
 
-func randomPullRequest(client *http.Client, baseRepo ghrepo.Interface) (*api.PullRequest, error) {
+func randomPullRequests(client *http.Client, baseRepo ghrepo.Interface, count int) ([]api.PullRequest, error) {
 	numbers, err := allPullRequestNumbers(client, baseRepo)
 	if err != nil {
 		return nil, err
 	}
-	i := rand.Intn(len(numbers))
-	number := numbers[i]
-	c := api.ClientFromHttpClient(client)
-	return api.PullRequestByNumber(c, baseRepo, number)
+
+	rand.Shuffle(len(numbers), func(i, j int) {
+		numbers[i], numbers[j] = numbers[j], numbers[i]
+	})
+
+	prs := []api.PullRequest{}
+	for _, number := range numbers[0:count] {
+		c := api.ClientFromHttpClient(client)
+		pr, err := api.PullRequestByNumber(c, baseRepo, number)
+		if err != nil {
+			return nil, err
+		}
+		prs = append(prs, *pr)
+	}
+
+	return prs, err
 }
 
 func allPullRequestNumbers(client *http.Client, baseRepo ghrepo.Interface) ([]int, error) {

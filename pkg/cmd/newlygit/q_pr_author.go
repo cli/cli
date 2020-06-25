@@ -10,10 +10,12 @@ import (
 )
 
 func pr_author(client *http.Client, baseRepo ghrepo.Interface) (bool, error) {
-	pr, err := randomPullRequest(client, baseRepo)
+	prs, err := randomPullRequests(client, baseRepo, 1)
 	if err != nil {
 		return false, err
 	}
+	pr := prs[0]
+
 	contributors, err := allContributors(client, baseRepo)
 	if err != nil {
 		return false, err
