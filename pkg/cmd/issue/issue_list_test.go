@@ -2,6 +2,7 @@ package issue
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -144,7 +145,7 @@ func TestIssueList_success(t *testing.T) {
 	defer jsonFile.Close()
 	tr.StubResponse(200, jsonFile)
 
-	io, _, stdout, stderr := iostreams.Test()
+	i, _, stdout, stderr := iostreams.Test()
 	opts := ListOptions{
 		State:      "open",
 		Assignee:   "",
@@ -153,11 +154,11 @@ func TestIssueList_success(t *testing.T) {
 		Author:     "",
 		HasFilters: false,
 		SharedOptions: SharedOptions{
-			IO:             io,
-			BaseRepo:       func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
-			HttpClient:     func() (*http.Client, error) { return &http.Client{Transport: tr}, nil },
-			ColorableErr:   io.ErrOut,
-			ColorableWrite: io.Out,
+			IO:           i,
+			BaseRepo:     func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil },
+			HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: tr}, nil },
+			ColorableErr: func() io.Writer { return i.ErrOut },
+			ColorableOut: func() io.Writer { return i.Out },
 		},
 	}
 

@@ -70,6 +70,7 @@ func init() {
 	})
 
 	// TODO: iron out how a factory incorporates context
+
 	cmdFactory := &cmdutil.Factory{
 		IOStreams: iostreams.System(),
 		HttpClient: func() (*http.Client, error) {
@@ -90,9 +91,7 @@ func init() {
 			// TODO: decouple from `context`
 			ctx := context.New()
 			return ctx.BaseRepo()
-		},
-		ColorableErr: colorableErr(RootCmd),
-		ColorableOut: colorableOut(RootCmd),
+		}
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 	RootCmd.AddCommand(issue.NewCmd(cmdFactory, GetLegacyIssueCmd()))

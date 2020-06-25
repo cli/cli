@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -94,6 +95,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, args := range cmdQueue {
+		fmt.Printf("🌭 %+v\n", strings.Join(args, " "))
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

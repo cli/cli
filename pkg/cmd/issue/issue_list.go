@@ -124,8 +124,8 @@ func list(opts ListOptions) error {
 
 	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, opts.HasFilters)
 	// TODO: avoid printing header if piped to a script
-	fmt.Fprintf(opts.ColorableWrite, "\n%s\n\n", title)
-	printIssues(opts.ColorableWrite, "", len(listResult.Issues), listResult.Issues)
+	fmt.Fprintf(opts.ColorableOut(), "\n%s\n\n", title)
+	printIssues(opts.ColorableOut(), "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }

@@ -18,20 +18,20 @@ import (
 )
 
 type SharedOptions struct {
-	IO             *iostreams.IOStreams
-	HttpClient     func() (*http.Client, error)
-	BaseRepo       func() (ghrepo.Interface, error)
-	ColorableWrite io.Writer
-	ColorableErr   io.Writer
+	IO           *iostreams.IOStreams
+	HttpClient   func() (*http.Client, error)
+	BaseRepo     func() (ghrepo.Interface, error)
+	ColorableOut func() io.Writer
+	ColorableErr func() io.Writer
 }
 
 func NewCmd(f *cmdutil.Factory, legacyIssueCmd *cobra.Command) *cobra.Command {
 	sharedOpts := SharedOptions{
-		IO:             f.IOStreams,
-		HttpClient:     f.HttpClient,
-		BaseRepo:       f.BaseRepo,
-		ColorableWrite: f.ColorableOut,
-		ColorableErr:   f.ColorableErr,
+		IO:           f.IOStreams,
+		HttpClient:   f.HttpClient,
+		BaseRepo:     f.BaseRepo,
+		ColorableOut: f.ColorableOut,
+		ColorableErr: f.ColorableErr,
 	}
 
 	listCmd := newListCmd(sharedOpts, nil)
