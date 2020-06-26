@@ -13,14 +13,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-type TablePrinter interface {
-	IsTTY() bool
-	AddField(string, func(int, string) string, func(string) string)
-	EndRow()
-	Render() error
-}
-
-func NewTablePrinter(w io.Writer) TablePrinter {
+func TerminalInfo(w io.Writer) (bool, int) {
 	if outFile, isFile := w.(*os.File); isFile {
 		// TODO: use utils.IsTerminal()
 		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
@@ -37,10 +30,38 @@ func NewTablePrinter(w io.Writer) TablePrinter {
 					}
 				}
 			}
-			return &ttyTablePrinter{
-				out:      NewColorable(outFile),
-				maxWidth: ttyWidth,
-			}
+			return true, ttyWidth
+		}
+	}
+	return false, -1
+}
+
+type TablePrinter interface {
+	IsTTY() bool
+	AddField(string, func(int, string) string, func(string) string)
+	EndRow()
+	Render() error
+}
+
+func NewTablePrinter(w io.Writer) TablePrinter {
+	isTTY, ttyWidth := TerminalInfo(w)
+	if isTTY {
+		outFile := w.(*os.File)
+		return &ttyTablePrinter{
+			out:      NewColorable(outFile),
+			maxWidth: ttyWidth,
+		}
+	}
+	return &tsvTablePrinter{
+		out: w,
+	}
+}
+
+func NewTablePrinterTerminalInfo(w io.Writer, isTTY bool, ttyWidth int) TablePrinter {
+	if isTTY {
+		return &ttyTablePrinter{
+			out:      w,
+			maxWidth: ttyWidth,
 		}
 	}
 	return &tsvTablePrinter{

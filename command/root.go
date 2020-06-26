@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
+	branchCmd "github.com/cli/cli/pkg/cmd/branch"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -92,6 +93,7 @@ func init() {
 		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
+	RootCmd.AddCommand(branchCmd.NewCmdBranch(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
