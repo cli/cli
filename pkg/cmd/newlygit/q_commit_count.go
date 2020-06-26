@@ -63,7 +63,7 @@ func commit_count(client *http.Client, baseRepo ghrepo.Interface) (bool, error) 
 		fmt.Printf("%s", utils.Red("\n😫 WRONG 😫\n"))
 	}
 
-	if a.count == 1 {
+	if a.Count == "1" {
 		fmt.Printf("%s has made %s commit\n\n", a.Name, utils.Green(a.Count))
 	} else {
 		fmt.Printf("%s has made %s commits\n\n", a.Name, utils.Green(a.Count))

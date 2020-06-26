@@ -5,16 +5,17 @@ package newlygit
 Ideas
 -----
 
+- When was this PR opened?
+- How many comments are on this issue?
+- How long was this PR open?
+- When was X’s first commit?
+
 - What PR is this commit from?
 - How many commits does X have?
 	- How lines has X added removed?
 - Who is the author of this commit/PR/Issue?
 - Has this PR been merged yet?
 - From what release is this PR from?
-- How many comments are on this issue?
-- How long was this PR open?
-- When was this PR opened?
-- When was X’s first commit?
 
 */
 
@@ -58,7 +59,7 @@ func newlygit(client *http.Client, baseRepo ghrepo.Interface) error {
 	rand.Seed(time.Now().UnixNano())
 	right := 0
 	wrong := 0
-	isCorrect, err := commit_count(client, baseRepo)
+	isCorrect, err := pr_opened(client, baseRepo)
 	if err != nil {
 		return err
 	}
