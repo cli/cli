@@ -32,7 +32,7 @@ func ParseDefaultConfig() (Config, error) {
 var ReadConfigFile = func(filename string) ([]byte, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading config file: %v should be a file in the %v directory", filename, ConfigDir())
 	}
 	defer f.Close()
 

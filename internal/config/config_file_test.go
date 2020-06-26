@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,4 +121,12 @@ func Test_parseConfigFile(t *testing.T) {
 			eq(t, len(yamlRoot.Content[0].Content), 0)
 		})
 	}
+}
+
+func Test_ReadConfigFile_error(t *testing.T) {
+	data, err := ReadConfigFile("this-file-should-not-exist.yml")
+	expectedErrorSubstring := "error reading config file: this-file-should-not-exist.yml"
+
+	assert.Equal(t, []byte(nil), data)
+	assert.Equal(t, true, strings.Contains(err.Error(), expectedErrorSubstring))
 }
