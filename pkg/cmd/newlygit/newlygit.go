@@ -57,17 +57,52 @@ func NewCmd(f *cmdutil.Factory) *cobra.Command {
 
 func newlygit(client *http.Client, baseRepo ghrepo.Interface) error {
 	rand.Seed(time.Now().UnixNano())
-	right := 0
-	wrong := 0
-	isCorrect, err := pr_opened(client, baseRepo)
-	if err != nil {
-		return err
+
+	fmt.Printf(`
+Welcome to...
+        the greatest git-related...
+     cli-based... 
+               game show ever created!!
+`)
+	fmt.Printf("🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳 🥳\n\n\n")
+
+	qs := []func() (bool, error){}
+	for i := 0; i < 5; i++ {
+		switch rand.Intn(4) {
+		case 0:
+			qs = append(qs, func() (bool, error) {
+				return commit_count(client, baseRepo)
+			})
+		case 1:
+			qs = append(qs, func() (bool, error) {
+				return commit_pr(client, baseRepo)
+			})
+		case 2:
+			qs = append(qs, func() (bool, error) {
+				return pr_author(client, baseRepo)
+			})
+		case 3:
+			qs = append(qs, func() (bool, error) {
+				return pr_opened(client, baseRepo)
+			})
+		}
 	}
 
-	if isCorrect {
-		right++
-	} else {
-		wrong++
+	right := 0
+	wrong := 0
+
+	for _, q := range qs {
+		isCorrect, err := q()
+		if err != nil {
+			return err
+		}
+
+		if isCorrect {
+			right++
+		} else {
+			wrong++
+		}
+		fmt.Printf("\n\n")
 	}
 
 	fmt.Printf("\nGame over\n")
