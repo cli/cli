@@ -12,19 +12,19 @@ import (
 // TODO: clean up methods in this file when there are no more callers
 
 func (r *Registry) StubResponse(status int, body io.Reader) {
-	r.Register(MatchAny, func(*http.Request) (*http.Response, error) {
-		return httpResponse(status, body), nil
+	r.Register(MatchAny, func(req *http.Request) (*http.Response, error) {
+		return httpResponse(status, req, body), nil
 	})
 }
 
 func (r *Registry) StubWithFixture(status int, fixtureFileName string) func() {
 	fixturePath := path.Join("../test/fixtures/", fixtureFileName)
 	fixtureFile, err := os.Open(fixturePath)
-	r.Register(MatchAny, func(*http.Request) (*http.Response, error) {
+	r.Register(MatchAny, func(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return nil, err
 		}
-		return httpResponse(200, fixtureFile), nil
+		return httpResponse(200, req, fixtureFile), nil
 	})
 	return func() {
 		if err == nil {
