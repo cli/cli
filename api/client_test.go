@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -65,4 +66,17 @@ func TestRESTGetDelete(t *testing.T) {
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("DELETE", "applications/CLIENTID/grant", r, nil)
 	eq(t, err, nil)
+}
+
+func TestRESTError(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	http.StubResponse(422, bytes.NewBufferString(`{"message": "OH NO"}`))
+
+	var httpErr HTTPError
+	err := client.REST("DELETE", "/repos/branch", nil, nil)
+	if err == nil || !errors.As(err, &httpErr) || httpErr.Code != 422 {
+		t.Fatalf("got %q", err.Error())
+	}
 }

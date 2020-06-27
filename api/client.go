@@ -157,6 +157,17 @@ func (gr GraphQLErrorResponse) Error() string {
 	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
 }
 
+// HTTPError is an error returned by a failed API call
+type HTTPError struct {
+	Code    int
+	URL     string
+	Message string
+}
+
+func (e HTTPError) Error() string {
+	return fmt.Sprintf("http error, '%s' failed (%d): '%s'", e.URL, e.Code, e.Message)
+}
+
 // Returns whether or not scopes are present, appID, and error
 func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	url := "https://api.github.com/user"
@@ -298,7 +309,11 @@ func handleHTTPError(resp *http.Response) error {
 		message = parsedBody.Message
 	}
 
-	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
+	return HTTPError{
+		Code:    resp.StatusCode,
+		URL:     resp.Request.URL.String(),
+		Message: message,
+	}
 }
 
 var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
