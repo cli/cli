@@ -1015,7 +1015,16 @@ func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) er
 		NodeID string `json:"node_id"`
 	}
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
-	return client.REST("DELETE", path, nil, &response)
+	err := client.REST("DELETE", path, nil, &response)
+	if err != nil {
+		var httpErr HTTPError
+		// The ref might have already been deleted by GitHub
+		if !errors.As(err, &httpErr) || httpErr.Code != 422 {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func min(a, b int) int {
