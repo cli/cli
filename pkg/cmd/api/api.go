@@ -34,6 +34,7 @@ type ApiOptions struct {
 	RequestHeaders      []string
 	ShowResponseHeaders bool
 	Paginate            bool
+	Silent              bool
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -134,6 +135,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
+	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Silence the output")
 	return cmd
 }
 
@@ -176,6 +178,10 @@ func apiRun(opts *ApiOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	if opts.Silent {
+		opts.IO.Out = ioutil.Discard
 	}
 
 	hasNextPage := true
