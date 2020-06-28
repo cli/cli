@@ -239,6 +239,33 @@ func TestIssueList_disabledIssues(t *testing.T) {
 	}
 }
 
+func TestIssueList_web(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand("issue list --web -a peter -A john -l bug -l docs -L 10 -s all")
+	if err != nil {
+		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
+	}
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+ in your browser.\n")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+")
+}
+
 func TestIssueView_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()

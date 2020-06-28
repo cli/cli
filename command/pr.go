@@ -231,7 +231,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if author != "" && !web {
-		return errors.New("the --author flag is currently supported only with --web")
+		return errors.New("the --author flag is currently supported only with the --web flag")
 	}
 
 	if web {
