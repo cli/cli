@@ -37,6 +37,7 @@ func init() {
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
+	issueListCmd.Flags().BoolP("web", "w", false, "Open the browser to list the issue(s)")
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
@@ -84,6 +85,7 @@ var issueListCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 	$ gh issue list -l "help wanted"
 	$ gh issue list -A monalisa
+	$ gh issue list --web
 	`),
 	Args: cmdutil.NoArgsQuoteReminder,
 	RunE: issueList,
@@ -116,6 +118,33 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
+func listURLWithQuery(listURL, entity, state, assignee string, labels []string, author, baseBranch string) (string, error) {
+	u, err := url.Parse(listURL)
+	if err != nil {
+		return "", err
+	}
+	queries := fmt.Sprintf("is:%s ", entity)
+	if state != "all" {
+		queries += fmt.Sprintf("is:%s ", state)
+	}
+	if assignee != "" {
+		queries += fmt.Sprintf("assignee:%s ", assignee)
+	}
+	for _, label := range labels {
+		queries += fmt.Sprintf("label:%s ", label)
+	}
+	if author != "" {
+		queries += fmt.Sprintf("author:%s ", author)
+	}
+	if baseBranch != "" {
+		queries += fmt.Sprintf("base:%s ", baseBranch)
+	}
+	q := u.Query()
+	q.Set("q", queries)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -124,6 +153,11 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -154,6 +188,19 @@ func issueList(cmd *cobra.Command, args []string) error {
 	author, err := cmd.Flags().GetString("author")
 	if err != nil {
 		return err
+	}
+
+	if web {
+		issueListURL := fmt.Sprintf(
+			"https://github.com/%s/issues",
+			ghrepo.FullName(baseRepo),
+		)
+		openURL, err := listURLWithQuery(issueListURL, "issue", state, assignee, labels, author, "")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
 	}
 
 	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author)

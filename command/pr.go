@@ -37,11 +37,13 @@ func init() {
 	prCmd.AddCommand(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
+	prListCmd.Flags().BoolP("web", "w", false, "Open the browser to list the pull request(s)")
 	prListCmd.Flags().IntP("limit", "L", 30, "Maximum number of items to fetch")
 	prListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	prListCmd.Flags().StringP("base", "B", "", "Filter by base branch")
-	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	prListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	prListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
+	prListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	prCmd.AddCommand(prViewCmd)
 	prViewCmd.Flags().BoolP("web", "w", false, "Open a pull request in the browser")
@@ -71,6 +73,7 @@ var prListCmd = &cobra.Command{
 	$ gh pr list --limit 999
 	$ gh pr list --state closed
 	$ gh pr list --label "priority 1" --label "bug"
+	$ gh pr list --web
 	`),
 	RunE: prList,
 }
@@ -194,6 +197,11 @@ func prList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	web, err := cmd.Flags().GetBool("web")
+	if err != nil {
+		return err
+	}
+
 	limit, err := cmd.Flags().GetInt("limit")
 	if err != nil {
 		return err
@@ -217,6 +225,26 @@ func prList(cmd *cobra.Command, args []string) error {
 	assignee, err := cmd.Flags().GetString("assignee")
 	if err != nil {
 		return err
+	}
+	author, err := cmd.Flags().GetString("author")
+	if err != nil {
+		return err
+	}
+	if author != "" && !web {
+		return errors.New("the --author flag is currently supported only with --web")
+	}
+
+	if web {
+		prListURL := fmt.Sprintf(
+			"https://github.com/%s/pulls",
+			ghrepo.FullName(baseRepo),
+		)
+		openURL, err := listURLWithQuery(prListURL, "pr", state, assignee, labels, author, baseBranch)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		return utils.OpenInBrowser(openURL)
 	}
 
 	var graphqlState []string
