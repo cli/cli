@@ -467,8 +467,9 @@ func Test_apiRun_silent(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		RequestPath: "issues",
-		Silent:      true,
+		RequestPath:         "issues",
+		ShowResponseHeaders: true,
+		Silent:              true,
 	}
 
 	err := apiRun(&options)

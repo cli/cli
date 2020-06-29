@@ -218,7 +218,7 @@ func apiRun(opts *ApiOptions) error {
 }
 
 func processResponse(resp *http.Response, opts *ApiOptions) (endCursor string, err error) {
-	if opts.ShowResponseHeaders {
+	if opts.ShowResponseHeaders && !opts.Silent {
 		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
 		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
 		fmt.Fprint(opts.IO.Out, "\r\n")
