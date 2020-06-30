@@ -288,6 +288,36 @@ func Test_apiRun(t *testing.T) {
 			stdout: `gateway timeout`,
 			stderr: "gh: HTTP 502\n",
 		},
+		{
+			name: "silent",
+			options: ApiOptions{
+				Silent: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+			},
+			err:    nil,
+			stdout: ``,
+			stderr: ``,
+		},
+		{
+			name: "show response headers even when silent",
+			options: ApiOptions{
+				ShowResponseHeaders: true,
+				Silent:              true,
+			},
+			httpResponse: &http.Response{
+				Proto:      "HTTP/1.1",
+				Status:     "200 Okey-dokey",
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			},
+			err:    nil,
+			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
+			stderr: ``,
+		},
 	}
 
 	for _, tt := range tests {
@@ -447,38 +477,6 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, true, hasCursor)
 	assert.Equal(t, "PAGE1_END", endCursor)
-}
-
-func Test_apiRun_silent(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	response := &http.Response{
-		StatusCode: 200,
-		Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
-		Header:     http.Header{"Content-Type": []string{"text/plain"}},
-	}
-
-	options := ApiOptions{
-		IO: io,
-		HttpClient: func() (*http.Client, error) {
-			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-				resp := response
-				resp.Request = req
-				return resp, nil
-			}
-			return &http.Client{Transport: tr}, nil
-		},
-		RequestPath:         "issues",
-		ShowResponseHeaders: true,
-		Silent:              true,
-	}
-
-	err := apiRun(&options)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "", stdout.String(), "stdout")
-	assert.Equal(t, "", stderr.String(), "stderr")
-
-	assert.Equal(t, "https://api.github.com/issues", response.Request.URL.String())
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
