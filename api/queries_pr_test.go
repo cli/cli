@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -10,31 +9,35 @@ import (
 
 func TestBranchDeleteRemote(t *testing.T) {
 	var tests = []struct {
-		name        string
-		code        int
-		body        string
-		expectError bool
+		name           string
+		responseStatus int
+		responseBody   string
+		expectError    bool
 	}{
-		{name: "success", code: 204, body: "", expectError: false},
-		{name: "error", code: 500, body: `{"message": "oh no"}`, expectError: true},
 		{
-			name:        "already_deleted",
-			code:        422,
-			body:        `{"message": "Reference does not exist"}`,
-			expectError: false,
+			name:           "success",
+			responseStatus: 204,
+			responseBody:   "",
+			expectError:    false,
+		},
+		{
+			name:           "error",
+			responseStatus: 500,
+			responseBody:   `{"message": "oh no"}`,
+			expectError:    true,
 		},
 	}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			http := &httpmock.Registry{}
-			client := NewClient(ReplaceTripper(http))
+			http.Register(httpmock.MatchAny, httpmock.StatusStringResponse(tt.responseStatus, tt.responseBody))
 
-			http.StubResponse(tc.code, bytes.NewBufferString(tc.body))
+			client := NewClient(ReplaceTripper(http))
 			repo, _ := ghrepo.FromFullName("OWNER/REPO")
+
 			err := BranchDeleteRemote(client, repo, "branch")
-			if isError := err != nil; isError != tc.expectError {
+			if (err != nil) != tt.expectError {
 				t.Fatalf("unexpected result: %v", err)
 			}
 		})
