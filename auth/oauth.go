@@ -68,7 +68,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		// TODO: Temporary workaround for https://github.com/cli/cli/issues/297
 		fmt.Fprintf(os.Stderr, "If you are on a server or other headless system, use this workaround instead:\n")
 		fmt.Fprintf(os.Stderr, "  1. Complete authentication on a GUI system;\n")
-		fmt.Fprintf(os.Stderr, "  2. Copy the contents of `~/.config/gh/hosts.yml` to this system.\n")
+		fmt.Fprintf(os.Stderr, "  2. Copy `~/.config/gh/hosts.yml` and `~/.config/gh/config.yml` to this system.\n")
 	}
 
 	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
