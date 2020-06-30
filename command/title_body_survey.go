@@ -107,13 +107,13 @@ func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string, metadataType metadataStateType) (string, error) {
+func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string, metadataType metadataStateType, templateHandler *githubtemplate.TemplateHandler) (string, error) {
 	templateResponse := struct {
 		Index int
 	}{}
 	templateNames := make([]string, 0, len(nonLegacyTemplatePaths))
 	for _, p := range nonLegacyTemplatePaths {
-		templateNames = append(templateNames, githubtemplate.GitHubTemplateHandler.ExtractName(p))
+		templateNames = append(templateNames, templateHandler.ExtractName(p))
 	}
 	if metadataType == issueMetadata {
 		templateNames = append(templateNames, "Open a blank issue")
@@ -136,17 +136,17 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 
 	if templateResponse.Index == len(nonLegacyTemplatePaths) { // the user has selected the blank template
 		if legacyTemplatePath != nil {
-			templateContents := githubtemplate.GitHubTemplateHandler.ExtractContents(*legacyTemplatePath)
+			templateContents := templateHandler.ExtractContents(*legacyTemplatePath)
 			return string(templateContents), nil
 		} else {
 			return "", nil
 		}
 	}
-	templateContents := githubtemplate.GitHubTemplateHandler.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
+	templateContents := templateHandler.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
+func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool, templateHandler *githubtemplate.TemplateHandler) error {
 	editorCommand, err := determineEditor(cmd)
 	if err != nil {
 		return err
@@ -158,13 +158,13 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 	if providedBody == "" {
 		if len(nonLegacyTemplatePaths) > 0 {
 			var err error
-			templateContents, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type)
+			templateContents, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type, templateHandler)
 			if err != nil {
 				return err
 			}
 			issueState.Body = templateContents
 		} else if legacyTemplatePath != nil {
-			templateContents = string(githubtemplate.GitHubTemplateHandler.ExtractContents(*legacyTemplatePath))
+			templateContents = string(templateHandler.ExtractContents(*legacyTemplatePath))
 			issueState.Body = templateContents
 		} else {
 			issueState.Body = defs.Body

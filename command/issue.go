@@ -69,7 +69,10 @@ var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
 	Args:  cmdutil.NoArgsQuoteReminder,
-	RunE:  issueCreate,
+	RunE: func(c *cobra.Command, args []string) error {
+		templateHandler := githubtemplate.GitHubTemplateHandler
+		return issueCreate(c, args, &templateHandler)
+	},
 	Example: heredoc.Doc(`
 	$ gh issue create --title "I found a bug" --body "Nothing works"
 	$ gh issue create --label "bug,help wanted"
@@ -356,7 +359,7 @@ func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) 
 	return nil, fmt.Errorf("invalid issue format: %q", arg)
 }
 
-func issueCreate(cmd *cobra.Command, args []string) error {
+func issueCreate(cmd *cobra.Command, args []string, templateHandler *githubtemplate.TemplateHandler) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -377,8 +380,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	var nonLegacyTemplateFiles []string
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
-			// TODO: figure out how to stub this in tests
-			nonLegacyTemplateFiles = githubtemplate.GitHubTemplateHandler.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
+			nonLegacyTemplateFiles = templateHandler.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
@@ -454,11 +456,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		var legacyTemplateFile *string
 		if baseOverride == "" {
 			if rootDir, err := git.ToplevelDir(); err == nil {
-				// TODO: figure out how to stub this in tests
-				legacyTemplateFile = githubtemplate.GitHubTemplateHandler.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+				legacyTemplateFile = templateHandler.FindLegacy(rootDir, "ISSUE_TEMPLATE")
 			}
 		}
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage(), templateHandler)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}

@@ -51,7 +51,7 @@ func computeDefaults(baseRef, headRef string) (defaults, error) {
 	return out, nil
 }
 
-func prCreate(cmd *cobra.Command, _ []string) error {
+func prCreate(cmd *cobra.Command, _ []string, templateHandler *githubtemplate.TemplateHandler) error {
 	ctx := contextForCommand(cmd)
 	remotes, err := ctx.Remotes()
 	if err != nil {
@@ -229,11 +229,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		var nonLegacyTemplateFiles []string
 		var legacyTemplateFile *string
 		if rootDir, err := git.ToplevelDir(); err == nil {
-			// TODO: figure out how to stub this in tests
-			nonLegacyTemplateFiles = githubtemplate.GitHubTemplateHandler.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
-			legacyTemplateFile = githubtemplate.GitHubTemplateHandler.FindLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
+			nonLegacyTemplateFiles = templateHandler.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
+			legacyTemplateFile = templateHandler.FindLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
-		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage())
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage(), templateHandler)
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
@@ -455,7 +454,10 @@ var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
 	Args:  cmdutil.NoArgsQuoteReminder,
-	RunE:  prCreate,
+	RunE: func(c *cobra.Command, args []string) error {
+		templateHandler := githubtemplate.GitHubTemplateHandler
+		return prCreate(c, args, &templateHandler)
+	},
 	Example: heredoc.Doc(`
 	$ gh pr create --title "The bug is fixed" --body "Everything works again"
 	$ gh issue create --label "bug,help wanted"
