@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -30,14 +31,14 @@ func init() {
 	issueCreateCmd.Flags().StringP("body", "b", "",
 		"Supply a body. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().BoolP("web", "w", false, "Open the browser to create an issue")
-	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
-	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
-	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to a project by `name`")
+	issueCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign people by their `login`")
+	issueCreateCmd.Flags().StringSliceP("label", "l", nil, "Add labels by `name`")
+	issueCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the issue to projects by `name`")
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
-	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by label")
+	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
@@ -69,16 +70,30 @@ var issueCmd = &cobra.Command{
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new issue",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueCreate,
+	Example: heredoc.Doc(`
+	$ gh issue create --title "I found a bug" --body "Nothing works"
+	$ gh issue create --label "bug,help wanted"
+	$ gh issue create --label bug --label "help wanted"
+	$ gh issue create --assignee monalisa,hubot
+	$ gh issue create --project "Roadmap"
+	`),
 }
 var issueListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List and filter issues in this repository",
-	RunE:  issueList,
+	Example: heredoc.Doc(`
+	$ gh issue list -l "help wanted"
+	$ gh issue list -A monalisa
+	`),
+	Args: cmdutil.NoArgsQuoteReminder,
+	RunE: issueList,
 }
 var issueStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show status of relevant issues",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  issueStatus,
 }
 var issueViewCmd = &cobra.Command{

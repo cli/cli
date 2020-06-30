@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -192,8 +194,18 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	isDraft, err := cmd.Flags().GetBool("draft")
+	if err != nil {
+		return fmt.Errorf("could not parse draft: %w", err)
+	}
+
 	if !isWeb && !autofill {
-		fmt.Fprintf(colorableErr(cmd), "\nCreating pull request for %s into %s in %s\n\n",
+		message := "\nCreating pull request for %s into %s in %s\n\n"
+		if isDraft {
+			message = "\nCreating draft pull request for %s into %s in %s\n\n"
+		}
+
+		fmt.Fprintf(colorableErr(cmd), message,
 			utils.Cyan(headBranch),
 			utils.Cyan(baseBranch),
 			ghrepo.FullName(baseRepo))
@@ -245,10 +257,6 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		return errors.New("pull request title must not be blank")
 	}
 
-	isDraft, err := cmd.Flags().GetBool("draft")
-	if err != nil {
-		return fmt.Errorf("could not parse draft: %w", err)
-	}
 	if isDraft && isWeb {
 		return errors.New("the --draft flag is not supported with --web")
 	}
@@ -446,7 +454,16 @@ func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assi
 var prCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a pull request",
+	Args:  cmdutil.NoArgsQuoteReminder,
 	RunE:  prCreate,
+	Example: heredoc.Doc(`
+	$ gh pr create --title "The bug is fixed" --body "Everything works again"
+	$ gh issue create --label "bug,help wanted"
+	$ gh issue create --label bug --label "help wanted"
+	$ gh pr create --reviewer monalisa,hubot
+	$ gh pr create --project "Roadmap"
+	$ gh pr create --base develop
+	`),
 }
 
 func init() {
@@ -461,9 +478,9 @@ func init() {
 	prCreateCmd.Flags().BoolP("web", "w", false, "Open the web browser to create a pull request")
 	prCreateCmd.Flags().BoolP("fill", "f", false, "Do not prompt for title/body and just use commit info")
 
-	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request a review from someone by their `login`")
-	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign a person by their `login`")
-	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add a label by `name`")
-	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to a project by `name`")
+	prCreateCmd.Flags().StringSliceP("reviewer", "r", nil, "Request reviews from people by their `login`")
+	prCreateCmd.Flags().StringSliceP("assignee", "a", nil, "Assign people by their `login`")
+	prCreateCmd.Flags().StringSliceP("label", "l", nil, "Add labels by `name`")
+	prCreateCmd.Flags().StringSliceP("project", "p", nil, "Add the pull request to projects by `name`")
 	prCreateCmd.Flags().StringP("milestone", "m", "", "Add the pull request to a milestone by `name`")
 }

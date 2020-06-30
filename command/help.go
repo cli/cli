@@ -9,32 +9,67 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func rootHelpFunc(command *cobra.Command, args []string) {
-	// Display helpful error message in case subcommand name was mistyped.
-	// This matches Cobra's behavior for root command, which Cobra
-	// confusingly doesn't apply to nested commands.
-	if command != RootCmd {
-		if command.Parent() == RootCmd && len(args) >= 2 {
-			if command.SuggestionsMinimumDistance <= 0 {
-				command.SuggestionsMinimumDistance = 2
+func rootUsageFunc(command *cobra.Command) error {
+	command.Printf("Usage:  %s", command.UseLine())
+
+	subcommands := command.Commands()
+	if len(subcommands) > 0 {
+		command.Print("\n\nAvailable commands:\n")
+		for _, c := range subcommands {
+			if c.Hidden {
+				continue
 			}
-			candidates := command.SuggestionsFor(args[1])
-
-			errOut := command.OutOrStderr()
-			fmt.Fprintf(errOut, "unknown command %q for %q\n", args[1], "gh "+args[0])
-
-			if len(candidates) > 0 {
-				fmt.Fprint(errOut, "\nDid you mean this?\n")
-				for _, c := range candidates {
-					fmt.Fprintf(errOut, "\t%s\n", c)
-				}
-				fmt.Fprint(errOut, "\n")
-			}
-
-			oldOut := command.OutOrStdout()
-			command.SetOut(errOut)
-			defer command.SetOut(oldOut)
+			command.Printf("  %s\n", c.Name())
 		}
+		return nil
+	}
+
+	flagUsages := command.LocalFlags().FlagUsages()
+	if flagUsages != "" {
+		command.Printf("\n\nFlags:\n%s", flagUsages)
+	}
+	return nil
+}
+
+var hasFailed bool
+
+// HasFailed signals that the main process should exit with non-zero status
+func HasFailed() bool {
+	return hasFailed
+}
+
+// Display helpful error message in case subcommand name was mistyped.
+// This matches Cobra's behavior for root command, which Cobra
+// confusingly doesn't apply to nested commands.
+func nestedSuggestFunc(command *cobra.Command, arg string) {
+	command.Printf("unknown command %q for %q\n", arg, command.CommandPath())
+
+	var candidates []string
+	if arg == "help" {
+		candidates = []string{"--help"}
+	} else {
+		if command.SuggestionsMinimumDistance <= 0 {
+			command.SuggestionsMinimumDistance = 2
+		}
+		candidates = command.SuggestionsFor(arg)
+	}
+
+	if len(candidates) > 0 {
+		command.Print("\nDid you mean this?\n")
+		for _, c := range candidates {
+			command.Printf("\t%s\n", c)
+		}
+	}
+
+	command.Print("\n")
+	_ = rootUsageFunc(command)
+}
+
+func rootHelpFunc(command *cobra.Command, args []string) {
+	if command.Parent() == RootCmd && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
+		nestedSuggestFunc(command, args[1])
+		hasFailed = true
+		return
 	}
 
 	coreCommands := []string{}
@@ -84,6 +119,11 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	if flagUsages != "" {
 		dedent := regexp.MustCompile(`(?m)^  `)
 		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent.ReplaceAllString(flagUsages, "")})
+	}
+	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
+	if inheritedFlagUsages != "" {
+		dedent := regexp.MustCompile(`(?m)^  `)
+		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent.ReplaceAllString(inheritedFlagUsages, "")})
 	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
