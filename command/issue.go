@@ -22,12 +22,12 @@ import (
 )
 
 func init() {
+	issueCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
-	includeRepoFlag(issueStatusCmd)
 
 	issueCmd.AddCommand(issueCreateCmd)
-	includeRepoFlag(issueCreateCmd)
 	issueCreateCmd.Flags().StringP("title", "t", "",
 		"Supply a title. Will prompt for one otherwise.")
 	issueCreateCmd.Flags().StringP("body", "b", "",
@@ -39,7 +39,6 @@ func init() {
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
-	includeRepoFlag(issueListCmd)
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
@@ -47,13 +46,10 @@ func init() {
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 
 	issueCmd.AddCommand(issueViewCmd)
-	includeRepoFlag(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
 
 	issueCmd.AddCommand(issueCloseCmd)
-	includeRepoFlag(issueCloseCmd)
 	issueCmd.AddCommand(issueReopenCmd)
-	includeRepoFlag(issueReopenCmd)
 }
 
 var issueCmd = &cobra.Command{
