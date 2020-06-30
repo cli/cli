@@ -480,17 +480,6 @@ func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	}
 }
 
-func TestPRList_AuthorWithoutWebFlag(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	_, err := RunCommand(`pr list --author abc`)
-	if err == nil && err.Error() != "the --author flag is currently supported only with the --web flag" {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
-}
-
 func TestPRList_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
@@ -503,19 +492,19 @@ func TestPRList_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand("pr list --web -a peter -A john -l bug -l docs -L 10 -s merged -B trunk")
+	output, err := RunCommand("pr list --web -a peter -l bug -l docs -L 10 -s merged -B trunk")
 	if err != nil {
 		t.Errorf("error running command `pr list` with `--web` flag: %v", err)
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+base%3Atrunk+ in your browser.\n")
+	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk+ in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+base%3Atrunk+")
+	eq(t, url, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk+")
 }
 
 func TestPRView_Preview(t *testing.T) {
