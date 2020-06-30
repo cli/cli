@@ -299,6 +299,38 @@ Requesting a code review from you
 	}
 }
 
+func TestPRStatus_detachedHead(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": {} }
+	`))
+
+	output, err := RunCommand("pr status")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := `
+Relevant pull requests in OWNER/REPO
+
+Current branch
+  There is no current branch
+
+Created by you
+  You have no open pull requests
+
+Requesting a code review from you
+  You have no pull requests to review
+
+`
+	if output.String() != expected {
+		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
 func TestPRList(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
