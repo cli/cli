@@ -378,7 +378,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if baseOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
 			// TODO: figure out how to stub this in tests
-			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
+			nonLegacyTemplateFiles = githubtemplate.GitHubTemplateHandler.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
 
@@ -455,7 +455,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		if baseOverride == "" {
 			if rootDir, err := git.ToplevelDir(); err == nil {
 				// TODO: figure out how to stub this in tests
-				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+				legacyTemplateFile = githubtemplate.GitHubTemplateHandler.FindLegacy(rootDir, "ISSUE_TEMPLATE")
 			}
 		}
 		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())

@@ -132,7 +132,7 @@ func TestFindNonLegacy(t *testing.T) {
 				file.Close()
 			}
 
-			if got := FindNonLegacy(tt.args.rootDir, tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := findNonLegacy(tt.args.rootDir, tt.args.name); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Find() = %v, want %v", got, tt.want)
 			}
 		})
@@ -224,7 +224,7 @@ func TestFindLegacy(t *testing.T) {
 				file.Close()
 			}
 
-			if got := FindLegacy(tt.args.rootDir, tt.args.name); *got != tt.want {
+			if got := findLegacy(tt.args.rootDir, tt.args.name); *got != tt.want {
 				t.Errorf("Find() = %v, want %v", got, tt.want)
 			}
 		})
@@ -286,7 +286,7 @@ about: This is how you report bugs
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
-			if got := ExtractName(tt.args.filePath); got != tt.want {
+			if got := extractName(tt.args.filePath); got != tt.want {
 				t.Errorf("ExtractName() = %v, want %v", got, tt.want)
 			}
 		})
@@ -351,7 +351,7 @@ Even more
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
-			if got := ExtractContents(tt.args.filePath); string(got) != tt.want {
+			if got := extractContents(tt.args.filePath); string(got) != tt.want {
 				t.Errorf("ExtractContents() = %v, want %v", string(got), tt.want)
 			}
 		})

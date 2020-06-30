@@ -113,7 +113,7 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 	}{}
 	templateNames := make([]string, 0, len(nonLegacyTemplatePaths))
 	for _, p := range nonLegacyTemplatePaths {
-		templateNames = append(templateNames, githubtemplate.ExtractName(p))
+		templateNames = append(templateNames, githubtemplate.GitHubTemplateHandler.ExtractName(p))
 	}
 	if metadataType == issueMetadata {
 		templateNames = append(templateNames, "Open a blank issue")
@@ -136,13 +136,13 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 
 	if templateResponse.Index == len(nonLegacyTemplatePaths) { // the user has selected the blank template
 		if legacyTemplatePath != nil {
-			templateContents := githubtemplate.ExtractContents(*legacyTemplatePath)
+			templateContents := githubtemplate.GitHubTemplateHandler.ExtractContents(*legacyTemplatePath)
 			return string(templateContents), nil
 		} else {
 			return "", nil
 		}
 	}
-	templateContents := githubtemplate.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
+	templateContents := githubtemplate.GitHubTemplateHandler.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
 	return string(templateContents), nil
 }
 
@@ -164,7 +164,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			}
 			issueState.Body = templateContents
 		} else if legacyTemplatePath != nil {
-			templateContents = string(githubtemplate.ExtractContents(*legacyTemplatePath))
+			templateContents = string(githubtemplate.GitHubTemplateHandler.ExtractContents(*legacyTemplatePath))
 			issueState.Body = templateContents
 		} else {
 			issueState.Body = defs.Body

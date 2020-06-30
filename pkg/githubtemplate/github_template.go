@@ -10,8 +10,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// FindNonLegacy returns the list of template file paths from the template folder (according to the "upgraded multiple template builder")
-func FindNonLegacy(rootDir string, name string) []string {
+// TemplateHandler contains all the template related functions
+type TemplateHandler struct {
+	// FindNonLegacy returns the list of template file paths from the template folder (according to the "upgraded multiple template builder")
+	FindNonLegacy func(rootDir string, name string) []string
+	// FindLegacy returns the file path of the default(legacy) template
+	FindLegacy func(rootDir string, name string) *string
+	// ExtractName returns the name of the template from YAML front-matter
+	ExtractName func(filePath string) string
+	// ExtractContents returns the template contents without the YAML front-matter
+	ExtractContents func(filePath string) []byte
+}
+
+func findNonLegacy(rootDir string, name string) []string {
 	results := []string{}
 
 	// https://help.github.com/en/github/building-a-strong-community/creating-a-pull-request-template-for-your-repository
@@ -51,8 +62,7 @@ mainLoop:
 	return results
 }
 
-// FindLegacy returns the file path of the default(legacy) template
-func FindLegacy(rootDir string, name string) *string {
+func findLegacy(rootDir string, name string) *string {
 	// https://help.github.com/en/github/building-a-strong-community/creating-a-pull-request-template-for-your-repository
 	candidateDirs := []string{
 		path.Join(rootDir, ".github"),
@@ -76,8 +86,7 @@ func FindLegacy(rootDir string, name string) *string {
 	return nil
 }
 
-// ExtractName returns the name of the template from YAML front-matter
-func ExtractName(filePath string) string {
+func extractName(filePath string) string {
 	contents, err := ioutil.ReadFile(filePath)
 	frontmatterBoundaries := detectFrontmatter(contents)
 	if err == nil && frontmatterBoundaries[0] == 0 {
@@ -91,8 +100,7 @@ func ExtractName(filePath string) string {
 	return path.Base(filePath)
 }
 
-// ExtractContents returns the template contents without the YAML front-matter
-func ExtractContents(filePath string) []byte {
+func extractContents(filePath string) []byte {
 	contents, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return []byte{}
@@ -110,4 +118,12 @@ func detectFrontmatter(c []byte) []int {
 		return []int{matches[0][0], matches[1][1]}
 	}
 	return []int{-1, -1}
+}
+
+// GitHubTemplateHandler handles all the template related functionalities
+var GitHubTemplateHandler = TemplateHandler{
+	findNonLegacy,
+	findLegacy,
+	extractName,
+	extractContents,
 }
