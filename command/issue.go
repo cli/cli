@@ -41,8 +41,8 @@ func init() {
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
-	issueListCmd.Flags().StringP("mention", "", "", "Filter by mention")
-	issueListCmd.Flags().StringP("milestone", "", "", "Filter by milestone")
+	issueListCmd.Flags().String("mention", "", "Filter by mention")
+	issueListCmd.Flags().StringP("milestone", "m", "", "Filter by milestone `name`")
 
 	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")
@@ -161,7 +161,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	hasFilters := false
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		switch f.Name {
-		case "state", "label", "assignee", "author":
+		case "state", "label", "assignee", "author", "mention", "milestone":
 			hasFilters = true
 		}
 	})
