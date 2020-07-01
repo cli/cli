@@ -450,6 +450,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
+	if interactive && !connectedToTerminal(cmd) {
+		return fmt.Errorf("can't run non-interactively without both --title and --body")
+	}
+
 	if interactive {
 		var legacyTemplateFile *string
 		if baseOverride == "" {

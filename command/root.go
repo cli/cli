@@ -413,3 +413,7 @@ func ExpandAlias(args []string) ([]string, error) {
 
 	return args[1:], nil
 }
+
+func connectedToTerminal(cmd *cobra.Command) bool {
+	return utils.IsTerminal(cmd.InOrStdin().(*os.File)) && utils.IsTerminal(cmd.OutOrStdout().(*os.File))
+}
