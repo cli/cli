@@ -170,8 +170,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 	})
 
 	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
-	// TODO: avoid printing header if piped to a script
-	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	if connectedToTerminal(cmd) {
+		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	}
 
 	out := cmd.OutOrStdout()
 
@@ -615,9 +616,16 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
 		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		if !table.IsTTY() {
+			table.AddField(issue.State, nil, nil)
+		}
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
-		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		if table.IsTTY() {
+			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		} else {
+			table.AddField(fmt.Sprintf("%d", int(ago.Minutes())), nil, nil)
+		}
 		table.EndRow()
 	}
 	_ = table.Render()
