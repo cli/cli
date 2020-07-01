@@ -110,14 +110,36 @@ github.com:
 }
 
 func Test_parseConfigFile(t *testing.T) {
-	fileContents := []string{"", " ", "\n"}
-	for _, contents := range fileContents {
-		t.Run(fmt.Sprintf("contents: %q", contents), func(t *testing.T) {
-			defer StubConfig(contents, "")()
+	tests := []struct {
+		contents string
+		wantsErr bool
+	}{
+		{
+			contents: "",
+			wantsErr: true,
+		},
+		{
+			contents: " ",
+			wantsErr: false,
+		},
+		{
+			contents: "\n",
+			wantsErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("contents: %q", tt.contents), func(t *testing.T) {
+			defer StubConfig(tt.contents, "")()
 			_, yamlRoot, err := parseConfigFile("config.yml")
-			eq(t, err, nil)
-			eq(t, yamlRoot.Content[0].Kind, yaml.MappingNode)
-			eq(t, len(yamlRoot.Content[0].Content), 0)
+			if tt.wantsErr != (err != nil) {
+				t.Fatalf("got error: %v", err)
+			}
+			if tt.wantsErr {
+				return
+			}
+			assert.Equal(t, yaml.MappingNode, yamlRoot.Content[0].Kind)
+			assert.Equal(t, 0, len(yamlRoot.Content[0].Content))
 		})
 	}
 }
