@@ -184,8 +184,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 	})
 
 	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
-	// TODO: avoid printing header if piped to a script
-	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	if connectedToTerminal(cmd) {
+		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	}
 
 	out := cmd.OutOrStdout()
 
@@ -278,8 +279,11 @@ func issueView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
-	out := colorableOut(cmd)
-	return printIssuePreview(out, issue)
+	if connectedToTerminal(cmd) {
+		return printHumanIssuePreview(colorableOut(cmd), issue)
+	}
+
+	return printRawIssuePreview(cmd.OutOrStdout(), issue)
 }
 
 func issueStateTitleWithColor(state string) string {
@@ -306,7 +310,28 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+	assignees := issueAssigneeList(*issue)
+	labels := issueLabelList(*issue)
+	projects := issueProjectList(*issue)
+
+	// Print empty strings for empty values so the number of metadata lines is always consistent (ie
+	// so head -n8 can be relied on)
+	fmt.Fprintf(out, "title:\t%s\n", issue.Title)
+	fmt.Fprintf(out, "state:\t%s\n", issue.State)
+	fmt.Fprintf(out, "author:\t%s\n", issue.Author.Login)
+	fmt.Fprintf(out, "labels:\t%s\n", labels)
+	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
+	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
+	fmt.Fprintf(out, "projects:\t%s\n", projects)
+	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
+
+	fmt.Fprintln(out, "--")
+	fmt.Fprintln(out, issue.Body)
+	return nil
+}
+
+func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
@@ -463,6 +488,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+
+	if interactive && !connectedToTerminal(cmd) {
+		return fmt.Errorf("can't run non-interactively without both --title and --body")
+	}
 
 	if interactive {
 		var legacyTemplateFile *string
@@ -625,9 +654,16 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
 		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		if !table.IsTTY() {
+			table.AddField(issue.State, nil, nil)
+		}
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
-		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		if table.IsTTY() {
+			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		} else {
+			table.AddField(fmt.Sprintf("%d", int(ago.Minutes())), nil, nil)
+		}
 		table.EndRow()
 	}
 	_ = table.Render()
