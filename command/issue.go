@@ -265,8 +265,11 @@ func issueView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
-	out := colorableOut(cmd)
-	return printIssuePreview(out, issue)
+	if connectedToTerminal(cmd) {
+		return printHumanIssuePreview(colorableOut(cmd), issue)
+	}
+
+	return printRawIssuePreview(cmd.OutOrStdout(), issue)
 }
 
 func issueStateTitleWithColor(state string) string {
@@ -293,7 +296,14 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+
+	// TODO print metadata linewise
+	fmt.Fprintln(out, issue.Body)
+	return nil
+}
+
+func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
