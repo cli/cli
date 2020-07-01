@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -117,24 +118,20 @@ func (c cmdOut) Stderr() string {
 	return c.errBuf.String()
 }
 
-func RunCommand(args string) (*cmdOut, error) {
+func setupCommand(args string, cmdOutStreams *cmdOut) (*cobra.Command, *cobra.Command, []string, []string, func(), error) {
 	rootCmd := RootCmd
 	rootArgv, err := shlex.Split(args)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	cmd, _, err := rootCmd.Traverse(rootArgv)
+	cmd, argv, err := rootCmd.Traverse(rootArgv)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	rootCmd.SetArgs(rootArgv)
-
-	outBuf := bytes.Buffer{}
-	cmd.SetOut(&outBuf)
-	errBuf := bytes.Buffer{}
-	cmd.SetErr(&errBuf)
+	cmd.SetOut(cmdOutStreams.outBuf)
+	cmd.SetErr(cmdOutStreams.errBuf)
 
 	// Reset flag values so they don't leak between tests
 	// FIXME: change how we initialize Cobra commands to render this hack unnecessary
@@ -151,11 +148,29 @@ func RunCommand(args string) (*cmdOut, error) {
 		}
 	})
 
-	_, err = rootCmd.ExecuteC()
-	cmd.SetOut(nil)
-	cmd.SetErr(nil)
+	return rootCmd, cmd, rootArgv, argv, func() {
+		cmd.SetOut(nil)
+		cmd.SetErr(nil)
+	}, nil
+}
 
-	return &cmdOut{&outBuf, &errBuf}, err
+func RunCommand(args string) (*cmdOut, error) {
+	cmdOutStreams := cmdOut{
+		outBuf: &bytes.Buffer{},
+		errBuf: &bytes.Buffer{},
+	}
+
+	rootCmd, _, rootArgv, _, cleanUpFunc, err := setupCommand(args, &cmdOutStreams)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanUpFunc()
+
+	rootCmd.SetArgs(rootArgv)
+
+	_, err = rootCmd.ExecuteC()
+
+	return &cmdOutStreams, err
 }
 
 type errorStub struct {
