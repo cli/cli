@@ -48,6 +48,7 @@ var configSetCmd = &cobra.Command{
 	Short: "Update configuration with a value for the given key",
 	Example: heredoc.Doc(`
 	$ gh config set editor vim
+	$ gh config set editor "code --wait"
 	`),
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
