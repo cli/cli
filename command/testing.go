@@ -173,6 +173,27 @@ func RunCommand(args string) (*cmdOut, error) {
 	return &cmdOutStreams, err
 }
 
+func PrepareCommandArguments(args string) (*cobra.Command, []string, *cmdOut, func(), error) {
+	cmdOutStreams := cmdOut{
+		outBuf: &bytes.Buffer{},
+		errBuf: &bytes.Buffer{},
+	}
+
+	_, cmd, _, argv, cleanUpFunc, err := setupCommand(args, &cmdOutStreams)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	err = cmd.ParseFlags(argv)
+	if err != nil {
+		cleanUpFunc()
+		return nil, nil, nil, nil, err
+	}
+	argWoFlags := cmd.Flags().Args()
+
+	return cmd, argWoFlags, &cmdOutStreams, cleanUpFunc, err
+}
+
 type errorStub struct {
 	message string
 }
