@@ -59,15 +59,21 @@ func decodeJSONBody(req *http.Request, dest interface{}) error {
 }
 
 func StringResponse(body string) Responder {
-	return func(*http.Request) (*http.Response, error) {
-		return httpResponse(200, bytes.NewBufferString(body)), nil
+	return func(req *http.Request) (*http.Response, error) {
+		return httpResponse(200, req, bytes.NewBufferString(body)), nil
+	}
+}
+
+func StatusStringResponse(status int, body string) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		return httpResponse(status, req, bytes.NewBufferString(body)), nil
 	}
 }
 
 func JSONResponse(body interface{}) Responder {
-	return func(*http.Request) (*http.Response, error) {
+	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
-		return httpResponse(200, bytes.NewBuffer(b)), nil
+		return httpResponse(200, req, bytes.NewBuffer(b)), nil
 	}
 }
 
@@ -84,7 +90,7 @@ func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 		}
 		cb(bodyData.Variables.Input)
 
-		return httpResponse(200, bytes.NewBufferString(body)), nil
+		return httpResponse(200, req, bytes.NewBufferString(body)), nil
 	}
 }
 
@@ -100,13 +106,14 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 		}
 		cb(bodyData.Query, bodyData.Variables)
 
-		return httpResponse(200, bytes.NewBufferString(body)), nil
+		return httpResponse(200, req, bytes.NewBufferString(body)), nil
 	}
 }
 
-func httpResponse(status int, body io.Reader) *http.Response {
+func httpResponse(status int, req *http.Request, body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: status,
+		Request:    req,
 		Body:       ioutil.NopCloser(body),
 	}
 }

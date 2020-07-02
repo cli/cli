@@ -1011,11 +1011,8 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	var response struct {
-		NodeID string `json:"node_id"`
-	}
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
-	return client.REST("DELETE", path, nil, &response)
+	return client.REST("DELETE", path, nil, nil)
 }
 
 func min(a, b int) int {
