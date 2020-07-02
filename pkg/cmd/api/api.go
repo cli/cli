@@ -34,6 +34,7 @@ type ApiOptions struct {
 	RequestHeaders      []string
 	ShowResponseHeaders bool
 	Paginate            bool
+	Silent              bool
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -134,6 +135,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
+	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	return cmd
 }
 
@@ -178,6 +180,11 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	headersOutputStream := opts.IO.Out
+	if opts.Silent {
+		opts.IO.Out = ioutil.Discard
+	}
+
 	hasNextPage := true
 	for hasNextPage {
 		resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
@@ -185,7 +192,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts)
+		endCursor, err := processResponse(resp, opts, headersOutputStream)
 		if err != nil {
 			return err
 		}
@@ -211,11 +218,11 @@ func apiRun(opts *ApiOptions) error {
 	return nil
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
-		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
-		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
-		fmt.Fprint(opts.IO.Out, "\r\n")
+		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
+		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersOutputStream, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
