@@ -437,12 +437,7 @@ func withPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, p
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestone string) (string, error) {
-	u := fmt.Sprintf(
-		"https://github.com/%s/compare/%s...%s?expand=1",
-		ghrepo.FullName(r),
-		base,
-		head,
-	)
+	u := generateRepoURL(r, "compare/%s...%s?expand=1", base, head)
 	url, err := withPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestone)
 	if err != nil {
 		return "", err

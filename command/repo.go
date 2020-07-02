@@ -592,7 +592,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 	fullName := ghrepo.FullName(toView)
 
-	openURL := fmt.Sprintf("https://github.com/%s", fullName)
+	openURL := generateRepoURL(toView, "")
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
