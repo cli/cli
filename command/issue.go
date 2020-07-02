@@ -22,6 +22,8 @@ import (
 )
 
 func init() {
+	issueCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+
 	RootCmd.AddCommand(issueCmd)
 	issueCmd.AddCommand(issueStatusCmd)
 

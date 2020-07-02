@@ -23,6 +23,8 @@ import (
 )
 
 func init() {
+	prCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
