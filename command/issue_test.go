@@ -153,7 +153,7 @@ func TestIssueList_withFlags(t *testing.T) {
 	} } }
 	`))
 
-	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo")
+	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -167,10 +167,12 @@ No issues match your search in OWNER/REPO
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
 		Variables struct {
-			Assignee string
-			Labels   []string
-			States   []string
-			Author   string
+			Assignee  string
+			Labels    []string
+			States    []string
+			Author    string
+			Mention   string
+			Milestone string
 		}
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
@@ -179,6 +181,8 @@ No issues match your search in OWNER/REPO
 	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
 	eq(t, reqBody.Variables.States, []string{"OPEN"})
 	eq(t, reqBody.Variables.Author, "foo")
+	eq(t, reqBody.Variables.Mention, "me")
+	eq(t, reqBody.Variables.Milestone, "1.x")
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -403,7 +407,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer restoreCmd()
 
 	_, err := RunCommand("issue view -w 9999")
-	if err == nil || err.Error() != "graphql error: 'Could not resolve to an Issue with the number of 9999.'" {
+	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 

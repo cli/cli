@@ -23,6 +23,8 @@ import (
 )
 
 func init() {
+	prCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
 	prCmd.AddCommand(prCreateCmd)
@@ -131,7 +133,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	repoOverride, _ := cmd.Flags().GetString("repo")
 	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
 
-	if err != nil && repoOverride == "" && err.Error() != "git: not on any branch" {
+	if err != nil && repoOverride == "" && !errors.Is(err, git.ErrNotOnAnyBranch) {
 		return fmt.Errorf("could not query for pull request for current branch: %w", err)
 	}
 
@@ -523,7 +525,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 
 		if !crossRepoPR {
 			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-			if err != nil {
+			var httpErr api.HTTPError
+			// The ref might have already been deleted by GitHub
+			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
 				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 				return err
 			}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -46,9 +47,15 @@ func TestGraphQLError(t *testing.T) {
 	client := NewClient(ReplaceTripper(http))
 
 	response := struct{}{}
-	http.StubResponse(200, bytes.NewBufferString(`{"errors":[{"message":"OH NO"}]}`))
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "errors": [
+		{"message":"OH NO"},
+		{"message":"this is fine"}
+	  ]
+	}`))
+
 	err := client.GraphQL("", nil, &response)
-	if err == nil || err.Error() != "graphql error: 'OH NO'" {
+	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
 		t.Fatalf("got %q", err.Error())
 	}
 }
@@ -65,4 +72,24 @@ func TestRESTGetDelete(t *testing.T) {
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("DELETE", "applications/CLIENTID/grant", r, nil)
 	eq(t, err, nil)
+}
+
+func TestRESTError(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	http.StubResponse(422, bytes.NewBufferString(`{"message": "OH NO"}`))
+
+	var httpErr HTTPError
+	err := client.REST("DELETE", "repos/branch", nil, nil)
+	if err == nil || !errors.As(err, &httpErr) {
+		t.Fatalf("got %v", err)
+	}
+
+	if httpErr.StatusCode != 422 {
+		t.Errorf("expected status code 422, got %d", httpErr.StatusCode)
+	}
+	if httpErr.Error() != "HTTP 422: OH NO (https://api.github.com/repos/branch)" {
+		t.Errorf("got %q", httpErr.Error())
+	}
 }
