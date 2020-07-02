@@ -387,6 +387,7 @@ func TestIssueView_Preview(t *testing.T) {
 func TestIssueView_web_notFound(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "errors": [
@@ -432,7 +433,6 @@ func TestIssueView_disabledIssues(t *testing.T) {
 func TestIssueView_web_urlArg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
@@ -857,12 +857,8 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 	`))
 
 	_, err := RunCommand("issue close 13")
-	if err == nil {
-		t.Fatalf("expected error when issues are disabled")
-	}
-
-	if !strings.Contains(err.Error(), "issues disabled") {
-		t.Fatalf("got unexpected error: %s", err)
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Fatalf("got error: %v", err)
 	}
 }
 
@@ -930,11 +926,7 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	`))
 
 	_, err := RunCommand("issue reopen 2")
-	if err == nil {
-		t.Fatalf("expected error when issues are disabled")
-	}
-
-	if !strings.Contains(err.Error(), "issues disabled") {
-		t.Fatalf("got unexpected error: %s", err)
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Fatalf("got error: %v", err)
 	}
 }

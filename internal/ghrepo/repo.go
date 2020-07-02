@@ -23,6 +23,15 @@ func New(owner, repo string) Interface {
 	}
 }
 
+// NewWithHost is like New with an explicit host name
+func NewWithHost(owner, repo, hostname string) Interface {
+	return &ghRepo{
+		owner:    owner,
+		name:     repo,
+		hostname: hostname,
+	}
+}
+
 // FullName serializes a GitHub repository into an "OWNER/REPO" string
 func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())

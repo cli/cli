@@ -1,11 +1,9 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -244,12 +242,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	issue, _, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
 		return err
 	}
@@ -339,21 +332,6 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
-}
-
-var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
-
-func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	if m := issueURLRE.FindStringSubmatch(arg); m != nil {
-		issueNumber, _ := strconv.Atoi(m[3])
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	return nil, fmt.Errorf("invalid issue format: %q", arg)
 }
 
 func issueCreate(cmd *cobra.Command, args []string) error {
@@ -685,17 +663,9 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
 		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
-		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
 	}
 
 	if issue.Closed {
@@ -705,7 +675,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d\n", utils.Red("✔"), issue.Number)
@@ -720,17 +690,9 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
 		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
-		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
 	}
 
 	if !issue.Closed {
@@ -740,7 +702,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueReopen(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Green("✔"), issue.Number)

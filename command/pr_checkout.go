@@ -84,8 +84,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseURLOrName
 		mergeRef := ref
 		if pr.MaintainerCanModify {
-			// FIXME: inherit hostname from the server
-			headRepo := ghrepo.New(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+			headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
 			remote = formatRemoteURL(cmd, headRepo)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
