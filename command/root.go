@@ -317,7 +317,7 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, repo)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return nil, err
 	}
