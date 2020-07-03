@@ -503,6 +503,82 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
+func TestIssueCreate_withNonLegacyTemplate(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+
+	templateHandlerStub := initTemplateHandlerStub(map[string]templateStub{
+		"REPO/.github/PULL_REQUEST_TEMPLATE/one.md": {
+			name:     "Money Matters",
+			content:  []byte("cash rules everything around me"),
+			isLegacy: false,
+		},
+	})
+
+	as, teardown := initAskStubber()
+	defer teardown()
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "index",
+			Value: 0,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	cmd, args, output, cleanUpFunc, err := PrepareCommandArguments(`issue create -t hello`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+	defer cleanUpFunc()
+	err = issueCreate(cmd, args, templateHandlerStub)
+
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "hello")
+	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
 func TestIssueCreate_metadata(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
