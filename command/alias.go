@@ -40,9 +40,10 @@ var aliasSetCmd = &cobra.Command{
 	includes positional placeholders such as '$1', '$2', etc., any extra arguments
 	that follow the invocation of an alias will be inserted appropriately.
 
-	If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
-	to compose commands with "|" or redirect output with ">". Note that extra arguments are not passed
-	to shell-interpreted aliases; only placeholders ("$1", "$2", etc) are supported.
+	If '--shell' is specified, the alias will be run through a shell interpreter (sh or pwsh). This allows you
+	to compose commands with "|" or redirect output. Note that extra arguments are not passed to
+	shell-interpreted aliases; only placeholders ("$1", "$2" on *nix, "$args" in powershell) are
+	supported.
 
 	Quotes must always be used when defining a command as in the examples.`),
 	Example: heredoc.Doc(`
@@ -56,9 +57,15 @@ var aliasSetCmd = &cobra.Command{
 	$ gh epicsBy vilmibm
 	#=> gh issue list --author="vilmibm" --label="epic"
 
+	# On macOS and Linux:
 	$ gh alias set --shell igrep 'gh issue list --label="$1" | grep $2'
 	$ gh igrep epic foo
-	#=> gh issue list --label="epic" | grep "foo"`),
+	#=> gh issue list --label="epic" | grep "foo"
+
+	# On Windows (Powershell):
+	$ gh alias set --shell igrep 'gh issue list --label=$args[0] | Select-String -Pattern $args[1]
+	$ gh igrep epic foo
+	#=> gh issue list --label=epic | Select-String -Pattern foo`),
 	Args: cobra.ExactArgs(2),
 	RunE: aliasSet,
 }

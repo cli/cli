@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -385,11 +386,29 @@ func ExpandAlias(args []string) ([]string, error) {
 	if ok {
 		if strings.HasPrefix(expansion, "!") {
 			shellArgs := []string{"-c", expansion[1:]}
-			if len(args[2:]) > 0 {
-				shellArgs = append(shellArgs, "--")
-				shellArgs = append(shellArgs, args[2:]...)
+			shellCmd := "sh"
+			if runtime.GOOS == "windows" {
+				shellCmd = "pwsh"
+				argList := ""
+				if len(args[2:]) > 0 {
+					argList = " -ArgumentList @("
+					for i, arg := range args[2:] {
+						argList += fmt.Sprintf("'%s'", arg)
+						if i < len(args[2:])-1 {
+							argList += ","
+						}
+					}
+					argList += ")"
+				}
+				invoke := fmt.Sprintf("Invoke-Command -ScriptBlock { %s } %s", expansion[1:], argList)
+				shellArgs = []string{"-Command", invoke}
+			} else {
+				if len(args[2:]) > 0 {
+					shellArgs = append(shellArgs, "--")
+					shellArgs = append(shellArgs, args[2:]...)
+				}
 			}
-			externalCmd := exec.Command("sh", shellArgs...)
+			externalCmd := exec.Command(shellCmd, shellArgs...)
 			externalCmd.Stderr = os.Stderr
 			externalCmd.Stdout = os.Stdout
 			externalCmd.Stdin = os.Stdin

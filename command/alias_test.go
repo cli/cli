@@ -2,7 +2,7 @@ package command
 
 import (
 	"bytes"
-	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -177,12 +177,39 @@ aliases:
 
 }
 
-func TestExpandAlias_external(t *testing.T) {
+func TestExpandAlias_shell_nix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping test on windows")
+	}
 	cfg := `---
 aliases:
-  co: pr checkout
-  il: issue list --author="$1" --label="$2"
-  ia: issue list --author="$1" --assignee="$1"
+  ig: '!gh issue list | grep cool'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+	cs.Stub("")
+
+	_, err := ExpandAlias([]string{"gh", "ig"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	assert.Equal(t, 1, len(cs.Calls))
+
+	expected := []string{"sh", "-c", "gh issue list | grep cool"}
+
+	assert.Equal(t, expected, cs.Calls[0].Args)
+}
+
+func TestExpandAlias_shell_nix_extra_args(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping test on windows")
+	}
+	cfg := `---
+aliases:
   ig: '!gh issue list --label=$1 | grep'
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
@@ -199,9 +226,62 @@ aliases:
 
 	assert.Equal(t, 1, len(cs.Calls))
 
-	fmt.Printf("DEBUG %#v\n", cs.Calls[0])
-
 	expected := []string{"sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
+
+	assert.Equal(t, expected, cs.Calls[0].Args)
+}
+
+func TestExpandAlias_shell_windows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("skipping test on non-windows")
+	}
+	cfg := `---
+aliases:
+  ig: '!gh issue list | select-string -Pattern cool'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+	cs.Stub("")
+
+	_, err := ExpandAlias([]string{"gh", "ig"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	assert.Equal(t, 1, len(cs.Calls))
+
+	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list | select-string -Pattern cool } "}
+
+	assert.Equal(t, expected, cs.Calls[0].Args)
+}
+
+func TestExpandAlias_shell_windows_extra_args(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("skipping test on non-windows")
+	}
+	cfg := `---
+aliases:
+  co: pr checkout
+  ig: '!gh issue list --label=$args[0] | select-string -Pattern $args[1]'
+`
+	initBlankContext(cfg, "OWNER/REPO", "trunk")
+
+	cs, teardown := test.InitCmdStubber()
+	defer teardown()
+	cs.Stub("")
+
+	_, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	assert.Equal(t, 1, len(cs.Calls))
+
+	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list --label=$args[0] | select-string -Pattern $args[1] }  -ArgumentList @('bug','foo')"}
 
 	assert.Equal(t, expected, cs.Calls[0].Args)
 }
