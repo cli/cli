@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -173,13 +174,13 @@ func RunCommand(args string) (*cmdOut, error) {
 	return &cmdOutStreams, err
 }
 
-func PrepareCommandArguments(args string) (*cobra.Command, []string, *cmdOut, func(), error) {
+func PrepareCommandArguments(command string) (*cobra.Command, []string, *cmdOut, func(), error) {
 	cmdOutStreams := cmdOut{
 		outBuf: &bytes.Buffer{},
 		errBuf: &bytes.Buffer{},
 	}
 
-	_, cmd, _, argv, cleanUpFunc, err := setupCommand(args, &cmdOutStreams)
+	_, cmd, _, argv, cleanUpFunc, err := setupCommand(command, &cmdOutStreams)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -204,4 +205,48 @@ func (s errorStub) Output() ([]byte, error) {
 
 func (s errorStub) Run() error {
 	return errors.New(s.message)
+}
+
+type templateStub struct {
+	name     string
+	content  []byte
+	isLegacy bool
+}
+
+func initTemplateHandlerStub(templates map[string]templateStub) *githubtemplate.TemplateHandler {
+	return &githubtemplate.TemplateHandler{
+		FindNonLegacy: func(rootDir string, name string) []string {
+			paths := []string{}
+			for path, body := range templates {
+				if !body.isLegacy {
+					paths = append(paths, path)
+				}
+			}
+			return paths
+		},
+		FindLegacy: func(rootDir string, name string) *string {
+			for path, body := range templates {
+				if body.isLegacy {
+					return &path
+				}
+			}
+			return nil
+		},
+		ExtractName: func(filePath string) string {
+			for path, body := range templates {
+				if path == filePath {
+					return body.name
+				}
+			}
+			return ""
+		},
+		ExtractContents: func(filePath string) []byte {
+			for path, body := range templates {
+				if path == filePath {
+					return body.content
+				}
+			}
+			return []byte{}
+		},
+	}
 }
