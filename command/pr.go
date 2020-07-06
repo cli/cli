@@ -111,9 +111,9 @@ var prMergeCmd = &cobra.Command{
 	Short: "Merge a pull request",
 	Long: `Merge a pull request by providing the pull request number or url or the branch.
 
-	By default, the source branch gets deleted after the merge is complete.
-	
-	If the source branch needs be retained, '--delete-branch=false' should be specified.`,
+By default, the source branch gets deleted after the merge is complete.
+
+If the source branch needs be retained, '--delete-branch=false' should be specified.`,
 	RunE:  prMerge,
 }
 var prReadyCmd = &cobra.Command{
