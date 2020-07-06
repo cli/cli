@@ -111,10 +111,10 @@ var prMergeCmd = &cobra.Command{
 	Short: "Merge a pull request",
 	Long: `Merge a pull request by providing the pull request number or url or the branch.
 
-By default, the source branch gets deleted after the merge is complete.
+By default, the source branch gets deleted after the pull request merge is complete.
 
 If the source branch needs be retained, '--delete-branch=false' should be specified.`,
-	RunE:  prMerge,
+	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
@@ -128,7 +128,7 @@ func prStatus(cmd *cobra.Command, args []string) error {
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
 		return err
-	} 
+	}
 
 	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
 	if err != nil {
