@@ -107,9 +107,14 @@ var prReopenCmd = &cobra.Command{
 }
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
-	Short: "Merge a pull request",
 	Args:  cobra.MaximumNArgs(1),
-	RunE:  prMerge,
+	Short: "Merge a pull request",
+	Long: `Merge a pull request by providing the pull request number or url or the branch.
+
+By default, the source branch gets deleted after the pull request merge is complete.
+
+If the source branch needs be retained, '--delete-branch=false' should be specified.`,
+	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
