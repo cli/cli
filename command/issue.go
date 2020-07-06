@@ -709,7 +709,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 	if errors.As(err, &idErr) {
 		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
 	} else if err != nil {
-		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+		return err
 	}
 
 	if issue.Closed {
@@ -744,7 +744,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 	if errors.As(err, &idErr) {
 		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
 	} else if err != nil {
-		return fmt.Errorf("failed to find issue #%d: %w", issue.Number, err)
+		return err
 	}
 
 	if !issue.Closed {
