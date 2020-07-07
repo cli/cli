@@ -749,16 +749,16 @@ func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) e
 	}
 
 	body := githubv4.String(input.Body)
-
-	gqlInput := githubv4.AddPullRequestReviewInput{
-		PullRequestID: pr.ID,
-		Event:         &state,
-		Body:          &body,
+	variables := map[string]interface{}{
+		"input": githubv4.AddPullRequestReviewInput{
+			PullRequestID: pr.ID,
+			Event:         &state,
+			Body:          &body,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-
-	return v4.Mutate(context.Background(), &mutation, gqlInput, nil)
+	gql := graphQLClient(client.http)
+	return gql.MutateNamed(context.Background(), "PullRequestReviewAdd", &mutation, variables)
 }
 
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
@@ -938,12 +938,14 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		} `graphql:"closePullRequest(input: $input)"`
 	}
 
-	input := githubv4.ClosePullRequestInput{
-		PullRequestID: pr.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.ClosePullRequestInput{
+			PullRequestID: pr.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
 
 	return err
 }
@@ -957,12 +959,14 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 		} `graphql:"reopenPullRequest(input: $input)"`
 	}
 
-	input := githubv4.ReopenPullRequestInput{
-		PullRequestID: pr.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.ReopenPullRequestInput{
+			PullRequestID: pr.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
 
 	return err
 }
@@ -984,13 +988,15 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		} `graphql:"mergePullRequest(input: $input)"`
 	}
 
-	input := githubv4.MergePullRequestInput{
-		PullRequestID: pr.ID,
-		MergeMethod:   &mergeMethod,
+	variables := map[string]interface{}{
+		"input": githubv4.MergePullRequestInput{
+			PullRequestID: pr.ID,
+			MergeMethod:   &mergeMethod,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "PullRequestMerge", &mutation, variables)
 
 	return err
 }
@@ -1004,10 +1010,14 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		} `graphql:"markPullRequestReadyForReview(input: $input)"`
 	}
 
-	input := githubv4.MarkPullRequestReadyForReviewInput{PullRequestID: pr.ID}
+	variables := map[string]interface{}{
+		"input": githubv4.MarkPullRequestReadyForReviewInput{
+			PullRequestID: pr.ID,
+		},
+	}
 
-	v4 := githubv4.NewClient(client.http)
-	return v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	return gql.MutateNamed(context.Background(), "PullRequestReadyForReview", &mutation, variables)
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {

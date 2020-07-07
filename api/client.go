@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/henvic/httpretty"
+	"github.com/shurcooL/graphql"
 )
 
 // ClientOption represents an argument to NewClient
@@ -233,6 +234,10 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	defer resp.Body.Close()
 
 	return handleResponse(resp, data)
+}
+
+func graphQLClient(h *http.Client) *graphql.Client {
+	return graphql.NewClient("https://api.github.com/graphql", h)
 }
 
 // REST performs a REST request and parses the response.

@@ -383,12 +383,14 @@ func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
-	input := githubv4.CloseIssueInput{
-		IssueID: issue.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.CloseIssueInput{
+			IssueID: issue.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
 
 	if err != nil {
 		return err
@@ -406,12 +408,14 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 		} `graphql:"reopenIssue(input: $input)"`
 	}
 
-	input := githubv4.ReopenIssueInput{
-		IssueID: issue.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.ReopenIssueInput{
+			IssueID: issue.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
 
 	return err
 }

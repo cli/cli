@@ -124,8 +124,8 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Query(context.Background(), &query, variables)
+	gql := graphQLClient(client.http)
+	err := gql.QueryNamed(context.Background(), "RepositoryFindParent", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -710,11 +710,11 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var projects []RepoProject
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
