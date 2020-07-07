@@ -81,7 +81,6 @@ sudo port selfupdate && sudo port upgrade gh
 Install:
 
 ```powershell
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
 scoop install gh
 ```
 
