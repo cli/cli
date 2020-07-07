@@ -108,8 +108,14 @@ var prReopenCmd = &cobra.Command{
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
 	Short: "Merge a pull request",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  prMerge,
+	Long: heredoc.Doc(`
+	Merge a pull request on GitHub.
+
+	By default, the head branch of the pull request will get deleted on both remote and local repositories.
+	To retain the branch, use '--delete-branch=false'.
+	`),
+	Args: cobra.MaximumNArgs(1),
+	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
