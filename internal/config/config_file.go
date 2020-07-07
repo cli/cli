@@ -138,7 +138,11 @@ func migrateConfig(filename string) error {
 func ParseConfig(filename string) (Config, error) {
 	_, root, err := parseConfigFile(filename)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			root = NewBlankRoot()
+		} else {
+			return nil, err
+		}
 	}
 
 	if isLegacy(root) {
