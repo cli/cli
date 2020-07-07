@@ -107,13 +107,14 @@ var prReopenCmd = &cobra.Command{
 }
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
-	Args:  cobra.MaximumNArgs(1),
 	Short: "Merge a pull request",
-	Long: `Merge a pull request by providing the pull request number or url or the branch.
+	Long: heredoc.Doc(`
+	Merge a pull request on GitHub.
 
-By default, the source branch gets deleted after the pull request merge is complete.
-
-If the source branch needs be retained, '--delete-branch=false' should be specified.`,
+	By default, the head branch of the pull request will get deleted on both remote and local repositories.
+	To retain the branch, use '--delete-branch=false'.
+	`),
+	Args: cobra.MaximumNArgs(1),
 	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
