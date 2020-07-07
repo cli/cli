@@ -722,7 +722,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d\n", utils.Red("✔"), issue.Number)
+	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d (%s)\n", utils.Red("✔"), issue.Number, issue.Title)
 
 	return nil
 }
@@ -757,7 +757,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed:%w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d\n", utils.Green("✔"), issue.Number)
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d (%s)\n", utils.Green("✔"), issue.Number, issue.Title)
 
 	return nil
 }
