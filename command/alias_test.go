@@ -187,21 +187,17 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-	cs.Stub("")
+	expanded, isShell, err := ExpandAlias([]string{"gh", "ig"})
 
-	_, err := ExpandAlias([]string{"gh", "ig"})
+	assert.True(t, isShell)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	assert.Equal(t, 1, len(cs.Calls))
-
 	expected := []string{"sh", "-c", "gh issue list | grep cool"}
 
-	assert.Equal(t, expected, cs.Calls[0].Args)
+	assert.Equal(t, expected, expanded)
 }
 
 func TestExpandAlias_shell_nix_extra_args(t *testing.T) {
@@ -214,21 +210,17 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-	cs.Stub("")
+	expanded, isShell, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
 
-	_, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
+	assert.True(t, isShell)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	assert.Equal(t, 1, len(cs.Calls))
-
 	expected := []string{"sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
 
-	assert.Equal(t, expected, cs.Calls[0].Args)
+	assert.Equal(t, expected, expanded)
 }
 
 func TestExpandAlias_shell_windows(t *testing.T) {
@@ -245,17 +237,17 @@ aliases:
 	defer teardown()
 	cs.Stub("")
 
-	_, err := ExpandAlias([]string{"gh", "ig"})
+	expanded, isShell, err := ExpandAlias([]string{"gh", "ig"})
+
+	assert.True(t, isShell)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	assert.Equal(t, 1, len(cs.Calls))
-
 	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list | select-string -Pattern cool } "}
 
-	assert.Equal(t, expected, cs.Calls[0].Args)
+	assert.Equal(t, expected, expanded)
 }
 
 func TestExpandAlias_shell_windows_extra_args(t *testing.T) {
@@ -269,21 +261,17 @@ aliases:
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-	cs.Stub("")
+	expanded, isShell, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
 
-	_, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
+	assert.True(t, isShell)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	assert.Equal(t, 1, len(cs.Calls))
-
 	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list --label=$args[0] | select-string -Pattern $args[1] }  -ArgumentList @('bug','foo')"}
 
-	assert.Equal(t, expected, cs.Calls[0].Args)
+	assert.Equal(t, expected, expanded)
 }
 
 func TestExpandAlias(t *testing.T) {
@@ -317,7 +305,9 @@ aliases:
 			args = strings.Split(c.Args, " ")
 		}
 
-		out, err := ExpandAlias(args)
+		expanded, isShell, err := ExpandAlias(args)
+
+		assert.False(t, isShell)
 
 		if err == nil && c.Err != "" {
 			t.Errorf("expected error %s for %s", c.Err, c.Args)
@@ -329,7 +319,7 @@ aliases:
 			continue
 		}
 
-		eq(t, out, c.ExpectedArgs)
+		assert.Equal(t, c.ExpectedArgs, expanded)
 	}
 }
 

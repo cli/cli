@@ -41,9 +41,9 @@ var aliasSetCmd = &cobra.Command{
 	that follow the invocation of an alias will be inserted appropriately.
 
 	If '--shell' is specified, the alias will be run through a shell interpreter (sh or pwsh). This allows you
-	to compose commands with "|" or redirect output. Note that extra arguments are not passed to
-	shell-interpreted aliases; only placeholders ("$1", "$2" on *nix, "$args" in powershell) are
-	supported.
+	to compose commands with "|" or redirect output. Note that extra arguments following the alias
+	will not be automatically passed to the expanded expression. To have a shell alias receive
+	arguments, you must explicitly accept them using "$1", "$2", etc or "$@" to accept all of them.
 
 	Quotes must always be used when defining a command as in the examples.`),
 	Example: heredoc.Doc(`

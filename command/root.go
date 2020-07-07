@@ -366,29 +366,50 @@ func determineEditor(cmd *cobra.Command) (string, error) {
 	return editorCommand, nil
 }
 
-func ExpandAlias(args []string) ([]string, error) {
+func ExecuteShellAlias(args []string) error {
+	externalCmd := exec.Command(args[0], args[1:]...)
+	externalCmd.Stderr = os.Stderr
+	externalCmd.Stdout = os.Stdout
+	externalCmd.Stdin = os.Stdin
+	preparedCmd := run.PrepareCmd(externalCmd)
+
+	err := preparedCmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run external command: %w", err)
+	}
+
+	return nil
+}
+
+// ExpandAlias processes argv to see if it should be rewritten according to a user's aliases. The
+// second return value indicates whether the alias should be executed in a new shell process instead
+// of running gh itself.
+func ExpandAlias(args []string) (expanded []string, isShell bool, err error) {
+	err = nil
+	isShell = false
+	expanded = []string{}
+
 	if len(args) < 2 {
 		// the command is lacking a subcommand
-		return []string{}, nil
+		return
 	}
 
 	ctx := initContext()
 	cfg, err := ctx.Config()
 	if err != nil {
-		return nil, err
+		return
 	}
 	aliases, err := cfg.Aliases()
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	expansion, ok := aliases.Get(args[1])
 	if ok {
 		if strings.HasPrefix(expansion, "!") {
-			shellArgs := []string{"-c", expansion[1:]}
-			shellCmd := "sh"
+			isShell = true
+			expanded = []string{"sh", "-c", expansion[1:]}
 			if runtime.GOOS == "windows" {
-				shellCmd = "pwsh"
 				argList := ""
 				if len(args[2:]) > 0 {
 					argList = " -ArgumentList @("
@@ -401,25 +422,15 @@ func ExpandAlias(args []string) ([]string, error) {
 					argList += ")"
 				}
 				invoke := fmt.Sprintf("Invoke-Command -ScriptBlock { %s } %s", expansion[1:], argList)
-				shellArgs = []string{"-Command", invoke}
+				expanded = []string{"pwsh", "-Command", invoke}
 			} else {
 				if len(args[2:]) > 0 {
-					shellArgs = append(shellArgs, "--")
-					shellArgs = append(shellArgs, args[2:]...)
+					expanded = append(expanded, "--")
+					expanded = append(expanded, args[2:]...)
 				}
 			}
-			externalCmd := exec.Command(shellCmd, shellArgs...)
-			externalCmd.Stderr = os.Stderr
-			externalCmd.Stdout = os.Stdout
-			externalCmd.Stdin = os.Stdin
-			preparedCmd := run.PrepareCmd(externalCmd)
 
-			err := preparedCmd.Run()
-			if err != nil {
-				return nil, fmt.Errorf("failed to run external command: %w", err)
-			}
-
-			return nil, nil
+			return
 		}
 
 		extraArgs := []string{}
@@ -432,19 +443,22 @@ func ExpandAlias(args []string) ([]string, error) {
 		}
 		lingeringRE := regexp.MustCompile(`\$\d`)
 		if lingeringRE.MatchString(expansion) {
-			return nil, fmt.Errorf("not enough arguments for alias: %s", expansion)
+			err = fmt.Errorf("not enough arguments for alias: %s", expansion)
+			return
 		}
 
-		newArgs, err := shlex.Split(expansion)
+		var newArgs []string
+		newArgs, err = shlex.Split(expansion)
 		if err != nil {
-			return nil, err
+			return
 		}
 
-		return append(newArgs, extraArgs...), nil
-
+		expanded = append(newArgs, extraArgs...)
+		return
 	}
 
-	return args[1:], nil
+	expanded = args[1:]
+	return
 }
 
 func connectedToTerminal(cmd *cobra.Command) bool {
