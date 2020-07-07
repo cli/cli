@@ -188,7 +188,7 @@ func Test_RepoResolveMetadataIDs(t *testing.T) {
 		Labels:    []string{"bug", "help wanted"},
 	}
 
-	expectedQuery := `{
+	expectedQuery := `query RepositoryResolveMetadataIDs {
 u000: user(login:"monalisa"){id,login}
 u001: user(login:"hubot"){id,login}
 u002: user(login:"octocat"){id,login}

@@ -140,7 +140,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	}
 
 	query := fragments + `
-	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
+	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -212,7 +212,7 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String, $mention: String, $milestone: String) {
+	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String, $mention: String, $milestone: String) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author, mentioned: $mention, milestone: $milestone}) {
@@ -306,7 +306,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	query := `
-	query($owner: String!, $repo: String!, $issue_number: Int!) {
+	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {

@@ -296,7 +296,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	`
 
 	queryPrefix := `
-	query($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			defaultBranchRef { name }
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
@@ -311,7 +311,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	`
 	if currentPRNumber > 0 {
 		queryPrefix = `
-		query($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
 				defaultBranchRef { name }
 				pullRequest(number: $number) {
@@ -408,7 +408,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	}
 
 	query := `
-	query($owner: String!, $repo: String!, $pr_number: Int!) {
+	query PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pr_number) {
 				id
@@ -518,7 +518,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	query := `
-	query($owner: String!, $repo: String!, $headRefName: String!) {
+	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
 				nodes {
@@ -634,7 +634,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 // CreatePullRequest creates a pull request in a GitHub repository
 func CreatePullRequest(client *Client, repo *Repository, params map[string]interface{}) (*PullRequest, error) {
 	query := `
-		mutation CreatePullRequest($input: CreatePullRequestInput!) {
+		mutation PullRequestCreate($input: CreatePullRequestInput!) {
 			createPullRequest(input: $input) {
 				pullRequest {
 					id
@@ -681,7 +681,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 	if len(updateParams) > 0 {
 		updateQuery := `
-		mutation UpdatePullRequest($input: UpdatePullRequestInput!) {
+		mutation PullRequestCreateMetadata($input: UpdatePullRequestInput!) {
 			updatePullRequest(input: $input) { clientMutationId }
 		}`
 		updateParams["pullRequestId"] = pr.ID
@@ -705,7 +705,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 
 	if len(reviewParams) > 0 {
 		reviewQuery := `
-		mutation RequestReviews($input: RequestReviewsInput!) {
+		mutation PullRequestCreateRequestReviews($input: RequestReviewsInput!) {
 			requestReviews(input: $input) { clientMutationId }
 		}`
 		reviewParams["pullRequestId"] = pr.ID
@@ -798,7 +798,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 	// If assignee wasn't specified, use `Repository.pullRequest` for ability to
 	// query by multiple labels
 	query := fragment + `
-    query(
+    query PullRequestList(
 		$owner: String!,
 		$repo: String!,
 		$limit: Int!,
@@ -840,7 +840,7 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 	// `Repository.pullRequests`, but this mode doesn't support multiple labels
 	if assignee, ok := vars["assignee"].(string); ok {
 		query = fragment + `
-		query(
+		query PullRequestList(
 			$q: String!,
 			$limit: Int!,
 			$endCursor: String,

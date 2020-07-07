@@ -78,7 +78,7 @@ func (r Repository) ViewerCanTriage() bool {
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
-	query($owner: String!, $name: String!) {
+	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
 			hasIssuesEnabled
@@ -174,7 +174,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		}
 		isPrivate
 	}
-	query {
+	query RepositoryNetwork {
 		viewer { login }
 		%s
 	}
@@ -284,7 +284,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	if err := client.GraphQL(`
-	query($owner: String!, $repo: String!) {
+	query RepositoryFindFork($owner: String!, $repo: String!) {
 		repository(owner: $owner, name: $repo) {
 			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
 				nodes {
@@ -353,7 +353,7 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	}
 
 	err := client.GraphQL(`
-	mutation($input: CreateRepositoryInput!) {
+	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
 				id
@@ -626,7 +626,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	}
 
 	query := &bytes.Buffer{}
-	fmt.Fprint(query, "{\n")
+	fmt.Fprint(query, "query RepositoryResolveMetadataIDs {\n")
 	for i, u := range users {
 		fmt.Fprintf(query, "u%03d: user(login:%q){id,login}\n", i, u)
 	}
