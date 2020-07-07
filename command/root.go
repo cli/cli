@@ -257,8 +257,8 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 		}
 		return reloadedClient, nil
 	} else {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires %s OAuth scopes.", wantedScopes))
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Visit https://github.com/settings/tokens and edit your token to enable %s", wantedScopes))
+		fmt.Fprintf(os.Stderr, "Warning: gh now requires %s OAuth scopes.\n", wantedScopes)
+		fmt.Fprintf(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable %s\n", wantedScopes)
 		if tokenFromEnv {
 			fmt.Fprintln(os.Stderr, "or generate a new token for the GITHUB_TOKEN environment variable")
 		} else {
