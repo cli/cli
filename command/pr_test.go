@@ -897,7 +897,7 @@ func TestPrClose(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
-			"pullRequest": { "number": 96 }
+			"pullRequest": { "number": 96, "title": "The title of the PR" }
 		} } }
 	`))
 
@@ -908,7 +908,7 @@ func TestPrClose(t *testing.T) {
 		t.Fatalf("error running command `pr close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Closed pull request #96`)
+	r := regexp.MustCompile(`Closed pull request #96 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -922,7 +922,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": {
-			"pullRequest": { "number": 101, "closed": true }
+			"pullRequest": { "number": 101, "title": "The title of the PR", "closed": true }
 		} } }
 	`))
 
@@ -933,7 +933,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 		t.Fatalf("error running command `pr close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #101 is already closed`)
+	r := regexp.MustCompile(`Pull request #101 \(The title of the PR\) is already closed`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -947,7 +947,7 @@ func TestPRReopen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
-		"pullRequest": { "number": 666, "closed": true}
+		"pullRequest": { "number": 666, "title": "The title of the PR", "closed": true}
 	} } }
 	`))
 
@@ -958,7 +958,7 @@ func TestPRReopen(t *testing.T) {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Reopened pull request #666`)
+	r := regexp.MustCompile(`Reopened pull request #666 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -972,7 +972,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
-		"pullRequest": { "number": 666, "closed": false}
+		"pullRequest": { "number": 666,  "title": "The title of the PR", "closed": false}
 	} } }
 	`))
 
@@ -983,7 +983,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 		t.Fatalf("error running command `pr reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #666 is already open`)
+	r := regexp.MustCompile(`Pull request #666 \(The title of the PR\) is already open`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -997,7 +997,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
-		"pullRequest": { "number": 666, "closed": true, "state": "MERGED"}
+		"pullRequest": { "number": 666, "title": "The title of the PR", "closed": true, "state": "MERGED"}
 	} } }
 	`))
 
@@ -1008,7 +1008,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 		t.Fatalf("expected an error running command `pr reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #666 can't be reopened because it was already merged`)
+	r := regexp.MustCompile(`Pull request #666 \(The title of the PR\) can't be reopened because it was already merged`)
 
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1033,7 +1033,7 @@ func initWithStubs(branch string, stubs ...stubResponse) {
 func TestPrMerge(t *testing.T) {
 	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
-			"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+			"pullRequest": { "number": 1, "title": "The title of the PR", "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
@@ -1053,7 +1053,7 @@ func TestPrMerge(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1`)
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1064,7 +1064,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": { "repository": {
-		"pullRequest": { "number": 1, "closed": false, "state": "OPEN"}
+		"pullRequest": { "number": 1, "title": "The title of the PR", "closed": false, "state": "OPEN"}
 		} } }`))
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
 	http.StubRepoResponse("OWNER", "REPO")
@@ -1080,7 +1080,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1`)
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1091,7 +1091,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	initWithStubs("blueberries",
 		stubResponse{200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
-			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+			{ "headRefName": "blueberries", "id": "THE-ID", "number": 3, "title": "The title of the PR"}
 		] } } } }`)},
 		stubResponse{200, bytes.NewBufferString(`{ "data": {} }`)},
 		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
@@ -1111,7 +1111,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+	test.ExpectLines(t, output.String(), `Merged pull request #3 \(The title of the PR\)`, "Deleted branch blueberries")
 }
 
 func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
@@ -1120,7 +1120,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "headRefName": "blueberries", "id": "THE-ID", "number": 3}
+		{ "headRefName": "blueberries", "id": "THE-ID", "number": 3, "title": "The title of the PR"}
 	] } } } }`))
 	http.StubResponse(200, bytes.NewBufferString(`{ "data": {} }`))
 	http.StubResponse(200, bytes.NewBufferString(`{"node_id": "THE-ID"}`))
@@ -1138,7 +1138,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+	test.ExpectLines(t, output.String(), `Merged pull request #3 \(The title of the PR\)`, "Deleted branch blueberries")
 }
 
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
@@ -1165,7 +1165,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #10`)
+	r := regexp.MustCompile(`Merged pull request #10 \(Blueberries are a good fruit\)`)
 
 	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1175,7 +1175,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 func TestPrMerge_rebase(t *testing.T) {
 	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
-			"pullRequest": { "number": 2, "closed": false, "state": "OPEN"}
+			"pullRequest": { "number": 2, "title": "The title of the PR", "closed": false, "state": "OPEN"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
@@ -1194,7 +1194,7 @@ func TestPrMerge_rebase(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Rebased and merged pull request #2`)
+	r := regexp.MustCompile(`Rebased and merged pull request #2 \(The title of the PR\)`)
 
 	if !r.MatchString(output.String()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1233,7 +1233,7 @@ func TestPrMerge_squash(t *testing.T) {
 func TestPrMerge_alreadyMerged(t *testing.T) {
 	initWithStubs("master",
 		stubResponse{200, bytes.NewBufferString(`{ "data": { "repository": {
-			"pullRequest": { "number": 4, "closed": true, "state": "MERGED"}
+			"pullRequest": { "number": 4, "title": "The title of the PR", "closed": true, "state": "MERGED"}
 		} } }`)},
 		stubResponse{200, bytes.NewBufferString(`{"id": "THE-ID"}`)},
 		stubResponse{200, bytes.NewBufferString(`{"node_id": "THE-ID"}`)},
@@ -1252,7 +1252,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		t.Fatalf("expected an error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #4 was already merged`)
+	r := regexp.MustCompile(`Pull request #4 \(The title of the PR\) was already merged`)
 
 	if !r.MatchString(err.Error()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
