@@ -713,7 +713,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 	}
 
 	if issue.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already closed\n", utils.Yellow("!"), issue.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d (%s) is already closed\n", utils.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
 
@@ -748,7 +748,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	if !issue.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d is already open\n", utils.Yellow("!"), issue.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Issue #%d (%s) is already open\n", utils.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
 
