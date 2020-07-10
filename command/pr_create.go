@@ -271,11 +271,23 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if baseRepo.IsPrivate {
 			return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
 		}
-		headRepo, err = api.ForkRepo(client, baseRepo)
+		confirmForkRepo := false
+		err = Confirm("You don't have write permissions to this repository. Do you want to proceed with a fork? ", &confirmForkRepo)
 		if err != nil {
-			return fmt.Errorf("error forking repo: %w", err)
+			return err
 		}
-		didForkRepo = true
+		if confirmForkRepo {
+			headRepo, err = api.ForkRepo(client, baseRepo)
+			if err != nil {
+				return fmt.Errorf("error forking repo: %w", err)
+			}
+			didForkRepo = true
+		} else {
+			// Since user denied a fork, it's best to quit the pr create here
+			fmt.Fprintln(colorableOut(cmd), "Create PR aborted")
+			return nil
+		}
+
 	}
 
 	headBranchLabel := headBranch
