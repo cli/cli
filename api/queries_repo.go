@@ -754,11 +754,11 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var users []RepoAssignee
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryAssignableUsers", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -798,11 +798,11 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var labels []RepoLabel
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryLabelList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -842,11 +842,11 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var milestones []RepoMilestone
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryMilestoneList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
