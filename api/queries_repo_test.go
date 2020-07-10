@@ -60,7 +60,7 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
@@ -71,7 +71,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
+		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "labels": {
 			"nodes": [
@@ -83,7 +83,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
@@ -94,7 +94,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
@@ -105,7 +105,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [
@@ -115,7 +115,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
+		httpmock.GraphQL(`query OrganizationTeamList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "teams": {
 			"nodes": [
@@ -219,7 +219,7 @@ t001: team(slug:"robots"){id,slug}
 	`
 
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.GraphQLQuery(responseJSON, func(q string, _ map[string]interface{}) {
 			if q != expectedQuery {
 				t.Errorf("expected query %q, got %q", expectedQuery, q)
