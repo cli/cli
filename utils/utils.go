@@ -26,7 +26,8 @@ func RenderMarkdown(text string) (string, error) {
 	if isColorEnabled() {
 		style = "dark"
 	}
-	text = strings.Map(filterCarriageReturn, text)
+	// This ensures that carriage returns before the newlines are omitted
+	text = strings.ReplaceAll(text, "\r\n", "\n")
 	return glamour.Render(text, style)
 }
 
@@ -87,11 +88,4 @@ var StopSpinner = func(s *spinner.Spinner) {
 
 func Spinner(w io.Writer) *spinner.Spinner {
 	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
-}
-
-func filterCarriageReturn(r rune) rune {
-	if r == '\r' {
-		return -1
-	}
-	return r
 }
