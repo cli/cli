@@ -88,7 +88,7 @@ const fragments = `
 // IssueCreate creates an issue in a GitHub repository
 func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
 	query := `
-	mutation CreateIssue($input: CreateIssueInput!) {
+	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
 				url
