@@ -805,7 +805,7 @@ func TestIssueClose(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 13}
+		"issue": { "number": 13, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -816,7 +816,7 @@ func TestIssueClose(t *testing.T) {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Closed issue #13`)
+	r := regexp.MustCompile(`Closed issue #13 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -831,7 +831,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 13, "closed": true}
+		"issue": { "number": 13, "title": "The title of the issue", "closed": true}
 	} } }
 	`))
 
@@ -842,7 +842,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`#13 is already closed`)
+	r := regexp.MustCompile(`Issue #13 \(The title of the issue\) is already closed`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -878,7 +878,7 @@ func TestIssueReopen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": true}
+		"issue": { "number": 2, "closed": true, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -889,7 +889,7 @@ func TestIssueReopen(t *testing.T) {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Reopened issue #2`)
+	r := regexp.MustCompile(`Reopened issue #2 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -904,7 +904,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": false}
+		"issue": { "number": 2, "closed": false, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -915,7 +915,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`#2 is already open`)
+	r := regexp.MustCompile(`Issue #2 \(The title of the issue\) is already open`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())

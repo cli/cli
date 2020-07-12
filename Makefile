@@ -20,10 +20,10 @@ ifndef CGO_LDFLAGS
 endif
 
 GO_LDFLAGS := -X github.com/cli/cli/command.Version=$(GH_VERSION)
-GO_LDFLAGS := -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE)
+GO_LDFLAGS += -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE)
 ifdef GH_OAUTH_CLIENT_SECRET
-	GO_LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientID=$(GH_OAUTH_CLIENT_ID)
-	GO_LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET)
+	GO_LDFLAGS += -X github.com/cli/cli/internal/config.oauthClientID=$(GH_OAUTH_CLIENT_ID)
+	GO_LDFLAGS += -X github.com/cli/cli/internal/config.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET)
 endif
 
 bin/gh: $(BUILD_FILES)
