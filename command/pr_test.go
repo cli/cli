@@ -1289,6 +1289,10 @@ func TestPRMerge_interactive(t *testing.T) {
 			Name:  "deleteBranch",
 			Value: true,
 		},
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
 	})
 
 	output, err := RunCommand(`pr merge`)

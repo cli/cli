@@ -572,6 +572,13 @@ func TestRepoCreate(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	oldConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+	defer func() { Confirm = oldConfirm }()
+
 	output, err := RunCommand("repo create REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
@@ -643,6 +650,13 @@ func TestRepoCreate_org(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	oldConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+	defer func() { Confirm = oldConfirm }()
+
 	output, err := RunCommand("repo create ORG/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
@@ -713,6 +727,13 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
+
+	oldConfirm := Confirm
+	Confirm = func(_ string, result *bool) error {
+		*result = true
+		return nil
+	}
+	defer func() { Confirm = oldConfirm }()
 
 	output, err := RunCommand("repo create ORG/REPO --team monkeys")
 	if err != nil {

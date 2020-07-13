@@ -411,6 +411,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 }
 
 func prMerge(cmd *cobra.Command, args []string) error {
+	confirmSubmit := false
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
 	if err != nil {
@@ -448,14 +449,17 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	if b, _ := cmd.Flags().GetBool("merge"); b {
 		enabledFlagCount++
 		mergeMethod = api.PullRequestMergeMethodMerge
+		confirmSubmit = true
 	}
 	if b, _ := cmd.Flags().GetBool("rebase"); b {
 		enabledFlagCount++
 		mergeMethod = api.PullRequestMergeMethodRebase
+		confirmSubmit = true
 	}
 	if b, _ := cmd.Flags().GetBool("squash"); b {
 		enabledFlagCount++
 		mergeMethod = api.PullRequestMergeMethodSquash
+		confirmSubmit = true
 	}
 
 	if enabledFlagCount == 0 {
@@ -464,8 +468,8 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
 	}
 
-	confirmSubmit := false
 	if isInteractive {
+		confirmSubmit = false
 		mergeMethod, deleteBranch, confirmSubmit, err = prInteractiveMerge(deleteLocalBranch, crossRepoPR, confirmSubmit)
 		if err != nil {
 			return err
