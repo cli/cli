@@ -496,7 +496,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("API call failed: %w", err)
 		}
 
-		fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
+		fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 
 		if deleteBranch {
 			repo, err := api.GitHubRepo(apiClient, baseRepo)

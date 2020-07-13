@@ -1056,7 +1056,7 @@ func TestPrMerge(t *testing.T) {
 	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
 	}
 }
 
