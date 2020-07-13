@@ -26,6 +26,9 @@ func RenderMarkdown(text string) (string, error) {
 	if isColorEnabled() {
 		style = "dark"
 	}
+	// Glamour rendering preserves carriage return characters in code blocks, but
+	// we need to ensure that no such characters are present in the output.
+	text = strings.ReplaceAll(text, "\r\n", "\n")
 	return glamour.Render(text, style)
 }
 

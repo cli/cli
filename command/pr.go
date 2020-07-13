@@ -108,8 +108,14 @@ var prReopenCmd = &cobra.Command{
 var prMergeCmd = &cobra.Command{
 	Use:   "merge [<number> | <url> | <branch>]",
 	Short: "Merge a pull request",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  prMerge,
+	Long: heredoc.Doc(`
+	Merge a pull request on GitHub.
+
+	By default, the head branch of the pull request will get deleted on both remote and local repositories.
+	To retain the branch, use '--delete-branch=false'.
+	`),
+	Args: cobra.MaximumNArgs(1),
+	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
@@ -355,10 +361,10 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d can't be closed because it was already merged", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d (%s) can't be closed because it was already merged", utils.Red("!"), pr.Number, pr.Title)
 		return err
 	} else if pr.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already closed\n", utils.Yellow("!"), pr.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d (%s) is already closed\n", utils.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}
 
@@ -367,7 +373,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d\n", utils.Red("✔"), pr.Number)
+	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
 
 	return nil
 }
@@ -385,12 +391,12 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d can't be reopened because it was already merged", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d (%s) can't be reopened because it was already merged", utils.Red("!"), pr.Number, pr.Title)
 		return err
 	}
 
 	if !pr.Closed {
-		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is already open\n", utils.Yellow("!"), pr.Number)
+		fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d (%s) is already open\n", utils.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}
 
@@ -399,7 +405,7 @@ func prReopen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d\n", utils.Green("✔"), pr.Number)
+	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d (%s)\n", utils.Green("✔"), pr.Number, pr.Title)
 
 	return nil
 }
@@ -417,13 +423,13 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	if pr.Mergeable == "CONFLICTING" {
-		err := fmt.Errorf("%s Pull request #%d has conflicts and isn't mergeable ", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", utils.Red("!"), pr.Number, pr.Title)
 		return err
 	} else if pr.Mergeable == "UNKNOWN" {
-		err := fmt.Errorf("%s Pull request #%d can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d (%s) can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number, pr.Title)
 		return err
 	} else if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d was already merged", utils.Red("!"), pr.Number)
+		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", utils.Red("!"), pr.Number, pr.Title)
 		return err
 	}
 
@@ -484,7 +490,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d\n", utils.Magenta("✔"), action, pr.Number)
+	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 
 	if deleteBranch {
 		repo, err := api.GitHubRepo(apiClient, baseRepo)

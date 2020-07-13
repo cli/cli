@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"syscall"
 
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
@@ -32,7 +33,7 @@ func ParseDefaultConfig() (Config, error) {
 var ReadConfigFile = func(filename string) ([]byte, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, pathError(err)
 	}
 	defer f.Close()
 
@@ -47,7 +48,7 @@ var ReadConfigFile = func(filename string) ([]byte, error) {
 var WriteConfigFile = func(filename string, data []byte) error {
 	err := os.MkdirAll(path.Dir(filename), 0771)
 	if err != nil {
-		return err
+		return pathError(err)
 	}
 
 	cfgFile, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // cargo coded from setup
@@ -138,7 +139,11 @@ func migrateConfig(filename string) error {
 func ParseConfig(filename string) (Config, error) {
 	_, root, err := parseConfigFile(filename)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			root = NewBlankRoot()
+		} else {
+			return nil, err
+		}
 	}
 
 	if isLegacy(root) {
@@ -167,4 +172,29 @@ func ParseConfig(filename string) (Config, error) {
 	}
 
 	return NewConfig(root), nil
+}
+
+func pathError(err error) error {
+	var pathError *os.PathError
+	if errors.As(err, &pathError) && errors.Is(pathError.Err, syscall.ENOTDIR) {
+		if p := findRegularFile(pathError.Path); p != "" {
+			return fmt.Errorf("remove or rename regular file `%s` (must be a directory)", p)
+		}
+
+	}
+	return err
+}
+
+func findRegularFile(p string) string {
+	for {
+		if s, err := os.Stat(p); err == nil && s.Mode().IsRegular() {
+			return p
+		}
+		newPath := path.Dir(p)
+		if newPath == p || newPath == "/" || newPath == "." {
+			break
+		}
+		p = newPath
+	}
+	return ""
 }

@@ -31,7 +31,9 @@ func TestBranchDeleteRemote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			http := &httpmock.Registry{}
-			http.Register(httpmock.MatchAny, httpmock.StatusStringResponse(tt.responseStatus, tt.responseBody))
+			http.Register(
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/branch"),
+				httpmock.StatusStringResponse(tt.responseStatus, tt.responseBody))
 
 			client := NewClient(ReplaceTripper(http))
 			repo, _ := ghrepo.FromFullName("OWNER/REPO")
