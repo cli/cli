@@ -125,11 +125,21 @@ func Test_CheckScopes(t *testing.T) {
 			responseScopes: "repo, admin:org, gist",
 			expectCallback: false,
 		},
+		{
+			name:           "no scopes in response",
+			wantScope:      "read:org",
+			responseApp:    "",
+			responseScopes: "",
+			expectCallback: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &httpmock.Registry{}
 			tr.Register(httpmock.MatchAny, func(*http.Request) (*http.Response, error) {
+				if tt.responseScopes == "" {
+					return &http.Response{StatusCode: 200}, nil
+				}
 				return &http.Response{
 					StatusCode: 200,
 					Header: http.Header{

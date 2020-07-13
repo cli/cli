@@ -89,6 +89,11 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 
 var issuedScopesWarning bool
 
+const (
+	httpOAuthAppID  = "X-Oauth-Client-Id"
+	httpOAuthScopes = "X-Oauth-Scopes"
+)
+
 // CheckScopes checks whether an OAuth scope is present in a response
 func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 	wantedCandidates := []string{wantedScope}
@@ -99,12 +104,13 @@ func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
+			_, hasHeader := res.Header[httpOAuthAppID]
+			if err != nil || res.StatusCode > 299 || !hasHeader || issuedScopesWarning {
 				return res, err
 			}
 
-			appID := res.Header.Get("X-Oauth-Client-Id")
-			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+			appID := res.Header.Get(httpOAuthAppID)
+			hasScopes := strings.Split(res.Header.Get(httpOAuthScopes), ",")
 
 			hasWanted := false
 		outer:
