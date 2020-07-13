@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -21,6 +22,18 @@ type Stub struct {
 
 func MatchAny(*http.Request) bool {
 	return true
+}
+
+func REST(method, p string) Matcher {
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Method, method) {
+			return false
+		}
+		if req.URL.Path != "/"+p {
+			return false
+		}
+		return true
+	}
 }
 
 func GraphQL(q string) Matcher {
@@ -74,6 +87,16 @@ func JSONResponse(body interface{}) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
 		return httpResponse(200, req, bytes.NewBuffer(b)), nil
+	}
+}
+
+func FileResponse(filename string) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		f, err := os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		return httpResponse(200, req, f), nil
 	}
 }
 

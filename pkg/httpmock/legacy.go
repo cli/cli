@@ -38,15 +38,15 @@ func (r *Registry) StubRepoResponse(owner, repo string) {
 }
 
 func (r *Registry) StubRepoResponseWithPermission(owner, repo, permission string) {
-	r.Register(MatchAny, StringResponse(RepoNetworkStubResponse(owner, repo, "master", permission)))
+	r.Register(GraphQL(`query RepositoryNetwork\b`), StringResponse(RepoNetworkStubResponse(owner, repo, "master", permission)))
 }
 
 func (r *Registry) StubRepoResponseWithDefaultBranch(owner, repo, defaultBranch string) {
-	r.Register(MatchAny, StringResponse(RepoNetworkStubResponse(owner, repo, defaultBranch, "WRITE")))
+	r.Register(GraphQL(`query RepositoryNetwork\b`), StringResponse(RepoNetworkStubResponse(owner, repo, defaultBranch, "WRITE")))
 }
 
 func (r *Registry) StubForkedRepoResponse(ownRepo, parentRepo string) {
-	r.Register(MatchAny, StringResponse(RepoNetworkStubForkResponse(ownRepo, parentRepo)))
+	r.Register(GraphQL(`query RepositoryNetwork\b`), StringResponse(RepoNetworkStubForkResponse(ownRepo, parentRepo)))
 }
 
 func RepoNetworkStubResponse(owner, repo, defaultBranch, permission string) string {

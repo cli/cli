@@ -78,7 +78,7 @@ func (r Repository) ViewerCanTriage() bool {
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
-	query($owner: String!, $name: String!) {
+	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
 			hasIssuesEnabled
@@ -124,8 +124,8 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Query(context.Background(), &query, variables)
+	gql := graphQLClient(client.http)
+	err := gql.QueryNamed(context.Background(), "RepositoryFindParent", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		}
 		isPrivate
 	}
-	query {
+	query RepositoryNetwork {
 		viewer { login }
 		%s
 	}
@@ -284,7 +284,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	if err := client.GraphQL(`
-	query($owner: String!, $repo: String!) {
+	query RepositoryFindFork($owner: String!, $repo: String!) {
 		repository(owner: $owner, name: $repo) {
 			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
 				nodes {
@@ -353,7 +353,7 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	}
 
 	err := client.GraphQL(`
-	mutation($input: CreateRepositoryInput!) {
+	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
 				id
@@ -626,7 +626,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	}
 
 	query := &bytes.Buffer{}
-	fmt.Fprint(query, "{\n")
+	fmt.Fprint(query, "query RepositoryResolveMetadataIDs {\n")
 	for i, u := range users {
 		fmt.Fprintf(query, "u%03d: user(login:%q){id,login}\n", i, u)
 	}
@@ -710,11 +710,11 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var projects []RepoProject
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -754,11 +754,11 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var users []RepoAssignee
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryAssignableUsers", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -798,11 +798,11 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var labels []RepoLabel
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryLabelList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -842,11 +842,11 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var milestones []RepoMilestone
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryMilestoneList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
