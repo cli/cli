@@ -91,6 +91,11 @@ var issuedScopesWarning bool
 
 // CheckScopes checks whether an OAuth scope is present in a response
 func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
+	wantedCandidates := []string{wantedScope}
+	if strings.HasPrefix(wantedScope, "read:") {
+		wantedCandidates = append(wantedCandidates, "admin:"+strings.TrimPrefix(wantedScope, "read:"))
+	}
+
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
@@ -102,10 +107,13 @@ func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
 
 			hasWanted := false
+		outer:
 			for _, s := range hasScopes {
-				if wantedScope == strings.TrimSpace(s) {
-					hasWanted = true
-					break
+				for _, w := range wantedCandidates {
+					if w == strings.TrimSpace(s) {
+						hasWanted = true
+						break outer
+					}
 				}
 			}
 
