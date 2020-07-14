@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"regexp"
@@ -240,19 +241,21 @@ func TestIssueList_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand("issue list --web -a peter -A john -l bug -l docs -L 10 -s all")
+	output, err := RunCommand("issue list --web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1")
 	if err != nil {
 		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
 	}
 
+	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1+"
+
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+ in your browser.\n")
+	eq(t, output.Stderr(), fmt.Sprintf("Opening %s in your browser.\n", expectedURL))
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+")
+	eq(t, url, expectedURL)
 }
 
 func TestIssueView_web(t *testing.T) {

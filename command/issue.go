@@ -122,29 +122,46 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
-func listURLWithQuery(listURL, entity, state, assignee string, labels []string, author, baseBranch string) (string, error) {
+type filterOptions struct {
+	entity     string
+	state      string
+	assignee   string
+	labels     []string
+	author     string
+	baseBranch string
+	mention    string
+	milestone  string
+}
+
+func listURLWithQuery(listURL string, options filterOptions) (string, error) {
 	u, err := url.Parse(listURL)
 	if err != nil {
 		return "", err
 	}
-	queries := fmt.Sprintf("is:%s ", entity)
-	if state != "all" {
-		queries += fmt.Sprintf("is:%s ", state)
+	query := fmt.Sprintf("is:%s ", options.entity)
+	if options.state != "all" {
+		query += fmt.Sprintf("is:%s ", options.state)
 	}
-	if assignee != "" {
-		queries += fmt.Sprintf("assignee:%s ", assignee)
+	if options.assignee != "" {
+		query += fmt.Sprintf("assignee:%s ", options.assignee)
 	}
-	for _, label := range labels {
-		queries += fmt.Sprintf("label:%s ", label)
+	for _, label := range options.labels {
+		query += fmt.Sprintf("label:%s ", label)
 	}
-	if author != "" {
-		queries += fmt.Sprintf("author:%s ", author)
+	if options.author != "" {
+		query += fmt.Sprintf("author:%s ", options.author)
 	}
-	if baseBranch != "" {
-		queries += fmt.Sprintf("base:%s ", baseBranch)
+	if options.baseBranch != "" {
+		query += fmt.Sprintf("base:%s ", options.baseBranch)
+	}
+	if options.mention != "" {
+		query += fmt.Sprintf("mentions:%s ", options.mention)
+	}
+	if options.milestone != "" {
+		query += fmt.Sprintf("milestone:%s ", options.milestone)
 	}
 	q := u.Query()
-	q.Set("q", queries)
+	q.Set("q", query)
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
@@ -209,7 +226,15 @@ func issueList(cmd *cobra.Command, args []string) error {
 			"https://github.com/%s/issues",
 			ghrepo.FullName(baseRepo),
 		)
-		openURL, err := listURLWithQuery(issueListURL, "issue", state, assignee, labels, author, "")
+		openURL, err := listURLWithQuery(issueListURL, filterOptions{
+			entity:    "issue",
+			state:     state,
+			assignee:  assignee,
+			labels:    labels,
+			author:    author,
+			mention:   mention,
+			milestone: milestone,
+		})
 		if err != nil {
 			return err
 		}

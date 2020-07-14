@@ -239,7 +239,13 @@ func prList(cmd *cobra.Command, args []string) error {
 			"https://github.com/%s/pulls",
 			ghrepo.FullName(baseRepo),
 		)
-		openURL, err := listURLWithQuery(prListURL, "pr", state, assignee, labels, "", baseBranch)
+		openURL, err := listURLWithQuery(prListURL, filterOptions{
+			entity:     "pr",
+			state:      state,
+			assignee:   assignee,
+			labels:     labels,
+			baseBranch: baseBranch,
+		})
 		if err != nil {
 			return err
 		}
