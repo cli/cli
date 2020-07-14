@@ -114,9 +114,9 @@ func TestIssueList_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("../test/fixtures/issueList.json"))
 
 	output, err := RunCommand("issue list")
 	if err != nil {
@@ -381,9 +381,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 			http := initFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
 
-			jsonFile, _ := os.Open(tc.fixture)
-			defer jsonFile.Close()
-			http.StubResponse(200, jsonFile)
+			http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
 
 			output, err := RunCommand(tc.command)
 			if err != nil {
