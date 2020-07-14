@@ -7,10 +7,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
 	"github.com/henvic/httpretty"
+	"github.com/shurcooL/graphql"
 )
 
 // ClientOption represents an argument to NewClient
@@ -154,7 +156,21 @@ func (gr GraphQLErrorResponse) Error() string {
 	for _, e := range gr.Errors {
 		errorMessages = append(errorMessages, e.Message)
 	}
-	return fmt.Sprintf("graphql error: '%s'", strings.Join(errorMessages, ", "))
+	return fmt.Sprintf("GraphQL error: %s", strings.Join(errorMessages, "\n"))
+}
+
+// HTTPError is an error returned by a failed API call
+type HTTPError struct {
+	StatusCode int
+	RequestURL *url.URL
+	Message    string
+}
+
+func (err HTTPError) Error() string {
+	if err.Message != "" {
+		return fmt.Sprintf("HTTP %d: %s (%s)", err.StatusCode, err.Message, err.RequestURL)
+	}
+	return fmt.Sprintf("HTTP %d (%s)", err.StatusCode, err.RequestURL)
 }
 
 // Returns whether or not scopes are present, appID, and error
@@ -220,6 +236,10 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	return handleResponse(resp, data)
 }
 
+func graphQLClient(h *http.Client) *graphql.Client {
+	return graphql.NewClient("https://api.github.com/graphql", h)
+}
+
 // REST performs a REST request and parses the response.
 func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
 	url := "https://api.github.com/" + p
@@ -283,22 +303,25 @@ func handleResponse(resp *http.Response, data interface{}) error {
 }
 
 func handleHTTPError(resp *http.Response) error {
-	var message string
+	httpError := HTTPError{
+		StatusCode: resp.StatusCode,
+		RequestURL: resp.Request.URL,
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		httpError.Message = err.Error()
+		return httpError
+	}
+
 	var parsedBody struct {
 		Message string `json:"message"`
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(body, &parsedBody)
-	if err != nil {
-		message = string(body)
-	} else {
-		message = parsedBody.Message
+	if err := json.Unmarshal(body, &parsedBody); err == nil {
+		httpError.Message = parsedBody.Message
 	}
 
-	return fmt.Errorf("http error, '%s' failed (%d): '%s'", resp.Request.URL, resp.StatusCode, message)
+	return httpError
 }
 
 var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)

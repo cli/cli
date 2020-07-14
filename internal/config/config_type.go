@@ -123,7 +123,11 @@ func NewConfig(root *yaml.Node) Config {
 }
 
 func NewBlankConfig() Config {
-	return NewConfig(&yaml.Node{
+	return NewConfig(NewBlankRoot())
+}
+
+func NewBlankRoot() *yaml.Node {
+	return &yaml.Node{
 		Kind: yaml.DocumentNode,
 		Content: []*yaml.Node{
 			{
@@ -168,7 +172,7 @@ func NewBlankConfig() Config {
 				},
 			},
 		},
-	})
+	}
 }
 
 // This type implements a Config interface and represents a config file on disk.

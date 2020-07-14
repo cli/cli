@@ -459,7 +459,7 @@ func TestRepoClone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			http := initFakeHTTP()
 			http.Register(
-				httpmock.GraphQL(`\brepository\(`),
+				httpmock.GraphQL(`query RepositoryFindParent\b`),
 				httpmock.StringResponse(`
 				{ "data": { "repository": {
 					"parent": null
@@ -487,7 +487,7 @@ func TestRepoClone(t *testing.T) {
 func TestRepoClone_hasParent(t *testing.T) {
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.GraphQL(`\brepository\(`),
+		httpmock.GraphQL(`query RepositoryFindParent\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"parent": {
@@ -515,13 +515,13 @@ func TestRepoClone_hasParent(t *testing.T) {
 func TestRepo_withoutUsername(t *testing.T) {
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`
 		{ "data": { "viewer": {
 			"login": "OWNER"
 		}}}`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(`),
+		httpmock.GraphQL(`query RepositoryFindParent\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"parent": null
@@ -552,7 +552,7 @@ func TestRepoCreate(t *testing.T) {
 
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
 		httpmock.StringResponse(`
 		{ "data": { "createRepository": {
 			"repository": {
@@ -618,12 +618,12 @@ func TestRepoCreate_org(t *testing.T) {
 
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.REST("GET", "users/ORG"),
 		httpmock.StringResponse(`
 		{ "node_id": "ORGID"
 		}`))
 	http.Register(
-		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
 		httpmock.StringResponse(`
 		{ "data": { "createRepository": {
 			"repository": {
@@ -688,13 +688,13 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.REST("GET", "orgs/ORG/teams/monkeys"),
 		httpmock.StringResponse(`
 		{ "node_id": "TEAMID",
 			"organization": { "node_id": "ORGID" }
 		}`))
 	http.Register(
-		httpmock.GraphQL(`\bcreateRepository\(`),
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
 		httpmock.StringResponse(`
 		{ "data": { "createRepository": {
 			"repository": {
@@ -755,7 +755,7 @@ func TestRepoView_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ }`))
 
@@ -789,7 +789,7 @@ func TestRepoView_web_ownerRepo(t *testing.T) {
 	}
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ }`))
 
@@ -823,7 +823,7 @@ func TestRepoView_web_fullURL(t *testing.T) {
 	}
 	http := initFakeHTTP()
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ }`))
 	var seenCmd *exec.Cmd
@@ -853,14 +853,14 @@ func TestRepoView(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\brepository\(`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": {
 			"repository": {
 			"description": "social distancing"
 		} } }`))
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
 		httpmock.StringResponse(`
 		{ "name": "readme.md",
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
@@ -883,14 +883,14 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\brepository\(`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": {
 				"repository": {
 				"description": "social distancing"
 		} } }`))
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
 		httpmock.StringResponse(`
 		{ "name": "readme.org",
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
@@ -911,8 +911,7 @@ func TestRepoView_blanks(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(httpmock.MatchAny, httpmock.StringResponse("{}"))
-	http.Register(httpmock.MatchAny, httpmock.StringResponse("{}"))
+	http.Register(httpmock.GraphQL(`query RepositoryInfo\b`), httpmock.StringResponse("{}"))
 
 	output, err := RunCommand("repo view")
 	if err != nil {

@@ -29,7 +29,7 @@ jobs:
           go mod verify
           go mod download
 
-          LINT_VERSION=1.26.0
+          LINT_VERSION=1.27.0
           curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
             tar xz --strip-components 1 --wildcards \*/golangci-lint
           mkdir -p bin && mv golangci-lint bin/

@@ -47,11 +47,11 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var projects []RepoProject
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "OrganizationProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -90,11 +90,11 @@ func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var teams []OrgTeam
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "OrganizationTeamList", &query, variables)
 		if err != nil {
 			return nil, err
 		}

@@ -52,7 +52,6 @@ func init() {
 	RootCmd.AddCommand(versionCmd)
 	RootCmd.SetVersionTemplate(versionOutput)
 
-	RootCmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
 	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
 	RootCmd.Flags().Bool("version", false, "Show gh version")
 	// TODO:
@@ -258,8 +257,8 @@ var ensureScopes = func(ctx context.Context, client *api.Client, wantedScopes ..
 		}
 		return reloadedClient, nil
 	} else {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Warning: gh now requires %s OAuth scopes.", wantedScopes))
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Visit https://github.com/settings/tokens and edit your token to enable %s", wantedScopes))
+		fmt.Fprintf(os.Stderr, "Warning: gh now requires %s OAuth scopes.\n", wantedScopes)
+		fmt.Fprintf(os.Stderr, "Visit https://github.com/settings/tokens and edit your token to enable %s\n", wantedScopes)
 		if tokenFromEnv {
 			fmt.Fprintln(os.Stderr, "or generate a new token for the GITHUB_TOKEN environment variable")
 		} else {
@@ -304,8 +303,8 @@ func changelogURL(version string) string {
 }
 
 func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
-	repo, err := cmd.Flags().GetString("repo")
-	if err == nil && repo != "" {
+	repo, _ := cmd.Flags().GetString("repo")
+	if repo != "" {
 		baseRepo, err := ghrepo.FromFullName(repo)
 		if err != nil {
 			return nil, fmt.Errorf("argument error: %w", err)
@@ -313,17 +312,12 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 		return baseRepo, nil
 	}
 
-	baseOverride, err := cmd.Flags().GetString("repo")
-	if err != nil {
-		return nil, err
-	}
-
 	remotes, err := ctx.Remotes()
 	if err != nil {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, baseOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return nil, err
 	}

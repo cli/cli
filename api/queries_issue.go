@@ -88,7 +88,7 @@ const fragments = `
 // IssueCreate creates an issue in a GitHub repository
 func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
 	query := `
-	mutation CreateIssue($input: CreateIssueInput!) {
+	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
 				url
@@ -140,7 +140,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	}
 
 	query := fragments + `
-	query($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
+	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			assigned: issues(filterBy: {assignee: $viewer, states: OPEN}, first: $per_page, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -198,7 +198,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	return &payload, nil
 }
 
-func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string) (*IssuesAndTotalCount, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string, mentionString string, milestoneString string) (*IssuesAndTotalCount, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -212,10 +212,10 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-	query($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String) {
+	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String, $mention: String, $milestone: String) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
-			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author}) {
+			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author, mentioned: $mention, milestone: $milestone}) {
 				totalCount
 				nodes {
 					...issue
@@ -242,6 +242,12 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 	if authorString != "" {
 		variables["author"] = authorString
+	}
+	if mentionString != "" {
+		variables["mention"] = mentionString
+	}
+	if milestoneString != "" {
+		variables["milestone"] = milestoneString
 	}
 
 	var response struct {
@@ -300,7 +306,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	query := `
-	query($owner: String!, $repo: String!, $issue_number: Int!) {
+	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
@@ -377,12 +383,14 @@ func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
-	input := githubv4.CloseIssueInput{
-		IssueID: issue.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.CloseIssueInput{
+			IssueID: issue.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
 
 	if err != nil {
 		return err
@@ -400,12 +408,14 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 		} `graphql:"reopenIssue(input: $input)"`
 	}
 
-	input := githubv4.ReopenIssueInput{
-		IssueID: issue.ID,
+	variables := map[string]interface{}{
+		"input": githubv4.ReopenIssueInput{
+			IssueID: issue.ID,
+		},
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Mutate(context.Background(), &mutation, input, nil)
+	gql := graphQLClient(client.http)
+	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
 
 	return err
 }

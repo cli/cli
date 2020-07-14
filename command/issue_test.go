@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIssueStatus(t *testing.T) {
@@ -21,12 +21,11 @@ func TestIssueStatus(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.FileResponse("../test/fixtures/issueStatus.json"))
 
 	output, err := RunCommand("issue status")
 	if err != nil {
@@ -53,17 +52,17 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"assigned": { "nodes": [] },
-		"mentioned": { "nodes": [] },
-		"authored": { "nodes": [] }
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"hasIssuesEnabled": true,
+			"assigned": { "nodes": [] },
+			"mentioned": { "nodes": [] },
+			"authored": { "nodes": [] }
+		} } }`))
 
 	output, err := RunCommand("issue status")
 	if err != nil {
@@ -93,14 +92,14 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": false
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"hasIssuesEnabled": false
+		} } }`))
 
 	_, err := RunCommand("issue status")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
@@ -112,10 +111,9 @@ func TestIssueList(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("../test/fixtures/issueList.json"))
 
 	output, err := RunCommand("issue list")
 	if err != nil {
@@ -145,15 +143,22 @@ func TestIssueList_withFlags(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "probablyCher", params["assignee"].(string))
+			assert.Equal(t, "foo", params["author"].(string))
+			assert.Equal(t, "me", params["mention"].(string))
+			assert.Equal(t, "1.x", params["milestone"].(string))
+			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
+			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
+		}))
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {	"repository": {
-		"hasIssuesEnabled": true,
-		"issues": { "nodes": [] }
-	} } }
-	`))
-
-	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo")
+	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -163,22 +168,6 @@ func TestIssueList_withFlags(t *testing.T) {
 No issues match your search in OWNER/REPO
 
 `)
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Assignee string
-			Labels   []string
-			States   []string
-			Author   string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Assignee, "probablyCher")
-	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
-	eq(t, reqBody.Variables.States, []string{"OPEN"})
-	eq(t, reqBody.Variables.Author, "foo")
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -394,10 +383,7 @@ func TestIssueView_Preview(t *testing.T) {
 			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
 			http := initFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
-
-			jsonFile, _ := os.Open(tc.fixture)
-			defer jsonFile.Close()
-			http.StubResponse(200, jsonFile)
+			http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
 
 			output, err := RunCommand(tc.command)
 			if err != nil {
@@ -429,7 +415,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer restoreCmd()
 
 	_, err := RunCommand("issue view -w 9999")
-	if err == nil || err.Error() != "graphql error: 'Could not resolve to an Issue with the number of 9999.'" {
+	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
@@ -536,10 +522,10 @@ func TestIssueCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`\bviewerPermission\b`),
+		httpmock.GraphQL(`query RepositoryNetwork\b`),
 		httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
 	http.Register(
-		httpmock.GraphQL(`\bhasIssuesEnabled\b`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -548,7 +534,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bu000:`),
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
 		{ "data": {
 			"u000": { "login": "MonaLisa", "id": "MONAID" },
@@ -559,7 +545,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
@@ -570,7 +556,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
@@ -581,7 +567,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{	"data": { "organization": null },
 			"errors": [{
@@ -592,7 +578,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		}
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bcreateIssue\(`),
+		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
@@ -828,7 +814,7 @@ func TestIssueClose(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 13}
+		"issue": { "number": 13, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -839,7 +825,7 @@ func TestIssueClose(t *testing.T) {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Closed issue #13`)
+	r := regexp.MustCompile(`Closed issue #13 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -854,7 +840,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 13, "closed": true}
+		"issue": { "number": 13, "title": "The title of the issue", "closed": true}
 	} } }
 	`))
 
@@ -865,7 +851,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 		t.Fatalf("error running command `issue close`: %v", err)
 	}
 
-	r := regexp.MustCompile(`#13 is already closed`)
+	r := regexp.MustCompile(`Issue #13 \(The title of the issue\) is already closed`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -901,7 +887,7 @@ func TestIssueReopen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": true}
+		"issue": { "number": 2, "closed": true, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -912,7 +898,7 @@ func TestIssueReopen(t *testing.T) {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Reopened issue #2`)
+	r := regexp.MustCompile(`Reopened issue #2 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -927,7 +913,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": false}
+		"issue": { "number": 2, "closed": false, "title": "The title of the issue"}
 	} } }
 	`))
 
@@ -938,7 +924,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 		t.Fatalf("error running command `issue reopen`: %v", err)
 	}
 
-	r := regexp.MustCompile(`#2 is already open`)
+	r := regexp.MustCompile(`Issue #2 \(The title of the issue\) is already open`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())

@@ -8,15 +8,26 @@ ifdef SOURCE_DATE_EPOCH
 else
     BUILD_DATE ?= $(shell date "$(DATE_FMT)")
 endif
-LDFLAGS := -X github.com/cli/cli/command.Version=$(GH_VERSION) $(LDFLAGS)
-LDFLAGS := -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE) $(LDFLAGS)
+
+ifndef CGO_CPPFLAGS
+    export CGO_CPPFLAGS := $(CPPFLAGS)
+endif
+ifndef CGO_CFLAGS
+    export CGO_CFLAGS := $(CFLAGS)
+endif
+ifndef CGO_LDFLAGS
+    export CGO_LDFLAGS := $(LDFLAGS)
+endif
+
+GO_LDFLAGS := -X github.com/cli/cli/command.Version=$(GH_VERSION)
+GO_LDFLAGS += -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE)
 ifdef GH_OAUTH_CLIENT_SECRET
-	LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientID=$(GH_OAUTH_CLIENT_ID) $(LDFLAGS)
-	LDFLAGS := -X github.com/cli/cli/internal/config.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(LDFLAGS)
+	GO_LDFLAGS += -X github.com/cli/cli/internal/config.oauthClientID=$(GH_OAUTH_CLIENT_ID)
+	GO_LDFLAGS += -X github.com/cli/cli/internal/config.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET)
 endif
 
 bin/gh: $(BUILD_FILES)
-	@go build -trimpath -ldflags "$(LDFLAGS)" -o "$@" ./cmd/gh
+	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
 test:
 	go test ./...
