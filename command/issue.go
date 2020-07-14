@@ -315,8 +315,8 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	labels := issueLabelList(*issue)
 	projects := issueProjectList(*issue)
 
-	// Print empty strings for empty values so the number of metadata lines is always consistent (ie
-	// so head -n8 can be relied on)
+	// Print empty strings for empty values so the number of metadata lines is consistent when
+	// processing many issues with head and grep.
 	fmt.Fprintf(out, "title:\t%s\n", issue.Title)
 	fmt.Fprintf(out, "state:\t%s\n", issue.State)
 	fmt.Fprintf(out, "author:\t%s\n", issue.Author.Login)
@@ -490,7 +490,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if interactive && !connectedToTerminal(cmd) {
-		return fmt.Errorf("can't run non-interactively without both --title and --body")
+		return fmt.Errorf("must provide --title and --body when not attached to a terminal")
 	}
 
 	if interactive {
@@ -662,7 +662,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		if table.IsTTY() {
 			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
 		} else {
-			table.AddField(fmt.Sprintf("%d", int(ago.Minutes())), nil, nil)
+			table.AddField(issue.UpdatedAt.String(), nil, nil)
 		}
 		table.EndRow()
 	}

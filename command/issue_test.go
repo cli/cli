@@ -568,7 +568,7 @@ func TestIssueCreate_nontty_error(t *testing.T) {
 		t.Fatal("expected error running command `issue create`")
 	}
 
-	assert.Equal(t, "can't run non-interactively without both --title and --body", err.Error())
+	assert.Equal(t, "must provide --title and --body when not attached to a terminal", err.Error())
 
 }
 
