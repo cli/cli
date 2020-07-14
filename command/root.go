@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"runtime/debug"
@@ -410,32 +411,23 @@ func ExpandAlias(args []string) (expanded []string, isShell bool, err error) {
 			isShell = true
 			expanded = []string{"sh", "-c", expansion[1:]}
 			if runtime.GOOS == "windows" {
-				//argList := ""
-				//if len(args[2:]) > 0 {
-				//	argList = " -ArgumentList @("
-				//	for i, arg := range args[2:] {
-				//		argList += fmt.Sprintf("'%s'", arg)
-				//		if i < len(args[2:])-1 {
-				//			argList += ","
-				//		}
-				//	}
-				//	argList += ")"
-				//}
-				//invoke := fmt.Sprintf("Invoke-Command -ScriptBlock { %s } %s", expansion[1:], argList)
-				//expanded = []string{"pwsh", "-Command", invoke}
-				executable, err := os.Executable()
-				if err != nil {
-					return
+				// Need to use absolute path for sh on windows
+				shPath, lookErr := exec.LookPath("sh")
+				if lookErr != nil {
+					gitPath, lookErr := exec.LookPath("git")
+					if lookErr != nil {
+						// TODO this error could be better probably
+						err = fmt.Errorf("unable to find sh. you will not be able to use shell aliases on this platform.")
+						return
+					}
+					shPath = filepath.Join(filepath.Dir(gitPath), "..", "bin", "sh.exe")
 				}
-				invoke := fmt.Sprintf("gh () { %s \"$@\" }; %s", executable, expansion[1:])
+				expanded[0] = shPath
+			}
 
-				expanded = []string{"bash", "--posix", "-c", invoke, "--"}
+			if len(args[2:]) > 0 {
+				expanded = append(expanded, "--")
 				expanded = append(expanded, args[2:]...)
-			} else {
-				if len(args[2:]) > 0 {
-					expanded = append(expanded, "--")
-					expanded = append(expanded, args[2:]...)
-				}
 			}
 
 			return

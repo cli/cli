@@ -229,7 +229,7 @@ func TestExpandAlias_shell_windows(t *testing.T) {
 	}
 	cfg := `---
 aliases:
-  ig: '!gh issue list | select-string -Pattern cool'
+  ig: '!gh issue list | grep cool'
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
@@ -245,7 +245,7 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list | select-string -Pattern cool } "}
+	expected := []string{"C:\\Program Files\\Git\\bin\\sh.exe", "-c", "gh issue list | grep cool"}
 
 	assert.Equal(t, expected, expanded)
 }
@@ -257,7 +257,7 @@ func TestExpandAlias_shell_windows_extra_args(t *testing.T) {
 	cfg := `---
 aliases:
   co: pr checkout
-  ig: '!gh issue list --label=$args[0] | select-string -Pattern $args[1]'
+  ig: '!gh issue list --label=$1 | grep $2'
 `
 	initBlankContext(cfg, "OWNER/REPO", "trunk")
 
@@ -269,7 +269,7 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"pwsh", "-Command", "Invoke-Command -ScriptBlock { gh issue list --label=$args[0] | select-string -Pattern $args[1] }  -ArgumentList @('bug','foo')"}
+	expected := []string{"C:\\Program Files\\Git\\bin\\sh.exe", "-c", "gh issue list --label=$1 | grep $2", "--", "bug", "foo"}
 
 	assert.Equal(t, expected, expanded)
 }
