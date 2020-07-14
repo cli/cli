@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPRReview_validation(t *testing.T) {
@@ -49,6 +50,7 @@ func TestPRReview_bad_body(t *testing.T) {
 
 func TestPRReview_url_arg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequest": {
@@ -74,7 +76,7 @@ func TestPRReview_url_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Approved pull request #123")
+	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
 	reqBody := struct {
@@ -95,6 +97,7 @@ func TestPRReview_url_arg(t *testing.T) {
 
 func TestPRReview_number_arg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -121,7 +124,7 @@ func TestPRReview_number_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Approved pull request #123")
+	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
@@ -142,6 +145,7 @@ func TestPRReview_number_arg(t *testing.T) {
 
 func TestPRReview_no_arg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -159,7 +163,7 @@ func TestPRReview_no_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "- Reviewed pull request #123")
+	test.ExpectLines(t, output.Stderr(), "- Reviewed pull request #123")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
@@ -254,8 +258,73 @@ func TestPRReview(t *testing.T) {
 	}
 }
 
+func TestPRReview_nontty_insufficient_flags(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "number": 123,
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+
+	output, err := RunCommand("pr review")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	assert.Equal(t, "", output.String())
+
+	assert.Equal(t, "did not understand desired review action: --approve, --request-changes, or --comment required when not attached to a tty", err.Error())
+}
+
+func TestPRReview_nontty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "url": "https://github.com/OWNER/REPO/pull/123",
+			  "number": 123,
+			  "id": "foobar123",
+			  "headRefName": "feature",
+				"baseRefName": "master" }
+		] } } } }
+	`))
+
+	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
+	output, err := RunCommand("pr review -c -bcool")
+	if err != nil {
+		t.Fatalf("unexpected error running command: %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				Event string
+				Body  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	assert.Equal(t, "COMMENT", reqBody.Variables.Input.Event)
+	assert.Equal(t, "cool", reqBody.Variables.Input.Body)
+}
+
 func TestPRReview_interactive(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -295,10 +364,11 @@ func TestPRReview_interactive(t *testing.T) {
 		t.Fatalf("got unexpected error running pr review: %s", err)
 	}
 
+	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
+
 	test.ExpectLines(t, output.String(),
-		"Approved pull request #123",
 		"Got:",
-		"cool.*story") // weird because markdown rendering puts a bunch of junk between works
+		"cool.*story")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
@@ -317,6 +387,7 @@ func TestPRReview_interactive(t *testing.T) {
 
 func TestPRReview_interactive_no_body(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -359,6 +430,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 
 func TestPRReview_interactive_blank_approve(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -403,7 +475,7 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 		t.Errorf("did not expect to see body printed in %s", output.String())
 	}
 
-	test.ExpectLines(t, output.String(), "Approved pull request #123")
+	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {
