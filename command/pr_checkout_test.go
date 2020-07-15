@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPRCheckout_sameRepo(t *testing.T) {
@@ -462,6 +463,47 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	eq(t, len(ranCommands), 2)
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head")
 	eq(t, strings.Join(ranCommands[1], " "), "git merge --ff-only FETCH_HEAD")
+}
+
+func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("feature")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "-foo",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO"
+		},
+		"isCrossRepository": true,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		t.Errorf("unexpected external invocation: %v", cmd.Args)
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(`pr checkout 123`)
+	if assert.Errorf(t, err, "expected command to fail") {
+		assert.Equal(t, `invalid branch name: "-foo"`, err.Error())
+	}
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_maintainerCanModify(t *testing.T) {

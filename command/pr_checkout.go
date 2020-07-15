@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -46,6 +47,9 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
+	if strings.HasPrefix(newBranchName, "-") {
+		return fmt.Errorf("invalid branch name: %q", newBranchName)
+	}
 
 	if headRemote != nil {
 		// there is an existing git remote for PR head
