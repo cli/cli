@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 
@@ -40,11 +41,26 @@ func main() {
 	cmd, _, err := command.RootCmd.Traverse(expandedArgs)
 	if err != nil || cmd == command.RootCmd {
 		originalArgs := expandedArgs
-		expandedArgs, err = command.ExpandAlias(os.Args)
+		expandedArgs, isShell, err := command.ExpandAlias(os.Args)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			os.Exit(2)
 		}
+
+		if isShell {
+			err = command.ExecuteShellAlias(expandedArgs)
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok {
+					os.Exit(ee.ExitCode())
+				}
+
+				fmt.Fprintf(stderr, "failed to run external command: %s", err)
+				os.Exit(3)
+			}
+
+			os.Exit(0)
+		}
+
 		if hasDebug {
 			fmt.Fprintf(stderr, "%v -> %v\n", originalArgs, expandedArgs)
 		}

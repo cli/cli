@@ -6,7 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -362,25 +366,85 @@ func determineEditor(cmd *cobra.Command) (string, error) {
 	return editorCommand, nil
 }
 
-func ExpandAlias(args []string) ([]string, error) {
-	empty := []string{}
+func ExecuteShellAlias(args []string) error {
+	externalCmd := exec.Command(args[0], args[1:]...)
+	externalCmd.Stderr = os.Stderr
+	externalCmd.Stdout = os.Stdout
+	externalCmd.Stdin = os.Stdin
+	preparedCmd := run.PrepareCmd(externalCmd)
+
+	return preparedCmd.Run()
+}
+
+var findSh = func() (string, error) {
+	shPath, err := exec.LookPath("sh")
+	if err == nil {
+		return shPath, nil
+	}
+
+	if runtime.GOOS == "windows" {
+		winNotFoundErr := errors.New("unable to locate sh to execute the shell alias with. The sh.exe interpreter is typically distributed with Git for Windows.")
+		// We can try and find a sh executable in a Git for Windows install
+		gitPath, err := exec.LookPath("git")
+		if err != nil {
+			return "", winNotFoundErr
+		}
+
+		shPath = filepath.Join(filepath.Dir(gitPath), "..", "bin", "sh.exe")
+		_, err = os.Stat(shPath)
+		if err != nil {
+			return "", winNotFoundErr
+		}
+
+		return shPath, nil
+	}
+
+	return "", errors.New("unable to locate sh to execute shell alias with")
+}
+
+// ExpandAlias processes argv to see if it should be rewritten according to a user's aliases. The
+// second return value indicates whether the alias should be executed in a new shell process instead
+// of running gh itself.
+func ExpandAlias(args []string) (expanded []string, isShell bool, err error) {
+	err = nil
+	isShell = false
+	expanded = []string{}
+
 	if len(args) < 2 {
 		// the command is lacking a subcommand
-		return empty, nil
+		return
 	}
 
 	ctx := initContext()
 	cfg, err := ctx.Config()
 	if err != nil {
-		return empty, err
+		return
 	}
 	aliases, err := cfg.Aliases()
 	if err != nil {
-		return empty, err
+		return
 	}
 
 	expansion, ok := aliases.Get(args[1])
 	if ok {
+		if strings.HasPrefix(expansion, "!") {
+			isShell = true
+			shPath, shErr := findSh()
+			if shErr != nil {
+				err = shErr
+				return
+			}
+
+			expanded = []string{shPath, "-c", expansion[1:]}
+
+			if len(args[2:]) > 0 {
+				expanded = append(expanded, "--")
+				expanded = append(expanded, args[2:]...)
+			}
+
+			return
+		}
+
 		extraArgs := []string{}
 		for i, a := range args[2:] {
 			if !strings.Contains(expansion, "$") {
@@ -391,20 +455,22 @@ func ExpandAlias(args []string) ([]string, error) {
 		}
 		lingeringRE := regexp.MustCompile(`\$\d`)
 		if lingeringRE.MatchString(expansion) {
-			return empty, fmt.Errorf("not enough arguments for alias: %s", expansion)
+			err = fmt.Errorf("not enough arguments for alias: %s", expansion)
+			return
 		}
 
-		newArgs, err := shlex.Split(expansion)
+		var newArgs []string
+		newArgs, err = shlex.Split(expansion)
 		if err != nil {
-			return nil, err
+			return
 		}
 
-		newArgs = append(newArgs, extraArgs...)
-
-		return newArgs, nil
+		expanded = append(newArgs, extraArgs...)
+		return
 	}
 
-	return args[1:], nil
+	expanded = args[1:]
+	return
 }
 
 func connectedToTerminal(cmd *cobra.Command) bool {
