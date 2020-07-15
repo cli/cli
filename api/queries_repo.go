@@ -114,6 +114,18 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	return initRepoHostname(&result.Repository, repo.RepoHost()), nil
 }
 
+func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
+	if r, ok := repo.(*Repository); ok && r.DefaultBranchRef.Name != "" {
+		return r.DefaultBranchRef.Name, nil
+	}
+
+	r, err := GitHubRepo(client, repo)
+	if err != nil {
+		return "", err
+	}
+	return r.DefaultBranchRef.Name, nil
+}
+
 // RepoParent finds out the parent repository of a fork
 func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error) {
 	var query struct {

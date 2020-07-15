@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -65,8 +66,13 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	} else {
 		// no git remote for PR head
 
+		defaultBranchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return err
+		}
+
 		// avoid naming the new branch the same as the default branch
-		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+		if newBranchName == defaultBranchName {
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 

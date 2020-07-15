@@ -33,10 +33,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": false,
 		"maintainerCanModify": false
@@ -84,10 +81,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": false,
 		"maintainerCanModify": false
@@ -132,14 +126,16 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "POE",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "POE"
 		},
 		"isCrossRepository": false,
 		"maintainerCanModify": false
 	} } } }
+	`))
+	http.Register(httpmock.GraphQL(`query RepositoryInfo\b`), httpmock.StringResponse(`
+	{ "data": { "repository": {
+		"defaultBranchRef": {"name": "master"}
+	} } }
 	`))
 
 	ranCommands := [][]string{}
@@ -195,10 +191,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 		  	"login": "hubot"
 		  },
 		  "headRepository": {
-		  	"name": "REPO",
-		  	"defaultBranchRef": {
-		  		"name": "master"
-		  	}
+		  	"name": "REPO"
 		  },
 		  "isCrossRepository": true,
 		  "maintainerCanModify": false }
@@ -245,10 +238,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": false,
 		"maintainerCanModify": false
@@ -298,10 +288,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": true,
 		"maintainerCanModify": false
@@ -351,10 +338,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": true,
 		"maintainerCanModify": false
@@ -404,10 +388,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": true,
 		"maintainerCanModify": false
@@ -455,10 +436,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": true,
 		"maintainerCanModify": false
@@ -506,10 +484,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": true,
 		"maintainerCanModify": true

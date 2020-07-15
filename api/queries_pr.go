@@ -432,9 +432,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				}
 				headRepository {
 					name
-					defaultBranchRef {
-						name
-					}
 				}
 				isCrossRepository
 				isDraft
