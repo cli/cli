@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"os/exec"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 )
 
@@ -25,7 +25,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -76,7 +76,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -124,7 +124,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -187,7 +187,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequests": { "nodes": [
 		{ "number": 123,
 		  "headRefName": "feature",
@@ -237,7 +237,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -290,7 +290,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -343,7 +343,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -396,7 +396,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -447,7 +447,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -498,7 +498,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
