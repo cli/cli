@@ -195,7 +195,7 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"sh", "-c", "gh issue list | grep cool"}
+	expected := []string{"/usr/bin/sh", "-c", "gh issue list | grep cool"}
 
 	assert.Equal(t, expected, expanded)
 }
@@ -218,7 +218,7 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
+	expected := []string{"/usr/bin/sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
 
 	assert.Equal(t, expected, expanded)
 }
