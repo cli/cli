@@ -40,10 +40,10 @@ var aliasSetCmd = &cobra.Command{
 	includes positional placeholders such as '$1', '$2', etc., any extra arguments
 	that follow the invocation of an alias will be inserted appropriately.
 
-	If '--shell' is specified, the alias will be run through a shell interpreter (sh or pwsh). This allows you
+	If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
 	to compose commands with "|" or redirect with ">". Note that extra arguments following the alias
 	will not be automatically passed to the expanded expression. To have a shell alias receive
-	arguments, you must explicitly accept them using "$1", "$2", etc or "$@" to accept all of them.
+	arguments, you must explicitly accept them using "$1", "$2", etc., or "$@" to accept all of them.
 
 	Platform note: on Windows, shell aliases are executed via "sh" as installed by Git For Windows. If
 	you have installed git on Windows in some other way, shell aliases may not work for you.
