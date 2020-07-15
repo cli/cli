@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
@@ -31,21 +32,30 @@ type Context interface {
 // unusually large number of git remotes
 const maxRemotesForLookup = 5
 
+// ResolveRemotesToRepos takes in a list of git remotes and fetches more information about the repositories they map to.
+// Only the git remotes belonging to the same hostname are ever looked up; all others are ignored.
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
 	sort.Stable(remotes)
-	lenRemotesForLookup := len(remotes)
-	if lenRemotesForLookup > maxRemotesForLookup {
-		lenRemotesForLookup = maxRemotesForLookup
-	}
 
 	hasBaseOverride := base != ""
 	baseOverride, _ := ghrepo.FromFullName(base)
 	foundBaseOverride := false
-	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
-	for _, r := range remotes[:lenRemotesForLookup] {
+
+	var hostname string
+	var repos []ghrepo.Interface
+	for i, r := range remotes {
+		if i == 0 {
+			hostname = r.RepoHost()
+		} else if !strings.EqualFold(r.RepoHost(), hostname) {
+			// ignore all remotes for a hostname different to that of the 1st remote
+			continue
+		}
 		repos = append(repos, r)
 		if ghrepo.IsSame(r, baseOverride) {
 			foundBaseOverride = true
+		}
+		if len(repos) == maxRemotesForLookup {
+			break
 		}
 	}
 	if hasBaseOverride && !foundBaseOverride {

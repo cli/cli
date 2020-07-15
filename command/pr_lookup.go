@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,16 +56,27 @@ func prFromNumberString(ctx context.Context, apiClient *api.Client, repo ghrepo.
 	return nil, nil
 }
 
+var pullURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
+
 func prFromURL(ctx context.Context, apiClient *api.Client, s string) (*api.PullRequest, ghrepo.Interface, error) {
-	r := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)`)
-	if m := r.FindStringSubmatch(s); m != nil {
-		repo := ghrepo.New(m[1], m[2])
-		prNumberString := m[3]
-		pr, err := prFromNumberString(ctx, apiClient, repo, prNumberString)
-		return pr, repo, err
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, nil, nil
 	}
 
-	return nil, nil, nil
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return nil, nil, nil
+	}
+
+	m := pullURLRE.FindStringSubmatch(u.Path)
+	if m == nil {
+		return nil, nil, nil
+	}
+
+	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
+	prNumberString := m[3]
+	pr, err := prFromNumberString(ctx, apiClient, repo, prNumberString)
+	return pr, repo, err
 }
 
 func prForCurrentBranch(ctx context.Context, apiClient *api.Client, repo ghrepo.Interface) (*api.PullRequest, error) {

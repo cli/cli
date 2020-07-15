@@ -1,11 +1,9 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -259,12 +257,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	issue, _, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
 		return err
 	}
@@ -380,21 +373,6 @@ func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
-
-func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	if m := issueURLRE.FindStringSubmatch(arg); m != nil {
-		issueNumber, _ := strconv.Atoi(m[3])
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	return nil, fmt.Errorf("invalid issue format: %q", arg)
-}
-
 func issueCreate(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -450,8 +428,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
-		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
+		openURL := generateRepoURL(baseRepo, "issues/new")
 		if title != "" || body != "" {
 			milestone := ""
 			if len(milestoneTitles) > 0 {
@@ -527,7 +504,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new/", ghrepo.FullName(baseRepo))
+		openURL := generateRepoURL(baseRepo, "issues/new")
 		milestone := ""
 		if len(milestoneTitles) > 0 {
 			milestone = milestoneTitles[0]
@@ -561,6 +538,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func generateRepoURL(repo ghrepo.Interface, p string, args ...interface{}) string {
+	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	if p != "" {
+		return baseURL + "/" + fmt.Sprintf(p, args...)
+	}
+	return baseURL
 }
 
 func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {
@@ -735,16 +720,8 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
 		return err
 	}
 
@@ -755,7 +732,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d (%s)\n", utils.Red("✔"), issue.Number, issue.Title)
@@ -770,16 +747,8 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
 		return err
 	}
 
@@ -790,7 +759,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueReopen(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d (%s)\n", utils.Green("✔"), issue.Number, issue.Title)

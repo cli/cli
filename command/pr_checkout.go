@@ -33,7 +33,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
-	baseURLOrName := formatRemoteURL(cmd, ghrepo.FullName(baseRepo))
+	baseURLOrName := formatRemoteURL(cmd, baseRepo)
 	if baseRemote != nil {
 		baseURLOrName = baseRemote.Name
 	}
@@ -84,7 +84,8 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseURLOrName
 		mergeRef := ref
 		if pr.MaintainerCanModify {
-			remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
+			headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
+			remote = formatRemoteURL(cmd, headRepo)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
 		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {

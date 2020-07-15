@@ -295,7 +295,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
 	if headRemote == nil {
-		headRepoURL := formatRemoteURL(cmd, ghrepo.FullName(headRepo))
+		headRepoURL := formatRemoteURL(cmd, headRepo)
 
 		// TODO: prevent clashes with another remote of a same name
 		gitRemote, err := git.AddRemote("fork", headRepoURL)
@@ -304,8 +304,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		headRemote = &context.Remote{
 			Remote: gitRemote,
-			Owner:  headRepo.RepoOwner(),
-			Repo:   headRepo.RepoName(),
+			Repo:   headRepo,
 		}
 	}
 
@@ -438,12 +437,7 @@ func withPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, p
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestone string) (string, error) {
-	u := fmt.Sprintf(
-		"https://github.com/%s/compare/%s...%s?expand=1",
-		ghrepo.FullName(r),
-		base,
-		head,
-	)
+	u := generateRepoURL(r, "compare/%s...%s?expand=1", base, head)
 	url, err := withPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestone)
 	if err != nil {
 		return "", err
