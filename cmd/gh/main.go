@@ -41,7 +41,8 @@ func main() {
 	cmd, _, err := command.RootCmd.Traverse(expandedArgs)
 	if err != nil || cmd == command.RootCmd {
 		originalArgs := expandedArgs
-		expandedArgs, isShell, err := command.ExpandAlias(os.Args)
+		isShell := false
+		expandedArgs, isShell, err = command.ExpandAlias(os.Args)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			os.Exit(2)
