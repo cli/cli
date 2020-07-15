@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 
@@ -49,7 +50,11 @@ func main() {
 		if isShell {
 			err = command.ExecuteShellAlias(expandedArgs)
 			if err != nil {
-				fmt.Fprintf(stderr, "failed to run alias %q: %s\n", expandedArgs, err)
+				if ee, ok := err.(*exec.ExitError); ok {
+					os.Exit(ee.ExitCode())
+				}
+
+				fmt.Fprintf(stderr, "failed to run external command: %s", err)
 				os.Exit(3)
 			}
 

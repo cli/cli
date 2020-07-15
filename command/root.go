@@ -374,12 +374,7 @@ func ExecuteShellAlias(args []string) error {
 	externalCmd.Stdin = os.Stdin
 	preparedCmd := run.PrepareCmd(externalCmd)
 
-	err := preparedCmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run external command: %w", err)
-	}
-
-	return nil
+	return preparedCmd.Run()
 }
 
 func findSh() (string, error) {
