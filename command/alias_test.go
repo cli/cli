@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -10,6 +9,16 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func stubSh(value string) func() {
+	orig := findSh
+	findSh = func() (string, error) {
+		return value, nil
+	}
+	return func() {
+		findSh = orig
+	}
+}
 
 func TestAliasSet_gh_command(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "trunk")
@@ -177,10 +186,8 @@ aliases:
 
 }
 
-func TestExpandAlias_shell_nix(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping test on windows")
-	}
+func TestExpandAlias_shell(t *testing.T) {
+	defer stubSh("sh")()
 	cfg := `---
 aliases:
   ig: '!gh issue list | grep cool'
@@ -195,15 +202,13 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"/usr/bin/sh", "-c", "gh issue list | grep cool"}
+	expected := []string{"sh", "-c", "gh issue list | grep cool"}
 
 	assert.Equal(t, expected, expanded)
 }
 
-func TestExpandAlias_shell_nix_extra_args(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping test on windows")
-	}
+func TestExpandAlias_shell_extra_args(t *testing.T) {
+	defer stubSh("sh")()
 	cfg := `---
 aliases:
   ig: '!gh issue list --label=$1 | grep'
@@ -218,58 +223,7 @@ aliases:
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expected := []string{"/usr/bin/sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
-
-	assert.Equal(t, expected, expanded)
-}
-
-func TestExpandAlias_shell_windows(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("skipping test on non-windows")
-	}
-	cfg := `---
-aliases:
-  ig: '!gh issue list | grep cool'
-`
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
-
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-	cs.Stub("")
-
-	expanded, isShell, err := ExpandAlias([]string{"gh", "ig"})
-
-	assert.True(t, isShell)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-
-	expected := []string{"C:\\Program Files\\Git\\bin\\sh.exe", "-c", "gh issue list | grep cool"}
-
-	assert.Equal(t, expected, expanded)
-}
-
-func TestExpandAlias_shell_windows_extra_args(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("skipping test on non-windows")
-	}
-	cfg := `---
-aliases:
-  co: pr checkout
-  ig: '!gh issue list --label=$1 | grep $2'
-`
-	initBlankContext(cfg, "OWNER/REPO", "trunk")
-
-	expanded, isShell, err := ExpandAlias([]string{"gh", "ig", "bug", "foo"})
-
-	assert.True(t, isShell)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-
-	expected := []string{"C:\\Program Files\\Git\\bin\\sh.exe", "-c", "gh issue list --label=$1 | grep $2", "--", "bug", "foo"}
+	expected := []string{"sh", "-c", "gh issue list --label=$1 | grep", "--", "bug", "foo"}
 
 	assert.Equal(t, expected, expanded)
 }

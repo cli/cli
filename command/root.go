@@ -377,7 +377,7 @@ func ExecuteShellAlias(args []string) error {
 	return preparedCmd.Run()
 }
 
-func findSh() (string, error) {
+var findSh = func() (string, error) {
 	shPath, err := exec.LookPath("sh")
 	if err == nil {
 		return shPath, nil
