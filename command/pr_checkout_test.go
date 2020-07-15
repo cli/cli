@@ -24,6 +24,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -74,6 +75,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -119,6 +121,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
@@ -182,6 +185,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.StringResponse(`
@@ -229,6 +233,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -279,6 +284,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -329,6 +335,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -379,6 +386,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -427,6 +435,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
@@ -516,6 +525,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 		return ctx
 	}
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
