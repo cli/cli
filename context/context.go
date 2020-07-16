@@ -240,10 +240,22 @@ func (c *fsContext) Remotes() (Remotes, error) {
 		}
 
 		sshTranslate := git.ParseSSHConfig().Translator()
-		c.remotes = translateRemotes(gitRemotes, sshTranslate)
+		resolvedRemotes := translateRemotes(gitRemotes, sshTranslate)
+
+		// ignore non-github.com remotes
+		// TODO: GHE compatibility
+		filteredRemotes := Remotes{}
+		for _, r := range resolvedRemotes {
+			if r.RepoHost() != defaultHostname {
+				continue
+			}
+			filteredRemotes = append(filteredRemotes, r)
+		}
+		c.remotes = filteredRemotes
 	}
 
 	if len(c.remotes) == 0 {
+		// TODO: GHE compatibility
 		return nil, errors.New("no git remote found for a github.com repository")
 	}
 	return c.remotes, nil
