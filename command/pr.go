@@ -235,10 +235,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	if web {
-		prListURL := fmt.Sprintf(
-			"https://github.com/%s/pulls",
-			ghrepo.FullName(baseRepo),
-		)
+		prListURL := generateRepoURL(baseRepo, "pulls")
 		openURL, err := listURLWithQuery(prListURL, filterOptions{
 			entity:     "pr",
 			state:      state,
@@ -249,7 +246,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	}
 

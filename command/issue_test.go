@@ -3,7 +3,6 @@ package command
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"regexp"
@@ -263,10 +262,10 @@ func TestIssueList_web(t *testing.T) {
 		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
 	}
 
-	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1+"
+	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1"
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), fmt.Sprintf("Opening %s in your browser.\n", expectedURL))
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -1066,5 +1065,73 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	_, err := RunCommand("issue reopen 2")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Fatalf("got error: %v", err)
+	}
+}
+
+func Test_listURLWithQuery(t *testing.T) {
+	type args struct {
+		listURL string
+		options filterOptions
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "blank",
+			args: args{
+				listURL: "https://example.com/path?a=b",
+				options: filterOptions{
+					entity: "issue",
+					state:  "open",
+				},
+			},
+			want:    "https://example.com/path?a=b&q=is%3Aissue+is%3Aopen",
+			wantErr: false,
+		},
+		{
+			name: "all",
+			args: args{
+				listURL: "https://example.com/path",
+				options: filterOptions{
+					entity:     "issue",
+					state:      "open",
+					assignee:   "bo",
+					author:     "ka",
+					baseBranch: "trunk",
+					mention:    "nu",
+				},
+			},
+			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+base%3Atrunk+mentions%3Anu",
+			wantErr: false,
+		},
+		{
+			name: "spaces in values",
+			args: args{
+				listURL: "https://example.com/path",
+				options: filterOptions{
+					entity:    "pr",
+					state:     "open",
+					labels:    []string{"docs", "help wanted"},
+					milestone: `Codename "What Was Missing"`,
+				},
+			},
+			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+label%3Adocs+label%3A%22help+wanted%22+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := listURLWithQuery(tt.args.listURL, tt.args.options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("listURLWithQuery() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("listURLWithQuery() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

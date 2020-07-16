@@ -144,7 +144,7 @@ func listURLWithQuery(listURL string, options filterOptions) (string, error) {
 		query += fmt.Sprintf("assignee:%s ", options.assignee)
 	}
 	for _, label := range options.labels {
-		query += fmt.Sprintf("label:%s ", label)
+		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
 	}
 	if options.author != "" {
 		query += fmt.Sprintf("author:%s ", options.author)
@@ -156,12 +156,19 @@ func listURLWithQuery(listURL string, options filterOptions) (string, error) {
 		query += fmt.Sprintf("mentions:%s ", options.mention)
 	}
 	if options.milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", options.milestone)
+		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.milestone))
 	}
 	q := u.Query()
-	q.Set("q", query)
+	q.Set("q", strings.TrimSuffix(query, " "))
 	u.RawQuery = q.Encode()
 	return u.String(), nil
+}
+
+func quoteValueForQuery(v string) string {
+	if strings.ContainsAny(v, " \"\t\r\n") {
+		return fmt.Sprintf("%q", v)
+	}
+	return v
 }
 
 func issueList(cmd *cobra.Command, args []string) error {
@@ -220,10 +227,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	if web {
-		issueListURL := fmt.Sprintf(
-			"https://github.com/%s/issues",
-			ghrepo.FullName(baseRepo),
-		)
+		issueListURL := generateRepoURL(baseRepo, "issues")
 		openURL, err := listURLWithQuery(issueListURL, filterOptions{
 			entity:    "issue",
 			state:     state,
@@ -236,7 +240,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	}
 

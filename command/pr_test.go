@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"os/exec"
 	"reflect"
 	"regexp"
@@ -426,10 +425,10 @@ func TestPRList_web(t *testing.T) {
 		t.Errorf("error running command `pr list` with `--web` flag: %v", err)
 	}
 
-	expectedURL := "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk+"
+	expectedURL := "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk"
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), fmt.Sprintf("Opening %s in your browser.\n", expectedURL))
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/pulls in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
