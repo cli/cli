@@ -3,7 +3,6 @@ package command
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/cli/cli/utils"
@@ -118,11 +117,11 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		helpEntries = append(helpEntries, helpEntry{"FLAGS", stripIndent(flagUsages)})
+		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent(flagUsages)})
 	}
 	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
 	if inheritedFlagUsages != "" {
-		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", stripIndent(inheritedFlagUsages)})
+		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent(inheritedFlagUsages)})
 	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
@@ -160,20 +159,30 @@ func rpad(s string, padding int) string {
 	return fmt.Sprintf(template, s)
 }
 
-func stripIndent(s string) string {
-	dedent := regexp.MustCompile(`(?m)^  `)
-	dedended := dedent.ReplaceAllString(s, "")
+func dedent(s string) string {
+	lines := strings.Split(s, "\n")
 
-	buf := new(bytes.Buffer)
+	n := int(^uint(0) >> 1)
 
-	for _, line := range strings.Split(dedended, "\n") {
-		// Abort strip if shorthand exist
-		if strings.HasPrefix(line, "-") {
-			return dedended
+	for _, l := range lines {
+		if len(l) == 0 {
+			continue
 		}
 
-		fmt.Fprintln(buf, strings.TrimPrefix(line, "    "))
+		if c := countLeadingSpaces(l); c < n {
+			n = c
+		}
 	}
 
-	return buf.String()
+	var buf bytes.Buffer
+
+	for _, l := range lines {
+		fmt.Fprintln(&buf, strings.TrimPrefix(l, strings.Repeat(" ", n)))
+	}
+
+	return strings.TrimSuffix(buf.String(), "\n")
+}
+
+func countLeadingSpaces(s string) int {
+	return len(s) - len(strings.TrimLeft(s, " "))
 }
