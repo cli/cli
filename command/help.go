@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -26,7 +27,8 @@ func rootUsageFunc(command *cobra.Command) error {
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		command.Printf("\n\nFlags:\n%s", flagUsages)
+		command.Println("\n\nFlags:")
+		command.Print(indent(dedent(flagUsages), "  "))
 	}
 	return nil
 }
@@ -117,13 +119,11 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		dedent := regexp.MustCompile(`(?m)^  `)
-		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent.ReplaceAllString(flagUsages, "")})
+		helpEntries = append(helpEntries, helpEntry{"FLAGS", dedent(flagUsages)})
 	}
 	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
 	if inheritedFlagUsages != "" {
-		dedent := regexp.MustCompile(`(?m)^  `)
-		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent.ReplaceAllString(inheritedFlagUsages, "")})
+		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent(inheritedFlagUsages)})
 	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
@@ -143,10 +143,7 @@ Read the manual at https://cli.github.com/manual`})
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
 			fmt.Fprintln(out, utils.Bold(e.Title))
-
-			for _, l := range strings.Split(strings.Trim(e.Body, "\n\r"), "\n") {
-				fmt.Fprintln(out, "  "+l)
-			}
+			fmt.Fprintln(out, indent(strings.Trim(e.Body, "\r\n"), "  "))
 		} else {
 			// If there is no title print the body as is
 			fmt.Fprintln(out, e.Body)
@@ -159,4 +156,39 @@ Read the manual at https://cli.github.com/manual`})
 func rpad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds ", padding)
 	return fmt.Sprintf(template, s)
+}
+
+var lineRE = regexp.MustCompile(`(?m)^`)
+
+func indent(s, indent string) string {
+	if len(strings.TrimSpace(s)) == 0 {
+		return s
+	}
+	return lineRE.ReplaceAllLiteralString(s, indent)
+}
+
+func dedent(s string) string {
+	lines := strings.Split(s, "\n")
+	minIndent := -1
+
+	for _, l := range lines {
+		if len(l) == 0 {
+			continue
+		}
+
+		indent := len(l) - len(strings.TrimLeft(l, " "))
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
+		}
+	}
+
+	if minIndent <= 0 {
+		return s
+	}
+
+	var buf bytes.Buffer
+	for _, l := range lines {
+		fmt.Fprintln(&buf, strings.TrimPrefix(l, strings.Repeat(" ", minIndent)))
+	}
+	return strings.TrimSuffix(buf.String(), "\n")
 }
