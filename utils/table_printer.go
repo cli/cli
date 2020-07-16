@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/pkg/text"
-	"github.com/mattn/go-isatty"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 type TablePrinter interface {
@@ -21,26 +19,23 @@ type TablePrinter interface {
 }
 
 func NewTablePrinter(w io.Writer) TablePrinter {
-	if outFile, isFile := w.(*os.File); isFile {
-		// TODO: use utils.IsTerminal()
-		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
-		if isatty.IsTerminal(outFile.Fd()) || isCygwin {
-			ttyWidth := 80
-			if w, _, err := terminal.GetSize(int(outFile.Fd())); err == nil {
-				ttyWidth = w
-			} else if isCygwin {
-				tputCmd := exec.Command("tput", "cols")
-				tputCmd.Stdin = os.Stdin
-				if out, err := tputCmd.Output(); err == nil {
-					if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
-						ttyWidth = w
-					}
+	if IsTerminal(w) {
+		isCygwin := IsCygwinTerminal(w)
+		ttyWidth := 80
+		if termWidth, _, err := TerminalSize(w); err == nil {
+			ttyWidth = termWidth
+		} else if isCygwin {
+			tputCmd := exec.Command("tput", "cols")
+			tputCmd.Stdin = os.Stdin
+			if out, err := tputCmd.Output(); err == nil {
+				if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+					ttyWidth = w
 				}
 			}
-			return &ttyTablePrinter{
-				out:      NewColorable(outFile),
-				maxWidth: ttyWidth,
-			}
+		}
+		return &ttyTablePrinter{
+			out:      NewColorable(w),
+			maxWidth: ttyWidth,
 		}
 	}
 	return &tsvTablePrinter{

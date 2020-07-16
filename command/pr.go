@@ -519,23 +519,21 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 
 	if deleteBranch {
-		repo, err := api.GitHubRepo(apiClient, baseRepo)
-		if err != nil {
-			return err
-		}
-
-		currentBranch, err := ctx.Branch()
-		if err != nil {
-			return err
-		}
-
 		branchSwitchString := ""
 
 		if deleteLocalBranch && !crossRepoPR {
+			currentBranch, err := ctx.Branch()
+			if err != nil {
+				return err
+			}
+
 			var branchToSwitchTo string
 			if currentBranch == pr.HeadRefName {
-				branchToSwitchTo = repo.DefaultBranchRef.Name
-				err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if err != nil {
+					return err
+				}
+				err = git.CheckoutBranch(branchToSwitchTo)
 				if err != nil {
 					return err
 				}

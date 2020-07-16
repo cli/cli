@@ -186,7 +186,11 @@ func repoClone(cmd *cobra.Command, args []string) error {
 			}
 			cloneURL = currentUser + "/" + cloneURL
 		}
-		cloneURL = formatRemoteURL(cmd, cloneURL)
+		repo, err := ghrepo.FromFullName(cloneURL)
+		if err != nil {
+			return err
+		}
+		cloneURL = formatRemoteURL(cmd, repo)
 	}
 
 	var repo ghrepo.Interface
@@ -221,7 +225,7 @@ func repoClone(cmd *cobra.Command, args []string) error {
 }
 
 func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir string) error {
-	upstreamURL := formatRemoteURL(cmd, ghrepo.FullName(parentRepo))
+	upstreamURL := formatRemoteURL(cmd, parentRepo)
 
 	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
 	cloneCmd.Stdout = os.Stdout
@@ -322,7 +326,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(out, repo.URL)
 	}
 
-	remoteURL := formatRemoteURL(cmd, ghrepo.FullName(repo))
+	remoteURL := formatRemoteURL(cmd, repo)
 
 	if projectDirErr == nil {
 		_, err = git.AddRemote("origin", remoteURL)
@@ -497,7 +501,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(out, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
 			}
 
-			forkedRepoCloneURL := formatRemoteURL(cmd, ghrepo.FullName(forkedRepo))
+			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
 
 			_, err = git.AddRemote(remoteName, forkedRepoCloneURL)
 			if err != nil {
@@ -515,7 +519,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if cloneDesired {
-			forkedRepoCloneURL := formatRemoteURL(cmd, ghrepo.FullName(forkedRepo))
+			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
 			cloneDir, err := runClone(forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
@@ -588,7 +592,7 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 	fullName := ghrepo.FullName(toView)
 
-	openURL := fmt.Sprintf("https://github.com/%s", fullName)
+	openURL := generateRepoURL(toView, "")
 	if web {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
 		return utils.OpenInBrowser(openURL)
