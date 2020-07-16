@@ -109,6 +109,11 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 				}
 			'
 		`),
+		Annotations: map[string]string{
+			"help:environment": heredoc.Doc(`
+				GITHUB_TOKEN: an authentication token for API requests.
+			`),
+		},
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]

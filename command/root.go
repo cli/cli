@@ -111,9 +111,28 @@ var RootCmd = &cobra.Command{
 	$ gh pr checkout 321
 	`),
 	Annotations: map[string]string{
-		"help:feedback": `
-Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
-Open an issue using “gh issue create -R cli/cli”`},
+		"help:feedback": heredoc.Doc(`
+			Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
+			Open an issue using “gh issue create -R cli/cli”
+		`),
+		"help:environment": heredoc.Doc(`
+			GITHUB_TOKEN: an authentication token for API requests. Setting this avoids being
+			prompted to authenticate and overrides any previously stored credentials.
+
+			GH_REPO: specify the GitHub repository in "OWNER/REPO" format for commands that
+			otherwise operate on a local repository.
+
+			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
+			for authoring text.
+
+			BROWSER: the web browser to use for opening links.
+
+			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
+			or "oauth" to print detailed information about HTTP requests or authentication flow.
+
+			NO_COLOR: avoid printing ANSI escape sequences for color output.
+		`),
+	},
 }
 
 var versionCmd = &cobra.Command{

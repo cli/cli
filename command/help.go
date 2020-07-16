@@ -131,6 +131,9 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 	if command.Example != "" {
 		helpEntries = append(helpEntries, helpEntry{"EXAMPLES", command.Example})
 	}
+	if _, ok := command.Annotations["help:environment"]; ok {
+		helpEntries = append(helpEntries, helpEntry{"ENVIRONMENT VARIABLES", command.Annotations["help:environment"]})
+	}
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
 Use "gh <command> <subcommand> --help" for more information about a command.
 Read the manual at https://cli.github.com/manual`})
