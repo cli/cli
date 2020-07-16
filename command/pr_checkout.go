@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -45,6 +47,9 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
+	if strings.HasPrefix(newBranchName, "-") {
+		return fmt.Errorf("invalid branch name: %q", newBranchName)
+	}
 
 	if headRemote != nil {
 		// there is an existing git remote for PR head
@@ -65,8 +70,13 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	} else {
 		// no git remote for PR head
 
+		defaultBranchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return err
+		}
+
 		// avoid naming the new branch the same as the default branch
-		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+		if newBranchName == defaultBranchName {
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 
