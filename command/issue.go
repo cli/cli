@@ -37,6 +37,7 @@ func init() {
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
+	issueListCmd.Flags().BoolP("web", "w", false, "Open the browser to list the issue(s)")
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
@@ -86,6 +87,7 @@ var issueListCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 	$ gh issue list -l "help wanted"
 	$ gh issue list -A monalisa
+	$ gh issue list --web
 	`),
 	Args: cmdutil.NoArgsQuoteReminder,
 	RunE: issueList,
@@ -118,6 +120,57 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
+type filterOptions struct {
+	entity     string
+	state      string
+	assignee   string
+	labels     []string
+	author     string
+	baseBranch string
+	mention    string
+	milestone  string
+}
+
+func listURLWithQuery(listURL string, options filterOptions) (string, error) {
+	u, err := url.Parse(listURL)
+	if err != nil {
+		return "", err
+	}
+	query := fmt.Sprintf("is:%s ", options.entity)
+	if options.state != "all" {
+		query += fmt.Sprintf("is:%s ", options.state)
+	}
+	if options.assignee != "" {
+		query += fmt.Sprintf("assignee:%s ", options.assignee)
+	}
+	for _, label := range options.labels {
+		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
+	}
+	if options.author != "" {
+		query += fmt.Sprintf("author:%s ", options.author)
+	}
+	if options.baseBranch != "" {
+		query += fmt.Sprintf("base:%s ", options.baseBranch)
+	}
+	if options.mention != "" {
+		query += fmt.Sprintf("mentions:%s ", options.mention)
+	}
+	if options.milestone != "" {
+		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.milestone))
+	}
+	q := u.Query()
+	q.Set("q", strings.TrimSuffix(query, " "))
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func quoteValueForQuery(v string) string {
+	if strings.ContainsAny(v, " \"\t\r\n") {
+		return fmt.Sprintf("%q", v)
+	}
+	return v
+}
+
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -126,6 +179,11 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -166,6 +224,24 @@ func issueList(cmd *cobra.Command, args []string) error {
 	milestone, err := cmd.Flags().GetString("milestone")
 	if err != nil {
 		return err
+	}
+
+	if web {
+		issueListURL := generateRepoURL(baseRepo, "issues")
+		openURL, err := listURLWithQuery(issueListURL, filterOptions{
+			entity:    "issue",
+			state:     state,
+			assignee:  assignee,
+			labels:    labels,
+			author:    author,
+			mention:   mention,
+			milestone: milestone,
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		return utils.OpenInBrowser(openURL)
 	}
 
 	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author, mention, milestone)

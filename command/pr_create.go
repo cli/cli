@@ -411,7 +411,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 func withPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, projects []string, milestone string) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	q := u.Query()
 	if title != "" {
