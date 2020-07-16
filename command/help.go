@@ -26,7 +26,10 @@ func rootUsageFunc(command *cobra.Command) error {
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		command.Printf("\n\nFlags:\n%s", flagUsages)
+		command.Println("\n\nFlags:")
+		for _, l := range strings.Split(strings.Trim(dedent(flagUsages), "\n\r"), "\n") {
+			command.Println("  " + l)
+		}
 	}
 	return nil
 }
