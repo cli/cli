@@ -82,8 +82,10 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 	alias := args[0]
 	expansion := args[1]
 
-	out := colorableOut(cmd)
-	fmt.Fprintf(out, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
+	stderr := colorableErr(cmd)
+	if connectedToTerminal(cmd) {
+		fmt.Fprintf(stderr, "- Adding alias for %s: %s\n", utils.Bold(alias), utils.Bold(expansion))
+	}
 
 	shell, err := cmd.Flags().GetBool("shell")
 	if err != nil {
@@ -119,7 +121,9 @@ func aliasSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not create alias: %s", err)
 	}
 
-	fmt.Fprintln(out, successMsg)
+	if connectedToTerminal(cmd) {
+		fmt.Fprintln(stderr, successMsg)
+	}
 
 	return nil
 }
@@ -156,7 +160,9 @@ func aliasList(cmd *cobra.Command, args []string) error {
 	stderr := colorableErr(cmd)
 
 	if aliasCfg.Empty() {
-		fmt.Fprintf(stderr, "no aliases configured\n")
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(stderr, "no aliases configured\n")
+		}
 		return nil
 	}
 
@@ -217,9 +223,11 @@ func aliasDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to delete alias %s: %w", alias, err)
 	}
 
-	out := colorableOut(cmd)
-	redCheck := utils.Red("✓")
-	fmt.Fprintf(out, "%s Deleted alias %s; was %s\n", redCheck, alias, expansion)
+	if connectedToTerminal(cmd) {
+		stderr := colorableErr(cmd)
+		redCheck := utils.Red("✓")
+		fmt.Fprintf(stderr, "%s Deleted alias %s; was %s\n", redCheck, alias, expansion)
+	}
 
 	return nil
 }
