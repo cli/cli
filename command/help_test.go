@@ -27,9 +27,20 @@ func TestDedent(t *testing.T) {
 			input:    "  line 1\n  line 2\n  line 3\n\n",
 			expected: "line 1\nline 2\nline 3\n\n",
 		},
+		{
+			input:    "\n\n\n\n\n\n",
+			expected: "\n\n\n\n\n\n",
+		},
+		{
+			input:    "",
+			expected: "",
+		},
 	}
 
-	for _, kase := range cases {
-		eq(t, dedent(kase.input), kase.expected)
+	for _, tt := range cases {
+		got := dedent(tt.input)
+		if got != tt.expected {
+			t.Errorf("expected: %q, got: %q", tt.expected, got)
+		}
 	}
 }

@@ -164,28 +164,26 @@ func rpad(s string, padding int) string {
 
 func dedent(s string) string {
 	lines := strings.Split(s, "\n")
-
-	n := int(^uint(0) >> 1)
+	minIndent := -1
 
 	for _, l := range lines {
 		if len(l) == 0 {
 			continue
 		}
 
-		if c := countLeadingSpaces(l); c < n {
-			n = c
+		indent := len(l) - len(strings.TrimLeft(l, " "))
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
 		}
 	}
 
-	var buf bytes.Buffer
-
-	for _, l := range lines {
-		fmt.Fprintln(&buf, strings.TrimPrefix(l, strings.Repeat(" ", n)))
+	if minIndent <= 0 {
+		return s
 	}
 
+	var buf bytes.Buffer
+	for _, l := range lines {
+		fmt.Fprintln(&buf, strings.TrimPrefix(l, strings.Repeat(" ", minIndent)))
+	}
 	return strings.TrimSuffix(buf.String(), "\n")
-}
-
-func countLeadingSpaces(s string) int {
-	return len(s) - len(strings.TrimLeft(s, " "))
 }
