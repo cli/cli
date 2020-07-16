@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
@@ -104,7 +105,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	result := struct {
 		Repository Repository
 	}{}
-	err := client.GraphQL(query, variables, &result)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
 
 	if err != nil {
 		return nil, err
@@ -143,7 +144,7 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.QueryNamed(context.Background(), "RepositoryFindParent", &query, variables)
 	if err != nil {
 		return nil, err
@@ -187,7 +188,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	graphqlResult := make(map[string]*json.RawMessage)
 	var result RepoNetworkResult
 
-	err := client.GraphQL(fmt.Sprintf(`
+	err := client.GraphQL(hostname, fmt.Sprintf(`
 	fragment repo on Repository {
 		id
 		name
@@ -283,7 +284,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
 	body := bytes.NewBufferString(`{}`)
 	result := repositoryV3{}
-	err := client.REST("POST", path, body, &result)
+	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +317,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		"repo":  repo.RepoName(),
 	}
 
-	if err := client.GraphQL(`
+	if err := client.GraphQL(repo.RepoHost(), `
 	query RepositoryFindFork($owner: String!, $repo: String!) {
 		repository(owner: $owner, name: $repo) {
 			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
@@ -385,7 +386,8 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 		"input": input,
 	}
 
-	err := client.GraphQL(`
+	// TODO: GHE support
+	err := client.GraphQL(ghinstance.Default(), `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
@@ -416,7 +418,7 @@ func RepositoryReadme(client *Client, repo ghrepo.Interface) (*RepoReadme, error
 		Content string
 	}
 
-	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
+	err := client.REST(repo.RepoHost(), "GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
 	if err != nil {
 		var httpError HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
@@ -554,7 +556,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Reviewers {
 		count++
 		go func() {
-			teams, err := OrganizationTeams(client, repo.RepoOwner())
+			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos
 			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
 				errc <- fmt.Errorf("error fetching organization teams: %w", err)
@@ -585,7 +587,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			}
 			result.Projects = projects
 
-			orgProjects, err := OrganizationProjects(client, repo.RepoOwner())
+			orgProjects, err := OrganizationProjects(client, repo)
 			// TODO: better detection of non-org repos
 			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
 				errc <- fmt.Errorf("error fetching organization projects: %w", err)
@@ -681,7 +683,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	fmt.Fprint(query, "}\n")
 
 	response := make(map[string]json.RawMessage)
-	err = client.GraphQL(query.String(), nil, &response)
+	err = client.GraphQL(repo.RepoHost(), query.String(), nil, &response)
 	if err != nil {
 		return result, err
 	}
@@ -744,7 +746,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var projects []RepoProject
 	for {
@@ -788,7 +790,7 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var users []RepoAssignee
 	for {
@@ -832,7 +834,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var labels []RepoLabel
 	for {
@@ -876,7 +878,7 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var milestones []RepoMilestone
 	for {

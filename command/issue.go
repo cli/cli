@@ -281,7 +281,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentUser, err := api.CurrentLoginName(apiClient)
+	currentUser, err := api.CurrentLoginName(apiClient, baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}

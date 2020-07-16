@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/henvic/httpretty"
 	"github.com/shurcooL/graphql"
 )
@@ -43,25 +44,21 @@ func NewClientFromHTTP(httpClient *http.Client) *Client {
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			// prevent the token from leaking to non-GitHub hosts
-			// TODO: GHE support
-			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
-				req.Header.Add(name, value)
-			}
+			req.Header.Add(name, value)
 			return tr.RoundTrip(req)
 		}}
 	}
 }
 
 // AddHeaderFunc is an AddHeader that gets the string value from a function
-func AddHeaderFunc(name string, value func() string) ClientOption {
+func AddHeaderFunc(name string, getValue func(*http.Request) (string, error)) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			// prevent the token from leaking to non-GitHub hosts
-			// TODO: GHE support
-			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
-				req.Header.Add(name, value())
+			value, err := getValue(req)
+			if err != nil {
+				return nil, err
 			}
+			req.Header.Add(name, value)
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -238,14 +235,13 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 }
 
 // GraphQL performs a GraphQL request and parses the response
-func (c Client) GraphQL(query string, variables map[string]interface{}, data interface{}) error {
-	url := "https://api.github.com/graphql"
+func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", ghinstance.GraphQLEndpoint(hostname), bytes.NewBuffer(reqBody))
 	if err != nil {
 		return err
 	}
@@ -261,13 +257,13 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	return handleResponse(resp, data)
 }
 
-func graphQLClient(h *http.Client) *graphql.Client {
-	return graphql.NewClient("https://api.github.com/graphql", h)
+func graphQLClient(h *http.Client, hostname string) *graphql.Client {
+	return graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), h)
 }
 
 // REST performs a REST request and parses the response.
-func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
-	url := "https://api.github.com/" + p
+func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
+	url := ghinstance.RESTPrefix(hostname) + p
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err

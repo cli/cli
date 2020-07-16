@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -12,7 +14,8 @@ func resolveOrganization(client *Client, orgName string) (string, error) {
 	var response struct {
 		NodeID string `json:"node_id"`
 	}
-	err := client.REST("GET", fmt.Sprintf("users/%s", orgName), nil, &response)
+	// TODO: GHE support
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
 	return response.NodeID, err
 }
 
@@ -24,12 +27,13 @@ func resolveOrganizationTeam(client *Client, orgName, teamSlug string) (string, 
 			NodeID string `json:"node_id"`
 		}
 	}
-	err := client.REST("GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	// TODO: GHE support
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return response.Organization.NodeID, response.NodeID, err
 }
 
 // OrganizationProjects fetches all open projects for an organization
-func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
+func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	var query struct {
 		Organization struct {
 			Projects struct {
@@ -43,11 +47,11 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(owner),
+		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var projects []RepoProject
 	for {
@@ -72,7 +76,7 @@ type OrgTeam struct {
 }
 
 // OrganizationTeams fetches all the teams in an organization
-func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
+func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error) {
 	var query struct {
 		Organization struct {
 			Teams struct {
@@ -86,11 +90,11 @@ func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(owner),
+		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var teams []OrgTeam
 	for {

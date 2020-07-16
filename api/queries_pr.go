@@ -363,7 +363,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +500,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -613,7 +613,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +663,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}{}
 
-	err := client.GraphQL(query, variables, &result)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -689,7 +689,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		variables := map[string]interface{}{
 			"input": updateParams,
 		}
-		err := client.GraphQL(updateQuery, variables, &result)
+		err := client.GraphQL(repo.RepoHost(), updateQuery, variables, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -714,7 +714,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		variables := map[string]interface{}{
 			"input": reviewParams,
 		}
-		err := client.GraphQL(reviewQuery, variables, &result)
+		err := client.GraphQL(repo.RepoHost(), reviewQuery, variables, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -734,7 +734,7 @@ func isBlank(v interface{}) bool {
 	}
 }
 
-func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) error {
+func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {
 	var mutation struct {
 		AddPullRequestReview struct {
 			ClientMutationID string
@@ -758,11 +758,11 @@ func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) e
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	return gql.MutateNamed(context.Background(), "PullRequestReviewAdd", &mutation, variables)
 }
 
-func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
+func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
 	type prBlock struct {
 		Edges []struct {
 			Node PullRequest
@@ -859,10 +859,8 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 				}
 			}
 		}`
-		owner := vars["owner"].(string)
-		repo := vars["repo"].(string)
 		search := []string{
-			fmt.Sprintf("repo:%s/%s", owner, repo),
+			fmt.Sprintf("repo:%s/%s", repo.RepoOwner(), repo.RepoName()),
 			fmt.Sprintf("assignee:%s", assignee),
 			"is:pr",
 			"sort:created-desc",
@@ -888,6 +886,8 @@ func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*P
 		}
 		variables["q"] = strings.Join(search, " ")
 	} else {
+		variables["owner"] = repo.RepoOwner()
+		variables["repo"] = repo.RepoName()
 		for name, val := range vars {
 			variables[name] = val
 		}
@@ -896,7 +896,7 @@ loop:
 	for {
 		variables["limit"] = pageLimit
 		var data response
-		err := client.GraphQL(query, variables, &data)
+		err := client.GraphQL(repo.RepoHost(), query, variables, &data)
 		if err != nil {
 			return nil, err
 		}
@@ -945,7 +945,7 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
 
 	return err
@@ -966,7 +966,7 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
 
 	return err
@@ -996,7 +996,7 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "PullRequestMerge", &mutation, variables)
 
 	return err
@@ -1017,13 +1017,13 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	return gql.MutateNamed(context.Background(), "PullRequestReadyForReview", &mutation, variables)
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
-	return client.REST("DELETE", path, nil, nil)
+	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }
 
 func min(a, b int) int {

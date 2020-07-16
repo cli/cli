@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -105,7 +106,8 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	gist, err := apiCreate(httpClient, opts.Description, opts.Public, files)
+	// TODO: GHE support
+	gist, err := apiCreate(httpClient, ghinstance.Default(), opts.Description, opts.Public, files)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {

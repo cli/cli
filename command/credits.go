@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/utils"
 )
 
@@ -73,21 +74,17 @@ func credits(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var owner string
-	var repo string
-
+	var baseRepo ghrepo.Interface
 	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(client, cmd, ctx)
+		baseRepo, err = determineBaseRepo(client, cmd, ctx)
 		if err != nil {
 			return err
 		}
-
-		owner = baseRepo.RepoOwner()
-		repo = baseRepo.RepoName()
 	} else {
-		parts := strings.SplitN(args[0], "/", 2)
-		owner = parts[0]
-		repo = parts[1]
+		baseRepo, err = ghrepo.FromFullName(args[0])
+		if err != nil {
+			return err
+		}
 	}
 
 	type Contributor struct {
@@ -98,9 +95,9 @@ func credits(cmd *cobra.Command, args []string) error {
 
 	result := Result{}
 	body := bytes.NewBufferString("")
-	path := fmt.Sprintf("repos/%s/%s/contributors", owner, repo)
+	path := fmt.Sprintf("repos/%s/%s/contributors", baseRepo.RepoOwner(), baseRepo.RepoName())
 
-	err = client.REST("GET", path, body, &result)
+	err = client.REST(baseRepo.RepoHost(), "GET", path, body, &result)
 	if err != nil {
 		return err
 	}

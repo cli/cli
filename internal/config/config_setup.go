@@ -74,7 +74,7 @@ func authFlow(oauthHost, notice string) (string, string, error) {
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(token)
+	userLogin, err := getViewer(oauthHost, token)
 	if err != nil {
 		return "", "", err
 	}
@@ -87,9 +87,9 @@ func AuthFlowComplete() {
 	_ = waitForEnter(os.Stdin)
 }
 
-func getViewer(token string) (string, error) {
+func getViewer(hostname, token string) (string, error) {
 	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-	return api.CurrentLoginName(http)
+	return api.CurrentLoginName(http, hostname)
 }
 
 func waitForEnter(r io.Reader) error {
