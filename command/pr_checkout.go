@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -33,7 +35,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
-	baseURLOrName := formatRemoteURL(cmd, ghrepo.FullName(baseRepo))
+	baseURLOrName := formatRemoteURL(cmd, baseRepo)
 	if baseRemote != nil {
 		baseURLOrName = baseRemote.Name
 	}
@@ -45,6 +47,9 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 
 	var cmdQueue [][]string
 	newBranchName := pr.HeadRefName
+	if strings.HasPrefix(newBranchName, "-") {
+		return fmt.Errorf("invalid branch name: %q", newBranchName)
+	}
 
 	if headRemote != nil {
 		// there is an existing git remote for PR head
@@ -65,8 +70,13 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	} else {
 		// no git remote for PR head
 
+		defaultBranchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return err
+		}
+
 		// avoid naming the new branch the same as the default branch
-		if newBranchName == pr.HeadRepository.DefaultBranchRef.Name {
+		if newBranchName == defaultBranchName {
 			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 		}
 
@@ -84,7 +94,8 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		remote := baseURLOrName
 		mergeRef := ref
 		if pr.MaintainerCanModify {
-			remote = formatRemoteURL(cmd, fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name))
+			headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
+			remote = formatRemoteURL(cmd, headRepo)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
 		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {

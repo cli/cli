@@ -1,11 +1,9 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +37,7 @@ func init() {
 	issueCreateCmd.Flags().StringP("milestone", "m", "", "Add the issue to a milestone by `name`")
 
 	issueCmd.AddCommand(issueListCmd)
+	issueListCmd.Flags().BoolP("web", "w", false, "Open the browser to list the issue(s)")
 	issueListCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	issueListCmd.Flags().StringSliceP("label", "l", nil, "Filter by labels")
 	issueListCmd.Flags().StringP("state", "s", "open", "Filter by state: {open|closed|all}")
@@ -88,6 +87,7 @@ var issueListCmd = &cobra.Command{
 	Example: heredoc.Doc(`
 	$ gh issue list -l "help wanted"
 	$ gh issue list -A monalisa
+	$ gh issue list --web
 	`),
 	Args: cmdutil.NoArgsQuoteReminder,
 	RunE: issueList,
@@ -120,6 +120,57 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
+type filterOptions struct {
+	entity     string
+	state      string
+	assignee   string
+	labels     []string
+	author     string
+	baseBranch string
+	mention    string
+	milestone  string
+}
+
+func listURLWithQuery(listURL string, options filterOptions) (string, error) {
+	u, err := url.Parse(listURL)
+	if err != nil {
+		return "", err
+	}
+	query := fmt.Sprintf("is:%s ", options.entity)
+	if options.state != "all" {
+		query += fmt.Sprintf("is:%s ", options.state)
+	}
+	if options.assignee != "" {
+		query += fmt.Sprintf("assignee:%s ", options.assignee)
+	}
+	for _, label := range options.labels {
+		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
+	}
+	if options.author != "" {
+		query += fmt.Sprintf("author:%s ", options.author)
+	}
+	if options.baseBranch != "" {
+		query += fmt.Sprintf("base:%s ", options.baseBranch)
+	}
+	if options.mention != "" {
+		query += fmt.Sprintf("mentions:%s ", options.mention)
+	}
+	if options.milestone != "" {
+		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.milestone))
+	}
+	q := u.Query()
+	q.Set("q", strings.TrimSuffix(query, " "))
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func quoteValueForQuery(v string) string {
+	if strings.ContainsAny(v, " \"\t\r\n") {
+		return fmt.Sprintf("%q", v)
+	}
+	return v
+}
+
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -128,6 +179,11 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if err != nil {
+		return err
+	}
+
+	web, err := cmd.Flags().GetBool("web")
 	if err != nil {
 		return err
 	}
@@ -170,6 +226,24 @@ func issueList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if web {
+		issueListURL := generateRepoURL(baseRepo, "issues")
+		openURL, err := listURLWithQuery(issueListURL, filterOptions{
+			entity:    "issue",
+			state:     state,
+			assignee:  assignee,
+			labels:    labels,
+			author:    author,
+			mention:   mention,
+			milestone: milestone,
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		return utils.OpenInBrowser(openURL)
+	}
+
 	listResult, err := api.IssueList(apiClient, baseRepo, state, labels, assignee, limit, author, mention, milestone)
 	if err != nil {
 		return err
@@ -184,8 +258,9 @@ func issueList(cmd *cobra.Command, args []string) error {
 	})
 
 	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
-	// TODO: avoid printing header if piped to a script
-	fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	if connectedToTerminal(cmd) {
+		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
+	}
 
 	out := cmd.OutOrStdout()
 
@@ -258,12 +333,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
+	issue, _, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
 		return err
 	}
@@ -278,8 +348,11 @@ func issueView(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
 		return utils.OpenInBrowser(openURL)
 	}
-	out := colorableOut(cmd)
-	return printIssuePreview(out, issue)
+	if connectedToTerminal(cmd) {
+		return printHumanIssuePreview(colorableOut(cmd), issue)
+	}
+
+	return printRawIssuePreview(cmd.OutOrStdout(), issue)
 }
 
 func issueStateTitleWithColor(state string) string {
@@ -306,7 +379,28 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
 }
 
-func printIssuePreview(out io.Writer, issue *api.Issue) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+	assignees := issueAssigneeList(*issue)
+	labels := issueLabelList(*issue)
+	projects := issueProjectList(*issue)
+
+	// Print empty strings for empty values so the number of metadata lines is consistent when
+	// processing many issues with head and grep.
+	fmt.Fprintf(out, "title:\t%s\n", issue.Title)
+	fmt.Fprintf(out, "state:\t%s\n", issue.State)
+	fmt.Fprintf(out, "author:\t%s\n", issue.Author.Login)
+	fmt.Fprintf(out, "labels:\t%s\n", labels)
+	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
+	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
+	fmt.Fprintf(out, "projects:\t%s\n", projects)
+	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
+
+	fmt.Fprintln(out, "--")
+	fmt.Fprintln(out, issue.Body)
+	return nil
+}
+
+func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
@@ -353,21 +447,6 @@ func printIssuePreview(out io.Writer, issue *api.Issue) error {
 	// Footer
 	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
-}
-
-var issueURLRE = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)`)
-
-func issueFromArg(apiClient *api.Client, baseRepo ghrepo.Interface, arg string) (*api.Issue, error) {
-	if issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#")); err == nil {
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	if m := issueURLRE.FindStringSubmatch(arg); m != nil {
-		issueNumber, _ := strconv.Atoi(m[3])
-		return api.IssueByNumber(apiClient, baseRepo, issueNumber)
-	}
-
-	return nil, fmt.Errorf("invalid issue format: %q", arg)
 }
 
 func issueCreate(cmd *cobra.Command, args []string) error {
@@ -425,8 +504,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
-		// TODO: move URL generation into GitHubRepository
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new", ghrepo.FullName(baseRepo))
+		openURL := generateRepoURL(baseRepo, "issues/new")
 		if title != "" || body != "" {
 			milestone := ""
 			if len(milestoneTitles) > 0 {
@@ -464,6 +542,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 
 	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
+	if interactive && !connectedToTerminal(cmd) {
+		return fmt.Errorf("must provide --title and --body when not attached to a terminal")
+	}
+
 	if interactive {
 		var legacyTemplateFile *string
 		if baseOverride == "" {
@@ -498,7 +580,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := fmt.Sprintf("https://github.com/%s/issues/new/", ghrepo.FullName(baseRepo))
+		openURL := generateRepoURL(baseRepo, "issues/new")
 		milestone := ""
 		if len(milestoneTitles) > 0 {
 			milestone = milestoneTitles[0]
@@ -532,6 +614,14 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func generateRepoURL(repo ghrepo.Interface, p string, args ...interface{}) string {
+	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	if p != "" {
+		return baseURL + "/" + fmt.Sprintf(p, args...)
+	}
+	return baseURL
 }
 
 func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {
@@ -625,9 +715,16 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
 		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		if !table.IsTTY() {
+			table.AddField(issue.State, nil, nil)
+		}
 		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
-		table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		if table.IsTTY() {
+			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
+		} else {
+			table.AddField(issue.UpdatedAt.String(), nil, nil)
+		}
 		table.EndRow()
 	}
 	_ = table.Render()
@@ -699,16 +796,8 @@ func issueClose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
 		return err
 	}
 
@@ -719,7 +808,7 @@ func issueClose(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed issue #%d (%s)\n", utils.Red("✔"), issue.Number, issue.Title)
@@ -734,16 +823,8 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	issue, baseRepo, err := issueFromArg(ctx, apiClient, cmd, args[0])
 	if err != nil {
-		return err
-	}
-
-	issue, err := issueFromArg(apiClient, baseRepo, args[0])
-	var idErr *api.IssuesDisabledError
-	if errors.As(err, &idErr) {
-		return fmt.Errorf("issues disabled for %s", ghrepo.FullName(baseRepo))
-	} else if err != nil {
 		return err
 	}
 
@@ -754,7 +835,7 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 
 	err = api.IssueReopen(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed:%w", err)
+		return err
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d (%s)\n", utils.Green("✔"), issue.Number, issue.Title)

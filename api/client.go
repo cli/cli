@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/henvic/httpretty"
+	"github.com/shurcooL/graphql"
 )
 
 // ClientOption represents an argument to NewClient
@@ -88,23 +89,37 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 
 var issuedScopesWarning bool
 
+const (
+	httpOAuthAppID  = "X-Oauth-Client-Id"
+	httpOAuthScopes = "X-Oauth-Scopes"
+)
+
 // CheckScopes checks whether an OAuth scope is present in a response
 func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
+	wantedCandidates := []string{wantedScope}
+	if strings.HasPrefix(wantedScope, "read:") {
+		wantedCandidates = append(wantedCandidates, "admin:"+strings.TrimPrefix(wantedScope, "read:"))
+	}
+
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
+			_, hasHeader := res.Header[httpOAuthAppID]
+			if err != nil || res.StatusCode > 299 || !hasHeader || issuedScopesWarning {
 				return res, err
 			}
 
-			appID := res.Header.Get("X-Oauth-Client-Id")
-			hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+			appID := res.Header.Get(httpOAuthAppID)
+			hasScopes := strings.Split(res.Header.Get(httpOAuthScopes), ",")
 
 			hasWanted := false
+		outer:
 			for _, s := range hasScopes {
-				if wantedScope == strings.TrimSpace(s) {
-					hasWanted = true
-					break
+				for _, w := range wantedCandidates {
+					if w == strings.TrimSpace(s) {
+						hasWanted = true
+						break outer
+					}
 				}
 			}
 
@@ -233,6 +248,10 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	defer resp.Body.Close()
 
 	return handleResponse(resp, data)
+}
+
+func graphQLClient(h *http.Client) *graphql.Client {
+	return graphql.NewClient("https://api.github.com/graphql", h)
 }
 
 // REST performs a REST request and parses the response.

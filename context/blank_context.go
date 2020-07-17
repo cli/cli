@@ -62,8 +62,7 @@ func (c *blankContext) SetRemotes(stubs map[string]string) {
 		ownerWithName := strings.SplitN(repo, "/", 2)
 		c.remotes = append(c.remotes, &Remote{
 			Remote: &git.Remote{Name: remoteName},
-			Owner:  ownerWithName[0],
-			Repo:   ownerWithName[1],
+			Repo:   ghrepo.New(ownerWithName[0], ownerWithName[1]),
 		})
 	}
 }

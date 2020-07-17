@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/pflag"
 )
@@ -168,4 +169,27 @@ func (s errorStub) Output() ([]byte, error) {
 
 func (s errorStub) Run() error {
 	return errors.New(s.message)
+}
+
+func stubTerminal(connected bool) func() {
+	isTerminal := utils.IsTerminal
+	utils.IsTerminal = func(_ interface{}) bool {
+		return connected
+	}
+
+	terminalSize := utils.TerminalSize
+	if connected {
+		utils.TerminalSize = func(_ interface{}) (int, int, error) {
+			return 80, 20, nil
+		}
+	} else {
+		utils.TerminalSize = func(_ interface{}) (int, int, error) {
+			return 0, 0, fmt.Errorf("terminal connection stubbed to false")
+		}
+	}
+
+	return func() {
+		utils.IsTerminal = isTerminal
+		utils.TerminalSize = terminalSize
+	}
 }

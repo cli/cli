@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 )
@@ -72,22 +73,22 @@ func TestPRCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`\bviewerPermission\b`),
+		httpmock.GraphQL(`query RepositoryNetwork\b`),
 		httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
 	http.Register(
-		httpmock.GraphQL(`\bforks\(`),
+		httpmock.GraphQL(`query RepositoryFindFork\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "forks": { "nodes": [
 		] } } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bpullRequests\(`),
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 		] } } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bteam\(`),
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
 		{ "data": {
 			"u000": { "login": "MonaLisa", "id": "MONAID" },
@@ -103,7 +104,7 @@ func TestPRCreate_metadata(t *testing.T) {
 		} }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
@@ -114,7 +115,7 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
@@ -125,7 +126,7 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [],
@@ -133,7 +134,7 @@ func TestPRCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bcreatePullRequest\(`),
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"id": "NEWPULLID",
@@ -150,7 +151,7 @@ func TestPRCreate_metadata(t *testing.T) {
 			}
 		}))
 	http.Register(
-		httpmock.GraphQL(`\bupdatePullRequest\(`),
+		httpmock.GraphQL(`mutation PullRequestCreateMetadata\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "updatePullRequest": {
 			"clientMutationId": ""
@@ -163,7 +164,7 @@ func TestPRCreate_metadata(t *testing.T) {
 			eq(t, inputs["milestoneId"], "BIGONEID")
 		}))
 	http.Register(
-		httpmock.GraphQL(`\brequestReviews\(`),
+		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "requestReviews": {
 			"clientMutationId": ""
@@ -534,16 +535,16 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(httpmock.GraphQL(`\bviewerPermission\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
-	http.Register(httpmock.GraphQL(`\bforks\(`), httpmock.StringResponse(`
+	http.Register(httpmock.GraphQL(`query RepositoryNetwork\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
+	http.Register(httpmock.GraphQL(`query RepositoryFindFork\b`), httpmock.StringResponse(`
 		{ "data": { "repository": { "forks": { "nodes": [
 		] } } } }
 	`))
-	http.Register(httpmock.GraphQL(`\bpullRequests\(`), httpmock.StringResponse(`
+	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.StringResponse(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
 	`))
-	http.Register(httpmock.GraphQL(`\bcreatePullRequest\(`), httpmock.GraphQLMutation(`
+	http.Register(httpmock.GraphQL(`mutation PullRequestCreate\b`), httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
@@ -759,13 +760,11 @@ func Test_determineTrackingBranch_noMatch(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 		&context.Remote{
 			Remote: &git.Remote{Name: "upstream"},
-			Owner:  "octocat",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
 	}
 
@@ -786,13 +785,11 @@ func Test_determineTrackingBranch_hasMatch(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 		&context.Remote{
 			Remote: &git.Remote{Name: "upstream"},
-			Owner:  "octocat",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
 	}
 
@@ -819,8 +816,7 @@ func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
 	remotes := context.Remotes{
 		&context.Remote{
 			Remote: &git.Remote{Name: "origin"},
-			Owner:  "hubot",
-			Repo:   "Spoon-Knife",
+			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
 	}
 

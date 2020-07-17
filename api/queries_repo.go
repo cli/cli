@@ -34,6 +34,9 @@ type Repository struct {
 	}
 
 	Parent *Repository
+
+	// pseudo-field that keeps track of host name of this repo
+	hostname string
 }
 
 // RepositoryOwner is the owner of a GitHub repository
@@ -49,6 +52,11 @@ func (r Repository) RepoOwner() string {
 // RepoName is the name of the repository
 func (r Repository) RepoName() string {
 	return r.Name
+}
+
+// RepoHost is the GitHub hostname of the repository
+func (r Repository) RepoHost() string {
+	return r.hostname
 }
 
 // IsFork is true when this repository has a parent repository
@@ -78,7 +86,7 @@ func (r Repository) ViewerCanTriage() bool {
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
-	query($owner: String!, $name: String!) {
+	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
 			hasIssuesEnabled
@@ -103,7 +111,19 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		return nil, err
 	}
 
-	return &result.Repository, nil
+	return initRepoHostname(&result.Repository, repo.RepoHost()), nil
+}
+
+func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
+	if r, ok := repo.(*Repository); ok && r.DefaultBranchRef.Name != "" {
+		return r.DefaultBranchRef.Name, nil
+	}
+
+	r, err := GitHubRepo(client, repo)
+	if err != nil {
+		return "", err
+	}
+	return r.DefaultBranchRef.Name, nil
 }
 
 // RepoParent finds out the parent repository of a fork
@@ -124,8 +144,8 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	v4 := githubv4.NewClient(client.http)
-	err := v4.Query(context.Background(), &query, variables)
+	gql := graphQLClient(client.http)
+	err := gql.QueryNamed(context.Background(), "RepositoryFindParent", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +153,7 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		return nil, nil
 	}
 
-	parent := ghrepo.New(query.Repository.Parent.Owner.Login, query.Repository.Parent.Name)
+	parent := ghrepo.NewWithHost(query.Repository.Parent.Owner.Login, query.Repository.Parent.Name, repo.RepoHost())
 	return parent, nil
 }
 
@@ -145,6 +165,11 @@ type RepoNetworkResult struct {
 
 // RepoNetwork inspects the relationship between multiple GitHub repositories
 func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, error) {
+	var hostname string
+	if len(repos) > 0 {
+		hostname = repos[0].RepoHost()
+	}
+
 	queries := make([]string, 0, len(repos))
 	for i, repo := range repos {
 		queries = append(queries, fmt.Sprintf(`
@@ -174,7 +199,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		}
 		isPrivate
 	}
-	query {
+	query RepositoryNetwork {
 		viewer { login }
 		%s
 	}
@@ -227,12 +252,20 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 			if err := decoder.Decode(&repo); err != nil {
 				return result, err
 			}
-			result.Repositories = append(result.Repositories, &repo)
+			result.Repositories = append(result.Repositories, initRepoHostname(&repo, hostname))
 		} else {
 			return result, fmt.Errorf("unknown GraphQL result key %q", name)
 		}
 	}
 	return result, nil
+}
+
+func initRepoHostname(repo *Repository, hostname string) *Repository {
+	repo.hostname = hostname
+	if repo.Parent != nil {
+		repo.Parent.hostname = hostname
+	}
+	return repo
 }
 
 // repositoryV3 is the repository result from GitHub API v3
@@ -265,6 +298,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			Login: result.Owner.Login,
 		},
 		ViewerPermission: "WRITE",
+		hostname:         repo.RepoHost(),
 	}, nil
 }
 
@@ -284,7 +318,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	if err := client.GraphQL(`
-	query($owner: String!, $repo: String!) {
+	query RepositoryFindFork($owner: String!, $repo: String!) {
 		repository(owner: $owner, name: $repo) {
 			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
 				nodes {
@@ -306,7 +340,7 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	// `affiliations` condition, to guard against versions of GitHub with a
 	// faulty `affiliations` implementation
 	if len(forks) > 0 && forks[0].ViewerCanPush() {
-		return &forks[0], nil
+		return initRepoHostname(&forks[0], repo.RepoHost()), nil
 	}
 	return nil, &NotFoundError{errors.New("no fork found")}
 }
@@ -353,7 +387,7 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	}
 
 	err := client.GraphQL(`
-	mutation($input: CreateRepositoryInput!) {
+	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
 				id
@@ -368,7 +402,8 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 		return nil, err
 	}
 
-	return &response.CreateRepository.Repository, nil
+	// FIXME: support Enterprise hosts
+	return initRepoHostname(&response.CreateRepository.Repository, "github.com"), nil
 }
 
 func RepositoryReadme(client *Client, fullName string) (string, error) {
@@ -626,7 +661,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	}
 
 	query := &bytes.Buffer{}
-	fmt.Fprint(query, "{\n")
+	fmt.Fprint(query, "query RepositoryResolveMetadataIDs {\n")
 	for i, u := range users {
 		fmt.Fprintf(query, "u%03d: user(login:%q){id,login}\n", i, u)
 	}
@@ -710,11 +745,11 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var projects []RepoProject
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -754,11 +789,11 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var users []RepoAssignee
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryAssignableUsers", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -798,11 +833,11 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var labels []RepoLabel
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryLabelList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -842,11 +877,11 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	v4 := githubv4.NewClient(client.http)
+	gql := graphQLClient(client.http)
 
 	var milestones []RepoMilestone
 	for {
-		err := v4.Query(context.Background(), &query, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryMilestoneList", &query, variables)
 		if err != nil {
 			return nil, err
 		}

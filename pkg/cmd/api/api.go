@@ -86,29 +86,34 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 			$ gh api repos/:owner/:repo/releases
 
 			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
-				query($name: String!, $owner: String!) {
-					repository(owner: $owner, name: $name) {
-						releases(last: 3) {
-							nodes { tagName }
-						}
-					}
-				}
+			  query($name: String!, $owner: String!) {
+			    repository(owner: $owner, name: $name) {
+			      releases(last: 3) {
+			        nodes { tagName }
+			      }
+			    }
+			  }
 			'
 			
 			$ gh api graphql --paginate -f query='
-				query($endCursor: String) {
-					viewer {
-						repositories(first: 100, after: $endCursor) {
-							nodes { nameWithOwner }
-							pageInfo {
-								hasNextPage
-								endCursor
-							}
-						}
-					}
-				}
+			  query($endCursor: String) {
+			    viewer {
+			      repositories(first: 100, after: $endCursor) {
+			        nodes { nameWithOwner }
+			        pageInfo {
+			          hasNextPage
+			          endCursor
+			        }
+			      }
+			    }
+			  }
 			'
 		`),
+		Annotations: map[string]string{
+			"help:environment": heredoc.Doc(`
+				GITHUB_TOKEN: an authentication token for API requests.
+			`),
+		},
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]

@@ -25,6 +25,10 @@ just imagine a flowchart
   - e.g. have already discussed not wanting to do or duplicate issue
   - comment acknowledging receipt
   - close
+- do we want someone in the community to do it?
+  - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
+  - ensure that the thread contains all the context necessary for someone new to pick this up
+  - add `help-wanted` label
 - do we want to do it, but not in the next year?
   - comment acknowledging it, but that we don't plan on working on it this year.
   - add `future` label

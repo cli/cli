@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -14,19 +13,20 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIssueStatus(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	jsonFile, _ := os.Open("../test/fixtures/issueStatus.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.FileResponse("../test/fixtures/issueStatus.json"))
 
 	output, err := RunCommand("issue status")
 	if err != nil {
@@ -53,17 +53,17 @@ func TestIssueStatus_blankSlate(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"assigned": { "nodes": [] },
-		"mentioned": { "nodes": [] },
-		"authored": { "nodes": [] }
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"hasIssuesEnabled": true,
+			"assigned": { "nodes": [] },
+			"mentioned": { "nodes": [] },
+			"authored": { "nodes": [] }
+		} } }`))
 
 	output, err := RunCommand("issue status")
 	if err != nil {
@@ -93,14 +93,14 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(
-		httpmock.GraphQL(`\bviewer\b`),
+		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": false
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueStatus\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"hasIssuesEnabled": false
+		} } }`))
 
 	_, err := RunCommand("issue status")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
@@ -108,14 +108,36 @@ func TestIssueStatus_disabledIssues(t *testing.T) {
 	}
 }
 
-func TestIssueList(t *testing.T) {
+func TestIssueList_nontty(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
+	defer stubTerminal(false)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	jsonFile, _ := os.Open("../test/fixtures/issueList.json")
-	defer jsonFile.Close()
-	http.StubResponse(200, jsonFile)
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("../test/fixtures/issueList.json"))
+
+	output, err := RunCommand("issue list")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	eq(t, output.Stderr(), "")
+	test.ExpectLines(t, output.String(),
+		`1[\t]+number won[\t]+label[\t]+\d+`,
+		`2[\t]+number too[\t]+label[\t]+\d+`,
+		`4[\t]+number fore[\t]+label[\t]+\d+`)
+}
+
+func TestIssueList_tty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	defer stubTerminal(true)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("../test/fixtures/issueList.json"))
 
 	output, err := RunCommand("issue list")
 	if err != nil {
@@ -127,31 +149,31 @@ Showing 3 of 3 issues in OWNER/REPO
 
 `)
 
-	expectedIssues := []*regexp.Regexp{
-		regexp.MustCompile(`(?m)^1\t.*won`),
-		regexp.MustCompile(`(?m)^2\t.*too`),
-		regexp.MustCompile(`(?m)^4\t.*fore`),
-	}
-
-	for _, r := range expectedIssues {
-		if !r.MatchString(output.String()) {
-			t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-			return
-		}
-	}
+	test.ExpectLines(t, output.String(),
+		"number won",
+		"number too",
+		"number fore")
 }
 
-func TestIssueList_withFlags(t *testing.T) {
+func TestIssueList_tty_withFlags(t *testing.T) {
+	defer stubTerminal(true)()
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {	"repository": {
-		"hasIssuesEnabled": true,
-		"issues": { "nodes": [] }
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "probablyCher", params["assignee"].(string))
+			assert.Equal(t, "foo", params["author"].(string))
+			assert.Equal(t, "me", params["mention"].(string))
+			assert.Equal(t, "1.x", params["milestone"].(string))
+			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
+			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
+		}))
 
 	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
 	if err != nil {
@@ -163,26 +185,6 @@ func TestIssueList_withFlags(t *testing.T) {
 No issues match your search in OWNER/REPO
 
 `)
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Assignee  string
-			Labels    []string
-			States    []string
-			Author    string
-			Mention   string
-			Milestone string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Assignee, "probablyCher")
-	eq(t, reqBody.Variables.Labels, []string{"web", "bug"})
-	eq(t, reqBody.Variables.States, []string{"OPEN"})
-	eq(t, reqBody.Variables.Author, "foo")
-	eq(t, reqBody.Variables.Mention, "me")
-	eq(t, reqBody.Variables.Milestone, "1.x")
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -241,6 +243,35 @@ func TestIssueList_disabledIssues(t *testing.T) {
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
+}
+
+func TestIssueList_web(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand("issue list --web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1")
+	if err != nil {
+		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
+	}
+
+	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1"
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues in your browser.\n")
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := seenCmd.Args[len(seenCmd.Args)-1]
+	eq(t, url, expectedURL)
 }
 
 func TestIssueView_web(t *testing.T) {
@@ -311,7 +342,90 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
 }
 
-func TestIssueView_Preview(t *testing.T) {
+func TestIssueView_nontty_Preview(t *testing.T) {
+	defer stubTerminal(false)()
+	tests := map[string]struct {
+		ownerRepo       string
+		command         string
+		fixture         string
+		expectedOutputs []string
+	}{
+		"Open issue without metadata": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_preview.json",
+			expectedOutputs: []string{
+				`title:\tix of coins`,
+				`state:\tOPEN`,
+				`comments:\t9`,
+				`author:\tmarseilles`,
+				`assignees:`,
+				`\*\*bold story\*\*`,
+			},
+		},
+		"Open issue with metadata": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewWithMetadata.json",
+			expectedOutputs: []string{
+				`title:\tix of coins`,
+				`assignees:\tmarseilles, monaco`,
+				`author:\tmarseilles`,
+				`state:\tOPEN`,
+				`comments:\t9`,
+				`labels:\tone, two, three, four, five`,
+				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
+				`milestone:\tuluru\n`,
+				`\*\*bold story\*\*`,
+			},
+		},
+		"Open issue with empty body": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
+			expectedOutputs: []string{
+				`title:\tix of coins`,
+				`state:\tOPEN`,
+				`author:\tmarseilles`,
+				`labels:\ttarot`,
+			},
+		},
+		"Closed issue": {
+			ownerRepo: "master",
+			command:   "issue view 123",
+			fixture:   "../test/fixtures/issueView_previewClosedState.json",
+			expectedOutputs: []string{
+				`title:\tix of coins`,
+				`state:\tCLOSED`,
+				`\*\*bold story\*\*`,
+				`author:\tmarseilles`,
+				`labels:\ttarot`,
+				`\*\*bold story\*\*`,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
+			http := initFakeHTTP()
+			http.StubRepoResponse("OWNER", "REPO")
+
+			http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
+
+			output, err := RunCommand(tc.command)
+			if err != nil {
+				t.Errorf("error running command `%v`: %v", tc.command, err)
+			}
+
+			eq(t, output.Stderr(), "")
+
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
+	}
+}
+
+func TestIssueView_tty_Preview(t *testing.T) {
+	defer stubTerminal(true)()
 	tests := map[string]struct {
 		ownerRepo       string
 		command         string
@@ -371,10 +485,7 @@ func TestIssueView_Preview(t *testing.T) {
 			initBlankContext("", "OWNER/REPO", tc.ownerRepo)
 			http := initFakeHTTP()
 			http.StubRepoResponse("OWNER", "REPO")
-
-			jsonFile, _ := os.Open(tc.fixture)
-			defer jsonFile.Close()
-			http.StubResponse(200, jsonFile)
+			http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
 
 			output, err := RunCommand(tc.command)
 			if err != nil {
@@ -391,6 +502,7 @@ func TestIssueView_Preview(t *testing.T) {
 func TestIssueView_web_notFound(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "errors": [
@@ -436,7 +548,6 @@ func TestIssueView_disabledIssues(t *testing.T) {
 func TestIssueView_web_urlArg(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
 
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
@@ -464,6 +575,28 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+}
+
+func TestIssueCreate_nontty_error(t *testing.T) {
+	defer stubTerminal(false)()
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+
+	_, err := RunCommand(`issue create -t hello`)
+	if err == nil {
+		t.Fatal("expected error running command `issue create`")
+	}
+
+	assert.Equal(t, "must provide --title and --body when not attached to a terminal", err.Error())
+
 }
 
 func TestIssueCreate(t *testing.T) {
@@ -513,10 +646,10 @@ func TestIssueCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`\bviewerPermission\b`),
+		httpmock.GraphQL(`query RepositoryNetwork\b`),
 		httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
 	http.Register(
-		httpmock.GraphQL(`\bhasIssuesEnabled\b`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -525,7 +658,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bu000:`),
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
 		{ "data": {
 			"u000": { "login": "MonaLisa", "id": "MONAID" },
@@ -536,7 +669,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
@@ -547,7 +680,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
@@ -558,7 +691,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{	"data": { "organization": null },
 			"errors": [{
@@ -569,7 +702,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		}
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bcreateIssue\(`),
+		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
@@ -861,12 +994,8 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 	`))
 
 	_, err := RunCommand("issue close 13")
-	if err == nil {
-		t.Fatalf("expected error when issues are disabled")
-	}
-
-	if !strings.Contains(err.Error(), "issues disabled") {
-		t.Fatalf("got unexpected error: %s", err)
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Fatalf("got error: %v", err)
 	}
 }
 
@@ -934,11 +1063,75 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	`))
 
 	_, err := RunCommand("issue reopen 2")
-	if err == nil {
-		t.Fatalf("expected error when issues are disabled")
+	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
+		t.Fatalf("got error: %v", err)
 	}
+}
 
-	if !strings.Contains(err.Error(), "issues disabled") {
-		t.Fatalf("got unexpected error: %s", err)
+func Test_listURLWithQuery(t *testing.T) {
+	type args struct {
+		listURL string
+		options filterOptions
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "blank",
+			args: args{
+				listURL: "https://example.com/path?a=b",
+				options: filterOptions{
+					entity: "issue",
+					state:  "open",
+				},
+			},
+			want:    "https://example.com/path?a=b&q=is%3Aissue+is%3Aopen",
+			wantErr: false,
+		},
+		{
+			name: "all",
+			args: args{
+				listURL: "https://example.com/path",
+				options: filterOptions{
+					entity:     "issue",
+					state:      "open",
+					assignee:   "bo",
+					author:     "ka",
+					baseBranch: "trunk",
+					mention:    "nu",
+				},
+			},
+			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+base%3Atrunk+mentions%3Anu",
+			wantErr: false,
+		},
+		{
+			name: "spaces in values",
+			args: args{
+				listURL: "https://example.com/path",
+				options: filterOptions{
+					entity:    "pr",
+					state:     "open",
+					labels:    []string{"docs", "help wanted"},
+					milestone: `Codename "What Was Missing"`,
+				},
+			},
+			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+label%3Adocs+label%3A%22help+wanted%22+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := listURLWithQuery(tt.args.listURL, tt.args.options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("listURLWithQuery() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("listURLWithQuery() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
