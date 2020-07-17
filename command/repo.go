@@ -318,70 +318,70 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// if confirmRepoCreate {
-	repo, err := api.RepoCreate(client, input)
-	if err != nil {
-		return err
-	}
-
-	out := cmd.OutOrStdout()
-	greenCheck := utils.Green("✓")
-	isTTY := false
-	if outFile, isFile := out.(*os.File); isFile {
-		isTTY = utils.IsTerminal(outFile)
-		if isTTY {
-			// FIXME: duplicates colorableOut
-			out = utils.NewColorable(outFile)
+	if confirmRepoCreate {
+		repo, err := api.RepoCreate(client, input)
+		if err != nil {
+			return err
 		}
-	}
 
-	if isTTY {
-		fmt.Fprintf(out, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+		out := cmd.OutOrStdout()
+		greenCheck := utils.Green("✓")
+		isTTY := false
+		if outFile, isFile := out.(*os.File); isFile {
+			isTTY = utils.IsTerminal(outFile)
+			if isTTY {
+				// FIXME: duplicates colorableOut
+				out = utils.NewColorable(outFile)
+			}
+		}
+
+		if isTTY {
+			fmt.Fprintf(out, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+		} else {
+			fmt.Fprintln(out, repo.URL)
+		}
+
+		remoteURL := formatRemoteURL(cmd, repo)
+
+		if projectDirErr == nil {
+			_, err = git.AddRemote("origin", remoteURL)
+			if err != nil {
+				return err
+			}
+			if isTTY {
+				fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
+			}
+		} else if isTTY {
+			doSetup := false
+			err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+			if err != nil {
+				return err
+			}
+
+			if doSetup {
+				path := repo.Name
+
+				gitInit := git.GitCommand("init", path)
+				gitInit.Stdout = os.Stdout
+				gitInit.Stderr = os.Stderr
+				err = run.PrepareCmd(gitInit).Run()
+				if err != nil {
+					return err
+				}
+				gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				gitRemoteAdd.Stdout = os.Stdout
+				gitRemoteAdd.Stderr = os.Stderr
+				err = run.PrepareCmd(gitRemoteAdd).Run()
+				if err != nil {
+					return err
+				}
+
+				fmt.Fprintf(out, "%s Initialized repository in './%s/'\n", greenCheck, path)
+			}
+		}
 	} else {
-		fmt.Fprintln(out, repo.URL)
+		fmt.Fprintf(colorableOut(cmd), "Repo Create aborted by user\n")
 	}
-
-	remoteURL := formatRemoteURL(cmd, repo)
-
-	if projectDirErr == nil {
-		_, err = git.AddRemote("origin", remoteURL)
-		if err != nil {
-			return err
-		}
-		if isTTY {
-			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
-		}
-	} else if isTTY {
-		doSetup := false
-		err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
-		if err != nil {
-			return err
-		}
-
-		if doSetup {
-			path := repo.Name
-
-			gitInit := git.GitCommand("init", path)
-			gitInit.Stdout = os.Stdout
-			gitInit.Stderr = os.Stderr
-			err = run.PrepareCmd(gitInit).Run()
-			if err != nil {
-				return err
-			}
-			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
-			gitRemoteAdd.Stdout = os.Stdout
-			gitRemoteAdd.Stderr = os.Stderr
-			err = run.PrepareCmd(gitRemoteAdd).Run()
-			if err != nil {
-				return err
-			}
-
-			fmt.Fprintf(out, "%s Initialized repository in './%s/'\n", greenCheck, path)
-		}
-	}
-	// } else {
-	// 	fmt.Fprintf(colorableOut(cmd), "Repo Create aborted by user\n")
-	// }
 
 	return nil
 }
