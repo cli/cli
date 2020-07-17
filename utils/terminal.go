@@ -8,14 +8,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-func isStdoutTerminal() bool {
-	if !checkedTerminal {
-		_isStdoutTerminal = IsTerminal(os.Stdout)
-		checkedTerminal = true
-	}
-	return _isStdoutTerminal
-}
-
 // TODO I don't like this use of interface{} but we need to accept both io.Writer and io.Reader
 // interfaces.
 

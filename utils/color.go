@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	_isStdoutTerminal, checkedTerminal bool
-
 	// Outputs ANSI color if stdout is a tty
 	Magenta = makeColorFunc("magenta")
 	Cyan    = makeColorFunc("cyan")
@@ -45,5 +43,6 @@ func isColorEnabled() bool {
 		return false
 	}
 
-	return isStdoutTerminal()
+	// TODO ignores cmd.OutOrStdout
+	return IsTerminal(os.Stdout)
 }
