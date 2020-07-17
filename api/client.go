@@ -104,9 +104,13 @@ func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 			res, err := tr.RoundTrip(req)
-			_, hasHeader := res.Header[httpOAuthAppID]
-			if err != nil || res.StatusCode > 299 || !hasHeader || issuedScopesWarning {
+			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
 				return res, err
+			}
+
+			_, hasHeader := res.Header[httpOAuthAppID]
+			if !hasHeader {
+				return res, nil
 			}
 
 			appID := res.Header.Get(httpOAuthAppID)

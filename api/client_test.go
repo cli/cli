@@ -102,6 +102,7 @@ func Test_CheckScopes(t *testing.T) {
 		wantScope      string
 		responseApp    string
 		responseScopes string
+		responseError  error
 		expectCallback bool
 	}{
 		{
@@ -132,11 +133,22 @@ func Test_CheckScopes(t *testing.T) {
 			responseScopes: "",
 			expectCallback: false,
 		},
+		{
+			name:           "errored response",
+			wantScope:      "read:org",
+			responseApp:    "",
+			responseScopes: "",
+			responseError:  errors.New("Network Failed"),
+			expectCallback: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &httpmock.Registry{}
 			tr.Register(httpmock.MatchAny, func(*http.Request) (*http.Response, error) {
+				if tt.responseError != nil {
+					return nil, tt.responseError
+				}
 				if tt.responseScopes == "" {
 					return &http.Response{StatusCode: 200}, nil
 				}
@@ -165,7 +177,7 @@ func Test_CheckScopes(t *testing.T) {
 
 			issuedScopesWarning = false
 			_, err = rt.RoundTrip(req)
-			if err != nil {
+			if err != nil && !errors.Is(err, tt.responseError) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
