@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGistCreate(t *testing.T) {
@@ -43,10 +45,11 @@ func TestGistCreate(t *testing.T) {
 
 func TestGistCreate_stdin(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
-	files, err := processFiles(fakeStdin, []string{"-"})
+	files, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
 
-	eq(t, files["gistfile0.txt"], "hey cool how is it going")
+	assert.Equal(t, 1, len(files))
+	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"])
 }
