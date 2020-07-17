@@ -65,7 +65,7 @@ By default, gists are private; use '--public' to make publicly listed ones.`,
 
 		stdinIsTTY := (info.Mode() & os.ModeCharDevice) == os.ModeCharDevice
 		if stdinIsTTY {
-			return cmdutil.FlagError{Err: errors.New("no filenames passed and nothing on STDIN")}
+			return &cmdutil.FlagError{Err: errors.New("no filenames passed and nothing on STDIN")}
 		}
 		return nil
 	},
