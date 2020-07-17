@@ -19,7 +19,7 @@ func init() {
 	RootCmd.AddCommand(gistCmd)
 	gistCmd.AddCommand(gistCreateCmd)
 	gistCreateCmd.Flags().StringP("desc", "d", "", "A description for this gist")
-	gistCreateCmd.Flags().BoolP("public", "p", false, "When true, the gist will be public and available for anyone to see (default: private)")
+	gistCreateCmd.Flags().BoolP("public", "p", false, "List the gist publicly (default: private)")
 }
 
 var gistCmd = &cobra.Command{
