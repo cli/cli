@@ -1332,15 +1332,7 @@ func TestPRMerge_interactive(t *testing.T) {
 	}
 
 	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
-}
 
-func TestPrMerge_multipleMergeMethods(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-
-	_, err := RunCommand("pr merge 1 --merge --squash")
-	if err == nil {
-		t.Fatal("expected error running `pr merge` with multiple merge methods")
-	}
 }
 
 func TestPRReady(t *testing.T) {

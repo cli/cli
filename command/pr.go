@@ -471,18 +471,18 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	isInteractive := false
 	if b, _ := cmd.Flags().GetBool("merge"); b {
 		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodMerge
 		confirmSubmit = true
+		mergeMethod = api.PullRequestMergeMethodMerge
 	}
 	if b, _ := cmd.Flags().GetBool("rebase"); b {
 		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodRebase
 		confirmSubmit = true
+		mergeMethod = api.PullRequestMergeMethodRebase
 	}
 	if b, _ := cmd.Flags().GetBool("squash"); b {
 		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodSquash
 		confirmSubmit = true
+		mergeMethod = api.PullRequestMergeMethodSquash
 	}
 
 	if enabledFlagCount == 0 {
@@ -492,10 +492,9 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	if isInteractive {
-		confirmSubmit = false
 		mergeMethod, deleteBranch, confirmSubmit, err = prInteractiveMerge(deleteLocalBranch, crossRepoPR, confirmSubmit)
 		if err != nil {
-			return err
+			return nil
 		}
 	}
 
@@ -522,23 +521,21 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 
 		if deleteBranch {
-			repo, err := api.GitHubRepo(apiClient, baseRepo)
-			if err != nil {
-				return err
-			}
-
-			currentBranch, err := ctx.Branch()
-			if err != nil {
-				return err
-			}
-
 			branchSwitchString := ""
 
 			if deleteLocalBranch && !crossRepoPR {
+				currentBranch, err := ctx.Branch()
+				if err != nil {
+					return err
+				}
+
 				var branchToSwitchTo string
 				if currentBranch == pr.HeadRefName {
-					branchToSwitchTo = repo.DefaultBranchRef.Name
-					err = git.CheckoutBranch(repo.DefaultBranchRef.Name)
+					branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+					if err != nil {
+						return err
+					}
+					err = git.CheckoutBranch(branchToSwitchTo)
 					if err != nil {
 						return err
 					}
@@ -571,14 +568,14 @@ func prMerge(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
 		}
 
-		return nil
+	} else {
+		fmt.Fprintf(colorableOut(cmd), "Discarding\n")
 	}
-	fmt.Fprintf(colorableOut(cmd), "Discarding\n")
-	return nil
 
+	return nil
 }
 
-func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, confirmBeforeSubmit bool) (api.PullRequestMergeMethod, bool, bool, error) {
+func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, confirmSubmit bool) (api.PullRequestMergeMethod, bool, bool, error) {
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
@@ -608,7 +605,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, confirmBeforeS
 		qs = append(qs, deleteBranchQuestion)
 	}
 
-	if !confirmBeforeSubmit {
+	if !confirmSubmit {
 		// Confirm before submitting
 		confirmBeforeSubmitting := &survey.Question{
 			Name: "confirmSubmit",
@@ -642,7 +639,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, confirmBeforeS
 	}
 
 	deleteBranch := answers.DeleteBranch
-	confirmSubmit := answers.ConfirmSubmit
+	confirmSubmit = answers.ConfirmSubmit
 	return mergeMethod, deleteBranch, confirmSubmit, nil
 }
 
