@@ -1,0 +1,16 @@
+**
+
+!.git
+!/api
+!/auth
+!/cmd
+!/command
+!/context
+!/git
+!/internal
+!/pkg
+!/test
+!/update
+!/utils
+!/Makefile
+!/go.*
