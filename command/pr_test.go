@@ -1035,21 +1035,6 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	eq(t, url, "https://github.com/hubot/REPO/pull/23")
 }
 
-func TestPrView_web_nontty(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	defer stubTerminal(false)()
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
-
-	output, err := RunCommand("pr view -w")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	assert.Equal(t, "--web unsupported when not attached to a tty", err.Error())
-	assert.Equal(t, "", output.String())
-}
-
 func TestReplaceExcessiveWhitespace(t *testing.T) {
 	eq(t, replaceExcessiveWhitespace("hello\ngoodbye"), "hello goodbye")
 	eq(t, replaceExcessiveWhitespace("  hello goodbye  "), "hello goodbye")

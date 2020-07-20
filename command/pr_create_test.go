@@ -15,6 +15,39 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPRCreate_nontty_web(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
+
+	output, err := RunCommand(`pr create --web`)
+	eq(t, err, nil)
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "")
+
+	eq(t, len(cs.Calls), 6)
+	eq(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature")
+	browserCall := cs.Calls[5].Args
+	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+
+}
+
 func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
 	defer stubTerminal(false)()

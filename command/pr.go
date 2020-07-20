@@ -362,10 +362,6 @@ func prView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if web && !connectedToTerminal(cmd) {
-		return errors.New("--web unsupported when not attached to a tty")
-	}
-
 	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
@@ -373,7 +369,9 @@ func prView(cmd *cobra.Command, args []string) error {
 	openURL := pr.URL
 
 	if web {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", openURL)
+		}
 		return utils.OpenInBrowser(openURL)
 	}
 

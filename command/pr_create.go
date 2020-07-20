@@ -226,10 +226,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 	}
 
 	if !connectedToTerminal(cmd) {
-		if isWeb {
-			return errors.New("--web unsupported when not attached to a tty")
-		}
-		if !cmd.Flags().Changed("title") && !autofill {
+		if !isWeb && (!cmd.Flags().Changed("title") && !autofill) {
 			return errors.New("--title or --fill required when not attached to a tty")
 		}
 	}
@@ -368,8 +365,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		if connectedToTerminal(cmd) {
+			// TODO could exceed max url length for explorer
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		}
 		return utils.OpenInBrowser(openURL)
 	} else {
 		panic("Unreachable state")
