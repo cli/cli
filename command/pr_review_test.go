@@ -163,7 +163,7 @@ func TestPRReview_no_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "- Reviewed pull request #123")
+	test.ExpectLines(t, output.Stderr(), "Reviewed pull request #123")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
 	reqBody := struct {

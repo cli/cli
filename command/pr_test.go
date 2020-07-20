@@ -310,10 +310,18 @@ Showing 3 of 3 pull requests in OWNER/REPO
 
 `, output.Stderr())
 
-	assert.Equal(t, `#32  New feature            feature
-#29  Fixed bad bug          hubot:bug-fix
-#28  Improve documentation  docs
-`, output.String())
+	lines := strings.Split(output.String(), "\n")
+	res := []*regexp.Regexp{
+		regexp.MustCompile(`#32.*New feature.*feature`),
+		regexp.MustCompile(`#29.*Fixed bad bug.*hubot:bug-fix`),
+		regexp.MustCompile(`#28.*Improve documentation.*docs`),
+	}
+
+	for i, r := range res {
+		if !r.MatchString(lines[i]) {
+			t.Errorf("%s did not match %s", lines[i], r)
+		}
+	}
 }
 
 func TestPRList_nontty(t *testing.T) {
@@ -374,10 +382,19 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, `#32  New feature            feature
-#29  Fixed bad bug          hubot:bug-fix
-#28  Improve documentation  docs
-`, output.String())
+	lines := strings.Split(output.String(), "\n")
+
+	res := []*regexp.Regexp{
+		regexp.MustCompile(`#32.*New feature.*feature`),
+		regexp.MustCompile(`#29.*Fixed bad bug.*hubot:bug-fix`),
+		regexp.MustCompile(`#28.*Improve documentation.*docs`),
+	}
+
+	for i, r := range res {
+		if !r.MatchString(lines[i]) {
+			t.Errorf("%s did not match %s", lines[i], r)
+		}
+	}
 }
 
 func TestPRList_filteringClosed(t *testing.T) {
@@ -669,7 +686,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreview.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Open • nobody wants to merge 12 commits into master from blueberries`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -680,12 +697,12 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithMetadataByNumber.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Open • nobody wants to merge 12 commits into master from blueberries`,
-				`Reviewers: 2 \(Approved\), 3 \(Commented\), 1 \(Requested\)\n`,
-				`Assignees: marseilles, monaco\n`,
-				`Labels: one, two, three, four, five\n`,
-				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
-				`Milestone: uluru\n`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries`,
+				`Reviewers:.*2 \(.*Approved.*\), 3 \(Commented\), 1 \(.*Requested.*\)\n`,
+				`Assignees:.*marseilles, monaco\n`,
+				`Labels:.*one, two, three, four, five\n`,
+				`Projects:.*Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
+				`Milestone:.*uluru\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},
@@ -696,7 +713,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithReviewersByNumber.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
+				`Reviewers:.*DEF \(.*Commented.*\), def \(.*Changes requested.*\), ghost \(.*Approved.*\), hubot \(Commented\), xyz \(.*Approved.*\), 123 \(.*Requested.*\), Team 1 \(.*Requested.*\), abc \(.*Requested.*\)\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12\n`,
 			},
@@ -707,11 +724,11 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewWithMetadataByBranch.json",
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open • nobody wants to merge 8 commits into master from blueberries`,
-				`Assignees: marseilles, monaco\n`,
-				`Labels: one, two, three, four, five\n`,
-				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
-				`Milestone: uluru\n`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries`,
+				`Assignees:.*marseilles, monaco\n`,
+				`Labels:.*one, two, three, four, five\n`,
+				`Projects:.*Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
+				`Milestone:.*uluru\n`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10\n`,
 			},
@@ -722,7 +739,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prView.json",
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open • nobody wants to merge 8 commits into master from blueberries`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
@@ -733,7 +750,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prView_EmptyBody.json",
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open • nobody wants to merge 8 commits into master from blueberries`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
@@ -743,7 +760,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewClosedState.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Closed • nobody wants to merge 12 commits into master from blueberries`,
+				`Closed.*nobody wants to merge 12 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -754,7 +771,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewMergedState.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Merged • nobody wants to merge 12 commits into master from blueberries`,
+				`Merged.*nobody wants to merge 12 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -765,7 +782,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Draft • nobody wants to merge 12 commits into master from blueberries`,
+				`Draft.*nobody wants to merge 12 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -776,7 +793,7 @@ func TestPRView_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Draft • nobody wants to merge 8 commits into master from blueberries`,
+				`Draft.*nobody wants to merge 8 commits into master from blueberries`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
@@ -1232,8 +1249,8 @@ func TestPrMerge(t *testing.T) {
 
 	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
-	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
 
@@ -1339,8 +1356,8 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 
 	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
-	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
 
@@ -1377,7 +1394,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), `Merged pull request #10 \(Blueberries are a good fruit\)`, "Deleted branch blueberries")
+	test.ExpectLines(t, output.Stderr(), `Merged pull request #10 \(Blueberries are a good fruit\)`, `Deleted branch.*blueberries`)
 }
 
 func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
@@ -1411,7 +1428,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), `Merged pull request #10 \(Blueberries are a good fruit\)`, "Deleted branch blueberries")
+	test.ExpectLines(t, output.Stderr(), `Merged pull request #10 \(Blueberries are a good fruit\)`, `Deleted branch.*blueberries`)
 }
 
 func TestPrMerge_noPrNumberGiven(t *testing.T) {
@@ -1449,8 +1466,8 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 
 	r := regexp.MustCompile(`Merged pull request #10 \(Blueberries are a good fruit\)`)
 
-	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
 
@@ -1496,8 +1513,8 @@ func TestPrMerge_rebase(t *testing.T) {
 
 	r := regexp.MustCompile(`Rebased and merged pull request #2 \(The title of the PR\)`)
 
-	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
 }
 
@@ -1541,8 +1558,7 @@ func TestPrMerge_squash(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	expected := "✔ Squashed and merged pull request #3 (The title of the PR)\n✔ Deleted branch blueberries\n"
-	assert.Equal(t, expected, output.String())
+	test.ExpectLines(t, output.Stderr(), "Squashed and merged pull request #3", `Deleted branch.*blueberries`)
 }
 
 func TestPrMerge_alreadyMerged(t *testing.T) {
@@ -1631,7 +1647,7 @@ func TestPRMerge_interactive(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.String(), "Merged pull request #3", "Deleted branch blueberries")
+	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", `Deleted branch.*blueberries`)
 }
 
 func TestPrMerge_multipleMergeMethods(t *testing.T) {

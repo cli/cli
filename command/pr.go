@@ -529,7 +529,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 	}
 
 	if connectedToTerminal(cmd) {
-		fmt.Fprintf(colorableOut(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
+		fmt.Fprintf(colorableErr(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 	}
 
 	if deleteBranch {
@@ -578,7 +578,7 @@ func prMerge(cmd *cobra.Command, args []string) error {
 		}
 
 		if connectedToTerminal(cmd) {
-			fmt.Fprintf(colorableOut(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+			fmt.Fprintf(colorableErr(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
 		}
 	}
 
@@ -639,6 +639,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
+// TODO merge OPEN and DRAFT states; use this in nontty list/view
 func prReadyState(pr *api.PullRequest) string {
 	switch pr.State {
 	case "OPEN":

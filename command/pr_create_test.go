@@ -482,12 +482,9 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
-	eq(t, output.Stderr(), `Warning: 1 uncommitted change
-
-Creating pull request for feature into master in OWNER/REPO
-
-`)
+	test.ExpectLines(t, output.Stderr(), `Warning: 1 uncommitted change`, `Creating pull request for.*feature.*into.*master.*in OWNER/REPO`)
 }
+
 func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 	defer stubTerminal(true)()
 	ctx := context.NewBlank()
