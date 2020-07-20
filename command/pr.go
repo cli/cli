@@ -304,12 +304,11 @@ func prList(cmd *cobra.Command, args []string) error {
 			prNum = "#" + prNum
 		}
 		table.AddField(prNum, nil, colorFuncForPR(pr))
-		if !table.IsTTY() {
-			table.AddField(pr.State, nil, nil)
-			table.AddField(prReadyState(&pr), nil, nil)
-		}
 		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		if !table.IsTTY() {
+			table.AddField(prStateWithDraft(&pr), nil, nil)
+		}
 		table.EndRow()
 	}
 	err = table.Render()
@@ -639,22 +638,12 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 	return mergeMethod, deleteBranch, nil
 }
 
-// TODO merge OPEN and DRAFT states; use this in nontty list/view
-func prReadyState(pr *api.PullRequest) string {
-	switch pr.State {
-	case "OPEN":
-		if pr.IsDraft {
-			return "draft"
-		} else {
-			return "ready"
-		}
-	case "CLOSED":
-		return "unreviewable"
-	case "MERGED":
-		return "unreviewable"
+func prStateWithDraft(pr *api.PullRequest) string {
+	if pr.IsDraft && pr.State == "OPEN" {
+		return "DRAFT"
 	}
 
-	return "unknown"
+	return pr.State
 }
 
 func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
@@ -664,8 +653,7 @@ func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
 	projects := prProjectList(*pr)
 
 	fmt.Fprintf(out, "title:\t%s\n", pr.Title)
-	fmt.Fprintf(out, "state:\t%s\n", pr.State)
-	fmt.Fprintf(out, "ready:\t%s\n", prReadyState(pr))
+	fmt.Fprintf(out, "state:\t%s\n", prStateWithDraft(pr))
 	fmt.Fprintf(out, "author:\t%s\n", pr.Author.Login)
 	fmt.Fprintf(out, "labels:\t%s\n", labels)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)

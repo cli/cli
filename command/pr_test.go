@@ -338,9 +338,9 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	OPEN	draft	New feature	feature
-29	OPEN	ready	Fixed bad bug	hubot:bug-fix
-28	MERGED	unreviewable	Improve documentation	docs
+	assert.Equal(t, `32	New feature	feature	DRAFT
+29	Fixed bad bug	hubot:bug-fix	OPEN
+28	Improve documentation	docs	MERGED
 `, output.String())
 }
 
@@ -500,7 +500,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`state:\tOPEN\n`,
 				`author:\tnobody\n`,
 				`labels:\t\n`,
-				`ready:\tready\n`,
 				`assignees:\t\n`,
 				`reviewers:\t\n`,
 				`projects:\t\n`,
@@ -517,7 +516,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:\t2 \(Approved\), 3 \(Commented\), 1 \(Requested\)\n`,
 				`assignees:\tmarseilles, monaco\n`,
 				`labels:\tone, two, three, four, five\n`,
-				`ready:\tready\n`,
 				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`milestone:\tuluru\n`,
 				`\*\*blueberries taste good\*\*`,
@@ -534,7 +532,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`labels:\t\n`,
 				`assignees:\t\n`,
 				`projects:\t\n`,
-				`ready:\tready\n`,
 				`milestone:\t\n`,
 				`reviewers:\tDEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`\*\*blueberries taste good\*\*`,
@@ -549,7 +546,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`state:\tOPEN`,
 				`author:\tnobody`,
 				`assignees:\tmarseilles, monaco\n`,
-				`ready:\tready\n`,
 				`labels:\tone, two, three, four, five\n`,
 				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
 				`milestone:\tuluru\n`,
@@ -564,7 +560,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`title:\tBlueberries are a good fruit`,
 				`state:\tOPEN`,
 				`author:\tnobody`,
-				`ready:\tready\n`,
 				`assignees:\t\n`,
 				`labels:\t\n`,
 				`projects:\t\n`,
@@ -579,7 +574,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 			expectedOutputs: []string{
 				`title:\tBlueberries are a good fruit`,
 				`state:\tOPEN`,
-				`ready:\tready\n`,
 				`author:\tnobody`,
 				`assignees:\t\n`,
 				`labels:\t\n`,
@@ -595,7 +589,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`state:\tCLOSED\n`,
 				`author:\tnobody\n`,
 				`labels:\t\n`,
-				`ready:\tunreviewable\n`,
 				`assignees:\t\n`,
 				`reviewers:\t\n`,
 				`projects:\t\n`,
@@ -612,7 +605,6 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`author:\tnobody\n`,
 				`labels:\t\n`,
 				`assignees:\t\n`,
-				`ready:\tunreviewable\n`,
 				`reviewers:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
@@ -625,10 +617,9 @@ func TestPRView_Preview_nontty(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewDraftState.json",
 			expectedOutputs: []string{
 				`title:\tBlueberries are from a fork\n`,
-				`state:\tOPEN\n`,
+				`state:\tDRAFT\n`,
 				`author:\tnobody\n`,
 				`labels:`,
-				`ready:\tdraft\n`,
 				`assignees:`,
 				`projects:`,
 				`milestone:`,
@@ -641,10 +632,9 @@ func TestPRView_Preview_nontty(t *testing.T) {
 			fixture:   "../test/fixtures/prViewPreviewDraftStatebyBranch.json",
 			expectedOutputs: []string{
 				`title:\tBlueberries are a good fruit\n`,
-				`state:\tOPEN\n`,
+				`state:\tDRAFT\n`,
 				`author:\tnobody\n`,
 				`labels:`,
-				`ready:\tdraft\n`,
 				`assignees:`,
 				`projects:`,
 				`milestone:`,
