@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -30,7 +31,9 @@ func init() {
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
+	prCloseCmd.Flags().BoolP("comment", "c", false, "Send text comment")
 	prCmd.AddCommand(prReopenCmd)
+	prReopenCmd.Flags().BoolP("comment", "c", false, "Send text comment")
 	prCmd.AddCommand(prMergeCmd)
 	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
 	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
@@ -98,13 +101,13 @@ With '--web', open the pull request in a web browser instead.`,
 var prCloseCmd = &cobra.Command{
 	Use:   "close {<number> | <url> | <branch>}",
 	Short: "Close a pull request",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(2),
 	RunE:  prClose,
 }
 var prReopenCmd = &cobra.Command{
 	Use:   "reopen {<number> | <url> | <branch>}",
 	Short: "Reopen a pull request",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(2),
 	RunE:  prReopen,
 }
 var prMergeCmd = &cobra.Command{
@@ -371,6 +374,20 @@ func prView(cmd *cobra.Command, args []string) error {
 	return printPrPreview(out, pr)
 }
 
+func prComment(cmd *cobra.Command, commentText string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface) error {
+	fmt.Println(commentText)
+	if commentText != "" {
+		pr.Body = commentText
+		err := api.PullRequestComment(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+		fmt.Fprintf(colorableErr(cmd), "%s Commented on pull request #%d\n", utils.Green("✔"), pr.Number)
+	}
+
+	return nil
+}
+
 func prClose(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -397,6 +414,26 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
+
+	commentBranch, err := cmd.Flags().GetBool("comment")
+	if err != nil {
+		return err
+	}
+	if commentBranch {
+		argsWithoutProg := os.Args[5:]
+		arg := os.Args[4]
+
+		argsString := strings.Join(argsWithoutProg, " ")
+		fmt.Println(argsWithoutProg)
+		if arg != "-c" && arg != "--comment" {
+			return fmt.Errorf("--comment (-c) must to be the last parammeter %v", err)
+		}
+		err = prComment(cmd, argsString, apiClient, pr, baseRepo) // Ask user for comment (optional)
+		if err != nil {
+			return fmt.Errorf("Error on add comment: %w", err)
+		}
+
+	}
 
 	return nil
 }
@@ -429,6 +466,26 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d (%s)\n", utils.Green("✔"), pr.Number, pr.Title)
+
+	commentBranch, err := cmd.Flags().GetBool("comment")
+	if err != nil {
+		return err
+	}
+	if commentBranch {
+		argsWithoutProg := os.Args[5:]
+		arg := os.Args[4]
+
+		argsString := strings.Join(argsWithoutProg, " ")
+		fmt.Println(argsWithoutProg)
+		if arg != "-c" && arg != "--comment" {
+			return fmt.Errorf("--comment (-c) must to be the last parammeter %v", err)
+		}
+		err = prComment(cmd, argsString, apiClient, pr, baseRepo) // Ask user for comment (optional)
+		if err != nil {
+			return fmt.Errorf("Error on add comment: %w", err)
+		}
+
+	}
 
 	return nil
 }

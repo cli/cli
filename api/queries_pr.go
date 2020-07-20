@@ -758,6 +758,24 @@ func AddReview(client *Client, pr *PullRequest, input *PullRequestReviewInput) e
 	return gql.MutateNamed(context.Background(), "PullRequestReviewAdd", &mutation, variables)
 }
 
+func PullRequestComment(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		AddComment struct {
+			ClientMutationID string
+		} `graphql:"addComment(input: $input)"`
+	}
+
+	input := githubv4.AddCommentInput{
+		SubjectID: pr.ID,
+		Body:      githubv4.String(pr.Body),
+	}
+
+	v4 := githubv4.NewClient(client.http)
+	err := v4.Mutate(context.Background(), &mutation, input, nil)
+
+	return err
+}
+
 func PullRequestList(client *Client, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
 	type prBlock struct {
 		Edges []struct {
