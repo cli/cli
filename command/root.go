@@ -20,6 +20,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
+	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -95,6 +96,14 @@ func init() {
 		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
+
+	gistCmd := &cobra.Command{
+		Use:   "gist",
+		Short: "Create gists",
+		Long:  `Work with GitHub gists.`,
+	}
+	RootCmd.AddCommand(gistCmd)
+	gistCmd.AddCommand(gistCreateCmd.NewCmdCreate(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
