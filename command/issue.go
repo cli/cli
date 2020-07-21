@@ -487,8 +487,12 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		title = tb.Title
-		body = tb.Body
+		if title == "" {
+			title = tb.Title
+		}
+		if body == "" {
+			body = tb.Body
+		}
 	}
 	if title == "" {
 		return fmt.Errorf("title can't be blank")
