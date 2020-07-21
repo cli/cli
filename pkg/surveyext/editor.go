@@ -117,7 +117,11 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 			}
 		}
 		if r == 'd' {
-			return e.Default, nil
+			if len(e.Default) > 0 {
+				return e.Default, nil
+			} else {
+				continue
+			}
 		}
 		if r == terminal.KeyInterrupt {
 			return "", terminal.InterruptErr
