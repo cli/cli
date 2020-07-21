@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	fixtureFile = "../../../../test/fixtures/gistCreate.json"
+)
+
 func Test_processFiles(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
 	files, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
@@ -160,7 +164,7 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{
 				IO:        testIO(),
 				Public:    true,
-				Filenames: []string{"../../../../test/fixtures/gistCreate.json"},
+				Filenames: []string{fixtureFile},
 			},
 			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
@@ -178,7 +182,7 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{
 				IO:          testIO(),
 				Description: "an incredibly interesting gist",
-				Filenames:   []string{"../../../../test/fixtures/gistCreate.json"},
+				Filenames:   []string{fixtureFile},
 			},
 			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
@@ -195,7 +199,7 @@ func Test_createRun(t *testing.T) {
 			name: "multiple files",
 			opts: &CreateOptions{
 				IO:        testIOWithStdin("cool stdin content"),
-				Filenames: []string{"../../../../test/fixtures/gistCreate.json", "-"},
+				Filenames: []string{fixtureFile, "-"},
 			},
 			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
@@ -229,8 +233,10 @@ func Test_createRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		reg.Register(httpmock.REST("POST", "gists"), httpmock.StringResponse(`
-			{ "html_url": "https://gist.github.com/aa5a315d61ae9438b18d"}`))
+		reg.Register(httpmock.REST("POST", "gists"),
+			httpmock.JSONResponse(struct {
+				Html_url string
+			}{"https://gist.github.com/aa5a315d61ae9438b18d"}))
 
 		mockClient := func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -252,5 +258,38 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantParams, reqBody)
 			reg.Verify(t)
 		})
+	}
+}
+
+func Test_CreateRun_reauth(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(httpmock.REST("POST", "gists"), func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 404,
+			Request:    req,
+			Header: map[string][]string{
+				"X-Oauth-Scopes": []string{"coolScope"},
+			},
+			Body: ioutil.NopCloser(bytes.NewBufferString("oh no")),
+		}, nil
+	})
+
+	mockClient := func() (*http.Client, error) {
+		return &http.Client{Transport: reg}, nil
+	}
+
+	opts := &CreateOptions{
+		IO:         testIO(),
+		HttpClient: mockClient,
+		Filenames:  []string{fixtureFile},
+	}
+
+	err := createRun(opts)
+	if err == nil {
+		t.Fatalf("expected oauth error")
+	}
+
+	if !strings.Contains(err.Error(), "Please re-authenticate") {
+		t.Errorf("got unexpected error: %s", err)
 	}
 }
