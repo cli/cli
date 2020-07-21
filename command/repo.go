@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -612,10 +613,23 @@ func repoView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	readmeContent, _ := api.RepositoryReadme(apiClient, fullName)
+	readme, err := api.RepositoryReadme(apiClient, toView)
+	var notFound *api.NotFoundError
+	if err != nil && !errors.As(err, &notFound) {
+		return err
+	}
 
-	if readmeContent == "" {
-		readmeContent = utils.Gray("No README provided")
+	var readmeContent string
+	if readme == nil {
+		readmeContent = utils.Gray("This repository does not have a README")
+	} else if isMarkdownFile(readme.Filename) {
+		var err error
+		readmeContent, err = utils.RenderMarkdown(readme.Content)
+		if err != nil {
+			return fmt.Errorf("error rendering markdown: %w", err)
+		}
+	} else {
+		readmeContent = readme.Content
 	}
 
 	description := repo.Description
@@ -647,4 +661,13 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 func repoCredits(cmd *cobra.Command, args []string) error {
 	return credits(cmd, args)
+}
+
+func isMarkdownFile(filename string) bool {
+	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
+	// seem worth executing a regex for this given that assumption.
+	return strings.HasSuffix(filename, ".md") ||
+		strings.HasSuffix(filename, ".markdown") ||
+		strings.HasSuffix(filename, ".mdown") ||
+		strings.HasSuffix(filename, ".mkdown")
 }
