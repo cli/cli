@@ -134,6 +134,10 @@ type NotFoundError struct {
 	error
 }
 
+func (err *NotFoundError) Unwrap() error {
+	return err.error
+}
+
 func (pr PullRequest) HeadLabel() string {
 	if pr.IsCrossRepository {
 		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
