@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 
@@ -93,7 +92,7 @@ func createRun(opts *CreateOptions) error {
 		fileArgs = []string{"-"}
 	}
 
-	files, err := processFiles(os.Stdin, fileArgs)
+	files, err := processFiles(opts.IO.In, fileArgs)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}

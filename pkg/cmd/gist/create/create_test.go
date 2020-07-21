@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -13,40 +14,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-// func TestGistCreate(t *testing.T) {
-// 	initBlankContext("", "OWNER/REPO", "trunk")
-
-// 	http := initFakeHTTP()
-// 	http.Register(httpmock.REST("POST", "gists"), httpmock.StringResponse(`
-// 	{
-// 		"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"
-// 	}
-// 	`))
-
-// 	output, err := RunCommand(`gist create "../test/fixtures/gistCreate.json" -d "Gist description" --public`)
-// 	assert.NoError(t, err)
-
-// 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-// 	reqBody := make(map[string]interface{})
-// 	err = json.Unmarshal(bodyBytes, &reqBody)
-// 	if err != nil {
-// 		t.Fatalf("error decoding JSON: %v", err)
-// 	}
-
-// 	expectParams := map[string]interface{}{
-// 		"description": "Gist description",
-// 		"files": map[string]interface{}{
-// 			"gistCreate.json": map[string]interface{}{
-// 				"content": "{}",
-// 			},
-// 		},
-// 		"public": true,
-// 	}
-
-// 	assert.Equal(t, expectParams, reqBody)
-// 	assert.Equal(t, "https://gist.github.com/aa5a315d61ae9438b18d\n", output.String())
-// }
 
 func Test_processFiles(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
@@ -169,6 +136,12 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
+func testIOWithStdin(stdinContent string) *iostreams.IOStreams {
+	tio, stdin, _, _ := iostreams.Test()
+	stdin.WriteString(stdinContent)
+	return tio
+}
+
 func testIO() *iostreams.IOStreams {
 	tio, _, _, _ := iostreams.Test()
 	return tio
@@ -176,43 +149,108 @@ func testIO() *iostreams.IOStreams {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *CreateOptions
-		want    func(t *testing.T)
-		wantErr bool
+		name       string
+		opts       *CreateOptions
+		wantOut    string
+		wantParams map[string]interface{}
+		wantErr    bool
 	}{
-		// TODO stdin passed as -
-		// TODO stdin as |
-		// TODO multiple files
-		// TODO description
-		// TODO public
 		{
-			name: "basic",
+			name: "public",
 			opts: &CreateOptions{
 				IO:        testIO(),
-				Filenames: []string{"-"},
-				HttpClient: func() (*http.Client, error) {
-					reg := &httpmock.Registry{}
-					reg.Register(httpmock.REST("POST", "gists"), httpmock.StringResponse(`
- 	          {
- 	          	"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"
- 	          }`))
-
-					return &http.Client{Transport: reg}, nil
+				Public:    true,
+				Filenames: []string{"../../../../test/fixtures/gistCreate.json"},
+			},
+			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantErr: false,
+			wantParams: map[string]interface{}{
+				"public": true,
+				"files": map[string]interface{}{
+					"gistCreate.json": map[string]interface{}{
+						"content": "{}",
+					},
 				},
 			},
-			want: func(t *testing.T) {
-
+		},
+		{
+			name: "with description",
+			opts: &CreateOptions{
+				IO:          testIO(),
+				Description: "an incredibly interesting gist",
+				Filenames:   []string{"../../../../test/fixtures/gistCreate.json"},
 			},
+			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
+			wantParams: map[string]interface{}{
+				"description": "an incredibly interesting gist",
+				"files": map[string]interface{}{
+					"gistCreate.json": map[string]interface{}{
+						"content": "{}",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple files",
+			opts: &CreateOptions{
+				IO:        testIOWithStdin("cool stdin content"),
+				Filenames: []string{"../../../../test/fixtures/gistCreate.json", "-"},
+			},
+			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantErr: false,
+			wantParams: map[string]interface{}{
+				"files": map[string]interface{}{
+					"gistCreate.json": map[string]interface{}{
+						"content": "{}",
+					},
+					"gistfile1.txt": map[string]interface{}{
+						"content": "cool stdin content",
+					},
+				},
+			},
+		},
+		{
+			name: "stdin arg",
+			opts: &CreateOptions{
+				IO:        testIOWithStdin("cool stdin content"),
+				Filenames: []string{"-"},
+			},
+			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantErr: false,
+			wantParams: map[string]interface{}{
+				"files": map[string]interface{}{
+					"gistfile0.txt": map[string]interface{}{
+						"content": "cool stdin content",
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		reg.Register(httpmock.REST("POST", "gists"), httpmock.StringResponse(`
+			{ "html_url": "https://gist.github.com/aa5a315d61ae9438b18d"}`))
+
+		mockClient := func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+
+		tt.opts.HttpClient = mockClient
+
 		t.Run(tt.name, func(t *testing.T) {
 			if err := createRun(tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("createRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			tt.want(t)
+			bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
+			reqBody := make(map[string]interface{})
+			err := json.Unmarshal(bodyBytes, &reqBody)
+			if err != nil {
+				t.Fatalf("error decoding JSON: %v", err)
+			}
+			assert.Equal(t, tt.wantOut, tt.opts.IO.Out.(*bytes.Buffer).String())
+			assert.Equal(t, tt.wantParams, reqBody)
+			reg.Verify(t)
 		})
 	}
 }
