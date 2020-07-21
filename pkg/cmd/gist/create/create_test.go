@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -168,20 +169,40 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
+func testIO() *iostreams.IOStreams {
+	tio, _, _, _ := iostreams.Test()
+	return tio
+}
+
 func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    *CreateOptions
+		want    func(t *testing.T)
 		wantErr bool
 	}{
+		// TODO stdin passed as -
+		// TODO stdin as |
+		// TODO multiple files
+		// TODO description
+		// TODO public
 		{
 			name: "basic",
 			opts: &CreateOptions{
+				IO:        testIO(),
 				Filenames: []string{"-"},
 				HttpClient: func() (*http.Client, error) {
-					// TODO: return an http.Client that wraps an httpmock instance
-					return nil, nil
+					reg := &httpmock.Registry{}
+					reg.Register(httpmock.REST("POST", "gists"), httpmock.StringResponse(`
+ 	          {
+ 	          	"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"
+ 	          }`))
+
+					return &http.Client{Transport: reg}, nil
 				},
+			},
+			want: func(t *testing.T) {
+
 			},
 			wantErr: false,
 		},
@@ -191,6 +212,7 @@ func Test_createRun(t *testing.T) {
 			if err := createRun(tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("createRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			tt.want(t)
 		})
 	}
 }
