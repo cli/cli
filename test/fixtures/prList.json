@@ -9,7 +9,9 @@
               "number": 32,
               "title": "New feature",
               "url": "https://github.com/monalisa/hello/pull/32",
-              "headRefName": "feature"
+              "headRefName": "feature",
+              "state": "OPEN",
+              "isDraft": true
             }
           },
           {
@@ -18,6 +20,8 @@
               "title": "Fixed bad bug",
               "url": "https://github.com/monalisa/hello/pull/29",
               "headRefName": "bug-fix",
+              "state": "OPEN",
+              "isDraft": false,
               "isCrossRepository": true,
               "headRepositoryOwner": {
                 "login": "hubot"
@@ -27,6 +31,8 @@
           {
             "node": {
               "number": 28,
+              "state": "MERGED",
+              "isDraft": false,
               "title": "Improve documentation",
               "url": "https://github.com/monalisa/hello/pull/28",
               "headRefName": "docs"

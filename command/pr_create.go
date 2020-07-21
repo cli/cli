@@ -205,12 +205,14 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			message = "\nCreating draft pull request for %s into %s in %s\n\n"
 		}
 
-		fmt.Fprintf(colorableErr(cmd), message,
-			utils.Cyan(headBranch),
-			utils.Cyan(baseBranch),
-			ghrepo.FullName(baseRepo))
-		if (title == "" || body == "") && defaultsErr != nil {
-			fmt.Fprintf(colorableErr(cmd), "%s warning: could not compute title or body defaults: %s\n", utils.Yellow("!"), defaultsErr)
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(colorableErr(cmd), message,
+				utils.Cyan(headBranch),
+				utils.Cyan(baseBranch),
+				ghrepo.FullName(baseRepo))
+			if (title == "" || body == "") && defaultsErr != nil {
+				fmt.Fprintf(colorableErr(cmd), "%s warning: could not compute title or body defaults: %s\n", utils.Yellow("!"), defaultsErr)
+			}
 		}
 	}
 
@@ -223,7 +225,13 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		Milestones: milestoneTitles,
 	}
 
-	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+	if !connectedToTerminal(cmd) {
+		if !isWeb && (!cmd.Flags().Changed("title") && !autofill) {
+			return errors.New("--title or --fill required when not attached to a tty")
+		}
+	}
+
+	interactive := connectedToTerminal(cmd) && !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
 
 	if !isWeb && !autofill && interactive {
 		var nonLegacyTemplateFiles []string
@@ -357,8 +365,10 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		if connectedToTerminal(cmd) {
+			// TODO could exceed max url length for explorer
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		}
 		return utils.OpenInBrowser(openURL)
 	} else {
 		panic("Unreachable state")
