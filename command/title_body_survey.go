@@ -146,68 +146,55 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
-	editorCommand, err := determineEditor(cmd)
-	if err != nil {
-		return err
+func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, askTitle, askBody bool, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
+	var qs []*survey.Question
+	if askTitle {
+		issueState.Title = defs.Title
+		titleQuestion := &survey.Question{
+			Name: "title",
+			Prompt: &survey.Input{
+				Message: "Title",
+				Default: issueState.Title,
+			},
+		}
+		qs = append(qs, titleQuestion)
 	}
-
-	issueState.Title = defs.Title
-	templateContents := ""
-
-	if providedBody == "" {
+	if askBody {
+		editorCommand, err := determineEditor(cmd)
+		if err != nil {
+			return err
+		}
+		defaultBody := ""
 		if len(nonLegacyTemplatePaths) > 0 {
 			var err error
-			templateContents, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type)
+			defaultBody, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type)
 			if err != nil {
 				return err
 			}
-			issueState.Body = templateContents
 		} else if legacyTemplatePath != nil {
-			templateContents = string(githubtemplate.ExtractContents(*legacyTemplatePath))
-			issueState.Body = templateContents
+			defaultBody = string(githubtemplate.ExtractContents(*legacyTemplatePath))
 		} else {
-			issueState.Body = defs.Body
+			defaultBody = defs.Body
 		}
-	}
-
-	titleQuestion := &survey.Question{
-		Name: "title",
-		Prompt: &survey.Input{
-			Message: "Title",
-			Default: issueState.Title,
-		},
-	}
-	bodyQuestion := &survey.Question{
-		Name: "body",
-		Prompt: &surveyext.GhEditor{
-			BlankAllowed:  true,
-			EditorCommand: editorCommand,
-			Editor: &survey.Editor{
-				Message:       "Body",
-				FileName:      "*.md",
-				Default:       issueState.Body,
-				HideDefault:   true,
-				AppendDefault: true,
+		bodyQuestion := &survey.Question{
+			Name: "body",
+			Prompt: &surveyext.GhEditor{
+				BlankAllowed:  true,
+				EditorCommand: editorCommand,
+				Editor: &survey.Editor{
+					Message:       "Body",
+					FileName:      "*.md",
+					Default:       defaultBody,
+					HideDefault:   true,
+					AppendDefault: true,
+				},
 			},
-		},
-	}
-
-	var qs []*survey.Question
-	if providedTitle == "" {
-		qs = append(qs, titleQuestion)
-	}
-	if providedBody == "" {
+		}
 		qs = append(qs, bodyQuestion)
 	}
-
-	err = SurveyAsk(qs, issueState)
+	err := SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
-	}
-
-	if issueState.Body == "" {
-		issueState.Body = templateContents
 	}
 
 	allowPreview := !issueState.HasMetadata()

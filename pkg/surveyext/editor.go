@@ -59,7 +59,9 @@ var EditorQuestionTemplate = `
 {{- else }}
   {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
   {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
-	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}{{- if .BlankAllowed }}, enter to skip{{ end }}] {{color "reset"}}
+	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}
+	{{- if .BlankAllowed }}, (enter/return) to keep empty{{ end }}
+	{{- if .Default }}, (d) to accept default{{ end }}] {{color "reset"}}
 {{- end}}`
 
 // EXTENDED to pass editor name (to use in prompt)
@@ -99,7 +101,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	defer cursor.Show()
 
 	for {
-		// EXTENDED to handle the e to edit / enter to skip behavior + BlankAllowed
+		// EXTENDED to handle the e to edit / enter to keep blank / d to accept default behavior + BlankAllowed
 		r, _, err := rr.ReadRune()
 		if err != nil {
 			return "", err
@@ -113,6 +115,9 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 			} else {
 				continue
 			}
+		}
+		if r == 'd' {
+			return e.Default, nil
 		}
 		if r == terminal.KeyInterrupt {
 			return "", terminal.InterruptErr

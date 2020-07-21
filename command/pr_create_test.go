@@ -519,11 +519,9 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	expectedBody := "- commit 1\n- commit 0\n"
-
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "cool bug fixes")
-	eq(t, reqBody.Variables.Input.Body, expectedBody)
+	eq(t, reqBody.Variables.Input.Body, "")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "cool_bug-fixes")
 
@@ -550,7 +548,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	`, func(inputs map[string]interface{}) {
 		eq(t, inputs["repositoryId"], "REPOID")
 		eq(t, inputs["title"], "the sky above the port")
-		eq(t, inputs["body"], "was the color of a television, turned to a dead channel")
+		eq(t, inputs["body"], "")
 		eq(t, inputs["baseRefName"], "master")
 		eq(t, inputs["headRefName"], "feature")
 	}))

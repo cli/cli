@@ -462,7 +462,9 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		Milestones: milestoneTitles,
 	}
 
-	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+	titleWasExplicitlySet := cmd.Flags().Changed("title")
+	bodyWasExplicitlySet := cmd.Flags().Changed("body")
+	interactive := !(titleWasExplicitlySet && bodyWasExplicitlySet)
 
 	if interactive {
 		var legacyTemplateFile *string
@@ -472,7 +474,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
 			}
 		}
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
+		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, !titleWasExplicitlySet, !bodyWasExplicitlySet, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}

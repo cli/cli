@@ -223,7 +223,9 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		Milestones: milestoneTitles,
 	}
 
-	interactive := !(cmd.Flags().Changed("title") && cmd.Flags().Changed("body"))
+	titleWasExplicitlySet := cmd.Flags().Changed("title")
+	bodyWasExplicitlySet := cmd.Flags().Changed("body")
+	interactive := !(titleWasExplicitlySet && bodyWasExplicitlySet)
 
 	if !isWeb && !autofill && interactive {
 		var nonLegacyTemplateFiles []string
@@ -233,7 +235,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 			legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
-		err := titleBodySurvey(cmd, &tb, client, baseRepo, title, body, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage())
+		err := titleBodySurvey(cmd, &tb, client, baseRepo, !titleWasExplicitlySet, !bodyWasExplicitlySet, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
