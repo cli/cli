@@ -6,8 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.11.1
-	github.com/charmbracelet/glamour v0.1.1-0.20200320173916-301d3bcf3058
-	github.com/dlclark/regexp2 v1.2.0 // indirect
+	github.com/charmbracelet/glamour v0.1.1-0.20200527150725-d3564681b966
 	github.com/google/go-cmp v0.4.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.0

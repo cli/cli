@@ -23,13 +23,25 @@ func OpenInBrowser(url string) error {
 
 func RenderMarkdown(text string) (string, error) {
 	style := "notty"
+	// TODO: make color an input parameter
 	if isColorEnabled() {
-		style = "dark"
+		style = "auto"
 	}
+
 	// Glamour rendering preserves carriage return characters in code blocks, but
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
-	return glamour.Render(text, style)
+
+	tr, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle(style),
+		// glamour.WithBaseURL(""),  // TODO: make configurable
+		// glamour.WithWordWrap(80), // TODO: make configurable
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return tr.Render(text)
 }
 
 func Pluralize(num int, thing string) string {
