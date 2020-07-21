@@ -487,10 +487,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		if title == "" {
+		if !titleWasExplicitlySet {
 			title = tb.Title
 		}
-		if body == "" {
+		if !bodyWasExplicitlySet {
 			body = tb.Body
 		}
 	}
