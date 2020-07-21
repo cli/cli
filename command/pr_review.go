@@ -109,7 +109,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	stderr := cmd.ErrOrStderr()
+	stderr := colorableErr(cmd)
 
 	if reviewData == nil {
 		reviewData, err = reviewSurvey(cmd)
