@@ -268,7 +268,7 @@ func Test_CreateRun_reauth(t *testing.T) {
 			StatusCode: 404,
 			Request:    req,
 			Header: map[string][]string{
-				"X-Oauth-Scopes": []string{"coolScope"},
+				"X-Oauth-Scopes": {"coolScope"},
 			},
 			Body: ioutil.NopCloser(bytes.NewBufferString("oh no")),
 		}, nil
