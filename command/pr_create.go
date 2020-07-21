@@ -247,12 +247,8 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 			return nil
 		}
 
-		if title == "" {
-			title = tb.Title
-		}
-		if body == "" {
-			body = tb.Body
-		}
+		title = tb.Title
+		body = tb.Body
 	}
 
 	if action == SubmitAction && title == "" {
