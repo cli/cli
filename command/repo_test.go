@@ -912,6 +912,9 @@ func TestRepoView_blanks(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.Register(httpmock.GraphQL(`query RepositoryInfo\b`), httpmock.StringResponse("{}"))
+	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
+		httpmock.StatusStringResponse(404, `{}`))
 
 	output, err := RunCommand("repo view")
 	if err != nil {
@@ -921,6 +924,6 @@ func TestRepoView_blanks(t *testing.T) {
 	test.ExpectLines(t, output.String(),
 		"OWNER/REPO",
 		"No description provided",
-		"No README provided",
+		"This repository does not have a README",
 		"View this repository on GitHub: https://github.com/OWNER/REPO")
 }
