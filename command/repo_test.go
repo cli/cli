@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func stubSpinner() {
@@ -25,6 +26,72 @@ func stubSpinner() {
 	}
 	utils.StopSpinner = func(_ *spinner.Spinner) {
 	}
+}
+
+func TestRepoFork_nontty_insufficient_flags(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	defer stubTerminal(false)()
+
+	_, err := RunCommand("repo fork")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	assert.Equal(t, "--remote or --clone must be explicitly set when not attached to tty", err.Error())
+}
+
+func TestRepoFork_in_parent_nontty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	defer stubSince(2 * time.Second)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(false)()
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git remote rename
+	cs.Stub("") // git remote add
+
+	output, err := RunCommand("repo fork --remote")
+	if err != nil {
+		t.Fatalf("error running command `repo fork`: %v", err)
+	}
+
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git remote rename origin upstream")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git remote add -f origin https://github.com/someone/REPO.git")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
+func TestRepoFork_outside_parent_nontty(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	http := initFakeHTTP()
+	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(false)()
+
+	cs, restore := test.InitCmdStubber()
+	defer restore()
+
+	cs.Stub("") // git clone
+	cs.Stub("") // git remote add
+
+	output, err := RunCommand("repo fork --clone OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	eq(t, output.String(), "")
+
+	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/REPO.git")
+	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git")
+
+	assert.Equal(t, output.Stderr(), "")
 }
 
 func TestRepoFork_already_forked(t *testing.T) {
@@ -41,14 +108,15 @@ func TestRepoFork_already_forked(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	output, err := RunCommand("repo fork --remote=false")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
-	r := regexp.MustCompile(`someone/REPO already exists`)
-	if !r.MatchString(output.String()) {
-		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
+	r := regexp.MustCompile(`someone/REPO.*already exists`)
+	if !r.MatchString(output.Stderr()) {
+		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output.Stderr())
 		return
 	}
 }
@@ -68,13 +136,15 @@ func TestRepoFork_reuseRemote(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	output, err := RunCommand("repo fork")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
-	if !strings.Contains(output.String(), "Using existing remote origin") {
-		t.Errorf("output did not match: %q", output)
+	r := regexp.MustCompile(`Using existing remote.*origin`)
+	if !r.MatchString(output.Stderr()) {
+		t.Errorf("output did not match: %q", output.Stderr())
 		return
 	}
 }
@@ -96,16 +166,17 @@ func TestRepoFork_in_parent(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	output, err := RunCommand("repo fork --remote=false")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
-	r := regexp.MustCompile(`Created fork someone/REPO`)
-	if !r.MatchString(output.String()) {
+	r := regexp.MustCompile(`Created fork.*someone/REPO`)
+	if !r.MatchString(output.Stderr()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
 	}
@@ -131,16 +202,17 @@ func TestRepoFork_outside(t *testing.T) {
 			defer stubSince(2 * time.Second)()
 			http := initFakeHTTP()
 			defer http.StubWithFixture(200, "forkResult.json")()
+			defer stubTerminal(true)()
 
 			output, err := RunCommand(tt.args)
 			if err != nil {
 				t.Errorf("error running command `repo fork`: %v", err)
 			}
 
-			eq(t, output.Stderr(), "")
+			eq(t, output.String(), "")
 
-			r := regexp.MustCompile(`Created fork someone/REPO`)
-			if !r.MatchString(output.String()) {
+			r := regexp.MustCompile(`Created fork.*someone/REPO`)
+			if !r.MatchString(output.Stderr()) {
 				t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 				return
 			}
@@ -155,6 +227,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	var seenCmds []*exec.Cmd
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -176,11 +249,11 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 		eq(t, strings.Join(cmd.Args, " "), expectedCmds[x])
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
-	test.ExpectLines(t, output.String(),
-		"Created fork someone/REPO",
-		"Added remote origin")
+	test.ExpectLines(t, output.Stderr(),
+		"Created fork.*someone/REPO",
+		"Added remote.*origin")
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
@@ -188,6 +261,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	cs, restore := test.InitCmdStubber()
 	defer restore()
@@ -200,13 +274,13 @@ func TestRepoFork_outside_yes(t *testing.T) {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
 	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/REPO.git")
 	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git")
 
-	test.ExpectLines(t, output.String(),
-		"Created fork someone/REPO",
+	test.ExpectLines(t, output.Stderr(),
+		"Created fork.*someone/REPO",
 		"Cloned fork")
 }
 
@@ -215,6 +289,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	cs, restore := test.InitCmdStubber()
 	defer restore()
@@ -234,13 +309,13 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
 	eq(t, strings.Join(cs.Calls[0].Args, " "), "git clone https://github.com/someone/REPO.git")
 	eq(t, strings.Join(cs.Calls[1].Args, " "), "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git")
 
-	test.ExpectLines(t, output.String(),
-		"Created fork someone/REPO",
+	test.ExpectLines(t, output.Stderr(),
+		"Created fork.*someone/REPO",
 		"Cloned fork")
 }
 
@@ -249,6 +324,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	http := initFakeHTTP()
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	cmdRun := false
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -268,12 +344,12 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
 	eq(t, cmdRun, false)
 
-	r := regexp.MustCompile(`Created fork someone/REPO`)
-	if !r.MatchString(output.String()) {
+	r := regexp.MustCompile(`Created fork.*someone/REPO`)
+	if !r.MatchString(output.Stderr()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
 	}
@@ -286,6 +362,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	var seenCmds []*exec.Cmd
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -314,12 +391,12 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 		eq(t, strings.Join(cmd.Args, " "), expectedCmds[x])
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
-	test.ExpectLines(t, output.String(),
-		"Created fork someone/REPO",
-		"Renamed origin remote to upstream",
-		"Added remote origin")
+	test.ExpectLines(t, output.Stderr(),
+		"Created fork.*someone/REPO",
+		"Renamed.*origin.*remote to.*upstream",
+		"Added remote.*origin")
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
@@ -329,6 +406,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	defer http.StubWithFixture(200, "forkResult.json")()
+	defer stubTerminal(true)()
 
 	cmdRun := false
 	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -348,12 +426,12 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	eq(t, output.String(), "")
 
 	eq(t, cmdRun, false)
 
-	r := regexp.MustCompile(`Created fork someone/REPO`)
-	if !r.MatchString(output.String()) {
+	r := regexp.MustCompile(`Created fork.*someone/REPO`)
+	if !r.MatchString(output.Stderr()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
 	}
@@ -766,6 +844,8 @@ func TestRepoView_web(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	defer stubTerminal(true)()
+
 	output, err := RunCommand("repo view -w")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
@@ -799,6 +879,7 @@ func TestRepoView_web_ownerRepo(t *testing.T) {
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
+	defer stubTerminal(true)()
 
 	output, err := RunCommand("repo view -w cli/cli")
 	if err != nil {
@@ -833,6 +914,7 @@ func TestRepoView_web_fullURL(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	defer stubTerminal(true)()
 	output, err := RunCommand("repo view -w https://github.com/cli/cli")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
@@ -865,6 +947,8 @@ func TestRepoView(t *testing.T) {
 		{ "name": "readme.md",
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
+	defer stubTerminal(true)()
+
 	output, err := RunCommand("repo view")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
@@ -875,7 +959,6 @@ func TestRepoView(t *testing.T) {
 		"social distancing",
 		"truly cool readme",
 		"View this repository on GitHub: https://github.com/OWNER/REPO")
-
 }
 
 func TestRepoView_nonmarkdown_readme(t *testing.T) {
@@ -894,6 +977,8 @@ func TestRepoView_nonmarkdown_readme(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "name": "readme.org",
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
+
+	defer stubTerminal(true)()
 
 	output, err := RunCommand("repo view")
 	if err != nil {
@@ -916,6 +1001,8 @@ func TestRepoView_blanks(t *testing.T) {
 		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
 		httpmock.StatusStringResponse(404, `{}`))
 
+	defer stubTerminal(true)()
+
 	output, err := RunCommand("repo view")
 	if err != nil {
 		t.Errorf("error running command `repo view`: %v", err)
@@ -926,4 +1013,35 @@ func TestRepoView_blanks(t *testing.T) {
 		"No description provided",
 		"This repository does not have a README",
 		"View this repository on GitHub: https://github.com/OWNER/REPO")
+}
+
+func TestRepoView_nontty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"repository": {
+			"description": "social distancing"
+		} } }`))
+	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
+		httpmock.StringResponse(`
+		{ "name": "readme.md",
+		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
+
+	defer stubTerminal(false)()
+
+	output, err := RunCommand("repo view")
+	if err != nil {
+		t.Errorf("error running command `repo view`: %v", err)
+	}
+
+	test.ExpectLines(t, output.String(),
+		"OWNER/REPO",
+		"social distancing",
+		"# truly cool readme check it out",
+	)
 }
