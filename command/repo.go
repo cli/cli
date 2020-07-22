@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -21,7 +20,6 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoCloneCmd)
 
 	repoCmd.AddCommand(repoCreateCmd)
@@ -37,9 +35,6 @@ func init() {
 	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
 	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
-
-	repoCmd.AddCommand(repoViewCmd)
-	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
 
 	repoCmd.AddCommand(repoCreditsCmd)
 	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
@@ -102,17 +97,6 @@ var repoForkCmd = &cobra.Command{
 
 With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.`,
 	RunE: repoFork,
-}
-
-var repoViewCmd = &cobra.Command{
-	Use:   "view [<repository>]",
-	Short: "View a repository",
-	Long: `Display the description and the README of a GitHub repository.
-
-With no argument, the repository for the current directory is displayed.
-
-With '--web', open the repository in a web browser instead.`,
-	RunE: repoView,
 }
 
 var repoCreditsCmd = &cobra.Command{
@@ -576,145 +560,6 @@ var Confirm = func(prompt string, result *bool) error {
 	return survey.AskOne(p, result)
 }
 
-func repoView(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	var toView ghrepo.Interface
-	if len(args) == 0 {
-		var err error
-		toView, err = determineBaseRepo(apiClient, cmd, ctx)
-		if err != nil {
-			return err
-		}
-	} else {
-		repoArg := args[0]
-		if isURL(repoArg) {
-			parsedURL, err := url.Parse(repoArg)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-
-			toView, err = ghrepo.FromURL(parsedURL)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-		} else {
-			var err error
-			toView, err = ghrepo.FromFullName(repoArg)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
-		}
-	}
-
-	repo, err := api.GitHubRepo(apiClient, toView)
-	if err != nil {
-		return err
-	}
-
-	web, err := cmd.Flags().GetBool("web")
-	if err != nil {
-		return err
-	}
-
-	openURL := generateRepoURL(toView, "")
-	if web {
-		if connectedToTerminal(cmd) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
-		}
-		return utils.OpenInBrowser(openURL)
-	}
-
-	fullName := ghrepo.FullName(toView)
-
-	if !connectedToTerminal(cmd) {
-		readme, err := api.RepositoryReadme(apiClient, toView)
-		if err != nil {
-			return err
-		}
-
-		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "name:\t%s\n", fullName)
-		fmt.Fprintf(out, "description:\t%s\n", repo.Description)
-		fmt.Fprintln(out, "--")
-		fmt.Fprintf(out, readme.Content)
-
-		return nil
-	}
-
-	repoTmpl := `
-{{.FullName}}
-{{.Description}}
-
-{{.Readme}}
-
-{{.View}}
-`
-
-	tmpl, err := template.New("repo").Parse(repoTmpl)
-	if err != nil {
-		return err
-	}
-
-	readme, err := api.RepositoryReadme(apiClient, toView)
-	var notFound *api.NotFoundError
-	if err != nil && !errors.As(err, &notFound) {
-		return err
-	}
-
-	var readmeContent string
-	if readme == nil {
-		readmeContent = utils.Gray("This repository does not have a README")
-	} else if isMarkdownFile(readme.Filename) {
-		var err error
-		readmeContent, err = utils.RenderMarkdown(readme.Content)
-		if err != nil {
-			return fmt.Errorf("error rendering markdown: %w", err)
-		}
-	} else {
-		readmeContent = readme.Content
-	}
-
-	description := repo.Description
-	if description == "" {
-		description = utils.Gray("No description provided")
-	}
-
-	repoData := struct {
-		FullName    string
-		Description string
-		Readme      string
-		View        string
-	}{
-		FullName:    utils.Bold(fullName),
-		Description: description,
-		Readme:      readmeContent,
-		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
-	}
-
-	out := colorableOut(cmd)
-
-	err = tmpl.Execute(out, repoData)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func repoCredits(cmd *cobra.Command, args []string) error {
 	return credits(cmd, args)
-}
-
-func isMarkdownFile(filename string) bool {
-	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
-	// seem worth executing a regex for this given that assumption.
-	return strings.HasSuffix(filename, ".md") ||
-		strings.HasSuffix(filename, ".markdown") ||
-		strings.HasSuffix(filename, ".mdown") ||
-		strings.HasSuffix(filename, ".mkdown")
 }

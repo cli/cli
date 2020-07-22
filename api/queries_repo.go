@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -403,37 +402,6 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 
 	// FIXME: support Enterprise hosts
 	return initRepoHostname(&response.CreateRepository.Repository, "github.com"), nil
-}
-
-type RepoReadme struct {
-	Filename string
-	Content  string
-}
-
-func RepositoryReadme(client *Client, repo ghrepo.Interface) (*RepoReadme, error) {
-	var response struct {
-		Name    string
-		Content string
-	}
-
-	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
-	if err != nil {
-		var httpError HTTPError
-		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
-			return nil, &NotFoundError{err}
-		}
-		return nil, err
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(response.Content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode readme: %w", err)
-	}
-
-	return &RepoReadme{
-		Filename: response.Name,
-		Content:  string(decoded),
-	}, nil
 }
 
 type RepoMetadataResult struct {

@@ -134,6 +134,10 @@ type NotFoundError struct {
 	error
 }
 
+func NewNotFoundError(err error) *NotFoundError {
+	return &NotFoundError{err}
+}
+
 func (err *NotFoundError) Unwrap() error {
 	return err.error
 }
