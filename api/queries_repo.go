@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/utils"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -406,35 +405,35 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	return initRepoHostname(&response.CreateRepository.Repository, "github.com"), nil
 }
 
-func RepositoryReadme(client *Client, fullName string) (string, error) {
-	type readmeResponse struct {
+type RepoReadme struct {
+	Filename string
+	Content  string
+}
+
+func RepositoryReadme(client *Client, repo ghrepo.Interface) (*RepoReadme, error) {
+	var response struct {
 		Name    string
 		Content string
 	}
 
-	var readme readmeResponse
-
-	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", fullName), nil, &readme)
-	if err != nil && !strings.HasSuffix(err.Error(), "'Not Found'") {
-		return "", fmt.Errorf("could not get readme for repo: %w", err)
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(readme.Content)
+	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode readme: %w", err)
-	}
-
-	readmeContent := string(decoded)
-
-	if isMarkdownFile(readme.Name) {
-		readmeContent, err = utils.RenderMarkdown(readmeContent)
-		if err != nil {
-			return "", fmt.Errorf("failed to render readme as markdown: %w", err)
+		var httpError HTTPError
+		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
+			return nil, &NotFoundError{err}
 		}
+		return nil, err
 	}
 
-	return readmeContent, nil
+	decoded, err := base64.StdEncoding.DecodeString(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode readme: %w", err)
+	}
 
+	return &RepoReadme{
+		Filename: response.Name,
+		Content:  string(decoded),
+	}, nil
 }
 
 type RepoMetadataResult struct {
@@ -894,13 +893,4 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 	}
 
 	return milestones, nil
-}
-
-func isMarkdownFile(filename string) bool {
-	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
-	// seem worth executing a regex for this given that assumption.
-	return strings.HasSuffix(filename, ".md") ||
-		strings.HasSuffix(filename, ".markdown") ||
-		strings.HasSuffix(filename, ".mdown") ||
-		strings.HasSuffix(filename, ".mkdown")
 }

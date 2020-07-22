@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -433,21 +434,36 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if !connectedToTerminal(cmd) {
+		if (inParent && remotePref == "prompt") || (!inParent && clonePref == "prompt") {
+			return errors.New("--remote or --clone must be explicitly set when not attached to tty")
+		}
+	}
+
 	greenCheck := utils.Green("✓")
-	out := colorableOut(cmd)
-	s := utils.Spinner(out)
-	loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
-	s.Suffix = " " + loading
-	s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
-	utils.StartSpinner(s)
+	stderr := colorableErr(cmd)
+	s := utils.Spinner(stderr)
+	stopSpinner := func() {}
+
+	if connectedToTerminal(cmd) {
+		loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
+		s.Suffix = " " + loading
+		s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
+		utils.StartSpinner(s)
+		stopSpinner = func() {
+			utils.StopSpinner(s)
+
+		}
+	}
 
 	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
 	if err != nil {
-		utils.StopSpinner(s)
+		stopSpinner()
 		return fmt.Errorf("failed to fork: %w", err)
 	}
 
-	s.Stop()
+	stopSpinner()
+
 	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
 	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
 	// returns the fork repo data even if it already exists -- with no change in status code or
@@ -455,12 +471,19 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// we assume the fork already existed and report an error.
 	createdAgo := Since(forkedRepo.CreatedAt)
 	if createdAgo > time.Minute {
-		fmt.Fprintf(out, "%s %s %s\n",
-			utils.Yellow("!"),
-			utils.Bold(ghrepo.FullName(forkedRepo)),
-			"already exists")
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(stderr, "%s %s %s\n",
+				utils.Yellow("!"),
+				utils.Bold(ghrepo.FullName(forkedRepo)),
+				"already exists")
+		} else {
+			fmt.Fprintf(stderr, "%s already exists", ghrepo.FullName(forkedRepo))
+			return nil
+		}
 	} else {
-		fmt.Fprintf(out, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(stderr, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
+		}
 	}
 
 	if (inParent && remotePref == "false") || (!inParent && clonePref == "false") {
@@ -473,7 +496,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
-			fmt.Fprintf(out, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+			if connectedToTerminal(cmd) {
+				fmt.Fprintf(stderr, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+			}
 			return nil
 		}
 
@@ -498,7 +523,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(out, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
+				if connectedToTerminal(cmd) {
+					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
+				}
 			}
 
 			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
@@ -508,7 +535,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
 
-			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
+			if connectedToTerminal(cmd) {
+				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
+			}
 		}
 	} else {
 		cloneDesired := clonePref == "true"
@@ -530,7 +559,9 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				return err
 			}
 
-			fmt.Fprintf(out, "%s Cloned fork\n", greenCheck)
+			if connectedToTerminal(cmd) {
+				fmt.Fprintf(stderr, "%s Cloned fork\n", greenCheck)
+			}
 		}
 	}
 
@@ -590,12 +621,29 @@ func repoView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fullName := ghrepo.FullName(toView)
-
 	openURL := generateRepoURL(toView, "")
 	if web {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		if connectedToTerminal(cmd) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		}
 		return utils.OpenInBrowser(openURL)
+	}
+
+	fullName := ghrepo.FullName(toView)
+
+	if !connectedToTerminal(cmd) {
+		readme, err := api.RepositoryReadme(apiClient, toView)
+		if err != nil {
+			return err
+		}
+
+		out := cmd.OutOrStdout()
+		fmt.Fprintf(out, "name:\t%s\n", fullName)
+		fmt.Fprintf(out, "description:\t%s\n", repo.Description)
+		fmt.Fprintln(out, "--")
+		fmt.Fprintf(out, readme.Content)
+
+		return nil
 	}
 
 	repoTmpl := `
@@ -612,10 +660,23 @@ func repoView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	readmeContent, _ := api.RepositoryReadme(apiClient, fullName)
+	readme, err := api.RepositoryReadme(apiClient, toView)
+	var notFound *api.NotFoundError
+	if err != nil && !errors.As(err, &notFound) {
+		return err
+	}
 
-	if readmeContent == "" {
-		readmeContent = utils.Gray("No README provided")
+	var readmeContent string
+	if readme == nil {
+		readmeContent = utils.Gray("This repository does not have a README")
+	} else if isMarkdownFile(readme.Filename) {
+		var err error
+		readmeContent, err = utils.RenderMarkdown(readme.Content)
+		if err != nil {
+			return fmt.Errorf("error rendering markdown: %w", err)
+		}
+	} else {
+		readmeContent = readme.Content
 	}
 
 	description := repo.Description
@@ -647,4 +708,13 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 func repoCredits(cmd *cobra.Command, args []string) error {
 	return credits(cmd, args)
+}
+
+func isMarkdownFile(filename string) bool {
+	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
+	// seem worth executing a regex for this given that assumption.
+	return strings.HasSuffix(filename, ".md") ||
+		strings.HasSuffix(filename, ".markdown") ||
+		strings.HasSuffix(filename, ".mdown") ||
+		strings.HasSuffix(filename, ".mkdown")
 }
