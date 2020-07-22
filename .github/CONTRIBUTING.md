@@ -33,7 +33,9 @@ Run tests with: `make test` or `go test ./...`
 
 ## Submitting a pull request
 
-1. Create a new branch: `git checkout -b my-branch-name`
+1. Create a new branch:
+   1. Ensure you are up-to-date with main repository branch: `git checkout trunk && git pull`
+   1. Create a new branch: `git checkout -b my-branch-name`
 1. Make your change, add tests, and ensure tests pass
 1. Submit a pull request: `gh pr create --web`
 
