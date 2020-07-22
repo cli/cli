@@ -359,6 +359,12 @@ type RepoCreateInput struct {
 	HasWikiEnabled   bool `json:"hasWikiEnabled"`
 }
 
+const (
+	RepositoryVisibilityPrivate  = "PRIVATE"
+	RepositoryVisibilityPublic   = "PUBLIC"
+	RepositoryVisibilityInternal = "INTERNAL"
+)
+
 // RepoCreate creates a new GitHub repository
 func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	var response struct {

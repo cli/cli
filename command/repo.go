@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,7 +30,10 @@ func init() {
 	repoCreateCmd.Flags().StringP("team", "t", "", "The name of the organization team to be granted access")
 	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
 	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
-	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public (default: private)")
+	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public")
+	repoCreateCmd.Flags().Bool("private", false, "Make the new repository private")
+	repoCreateCmd.Flags().Bool("internal", false, "Make the new repository internal")
+	repoCreateCmd.Flags().BoolP("confirm", "y", false, "Pass confirmation to create repository (default: false)")
 
 	repoCmd.AddCommand(repoForkCmd)
 	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
@@ -87,6 +91,9 @@ var repoCreateCmd = &cobra.Command{
 
 	# create a repository in an organization
 	$ gh repo create cli/my-project
+
+	# pass the -y flag to override default ask for confirmation step
+	$ gh repo create cli/my-project -y
 	`),
 	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
 - <OWNER/REPO>
@@ -243,27 +250,6 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	var name string
-	if len(args) > 0 {
-		name = args[0]
-		if strings.Contains(name, "/") {
-			newRepo, err := ghrepo.FromFullName(name)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
-			orgName = newRepo.RepoOwner()
-			name = newRepo.RepoName()
-		}
-	} else {
-		if projectDirErr != nil {
-			return projectDirErr
-		}
-		name = path.Base(projectDir)
-	}
-
-	isPublic, err := cmd.Flags().GetBool("public")
-	if err != nil {
-		return err
-	}
 	hasIssuesEnabled, err := cmd.Flags().GetBool("enable-issues")
 	if err != nil {
 		return err
@@ -280,45 +266,111 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO: move this into constant within `api`
-	visibility := "PRIVATE"
-	if isPublic {
-		visibility = "PUBLIC"
-	}
-
-	input := api.RepoCreateInput{
-		Name:             name,
-		Visibility:       visibility,
-		OwnerID:          orgName,
-		TeamID:           teamSlug,
-		Description:      description,
-		HomepageURL:      homepage,
-		HasIssuesEnabled: hasIssuesEnabled,
-		HasWikiEnabled:   hasWikiEnabled,
-	}
-
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
+	confirmAll, err := cmd.Flags().GetBool("confirm")
 	if err != nil {
 		return err
 	}
+	// User should pass exactly one flag among --public, --private, --internal
+	enabledFlagCount := 0
+	visibility := ""
+	// isInteractive := false
+	isVisibilityPassed := false
+	if b, _ := cmd.Flags().GetBool("public"); b {
+		enabledFlagCount++
+		visibility = api.RepositoryVisibilityPublic
+	}
+	if b, _ := cmd.Flags().GetBool("private"); b {
+		enabledFlagCount++
+		visibility = api.RepositoryVisibilityPrivate
+	}
+	if b, _ := cmd.Flags().GetBool("internal"); b {
+		enabledFlagCount++
+		visibility = api.RepositoryVisibilityInternal
+	}
 
-	confirmRepoCreate := false
-	promptString := ""
-	if input.OwnerID == "" {
-		promptString = "This will create " + name + " in your personal account. Continue? "
+	if enabledFlagCount > 1 {
+		return errors.New("expected exactly one of --public, --private, or --internal to be true")
+	} else if enabledFlagCount == 1 {
+		isVisibilityPassed = true
+	}
+
+	confirmSubmit := confirmAll
+	if len(args) > 0 {
+		// isInteractive = false
+		name = args[0]
+		// Display confirmation steps for repo name passed as argument
+		if !confirmSubmit {
+			promptString := ""
+			if strings.Contains(name, "/") {
+				newRepo, err := ghrepo.FromFullName(name)
+				if err != nil {
+					return fmt.Errorf("argument error: %w", err)
+				}
+				orgName = newRepo.RepoOwner()
+				name = newRepo.RepoName()
+				promptString = fmt.Sprintf("This will create %s/%s. Continue? ", orgName, name)
+			} else {
+				promptString = fmt.Sprintf("This will create %s in your personal account. Continue? ", name)
+			}
+			err := Confirm(promptString, &confirmSubmit)
+			if err != nil {
+				return err
+			}
+		}
+		if confirmSubmit {
+			isDescEmpty := description == ""
+			newVisibility := ""
+			_, newVisibility, description, err = interactiveRepoCreate(name, true, isDescEmpty, isVisibilityPassed)
+			if err != nil {
+				return err
+			}
+			if !isVisibilityPassed {
+				visibility = newVisibility
+			}
+		}
 	} else {
-		promptString = "This will create " + input.OwnerID + "/" + name + ". Continue? "
+		// isInteractive = true
+		if projectDirErr != nil {
+			return projectDirErr
+		}
+		name = path.Base(projectDir)
+		isDescEmpty := description == ""
+		newVisibility := ""
+		name, newVisibility, description, err = interactiveRepoCreate(name, false, isDescEmpty, isVisibilityPassed)
+		if err != nil {
+			return err
+		}
+		if !isVisibilityPassed {
+			visibility = newVisibility
+		}
+
+		if !confirmSubmit {
+			err := Confirm("Submit? ", &confirmSubmit)
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
-	err = Confirm(promptString, &confirmRepoCreate)
+	if confirmSubmit {
+		input := api.RepoCreateInput{
+			Name:             name,
+			Visibility:       visibility,
+			OwnerID:          orgName,
+			TeamID:           teamSlug,
+			Description:      description,
+			HomepageURL:      homepage,
+			HasIssuesEnabled: hasIssuesEnabled,
+			HasWikiEnabled:   hasWikiEnabled,
+		}
 
-	if err != nil {
-		return err
-	}
+		ctx := contextForCommand(cmd)
+		client, err := apiClientForContext(ctx)
+		if err != nil {
+			return err
+		}
 
-	if confirmRepoCreate {
 		repo, err := api.RepoCreate(client, input)
 		if err != nil {
 			return err
@@ -352,12 +404,13 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
 			}
 		} else if isTTY {
-			doSetup := false
-			err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
-			if err != nil {
-				return err
+			doSetup := confirmAll
+			if !doSetup {
+				err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+				if err != nil {
+					return err
+				}
 			}
-
 			if doSetup {
 				path := repo.Name
 
@@ -380,7 +433,7 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 			}
 		}
 	} else {
-		fmt.Fprintf(colorableOut(cmd), "Repo Create aborted by user\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Discarding\n")
 	}
 
 	return nil
@@ -665,4 +718,57 @@ func repoView(cmd *cobra.Command, args []string) error {
 
 func repoCredits(cmd *cobra.Command, args []string) error {
 	return credits(cmd, args)
+}
+
+func interactiveRepoCreate(defaultName string, isNameAnArg bool, isDescEmpty bool, isVisibilityPassed bool) (string, string, string, error) {
+
+	qs := []*survey.Question{}
+
+	if !isNameAnArg {
+		repoOwnerQuestion := &survey.Question{
+			Name: "repoOwner",
+			Prompt: &survey.Input{
+				Message: "Repository name",
+				Default: defaultName,
+			},
+		}
+		qs = append(qs, repoOwnerQuestion)
+	}
+
+	if isDescEmpty {
+		repoDescriptionQuestion := &survey.Question{
+			Name: "repoDescription",
+			Prompt: &survey.Multiline{
+				Message: "Repository description",
+			},
+		}
+
+		qs = append(qs, repoDescriptionQuestion)
+
+	}
+
+	if !isVisibilityPassed {
+		repoVisibilityQuestion := &survey.Question{
+			Name: "repoVisibility",
+			Prompt: &survey.Select{
+				Message: "Visibility",
+				Options: []string{api.RepositoryVisibilityPublic, api.RepositoryVisibilityPrivate, api.RepositoryVisibilityInternal},
+			},
+		}
+		qs = append(qs, repoVisibilityQuestion)
+	}
+
+	answers := struct {
+		RepoOwner       string
+		RepoDescription string
+		RepoVisibility  string
+	}{}
+
+	err := SurveyAsk(qs, &answers)
+
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return answers.RepoOwner, answers.RepoVisibility, answers.RepoDescription, nil
 }

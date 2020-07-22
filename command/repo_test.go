@@ -572,6 +572,20 @@ func TestRepoCreate(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "repoDescription",
+			Value: "",
+		},
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+
 	oldConfirm := Confirm
 	Confirm = func(_ string, result *bool) error {
 		*result = true
@@ -650,6 +664,20 @@ func TestRepoCreate_org(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "repoDescription",
+			Value: "",
+		},
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+
 	oldConfirm := Confirm
 	Confirm = func(_ string, result *bool) error {
 		*result = true
@@ -727,6 +755,20 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
+
+	as, surveyTeardown := initAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*QuestionStub{
+		{
+			Name:  "repoDescription",
+			Value: "",
+		},
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
 
 	oldConfirm := Confirm
 	Confirm = func(_ string, result *bool) error {

@@ -36,6 +36,7 @@ func init() {
 	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
 	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
 	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
+	prMergeCmd.Flags().BoolP("confirm", "y", false, "")
 	prCmd.AddCommand(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
@@ -606,7 +607,6 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, confirmSubmit 
 	}
 
 	if !confirmSubmit {
-		// Confirm before submitting
 		confirmBeforeSubmitting := &survey.Question{
 			Name: "confirmSubmit",
 			Prompt: &survey.Confirm{
