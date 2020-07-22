@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	fixtureFile = "../../../../test/fixtures/gistCreate.json"
+	fixtureFile = "../fixture.txt"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -162,7 +162,7 @@ func Test_createRun(t *testing.T) {
 			wantParams: map[string]interface{}{
 				"public": true,
 				"files": map[string]interface{}{
-					"gistCreate.json": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
 						"content": "{}",
 					},
 				},
@@ -180,7 +180,7 @@ func Test_createRun(t *testing.T) {
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
 				"files": map[string]interface{}{
-					"gistCreate.json": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
 						"content": "{}",
 					},
 				},
@@ -197,7 +197,7 @@ func Test_createRun(t *testing.T) {
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"files": map[string]interface{}{
-					"gistCreate.json": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
 						"content": "{}",
 					},
 					"gistfile1.txt": map[string]interface{}{
