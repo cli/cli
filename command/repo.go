@@ -798,7 +798,7 @@ func interactiveRepoCreate(defaultName string, isNameAnArg bool, isDescEmpty boo
 	if isDescEmpty {
 		repoDescriptionQuestion := &survey.Question{
 			Name: "repoDescription",
-			Prompt: &survey.Multiline{
+			Prompt: &survey.Input{
 				Message: "Repository description",
 			},
 		}
