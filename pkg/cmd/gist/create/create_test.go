@@ -146,6 +146,7 @@ func Test_createRun(t *testing.T) {
 		opts       *CreateOptions
 		stdin      string
 		wantOut    string
+		wantStderr string
 		wantParams map[string]interface{}
 		wantErr    bool
 	}{
@@ -155,8 +156,9 @@ func Test_createRun(t *testing.T) {
 				Public:    true,
 				Filenames: []string{fixtureFile},
 			},
-			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantErr: false,
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"public": true,
 				"files": map[string]interface{}{
@@ -172,8 +174,9 @@ func Test_createRun(t *testing.T) {
 				Description: "an incredibly interesting gist",
 				Filenames:   []string{fixtureFile},
 			},
-			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantErr: false,
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
 				"files": map[string]interface{}{
@@ -188,9 +191,10 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{
 				Filenames: []string{fixtureFile, "-"},
 			},
-			stdin:   "cool stdin content",
-			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantErr: false,
+			stdin:      "cool stdin content",
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"files": map[string]interface{}{
 					"gistCreate.json": map[string]interface{}{
@@ -207,9 +211,10 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{
 				Filenames: []string{"-"},
 			},
-			stdin:   "cool stdin content",
-			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantErr: false,
+			stdin:      "cool stdin content",
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"files": map[string]interface{}{
 					"gistfile0.txt": map[string]interface{}{
@@ -247,7 +252,7 @@ func Test_createRun(t *testing.T) {
 				t.Fatalf("error decoding JSON: %v", err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
-			assert.Equal(t, "", stderr.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantParams, reqBody)
 			reg.Verify(t)
 		})
