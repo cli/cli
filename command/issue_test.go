@@ -438,7 +438,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/issueView_preview.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open • marseilles opened about 292 years ago • 9 comments`,
+				`Open.*marseilles opened about 292 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -449,11 +449,11 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open • marseilles opened about 292 years ago • 9 comments`,
-				`Assignees: marseilles, monaco\n`,
-				`Labels: one, two, three, four, five\n`,
-				`Projects: Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
-				`Milestone: uluru\n`,
+				`Open.*marseilles opened about 292 years ago.*9 comments`,
+				`Assignees:.*marseilles, monaco\n`,
+				`Labels:.*one, two, three, four, five\n`,
+				`Projects:.*Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
+				`Milestone:.*uluru\n`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -464,7 +464,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open • marseilles opened about 292 years ago • 9 comments`,
+				`Open.*marseilles opened about 292 years ago.*9 comments`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
@@ -474,7 +474,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture:   "../test/fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Closed • marseilles opened about 292 years ago • 9 comments`,
+				`Closed.*marseilles opened about 292 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -753,6 +753,8 @@ func TestIssueCreate_web(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
+	defer stubTerminal(true)()
+
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
@@ -778,6 +780,8 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
+
+	defer stubTerminal(true)()
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {

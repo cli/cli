@@ -517,7 +517,9 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		} else if len(nonLegacyTemplateFiles) > 1 {
 			openURL += "/choose"
 		}
-		cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
+		if connectedToTerminal(cmd) {
+			cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
+		}
 		return utils.OpenInBrowser(openURL)
 	}
 

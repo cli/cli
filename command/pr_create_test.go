@@ -12,10 +12,124 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/test"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestPRCreate_nontty_web(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
+
+	output, err := RunCommand(`pr create --web`)
+	eq(t, err, nil)
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "")
+
+	eq(t, len(cs.Calls), 6)
+	eq(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature")
+	browserCall := cs.Calls[5].Args
+	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+
+}
+
+func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+
+	output, err := RunCommand("pr create")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	assert.Equal(t, "--title or --fill required when not attached to a tty", err.Error())
+
+	assert.Equal(t, "", output.String())
+}
+
+func TestPRCreate_nontty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+
+	output, err := RunCommand(`pr create -t "my title" -b "my body"`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	assert.Equal(t, "REPOID", reqBody.Variables.Input.RepositoryID)
+	assert.Equal(t, "my title", reqBody.Variables.Input.Title)
+	assert.Equal(t, "my body", reqBody.Variables.Input.Body)
+	assert.Equal(t, "master", reqBody.Variables.Input.BaseRefName)
+	assert.Equal(t, "feature", reqBody.Variables.Input.HeadRefName)
+
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+}
 
 func TestPRCreate(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -69,6 +183,7 @@ func TestPRCreate(t *testing.T) {
 
 func TestPRCreate_metadata(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -193,6 +308,7 @@ func TestPRCreate_metadata(t *testing.T) {
 
 func TestPRCreate_withForking(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponseWithPermission("OWNER", "REPO", "READ")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -236,6 +352,7 @@ func TestPRCreate_withForking(t *testing.T) {
 
 func TestPRCreate_alreadyExists(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -269,6 +386,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 
 func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -301,6 +419,7 @@ func TestPRCreate_alreadyExistsDifferentBase(t *testing.T) {
 
 func TestPRCreate_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -332,6 +451,7 @@ func TestPRCreate_web(t *testing.T) {
 
 func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 
 	http.StubRepoResponse("OWNER", "REPO")
@@ -362,13 +482,11 @@ func TestPRCreate_ReportsUncommittedChanges(t *testing.T) {
 	eq(t, err, nil)
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
-	eq(t, output.Stderr(), `Warning: 1 uncommitted change
-
-Creating pull request for feature into master in OWNER/REPO
-
-`)
+	test.ExpectLines(t, output.Stderr(), `Warning: 1 uncommitted change`, `Creating pull request for.*feature.*into.*master.*in OWNER/REPO`)
 }
+
 func TestPRCreate_cross_repo_same_branch(t *testing.T) {
+	defer stubTerminal(true)()
 	ctx := context.NewBlank()
 	ctx.SetBranch("default")
 	ctx.SetRemotes(map[string]string{
@@ -457,6 +575,7 @@ func TestPRCreate_cross_repo_same_branch(t *testing.T) {
 
 func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "cool_bug-fixes")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -533,6 +652,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 
 func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query RepositoryNetwork\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
@@ -592,8 +712,70 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 
+func TestPRCreate_survey_autofill_nontty(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(false)()
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                                        // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                                        // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                                        // git status
+	cs.Stub("1234567890,the sky above the port")                       // git log
+	cs.Stub("was the color of a television, turned to a dead channel") // git show
+	cs.Stub("")                                                        // git rev-parse
+	cs.Stub("")                                                        // git push
+	cs.Stub("")                                                        // browser open
+
+	output, err := RunCommand(`pr create -f`)
+	eq(t, err, nil)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	expectedBody := "was the color of a television, turned to a dead channel"
+
+	assert.Equal(t, "REPOID", reqBody.Variables.Input.RepositoryID)
+	assert.Equal(t, "the sky above the port", reqBody.Variables.Input.Title)
+	assert.Equal(t, expectedBody, reqBody.Variables.Input.Body)
+	assert.Equal(t, "master", reqBody.Variables.Input.BaseRefName)
+	assert.Equal(t, "feature", reqBody.Variables.Input.HeadRefName)
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+
+	assert.Equal(t, "", output.Stderr())
+}
+
 func TestPRCreate_survey_autofill(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
@@ -652,6 +834,7 @@ func TestPRCreate_survey_autofill(t *testing.T) {
 
 func TestPRCreate_defaults_error_autofill(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -670,6 +853,7 @@ func TestPRCreate_defaults_error_autofill(t *testing.T) {
 
 func TestPRCreate_defaults_error_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
@@ -688,6 +872,7 @@ func TestPRCreate_defaults_error_web(t *testing.T) {
 
 func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "feature")
+	defer stubTerminal(true)()
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 	http.StubResponse(200, bytes.NewBufferString(`
