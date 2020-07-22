@@ -33,6 +33,12 @@ func NewClient(opts ...ClientOption) *Client {
 	return client
 }
 
+// NewClientFromHTTP takes in an http.Client instance
+func NewClientFromHTTP(httpClient *http.Client) *Client {
+	client := &Client{http: httpClient}
+	return client
+}
+
 // AddHeader turns a RoundTripper into one that adds a request header
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
@@ -179,9 +185,10 @@ func (gr GraphQLErrorResponse) Error() string {
 
 // HTTPError is an error returned by a failed API call
 type HTTPError struct {
-	StatusCode int
-	RequestURL *url.URL
-	Message    string
+	StatusCode  int
+	RequestURL  *url.URL
+	Message     string
+	OAuthScopes string
 }
 
 func (err HTTPError) Error() string {
@@ -322,8 +329,9 @@ func handleResponse(resp *http.Response, data interface{}) error {
 
 func handleHTTPError(resp *http.Response) error {
 	httpError := HTTPError{
-		StatusCode: resp.StatusCode,
-		RequestURL: resp.Request.URL,
+		StatusCode:  resp.StatusCode,
+		RequestURL:  resp.Request.URL,
+		OAuthScopes: resp.Header.Get("X-Oauth-Scopes"),
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)

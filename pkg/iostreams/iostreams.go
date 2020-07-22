@@ -16,10 +16,28 @@ type IOStreams struct {
 	ErrOut io.Writer
 
 	colorEnabled bool
+
+	stdinTTYOverride bool
+	stdinIsTTY       bool
 }
 
 func (s *IOStreams) ColorEnabled() bool {
 	return s.colorEnabled
+}
+
+func (s *IOStreams) SetStdinTTY(isTTY bool) {
+	s.stdinTTYOverride = true
+	s.stdinIsTTY = isTTY
+}
+
+func (s *IOStreams) IsStdinTTY() bool {
+	if s.stdinTTYOverride {
+		return s.stdinIsTTY
+	}
+	if stdin, ok := s.In.(*os.File); ok {
+		return isTerminal(stdin)
+	}
+	return false
 }
 
 func System() *IOStreams {
