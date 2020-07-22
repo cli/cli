@@ -140,21 +140,11 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func testIOWithStdin(stdinContent string) *iostreams.IOStreams {
-	tio, stdin, _, _ := iostreams.Test()
-	stdin.WriteString(stdinContent)
-	return tio
-}
-
-func testIO() *iostreams.IOStreams {
-	tio, _, _, _ := iostreams.Test()
-	return tio
-}
-
 func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       *CreateOptions
+		stdin      string
 		wantOut    string
 		wantParams map[string]interface{}
 		wantErr    bool
@@ -162,7 +152,6 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "public",
 			opts: &CreateOptions{
-				IO:        testIO(),
 				Public:    true,
 				Filenames: []string{fixtureFile},
 			},
@@ -180,7 +169,6 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "with description",
 			opts: &CreateOptions{
-				IO:          testIO(),
 				Description: "an incredibly interesting gist",
 				Filenames:   []string{fixtureFile},
 			},
@@ -198,9 +186,9 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "multiple files",
 			opts: &CreateOptions{
-				IO:        testIOWithStdin("cool stdin content"),
 				Filenames: []string{fixtureFile, "-"},
 			},
+			stdin:   "cool stdin content",
 			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
 			wantParams: map[string]interface{}{
@@ -217,9 +205,9 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "stdin arg",
 			opts: &CreateOptions{
-				IO:        testIOWithStdin("cool stdin content"),
 				Filenames: []string{"-"},
 			},
+			stdin:   "cool stdin content",
 			wantOut: "https://gist.github.com/aa5a315d61ae9438b18d\n",
 			wantErr: false,
 			wantParams: map[string]interface{}{
@@ -241,10 +229,14 @@ func Test_createRun(t *testing.T) {
 		mockClient := func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-
 		tt.opts.HttpClient = mockClient
 
+		io, stdin, stdout, stderr := iostreams.Test()
+		tt.opts.IO = io
+
 		t.Run(tt.name, func(t *testing.T) {
+			stdin.WriteString(tt.stdin)
+
 			if err := createRun(tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("createRun() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -254,7 +246,8 @@ func Test_createRun(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error decoding JSON: %v", err)
 			}
-			assert.Equal(t, tt.wantOut, tt.opts.IO.Out.(*bytes.Buffer).String())
+			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, "", stderr.String())
 			assert.Equal(t, tt.wantParams, reqBody)
 			reg.Verify(t)
 		})
@@ -278,8 +271,10 @@ func Test_CreateRun_reauth(t *testing.T) {
 		return &http.Client{Transport: reg}, nil
 	}
 
+	io, _, _, _ := iostreams.Test()
+
 	opts := &CreateOptions{
-		IO:         testIO(),
+		IO:         io,
 		HttpClient: mockClient,
 		Filenames:  []string{fixtureFile},
 	}
