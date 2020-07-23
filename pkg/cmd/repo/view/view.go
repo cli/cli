@@ -71,7 +71,7 @@ func viewRun(opts *ViewOptions) error {
 			return err
 		}
 	} else {
-		if isURL(opts.RepoArg) {
+		if utils.IsURL(opts.RepoArg) {
 			parsedURL, err := url.Parse(opts.RepoArg)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
@@ -188,10 +188,6 @@ func isMarkdownFile(filename string) bool {
 }
 
 // TODO COPYPASTA FROM command; CONSIDER FOR cmdutil?
-func isURL(arg string) bool {
-	return strings.HasPrefix(arg, "http:/") || strings.HasPrefix(arg, "https:/")
-}
-
 func displayURL(urlStr string) string {
 	u, err := url.Parse(urlStr)
 	if err != nil {

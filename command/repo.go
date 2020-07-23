@@ -353,10 +353,6 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func isURL(arg string) bool {
-	return strings.HasPrefix(arg, "http:/") || strings.HasPrefix(arg, "https:/")
-}
-
 var Since = func(t time.Time) time.Duration {
 	return time.Since(t)
 }
@@ -390,7 +386,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	} else {
 		repoArg := args[0]
 
-		if isURL(repoArg) {
+		if utils.IsURL(repoArg) {
 			parsedURL, err := url.Parse(repoArg)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
