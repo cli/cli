@@ -135,7 +135,7 @@ func viewRun(opts *ViewOptions) error {
 		{{.Readme}}
 		
 		{{.View}}
-		`)
+	`)
 
 	tmpl, err := template.New("repo").Parse(repoTmpl)
 	if err != nil {
