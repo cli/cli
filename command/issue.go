@@ -227,7 +227,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 	}
 
 	if web {
-		issueListURL := generateRepoURL(baseRepo, "issues")
+		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
 		openURL, err := listURLWithQuery(issueListURL, filterOptions{
 			entity:    "issue",
 			state:     state,
@@ -504,7 +504,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
-		openURL := generateRepoURL(baseRepo, "issues/new")
+		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if title != "" || body != "" {
 			milestone := ""
 			if len(milestoneTitles) > 0 {
@@ -582,7 +582,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if action == PreviewAction {
-		openURL := generateRepoURL(baseRepo, "issues/new")
+		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		milestone := ""
 		if len(milestoneTitles) > 0 {
 			milestone = milestoneTitles[0]
@@ -616,14 +616,6 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func generateRepoURL(repo ghrepo.Interface, p string, args ...interface{}) string {
-	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
-	if p != "" {
-		return baseURL + "/" + fmt.Sprintf(p, args...)
-	}
-	return baseURL
 }
 
 func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {

@@ -97,7 +97,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	openURL := generateRepoURL(toView, "")
+	openURL := ghrepo.GenerateRepoURL(toView, "")
 	if opts.Web {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", displayURL(openURL))
@@ -190,14 +190,6 @@ func isMarkdownFile(filename string) bool {
 // TODO COPYPASTA FROM command; CONSIDER FOR cmdutil?
 func isURL(arg string) bool {
 	return strings.HasPrefix(arg, "http:/") || strings.HasPrefix(arg, "https:/")
-}
-
-func generateRepoURL(repo ghrepo.Interface, p string, args ...interface{}) string {
-	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
-	if p != "" {
-		return baseURL + "/" + fmt.Sprintf(p, args...)
-	}
-	return baseURL
 }
 
 func displayURL(urlStr string) string {

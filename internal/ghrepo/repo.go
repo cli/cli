@@ -77,6 +77,14 @@ func IsSame(a, b Interface) bool {
 		normalizeHostname(a.RepoHost()) == normalizeHostname(b.RepoHost())
 }
 
+func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
+	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	if p != "" {
+		return baseURL + "/" + fmt.Sprintf(p, args...)
+	}
+	return baseURL
+}
+
 type ghRepo struct {
 	owner    string
 	name     string

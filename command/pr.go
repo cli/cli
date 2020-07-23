@@ -235,7 +235,7 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	if web {
-		prListURL := generateRepoURL(baseRepo, "pulls")
+		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
 		openURL, err := listURLWithQuery(prListURL, filterOptions{
 			entity:     "pr",
 			state:      state,
