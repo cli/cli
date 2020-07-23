@@ -105,15 +105,6 @@ var repoCreditsCmd = &cobra.Command{
 	Hidden: true,
 }
 
-func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir string) error {
-	upstreamURL := formatRemoteURL(cmd, parentRepo)
-
-	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-	return run.PrepareCmd(cloneCmd).Run()
-}
-
 func repoCreate(cmd *cobra.Command, args []string) error {
 	projectDir, projectDirErr := git.ToplevelDir()
 
