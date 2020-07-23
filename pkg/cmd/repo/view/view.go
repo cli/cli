@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -17,9 +18,9 @@ import (
 )
 
 type ViewOptions struct {
-	HttpClient       func() (*http.Client, error)
-	IO               *iostreams.IOStreams
-	ResolvedBaseRepo func(*http.Client) (ghrepo.Interface, error)
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
 
 	RepoArg string
 	Web     bool
@@ -27,9 +28,32 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := ViewOptions{
-		IO:               f.IOStreams,
-		HttpClient:       f.HttpClient,
-		ResolvedBaseRepo: f.ResolvedBaseRepo,
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		BaseRepo: func() (ghrepo.Interface, error) {
+			httpClient, err := f.HttpClient()
+			if err != nil {
+				return nil, err
+			}
+
+			apiClient := api.NewClientFromHTTP(httpClient)
+
+			ctx := context.New()
+			remotes, err := ctx.Remotes()
+			if err != nil {
+				return nil, err
+			}
+			repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+			if err != nil {
+				return nil, err
+			}
+			baseRepo, err := repoContext.BaseRepo()
+			if err != nil {
+				return nil, err
+			}
+
+			return baseRepo, nil
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -66,7 +90,7 @@ func viewRun(opts *ViewOptions) error {
 	var toView ghrepo.Interface
 	if opts.RepoArg == "" {
 		var err error
-		toView, err = opts.ResolvedBaseRepo(httpClient)
+		toView, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
