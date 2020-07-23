@@ -113,7 +113,7 @@ func Test_RepoView_Web(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			BaseRepo: func() (ghrepo.Interface, error) {
+			ResolvedBaseRepo: func(_ *http.Client) (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
 		}
@@ -225,7 +225,7 @@ func Test_ViewRun(t *testing.T) {
 			tt.repoName = "OWNER/REPO"
 		}
 
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+		tt.opts.ResolvedBaseRepo = func(_ *http.Client) (ghrepo.Interface, error) {
 			repo, _ := ghrepo.FromFullName(tt.repoName)
 			return repo, nil
 		}
@@ -312,7 +312,7 @@ func Test_ViewRun_NonMarkdownReadme(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			BaseRepo: func() (ghrepo.Interface, error) {
+			ResolvedBaseRepo: func(_ *http.Client) (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
 		}
@@ -378,7 +378,7 @@ func Test_ViewRun_NoReadme(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			BaseRepo: func() (ghrepo.Interface, error) {
+			ResolvedBaseRepo: func(_ *http.Client) (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
 		}
@@ -448,7 +448,7 @@ func Test_ViewRun_NoDescription(t *testing.T) {
 			HttpClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
-			BaseRepo: func() (ghrepo.Interface, error) {
+			ResolvedBaseRepo: func(_ *http.Client) (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
 		}

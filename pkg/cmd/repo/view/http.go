@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -14,13 +15,14 @@ type RepoReadme struct {
 	Content  string
 }
 
-func RepositoryReadme(client *api.Client, repo ghrepo.Interface) (*RepoReadme, error) {
+func RepositoryReadme(client *http.Client, repo ghrepo.Interface) (*RepoReadme, error) {
+	apiClient := api.NewClientFromHTTP(client)
 	var response struct {
 		Name    string
 		Content string
 	}
 
-	err := client.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
+	err := apiClient.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {

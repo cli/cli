@@ -18,9 +18,9 @@ import (
 )
 
 type ViewOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
+	HttpClient       func() (*http.Client, error)
+	IO               *iostreams.IOStreams
+	ResolvedBaseRepo func(*http.Client) (ghrepo.Interface, error)
 
 	RepoArg string
 	Web     bool
@@ -28,9 +28,9 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := ViewOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
+		IO:               f.IOStreams,
+		HttpClient:       f.HttpClient,
+		ResolvedBaseRepo: f.ResolvedBaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -59,10 +59,15 @@ With '--web', open the repository in a web browser instead.`,
 }
 
 func viewRun(opts *ViewOptions) error {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
 	var toView ghrepo.Interface
 	if opts.RepoArg == "" {
 		var err error
-		toView, err = opts.BaseRepo()
+		toView, err = opts.ResolvedBaseRepo(httpClient)
 		if err != nil {
 			return err
 		}
@@ -86,11 +91,6 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	repo, err := api.GitHubRepo(apiClient, toView)
@@ -108,7 +108,7 @@ func viewRun(opts *ViewOptions) error {
 
 	fullName := ghrepo.FullName(toView)
 
-	readme, err := RepositoryReadme(apiClient, toView)
+	readme, err := RepositoryReadme(httpClient, toView)
 	var notFound *api.NotFoundError
 	if err != nil && !errors.As(err, &notFound) {
 		return err
