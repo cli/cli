@@ -8,7 +8,8 @@ import (
 )
 
 type Factory struct {
-	IOStreams  *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
+	IOStreams        *iostreams.IOStreams
+	HttpClient       func() (*http.Client, error)
+	ResolvedBaseRepo func(*http.Client) (ghrepo.Interface, error)
+	BaseRepo         func() (ghrepo.Interface, error)
 }

@@ -90,6 +90,23 @@ func init() {
 			}
 			return httpClient(token), nil
 		},
+		ResolvedBaseRepo: func(client *http.Client) (ghrepo.Interface, error) {
+			ctx := context.New()
+			remotes, err := ctx.Remotes()
+			if err != nil {
+				return nil, err
+			}
+			repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+			if err != nil {
+				return nil, err
+			}
+			baseRepo, err := repoContext.BaseRepo()
+			if err != nil {
+				return nil, err
+			}
+
+			return baseRepo, nil
+		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			// TODO: decouple from `context`
 			ctx := context.New()
