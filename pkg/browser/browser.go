@@ -20,20 +20,21 @@ func Command(url string) (*exec.Cmd, error) {
 
 // ForOS produces an exec.Cmd to open the web browser for different OS
 func ForOS(goos, url string) *exec.Cmd {
+	exe := "open"
 	var args []string
 	switch goos {
 	case "darwin":
-		args = []string{"open"}
+		args = append(args, url)
 	case "windows":
-		args = []string{"cmd", "/c", "start"}
+		exe = "cmd"
 		r := strings.NewReplacer("&", "^&")
-		url = r.Replace(url)
+		args = append(args, "/c", "start", r.Replace(url))
 	default:
-		args = []string{"xdg-open"}
+		exe = "xdg-open"
+		args = append(args, url)
 	}
 
-	args = append(args, url)
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(exe, args...)
 	cmd.Stderr = os.Stderr
 	return cmd
 }
