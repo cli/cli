@@ -20,8 +20,6 @@ import (
 )
 
 func init() {
-	repoCmd.AddCommand(repoCloneCmd)
-
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
 	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
@@ -55,19 +53,6 @@ var repoCmd = &cobra.Command{
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
 - by URL, e.g. "https://github.com/OWNER/REPO"`},
-}
-
-var repoCloneCmd = &cobra.Command{
-	Use:   "clone <repository> [<directory>]",
-	Args:  cobra.MinimumNArgs(1),
-	Short: "Clone a repository locally",
-	Long: `Clone a GitHub repository locally.
-
-If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
-defaults to the name of the authenticating user.
-
-To pass 'git clone' flags, separate them with '--'.`,
-	RunE: repoClone,
 }
 
 var repoCreateCmd = &cobra.Command{
@@ -118,95 +103,6 @@ var repoCreditsCmd = &cobra.Command{
 	Args:   cobra.MaximumNArgs(1),
 	RunE:   repoCredits,
 	Hidden: true,
-}
-
-func parseCloneArgs(extraArgs []string) (args []string, target string) {
-	args = extraArgs
-
-	if len(args) > 0 {
-		if !strings.HasPrefix(args[0], "-") {
-			target, args = args[0], args[1:]
-		}
-	}
-	return
-}
-
-func runClone(cloneURL string, args []string) (target string, err error) {
-	cloneArgs, target := parseCloneArgs(args)
-
-	cloneArgs = append(cloneArgs, cloneURL)
-
-	// If the args contain an explicit target, pass it to clone
-	//    otherwise, parse the URL to determine where git cloned it to so we can return it
-	if target != "" {
-		cloneArgs = append(cloneArgs, target)
-	} else {
-		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
-	}
-
-	cloneArgs = append([]string{"clone"}, cloneArgs...)
-
-	cloneCmd := git.GitCommand(cloneArgs...)
-	cloneCmd.Stdin = os.Stdin
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-
-	err = run.PrepareCmd(cloneCmd).Run()
-	return
-}
-
-func repoClone(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	cloneURL := args[0]
-	if !strings.Contains(cloneURL, ":") {
-		if !strings.Contains(cloneURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient)
-			if err != nil {
-				return err
-			}
-			cloneURL = currentUser + "/" + cloneURL
-		}
-		repo, err := ghrepo.FromFullName(cloneURL)
-		if err != nil {
-			return err
-		}
-		cloneURL = formatRemoteURL(cmd, repo)
-	}
-
-	var repo ghrepo.Interface
-	var parentRepo ghrepo.Interface
-
-	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
-	// here to handle hostname aliases in SSH remotes
-	if u, err := git.ParseURL(cloneURL); err == nil {
-		repo, _ = ghrepo.FromURL(u)
-	}
-
-	if repo != nil {
-		parentRepo, err = api.RepoParent(apiClient, repo)
-		if err != nil {
-			return err
-		}
-	}
-
-	cloneDir, err := runClone(cloneURL, args[1:])
-	if err != nil {
-		return err
-	}
-
-	if parentRepo != nil {
-		err := addUpstreamRemote(cmd, parentRepo, cloneDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir string) error {
@@ -529,12 +425,24 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		}
 		if cloneDesired {
 			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
-			cloneDir, err := runClone(forkedRepoCloneURL, []string{})
+			cloneDir, err := git.RunClone(forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(cmd, repoToFork, cloneDir)
+			// TODO This is overly wordy and I'd like to streamline this.
+			cfg, err := ctx.Config()
+			if err != nil {
+				return err
+			}
+			protocol, err := cfg.Get("", "git_protocol")
+			if err != nil {
+				return err
+			}
+
+			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
+
+			err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 			if err != nil {
 				return err
 			}

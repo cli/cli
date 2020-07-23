@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoViewCmd "github.com/cli/cli/pkg/cmd/repo/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -95,6 +96,15 @@ func init() {
 			ctx := context.New()
 			return ctx.BaseRepo()
 		},
+		Config: func() (config.Config, error) {
+			cfg, err := config.ParseDefaultConfig()
+			if errors.Is(err, os.ErrNotExist) {
+				cfg = config.NewBlankConfig()
+			} else if err != nil {
+				return nil, err
+			}
+			return cfg, nil
+		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 
@@ -137,6 +147,7 @@ func init() {
 
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	repoCmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
@@ -355,6 +366,7 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
+// TODO there is a parallel implementation for isolated commands
 func formatRemoteURL(cmd *cobra.Command, repo ghrepo.Interface) string {
 	ctx := contextForCommand(cmd)
 

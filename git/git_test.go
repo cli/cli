@@ -2,6 +2,7 @@ package git
 
 import (
 	"os/exec"
+	"reflect"
 	"testing"
 
 	"github.com/cli/cli/internal/run"
@@ -93,4 +94,63 @@ func Test_CurrentBranch_unexpected_error(t *testing.T) {
 	if len(cs.Calls) != 1 {
 		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
 	}
+}
+
+func TestParseExtraCloneArgs(t *testing.T) {
+	type Wanted struct {
+		args []string
+		dir  string
+	}
+	tests := []struct {
+		name string
+		args []string
+		want Wanted
+	}{
+		{
+			name: "args and target",
+			args: []string{"target_directory", "-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "only args",
+			args: []string{"-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "",
+			},
+		},
+		{
+			name: "only target",
+			args: []string{"target_directory"},
+			want: Wanted{
+				args: []string{},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "no args",
+			args: []string{},
+			want: Wanted{
+				args: []string{},
+				dir:  "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, dir := parseCloneArgs(tt.args)
+			got := Wanted{
+				args: args,
+				dir:  dir,
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %#v want %#v", got, tt.want)
+			}
+		})
+	}
+
 }
