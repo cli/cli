@@ -28,9 +28,9 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := ViewOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
+		IO:               f.IOStreams,
+		HttpClient:       f.HttpClient,
+		ResolvedBaseRepo: f.ResolvedBaseRepo,
 	}
 
 	cmd := &cobra.Command{

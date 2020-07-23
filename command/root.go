@@ -91,6 +91,9 @@ func init() {
 			return httpClient(token), nil
 		},
 		ResolvedBaseRepo: func(client *http.Client) (ghrepo.Interface, error) {
+			// TODO this may be abandoned when we stop trying to be magical about picking base repos for
+			// users. We can merge this with BaseRepo at that point.
+			apiClient := api.NewClientFromHTTP(client)
 			ctx := context.New()
 			remotes, err := ctx.Remotes()
 			if err != nil {
