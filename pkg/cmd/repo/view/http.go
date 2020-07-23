@@ -10,6 +10,8 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
+var NotFoundError = errors.New("not found")
+
 type RepoReadme struct {
 	Filename string
 	Content  string
@@ -26,7 +28,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface) (*RepoReadme, 
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
-			return nil, api.NewNotFoundError(err)
+			return nil, NotFoundError
 		}
 		return nil, err
 	}

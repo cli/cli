@@ -1,7 +1,6 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -109,8 +108,7 @@ func viewRun(opts *ViewOptions) error {
 	fullName := ghrepo.FullName(toView)
 
 	readme, err := RepositoryReadme(httpClient, toView)
-	var notFound *api.NotFoundError
-	if err != nil && !errors.As(err, &notFound) {
+	if err != nil && err != NotFoundError {
 		return err
 	}
 
