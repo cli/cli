@@ -9,7 +9,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -30,30 +29,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		BaseRepo: func() (ghrepo.Interface, error) {
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return nil, err
-			}
-
-			apiClient := api.NewClientFromHTTP(httpClient)
-
-			ctx := context.New()
-			remotes, err := ctx.Remotes()
-			if err != nil {
-				return nil, err
-			}
-			repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
-			if err != nil {
-				return nil, err
-			}
-			baseRepo, err := repoContext.BaseRepo()
-			if err != nil {
-				return nil, err
-			}
-
-			return baseRepo, nil
-		},
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{

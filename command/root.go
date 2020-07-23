@@ -106,8 +106,37 @@ func init() {
 	RootCmd.AddCommand(gistCmd)
 	gistCmd.AddCommand(gistCreateCmd.NewCmdCreate(cmdFactory, nil))
 
+	resolvedBaseRepo := func() (ghrepo.Interface, error) {
+		httpClient, err := cmdFactory.HttpClient()
+		if err != nil {
+			return nil, err
+		}
+
+		apiClient := api.NewClientFromHTTP(httpClient)
+
+		ctx := context.New()
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return nil, err
+		}
+		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+		if err != nil {
+			return nil, err
+		}
+		baseRepo, err := repoContext.BaseRepo()
+		if err != nil {
+			return nil, err
+		}
+
+		return baseRepo, nil
+	}
+
+	repoResolvingCmdFactory := *cmdFactory
+
+	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo
+
 	RootCmd.AddCommand(repoCmd)
-	repoCmd.AddCommand(repoViewCmd.NewCmdView(cmdFactory, nil))
+	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
