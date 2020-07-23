@@ -240,7 +240,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	}
 
@@ -518,7 +518,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			openURL += "/choose"
 		}
 		if connectedToTerminal(cmd) {
-			cmd.Printf("Opening %s in your browser.\n", displayURL(openURL))
+			cmd.Printf("Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	}
@@ -592,7 +592,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		// TODO could exceed max url length for explorer
-		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
 	} else if action == SubmitAction {
 		params := map[string]interface{}{
@@ -835,12 +835,4 @@ func issueReopen(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened issue #%d (%s)\n", utils.Green("✔"), issue.Number, issue.Title)
 
 	return nil
-}
-
-func displayURL(urlStr string) string {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return urlStr
-	}
-	return u.Hostname() + u.Path
 }

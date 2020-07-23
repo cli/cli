@@ -100,7 +100,7 @@ func viewRun(opts *ViewOptions) error {
 	openURL := ghrepo.GenerateRepoURL(toView, "")
 	if opts.Web {
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", displayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	}
@@ -185,13 +185,4 @@ func isMarkdownFile(filename string) bool {
 		strings.HasSuffix(filename, ".markdown") ||
 		strings.HasSuffix(filename, ".mdown") ||
 		strings.HasSuffix(filename, ".mkdown")
-}
-
-// TODO COPYPASTA FROM command; CONSIDER FOR cmdutil?
-func displayURL(urlStr string) string {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return urlStr
-	}
-	return u.Hostname() + u.Path
 }

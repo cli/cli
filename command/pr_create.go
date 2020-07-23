@@ -367,7 +367,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		if connectedToTerminal(cmd) {
 			// TODO could exceed max url length for explorer
-			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	} else {
