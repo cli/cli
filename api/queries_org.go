@@ -7,6 +7,7 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+// TODO clean up
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
 func resolveOrganization(client *Client, orgName string) (string, error) {
 	var response struct {

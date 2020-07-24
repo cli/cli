@@ -1,7 +1,6 @@
 package clone
 
 import (
-	"bytes"
 	"net/http"
 	"strings"
 	"testing"
@@ -15,20 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO copypasta from command package
-type cmdOut struct {
-	outBuf, errBuf *bytes.Buffer
-}
-
-func (c cmdOut) String() string {
-	return c.outBuf.String()
-}
-
-func (c cmdOut) Stderr() string {
-	return c.errBuf.String()
-}
-
-func runCloneCommand(httpClient *http.Client, cli string) (*cmdOut, error) {
+func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 	io, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
 		IOStreams: io,
@@ -59,7 +45,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*cmdOut, error) {
 		return nil, err
 	}
 
-	return &cmdOut{stdout, stderr}, nil
+	return &test.CmdOut{stdout, stderr}, nil
 }
 
 func Test_RepoClone(t *testing.T) {

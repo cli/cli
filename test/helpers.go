@@ -11,6 +11,19 @@ import (
 	"github.com/cli/cli/internal/run"
 )
 
+// TODO copypasta from command package
+type CmdOut struct {
+	OutBuf, ErrBuf *bytes.Buffer
+}
+
+func (c CmdOut) String() string {
+	return c.OutBuf.String()
+}
+
+func (c CmdOut) Stderr() string {
+	return c.ErrBuf.String()
+}
+
 // OutputStub implements a simple utils.Runnable
 type OutputStub struct {
 	Out   []byte

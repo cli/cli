@@ -22,6 +22,7 @@ import (
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
+	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
 	repoViewCmd "github.com/cli/cli/pkg/cmd/repo/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -148,6 +149,7 @@ func init() {
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
 	repoCmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
+	repoCmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
