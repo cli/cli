@@ -45,7 +45,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 		return nil, err
 	}
 
-	return &test.CmdOut{stdout, stderr}, nil
+	return &test.CmdOut{OutBuf: stdout, ErrBuf: stderr}, nil
 }
 
 func Test_RepoClone(t *testing.T) {

@@ -59,7 +59,9 @@ func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 		return nil, err
 	}
 
-	return &test.CmdOut{stdout, stderr}, nil
+	return &test.CmdOut{
+		OutBuf: stdout,
+		ErrBuf: stderr}, nil
 }
 
 func TestRepoCreate(t *testing.T) {
