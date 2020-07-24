@@ -77,6 +77,23 @@ func IsSame(a, b Interface) bool {
 		normalizeHostname(a.RepoHost()) == normalizeHostname(b.RepoHost())
 }
 
+func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
+	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	if p != "" {
+		return baseURL + "/" + fmt.Sprintf(p, args...)
+	}
+	return baseURL
+}
+
+// TODO there is a parallel implementation for non-isolated commands
+func FormatRemoteURL(repo Interface, protocol string) string {
+	if protocol == "ssh" {
+		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	}
+
+	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+}
+
 type ghRepo struct {
 	owner    string
 	name     string

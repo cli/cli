@@ -21,6 +21,8 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
+	repoViewCmd "github.com/cli/cli/pkg/cmd/repo/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -94,6 +96,15 @@ func init() {
 			ctx := context.New()
 			return ctx.BaseRepo()
 		},
+		Config: func() (config.Config, error) {
+			cfg, err := config.ParseDefaultConfig()
+			if errors.Is(err, os.ErrNotExist) {
+				cfg = config.NewBlankConfig()
+			} else if err != nil {
+				return nil, err
+			}
+			return cfg, nil
+		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 
@@ -104,6 +115,39 @@ func init() {
 	}
 	RootCmd.AddCommand(gistCmd)
 	gistCmd.AddCommand(gistCreateCmd.NewCmdCreate(cmdFactory, nil))
+
+	resolvedBaseRepo := func() (ghrepo.Interface, error) {
+		httpClient, err := cmdFactory.HttpClient()
+		if err != nil {
+			return nil, err
+		}
+
+		apiClient := api.NewClientFromHTTP(httpClient)
+
+		ctx := context.New()
+		remotes, err := ctx.Remotes()
+		if err != nil {
+			return nil, err
+		}
+		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+		if err != nil {
+			return nil, err
+		}
+		baseRepo, err := repoContext.BaseRepo()
+		if err != nil {
+			return nil, err
+		}
+
+		return baseRepo, nil
+	}
+
+	repoResolvingCmdFactory := *cmdFactory
+
+	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo
+
+	RootCmd.AddCommand(repoCmd)
+	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	repoCmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
 }
 
 // RootCmd is the entry point of command-line execution
@@ -322,6 +366,7 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	return baseRepo, nil
 }
 
+// TODO there is a parallel implementation for isolated commands
 func formatRemoteURL(cmd *cobra.Command, repo ghrepo.Interface) string {
 	ctx := contextForCommand(cmd)
 

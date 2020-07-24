@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -101,4 +102,16 @@ var StopSpinner = func(s *spinner.Spinner) {
 
 func Spinner(w io.Writer) *spinner.Spinner {
 	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
+}
+
+func IsURL(s string) bool {
+	return strings.HasPrefix(s, "http:/") || strings.HasPrefix(s, "https:/")
+}
+
+func DisplayURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+	return u.Hostname() + u.Path
 }

@@ -70,8 +70,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil
 		},
 		RunE: func(c *cobra.Command, args []string) error {
-			opts.HttpClient = f.HttpClient
-
 			opts.Filenames = args
 
 			if runF != nil {
