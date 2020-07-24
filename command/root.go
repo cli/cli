@@ -23,6 +23,7 @@ import (
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
+	repoForkCmd "github.com/cli/cli/pkg/cmd/repo/fork"
 	repoViewCmd "github.com/cli/cli/pkg/cmd/repo/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -97,6 +98,10 @@ func init() {
 			ctx := context.New()
 			return ctx.BaseRepo()
 		},
+		Remotes: func() (context.Remotes, error) {
+			ctx := context.New()
+			return ctx.Remotes()
+		},
 		Config: func() (config.Config, error) {
 			cfg, err := config.ParseDefaultConfig()
 			if errors.Is(err, os.ErrNotExist) {
@@ -148,6 +153,7 @@ func init() {
 
 	RootCmd.AddCommand(repoCmd)
 	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	repoCmd.AddCommand(repoForkCmd.NewCmdFork(&repoResolvingCmdFactory, nil))
 	repoCmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
 	repoCmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
 }
