@@ -31,9 +31,7 @@ func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 		},
 	}
 
-	fmt.Printf("DEBUG %#v\n", "HI")
 	cmd := NewCmdCreate(fac, nil)
-	fmt.Printf("DEBUG %#v\n", "BYE")
 
 	// TODO STUPID HACK
 	// cobra aggressively adds help to all commands. since we're not running through the root command
