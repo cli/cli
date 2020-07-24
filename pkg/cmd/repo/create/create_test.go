@@ -2,7 +2,6 @@ package create
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
