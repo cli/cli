@@ -218,9 +218,14 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 		// before we reconnect, so that we reuse the same TCPconnection.
 		const maxBodySlurpSize = 2 << 10
 		if res.ContentLength == -1 || res.ContentLength <= maxBodySlurpSize {
-			io.CopyN(ioutil.Discard, res.Body, maxBodySlurpSize)
+			if _, rerr := io.CopyN(ioutil.Discard, res.Body, maxBodySlurpSize); err != nil {
+				err = rerr
+			}
 		}
-		res.Body.Close()
+
+		if rerr := res.Body.Close(); err == nil {
+			err = rerr
+		}
 	}()
 
 	if res.StatusCode != 200 {
