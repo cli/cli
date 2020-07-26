@@ -212,7 +212,16 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-	defer res.Body.Close()
+
+	defer func() {
+		// Ensure the response body is fully read and closed
+		// before we reconnect, so that we reuse the same TCPconnection.
+		const maxBodySlurpSize = 2 << 10
+		if res.ContentLength == -1 || res.ContentLength <= maxBodySlurpSize {
+			io.CopyN(ioutil.Discard, res.Body, maxBodySlurpSize)
+		}
+		res.Body.Close()
+	}()
 
 	if res.StatusCode != 200 {
 		return false, "", handleHTTPError(res)
