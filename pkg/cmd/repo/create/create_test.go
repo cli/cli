@@ -1,6 +1,7 @@
 package create
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -19,7 +20,7 @@ import (
 )
 
 func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	io, _, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
@@ -42,9 +43,9 @@ func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 	argv, err := shlex.Split(cli)
 	cmd.SetArgs(argv)
 
-	cmd.SetIn(stdin)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
 
 	if err != nil {
 		panic(err)
