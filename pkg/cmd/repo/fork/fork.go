@@ -26,7 +26,6 @@ type ForkOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
-	Since      func(t time.Time) time.Duration
 
 	Repository   string
 	Clone        bool
@@ -35,7 +34,6 @@ type ForkOptions struct {
 	PromptRemote bool
 }
 
-// TODO decide if this should be injected via a factory.
 var Since = func(t time.Time) time.Duration {
 	return time.Since(t)
 }
