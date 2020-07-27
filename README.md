@@ -139,10 +139,10 @@ Install and upgrade:
 
 ### Arch Linux
 
-Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
+Arch Linux users can install from the community repo: https://www.archlinux.org/packages/community/x86_64/github-cli/
 
 ```bash
-yay -S github-cli
+pacman -S github-cli
 ```
 
 ### Other platforms
