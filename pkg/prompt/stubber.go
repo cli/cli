@@ -8,15 +8,17 @@ import (
 	"github.com/AlecAivazis/survey/v2/core"
 )
 
-type askStubber struct {
+type AskStubber struct {
 	Asks  [][]*survey.Question
 	Count int
 	Stubs [][]*QuestionStub
 }
 
-func InitAskStubber() (*askStubber, func()) {
+// TODO ADAPT THIS ALL TO SUPPORT THE NEW SURVEYASKONE
+
+func InitAskStubber() (*AskStubber, func()) {
 	origSurveyAsk := SurveyAsk
-	as := askStubber{}
+	as := AskStubber{}
 	SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
 		as.Asks = append(as.Asks, qs)
 		count := as.Count
@@ -54,7 +56,7 @@ type QuestionStub struct {
 	Default bool
 }
 
-func (as *askStubber) Stub(stubbedQuestions []*QuestionStub) {
+func (as *AskStubber) Stub(stubbedQuestions []*QuestionStub) {
 	// A call to .Ask takes a list of questions; a stub is then a list of questions in the same order.
 	as.Stubs = append(as.Stubs, stubbedQuestions)
 }
