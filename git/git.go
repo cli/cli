@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 
@@ -222,6 +223,48 @@ func CheckoutBranch(branch string) error {
 	configCmd := GitCommand("checkout", branch)
 	err := run.PrepareCmd(configCmd).Run()
 	return err
+}
+
+func parseCloneArgs(extraArgs []string) (args []string, target string) {
+	args = extraArgs
+
+	if len(args) > 0 {
+		if !strings.HasPrefix(args[0], "-") {
+			target, args = args[0], args[1:]
+		}
+	}
+	return
+}
+
+func RunClone(cloneURL string, args []string) (target string, err error) {
+	cloneArgs, target := parseCloneArgs(args)
+
+	cloneArgs = append(cloneArgs, cloneURL)
+
+	// If the args contain an explicit target, pass it to clone
+	//    otherwise, parse the URL to determine where git cloned it to so we can return it
+	if target != "" {
+		cloneArgs = append(cloneArgs, target)
+	} else {
+		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+	}
+
+	cloneArgs = append([]string{"clone"}, cloneArgs...)
+
+	cloneCmd := GitCommand(cloneArgs...)
+	cloneCmd.Stdin = os.Stdin
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+
+	err = run.PrepareCmd(cloneCmd).Run()
+	return
+}
+
+func AddUpstreamRemote(upstreamURL, cloneDir string) error {
+	cloneCmd := GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	return run.PrepareCmd(cloneCmd).Run()
 }
 
 func isFilesystemPath(p string) bool {

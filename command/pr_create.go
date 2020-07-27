@@ -367,7 +367,7 @@ func prCreate(cmd *cobra.Command, _ []string) error {
 		}
 		if connectedToTerminal(cmd) {
 			// TODO could exceed max url length for explorer
-			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
+			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	} else {
@@ -447,7 +447,7 @@ func withPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, p
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestone string) (string, error) {
-	u := generateRepoURL(r, "compare/%s...%s?expand=1", base, head)
+	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", base, head)
 	url, err := withPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestone)
 	if err != nil {
 		return "", err

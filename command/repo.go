@@ -7,14 +7,12 @@ import (
 	"os"
 	"path"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/utils"
@@ -22,9 +20,6 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(repoCmd)
-	repoCmd.AddCommand(repoCloneCmd)
-
 	repoCmd.AddCommand(repoCreateCmd)
 	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
 	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
@@ -38,9 +33,6 @@ func init() {
 	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
 	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
 	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
-
-	repoCmd.AddCommand(repoViewCmd)
-	repoViewCmd.Flags().BoolP("web", "w", false, "Open a repository in the browser")
 
 	repoCmd.AddCommand(repoCreditsCmd)
 	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
@@ -61,19 +53,6 @@ var repoCmd = &cobra.Command{
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
 - by URL, e.g. "https://github.com/OWNER/REPO"`},
-}
-
-var repoCloneCmd = &cobra.Command{
-	Use:   "clone <repository> [<directory>]",
-	Args:  cobra.MinimumNArgs(1),
-	Short: "Clone a repository locally",
-	Long: `Clone a GitHub repository locally.
-
-If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
-defaults to the name of the authenticating user.
-
-To pass 'git clone' flags, separate them with '--'.`,
-	RunE: repoClone,
 }
 
 var repoCreateCmd = &cobra.Command{
@@ -105,17 +84,6 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 	RunE: repoFork,
 }
 
-var repoViewCmd = &cobra.Command{
-	Use:   "view [<repository>]",
-	Short: "View a repository",
-	Long: `Display the description and the README of a GitHub repository.
-
-With no argument, the repository for the current directory is displayed.
-
-With '--web', open the repository in a web browser instead.`,
-	RunE: repoView,
-}
-
 var repoCreditsCmd = &cobra.Command{
 	Use:   "credits [<repository>]",
 	Short: "View credits for a repository",
@@ -135,105 +103,6 @@ var repoCreditsCmd = &cobra.Command{
 	Args:   cobra.MaximumNArgs(1),
 	RunE:   repoCredits,
 	Hidden: true,
-}
-
-func parseCloneArgs(extraArgs []string) (args []string, target string) {
-	args = extraArgs
-
-	if len(args) > 0 {
-		if !strings.HasPrefix(args[0], "-") {
-			target, args = args[0], args[1:]
-		}
-	}
-	return
-}
-
-func runClone(cloneURL string, args []string) (target string, err error) {
-	cloneArgs, target := parseCloneArgs(args)
-
-	cloneArgs = append(cloneArgs, cloneURL)
-
-	// If the args contain an explicit target, pass it to clone
-	//    otherwise, parse the URL to determine where git cloned it to so we can return it
-	if target != "" {
-		cloneArgs = append(cloneArgs, target)
-	} else {
-		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
-	}
-
-	cloneArgs = append([]string{"clone"}, cloneArgs...)
-
-	cloneCmd := git.GitCommand(cloneArgs...)
-	cloneCmd.Stdin = os.Stdin
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-
-	err = run.PrepareCmd(cloneCmd).Run()
-	return
-}
-
-func repoClone(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	cloneURL := args[0]
-	if !strings.Contains(cloneURL, ":") {
-		if !strings.Contains(cloneURL, "/") {
-			// TODO: GHE support
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-			if err != nil {
-				return err
-			}
-			cloneURL = currentUser + "/" + cloneURL
-		}
-		repo, err := ghrepo.FromFullName(cloneURL)
-		if err != nil {
-			return err
-		}
-		cloneURL = formatRemoteURL(cmd, repo)
-	}
-
-	var repo ghrepo.Interface
-	var parentRepo ghrepo.Interface
-
-	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
-	// here to handle hostname aliases in SSH remotes
-	if u, err := git.ParseURL(cloneURL); err == nil {
-		repo, _ = ghrepo.FromURL(u)
-	}
-
-	if repo != nil {
-		parentRepo, err = api.RepoParent(apiClient, repo)
-		if err != nil {
-			return err
-		}
-	}
-
-	cloneDir, err := runClone(cloneURL, args[1:])
-	if err != nil {
-		return err
-	}
-
-	if parentRepo != nil {
-		err := addUpstreamRemote(cmd, parentRepo, cloneDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func addUpstreamRemote(cmd *cobra.Command, parentRepo ghrepo.Interface, cloneDir string) error {
-	upstreamURL := formatRemoteURL(cmd, parentRepo)
-
-	cloneCmd := git.GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-	return run.PrepareCmd(cloneCmd).Run()
 }
 
 func repoCreate(cmd *cobra.Command, args []string) error {
@@ -371,10 +240,6 @@ func repoCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func isURL(arg string) bool {
-	return strings.HasPrefix(arg, "http:/") || strings.HasPrefix(arg, "https:/")
-}
-
 var Since = func(t time.Time) time.Duration {
 	return time.Since(t)
 }
@@ -408,7 +273,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	} else {
 		repoArg := args[0]
 
-		if isURL(repoArg) {
+		if utils.IsURL(repoArg) {
 			parsedURL, err := url.Parse(repoArg)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
@@ -551,12 +416,24 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		}
 		if cloneDesired {
 			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
-			cloneDir, err := runClone(forkedRepoCloneURL, []string{})
+			cloneDir, err := git.RunClone(forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			err = addUpstreamRemote(cmd, repoToFork, cloneDir)
+			// TODO This is overly wordy and I'd like to streamline this.
+			cfg, err := ctx.Config()
+			if err != nil {
+				return err
+			}
+			protocol, err := cfg.Get("", "git_protocol")
+			if err != nil {
+				return err
+			}
+
+			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
+
+			err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 			if err != nil {
 				return err
 			}
@@ -578,145 +455,6 @@ var Confirm = func(prompt string, result *bool) error {
 	return survey.AskOne(p, result)
 }
 
-func repoView(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	var toView ghrepo.Interface
-	if len(args) == 0 {
-		var err error
-		toView, err = determineBaseRepo(apiClient, cmd, ctx)
-		if err != nil {
-			return err
-		}
-	} else {
-		repoArg := args[0]
-		if isURL(repoArg) {
-			parsedURL, err := url.Parse(repoArg)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-
-			toView, err = ghrepo.FromURL(parsedURL)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-		} else {
-			var err error
-			toView, err = ghrepo.FromFullName(repoArg)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
-		}
-	}
-
-	repo, err := api.GitHubRepo(apiClient, toView)
-	if err != nil {
-		return err
-	}
-
-	web, err := cmd.Flags().GetBool("web")
-	if err != nil {
-		return err
-	}
-
-	openURL := generateRepoURL(toView, "")
-	if web {
-		if connectedToTerminal(cmd) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", displayURL(openURL))
-		}
-		return utils.OpenInBrowser(openURL)
-	}
-
-	fullName := ghrepo.FullName(toView)
-
-	if !connectedToTerminal(cmd) {
-		readme, err := api.RepositoryReadme(apiClient, toView)
-		if err != nil {
-			return err
-		}
-
-		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "name:\t%s\n", fullName)
-		fmt.Fprintf(out, "description:\t%s\n", repo.Description)
-		fmt.Fprintln(out, "--")
-		fmt.Fprintf(out, readme.Content)
-
-		return nil
-	}
-
-	repoTmpl := `
-{{.FullName}}
-{{.Description}}
-
-{{.Readme}}
-
-{{.View}}
-`
-
-	tmpl, err := template.New("repo").Parse(repoTmpl)
-	if err != nil {
-		return err
-	}
-
-	readme, err := api.RepositoryReadme(apiClient, toView)
-	var notFound *api.NotFoundError
-	if err != nil && !errors.As(err, &notFound) {
-		return err
-	}
-
-	var readmeContent string
-	if readme == nil {
-		readmeContent = utils.Gray("This repository does not have a README")
-	} else if isMarkdownFile(readme.Filename) {
-		var err error
-		readmeContent, err = utils.RenderMarkdown(readme.Content)
-		if err != nil {
-			return fmt.Errorf("error rendering markdown: %w", err)
-		}
-	} else {
-		readmeContent = readme.Content
-	}
-
-	description := repo.Description
-	if description == "" {
-		description = utils.Gray("No description provided")
-	}
-
-	repoData := struct {
-		FullName    string
-		Description string
-		Readme      string
-		View        string
-	}{
-		FullName:    utils.Bold(fullName),
-		Description: description,
-		Readme:      readmeContent,
-		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
-	}
-
-	out := colorableOut(cmd)
-
-	err = tmpl.Execute(out, repoData)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func repoCredits(cmd *cobra.Command, args []string) error {
 	return credits(cmd, args)
-}
-
-func isMarkdownFile(filename string) bool {
-	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
-	// seem worth executing a regex for this given that assumption.
-	return strings.HasSuffix(filename, ".md") ||
-		strings.HasSuffix(filename, ".markdown") ||
-		strings.HasSuffix(filename, ".mdown") ||
-		strings.HasSuffix(filename, ".mkdown")
 }
