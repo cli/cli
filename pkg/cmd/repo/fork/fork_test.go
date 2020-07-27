@@ -159,7 +159,7 @@ func TestRepoFork_already_forked(t *testing.T) {
 	cs, restore := test.InitCmdStubber()
 	defer restore()
 
-	output, err := runCommand(httpClient, nil, true, "--no-remote")
+	output, err := runCommand(httpClient, nil, true, "--remote=false")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestRepoFork_in_parent(t *testing.T) {
 	defer restore()
 	defer stubSince(2 * time.Second)()
 
-	output, err := runCommand(httpClient, nil, true, "--no-remote")
+	output, err := runCommand(httpClient, nil, true, "--remote=false")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
@@ -237,11 +237,11 @@ func TestRepoFork_outside(t *testing.T) {
 	}{
 		{
 			name: "url arg",
-			args: "--no-clone http://github.com/OWNER/REPO.git",
+			args: "--clone=false http://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "full name arg",
-			args: "--no-clone OWNER/REPO",
+			args: "--clone=false OWNER/REPO",
 		},
 	}
 	for _, tt := range tests {

@@ -1,7 +1,6 @@
 package fork
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -63,28 +62,12 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 				opts.Repository = args[0]
 			}
 
-			if cmd.Flags().Changed("clone") && cmd.Flags().Changed("no-clone") {
-				return errors.New("--clone and --no-clone are mutually excusive")
-			}
-
-			if cmd.Flags().Changed("remote") && cmd.Flags().Changed("no-remote") {
-				return errors.New("--remote and --no-remote are mutually excusive")
-			}
-
-			if promptOk && (!cmd.Flags().Changed("clone") && !cmd.Flags().Changed("no-clone")) {
+			if promptOk && !cmd.Flags().Changed("clone") {
 				opts.PromptClone = true
 			}
 
-			if promptOk && (!cmd.Flags().Changed("remote") && !cmd.Flags().Changed("no-remote")) {
+			if promptOk && !cmd.Flags().Changed("remote") {
 				opts.PromptRemote = true
-			}
-
-			if cmd.Flags().Changed("no-clone") {
-				opts.Clone = false
-			}
-
-			if cmd.Flags().Changed("no-remote") {
-				opts.Remote = false
 			}
 
 			if runF != nil {
@@ -96,8 +79,6 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork")
-	cmd.Flags().Bool("no-clone", false, "Do not clone the fork")
-	cmd.Flags().Bool("no-remote", false, "Do not add remote for fork")
 
 	return cmd
 }
