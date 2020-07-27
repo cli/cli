@@ -1,8 +1,6 @@
 package command
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -13,7 +11,7 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/cli/cli/utils"
 	"github.com/stretchr/testify/assert"
@@ -296,12 +294,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	cs.Stub("") // git clone
 	cs.Stub("") // git remote add
 
-	oldConfirm := Confirm
-	Confirm = func(_ string, result *bool) error {
-		*result = true
-		return nil
-	}
-	defer func() { Confirm = oldConfirm }()
+	defer prompt.StubConfirm(true)()
 
 	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
@@ -331,12 +324,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := Confirm
-	Confirm = func(_ string, result *bool) error {
-		*result = false
-		return nil
-	}
-	defer func() { Confirm = oldConfirm }()
+	defer prompt.StubConfirm(false)()
 
 	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
@@ -369,12 +357,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := Confirm
-	Confirm = func(_ string, result *bool) error {
-		*result = true
-		return nil
-	}
-	defer func() { Confirm = oldConfirm }()
+	defer prompt.StubConfirm(true)()
 
 	output, err := RunCommand("repo fork")
 	if err != nil {
@@ -413,12 +396,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := Confirm
-	Confirm = func(_ string, result *bool) error {
-		*result = false
-		return nil
-	}
-	defer func() { Confirm = oldConfirm }()
+	defer prompt.StubConfirm(false)()
 
 	output, err := RunCommand("repo fork")
 	if err != nil {
@@ -433,212 +411,5 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	if !r.MatchString(output.Stderr()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
-	}
-}
-
-func TestRepoCreate(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	initContext = func() context.Context {
-		return ctx
-	}
-
-	http := initFakeHTTP()
-	http.Register(
-		httpmock.GraphQL(`mutation RepositoryCreate\b`),
-		httpmock.StringResponse(`
-		{ "data": { "createRepository": {
-			"repository": {
-				"id": "REPOID",
-				"url": "https://github.com/OWNER/REPO",
-				"name": "REPO",
-				"owner": {
-					"login": "OWNER"
-				}
-			}
-		} } }`))
-
-	var seenCmd *exec.Cmd
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand("repo create REPO")
-	if err != nil {
-		t.Errorf("error running command `repo create`: %v", err)
-	}
-
-	eq(t, output.String(), "https://github.com/OWNER/REPO\n")
-	eq(t, output.Stderr(), "")
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/OWNER/REPO.git")
-
-	var reqBody struct {
-		Query     string
-		Variables struct {
-			Input map[string]interface{}
-		}
-	}
-
-	if len(http.Requests) != 1 {
-		t.Fatalf("expected 1 HTTP request, got %d", len(http.Requests))
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
-		t.Errorf("expected %q, got %q", "REPO", repoName)
-	}
-	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
-		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
-	}
-	if _, ownerSet := reqBody.Variables.Input["ownerId"]; ownerSet {
-		t.Error("expected ownerId not to be set")
-	}
-}
-
-func TestRepoCreate_org(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	initContext = func() context.Context {
-		return ctx
-	}
-
-	http := initFakeHTTP()
-	http.Register(
-		httpmock.REST("GET", "users/ORG"),
-		httpmock.StringResponse(`
-		{ "node_id": "ORGID"
-		}`))
-	http.Register(
-		httpmock.GraphQL(`mutation RepositoryCreate\b`),
-		httpmock.StringResponse(`
-		{ "data": { "createRepository": {
-			"repository": {
-				"id": "REPOID",
-				"url": "https://github.com/ORG/REPO",
-				"name": "REPO",
-				"owner": {
-					"login": "ORG"
-				}
-			}
-		} } }`))
-
-	var seenCmd *exec.Cmd
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand("repo create ORG/REPO")
-	if err != nil {
-		t.Errorf("error running command `repo create`: %v", err)
-	}
-
-	eq(t, output.String(), "https://github.com/ORG/REPO\n")
-	eq(t, output.Stderr(), "")
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/ORG/REPO.git")
-
-	var reqBody struct {
-		Query     string
-		Variables struct {
-			Input map[string]interface{}
-		}
-	}
-
-	if len(http.Requests) != 2 {
-		t.Fatalf("expected 2 HTTP requests, got %d", len(http.Requests))
-	}
-
-	eq(t, http.Requests[0].URL.Path, "/users/ORG")
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
-		t.Errorf("expected %q, got %q", "ORGID", orgID)
-	}
-	if _, teamSet := reqBody.Variables.Input["teamId"]; teamSet {
-		t.Error("expected teamId not to be set")
-	}
-}
-
-func TestRepoCreate_orgWithTeam(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	initContext = func() context.Context {
-		return ctx
-	}
-
-	http := initFakeHTTP()
-	http.Register(
-		httpmock.REST("GET", "orgs/ORG/teams/monkeys"),
-		httpmock.StringResponse(`
-		{ "node_id": "TEAMID",
-			"organization": { "node_id": "ORGID" }
-		}`))
-	http.Register(
-		httpmock.GraphQL(`mutation RepositoryCreate\b`),
-		httpmock.StringResponse(`
-		{ "data": { "createRepository": {
-			"repository": {
-				"id": "REPOID",
-				"url": "https://github.com/ORG/REPO",
-				"name": "REPO",
-				"owner": {
-					"login": "ORG"
-				}
-			}
-		} } }`))
-
-	var seenCmd *exec.Cmd
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
-	output, err := RunCommand("repo create ORG/REPO --team monkeys")
-	if err != nil {
-		t.Errorf("error running command `repo create`: %v", err)
-	}
-
-	eq(t, output.String(), "https://github.com/ORG/REPO\n")
-	eq(t, output.Stderr(), "")
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	eq(t, strings.Join(seenCmd.Args, " "), "git remote add -f origin https://github.com/ORG/REPO.git")
-
-	var reqBody struct {
-		Query     string
-		Variables struct {
-			Input map[string]interface{}
-		}
-	}
-
-	if len(http.Requests) != 2 {
-		t.Fatalf("expected 2 HTTP requests, got %d", len(http.Requests))
-	}
-
-	eq(t, http.Requests[0].URL.Path, "/orgs/ORG/teams/monkeys")
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if orgID := reqBody.Variables.Input["ownerId"].(string); orgID != "ORGID" {
-		t.Errorf("expected %q, got %q", "ORGID", orgID)
-	}
-	if teamID := reqBody.Variables.Input["teamId"].(string); teamID != "TEAMID" {
-		t.Errorf("expected %q, got %q", "TEAMID", teamID)
 	}
 }
