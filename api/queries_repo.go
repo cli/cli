@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
@@ -110,7 +109,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		return nil, err
 	}
 
-	return initRepoHostname(&result.Repository, repo.RepoHost()), nil
+	return InitRepoHostname(&result.Repository, repo.RepoHost()), nil
 }
 
 func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
@@ -251,7 +250,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 			if err := decoder.Decode(&repo); err != nil {
 				return result, err
 			}
-			result.Repositories = append(result.Repositories, initRepoHostname(&repo, hostname))
+			result.Repositories = append(result.Repositories, InitRepoHostname(&repo, hostname))
 		} else {
 			return result, fmt.Errorf("unknown GraphQL result key %q", name)
 		}
@@ -259,7 +258,7 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 	return result, nil
 }
 
-func initRepoHostname(repo *Repository, hostname string) *Repository {
+func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	repo.hostname = hostname
 	if repo.Parent != nil {
 		repo.Parent.hostname = hostname
@@ -339,72 +338,9 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	// `affiliations` condition, to guard against versions of GitHub with a
 	// faulty `affiliations` implementation
 	if len(forks) > 0 && forks[0].ViewerCanPush() {
-		return initRepoHostname(&forks[0], repo.RepoHost()), nil
+		return InitRepoHostname(&forks[0], repo.RepoHost()), nil
 	}
 	return nil, &NotFoundError{errors.New("no fork found")}
-}
-
-// RepoCreateInput represents input parameters for RepoCreate
-type RepoCreateInput struct {
-	Name        string `json:"name"`
-	Visibility  string `json:"visibility"`
-	HomepageURL string `json:"homepageUrl,omitempty"`
-	Description string `json:"description,omitempty"`
-
-	OwnerID string `json:"ownerId,omitempty"`
-	TeamID  string `json:"teamId,omitempty"`
-
-	HasIssuesEnabled bool `json:"hasIssuesEnabled"`
-	HasWikiEnabled   bool `json:"hasWikiEnabled"`
-}
-
-// RepoCreate creates a new GitHub repository
-func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
-	var response struct {
-		CreateRepository struct {
-			Repository Repository
-		}
-	}
-
-	if input.TeamID != "" {
-		orgID, teamID, err := resolveOrganizationTeam(client, input.OwnerID, input.TeamID)
-		if err != nil {
-			return nil, err
-		}
-		input.TeamID = teamID
-		input.OwnerID = orgID
-	} else if input.OwnerID != "" {
-		orgID, err := resolveOrganization(client, input.OwnerID)
-		if err != nil {
-			return nil, err
-		}
-		input.OwnerID = orgID
-	}
-
-	variables := map[string]interface{}{
-		"input": input,
-	}
-
-	// TODO: GHE support
-	hostname := ghinstance.Default()
-
-	err := client.GraphQL(hostname, `
-	mutation RepositoryCreate($input: CreateRepositoryInput!) {
-		createRepository(input: $input) {
-			repository {
-				id
-				name
-				owner { login }
-				url
-			}
-		}
-	}
-	`, variables, &response)
-	if err != nil {
-		return nil, err
-	}
-
-	return initRepoHostname(&response.CreateRepository.Repository, hostname), nil
 }
 
 type RepoMetadataResult struct {

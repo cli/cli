@@ -4,30 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
-	"path"
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	repoCmd.AddCommand(repoCreateCmd)
-	repoCreateCmd.Flags().StringP("description", "d", "", "Description of repository")
-	repoCreateCmd.Flags().StringP("homepage", "h", "", "Repository home page URL")
-	repoCreateCmd.Flags().StringP("team", "t", "", "The name of the organization team to be granted access")
-	repoCreateCmd.Flags().Bool("enable-issues", true, "Enable issues in the new repository")
-	repoCreateCmd.Flags().Bool("enable-wiki", true, "Enable wiki in the new repository")
-	repoCreateCmd.Flags().Bool("public", false, "Make the new repository public (default: private)")
-
 	repoCmd.AddCommand(repoForkCmd)
 	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
 	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
@@ -53,26 +43,6 @@ var repoCmd = &cobra.Command{
 A repository can be supplied as an argument in any of the following formats:
 - "OWNER/REPO"
 - by URL, e.g. "https://github.com/OWNER/REPO"`},
-}
-
-var repoCreateCmd = &cobra.Command{
-	Use:   "create [<name>]",
-	Short: "Create a new repository",
-	Long:  `Create a new GitHub repository.`,
-	Example: heredoc.Doc(`
-	# create a repository under your account using the current directory name
-	$ gh repo create
-
-	# create a repository with a specific name
-	$ gh repo create my-project
-
-	# create a repository in an organization
-	$ gh repo create cli/my-project
-	`),
-	Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
-- <OWNER/REPO>
-- by URL, e.g. "https://github.com/OWNER/REPO"`},
-	RunE: repoCreate,
 }
 
 var repoForkCmd = &cobra.Command{
@@ -103,141 +73,6 @@ var repoCreditsCmd = &cobra.Command{
 	Args:   cobra.MaximumNArgs(1),
 	RunE:   repoCredits,
 	Hidden: true,
-}
-
-func repoCreate(cmd *cobra.Command, args []string) error {
-	projectDir, projectDirErr := git.ToplevelDir()
-
-	orgName := ""
-	teamSlug, err := cmd.Flags().GetString("team")
-	if err != nil {
-		return err
-	}
-
-	var name string
-	if len(args) > 0 {
-		name = args[0]
-		if strings.Contains(name, "/") {
-			newRepo, err := ghrepo.FromFullName(name)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
-			orgName = newRepo.RepoOwner()
-			name = newRepo.RepoName()
-		}
-	} else {
-		if projectDirErr != nil {
-			return projectDirErr
-		}
-		name = path.Base(projectDir)
-	}
-
-	isPublic, err := cmd.Flags().GetBool("public")
-	if err != nil {
-		return err
-	}
-	hasIssuesEnabled, err := cmd.Flags().GetBool("enable-issues")
-	if err != nil {
-		return err
-	}
-	hasWikiEnabled, err := cmd.Flags().GetBool("enable-wiki")
-	if err != nil {
-		return err
-	}
-	description, err := cmd.Flags().GetString("description")
-	if err != nil {
-		return err
-	}
-	homepage, err := cmd.Flags().GetString("homepage")
-	if err != nil {
-		return err
-	}
-
-	// TODO: move this into constant within `api`
-	visibility := "PRIVATE"
-	if isPublic {
-		visibility = "PUBLIC"
-	}
-
-	input := api.RepoCreateInput{
-		Name:             name,
-		Visibility:       visibility,
-		OwnerID:          orgName,
-		TeamID:           teamSlug,
-		Description:      description,
-		HomepageURL:      homepage,
-		HasIssuesEnabled: hasIssuesEnabled,
-		HasWikiEnabled:   hasWikiEnabled,
-	}
-
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	repo, err := api.RepoCreate(client, input)
-	if err != nil {
-		return err
-	}
-
-	out := cmd.OutOrStdout()
-	greenCheck := utils.Green("✓")
-	isTTY := false
-	if outFile, isFile := out.(*os.File); isFile {
-		isTTY = utils.IsTerminal(outFile)
-		if isTTY {
-			// FIXME: duplicates colorableOut
-			out = utils.NewColorable(outFile)
-		}
-	}
-
-	if isTTY {
-		fmt.Fprintf(out, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
-	} else {
-		fmt.Fprintln(out, repo.URL)
-	}
-
-	remoteURL := formatRemoteURL(cmd, repo)
-
-	if projectDirErr == nil {
-		_, err = git.AddRemote("origin", remoteURL)
-		if err != nil {
-			return err
-		}
-		if isTTY {
-			fmt.Fprintf(out, "%s Added remote %s\n", greenCheck, remoteURL)
-		}
-	} else if isTTY {
-		doSetup := false
-		err := Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
-		if err != nil {
-			return err
-		}
-
-		if doSetup {
-			path := repo.Name
-
-			gitInit := git.GitCommand("init", path)
-			gitInit.Stdout = os.Stdout
-			gitInit.Stderr = os.Stderr
-			err = run.PrepareCmd(gitInit).Run()
-			if err != nil {
-				return err
-			}
-			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
-			gitRemoteAdd.Stdout = os.Stdout
-			gitRemoteAdd.Stderr = os.Stderr
-			err = run.PrepareCmd(gitRemoteAdd).Run()
-			if err != nil {
-				return err
-			}
-
-			fmt.Fprintf(out, "%s Initialized repository in './%s/'\n", greenCheck, path)
-		}
-	}
-
-	return nil
 }
 
 var Since = func(t time.Time) time.Duration {
@@ -371,7 +206,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 
 		remoteDesired := remotePref == "true"
 		if remotePref == "prompt" {
-			err = Confirm("Would you like to add a remote for the fork?", &remoteDesired)
+			err = prompt.Confirm("Would you like to add a remote for the fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
@@ -409,7 +244,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	} else {
 		cloneDesired := clonePref == "true"
 		if clonePref == "prompt" {
-			err = Confirm("Would you like to clone the fork?", &cloneDesired)
+			err = prompt.Confirm("Would you like to clone the fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
@@ -445,14 +280,6 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-var Confirm = func(prompt string, result *bool) error {
-	p := &survey.Confirm{
-		Message: prompt,
-		Default: true,
-	}
-	return survey.AskOne(p, result)
 }
 
 func repoCredits(cmd *cobra.Command, args []string) error {
