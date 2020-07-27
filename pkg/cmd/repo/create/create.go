@@ -45,18 +45,21 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long:  `Create a new GitHub repository.`,
 		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
-	# create a repository under your account using the current directory name
-	$ gh repo create
+			# create a repository under your account using the current directory name
+			$ gh repo create
 
-	# create a repository with a specific name
-	$ gh repo create my-project
+			# create a repository with a specific name
+			$ gh repo create my-project
 
-	# create a repository in an organization
-	$ gh repo create cli/my-project
-	`),
-		Annotations: map[string]string{"help:arguments": `A repository can be supplied as an argument in any of the following formats:
-- <OWNER/REPO>
-- by URL, e.g. "https://github.com/OWNER/REPO"`},
+			# create a repository in an organization
+			$ gh repo create cli/my-project
+	  `),
+		Annotations: map[string]string{
+			"help:arguments": heredoc.Doc(
+				`A repository can be supplied as an argument in any of the following formats:
+           - <OWNER/REPO>
+           - by URL, e.g. "https://github.com/OWNER/REPO"`),
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Name = args[0]
