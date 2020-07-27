@@ -386,7 +386,9 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 	}
 
 	// TODO: GHE support
-	err := client.GraphQL(ghinstance.Default(), `
+	hostname := ghinstance.Default()
+
+	err := client.GraphQL(hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
@@ -402,8 +404,7 @@ func RepoCreate(client *Client, input RepoCreateInput) (*Repository, error) {
 		return nil, err
 	}
 
-	// FIXME: support Enterprise hosts
-	return initRepoHostname(&response.CreateRepository.Repository, "github.com"), nil
+	return initRepoHostname(&response.CreateRepository.Repository, hostname), nil
 }
 
 type RepoMetadataResult struct {
