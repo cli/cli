@@ -294,12 +294,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	cs.Stub("") // git clone
 	cs.Stub("") // git remote add
 
-	oldConfirm := prompt.Confirm
-	prompt.Confirm = func(_ string, result *bool) error {
-		*result = true
-		return nil
-	}
-	defer func() { prompt.Confirm = oldConfirm }()
+	defer prompt.StubConfirm(true)()
 
 	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
@@ -329,12 +324,7 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := prompt.Confirm
-	prompt.Confirm = func(_ string, result *bool) error {
-		*result = false
-		return nil
-	}
-	defer func() { prompt.Confirm = oldConfirm }()
+	defer prompt.StubConfirm(false)()
 
 	output, err := RunCommand("repo fork OWNER/REPO")
 	if err != nil {
@@ -367,12 +357,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := prompt.Confirm
-	prompt.Confirm = func(_ string, result *bool) error {
-		*result = true
-		return nil
-	}
-	defer func() { prompt.Confirm = oldConfirm }()
+	defer prompt.StubConfirm(true)()
 
 	output, err := RunCommand("repo fork")
 	if err != nil {
@@ -411,12 +396,7 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 		return &test.OutputStub{}
 	})()
 
-	oldConfirm := prompt.Confirm
-	prompt.Confirm = func(_ string, result *bool) error {
-		*result = false
-		return nil
-	}
-	defer func() { prompt.Confirm = oldConfirm }()
+	defer prompt.StubConfirm(false)()
 
 	output, err := RunCommand("repo fork")
 	if err != nil {
