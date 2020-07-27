@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -337,22 +338,22 @@ func TestPRReview_interactive(t *testing.T) {
 		] } } } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
-	as, teardown := initAskStubber()
+	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewType",
 			Value: "Approve",
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "body",
 			Value: "cool story",
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirm",
 			Value: true,
@@ -399,22 +400,22 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 		] } } } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
-	as, teardown := initAskStubber()
+	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewType",
 			Value: "Request changes",
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "body",
 			Default: true,
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirm",
 			Value: true,
@@ -443,22 +444,22 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 		] } } } }
 	`))
 	http.StubResponse(200, bytes.NewBufferString(`{"data": {} }`))
-	as, teardown := initAskStubber()
+	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewType",
 			Value: "Approve",
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "body",
 			Default: true,
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirm",
 			Value: true,

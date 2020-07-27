@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/utils"
 )
@@ -166,7 +167,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		},
 	}
 
-	err = SurveyAsk(typeQs, &typeAnswers)
+	err = prompt.SurveyAsk(typeQs, &typeAnswers)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		},
 	}
 
-	err = SurveyAsk(bodyQs, &bodyAnswers)
+	err = prompt.SurveyAsk(bodyQs, &bodyAnswers)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +238,7 @@ func reviewSurvey(cmd *cobra.Command) (*api.PullRequestReviewInput, error) {
 		},
 	}
 
-	err = SurveyAsk(confirmQs, &confirm)
+	err = prompt.SurveyAsk(confirmQs, &confirm)
 	if err != nil {
 		return nil, err
 	}
