@@ -75,8 +75,8 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork")
-	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork")
+	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
+	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 
 	return cmd
 }
