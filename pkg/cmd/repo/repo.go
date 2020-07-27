@@ -1,11 +1,11 @@
-package command
+package repo
 
 import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
 
-var repoCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "repo <command>",
 	Short: "Create, clone, fork, and view repositories",
 	Long:  `Work with GitHub repositories`,

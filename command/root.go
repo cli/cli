@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
@@ -152,12 +153,12 @@ func init() {
 
 	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo
 
-	RootCmd.AddCommand(repoCmd)
-	repoCmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
-	repoCmd.AddCommand(repoForkCmd.NewCmdFork(&repoResolvingCmdFactory, nil))
-	repoCmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
-	repoCmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
-	repoCmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
+	RootCmd.AddCommand(repoCmd.Cmd)
+	repoCmd.Cmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	repoCmd.Cmd.AddCommand(repoForkCmd.NewCmdFork(&repoResolvingCmdFactory, nil))
+	repoCmd.Cmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
+	repoCmd.Cmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
+	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
