@@ -45,7 +45,7 @@ func TestChangelogURL(t *testing.T) {
 
 func TestRemoteURLFormatting_no_config(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
-	result := formatRemoteURL(repoForkCmd, ghrepo.New("OWNER", "REPO"))
+	result := formatRemoteURL(prCheckoutCmd, ghrepo.New("OWNER", "REPO"))
 	eq(t, result, "https://github.com/OWNER/REPO.git")
 }
 
@@ -58,6 +58,6 @@ hosts:
 git_protocol: ssh
 `
 	initBlankContext(cfg, "OWNER/REPO", "master")
-	result := formatRemoteURL(repoForkCmd, ghrepo.New("OWNER", "REPO"))
+	result := formatRemoteURL(prCheckoutCmd, ghrepo.New("OWNER", "REPO"))
 	eq(t, result, "git@github.com:OWNER/REPO.git")
 }
