@@ -191,6 +191,9 @@ var RootCmd = &cobra.Command{
 			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
 			or "oauth" to print detailed information about HTTP requests or authentication flow.
 
+			GLAMOUR_STYLE: the style to use for rendering Markdown. See
+			https://github.com/charmbracelet/glamour#styles
+
 			NO_COLOR: avoid printing ANSI escape sequences for color output.
 		`),
 	},
