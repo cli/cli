@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -619,7 +620,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 		DeleteBranch bool
 	}{}
 
-	err := SurveyAsk(qs, &answers)
+	err := prompt.SurveyAsk(qs, &answers)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not prompt: %w", err)
 	}

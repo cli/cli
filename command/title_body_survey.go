@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -54,10 +55,6 @@ const (
 	noMilestone = "(none)"
 )
 
-var SurveyAsk = func(qs []*survey.Question, response interface{}, opts ...survey.AskOpt) error {
-	return survey.Ask(qs, response, opts...)
-}
-
 func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	const (
 		submitLabel   = "Submit"
@@ -88,7 +85,7 @@ func confirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 		},
 	}
 
-	err := SurveyAsk(confirmQs, &confirmAnswers)
+	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
 	if err != nil {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
@@ -130,7 +127,7 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 			},
 		},
 	}
-	if err := SurveyAsk(selectQs, &templateResponse); err != nil {
+	if err := prompt.SurveyAsk(selectQs, &templateResponse); err != nil {
 		return "", fmt.Errorf("could not prompt: %w", err)
 	}
 
@@ -201,7 +198,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		qs = append(qs, bodyQuestion)
 	}
 
-	err = SurveyAsk(qs, issueState)
+	err = prompt.SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
@@ -232,7 +229,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		}
 		extraFieldsOptions = append(extraFieldsOptions, "Assignees", "Labels", "Projects", "Milestone")
 
-		err = SurveyAsk([]*survey.Question{
+		err = prompt.SurveyAsk([]*survey.Question{
 			{
 				Name: "metadata",
 				Prompt: &survey.MultiSelect{
@@ -364,7 +361,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			}
 		}
 		values := metadataValues{}
-		err = SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+		err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}

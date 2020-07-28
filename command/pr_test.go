@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -1618,10 +1619,10 @@ func TestPRMerge_interactive(t *testing.T) {
 	cs.Stub("") // git push origin --delete blueberries
 	cs.Stub("") // git branch -d
 
-	as, surveyTeardown := initAskStubber()
+	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "mergeMethod",
 			Value: 0,
