@@ -1,4 +1,4 @@
-# .github/actions/*/lib/* linguist-generated
+.github/actions/*/lib/* linguist-generated
 La Parse(str)función devuelve una consulta;
 Un PreparedQuery combina eso con valores escalares ("variables") para la consulta;
 Merge(queries...) devuelve la cadena de consulta GraphQL final + variables combinadas para la solicitud;
