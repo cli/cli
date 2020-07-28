@@ -216,7 +216,7 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	defer func() {
 		// Ensure the response body is fully read and closed
 		// before we reconnect, so that we reuse the same TCPconnection.
-		io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(ioutil.Discard, res.Body)
 		res.Body.Close()
 	}()
 
