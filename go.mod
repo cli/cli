@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.11.1
-	github.com/charmbracelet/glamour v0.1.1-0.20200527150725-d3564681b966
+	github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684
 	github.com/google/go-cmp v0.4.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.0
@@ -14,7 +14,6 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.6
 	github.com/mattn/go-isatty v0.0.12
-	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200627185320-e003124d66e4
