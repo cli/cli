@@ -49,7 +49,7 @@ tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn mor
 Install:
 
 ```bash
-brew install github/gh/gh
+brew install gh
 ```
 
 Upgrade:

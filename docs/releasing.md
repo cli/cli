@@ -22,7 +22,6 @@ To test out the build system, publish a prerelease tag with a name such as `vX.Y
 
 A successful build will result in changes across several repositories:
 * <https://github.com/github/cli.github.com>
-* <https://github.com/github/homebrew-gh>
 * <https://github.com/Homebrew/homebrew-core/pulls>
 * <https://github.com/cli/scoop-gh>
 
