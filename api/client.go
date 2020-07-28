@@ -216,16 +216,8 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	defer func() {
 		// Ensure the response body is fully read and closed
 		// before we reconnect, so that we reuse the same TCPconnection.
-		const maxBodySlurpSize = 2 << 10
-		if res.ContentLength == -1 || res.ContentLength <= maxBodySlurpSize {
-			if _, rerr := io.CopyN(ioutil.Discard, res.Body, maxBodySlurpSize); err != nil {
-				err = rerr
-			}
-		}
-
-		if rerr := res.Body.Close(); err == nil {
-			err = rerr
-		}
+		io.Copy(ioutil.Discard, res.Body)
+		res.Body.Close()
 	}()
 
 	if res.StatusCode != 200 {
