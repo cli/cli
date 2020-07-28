@@ -1,112 +1,99 @@
-package command
+package fork
 
 import (
-	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	repoCmd.AddCommand(repoForkCmd)
-	repoForkCmd.Flags().String("clone", "prompt", "Clone fork: {true|false|prompt}")
-	repoForkCmd.Flags().String("remote", "prompt", "Add remote for fork: {true|false|prompt}")
-	repoForkCmd.Flags().Lookup("clone").NoOptDefVal = "true"
-	repoForkCmd.Flags().Lookup("remote").NoOptDefVal = "true"
+type ForkOptions struct {
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (context.Remotes, error)
 
-	repoCmd.AddCommand(repoCreditsCmd)
-	repoCreditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
-}
-
-var repoCmd = &cobra.Command{
-	Use:   "repo <command>",
-	Short: "Create, clone, fork, and view repositories",
-	Long:  `Work with GitHub repositories`,
-	Example: heredoc.Doc(`
-	$ gh repo create
-	$ gh repo clone cli/cli
-	$ gh repo view --web
-	`),
-	Annotations: map[string]string{
-		"IsCore": "true",
-		"help:arguments": `
-A repository can be supplied as an argument in any of the following formats:
-- "OWNER/REPO"
-- by URL, e.g. "https://github.com/OWNER/REPO"`},
-}
-
-var repoForkCmd = &cobra.Command{
-	Use:   "fork [<repository>]",
-	Short: "Create a fork of a repository",
-	Long: `Create a fork of a repository.
-
-With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.`,
-	RunE: repoFork,
-}
-
-var repoCreditsCmd = &cobra.Command{
-	Use:   "credits [<repository>]",
-	Short: "View credits for a repository",
-	Example: heredoc.Doc(`
-	# view credits for the current repository
-	$ gh repo credits
-	
-	# view credits for a specific repository
-	$ gh repo credits cool/repo
-
-	# print a non-animated thank you
-	$ gh repo credits -s
-	
-	# pipe to just print the contributors, one per line
-	$ gh repo credits | cat
-	`),
-	Args:   cobra.MaximumNArgs(1),
-	RunE:   repoCredits,
-	Hidden: true,
+	Repository   string
+	Clone        bool
+	Remote       bool
+	PromptClone  bool
+	PromptRemote bool
 }
 
 var Since = func(t time.Time) time.Duration {
 	return time.Since(t)
 }
 
-func repoFork(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-
-	clonePref, err := cmd.Flags().GetString("clone")
-	if err != nil {
-		return err
-	}
-	remotePref, err := cmd.Flags().GetString("remote")
-	if err != nil {
-		return err
+func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Command {
+	opts := &ForkOptions{
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Config:     f.Config,
+		BaseRepo:   f.BaseRepo,
+		Remotes:    f.Remotes,
 	}
 
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to create client: %w", err)
+	cmd := &cobra.Command{
+		Use:   "fork [<repository>]",
+		Args:  cobra.MaximumNArgs(1),
+		Short: "Create a fork of a repository",
+		Long: `Create a fork of a repository.
+
+With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			promptOk := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
+			if len(args) > 0 {
+				opts.Repository = args[0]
+			}
+
+			if promptOk && !cmd.Flags().Changed("clone") {
+				opts.PromptClone = true
+			}
+
+			if promptOk && !cmd.Flags().Changed("remote") {
+				opts.PromptRemote = true
+			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+			return forkRun(opts)
+		},
 	}
 
+	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
+	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
+
+	return cmd
+}
+
+func forkRun(opts *ForkOptions) error {
 	var repoToFork ghrepo.Interface
+	var err error
 	inParent := false // whether or not we're forking the repo we're currently "in"
-	if len(args) == 0 {
-		baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
+	if opts.Repository == "" {
+		baseRepo, err := opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
 		inParent = true
 		repoToFork = baseRepo
 	} else {
-		repoArg := args[0]
+		repoArg := opts.Repository
 
 		if utils.IsURL(repoArg) {
 			parsedURL, err := url.Parse(repoArg)
@@ -136,27 +123,29 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if !connectedToTerminal(cmd) {
-		if (inParent && remotePref == "prompt") || (!inParent && clonePref == "prompt") {
-			return errors.New("--remote or --clone must be explicitly set when not attached to tty")
-		}
-	}
+	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()
 
 	greenCheck := utils.Green("✓")
-	stderr := colorableErr(cmd)
+	stderr := opts.IO.ErrOut
 	s := utils.Spinner(stderr)
 	stopSpinner := func() {}
 
-	if connectedToTerminal(cmd) {
+	if connectedToTerminal {
 		loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
 		s.Suffix = " " + loading
 		s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
 		utils.StartSpinner(s)
 		stopSpinner = func() {
 			utils.StopSpinner(s)
-
 		}
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return fmt.Errorf("unable to create client: %w", err)
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
 	if err != nil {
@@ -173,7 +162,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 	// we assume the fork already existed and report an error.
 	createdAgo := Since(forkedRepo.CreatedAt)
 	if createdAgo > time.Minute {
-		if connectedToTerminal(cmd) {
+		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s %s %s\n",
 				utils.Yellow("!"),
 				utils.Bold(ghrepo.FullName(forkedRepo)),
@@ -183,29 +172,39 @@ func repoFork(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 	} else {
-		if connectedToTerminal(cmd) {
+		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
-	if (inParent && remotePref == "false") || (!inParent && clonePref == "false") {
+	if (inParent && (!opts.Remote && !opts.PromptRemote)) || (!inParent && (!opts.Clone && !opts.PromptClone)) {
 		return nil
 	}
 
+	// TODO This is overly wordy and I'd like to streamline this.
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+	protocol, err := cfg.Get("", "git_protocol")
+	if err != nil {
+		return err
+	}
+
 	if inParent {
-		remotes, err := ctx.Remotes()
+		remotes, err := opts.Remotes()
 		if err != nil {
 			return err
 		}
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
-			if connectedToTerminal(cmd) {
+			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
 			}
 			return nil
 		}
 
-		remoteDesired := remotePref == "true"
-		if remotePref == "prompt" {
+		remoteDesired := opts.Remote
+		if opts.PromptRemote {
 			err = prompt.Confirm("Would you like to add a remote for the fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
@@ -214,7 +213,7 @@ func repoFork(cmd *cobra.Command, args []string) error {
 		if remoteDesired {
 			remoteName := "origin"
 
-			remotes, err := ctx.Remotes()
+			remotes, err := opts.Remotes()
 			if err != nil {
 				return err
 			}
@@ -225,63 +224,48 @@ func repoFork(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return err
 				}
-				if connectedToTerminal(cmd) {
+				if connectedToTerminal {
 					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
 				}
 			}
 
-			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
+			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 
 			_, err = git.AddRemote(remoteName, forkedRepoCloneURL)
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
 
-			if connectedToTerminal(cmd) {
+			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
 			}
 		}
 	} else {
-		cloneDesired := clonePref == "true"
-		if clonePref == "prompt" {
+		cloneDesired := opts.Clone
+		if opts.PromptClone {
 			err = prompt.Confirm("Would you like to clone the fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
 		}
 		if cloneDesired {
-			forkedRepoCloneURL := formatRemoteURL(cmd, forkedRepo)
-			cloneDir, err := git.RunClone(forkedRepoCloneURL, []string{})
+			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
+			cloneDir, err := git.RunClone(forkedRepoURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
-			// TODO This is overly wordy and I'd like to streamline this.
-			cfg, err := ctx.Config()
-			if err != nil {
-				return err
-			}
-			protocol, err := cfg.Get("", "git_protocol")
-			if err != nil {
-				return err
-			}
-
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-
 			err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 			if err != nil {
 				return err
 			}
 
-			if connectedToTerminal(cmd) {
+			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Cloned fork\n", greenCheck)
 			}
 		}
 	}
 
 	return nil
-}
-
-func repoCredits(cmd *cobra.Command, args []string) error {
-	return credits(cmd, args)
 }

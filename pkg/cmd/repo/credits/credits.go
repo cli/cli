@@ -1,10 +1,11 @@
-package command
+package credits
 
 import (
 	"bytes"
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -12,76 +13,121 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
-
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
+	"github.com/spf13/cobra"
 )
 
-var thankYou = `
-     _                    _
-    | |                  | |
-_|_ | |     __,   _  _   | |           __
- |  |/ \   /  |  / |/ |  |/_)   |   | /  \_|   |
- |_/|   |_/\_/|_/  |  |_/| \_/   \_/|/\__/  \_/|_/
-                                   /|
-                                   \|
-                              _
-                           o | |                           |
- __   __   _  _  _|_  ,_     | |        _|_  __   ,_    ,  |
-/    /  \_/ |/ |  |  /  |  | |/ \_|   |  |  /  \_/  |  / \_|
-\___/\__/   |  |_/|_/   |_/|_/\_/  \_/|_/|_/\__/    |_/ \/ o
+type CreditsOptions struct {
+	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
+	IO         *iostreams.IOStreams
 
-
-`
-
-func init() {
-	RootCmd.AddCommand(creditsCmd)
-
-	creditsCmd.Flags().BoolP("static", "s", false, "Print a static version of the credits")
+	Repository string
+	Static     bool
 }
 
-var creditsCmd = &cobra.Command{
-	Use:   "credits",
-	Short: "View credits for this tool",
-	Long:  `View animated credits for gh, the tool you are currently using :)`,
-	Example: heredoc.Doc(`
-	# see a credits animation for this project
-	$ gh credits
-	
-	# display a non-animated thank you
-	$ gh credits -s
-	
-	# just print the contributors, one per line
-	$ gh credits | cat
-	`),
-	Args:   cobra.ExactArgs(0),
-	RunE:   ghCredits,
-	Hidden: true,
+func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
+	opts := &CreditsOptions{
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		BaseRepo:   f.BaseRepo,
+		Repository: "cli/cli",
+	}
+
+	cmd := &cobra.Command{
+		Use:   "credits",
+		Short: "View credits for this tool",
+		Long:  `View animated credits for gh, the tool you are currently using :)`,
+		Example: heredoc.Doc(`
+			# see a credits animation for this project
+			$ gh credits
+			
+			# display a non-animated thank you
+			$ gh credits -s
+			
+			# just print the contributors, one per line
+			$ gh credits | cat
+		`),
+		Args: cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(opts)
+			}
+
+			return creditsRun(opts)
+		},
+		Hidden: true,
+	}
+
+	cmd.Flags().BoolVarP(&opts.Static, "static", "s", false, "Print a static version of the credits")
+
+	return cmd
 }
 
-func ghCredits(cmd *cobra.Command, _ []string) error {
-	args := []string{"cli/cli"}
-	return credits(cmd, args)
+func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
+	opts := &CreditsOptions{
+		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
+		IO:         f.IOStreams,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "credits [<repository>]",
+		Short: "View credits for a repository",
+		Example: heredoc.Doc(`
+      # view credits for the current repository
+      $ gh repo credits
+
+      # view credits for a specific repository
+      $ gh repo credits cool/repo
+
+      # print a non-animated thank you
+      $ gh repo credits -s
+
+      # pipe to just print the contributors, one per line
+      $ gh repo credits | cat
+    `),
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				opts.Repository = args[0]
+			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+
+			return creditsRun(opts)
+		},
+		Hidden: true,
+	}
+
+	cmd.Flags().BoolVarP(&opts.Static, "static", "s", false, "Print a static version of the credits")
+
+	return cmd
 }
 
-func credits(cmd *cobra.Command, args []string) error {
+func creditsRun(opts *CreditsOptions) error {
 	isWindows := runtime.GOOS == "windows"
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
+	client := api.NewClientFromHTTP(httpClient)
+
 	var baseRepo ghrepo.Interface
-	if len(args) == 0 {
-		baseRepo, err = determineBaseRepo(client, cmd, ctx)
+	if opts.Repository == "" {
+		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
 	} else {
-		baseRepo, err = ghrepo.FromFullName(args[0])
+		baseRepo, err = ghrepo.FromFullName(opts.Repository)
 		if err != nil {
 			return err
 		}
@@ -102,27 +148,15 @@ func credits(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	out := cmd.OutOrStdout()
-	isTTY := false
-	outFile, isFile := out.(*os.File)
-	if isFile {
-		isTTY = utils.IsTerminal(outFile)
-		if isTTY {
-			// FIXME: duplicates colorableOut
-			out = utils.NewColorable(outFile)
-		}
-	}
+	isTTY := opts.IO.IsStdoutTTY()
 
-	static, err := cmd.Flags().GetBool("static")
-	if err != nil {
-		return err
-	}
+	static := opts.Static || isWindows
 
-	static = static || isWindows
+	out := opts.IO.Out
 
 	if isTTY && static {
 		fmt.Fprintln(out, "THANK YOU CONTRIBUTORS!!! <3")
-		fmt.Println()
+		fmt.Fprintln(out, "")
 	}
 
 	logins := []string{}
@@ -150,7 +184,8 @@ func credits(cmd *cobra.Command, args []string) error {
 	lines = append(lines, logins...)
 	lines = append(lines, "( <3 press ctrl-c to quit <3 )")
 
-	termWidth, termHeight, err := terminal.GetSize(int(outFile.Fd()))
+	termWidth, termHeight, err := utils.TerminalSize(out)
+	//termWidth, termHeight, err := terminal.GetSize(int(outFile.Fd()))
 	if err != nil {
 		return err
 	}
@@ -259,3 +294,20 @@ func clear() {
 	cmd.Stdout = os.Stdout
 	_ = cmd.Run()
 }
+
+var thankYou = `
+     _                    _
+    | |                  | |
+_|_ | |     __,   _  _   | |           __
+ |  |/ \   /  |  / |/ |  |/_)   |   | /  \_|   |
+ |_/|   |_/\_/|_/  |  |_/| \_/   \_/|/\__/  \_/|_/
+                                   /|
+                                   \|
+                              _
+                           o | |                           |
+ __   __   _  _  _|_  ,_     | |        _|_  __   ,_    ,  |
+/    /  \_/ |/ |  |  /  |  | |/ \_|   |  |  /  \_/  |  / \_|
+\___/\__/   |  |_/|_/   |_/|_/\_/  \_/|_/|_/\__/    |_/ \/ o
+
+
+`

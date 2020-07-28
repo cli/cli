@@ -21,6 +21,8 @@ type IOStreams struct {
 	stdinIsTTY        bool
 	stdoutTTYOverride bool
 	stdoutIsTTY       bool
+	stderrTTYOverride bool
+	stderrIsTTY       bool
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -53,6 +55,21 @@ func (s *IOStreams) IsStdoutTTY() bool {
 	}
 	if stdout, ok := s.Out.(*os.File); ok {
 		return isTerminal(stdout)
+	}
+	return false
+}
+
+func (s *IOStreams) SetStderrTTY(isTTY bool) {
+	s.stderrTTYOverride = true
+	s.stderrIsTTY = isTTY
+}
+
+func (s *IOStreams) IsStderrTTY() bool {
+	if s.stderrTTYOverride {
+		return s.stderrIsTTY
+	}
+	if stderr, ok := s.ErrOut.(*os.File); ok {
+		return isTerminal(stderr)
 	}
 	return false
 }

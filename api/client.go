@@ -209,7 +209,13 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-	defer res.Body.Close()
+
+	defer func() {
+		// Ensure the response body is fully read and closed
+		// before we reconnect, so that we reuse the same TCPconnection.
+		_, _ = io.Copy(ioutil.Discard, res.Body)
+		res.Body.Close()
+	}()
 
 	if res.StatusCode != 200 {
 		return false, "", handleHTTPError(res)
