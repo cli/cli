@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -602,10 +603,10 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 	cs.Stub("")                                         // git rev-parse
 	cs.Stub("")                                         // git push
 
-	as, surveyTeardown := initAskStubber()
+	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "title",
 			Default: true,
@@ -615,7 +616,7 @@ func TestPRCreate_survey_defaults_multicommit(t *testing.T) {
 			Default: true,
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
 			Value: 0,
@@ -687,10 +688,10 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	cs.Stub("")                                                        // git rev-parse
 	cs.Stub("")                                                        // git push
 
-	as, surveyTeardown := initAskStubber()
+	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "title",
 			Default: true,
@@ -700,7 +701,7 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 			Default: true,
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
 			Value: 0,
@@ -896,10 +897,10 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 	cs.Stub("") // git push
 	cs.Stub("") // browser open
 
-	as, surveyTeardown := initAskStubber()
+	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "title",
 			Default: true,
@@ -909,7 +910,7 @@ func TestPRCreate_defaults_error_interactive(t *testing.T) {
 			Value: "social distancing",
 		},
 	})
-	as.Stub([]*QuestionStub{
+	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
 			Value: 1,
