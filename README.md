@@ -157,3 +157,4 @@ Install a prebuilt binary from the [releases page][]
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
+![Lint](https://github.com/cli/cli/workflows/Lint/badge.svg)
