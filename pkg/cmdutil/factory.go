@@ -15,4 +15,5 @@ type Factory struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Config     func() (config.Config, error)
+	Branch     func() (string, error)
 }
