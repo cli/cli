@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
 	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
 	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
@@ -172,6 +173,7 @@ func init() {
 
 	prCmd.AddCommand(prReviewCmd.NewCmdReview(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
