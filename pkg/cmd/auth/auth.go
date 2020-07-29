@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
 
@@ -10,10 +9,10 @@ var Cmd = &cobra.Command{
 	Short: "Login, logout, and refresh your authentication",
 	Long:  `Manage gh's authentication state.`,
 	// TODO this all doesn't exist yet
-	Example: heredoc.Doc(`
-		$ gh auth login
-		$ gh auth status
-		$ gh auth refresh --scopes gist
-		$ gh auth logout
-	`),
+	//Example: heredoc.Doc(`
+	//	$ gh auth login
+	//	$ gh auth status
+	//	$ gh auth refresh --scopes gist
+	//	$ gh auth logout
+	//`),
 }
