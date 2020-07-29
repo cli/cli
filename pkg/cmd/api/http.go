@@ -87,7 +87,7 @@ func groupGraphQLVariables(params map[string]interface{}) map[string]interface{}
 
 	for key, val := range params {
 		switch key {
-		case "query":
+		case "query", "operationName":
 			topLevel[key] = val
 		default:
 			variables[key] = val

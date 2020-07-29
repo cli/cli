@@ -55,6 +55,21 @@ func Test_groupGraphQLVariables(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "query + operationName + variables",
+			args: map[string]interface{}{
+				"query":         "query Q1{} query Q2{}",
+				"operationName": "Q1",
+				"power":         9001,
+			},
+			want: map[string]interface{}{
+				"query":         "query Q1{} query Q2{}",
+				"operationName": "Q1",
+				"variables": map[string]interface{}{
+					"power": 9001,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
