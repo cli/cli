@@ -3,6 +3,7 @@ package diff
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -83,8 +84,8 @@ func diffRun(opts *DiffOptions) error {
 	defer diff.Close()
 
 	if opts.UseColor == "never" {
-		fmt.Fprint(opts.IO.Out, diff)
-		return nil
+		_, err = io.Copy(opts.IO.Out, diff)
+		return err
 	}
 
 	diffLines := bufio.NewScanner(diff)

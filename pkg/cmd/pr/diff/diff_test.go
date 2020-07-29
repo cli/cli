@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -124,7 +125,9 @@ func TestPRDiff_notty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	assert.Equal(t, testDiff, output.String())
+	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
+		t.Errorf("command output did not match:\n%s", diff)
+	}
 }
 
 func TestPRDiff_tty(t *testing.T) {
