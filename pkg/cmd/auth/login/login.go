@@ -11,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -18,17 +19,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO fix scope validation; hasScopes doesn't know about admin:read override and it's hardcoded
-// for api.github.com.
 // TODO formatting for browser flow text
+
 // TODO clean up and streamline use of api client
+
 // TODO get down to one cfg.Write
-
-// TODO extract desired scopes somewhere, also hardcoded in config_setup
-var expectedScopes = []string{"repo", "read:org"}
-
-// TODO should probably use default hostname from mislav's work
-const defaultHostname = "github.com"
+// this is tricky; it is now easier to create an httpClient from an in-ram cfg but exposing that
+// to the login command is not simple.
+// some options:
+// 1. a top level helper in api that takes a cfg and returns an http client
+// 2. calling api.NewHTTPClient directly and specifying the opts a la httpClient in root.go
+// 3. a new factory method (this smells worst; it's just for login which has special needs)
+//
 
 type LoginOptions struct {
 	HttpClient func() (*http.Client, error)
@@ -87,7 +89,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 				opts.Token = strings.TrimSpace(string(token))
 				if opts.Hostname == "" {
-					opts.Hostname = defaultHostname
+					opts.Hostname = ghinstance.Default()
 				}
 			}
 
@@ -165,7 +167,7 @@ func loginRun(opts *LoginOptions) error {
 
 		isEnterprise := hostType == 1
 
-		hostname = defaultHostname
+		hostname = ghinstance.Default()
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
