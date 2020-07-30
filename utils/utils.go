@@ -46,18 +46,10 @@ func RenderMarkdown(text string) (string, error) {
 }
 
 func Pluralize(num int, thing string) string {
-	isIssueOrPR := thing == "issue" || thing == "pull request"
-	if isIssueOrPR {
-		if num == 1 {
-			return fmt.Sprintf("%d open %s", num, thing)
-		}
-		return fmt.Sprintf("%d open %ss", num, thing)
-	} else {
-		if num == 1 {
-			return fmt.Sprintf("%d %s", num, thing)
-		}
-		return fmt.Sprintf("%d %ss", num, thing)
+	if num == 1 {
+		return fmt.Sprintf("%d %s", num, thing)
 	}
+	return fmt.Sprintf("%d %ss", num, thing)
 }
 
 func fmtDuration(amount int, unit string) string {
