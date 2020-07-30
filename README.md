@@ -155,5 +155,5 @@ Install a prebuilt binary from the [releases page][]
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
-[hub]: https://github.com/github/hub
+[hub]: https://github.com/github/hub 
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
