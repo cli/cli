@@ -18,6 +18,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO fix scope validation; hasScopes doesn't know about admin:read override and it's hardcoded
+// for api.github.com.
+// TODO formatting for browser flow text
+// TODO clean up and streamline use of api client
+// TODO get down to one cfg.Write
+
 // TODO extract desired scopes somewhere, also hardcoded in config_setup
 var expectedScopes = []string{"repo", "read:org"}
 
