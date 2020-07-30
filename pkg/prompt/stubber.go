@@ -17,8 +17,6 @@ type AskStubber struct {
 	StubOnes []*PromptStub
 }
 
-// TODO ADAPT THIS ALL TO SUPPORT THE NEW SURVEYASKONE
-
 func InitAskStubber() (*AskStubber, func()) {
 	origSurveyAsk := SurveyAsk
 	origSurveyAskOne := SurveyAskOne
