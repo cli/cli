@@ -104,6 +104,8 @@ func Test_NewCmdLogin(t *testing.T) {
 				gotOpts = opts
 				return nil
 			})
+			// TODO cobra hack-around
+			cmd.Flags().BoolP("help", "x", false, "")
 
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})

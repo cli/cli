@@ -64,10 +64,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		RunE: func(cmd *cobra.Command, args []string) error {
 			isTTY := opts.IO.IsStdinTTY()
 
-			if !isTTY {
-				if !cmd.Flags().Changed("with-token") {
-					return &cmdutil.FlagError{Err: errors.New("--with-token required when not attached to tty")}
-				}
+			if !isTTY && !cmd.Flags().Changed("with-token") {
+				return &cmdutil.FlagError{Err: errors.New("--with-token required when not attached to tty")}
 			}
 
 			wt, _ := cmd.Flags().GetBool("with-token")
@@ -95,8 +93,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Hostname, "hostname", "", "The hostname of the GitHub instance to authenticate with")
-	cmd.Flags().Bool("with-token", false, "If specified, token is read from STDIN")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
+	cmd.Flags().Bool("with-token", false, "Read token from standard input")
 
 	return cmd
 }
@@ -109,7 +107,7 @@ func loginRun(opts *LoginOptions) error {
 
 	if opts.Token != "" {
 		if opts.Hostname == "" {
-			panic("empty hostname would leak oauth_token")
+			return errors.New("empty hostname would leak oauth_token")
 		}
 		err := cfg.Set(opts.Hostname, "oauth_token", opts.Token)
 		if err != nil {
@@ -209,7 +207,7 @@ func loginRun(opts *LoginOptions) error {
 		}
 
 		if hostname == "" {
-			panic("empty hostname would leak oauth_token")
+			return errors.New("empty hostname would leak oauth_token")
 		}
 		err = cfg.Set(hostname, "oauth_token", token)
 		if err != nil {
