@@ -273,7 +273,7 @@ func loginRun(opts *LoginOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	username, err := api.CurrentLoginName(apiClient)
+	username, err := api.CurrentLoginName(apiClient, hostname)
 	if err != nil {
 		return fmt.Errorf("error using api: %w", err)
 	}
