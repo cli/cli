@@ -145,7 +145,7 @@ func TestIssueList_tty(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), `
-Showing 3 of 3 issues in OWNER/REPO
+Showing 3 of 3 open issues in OWNER/REPO
 
 `)
 
