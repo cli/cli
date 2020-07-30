@@ -131,13 +131,9 @@ func loginRun(opts *LoginOptions) error {
 
 		apiClient := api.NewClientFromHTTP(httpClient)
 
-		hasScopes, _, err := apiClient.HasScopes(expectedScopes...)
+		_, err = apiClient.HasMinimumScopes(opts.Hostname)
 		if err != nil {
 			return fmt.Errorf("could not verify token: %w", err)
-		}
-
-		if !hasScopes {
-			return fmt.Errorf("token missing at least one of the required scopes: %v", expectedScopes)
 		}
 
 		return nil
@@ -231,14 +227,9 @@ func loginRun(opts *LoginOptions) error {
 
 		apiClient := api.NewClientFromHTTP(httpClient)
 
-		hasScopes, _, err := apiClient.HasScopes(expectedScopes...)
+		_, err = apiClient.HasMinimumScopes(hostname)
 		if err != nil {
 			return fmt.Errorf("could not verify token: %w", err)
-		}
-
-		if !hasScopes {
-			return fmt.Errorf("%s token missing at least one of the required scopes: %v",
-				utils.Red("!"), expectedScopes)
 		}
 	}
 
