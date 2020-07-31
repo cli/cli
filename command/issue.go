@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/utils"
@@ -356,7 +357,7 @@ func issueView(cmd *cobra.Command, args []string) error {
 }
 
 func issueStateTitleWithColor(state string) string {
-	colorFunc := colorFuncForState(state)
+	colorFunc := shared.ColorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
 }
 
@@ -708,7 +709,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issueNum, nil, shared.ColorFuncForState(issue.State))
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}
