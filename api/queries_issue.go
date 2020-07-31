@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -246,8 +247,18 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	if mentionString != "" {
 		variables["mention"] = mentionString
 	}
+
 	if milestoneString != "" {
-		variables["milestone"] = milestoneString
+		milestones, err := RepoMilestonesREST(client, repo)
+		if err != nil {
+			return nil, err
+		}
+		for i := range milestones {
+			if milestones[i].Title == milestoneString {
+				variables["milestone"] = strconv.Itoa(milestones[i].ID)
+				break
+			}
+		}
 	}
 
 	var response struct {

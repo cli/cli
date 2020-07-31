@@ -61,6 +61,7 @@ var issueCmd = &cobra.Command{
 	$ gh issue list
 	$ gh issue create --label bug
 	$ gh issue view --web
+	$ gh issue list --milestone 'MVP'
 	`),
 	Annotations: map[string]string{
 		"IsCore": "true",
