@@ -24,6 +24,7 @@ import (
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
 	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
+	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
 	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
 	prViewCmd "github.com/cli/cli/pkg/cmd/pr/view"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
@@ -176,6 +177,7 @@ func init() {
 	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
@@ -279,6 +281,9 @@ func httpClient(token string) *http.Client {
 	opts = append(opts,
 		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+		// antiope-preview: Checks
+		// FIXME: avoid setting this header for `api` command
+		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json"),
 	)
 	return api.NewHTTPClient(opts...)
 }

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -16,7 +15,6 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -31,11 +29,6 @@ func init() {
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
-	prCmd.AddCommand(prMergeCmd)
-	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
-	prMergeCmd.Flags().BoolP("merge", "m", false, "Merge the commits with the base branch")
-	prMergeCmd.Flags().BoolP("rebase", "r", false, "Rebase the commits onto the base branch")
-	prMergeCmd.Flags().BoolP("squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 	prCmd.AddCommand(prReadyCmd)
 
 	prCmd.AddCommand(prListCmd)
@@ -92,18 +85,6 @@ var prReopenCmd = &cobra.Command{
 	Short: "Reopen a pull request",
 	Args:  cobra.ExactArgs(1),
 	RunE:  prReopen,
-}
-var prMergeCmd = &cobra.Command{
-	Use:   "merge [<number> | <url> | <branch>]",
-	Short: "Merge a pull request",
-	Long: heredoc.Doc(`
-	Merge a pull request on GitHub.
-
-	By default, the head branch of the pull request will get deleted on both remote and local repositories.
-	To retain the branch, use '--delete-branch=false'.
-	`),
-	Args: cobra.MaximumNArgs(1),
-	RunE: prMerge,
 }
 var prReadyCmd = &cobra.Command{
 	Use:   "ready [<number> | <url> | <branch>]",
@@ -365,200 +346,6 @@ func prReopen(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableErr(cmd), "%s Reopened pull request #%d (%s)\n", utils.Green("✔"), pr.Number, pr.Title)
 
 	return nil
-}
-
-func prMerge(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
-	if err != nil {
-		return err
-	}
-
-	if pr.Mergeable == "CONFLICTING" {
-		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", utils.Red("!"), pr.Number, pr.Title)
-		return err
-	} else if pr.Mergeable == "UNKNOWN" {
-		err := fmt.Errorf("%s Pull request #%d (%s) can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number, pr.Title)
-		return err
-	} else if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", utils.Red("!"), pr.Number, pr.Title)
-		return err
-	}
-
-	var mergeMethod api.PullRequestMergeMethod
-	deleteBranch, err := cmd.Flags().GetBool("delete-branch")
-	if err != nil {
-		return err
-	}
-
-	deleteLocalBranch := !cmd.Flags().Changed("repo")
-	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
-
-	// Ensure only one merge method is specified
-	enabledFlagCount := 0
-	isInteractive := false
-	if b, _ := cmd.Flags().GetBool("merge"); b {
-		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodMerge
-	}
-	if b, _ := cmd.Flags().GetBool("rebase"); b {
-		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodRebase
-	}
-	if b, _ := cmd.Flags().GetBool("squash"); b {
-		enabledFlagCount++
-		mergeMethod = api.PullRequestMergeMethodSquash
-	}
-
-	if enabledFlagCount == 0 {
-		if !connectedToTerminal(cmd) {
-			return errors.New("--merge, --rebase, or --squash required when not attached to a tty")
-		}
-		isInteractive = true
-	} else if enabledFlagCount > 1 {
-		return errors.New("expected exactly one of --merge, --rebase, or --squash to be true")
-	}
-
-	if isInteractive {
-		mergeMethod, deleteBranch, err = prInteractiveMerge(deleteLocalBranch, crossRepoPR)
-		if err != nil {
-			return nil
-		}
-	}
-
-	var action string
-	if mergeMethod == api.PullRequestMergeMethodRebase {
-		action = "Rebased and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
-	} else if mergeMethod == api.PullRequestMergeMethodSquash {
-		action = "Squashed and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
-	} else if mergeMethod == api.PullRequestMergeMethodMerge {
-		action = "Merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
-	} else {
-		err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
-		return err
-	}
-
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
-
-	if connectedToTerminal(cmd) {
-		fmt.Fprintf(colorableErr(cmd), "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
-	}
-
-	if deleteBranch {
-		branchSwitchString := ""
-
-		if deleteLocalBranch && !crossRepoPR {
-			currentBranch, err := ctx.Branch()
-			if err != nil {
-				return err
-			}
-
-			var branchToSwitchTo string
-			if currentBranch == pr.HeadRefName {
-				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-				err = git.CheckoutBranch(branchToSwitchTo)
-				if err != nil {
-					return err
-				}
-			}
-
-			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-			if localBranchExists {
-				err = git.DeleteLocalBranch(pr.HeadRefName)
-				if err != nil {
-					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-					return err
-				}
-			}
-
-			if branchToSwitchTo != "" {
-				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
-			}
-		}
-
-		if !crossRepoPR {
-			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-			var httpErr api.HTTPError
-			// The ref might have already been deleted by GitHub
-			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
-				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-				return err
-			}
-		}
-
-		if connectedToTerminal(cmd) {
-			fmt.Fprintf(colorableErr(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
-		}
-	}
-
-	return nil
-}
-
-func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
-	mergeMethodQuestion := &survey.Question{
-		Name: "mergeMethod",
-		Prompt: &survey.Select{
-			Message: "What merge method would you like to use?",
-			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
-			Default: "Create a merge commit",
-		},
-	}
-
-	qs := []*survey.Question{mergeMethodQuestion}
-
-	if !crossRepoPR {
-		var message string
-		if deleteLocalBranch {
-			message = "Delete the branch locally and on GitHub?"
-		} else {
-			message = "Delete the branch on GitHub?"
-		}
-
-		deleteBranchQuestion := &survey.Question{
-			Name: "deleteBranch",
-			Prompt: &survey.Confirm{
-				Message: message,
-				Default: true,
-			},
-		}
-		qs = append(qs, deleteBranchQuestion)
-	}
-
-	answers := struct {
-		MergeMethod  int
-		DeleteBranch bool
-	}{}
-
-	err := prompt.SurveyAsk(qs, &answers)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not prompt: %w", err)
-	}
-
-	var mergeMethod api.PullRequestMergeMethod
-	switch answers.MergeMethod {
-	case 0:
-		mergeMethod = api.PullRequestMergeMethodMerge
-	case 1:
-		mergeMethod = api.PullRequestMergeMethodRebase
-	case 2:
-		mergeMethod = api.PullRequestMergeMethodSquash
-	}
-
-	deleteBranch := answers.DeleteBranch
-	return mergeMethod, deleteBranch, nil
 }
 
 func prStateWithDraft(pr *api.PullRequest) string {
