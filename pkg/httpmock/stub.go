@@ -56,6 +56,26 @@ func GraphQL(q string) Matcher {
 	}
 }
 
+func EnterpriseGraphQL(q string) Matcher {
+	re := regexp.MustCompile(q)
+
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Method, "POST") {
+			return false
+		}
+		if req.URL.Path != "/api/graphql" {
+			return false
+		}
+
+		var bodyData struct {
+			Query string
+		}
+		_ = decodeJSONBody(req, &bodyData)
+
+		return re.MatchString(bodyData.Query)
+	}
+}
+
 func readBody(req *http.Request) ([]byte, error) {
 	bodyCopy := &bytes.Buffer{}
 	r := io.TeeReader(req.Body, bodyCopy)

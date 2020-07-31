@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"testing"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -138,18 +140,18 @@ func scopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 	}
 }
 
-func Test_loginRun_Nontty(t *testing.T) {
+func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
 		name      string
 		opts      *LoginOptions
 		httpStubs func(*httpmock.Registry)
 		wantHosts string
-		wantsErr  bool
+		wantErr   *regexp.Regexp
 	}{
 		{
-			name:     "no arguments",
-			opts:     &LoginOptions{},
-			wantsErr: true,
+			name:    "no arguments",
+			opts:    &LoginOptions{},
+			wantErr: regexp.MustCompile(`when unattached to TTY`),
 		},
 		{
 			name: "with token",
@@ -165,18 +167,43 @@ func Test_loginRun_Nontty(t *testing.T) {
 				Hostname: "albert.wesker",
 				Token:    "abc123",
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org"))
+			},
 			wantHosts: "albert.wesker:\n    oauth_token: abc123\n",
 		},
 		{
-			name: "insufficient scopes",
+			name: "missing repo scope",
 			opts: &LoginOptions{
 				Hostname: "github.com",
 				Token:    "abc456",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "user"), scopesResponder("read:org"))
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("read:org"))
 			},
-			wantsErr: true,
+			wantErr: regexp.MustCompile(`missing required scope repo`),
+		},
+		{
+			name: "missing read scope",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc456",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo"))
+			},
+			wantErr: regexp.MustCompile(`missing a read scope`),
+		},
+		{
+			name: "has admin scope",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc456",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,admin:read"))
+			},
+			wantHosts: "github.com:\n    oauth_token: abc456\n",
 		},
 	}
 
@@ -190,27 +217,37 @@ func Test_loginRun_Nontty(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		reg := &httpmock.Registry{}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		} else {
-			reg.Register(httpmock.REST("GET", "user"), scopesResponder("repo,read:org,"))
-		}
-
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			origClientFromCfg := clientFromCfg
+			defer func() {
+				clientFromCfg = origClientFromCfg
+			}()
+			clientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+				httpClient := &http.Client{Transport: reg}
+				return api.NewClientFromHTTP(httpClient), nil
+			}
+
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			} else {
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org"))
+			}
+
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := loginRun(tt.opts)
-			assert.Equal(t, tt.wantsErr, (err != nil))
+			assert.Equal(t, tt.wantErr == nil, err == nil)
 			if err != nil {
-				return
+				if tt.wantErr != nil {
+					assert.True(t, tt.wantErr.MatchString(err.Error()))
+					return
+				} else {
+					t.Fatalf("unexpected error: %s", err)
+				}
 			}
 
 			assert.Equal(t, "", stdout.String())
@@ -241,6 +278,12 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org,"))
+				reg.Register(
+					httpmock.EnterpriseGraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
+			},
 		},
 		{
 			name:      "choose enterprise",
@@ -251,6 +294,12 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)              // auth mode: token
 				as.StubOne("def456")       // auth token
 				as.StubOne("HTTPS")        // git_protocol
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org,"))
+				reg.Register(
+					httpmock.EnterpriseGraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			},
 		},
 		{
@@ -290,22 +339,26 @@ func Test_loginRun_Survey(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		reg := &httpmock.Registry{}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		} else {
-			reg.Register(httpmock.REST("GET", "user"), scopesResponder("repo,read:org,"))
-			reg.Register(
-				httpmock.GraphQL(`query UserCurrent\b`),
-				httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
-		}
-
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			origClientFromCfg := clientFromCfg
+			defer func() {
+				clientFromCfg = origClientFromCfg
+			}()
+			clientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+				httpClient := &http.Client{Transport: reg}
+				return api.NewClientFromHTTP(httpClient), nil
+			}
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			} else {
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org,"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
+			}
+
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
@@ -321,8 +374,6 @@ func Test_loginRun_Survey(t *testing.T) {
 				t.Fatalf("unexpected error: %s", err)
 			}
 
-			// TODO is there value in checking the output of stderr? It's full of stuff and largely I
-			// don't think is important to test.
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			reg.Verify(t)
 		})
