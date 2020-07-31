@@ -257,8 +257,7 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	greenCheck := utils.Green("✓")
-	fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", greenCheck)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
 
 	apiClient, err := clientFromCfg(hostname, cfg)
 
@@ -272,7 +271,7 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", greenCheck, utils.Bold(username))
+	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
 
 	return nil
 }
