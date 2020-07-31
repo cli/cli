@@ -376,7 +376,7 @@ func listHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
 	}
 
-	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
