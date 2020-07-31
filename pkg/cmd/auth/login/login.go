@@ -19,9 +19,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO formatting for browser flow text
-// TODO check if already functioning login for given host first
-
 type LoginOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
