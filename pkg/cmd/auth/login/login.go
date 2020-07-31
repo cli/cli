@@ -117,28 +117,13 @@ func loginRun(opts *LoginOptions) error {
 		if opts.Hostname == "" {
 			return errors.New("empty hostname would leak oauth_token")
 		}
-		err := cfg.Set(opts.Hostname, "oauth_token", opts.Token)
-		if err != nil {
-			return err
-		}
-		err = cfg.Write()
-		if err != nil {
-			return err
-		}
 
-		httpClient, err := opts.HttpClient()
+		err := validateToken(opts.Hostname, opts.Token)
 		if err != nil {
 			return err
 		}
 
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		_, err = apiClient.HasMinimumScopes(opts.Hostname)
-		if err != nil {
-			return fmt.Errorf("could not verify token: %w", err)
-		}
-
-		return nil
+		return cfg.SetWrite(opts.Hostname, "oauth_token", opts.Token)
 	}
 
 	isTTY := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
@@ -213,26 +198,13 @@ func loginRun(opts *LoginOptions) error {
 		if hostname == "" {
 			return errors.New("empty hostname would leak oauth_token")
 		}
-		err = cfg.Set(hostname, "oauth_token", token)
-		if err != nil {
-			return err
-		}
-		err = cfg.Write()
+
+		err = validateToken(hostname, token)
 		if err != nil {
 			return err
 		}
 
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return err
-		}
-
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		_, err = apiClient.HasMinimumScopes(hostname)
-		if err != nil {
-			return fmt.Errorf("could not verify token: %w", err)
-		}
+		cfg.SetWrite(opts.Hostname, "oauth_token", opts.Token)
 	}
 
 	var gitProtocol string

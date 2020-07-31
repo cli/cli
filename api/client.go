@@ -238,7 +238,7 @@ func (c Client) HasMinimumScopes(hostname string) (bool, error) {
 		errorMsgs = append(errorMsgs, "missing required scope repo")
 	}
 
-	if !search["read:org"] || !search["admin:read"] {
+	if !search["read:org"] && !search["admin:read"] {
 		errorMsgs = append(errorMsgs, "missing a read scope (need one of read:org or admin:read)")
 	}
 

@@ -14,6 +14,7 @@ const defaultGitProtocol = "https"
 type Config interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
+	SetWrite(string, string, string) error
 	Aliases() (*AliasConfig, error)
 	Write() error
 }
@@ -234,6 +235,14 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 		}
 		return hostCfg.SetStringValue(key, value)
 	}
+}
+
+func (c *fileConfig) SetWrite(hostname, key, value string) error {
+	err := c.Set(hostname, key, value)
+	if err != nil {
+		return err
+	}
+	return c.Write()
 }
 
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
