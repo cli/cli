@@ -22,17 +22,6 @@ import (
 // TODO formatting for browser flow text
 // TODO check if already functioning login for given host first
 
-// TODO clean up and streamline use of api client
-
-// TODO get down to one cfg.Write
-// this is tricky; it is now easier to create an httpClient from an in-ram cfg but exposing that
-// to the login command is not simple.
-// some options:
-// 1. a top level helper in api that takes a cfg and returns an http client
-// 2. calling api.NewHTTPClient directly and specifying the opts a la httpClient in root.go
-// 3. a new factory method (this smells worst; it's just for login which has special needs)
-//
-
 type LoginOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
