@@ -20,6 +20,7 @@ import (
 )
 
 // TODO formatting for browser flow text
+// TODO check if already functioning login for given host first
 
 // TODO clean up and streamline use of api client
 
@@ -118,12 +119,17 @@ func loginRun(opts *LoginOptions) error {
 			return errors.New("empty hostname would leak oauth_token")
 		}
 
-		err := validateToken(opts.Hostname, opts.Token)
+		err := cfg.Set(opts.Hostname, "oauth_token", opts.Token)
 		if err != nil {
 			return err
 		}
 
-		return cfg.SetWrite(opts.Hostname, "oauth_token", opts.Token)
+		err = validateHostCfg(opts.Hostname, cfg)
+		if err != nil {
+			return err
+		}
+
+		return cfg.Write()
 	}
 
 	isTTY := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
@@ -199,12 +205,15 @@ func loginRun(opts *LoginOptions) error {
 			return errors.New("empty hostname would leak oauth_token")
 		}
 
-		err = validateToken(hostname, token)
+		err = cfg.Set(hostname, "oauth_token", token)
 		if err != nil {
 			return err
 		}
 
-		cfg.SetWrite(opts.Hostname, "oauth_token", opts.Token)
+		err = validateHostCfg(hostname, cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	var gitProtocol string
@@ -227,24 +236,19 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	err = cfg.Write()
-	if err != nil {
-		return err
-	}
-
 	greenCheck := utils.Green("✓")
 	fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", greenCheck)
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
-	apiClient := api.NewClientFromHTTP(httpClient)
+	apiClient, err := clientFromCfg(hostname, cfg)
 
 	username, err := api.CurrentLoginName(apiClient, hostname)
 	if err != nil {
 		return fmt.Errorf("error using api: %w", err)
+	}
+
+	err = cfg.Write()
+	if err != nil {
+		return err
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", greenCheck, utils.Bold(username))
