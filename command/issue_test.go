@@ -170,10 +170,13 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 			assert.Equal(t, "probablyCher", params["assignee"].(string))
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
-			assert.Equal(t, "1.x", params["milestone"].(string))
 			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
 			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
 		}))
+	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/milestones"),
+		httpmock.StringResponse("[]"),
+	)
 
 	output, err := RunCommand("issue list -a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
 	if err != nil {

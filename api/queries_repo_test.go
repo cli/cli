@@ -55,6 +55,14 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/milestones"),
+		httpmock.StringResponse(`
+		[
+			{ "title": "GA", "id": 1 },
+			{ "title": "Big One.oh", "id": 2 }
+		]	
+		`))
+	http.Register(
 		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
