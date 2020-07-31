@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cli/cli/api"
@@ -34,4 +36,12 @@ func ColorFuncForState(state string) func(string) string {
 	default:
 		return nil
 	}
+}
+
+func PrintHeader(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Bold(s))
+}
+
+func PrintMessage(w io.Writer, s string) {
+	fmt.Fprintln(w, utils.Gray(s))
 }

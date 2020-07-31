@@ -26,6 +26,7 @@ import (
 	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
 	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
 	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
+	prStatusCmd "github.com/cli/cli/pkg/cmd/pr/status"
 	prViewCmd "github.com/cli/cli/pkg/cmd/pr/view"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
@@ -178,6 +179,7 @@ func init() {
 	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prStatusCmd.NewCmdStatus(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }

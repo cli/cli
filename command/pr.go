@@ -1,17 +1,11 @@
 package command
 
 import (
-	"errors"
 	"fmt"
-	"io"
-	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -26,7 +20,6 @@ func init() {
 
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCreateCmd)
-	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prReadyCmd)
@@ -68,12 +61,6 @@ var prListCmd = &cobra.Command{
 	`),
 	RunE: prList,
 }
-var prStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show status of relevant pull requests",
-	Args:  cmdutil.NoArgsQuoteReminder,
-	RunE:  prStatus,
-}
 var prCloseCmd = &cobra.Command{
 	Use:   "close {<number> | <url> | <branch>}",
 	Short: "Close a pull request",
@@ -91,72 +78,6 @@ var prReadyCmd = &cobra.Command{
 	Short: "Mark a pull request as ready for review",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  prReady,
-}
-
-func prStatus(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	apiClient, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	baseRepo, err := determineBaseRepo(apiClient, cmd, ctx)
-	if err != nil {
-		return err
-	}
-
-	repoOverride, _ := cmd.Flags().GetString("repo")
-	currentPRNumber, currentPRHeadRef, err := prSelectorForCurrentBranch(ctx, baseRepo)
-
-	if err != nil && repoOverride == "" && !errors.Is(err, git.ErrNotOnAnyBranch) {
-		return fmt.Errorf("could not query for pull request for current branch: %w", err)
-	}
-
-	// the `@me` macro is available because the API lookup is ElasticSearch-based
-	currentUser := "@me"
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
-	if err != nil {
-		return err
-	}
-
-	out := colorableOut(cmd)
-
-	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
-	fmt.Fprintln(out, "")
-
-	printHeader(out, "Current branch")
-	currentPR := prPayload.CurrentPR
-	currentBranch, _ := ctx.Branch()
-	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
-		currentPR = nil
-	}
-	if currentPR != nil {
-		printPrs(out, 1, *currentPR)
-	} else if currentPRHeadRef == "" {
-		printMessage(out, "  There is no current branch")
-	} else {
-		printMessage(out, fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]")))
-	}
-	fmt.Fprintln(out)
-
-	printHeader(out, "Created by you")
-	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
-	} else {
-		printMessage(out, "  You have no open pull requests")
-	}
-	fmt.Fprintln(out)
-
-	printHeader(out, "Requesting a code review from you")
-	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
-	} else {
-		printMessage(out, "  You have no pull requests to review")
-	}
-	fmt.Fprintln(out)
-
-	return nil
 }
 
 func prList(cmd *cobra.Command, args []string) error {
@@ -271,7 +192,7 @@ func prList(cmd *cobra.Command, args []string) error {
 			prNum = "#" + prNum
 		}
 		table.AddField(prNum, nil, shared.ColorFuncForPR(pr))
-		table.AddField(replaceExcessiveWhitespace(pr.Title), nil, nil)
+		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
@@ -384,125 +305,4 @@ func prReady(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(colorableErr(cmd), "%s Pull request #%d is marked as \"ready for review\"\n", utils.Green("✔"), pr.Number)
 
 	return nil
-}
-
-func prSelectorForCurrentBranch(ctx context.Context, baseRepo ghrepo.Interface) (prNumber int, prHeadRef string, err error) {
-	prHeadRef, err = ctx.Branch()
-	if err != nil {
-		return
-	}
-	branchConfig := git.ReadBranchConfig(prHeadRef)
-
-	// the branch is configured to merge a special PR head ref
-	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		prNumber, _ = strconv.Atoi(m[1])
-		return
-	}
-
-	var branchOwner string
-	if branchConfig.RemoteURL != nil {
-		// the branch merges from a remote specified by URL
-		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	} else if branchConfig.RemoteName != "" {
-		// the branch merges from a remote specified by name
-		rem, _ := ctx.Remotes()
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	}
-
-	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
-			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
-		}
-		// prepend `OWNER:` if this branch is pushed to a fork
-		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			prHeadRef = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
-		}
-	}
-
-	return
-}
-
-func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
-	for _, pr := range prs {
-		prNumber := fmt.Sprintf("#%d", pr.Number)
-
-		prStateColorFunc := utils.Green
-		if pr.IsDraft {
-			prStateColorFunc = utils.Gray
-		} else if pr.State == "MERGED" {
-			prStateColorFunc = utils.Magenta
-		} else if pr.State == "CLOSED" {
-			prStateColorFunc = utils.Red
-		}
-
-		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, replaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
-
-		checks := pr.ChecksStatus()
-		reviews := pr.ReviewStatus()
-
-		if pr.State == "OPEN" {
-			reviewStatus := reviews.ChangesRequested || reviews.Approved || reviews.ReviewRequired
-			if checks.Total > 0 || reviewStatus {
-				// show checks & reviews on their own line
-				fmt.Fprintf(w, "\n  ")
-			}
-
-			if checks.Total > 0 {
-				var summary string
-				if checks.Failing > 0 {
-					if checks.Failing == checks.Total {
-						summary = utils.Red("× All checks failing")
-					} else {
-						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
-					}
-				} else if checks.Pending > 0 {
-					summary = utils.Yellow("- Checks pending")
-				} else if checks.Passing == checks.Total {
-					summary = utils.Green("✓ Checks passing")
-				}
-				fmt.Fprint(w, summary)
-			}
-
-			if checks.Total > 0 && reviewStatus {
-				// add padding between checks & reviews
-				fmt.Fprint(w, " ")
-			}
-
-			if reviews.ChangesRequested {
-				fmt.Fprint(w, utils.Red("+ Changes requested"))
-			} else if reviews.ReviewRequired {
-				fmt.Fprint(w, utils.Yellow("- Review required"))
-			} else if reviews.Approved {
-				fmt.Fprint(w, utils.Green("✓ Approved"))
-			}
-		} else {
-			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(pr))
-		}
-
-		fmt.Fprint(w, "\n")
-	}
-	remaining := totalCount - len(prs)
-	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
-	}
-}
-
-func printHeader(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Bold(s))
-}
-
-func printMessage(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Gray(s))
-}
-
-func replaceExcessiveWhitespace(s string) string {
-	s = strings.TrimSpace(s)
-	s = regexp.MustCompile(`\r?\n`).ReplaceAllString(s, " ")
-	s = regexp.MustCompile(`\s{2,}`).ReplaceAllString(s, " ")
-	return s
 }

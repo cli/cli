@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -298,28 +299,28 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	printHeader(out, "Issues assigned to you")
+	shared.PrintHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := "  There are no issues assigned to you"
-		printMessage(out, message)
+		shared.PrintMessage(out, message)
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues mentioning you")
+	shared.PrintHeader(out, "Issues mentioning you")
 	if issuePayload.Mentioned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
-		printMessage(out, "  There are no issues mentioning you")
+		shared.PrintMessage(out, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues opened by you")
+	shared.PrintHeader(out, "Issues opened by you")
 	if issuePayload.Authored.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
-		printMessage(out, "  There are no issues opened by you")
+		shared.PrintMessage(out, "  There are no issues opened by you")
 	}
 	fmt.Fprintln(out)
 
@@ -713,7 +714,7 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		if table.IsTTY() {
 			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)
