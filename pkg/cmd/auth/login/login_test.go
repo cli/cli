@@ -265,8 +265,25 @@ func Test_loginRun_Survey(t *testing.T) {
 		httpStubs func(*httpmock.Registry)
 		askStubs  func(*prompt.AskStubber)
 		wantHosts string
-		rr        bool
+		cfg       func(config.Config)
 	}{
+		{
+			name: "already authenticated",
+			cfg: func(cfg config.Config) {
+				cfg.Set("github.com", "oauth_token", "ghi789")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org,"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(0)     // host type github.com
+				as.StubOne(false) // do not continue
+			},
+			wantHosts: "", // nothing should have been written to hosts
+		},
 		{
 			name: "hostname set",
 			opts: &LoginOptions{
@@ -335,11 +352,17 @@ func Test_loginRun_Survey(t *testing.T) {
 		io.SetStderrTTY(true)
 		io.SetStdoutTTY(true)
 
+		tt.opts.IO = io
+
+		cfg := config.NewBlankConfig()
+
+		if tt.cfg != nil {
+			tt.cfg(cfg)
+		}
 		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			return cfg, nil
 		}
 
-		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			origClientFromCfg := clientFromCfg

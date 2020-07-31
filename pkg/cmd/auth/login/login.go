@@ -104,6 +104,9 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
+		// I chose to not error on existing host here; my thinking is that for --with-token the user
+		// probably doesn't care if a token is overwritten since they have a token in hand they
+		// explicitly want to use.
 		if opts.Hostname == "" {
 			return errors.New("empty hostname would leak oauth_token")
 		}
@@ -159,6 +162,35 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "- Logging into %s\n", hostname)
+
+	existingToken, _ := cfg.Get(hostname, "oauth_token")
+
+	if existingToken != "" {
+		err := validateHostCfg(hostname, cfg)
+		if err == nil {
+			apiClient, err := clientFromCfg(hostname, cfg)
+
+			username, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				return fmt.Errorf("error using api: %w", err)
+			}
+			var keepGoing bool
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: fmt.Sprintf(
+					"You're already logged into %s as %s. Do you want to re-authenticate?",
+					hostname,
+					username),
+				Default: false,
+			}, &keepGoing)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+
+			if !keepGoing {
+				return nil
+			}
+		}
+	}
 
 	var authMode int
 	err = prompt.SurveyAskOne(&survey.Select{
