@@ -31,6 +31,7 @@ func init() {
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
+	prCloseCmd.Flags().BoolP("delete-branch", "d", false, "Delete the local and remote branch after close")
 	prCmd.AddCommand(prReopenCmd)
 	prCmd.AddCommand(prMergeCmd)
 	prMergeCmd.Flags().BoolP("delete-branch", "d", true, "Delete the local and remote branch after merge")
@@ -99,8 +100,14 @@ With '--web', open the pull request in a web browser instead.`,
 var prCloseCmd = &cobra.Command{
 	Use:   "close {<number> | <url> | <branch>}",
 	Short: "Close a pull request",
-	Args:  cobra.ExactArgs(1),
-	RunE:  prClose,
+	Long: heredoc.Doc(`
+	Close a pull request on GitHub.
+
+	By default, the head branch of the pull request will be retained.
+	To delete the branch, use '--delete-branch=true'.
+	`),
+	Args: cobra.ExactArgs(1),
+	RunE: prClose,
 }
 var prReopenCmd = &cobra.Command{
 	Use:   "reopen {<number> | <url> | <branch>}",
@@ -409,6 +416,61 @@ func prClose(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(colorableErr(cmd), "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
+
+	deleteBranch, err := cmd.Flags().GetBool("delete-branch")
+	if err != nil {
+		return err
+	}
+
+	deleteLocalBranch := !cmd.Flags().Changed("repo")
+	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+
+	if deleteBranch {
+		branchSwitchString := ""
+
+		if deleteLocalBranch && !crossRepoPR {
+			currentBranch, err := ctx.Branch()
+			if err != nil {
+				return err
+			}
+
+			var branchToSwitchTo string
+			if currentBranch == pr.HeadRefName {
+				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if err != nil {
+					return err
+				}
+				err = git.CheckoutBranch(branchToSwitchTo)
+				if err != nil {
+					return err
+				}
+			}
+
+			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+			if localBranchExists {
+				err = git.DeleteLocalBranch(pr.HeadRefName)
+				if err != nil {
+					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					return err
+				}
+			}
+
+			if branchToSwitchTo != "" {
+				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
+			}
+		}
+
+		if !crossRepoPR {
+			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
+			var httpErr api.HTTPError
+			// The ref might have already been deleted by GitHub
+			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
+				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				return err
+			}
+		}
+		fmt.Fprintf(colorableErr(cmd), "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+	}
 
 	return nil
 }
