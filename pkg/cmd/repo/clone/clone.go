@@ -34,7 +34,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "clone <repository> [<directory>]",
+		Use:   "clone <repository> [<directory>] -- [<gitflags>...]",
 		Args:  cobra.MinimumNArgs(1),
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(
