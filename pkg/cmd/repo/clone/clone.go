@@ -1,6 +1,7 @@
 package clone
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type CloneOptions struct {
@@ -54,6 +56,13 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			return cloneRun(opts)
 		},
 	}
+
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		if err == pflag.ErrHelp {
+			return err
+		}
+		return &cmdutil.FlagError{Err: fmt.Errorf("%v\nSeparate git clone flags with `--`.", err)}
+	})
 
 	return cmd
 }
