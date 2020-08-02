@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -801,31 +800,4 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 	}
 
 	return milestones, nil
-}
-
-type RepoMilestoneREST struct {
-	ID    int
-	Title string
-}
-
-func RepoMilestonesREST(client *Client, repo ghrepo.Interface) ([]RepoMilestoneREST, error) {
-	var allMilestones []RepoMilestoneREST
-
-	path := fmt.Sprintf("repos/%s/%s/milestones", repo.RepoOwner(), repo.RepoName())
-
-	for page := 1; ; page++ {
-		var milestonesFromPage []RepoMilestoneREST
-
-		err := client.REST("GET", path+"?page="+strconv.Itoa(page), nil, &milestonesFromPage)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(milestonesFromPage) == 0 {
-			break
-		}
-		allMilestones = append(allMilestones, milestonesFromPage...)
-	}
-
-	return allMilestones, nil
 }
