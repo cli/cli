@@ -170,7 +170,7 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 			assert.Equal(t, "probablyCher", params["assignee"].(string))
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
-			assert.Equal(t, "12345", params["milestone"].(string)) // Database ID for the Milestone (see #1441)
+			assert.Equal(t, "12345", params["milestone"].(string)) // Database ID for the Milestone (see #1462)
 			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
 			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
 		}))
