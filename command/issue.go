@@ -61,7 +61,6 @@ var issueCmd = &cobra.Command{
 	$ gh issue list
 	$ gh issue create --label bug
 	$ gh issue view --web
-	$ gh issue list --milestone 'MVP'
 	`),
 	Annotations: map[string]string{
 		"IsCore": "true",
@@ -89,6 +88,7 @@ var issueListCmd = &cobra.Command{
 	$ gh issue list -l "help wanted"
 	$ gh issue list -A monalisa
 	$ gh issue list --web
+	$ gh issue list --milestone 'MVP'
 	`),
 	Args: cmdutil.NoArgsQuoteReminder,
 	RunE: issueList,
