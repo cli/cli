@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
@@ -104,6 +105,16 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	recurseSubmodules, err := cmd.Flags().GetBool("recurse-submodules")
+	if err != nil {
+		return err
+	}
+
+	if recurseSubmodules {
+		cmdQueue = append(cmdQueue, []string{"git", "submodule", "sync", "--recursive"})
+		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
+	}
+
 	for _, args := range cmdQueue {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
@@ -119,6 +130,10 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 var prCheckoutCmd = &cobra.Command{
 	Use:   "checkout {<number> | <url> | <branch>}",
 	Short: "Check out a pull request in Git",
+	Example: heredoc.Doc(`
+	$ gh pr checkout 353
+	$ gh pr checkout 353 --recurse-submodules
+	`),
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("requires a pull request number as an argument")

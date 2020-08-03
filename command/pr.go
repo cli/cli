@@ -28,6 +28,8 @@ func init() {
 
 	RootCmd.AddCommand(prCmd)
 	prCmd.AddCommand(prCheckoutCmd)
+	prCheckoutCmd.Flags().BoolP("recurse-submodules", "", false, "Update all active submodules (recursively)")
+	
 	prCmd.AddCommand(prCreateCmd)
 	prCmd.AddCommand(prStatusCmd)
 	prCmd.AddCommand(prCloseCmd)
