@@ -112,7 +112,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		}
 	}{}
 
-	err := client.GraphQL(query, variables, &result)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 loop:
 	for {
 		variables["limit"] = pageLimit
-		err := client.GraphQL(query, variables, &response)
+		err := client.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
 			return nil, err
 		}
@@ -361,7 +361,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	var resp response
-	err := client.GraphQL(query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
 
 	if err != nil {
@@ -414,7 +414,7 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 		},
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
 
 	return err

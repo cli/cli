@@ -100,7 +100,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pr, _, err := prFromArgs(ctx, apiClient, cmd, args)
+	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func prReview(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err = api.AddReview(apiClient, pr, reviewData)
+	err = api.AddReview(apiClient, baseRepo, pr, reviewData)
 	if err != nil {
 		return fmt.Errorf("failed to create review: %w", err)
 	}

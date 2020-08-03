@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 )
 
 // repoCreateInput represents input parameters for repoCreate
@@ -50,7 +51,10 @@ func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, er
 		"input": input,
 	}
 
-	err := apiClient.GraphQL(`
+	// TODO: GHE support
+	hostname := ghinstance.Default()
+
+	err := apiClient.GraphQL(hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
@@ -66,8 +70,7 @@ func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, er
 		return nil, err
 	}
 
-	// FIXME: support Enterprise hosts
-	return api.InitRepoHostname(&response.CreateRepository.Repository, "github.com"), nil
+	return api.InitRepoHostname(&response.CreateRepository.Repository, hostname), nil
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
@@ -75,7 +78,8 @@ func resolveOrganization(client *api.Client, orgName string) (string, error) {
 	var response struct {
 		NodeID string `json:"node_id"`
 	}
-	err := client.REST("GET", fmt.Sprintf("users/%s", orgName), nil, &response)
+	// TODO: GHE support
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
 	return response.NodeID, err
 }
 
@@ -87,6 +91,7 @@ func resolveOrganizationTeam(client *api.Client, orgName, teamSlug string) (stri
 			NodeID string `json:"node_id"`
 		}
 	}
-	err := client.REST("GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	// TODO: GHE support
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return response.Organization.NodeID, response.NodeID, err
 }
