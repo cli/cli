@@ -565,3 +565,57 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
 	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
+
+func TestPRCheckout_recurseSubmodules(t *testing.T) {
+	ctx := context.NewBlank()
+	ctx.SetBranch("master")
+	ctx.SetRemotes(map[string]string{
+		"origin": "OWNER/REPO",
+	})
+	initContext = func() context.Context {
+		return ctx
+	}
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO",
+			"defaultBranchRef": {
+				"name": "master"
+			}
+		},
+		"isCrossRepository": false,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify -- refs/heads/feature":
+			return &test.OutputStub{}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := RunCommand(`pr checkout 123 --recurse-submodules`)
+	eq(t, err, nil)
+	eq(t, output.String(), "")
+
+	eq(t, len(ranCommands), 5)
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	eq(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
+	eq(t, strings.Join(ranCommands[3], " "), "git submodule sync --recursive")
+	eq(t, strings.Join(ranCommands[4], " "), "git submodule update --init --recursive")
+}
