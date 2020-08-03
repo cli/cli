@@ -36,27 +36,26 @@ jobs:
       - name: install reprepro
         run: sudo apt-get install -y reprepro
       - name: run reprepro
-          run: |
-            echo "Importing pubkey..."
-            cat conf/pubkey.asc | gpg --import --no-tty --batch --yes
-            echo "Importing seckey..."
-            echo ${{secrets.GPG_KEY}} | base64 -d | gpg --import --no-tty --batch --yes
-            echo "Listing public keys..."
-            gpg --list-keys --with-keygrip
-            echo "Listing secret keys..."
-            gpg --list-secret-keys
-            echo "Resetting gpg-agent and ingesting passphrase"
-            echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
-            gpg-connect-agent RELOADAGENT /bye
-            echo ${{secrets.GPG_PASSPHRASE}} | /usr/lib/gnupg2/gpg-preset-passphrase --preset 6D05600E91B6B2104C6E291A2072C6F511C291AE
-            echo "Moving on to reprepro..."
-            mkdir upload
-            for file in \*.deb ; do /usr/bin/reprepro includedeb stable $file ; done
-
+        run: |
+          echo "Importing pubkey..."
+          cat conf/pubkey.asc | gpg --import --no-tty --batch --yes
+          echo "Importing seckey..."
+          echo ${{secrets.GPG_KEY}} | base64 -d | gpg --import --no-tty --batch --yes
+          echo "Listing public keys..."
+          gpg --list-keys --with-keygrip
+          echo "Listing secret keys..."
+          gpg --list-secret-keys
+          echo "Resetting gpg-agent and ingesting passphrase"
+          echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent RELOADAGENT /bye
+          echo ${{secrets.GPG_PASSPHRASE}} | /usr/lib/gnupg2/gpg-preset-passphrase --preset 6D05600E91B6B2104C6E291A2072C6F511C291AE
+          echo "Moving on to reprepro..."
+          mkdir upload
+          for file in \*.deb ; do /usr/bin/reprepro includedeb stable $file ; done
       - name: "Select repo artifacts"
         # Select only final repo artifacts
         # (this makes reprepro runs stateless)
-        - run: cp -a dists/ pool/ upload/
+        run: cp -a dists/ pool/ upload/
       - name: upload to blob storage
         run: ./blobxfer upload --local-path upload/ --storage-account focusedelgamal --rmote-path '$web'
         env:
