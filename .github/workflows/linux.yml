@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-			- name: Get package artifacts
+      - name: Get package artifacts
         with:
           uses: i3h/download-release-asset@v1
           owner: cli
@@ -35,8 +35,8 @@ jobs:
           chmod +x blobxfer
       - name: install reprepro
         run: sudo apt-get install -y reprepro
-			- name: run reprepro
-				run: |
+      - name: run reprepro
+          run: |
             echo "Importing pubkey..."
             cat conf/pubkey.asc | gpg --import --no-tty --batch --yes
             echo "Importing seckey..."
@@ -53,10 +53,10 @@ jobs:
             mkdir upload
             for file in \*.deb ; do /usr/bin/reprepro includedeb stable $file ; done
 
-			- name: "Select repo artifacts"
-				# Select only final repo artifacts
-				# (this makes reprepro runs stateless)
-				- run: cp -a dists/ pool/ upload/
+      - name: "Select repo artifacts"
+        # Select only final repo artifacts
+        # (this makes reprepro runs stateless)
+        - run: cp -a dists/ pool/ upload/
       - name: upload to blob storage
         run: ./blobxfer upload --local-path upload/ --storage-account focusedelgamal --rmote-path '$web'
         env:
