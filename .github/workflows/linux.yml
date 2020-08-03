@@ -19,9 +19,9 @@ jobs:
           owner: cli
           repo: cli
           tag: latest
-          file: .\*.deb
+          file: .*.deb
       - name: debug
-        run: ls \*.deb
+        run: ls *.deb
       - name: get blobxfer
         uses: i3h/download-release-asset@v1
         with:
@@ -51,7 +51,7 @@ jobs:
           echo ${{secrets.GPG_PASSPHRASE}} | /usr/lib/gnupg2/gpg-preset-passphrase --preset 6D05600E91B6B2104C6E291A2072C6F511C291AE
           echo "Moving on to reprepro..."
           mkdir upload
-          for file in \*.deb ; do /usr/bin/reprepro includedeb stable $file ; done
+          for file in *.deb ; do /usr/bin/reprepro includedeb stable $file ; done
       - name: "Select repo artifacts"
         # Select only final repo artifacts
         # (this makes reprepro runs stateless)
