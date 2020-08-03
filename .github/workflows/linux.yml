@@ -14,8 +14,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Get package artifacts
+        uses: i3h/download-release-asset@v1
         with:
-          uses: i3h/download-release-asset@v1
           owner: cli
           repo: cli
           tag: latest
@@ -23,8 +23,8 @@ jobs:
       - name: debug
         run: ls \*.deb
       - name: get blobxfer
+        uses: i3h/download-release-asset@v1
         with:
-          uses: i3h/download-release-asset@v1
           owner: azure
           repo: blobxfer
           tag: latest
