@@ -38,7 +38,7 @@ jobs:
       - name: run reprepro
         run: |
           echo "Importing pubkey..."
-          cat conf/pubkey.asc | gpg --import --no-tty --batch --yes
+          cat script/pubkey.asc | gpg --import --no-tty --batch --yes
           echo "Importing seckey..."
           echo ${{secrets.GPG_KEY}} | base64 -d | gpg --import --no-tty --batch --yes
           echo "Listing public keys..."
