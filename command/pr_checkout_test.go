@@ -578,7 +578,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	http := initFakeHTTP()
 	http.StubRepoResponse("OWNER", "REPO")
 
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
 		"number": 123,
 		"headRefName": "feature",
@@ -586,10 +586,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 			"login": "hubot"
 		},
 		"headRepository": {
-			"name": "REPO",
-			"defaultBranchRef": {
-				"name": "master"
-			}
+			"name": "REPO"
 		},
 		"isCrossRepository": false,
 		"maintainerCanModify": false
