@@ -120,21 +120,17 @@ func creditsRun(opts *CreditsOptions) error {
 
 	client := api.NewClientFromHTTP(httpClient)
 
-	var owner string
-	var repo string
-
+	var baseRepo ghrepo.Interface
 	if opts.Repository == "" {
-		baseRepo, err := opts.BaseRepo()
+		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
-
-		owner = baseRepo.RepoOwner()
-		repo = baseRepo.RepoName()
 	} else {
-		parts := strings.SplitN(opts.Repository, "/", 2)
-		owner = parts[0]
-		repo = parts[1]
+		baseRepo, err = ghrepo.FromFullName(opts.Repository)
+		if err != nil {
+			return err
+		}
 	}
 
 	type Contributor struct {
@@ -145,9 +141,9 @@ func creditsRun(opts *CreditsOptions) error {
 
 	result := Result{}
 	body := bytes.NewBufferString("")
-	path := fmt.Sprintf("repos/%s/%s/contributors", owner, repo)
+	path := fmt.Sprintf("repos/%s/%s/contributors", baseRepo.RepoOwner(), baseRepo.RepoName())
 
-	err = client.REST("GET", path, body, &result)
+	err = client.REST(baseRepo.RepoHost(), "GET", path, body, &result)
 	if err != nil {
 		return err
 	}

@@ -145,7 +145,7 @@ func TestIssueList_tty(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), `
-Showing 3 of 3 issues in OWNER/REPO
+Showing 3 of 3 open issues in OWNER/REPO
 
 `)
 
@@ -847,7 +847,7 @@ func Test_listHeader(t *testing.T) {
 				totalMatchCount: 23,
 				hasFilters:      false,
 			},
-			want: "Showing 1 of 23 genies in REPO",
+			want: "Showing 1 of 23 open genies in REPO",
 		},
 		{
 			name: "one result after filters",
@@ -869,7 +869,7 @@ func Test_listHeader(t *testing.T) {
 				totalMatchCount: 1,
 				hasFilters:      false,
 			},
-			want: "Showing 1 of 1 chip in REPO",
+			want: "Showing 1 of 1 open chip in REPO",
 		},
 		{
 			name: "one result in total after filters",
@@ -891,7 +891,7 @@ func Test_listHeader(t *testing.T) {
 				totalMatchCount: 23,
 				hasFilters:      false,
 			},
-			want: "Showing 4 of 23 plants in REPO",
+			want: "Showing 4 of 23 open plants in REPO",
 		},
 		{
 			name: "multiple results after filters",

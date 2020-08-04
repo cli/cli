@@ -99,7 +99,7 @@ func reviewRun(opts *ReviewOptions) error {
 		return fmt.Errorf("did not understand desired review action: %w", err)
 	}
 
-	pr, _, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func reviewRun(opts *ReviewOptions) error {
 		}
 	}
 
-	err = api.AddReview(apiClient, pr, reviewData)
+	err = api.AddReview(apiClient, baseRepo, pr, reviewData)
 	if err != nil {
 		return fmt.Errorf("failed to create review: %w", err)
 	}
