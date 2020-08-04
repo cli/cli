@@ -56,11 +56,11 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
-			return &api.Repository{
+			return api.InitRepoHostname(&api.Repository{
 				Name:             "REPO",
 				Owner:            api.RepositoryOwner{Login: "OWNER"},
 				DefaultBranchRef: api.BranchRef{Name: "master"},
-			}, nil
+			}, "github.com"), nil
 		},
 		Remotes: func() (context.Remotes, error) {
 			if remotes == nil {
@@ -129,10 +129,14 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	if !assert.NoError(t, err) {
+		return
+	}
 
-	eq(t, len(ranCommands), 4)
+	assert.Equal(t, "", output.String())
+	if !assert.Equal(t, 4, len(ranCommands)) {
+		return
+	}
 	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
 	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")

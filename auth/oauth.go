@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/browser"
 )
 
@@ -52,9 +53,18 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		scopes = strings.Join(oa.Scopes, " ")
 	}
 
+	localhost := "127.0.0.1"
+	callbackPath := "/callback"
+	if ghinstance.IsEnterprise(oa.Hostname) {
+		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
+		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
+		localhost = "localhost"
+		callbackPath = "/"
+	}
+
 	q := url.Values{}
 	q.Set("client_id", oa.ClientID)
-	q.Set("redirect_uri", fmt.Sprintf("http://127.0.0.1:%d/callback", port))
+	q.Set("redirect_uri", fmt.Sprintf("http://%s:%d%s", localhost, port, callbackPath))
 	q.Set("scope", scopes)
 	q.Set("state", state)
 
@@ -73,7 +83,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 
 	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		oa.logf("server handler: %s\n", r.URL.Path)
-		if r.URL.Path != "/callback" {
+		if r.URL.Path != callbackPath {
 			w.WriteHeader(404)
 			return
 		}

@@ -48,9 +48,8 @@ func RenderMarkdown(text string) (string, error) {
 func Pluralize(num int, thing string) string {
 	if num == 1 {
 		return fmt.Sprintf("%d %s", num, thing)
-	} else {
-		return fmt.Sprintf("%d %ss", num, thing)
 	}
+	return fmt.Sprintf("%d %ss", num, thing)
 }
 
 func fmtDuration(amount int, unit string) string {

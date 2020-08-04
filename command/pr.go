@@ -153,8 +153,6 @@ func prList(cmd *cobra.Command, args []string) error {
 	}
 
 	params := map[string]interface{}{
-		"owner": baseRepo.RepoOwner(),
-		"repo":  baseRepo.RepoName(),
 		"state": graphqlState,
 	}
 	if len(labels) > 0 {
@@ -167,7 +165,7 @@ func prList(cmd *cobra.Command, args []string) error {
 		params["assignee"] = assignee
 	}
 
-	listResult, err := api.PullRequestList(apiClient, params, limit)
+	listResult, err := api.PullRequestList(apiClient, baseRepo, params, limit)
 	if err != nil {
 		return err
 	}

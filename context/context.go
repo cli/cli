@@ -13,13 +13,8 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-// TODO these are sprinkled across command, context, config, and ghrepo
-const defaultHostname = "github.com"
-
 // Context represents the interface for querying information about the current environment
 type Context interface {
-	AuthToken() (string, error)
-	SetAuthToken(string)
 	Branch() (string, error)
 	SetBranch(string)
 	Remotes() (Remotes, error)
@@ -164,11 +159,10 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config    config.Config
-	remotes   Remotes
-	branch    string
-	baseRepo  ghrepo.Interface
-	authToken string
+	config   config.Config
+	remotes  Remotes
+	branch   string
+	baseRepo ghrepo.Interface
 }
 
 func (c *fsContext) Config() (config.Config, error) {
@@ -180,35 +174,8 @@ func (c *fsContext) Config() (config.Config, error) {
 			return nil, err
 		}
 		c.config = cfg
-		c.authToken = ""
 	}
 	return c.config, nil
-}
-
-func (c *fsContext) AuthToken() (string, error) {
-	if c.authToken != "" {
-		return c.authToken, nil
-	}
-
-	cfg, err := c.Config()
-	if err != nil {
-		return "", err
-	}
-
-	var notFound *config.NotFoundError
-	token, err := cfg.Get(defaultHostname, "oauth_token")
-	if token == "" || errors.As(err, &notFound) {
-		// interactive OAuth flow
-		return config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: authentication required")
-	} else if err != nil {
-		return "", err
-	}
-
-	return token, nil
-}
-
-func (c *fsContext) SetAuthToken(t string) {
-	c.authToken = t
 }
 
 func (c *fsContext) Branch() (string, error) {
@@ -242,11 +209,16 @@ func (c *fsContext) Remotes() (Remotes, error) {
 		sshTranslate := git.ParseSSHConfig().Translator()
 		resolvedRemotes := translateRemotes(gitRemotes, sshTranslate)
 
-		// ignore non-github.com remotes
-		// TODO: GHE compatibility
+		// determine hostname by looking at the "main" remote
+		var hostname string
+		if mainRemote, err := resolvedRemotes.FindByName("upstream", "github", "origin", "*"); err == nil {
+			hostname = mainRemote.RepoHost()
+		}
+
+		// filter the rest of the remotes to just that hostname
 		filteredRemotes := Remotes{}
 		for _, r := range resolvedRemotes {
-			if r.RepoHost() != defaultHostname {
+			if r.RepoHost() != hostname {
 				continue
 			}
 			filteredRemotes = append(filteredRemotes, r)
@@ -255,7 +227,6 @@ func (c *fsContext) Remotes() (Remotes, error) {
 	}
 
 	if len(c.remotes) == 0 {
-		// TODO: GHE compatibility
 		return nil, errors.New("no git remote found for a github.com repository")
 	}
 	return c.remotes, nil

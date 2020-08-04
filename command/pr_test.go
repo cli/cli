@@ -34,7 +34,7 @@ func TestPRList(t *testing.T) {
 	}
 
 	assert.Equal(t, `
-Showing 3 of 3 pull requests in OWNER/REPO
+Showing 3 of 3 open pull requests in OWNER/REPO
 
 `, output.Stderr())
 

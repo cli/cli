@@ -33,7 +33,7 @@ func TestGraphQL(t *testing.T) {
 	}{}
 
 	http.StubResponse(200, bytes.NewBufferString(`{"data":{"viewer":{"login":"hubot"}}}`))
-	err := client.GraphQL("QUERY", vars, &response)
+	err := client.GraphQL("github.com", "QUERY", vars, &response)
 	eq(t, err, nil)
 	eq(t, response.Viewer.Login, "hubot")
 
@@ -55,7 +55,7 @@ func TestGraphQLError(t *testing.T) {
 	  ]
 	}`))
 
-	err := client.GraphQL("", nil, &response)
+	err := client.GraphQL("github.com", "", nil, &response)
 	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
 		t.Fatalf("got %q", err.Error())
 	}
@@ -71,7 +71,7 @@ func TestRESTGetDelete(t *testing.T) {
 	http.StubResponse(204, bytes.NewBuffer([]byte{}))
 
 	r := bytes.NewReader([]byte(`{}`))
-	err := client.REST("DELETE", "applications/CLIENTID/grant", r, nil)
+	err := client.REST("github.com", "DELETE", "applications/CLIENTID/grant", r, nil)
 	eq(t, err, nil)
 }
 
@@ -82,7 +82,7 @@ func TestRESTError(t *testing.T) {
 	http.StubResponse(422, bytes.NewBufferString(`{"message": "OH NO"}`))
 
 	var httpErr HTTPError
-	err := client.REST("DELETE", "repos/branch", nil, nil)
+	err := client.REST("github.com", "DELETE", "repos/branch", nil, nil)
 	if err == nil || !errors.As(err, &httpErr) {
 		t.Fatalf("got %v", err)
 	}
