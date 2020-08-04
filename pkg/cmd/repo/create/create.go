@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
@@ -23,13 +24,14 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name         string
-	Description  string
-	Homepage     string
-	Team         string
-	EnableIssues bool
-	EnableWiki   bool
-	Public       bool
+	Name          string
+	Description   string
+	Homepage      string
+	Team          string
+	EnableIssues  bool
+	EnableWiki    bool
+	Public        bool
+	ConfirmSubmit bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -79,6 +81,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public (default: private)")
+	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm the submission directly")
 
 	return cmd
 }
@@ -126,68 +129,109 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	repo, err := repoCreate(httpClient, input)
-	if err != nil {
-		return err
-	}
-
-	stderr := opts.IO.ErrOut
-	stdout := opts.IO.Out
-	greenCheck := utils.Green("✓")
-	isTTY := opts.IO.IsStdoutTTY()
-
-	if isTTY {
-		fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
-	} else {
-		fmt.Fprintln(stdout, repo.URL)
-	}
-
-	// TODO This is overly wordy and I'd like to streamline this.
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-	protocol, err := cfg.Get("", "git_protocol")
-	if err != nil {
-		return err
-	}
-	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
-
-	if projectDirErr == nil {
-		_, err = git.AddRemote("origin", remoteURL)
+	if !opts.ConfirmSubmit {
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, &opts.ConfirmSubmit)
 		if err != nil {
 			return err
 		}
+	}
+
+	if opts.ConfirmSubmit {
+		repo, err := repoCreate(httpClient, input)
+		if err != nil {
+			return err
+		}
+
+		stderr := opts.IO.ErrOut
+		stdout := opts.IO.Out
+		greenCheck := utils.Green("✓")
+		isTTY := opts.IO.IsStdoutTTY()
+
 		if isTTY {
-			fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
+			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+		} else {
+			fmt.Fprintln(stdout, repo.URL)
 		}
-	} else if isTTY {
-		doSetup := false
-		err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+
+		// TODO This is overly wordy and I'd like to streamline this.
+		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
-
-		if doSetup {
-			path := repo.Name
-
-			gitInit := git.GitCommand("init", path)
-			gitInit.Stdout = stdout
-			gitInit.Stderr = stderr
-			err = run.PrepareCmd(gitInit).Run()
-			if err != nil {
-				return err
-			}
-			gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
-			gitRemoteAdd.Stdout = stdout
-			gitRemoteAdd.Stderr = stderr
-			err = run.PrepareCmd(gitRemoteAdd).Run()
-			if err != nil {
-				return err
-			}
-
-			fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", greenCheck, path)
+		protocol, err := cfg.Get("", "git_protocol")
+		if err != nil {
+			return err
 		}
+		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
+
+		if projectDirErr == nil {
+			_, err = git.AddRemote("origin", remoteURL)
+			if err != nil {
+				return err
+			}
+			if isTTY {
+				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
+			}
+		} else if isTTY {
+			doSetup := false
+			err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+			if err != nil {
+				return err
+			}
+
+			if doSetup {
+				path := repo.Name
+
+				gitInit := git.GitCommand("init", path)
+				gitInit.Stdout = stdout
+				gitInit.Stderr = stderr
+				err = run.PrepareCmd(gitInit).Run()
+				if err != nil {
+					return err
+				}
+				gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				gitRemoteAdd.Stdout = stdout
+				gitRemoteAdd.Stderr = stderr
+				err = run.PrepareCmd(gitRemoteAdd).Run()
+				if err != nil {
+					return err
+				}
+
+				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", greenCheck, path)
+			}
+		}
+		return nil
 	}
+	fmt.Fprintln(opts.IO.Out, "Discarding...")
 	return nil
+}
+
+func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *bool) (bool, error) {
+	qs := []*survey.Question{}
+
+	promptString := ""
+	if repoOwner != "" {
+		promptString = fmt.Sprintf("This will create %s/%s in your current directory. Continue? ", repoOwner, repoName)
+	} else {
+		promptString = fmt.Sprintf("This will create %s in your current directory. Continue? ", repoName)
+	}
+
+	confirmSubmitQuestion := &survey.Question{
+		Name: "confirmSubmit",
+		Prompt: &survey.Confirm{
+			Message: promptString,
+		},
+	}
+	qs = append(qs, confirmSubmitQuestion)
+
+	answer := struct {
+		ConfirmSubmit bool
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answer)
+	if err != nil {
+		return false, err
+	}
+
+	return answer.ConfirmSubmit, nil
 }
