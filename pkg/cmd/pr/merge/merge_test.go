@@ -37,11 +37,11 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
-			return &api.Repository{
+			return api.InitRepoHostname(&api.Repository{
 				Name:             "REPO",
 				Owner:            api.RepositoryOwner{Login: "OWNER"},
 				DefaultBranchRef: api.BranchRef{Name: "master"},
-			}, nil
+			}, "github.com"), nil
 		},
 		Remotes: func() (context.Remotes, error) {
 			return context.Remotes{
