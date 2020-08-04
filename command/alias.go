@@ -166,9 +166,8 @@ func aliasList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	stdout := colorableOut(cmd)
-
-	tp := utils.NewTablePrinter(stdout)
+	// TODO: connect to per-command io streams
+	tp := utils.NewTablePrinter(defaultStreams)
 
 	aliasMap := aliasCfg.All()
 	keys := []string{}

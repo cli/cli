@@ -26,6 +26,7 @@ import (
 	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
 	prCreateCmd "github.com/cli/cli/pkg/cmd/pr/create"
 	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
+	prListCmd "github.com/cli/cli/pkg/cmd/pr/list"
 	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
 	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
 	prStatusCmd "github.com/cli/cli/pkg/cmd/pr/status"
@@ -181,6 +182,7 @@ func init() {
 	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prStatusCmd.NewCmdStatus(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prCreateCmd.NewCmdCreate(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prListCmd.NewCmdList(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }

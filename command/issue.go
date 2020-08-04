@@ -3,7 +3,6 @@ package command
 import (
 	"fmt"
 	"io"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -122,57 +121,6 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
-type filterOptions struct {
-	entity     string
-	state      string
-	assignee   string
-	labels     []string
-	author     string
-	baseBranch string
-	mention    string
-	milestone  string
-}
-
-func listURLWithQuery(listURL string, options filterOptions) (string, error) {
-	u, err := url.Parse(listURL)
-	if err != nil {
-		return "", err
-	}
-	query := fmt.Sprintf("is:%s ", options.entity)
-	if options.state != "all" {
-		query += fmt.Sprintf("is:%s ", options.state)
-	}
-	if options.assignee != "" {
-		query += fmt.Sprintf("assignee:%s ", options.assignee)
-	}
-	for _, label := range options.labels {
-		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
-	}
-	if options.author != "" {
-		query += fmt.Sprintf("author:%s ", options.author)
-	}
-	if options.baseBranch != "" {
-		query += fmt.Sprintf("base:%s ", options.baseBranch)
-	}
-	if options.mention != "" {
-		query += fmt.Sprintf("mentions:%s ", options.mention)
-	}
-	if options.milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.milestone))
-	}
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
-	return u.String(), nil
-}
-
-func quoteValueForQuery(v string) string {
-	if strings.ContainsAny(v, " \"\t\r\n") {
-		return fmt.Sprintf("%q", v)
-	}
-	return v
-}
-
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -230,14 +178,14 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 	if web {
 		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
-		openURL, err := listURLWithQuery(issueListURL, filterOptions{
-			entity:    "issue",
-			state:     state,
-			assignee:  assignee,
-			labels:    labels,
-			author:    author,
-			mention:   mention,
-			milestone: milestone,
+		openURL, err := shared.ListURLWithQuery(issueListURL, shared.FilterOptions{
+			Entity:    "issue",
+			State:     state,
+			Assignee:  assignee,
+			Labels:    labels,
+			Author:    author,
+			Mention:   mention,
+			Milestone: milestone,
 		})
 		if err != nil {
 			return err
@@ -259,7 +207,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		}
 	})
 
-	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+	title := shared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
 	if connectedToTerminal(cmd) {
 		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 	}
@@ -360,25 +308,6 @@ func issueView(cmd *cobra.Command, args []string) error {
 func issueStateTitleWithColor(state string) string {
 	colorFunc := shared.ColorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
-}
-
-func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
-	if totalMatchCount == 0 {
-		if hasFilters {
-			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
-		}
-		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
-	}
-
-	if hasFilters {
-		matchVerb := "match"
-		if totalMatchCount == 1 {
-			matchVerb = "matches"
-		}
-		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
-	}
-
-	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
@@ -619,7 +548,8 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
-	table := utils.NewTablePrinter(w)
+	// TODO: accept io streams via argument
+	table := utils.NewTablePrinter(defaultStreams)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {

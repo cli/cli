@@ -112,3 +112,54 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 
 	return nil
 }
+
+type FilterOptions struct {
+	Entity     string
+	State      string
+	Assignee   string
+	Labels     []string
+	Author     string
+	BaseBranch string
+	Mention    string
+	Milestone  string
+}
+
+func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
+	u, err := url.Parse(listURL)
+	if err != nil {
+		return "", err
+	}
+	query := fmt.Sprintf("is:%s ", options.Entity)
+	if options.State != "all" {
+		query += fmt.Sprintf("is:%s ", options.State)
+	}
+	if options.Assignee != "" {
+		query += fmt.Sprintf("assignee:%s ", options.Assignee)
+	}
+	for _, label := range options.Labels {
+		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
+	}
+	if options.Author != "" {
+		query += fmt.Sprintf("author:%s ", options.Author)
+	}
+	if options.BaseBranch != "" {
+		query += fmt.Sprintf("base:%s ", options.BaseBranch)
+	}
+	if options.Mention != "" {
+		query += fmt.Sprintf("mentions:%s ", options.Mention)
+	}
+	if options.Milestone != "" {
+		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.Milestone))
+	}
+	q := u.Query()
+	q.Set("q", strings.TrimSuffix(query, " "))
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func quoteValueForQuery(v string) string {
+	if strings.ContainsAny(v, " \"\t\r\n") {
+		return fmt.Sprintf("%q", v)
+	}
+	return v
+}
