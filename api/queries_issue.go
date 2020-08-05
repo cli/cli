@@ -265,6 +265,10 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 				break
 			}
 		}
+
+		if variables["milestone"] == nil {
+			return nil, fmt.Errorf("no milestone found with title: %q", milestoneString)
+		}
 	}
 
 	var response struct {
