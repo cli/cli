@@ -23,14 +23,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
-	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
-	prCreateCmd "github.com/cli/cli/pkg/cmd/pr/create"
-	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
-	prListCmd "github.com/cli/cli/pkg/cmd/pr/list"
-	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
-	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
-	prStatusCmd "github.com/cli/cli/pkg/cmd/pr/status"
-	prViewCmd "github.com/cli/cli/pkg/cmd/pr/view"
+	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
@@ -175,15 +168,7 @@ func init() {
 	repoCmd.Cmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
 	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
 
-	prCmd.AddCommand(prReviewCmd.NewCmdReview(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prStatusCmd.NewCmdStatus(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prCreateCmd.NewCmdCreate(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prListCmd.NewCmdList(&repoResolvingCmdFactory, nil))
-
+	RootCmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
 
