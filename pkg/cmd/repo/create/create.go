@@ -133,11 +133,10 @@ func createRun(opts *CreateOptions) error {
 
 	stderr := opts.IO.ErrOut
 	stdout := opts.IO.Out
-	greenCheck := utils.Green("✓")
 	isTTY := opts.IO.IsStdoutTTY()
 
 	if isTTY {
-		fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+		fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", utils.GreenCheck(), ghrepo.FullName(repo))
 	} else {
 		fmt.Fprintln(stdout, repo.URL)
 	}
@@ -160,7 +159,7 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 		if isTTY {
-			fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
+			fmt.Fprintf(stderr, "%s Added remote %s\n", utils.GreenCheck(), remoteURL)
 		}
 	} else if isTTY {
 		doSetup := false
@@ -187,7 +186,7 @@ func createRun(opts *CreateOptions) error {
 				return err
 			}
 
-			fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", greenCheck, path)
+			fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", utils.GreenCheck(), path)
 		}
 	}
 	return nil
