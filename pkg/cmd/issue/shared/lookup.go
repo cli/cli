@@ -1,4 +1,4 @@
-package command
+package shared
 
 import (
 	"fmt"
@@ -8,12 +8,10 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/spf13/cobra"
 )
 
-func issueFromArg(ctx context.Context, apiClient *api.Client, cmd *cobra.Command, arg string) (*api.Issue, ghrepo.Interface, error) {
+func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
 	issue, baseRepo, err := issueFromURL(apiClient, arg)
 	if err != nil {
 		return nil, nil, err
@@ -22,7 +20,7 @@ func issueFromArg(ctx context.Context, apiClient *api.Client, cmd *cobra.Command
 		return issue, baseRepo, nil
 	}
 
-	baseRepo, err = determineBaseRepo(apiClient, cmd, ctx)
+	baseRepo, err = baseRepoFn()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 	}

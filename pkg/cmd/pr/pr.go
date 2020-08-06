@@ -1,6 +1,7 @@
 package pr
 
 import (
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	cmdCheckout "github.com/cli/cli/pkg/cmd/pr/checkout"
 	cmdClose "github.com/cli/cli/pkg/cmd/pr/close"
@@ -13,8 +14,6 @@ import (
 	cmdReview "github.com/cli/cli/pkg/cmd/pr/review"
 	cmdStatus "github.com/cli/cli/pkg/cmd/pr/status"
 	cmdView "github.com/cli/cli/pkg/cmd/pr/view"
-
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )

@@ -23,6 +23,7 @@ import (
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
@@ -169,6 +170,7 @@ func init() {
 	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
+	RootCmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
 
