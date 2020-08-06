@@ -93,6 +93,12 @@ func TestRepoCreate(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "confirmSubmit",
 			Value: true,
 		},
@@ -169,6 +175,12 @@ func TestRepoCreate_org(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "confirmSubmit",
 			Value: true,
 		},
@@ -243,6 +255,12 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
 
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmSubmit",
