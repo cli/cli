@@ -198,17 +198,12 @@ func createRun(opts *CreateOptions) error {
 		greenCheck := utils.Green("✓")
 		isTTY := opts.IO.IsStdoutTTY()
 
-		if isTTY {
-			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
-		} else {
-			fmt.Fprintln(stdout, repo.URL)
-		}
-
 		// TODO This is overly wordy and I'd like to streamline this.
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
+		// TODO: GHE support
 		protocol, err := cfg.Get("", "git_protocol")
 		if err != nil {
 			return err
