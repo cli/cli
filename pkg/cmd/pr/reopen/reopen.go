@@ -28,7 +28,6 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -36,6 +35,9 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 		Short: "Reopen a pull request",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}

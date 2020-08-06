@@ -36,7 +36,6 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
@@ -51,6 +50,9 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}

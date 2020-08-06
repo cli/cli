@@ -33,7 +33,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -47,6 +46,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
 			if opts.LimitResults < 1 {
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
 			}

@@ -31,7 +31,6 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
@@ -41,6 +40,9 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		Short: "Mark a pull request as ready for review",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
