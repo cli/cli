@@ -224,12 +224,13 @@ func createRun(opts *CreateOptions) error {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
 			}
 		} else if isTTY {
-			doSetup := false
-			err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
-			if err != nil {
-				return err
+			doSetup := opts.ConfirmSubmit
+			if !doSetup {
+				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+				if err != nil {
+					return err
+				}
 			}
-
 			if doSetup {
 				path := repo.Name
 
