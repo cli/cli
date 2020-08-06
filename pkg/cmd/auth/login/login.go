@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 
@@ -21,9 +20,8 @@ import (
 )
 
 type LoginOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	IO     *iostreams.IOStreams
+	Config func() (config.Config, error)
 
 	Hostname     string
 	Token        string
@@ -32,9 +30,8 @@ type LoginOptions struct {
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
-		Config:     f.Config,
+		IO:     f.IOStreams,
+		Config: f.Config,
 	}
 
 	cmd := &cobra.Command{
