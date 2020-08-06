@@ -196,6 +196,10 @@ func (err HTTPError) Error() string {
 	return fmt.Sprintf("HTTP %d (%s)", err.StatusCode, err.RequestURL)
 }
 
+type MissingScopesError struct {
+	error
+}
+
 func (c Client) HasMinimumScopes(hostname string) (bool, error) {
 	apiEndpoint := ghinstance.RESTPrefix(hostname)
 
@@ -243,11 +247,10 @@ func (c Client) HasMinimumScopes(hostname string) (bool, error) {
 	}
 
 	if len(errorMsgs) > 0 {
-		return false, errors.New(strings.Join(errorMsgs, ";"))
+		return false, &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
 	}
 
 	return true, nil
-
 }
 
 // GraphQL performs a GraphQL request and parses the response
