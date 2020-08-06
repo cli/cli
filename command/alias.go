@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -166,8 +167,9 @@ func aliasList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// TODO: connect to per-command io streams
-	tp := utils.NewTablePrinter(defaultStreams)
+	tp := utils.NewTablePrinter(&iostreams.IOStreams{
+		Out: cmd.OutOrStdout(),
+	})
 
 	aliasMap := aliasCfg.All()
 	keys := []string{}

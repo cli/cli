@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -548,8 +549,9 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
-	// TODO: accept io streams via argument
-	table := utils.NewTablePrinter(defaultStreams)
+	io := &iostreams.IOStreams{Out: w}
+	io.SetStdoutTTY(utils.IsTerminal(w))
+	table := utils.NewTablePrinter(io)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
