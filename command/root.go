@@ -22,15 +22,11 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
-	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
-	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
-	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
-	repoForkCmd "github.com/cli/cli/pkg/cmd/repo/fork"
-	repoViewCmd "github.com/cli/cli/pkg/cmd/repo/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -123,15 +119,9 @@ func init() {
 			return currentBranch, nil
 		},
 	}
-	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 
-	gistCmd := &cobra.Command{
-		Use:   "gist",
-		Short: "Create gists",
-		Long:  `Work with GitHub gists.`,
-	}
-	RootCmd.AddCommand(gistCmd)
-	gistCmd.AddCommand(gistCreateCmd.NewCmdCreate(cmdFactory, nil))
+	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
+	RootCmd.AddCommand(gistCmd.NewCmdGist(cmdFactory))
 
 	resolvedBaseRepo := func() (ghrepo.Interface, error) {
 		httpClient, err := cmdFactory.HttpClient()
@@ -162,15 +152,9 @@ func init() {
 
 	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo
 
-	RootCmd.AddCommand(repoCmd.Cmd)
-	repoCmd.Cmd.AddCommand(repoViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
-	repoCmd.Cmd.AddCommand(repoForkCmd.NewCmdFork(&repoResolvingCmdFactory, nil))
-	repoCmd.Cmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
-	repoCmd.Cmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
-	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
-
 	RootCmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	RootCmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
+	RootCmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
 
