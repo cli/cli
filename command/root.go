@@ -301,17 +301,6 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, setAccept bool) *htt
 	return api.NewHTTPClient(opts...)
 }
 
-// LEGACY; overridden in tests
-var apiClientForContext = func(ctx context.Context) (*api.Client, error) {
-	cfg, err := ctx.Config()
-	if err != nil {
-		return nil, err
-	}
-
-	http := httpClient(defaultStreams, cfg, true)
-	return api.NewClientFromHTTP(http), nil
-}
-
 func apiVerboseLog() api.ClientOption {
 	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
 	colorize := utils.IsTerminal(os.Stderr)
@@ -343,34 +332,6 @@ func changelogURL(version string) string {
 
 	url := fmt.Sprintf("%s/releases/tag/v%s", path, strings.TrimPrefix(version, "v"))
 	return url
-}
-
-func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Context) (ghrepo.Interface, error) {
-	repo, _ := cmd.Flags().GetString("repo")
-	if repo != "" {
-		baseRepo, err := ghrepo.FromFullName(repo)
-		if err != nil {
-			return nil, fmt.Errorf("argument error: %w", err)
-		}
-		return baseRepo, nil
-	}
-
-	remotes, err := ctx.Remotes()
-	if err != nil {
-		return nil, err
-	}
-
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
-	if err != nil {
-		return nil, err
-	}
-
-	baseRepo, err := repoContext.BaseRepo()
-	if err != nil {
-		return nil, err
-	}
-
-	return baseRepo, nil
 }
 
 func ExecuteShellAlias(args []string) error {
