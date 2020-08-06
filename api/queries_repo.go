@@ -27,7 +27,9 @@ type Repository struct {
 	IsPrivate        bool
 	HasIssuesEnabled bool
 	ViewerPermission string
-	DefaultBranchRef BranchRef
+	DefaultBranchRef struct {
+		Name string
+	}
 
 	Parent *Repository
 
@@ -38,11 +40,6 @@ type Repository struct {
 // RepositoryOwner is the owner of a GitHub repository
 type RepositoryOwner struct {
 	Login string
-}
-
-// BranchRef is the branch name in a GitHub repository
-type BranchRef struct {
-	Name string
 }
 
 // RepoOwner is the login name of the owner

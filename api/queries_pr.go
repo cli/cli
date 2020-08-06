@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -209,28 +209,36 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
 		ghrepo.FullName(baseRepo), prNumber)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode == 200 {
+		return string(b), nil
 	}
 
 	if resp.StatusCode == 404 {
-		return nil, &NotFoundError{errors.New("pull request not found")}
-	} else if resp.StatusCode != 200 {
-		return nil, handleHTTPError(resp)
+		return "", &NotFoundError{errors.New("pull request not found")}
 	}
 
-	return resp.Body, nil
+	return "", errors.New("pull request diff lookup failed")
 }
 
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {

@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/cli/cli/api"
@@ -99,6 +100,18 @@ func RunCommand(args string) (*cmdOut, error) {
 	cmd.SetErr(nil)
 
 	return &cmdOut{&outBuf, &errBuf}, err
+}
+
+type errorStub struct {
+	message string
+}
+
+func (s errorStub) Output() ([]byte, error) {
+	return nil, errors.New(s.message)
+}
+
+func (s errorStub) Run() error {
+	return errors.New(s.message)
 }
 
 func stubTerminal(connected bool) func() {

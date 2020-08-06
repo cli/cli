@@ -70,7 +70,6 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil {
 		return err
 	}
-	// TODO: GHE support
 	protocol, err := cfg.Get("", "git_protocol")
 	if err != nil {
 		return err
