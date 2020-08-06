@@ -17,28 +17,3 @@
 .DS_Store
 
 vendor/
-api/queries_pr.go
-api/queries_repo.go
-chocolateyIgnoreProxy ==
-command/pr.go
-command/pr_checkout.go
-command/pr_checkout_test.go
-command/pr_diff.go
-command/pr_diff_test.go
-command/pr_lookup.go
-command/pr_review.go
-command/pr_review_test.go
-command/root.go
-command/root_test.go
-command/testing.go
-pkg/cmd/pr/checkout/checkout.go
-pkg/cmd/pr/checkout/checkout_test.go
-pkg/cmd/pr/diff/diff.go
-pkg/cmd/pr/diff/diff_test.go
-pkg/cmd/pr/review/review.go
-pkg/cmd/pr/review/review_test.go
-pkg/cmd/pr/shared/lookup.go
-pkg/cmd/repo/clone/clone.go
-pkg/cmd/repo/create/create.go
-pkg/cmd/repo/fork/fork.go
-pkg/cmdutil/factory.go

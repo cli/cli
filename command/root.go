@@ -16,6 +16,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
@@ -24,6 +25,9 @@ import (
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
 	authLoginCmd "github.com/cli/cli/pkg/cmd/auth/login"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
+	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
+	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
@@ -114,6 +118,13 @@ func init() {
 			}
 			return cfg, nil
 		},
+		Branch: func() (string, error) {
+			currentBranch, err := git.CurrentBranch()
+			if err != nil {
+				return "", fmt.Errorf("could not determine current branch: %w", err)
+			}
+			return currentBranch, nil
+		},
 	}
 	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
 
@@ -163,6 +174,10 @@ func init() {
 	repoCmd.Cmd.AddCommand(repoCloneCmd.NewCmdClone(cmdFactory, nil))
 	repoCmd.Cmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
 	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
+
+	prCmd.AddCommand(prReviewCmd.NewCmdReview(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
@@ -398,6 +413,7 @@ func formatRemoteURL(cmd *cobra.Command, repo ghrepo.Interface) string {
 	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 }
 
+// TODO there is a parallel implementation for isolated commands
 func determineEditor(cmd *cobra.Command) (string, error) {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
