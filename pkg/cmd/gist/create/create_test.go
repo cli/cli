@@ -157,7 +157,7 @@ func Test_createRun(t *testing.T) {
 				Filenames: []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"public": true,
@@ -175,7 +175,7 @@ func Test_createRun(t *testing.T) {
 				Filenames:   []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
@@ -193,7 +193,7 @@ func Test_createRun(t *testing.T) {
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"files": map[string]interface{}{
