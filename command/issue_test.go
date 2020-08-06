@@ -282,6 +282,29 @@ func TestIssueList_web(t *testing.T) {
 	eq(t, url, expectedURL)
 }
 
+func TestIssueList_milestoneNotFound(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("../test/fixtures/issueList.json"),
+	)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [{ "title":"1.x", "id": "MDk6TWlsZXN0b25lMTIzNDU=" }],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+
+	_, err := RunCommand("issue list --milestone NotFound")
+	if err == nil || err.Error() != `no milestone found with title: "NotFound"` {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+}
+
 func TestIssueView_web(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
