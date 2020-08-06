@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/cmd/auth/client"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -119,7 +120,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = validateHostCfg(opts.Hostname, cfg)
+		err = client.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -167,9 +168,9 @@ func loginRun(opts *LoginOptions) error {
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
 
 	if existingToken != "" {
-		err := validateHostCfg(hostname, cfg)
+		err := client.ValidateHostCfg(hostname, cfg)
 		if err == nil {
-			apiClient, err := clientFromCfg(hostname, cfg)
+			apiClient, err := client.ClientFromCfg(hostname, cfg)
 			if err != nil {
 				return err
 			}
@@ -235,7 +236,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = validateHostCfg(hostname, cfg)
+		err = client.ValidateHostCfg(hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -263,7 +264,7 @@ func loginRun(opts *LoginOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
 
-	apiClient, err := clientFromCfg(hostname, cfg)
+	apiClient, err := client.ClientFromCfg(hostname, cfg)
 	if err != nil {
 		return err
 	}

@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/cmd/auth/client"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -18,6 +21,8 @@ type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
+	Token      string
+	Hostname   string
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -37,6 +42,13 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			report on any issues.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO support other names
+			opts.Token = os.Getenv("GITHUB_TOKEN")
+
+			if opts.Token != "" && opts.Hostname == "" {
+				opts.Hostname = ghinstance.Default()
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -44,6 +56,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			return statusRun(opts)
 		},
 	}
+
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
 
 	return cmd
 }
@@ -55,6 +69,37 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	stderr := opts.IO.ErrOut
+
+	if opts.Token != "" {
+		hostname := opts.Hostname
+		err := cfg.Set(opts.Hostname, "oauth_token", opts.Token)
+		if err != nil {
+			return err
+		}
+
+		apiClient, err := client.ClientFromCfg(hostname, cfg)
+		if err != nil {
+			return err
+		}
+
+		_, err = apiClient.HasMinimumScopes(hostname)
+		if err != nil {
+			var missingScopes *api.MissingScopesError
+			if errors.As(err, &missingScopes) {
+				return fmt.Errorf("%s %s: %s", utils.Red("X"), hostname, err)
+			} else {
+				return fmt.Errorf("%s %s: authentication failed", utils.Red("X"), hostname)
+			}
+		} else {
+			username, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				return fmt.Errorf("%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
+			}
+			fmt.Fprintf(stderr, "%s token valid for %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
+		}
+
+		return nil
+	}
 
 	hostnames, err := cfg.Hosts()
 	if len(hostnames) == 0 || err != nil {
@@ -71,11 +116,9 @@ func statusRun(opts *StatusOptions) error {
 	var failed bool
 
 	for _, hostname := range hostnames {
-		// what are the questions I'm trying to answer:
-		// - does the token work at all?
-		// - does it work but have the wrong scopes?
-		username, err := api.CurrentLoginName(apiClient, hostname)
-
+		if opts.Hostname != "" && opts.Hostname != hostname {
+			continue
+		}
 		_, err = apiClient.HasMinimumScopes(hostname)
 		if err != nil {
 			var missingScopes *api.MissingScopesError
@@ -86,6 +129,10 @@ func statusRun(opts *StatusOptions) error {
 			}
 			failed = true
 		} else {
+			username, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				fmt.Fprintf(stderr, "%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
+			}
 			fmt.Fprintf(stderr, "%s Logged into %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
 		}
 
