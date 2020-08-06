@@ -1,4 +1,4 @@
-package login
+package client
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	"github.com/cli/cli/internal/config"
 )
 
-func validateHostCfg(hostname string, cfg config.Config) error {
-	apiClient, err := clientFromCfg(hostname, cfg)
+func ValidateHostCfg(hostname string, cfg config.Config) error {
+	apiClient, err := ClientFromCfg(hostname, cfg)
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func validateHostCfg(hostname string, cfg config.Config) error {
 	return nil
 }
 
-var clientFromCfg = func(hostname string, cfg config.Config) (*api.Client, error) {
+var ClientFromCfg = func(hostname string, cfg config.Config) (*api.Client, error) {
 	var opts []api.ClientOption
 
 	token, err := cfg.Get(hostname, "oauth_token")
