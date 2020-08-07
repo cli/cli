@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	fixtureFile = "../fixture.txt"
+	fixtureFile  = "../fixture.txt"
+	buildingFile = "../building.txt"
 )
 
 func Test_processFiles(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
-	files, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
+	files, _, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
@@ -187,7 +188,7 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple files",
+			name: "multiple files sorted",
 			opts: &CreateOptions{
 				Filenames: []string{fixtureFile, "-"},
 			},
@@ -202,6 +203,25 @@ func Test_createRun(t *testing.T) {
 					},
 					"gistfile1.txt": map[string]interface{}{
 						"content": "cool stdin content",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple files unsorted",
+			opts: &CreateOptions{
+				Filenames: []string{fixtureFile, buildingFile},
+			},
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created gist building.txt\n",
+			wantErr:    false,
+			wantParams: map[string]interface{}{
+				"files": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
+						"content": "{}",
+					},
+					"building.txt": map[string]interface{}{
+						"content": "{}",
 					},
 				},
 			},
