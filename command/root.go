@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
+	configCmd "github.com/cli/cli/pkg/cmd/config"
 	"github.com/cli/cli/pkg/cmd/factory"
 	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/utils"
@@ -44,7 +45,7 @@ func init() {
 	RootCmd = root.NewCmdRoot(cmdFactory, Version, BuildDate)
 	RootCmd.AddCommand(aliasCmd)
 	RootCmd.AddCommand(root.NewCmdCompletion(cmdFactory.IOStreams))
-	RootCmd.AddCommand(configCmd)
+	RootCmd.AddCommand(configCmd.NewCmdConfig(cmdFactory))
 }
 
 // overridden in tests
