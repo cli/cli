@@ -103,7 +103,7 @@ func createRun(opts *CreateOptions) error {
 	if !isPiped {
 		firstFile := path.Base(fileArgs[0])
 		if len(files) > 1 {
-			processMessage = fmt.Sprintf("Creating gist with multiple files")
+			processMessage = "Creating gist with multiple files"
 			completionMessage = fmt.Sprintf("Created gist %s", firstFile)
 		}
 		if len(files) == 1 && firstFile != "-" {
