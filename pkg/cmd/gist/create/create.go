@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -87,29 +88,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 func createRun(opts *CreateOptions) error {
 	fileArgs := opts.Filenames
-
-	isPiped := len(fileArgs) == 0
-	if isPiped {
+	if len(fileArgs) == 0 {
 		fileArgs = []string{"-"}
 	}
 
-	files, err := processFiles(opts.IO.In, fileArgs)
+	files, nonGistFilesSorted, err := processFiles(opts.IO.In, fileArgs)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
 	processMessage := "Creating gist..."
 	completionMessage := "Created gist"
-	if !isPiped {
-		firstFile := path.Base(fileArgs[0])
-		if len(files) > 1 {
-			processMessage = "Creating gist with multiple files"
-			completionMessage = fmt.Sprintf("Created gist %s", firstFile)
-		}
-		if len(files) == 1 && firstFile != "-" {
-			processMessage = fmt.Sprintf("Creating gist %s", firstFile)
-			completionMessage = fmt.Sprintf("Created gist %s", firstFile)
-		}
+	if len(files) > 1 && len(nonGistFilesSorted) >= 1 {
+		processMessage = "Creating gist with multiple files"
+		completionMessage = fmt.Sprintf("Created gist %s", nonGistFilesSorted[0])
+	} else if len(nonGistFilesSorted) == 1 {
+		processMessage = fmt.Sprintf("Creating gist %s", nonGistFilesSorted[0])
+		completionMessage = fmt.Sprintf("Created gist %s", nonGistFilesSorted[0])
 	}
 
 	errOut := opts.IO.ErrOut
@@ -139,11 +134,12 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, error) {
+func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, []string, error) {
 	fs := map[string]string{}
+	nonGistFilesSorted := make([]string, 0, len(filenames))
 
 	if len(filenames) == 0 {
-		return nil, errors.New("no files passed")
+		return nil, nil, errors.New("no files passed")
 	}
 
 	for i, f := range filenames {
@@ -154,19 +150,21 @@ func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, e
 			filename = fmt.Sprintf("gistfile%d.txt", i)
 			content, err = ioutil.ReadAll(stdin)
 			if err != nil {
-				return fs, fmt.Errorf("failed to read from stdin: %w", err)
+				return fs, nonGistFilesSorted, fmt.Errorf("failed to read from stdin: %w", err)
 			}
 			stdin.Close()
 		} else {
 			content, err = ioutil.ReadFile(f)
 			if err != nil {
-				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
+				return fs, nonGistFilesSorted, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 			filename = path.Base(f)
+			nonGistFilesSorted = append(nonGistFilesSorted, filename)
 		}
 
 		fs[filename] = string(content)
 	}
+	sort.Strings(nonGistFilesSorted)
 
-	return fs, nil
+	return fs, nonGistFilesSorted, nil
 }
