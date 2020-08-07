@@ -426,23 +426,43 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 
 	var parsedBody struct {
 		Message string
-		Errors  []struct {
-			Message string
-		}
+		Errors  []json.RawMessage
 	}
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
 		return r, "", err
 	}
-
 	if parsedBody.Message != "" {
 		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
-	} else if len(parsedBody.Errors) > 0 {
-		msgs := make([]string, len(parsedBody.Errors))
-		for i, e := range parsedBody.Errors {
-			msgs[i] = e.Message
+	}
+
+	type errorMessage struct {
+		Message string
+	}
+	var errors []string
+	for _, rawErr := range parsedBody.Errors {
+		if len(rawErr) == 0 {
+			continue
 		}
-		return bodyCopy, strings.Join(msgs, "\n"), nil
+		if rawErr[0] == '{' {
+			var objectError errorMessage
+			err := json.Unmarshal(rawErr, &objectError)
+			if err != nil {
+				return r, "", err
+			}
+			errors = append(errors, objectError.Message)
+		} else if rawErr[0] == '"' {
+			var stringError string
+			err := json.Unmarshal(rawErr, &stringError)
+			if err != nil {
+				return r, "", err
+			}
+			errors = append(errors, stringError)
+		}
+	}
+
+	if len(errors) > 0 {
+		return bodyCopy, strings.Join(errors, "\n"), nil
 	}
 
 	return bodyCopy, "", nil
