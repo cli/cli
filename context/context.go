@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 )
@@ -154,9 +153,7 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config   config.Config
-	branch   string
-	baseRepo ghrepo.Interface
+	config config.Config
 }
 
 func (c *fsContext) Config() (config.Config, error) {
@@ -170,26 +167,4 @@ func (c *fsContext) Config() (config.Config, error) {
 		c.config = cfg
 	}
 	return c.config, nil
-}
-
-func (c *fsContext) Branch() (string, error) {
-	if c.branch != "" {
-		return c.branch, nil
-	}
-
-	currentBranch, err := git.CurrentBranch()
-	if err != nil {
-		return "", fmt.Errorf("could not determine current branch: %w", err)
-	}
-
-	c.branch = currentBranch
-	return c.branch, nil
-}
-
-func (c *fsContext) SetBranch(b string) {
-	c.branch = b
-}
-
-func (c *fsContext) SetBaseRepo(nwo string) {
-	c.baseRepo, _ = ghrepo.FromFullName(nwo)
 }

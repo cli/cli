@@ -29,11 +29,6 @@ const defaultTestConfig = `hosts:
 func initBlankContext(cfg, repo, branch string) {
 	initContext = func() context.Context {
 		ctx := context.NewBlank()
-		ctx.SetBaseRepo(repo)
-		ctx.SetBranch(branch)
-		ctx.SetRemotes(map[string]string{
-			"origin": "OWNER/REPO",
-		})
 
 		if cfg == "" {
 			cfg = defaultTestConfig
