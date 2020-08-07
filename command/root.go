@@ -43,7 +43,7 @@ func init() {
 	cmdFactory := factory.New(Version)
 	RootCmd = root.NewCmdRoot(cmdFactory, Version, BuildDate)
 	RootCmd.AddCommand(aliasCmd)
-	RootCmd.AddCommand(completionCmd)
+	RootCmd.AddCommand(root.NewCmdCompletion(cmdFactory.IOStreams))
 	RootCmd.AddCommand(configCmd)
 }
 
