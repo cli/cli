@@ -2,7 +2,6 @@ package pr
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/ghrepo"
 	cmdCheckout "github.com/cli/cli/pkg/cmd/pr/checkout"
 	cmdClose "github.com/cli/cli/pkg/cmd/pr/close"
 	cmdCreate "github.com/cli/cli/pkg/cmd/pr/create"
@@ -37,17 +36,9 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 				- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".
 			`),
 		},
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if repo, _ := cmd.Flags().GetString("repo"); repo != "" {
-				// NOTE: this mutates the factory
-				f.BaseRepo = func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName(repo)
-				}
-			}
-		},
 	}
 
-	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdCheckout.NewCmdCheckout(f, nil))
 	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))

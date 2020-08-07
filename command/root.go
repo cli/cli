@@ -49,11 +49,7 @@ func init() {
 
 // overridden in tests
 var initContext = func() context.Context {
-	ctx := context.New()
-	if repo := os.Getenv("GH_REPO"); repo != "" {
-		ctx.SetBaseRepo(repo)
-	}
-	return ctx
+	return context.New()
 }
 
 // BasicClient returns an API client for github.com only that borrows from but
@@ -78,11 +74,7 @@ func BasicClient() (*api.Client, error) {
 }
 
 func contextForCommand(cmd *cobra.Command) context.Context {
-	ctx := initContext()
-	if repo, err := cmd.Flags().GetString("repo"); err == nil && repo != "" {
-		ctx.SetBaseRepo(repo)
-	}
-	return ctx
+	return initContext()
 }
 
 func apiVerboseLog() api.ClientOption {

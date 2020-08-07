@@ -2,7 +2,6 @@ package issue
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/ghrepo"
 	cmdClose "github.com/cli/cli/pkg/cmd/issue/close"
 	cmdCreate "github.com/cli/cli/pkg/cmd/issue/create"
 	cmdList "github.com/cli/cli/pkg/cmd/issue/list"
@@ -31,17 +30,9 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 				- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".
 			`),
 		},
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if repo, _ := cmd.Flags().GetString("repo"); repo != "" {
-				// NOTE: this mutates the factory
-				f.BaseRepo = func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName(repo)
-				}
-			}
-		},
 	}
 
-	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `OWNER/REPO` format")
+	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))

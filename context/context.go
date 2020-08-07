@@ -15,9 +15,6 @@ import (
 
 // Context represents the interface for querying information about the current environment
 type Context interface {
-	Branch() (string, error)
-	SetBranch(string)
-	SetBaseRepo(string)
 	Config() (config.Config, error)
 }
 
