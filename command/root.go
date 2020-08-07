@@ -84,14 +84,6 @@ func apiVerboseLog() api.ClientOption {
 	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
 }
 
-func colorableOut(cmd *cobra.Command) io.Writer {
-	out := cmd.OutOrStdout()
-	if outFile, isFile := out.(*os.File); isFile {
-		return utils.NewColorable(outFile)
-	}
-	return out
-}
-
 func colorableErr(cmd *cobra.Command) io.Writer {
 	err := cmd.ErrOrStderr()
 	if outFile, isFile := err.(*os.File); isFile {
