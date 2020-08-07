@@ -62,6 +62,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 }
 
 func logoutRun(opts *LogoutOptions) error {
+	// TODO check for GITHUB_TOKEN and error if found
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	hostname := opts.Hostname
