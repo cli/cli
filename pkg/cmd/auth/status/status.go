@@ -143,9 +143,7 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	if failed {
-		// TODO unsure about this; want non-zero exit but don't need to print anything more. Is the
-		// non-zero exit worth it? Should we tweak error handling to not print "" errors?
-		return errors.New("")
+		return cmdutil.SilentError
 	}
 
 	return nil
