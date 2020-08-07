@@ -88,16 +88,31 @@ func statusRun(opts *StatusOptions) error {
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
-				return fmt.Errorf("%s %s: %s", utils.Red("X"), hostname, err)
+				fmt.Fprintf(stderr, "%s %s: %s\n", utils.Red("X"), hostname, err)
+				fmt.Fprintln(stderr,
+					"The token in GITHUB_TOKEN is valid but missing scopes that gh requires to function.")
 			} else {
-				return fmt.Errorf("%s %s: authentication failed", utils.Red("X"), hostname)
+				fmt.Fprintf(stderr, "%s %s: authentication failed\n", utils.Red("X"), hostname)
+				fmt.Fprintln(stderr)
+				fmt.Fprintf(stderr,
+					"The token in GITHUB_TOKEN is invalid.\n")
 			}
+			fmt.Fprintf(stderr,
+				"Please visit https://%s/settings/tokens and create a new token with 'repo', 'read:org', and 'gist' scopes.\n", hostname)
+			return cmdutil.SilentError
 		} else {
 			username, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
 				return fmt.Errorf("%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
 			}
-			fmt.Fprintf(stderr, "%s token valid for %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
+			fmt.Fprintf(stderr,
+				"%s token valid for %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
+			proto, _ := cfg.Get(hostname, "git_protocol")
+			if proto != "" {
+				fmt.Fprintln(stderr)
+				fmt.Fprintf(stderr,
+					"Git operations for %s configured to use %s protocol.\n", hostname, utils.Bold(proto))
+			}
 		}
 
 		return nil
@@ -105,8 +120,9 @@ func statusRun(opts *StatusOptions) error {
 
 	hostnames, err := cfg.Hosts()
 	if len(hostnames) == 0 || err != nil {
-		fmt.Fprintf(stderr, "You are not logged into any GitHub hosts. Run 'gh auth login' to authenticate.\n")
-		return nil
+		fmt.Fprintf(stderr,
+			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", utils.Bold("gh auth login"))
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -126,8 +142,17 @@ func statusRun(opts *StatusOptions) error {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
 				fmt.Fprintf(stderr, "%s %s: %s\n", utils.Red("X"), hostname, err)
+				fmt.Fprintf(stderr, "To enable the missing scopes, please run %s %s\n",
+					utils.Bold("gh auth refresh -h"),
+					utils.Bold(hostname))
 			} else {
 				fmt.Fprintf(stderr, "%s %s: authentication failed\n", utils.Red("X"), hostname)
+				fmt.Fprintln(stderr)
+				fmt.Fprintf(stderr, "The configured token for %s is no longer valid.\n", utils.Bold(hostname))
+				fmt.Fprintf(stderr, "To re-authenticate, please run %s %s\n",
+					utils.Bold("gh auth login -h"), utils.Bold(hostname))
+				fmt.Fprintf(stderr, "To forget about this host, please run %s %s\n",
+					utils.Bold("gh auth logout -h"), utils.Bold(hostname))
 			}
 			failed = true
 		} else {
@@ -136,6 +161,13 @@ func statusRun(opts *StatusOptions) error {
 				fmt.Fprintf(stderr, "%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
 			}
 			fmt.Fprintf(stderr, "%s Logged in to %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
+			proto, _ := cfg.Get(hostname, "git_protocol")
+			if proto != "" {
+				fmt.Fprintln(stderr)
+				fmt.Fprintf(stderr,
+					"Git operations for %s configured to use %s protocol.\n", hostname, utils.Bold(proto))
+				fmt.Fprintln(stderr)
+			}
 		}
 
 		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose

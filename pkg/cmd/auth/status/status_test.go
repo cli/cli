@@ -113,7 +113,8 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StatusStringResponse(400, "no bueno"),
 				)
 			},
-			wantErr: regexp.MustCompile(`authentication failed`),
+			wantErr:    regexp.MustCompile(``),
+			wantErrOut: regexp.MustCompile(`authentication failed`),
 		},
 		{
 			name: "token set, missing scope",
@@ -124,7 +125,8 @@ func Test_statusRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,"))
 			},
-			wantErr: regexp.MustCompile(`missing required scope 'read:org'`),
+			wantErr:    regexp.MustCompile(``),
+			wantErrOut: regexp.MustCompile(`missing required scope 'read:org'`),
 		},
 		{
 			name: "token set, good token",
