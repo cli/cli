@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -23,9 +24,15 @@ func StubWriteConfig(wc io.Writer, wh io.Writer) func() {
 	WriteConfigFile = func(fn string, data []byte) error {
 		switch path.Base(fn) {
 		case "config.yml":
+			if b, ok := wc.(*bytes.Buffer); ok {
+				b.Reset()
+			}
 			_, err := wc.Write(data)
 			return err
 		case "hosts.yml":
+			if b, ok := wh.(*bytes.Buffer); ok {
+				b.Reset()
+			}
 			_, err := wh.Write(data)
 			return err
 		default:
