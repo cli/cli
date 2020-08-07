@@ -10,7 +10,6 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(completionCmd)
 	completionCmd.Flags().StringP("shell", "s", "", "Shell type: {bash|zsh|fish|powershell}")
 }
 

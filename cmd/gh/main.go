@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
@@ -73,7 +74,7 @@ func main() {
 		printError(os.Stderr, err, cmd, hasDebug)
 		os.Exit(1)
 	}
-	if command.HasFailed() {
+	if root.HasFailed() {
 		os.Exit(1)
 	}
 

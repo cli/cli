@@ -13,7 +13,6 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(aliasCmd)
 	aliasCmd.AddCommand(aliasSetCmd)
 	aliasCmd.AddCommand(aliasListCmd)
 	aliasCmd.AddCommand(aliasDeleteCmd)

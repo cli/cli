@@ -8,7 +8,6 @@ import (
 )
 
 func init() {
-	RootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configGetCmd)
 	configCmd.AddCommand(configSetCmd)
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,27 +12,17 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
-	apiCmd "github.com/cli/cli/pkg/cmd/api"
-	gistCmd "github.com/cli/cli/pkg/cmd/gist"
-	issueCmd "github.com/cli/cli/pkg/cmd/issue"
-	prCmd "github.com/cli/cli/pkg/cmd/pr"
-	repoCmd "github.com/cli/cli/pkg/cmd/repo"
-	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/cmd/factory"
+	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // Version is dynamically set by the toolchain or overridden by the Makefile.
@@ -42,9 +31,7 @@ var Version = "DEV"
 // BuildDate is dynamically set at build time in the Makefile.
 var BuildDate = "" // YYYY-MM-DD
 
-var versionOutput = ""
-
-var defaultStreams *iostreams.IOStreams
+var RootCmd *cobra.Command
 
 func init() {
 	if Version == "DEV" {
@@ -52,159 +39,12 @@ func init() {
 			Version = info.Main.Version
 		}
 	}
-	Version = strings.TrimPrefix(Version, "v")
-	if BuildDate == "" {
-		RootCmd.Version = Version
-	} else {
-		RootCmd.Version = fmt.Sprintf("%s (%s)", Version, BuildDate)
-	}
-	versionOutput = fmt.Sprintf("gh version %s\n%s\n", RootCmd.Version, changelogURL(Version))
-	RootCmd.AddCommand(versionCmd)
-	RootCmd.SetVersionTemplate(versionOutput)
 
-	RootCmd.PersistentFlags().Bool("help", false, "Show help for command")
-	RootCmd.Flags().Bool("version", false, "Show gh version")
-	// TODO:
-	// RootCmd.PersistentFlags().BoolP("verbose", "V", false, "enable verbose output")
-
-	RootCmd.SetHelpFunc(rootHelpFunc)
-	RootCmd.SetUsageFunc(rootUsageFunc)
-
-	RootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		if err == pflag.ErrHelp {
-			return err
-		}
-		return &cmdutil.FlagError{Err: err}
-	})
-
-	defaultStreams = iostreams.System()
-
-	// TODO: iron out how a factory incorporates context
-	cmdFactory := &cmdutil.Factory{
-		IOStreams: defaultStreams,
-		HttpClient: func() (*http.Client, error) {
-			// TODO: decouple from `context`
-			ctx := context.New()
-			cfg, err := ctx.Config()
-			if err != nil {
-				return nil, err
-			}
-
-			// TODO: avoid setting Accept header for `api` command
-			return httpClient(defaultStreams, cfg, true), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			// TODO: decouple from `context`
-			ctx := context.New()
-			return ctx.BaseRepo()
-		},
-		Remotes: func() (context.Remotes, error) {
-			ctx := context.New()
-			return ctx.Remotes()
-		},
-		Config: func() (config.Config, error) {
-			cfg, err := config.ParseDefaultConfig()
-			if errors.Is(err, os.ErrNotExist) {
-				cfg = config.NewBlankConfig()
-			} else if err != nil {
-				return nil, err
-			}
-			return cfg, nil
-		},
-		Branch: func() (string, error) {
-			currentBranch, err := git.CurrentBranch()
-			if err != nil {
-				return "", fmt.Errorf("could not determine current branch: %w", err)
-			}
-			return currentBranch, nil
-		},
-	}
-
-	RootCmd.AddCommand(apiCmd.NewCmdApi(cmdFactory, nil))
-	RootCmd.AddCommand(gistCmd.NewCmdGist(cmdFactory))
-
-	resolvedBaseRepo := func() (ghrepo.Interface, error) {
-		httpClient, err := cmdFactory.HttpClient()
-		if err != nil {
-			return nil, err
-		}
-
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		ctx := context.New()
-		remotes, err := ctx.Remotes()
-		if err != nil {
-			return nil, err
-		}
-		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
-		if err != nil {
-			return nil, err
-		}
-		baseRepo, err := repoContext.BaseRepo()
-		if err != nil {
-			return nil, err
-		}
-
-		return baseRepo, nil
-	}
-
-	repoResolvingCmdFactory := *cmdFactory
-
-	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo
-
-	RootCmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
-	RootCmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
-	RootCmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
-	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
-}
-
-// RootCmd is the entry point of command-line execution
-var RootCmd = &cobra.Command{
-	Use:   "gh <command> <subcommand> [flags]",
-	Short: "GitHub CLI",
-	Long:  `Work seamlessly with GitHub from the command line.`,
-
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	Example: heredoc.Doc(`
-	$ gh issue create
-	$ gh repo clone cli/cli
-	$ gh pr checkout 321
-	`),
-	Annotations: map[string]string{
-		"help:feedback": heredoc.Doc(`
-			Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
-			Open an issue using “gh issue create -R cli/cli”
-		`),
-		"help:environment": heredoc.Doc(`
-			GITHUB_TOKEN: an authentication token for API requests. Setting this avoids being
-			prompted to authenticate and overrides any previously stored credentials.
-
-			GH_REPO: specify the GitHub repository in "OWNER/REPO" format for commands that
-			otherwise operate on a local repository.
-
-			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
-			for authoring text.
-
-			BROWSER: the web browser to use for opening links.
-
-			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-			or "oauth" to print detailed information about HTTP requests or authentication flow.
-
-			GLAMOUR_STYLE: the style to use for rendering Markdown. See
-			https://github.com/charmbracelet/glamour#styles
-
-			NO_COLOR: avoid printing ANSI escape sequences for color output.
-		`),
-	},
-}
-
-var versionCmd = &cobra.Command{
-	Use:    "version",
-	Hidden: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(versionOutput)
-	},
+	cmdFactory := factory.New(Version)
+	RootCmd = root.NewCmdRoot(cmdFactory, Version, BuildDate)
+	RootCmd.AddCommand(aliasCmd)
+	RootCmd.AddCommand(completionCmd)
+	RootCmd.AddCommand(configCmd)
 }
 
 // overridden in tests
@@ -245,62 +85,6 @@ func contextForCommand(cmd *cobra.Command) context.Context {
 	return ctx
 }
 
-// generic authenticated HTTP client for commands
-func httpClient(io *iostreams.IOStreams, cfg config.Config, setAccept bool) *http.Client {
-	var opts []api.ClientOption
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		opts = append(opts, apiVerboseLog())
-	}
-
-	opts = append(opts,
-		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
-		// antiope-preview: Checks
-		// FIXME: avoid setting this header for `api` command
-		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json"),
-		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
-			if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-				return fmt.Sprintf("token %s", token), nil
-			}
-
-			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
-			token, err := cfg.Get(hostname, "oauth_token")
-			if token == "" {
-				var notFound *config.NotFoundError
-				// TODO: check if stdout is TTY too
-				if errors.As(err, &notFound) && io.IsStdinTTY() {
-					// interactive OAuth flow
-					token, err = config.AuthFlowWithConfig(cfg, hostname, "Notice: authentication required")
-				}
-				if err != nil {
-					return "", err
-				}
-				if token == "" {
-					// TODO: instruct user how to manually authenticate
-					return "", fmt.Errorf("authentication required for %s", hostname)
-				}
-			}
-
-			return fmt.Sprintf("token %s", token), nil
-		}),
-	)
-
-	if setAccept {
-		opts = append(opts,
-			api.AddHeaderFunc("Accept", func(req *http.Request) (string, error) {
-				// antiope-preview: Checks
-				accept := "application/vnd.github.antiope-preview+json"
-				if ghinstance.IsEnterprise(req.URL.Hostname()) {
-					// shadow-cat-preview: Draft pull requests
-					accept += ", application/vnd.github.shadow-cat-preview"
-				}
-				return accept, nil
-			}),
-		)
-	}
-
-	return api.NewHTTPClient(opts...)
-}
-
 func apiVerboseLog() api.ClientOption {
 	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
 	colorize := utils.IsTerminal(os.Stderr)
@@ -321,17 +105,6 @@ func colorableErr(cmd *cobra.Command) io.Writer {
 		return utils.NewColorable(outFile)
 	}
 	return err
-}
-
-func changelogURL(version string) string {
-	path := "https://github.com/cli/cli"
-	r := regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[\w.]+)?$`)
-	if !r.MatchString(version) {
-		return fmt.Sprintf("%s/releases/latest", path)
-	}
-
-	url := fmt.Sprintf("%s/releases/tag/v%s", path, strings.TrimPrefix(version, "v"))
-	return url
 }
 
 func ExecuteShellAlias(args []string) error {
