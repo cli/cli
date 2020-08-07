@@ -87,7 +87,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 func createRun(opts *CreateOptions) error {
 	fileArgs := opts.Filenames
-	if len(fileArgs) == 0 {
+
+	isPiped := len(fileArgs) == 0
+	if isPiped {
 		fileArgs = []string{"-"}
 	}
 
@@ -96,8 +98,22 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	processMessage := "Creating gist..."
+	completionMessage := "Created gist"
+	if !isPiped {
+		firstFile := path.Base(fileArgs[0])
+		if len(files) > 1 {
+			processMessage = fmt.Sprintf("Creating gist with multiple files")
+			completionMessage = fmt.Sprintf("Created gist %s", firstFile)
+		}
+		if len(files) == 1 && firstFile != "-" {
+			processMessage = fmt.Sprintf("Creating gist %s", firstFile)
+			completionMessage = fmt.Sprintf("Created gist %s", firstFile)
+		}
+	}
+
 	errOut := opts.IO.ErrOut
-	fmt.Fprintf(errOut, "%s Creating gist...\n", utils.Gray("-"))
+	fmt.Fprintf(errOut, "%s %s\n", utils.Gray("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -116,7 +132,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s Created gist\n", utils.Green("✓"))
+	fmt.Fprintf(errOut, "%s %s\n", utils.Green("✓"), completionMessage)
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
