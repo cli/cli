@@ -104,7 +104,7 @@ var prCloseCmd = &cobra.Command{
 	Close a pull request on GitHub.
 
 	By default, the head branch of the pull request will be retained.
-	To delete the branch, use '--delete-branch=true'.
+	To delete the branch, use '--delete-branch'.
 	`),
 	Args: cobra.ExactArgs(1),
 	RunE: prClose,
