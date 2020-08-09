@@ -462,9 +462,7 @@ func prClose(cmd *cobra.Command, args []string) error {
 
 		if !crossRepoPR {
 			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-			var httpErr api.HTTPError
-			// The ref might have already been deleted by GitHub
-			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
+			if err != nil {
 				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
 				return err
 			}
