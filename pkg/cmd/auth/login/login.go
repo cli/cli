@@ -210,7 +210,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if authMode == 0 {
-		_, err := config.AuthFlowWithConfig(cfg, hostname, "")
+		_, err := config.AuthFlowWithConfig(cfg, hostname, "", []string{})
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
