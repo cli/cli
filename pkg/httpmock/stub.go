@@ -43,7 +43,7 @@ func GraphQL(q string) Matcher {
 		if !strings.EqualFold(req.Method, "POST") {
 			return false
 		}
-		if req.URL.Path != "/graphql" {
+		if req.URL.Path != "/graphql" && req.URL.Path != "/api/graphql" {
 			return false
 		}
 
