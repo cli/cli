@@ -170,15 +170,21 @@ func statusRun(opts *StatusOptions) error {
 			addMsg("%s Logged in to %s as %s", utils.GreenCheck(), hostname, utils.Bold(username))
 			proto, _ := cfg.Get(hostname, "git_protocol")
 			if proto != "" {
-				addMsg("Git operations for %s configured to use %s protocol.", hostname, utils.Bold(proto))
+				addMsg("%s Git operations for %s configured to use %s protocol.",
+					utils.GreenCheck(), hostname, utils.Bold(proto))
 			}
+			addMsg("")
 		}
 
 		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
 		// not to since I wanted this command to be read-only.
 	}
 
-	for hostname, lines := range statusInfo {
+	for _, hostname := range hostnames {
+		lines, ok := statusInfo[hostname]
+		if !ok {
+			continue
+		}
 		fmt.Fprintf(stderr, "%s\n", utils.Bold(hostname))
 		for _, line := range lines {
 			fmt.Fprintf(stderr, "\t%s\n", line)
