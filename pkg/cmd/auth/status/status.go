@@ -187,7 +187,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 		fmt.Fprintf(stderr, "%s\n", utils.Bold(hostname))
 		for _, line := range lines {
-			fmt.Fprintf(stderr, "\t%s\n", line)
+			fmt.Fprintf(stderr, "  %s\n", line)
 		}
 	}
 
