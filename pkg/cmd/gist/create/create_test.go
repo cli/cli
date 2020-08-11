@@ -33,11 +33,7 @@ func Test_processFiles(t *testing.T) {
 func Test_guessGistName_stdin(t *testing.T) {
 	files := map[string]string{"gistfile0.txt": "sample content"}
 
-	gistName, err := guessGistName(files)
-	if err != nil {
-		t.Fatalf("unexpected error guessing gist name: %s", err)
-	}
-
+	gistName := guessGistName(files)
 	assert.Equal(t, "", gistName)
 }
 
@@ -48,11 +44,7 @@ func Test_guessGistName_userFiles(t *testing.T) {
 		"gistfile0.txt": "sample content",
 	}
 
-	gistName, err := guessGistName(files)
-	if err != nil {
-		t.Fatalf("unexpected error guessing gist name: %s", err)
-	}
-
+	gistName := guessGistName(files)
 	assert.Equal(t, "apple.txt", gistName)
 }
 

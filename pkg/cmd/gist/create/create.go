@@ -98,7 +98,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
-	gistName, err := guessGistName(files)
+	gistName := guessGistName(files)
 	if err != nil {
 		return fmt.Errorf("failed to guess gist name: %w", err)
 	}
@@ -173,14 +173,13 @@ func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, e
 	return fs, nil
 }
 
-func guessGistName(files map[string]string) (string, error) {
+func guessGistName(files map[string]string) string {
 	filenames := make([]string, 0, len(files))
 	gistName := ""
 
 	re := regexp.MustCompile(`^gistfile\d+\.txt$`)
 	for k := range files {
-		match := re.MatchString(k)
-		if !match {
+		if !re.MatchString(k) {
 			filenames = append(filenames, k)
 		}
 	}
@@ -190,5 +189,5 @@ func guessGistName(files map[string]string) (string, error) {
 		gistName = filenames[0]
 	}
 
-	return gistName, nil
+	return gistName
 }
