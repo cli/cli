@@ -32,6 +32,7 @@ jobs:
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh
+          download-url: https://github.com/cli/cli.git
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
       - name: Checkout documentation site

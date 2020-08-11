@@ -3,7 +3,6 @@ package command
 import (
 	"fmt"
 	"io"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -12,8 +11,11 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -120,57 +122,6 @@ var issueReopenCmd = &cobra.Command{
 	RunE:  issueReopen,
 }
 
-type filterOptions struct {
-	entity     string
-	state      string
-	assignee   string
-	labels     []string
-	author     string
-	baseBranch string
-	mention    string
-	milestone  string
-}
-
-func listURLWithQuery(listURL string, options filterOptions) (string, error) {
-	u, err := url.Parse(listURL)
-	if err != nil {
-		return "", err
-	}
-	query := fmt.Sprintf("is:%s ", options.entity)
-	if options.state != "all" {
-		query += fmt.Sprintf("is:%s ", options.state)
-	}
-	if options.assignee != "" {
-		query += fmt.Sprintf("assignee:%s ", options.assignee)
-	}
-	for _, label := range options.labels {
-		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
-	}
-	if options.author != "" {
-		query += fmt.Sprintf("author:%s ", options.author)
-	}
-	if options.baseBranch != "" {
-		query += fmt.Sprintf("base:%s ", options.baseBranch)
-	}
-	if options.mention != "" {
-		query += fmt.Sprintf("mentions:%s ", options.mention)
-	}
-	if options.milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.milestone))
-	}
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
-	return u.String(), nil
-}
-
-func quoteValueForQuery(v string) string {
-	if strings.ContainsAny(v, " \"\t\r\n") {
-		return fmt.Sprintf("%q", v)
-	}
-	return v
-}
-
 func issueList(cmd *cobra.Command, args []string) error {
 	ctx := contextForCommand(cmd)
 	apiClient, err := apiClientForContext(ctx)
@@ -228,14 +179,14 @@ func issueList(cmd *cobra.Command, args []string) error {
 
 	if web {
 		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
-		openURL, err := listURLWithQuery(issueListURL, filterOptions{
-			entity:    "issue",
-			state:     state,
-			assignee:  assignee,
-			labels:    labels,
-			author:    author,
-			mention:   mention,
-			milestone: milestone,
+		openURL, err := shared.ListURLWithQuery(issueListURL, shared.FilterOptions{
+			Entity:    "issue",
+			State:     state,
+			Assignee:  assignee,
+			Labels:    labels,
+			Author:    author,
+			Mention:   mention,
+			Milestone: milestone,
 		})
 		if err != nil {
 			return err
@@ -257,7 +208,7 @@ func issueList(cmd *cobra.Command, args []string) error {
 		}
 	})
 
-	title := listHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+	title := shared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
 	if connectedToTerminal(cmd) {
 		fmt.Fprintf(colorableErr(cmd), "\n%s\n\n", title)
 	}
@@ -281,7 +232,7 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentUser, err := api.CurrentLoginName(apiClient)
+	currentUser, err := api.CurrentLoginName(apiClient, baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
@@ -297,28 +248,28 @@ func issueStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	printHeader(out, "Issues assigned to you")
+	shared.PrintHeader(out, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := "  There are no issues assigned to you"
-		printMessage(out, message)
+		shared.PrintMessage(out, message)
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues mentioning you")
+	shared.PrintHeader(out, "Issues mentioning you")
 	if issuePayload.Mentioned.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
-		printMessage(out, "  There are no issues mentioning you")
+		shared.PrintMessage(out, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
-	printHeader(out, "Issues opened by you")
+	shared.PrintHeader(out, "Issues opened by you")
 	if issuePayload.Authored.TotalCount > 0 {
 		printIssues(out, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
-		printMessage(out, "  There are no issues opened by you")
+		shared.PrintMessage(out, "  There are no issues opened by you")
 	}
 	fmt.Fprintln(out)
 
@@ -356,27 +307,8 @@ func issueView(cmd *cobra.Command, args []string) error {
 }
 
 func issueStateTitleWithColor(state string) string {
-	colorFunc := colorFuncForState(state)
+	colorFunc := shared.ColorFuncForState(state)
 	return colorFunc(strings.Title(strings.ToLower(state)))
-}
-
-func listHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
-	if totalMatchCount == 0 {
-		if hasFilters {
-			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
-		}
-		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
-	}
-
-	if hasFilters {
-		matchVerb := "match"
-		if totalMatchCount == 1 {
-			matchVerb = "matches"
-		}
-		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
-	}
-
-	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
@@ -506,11 +438,7 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	if isWeb, err := cmd.Flags().GetBool("web"); err == nil && isWeb {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if title != "" || body != "" {
-			milestone := ""
-			if len(milestoneTitles) > 0 {
-				milestone = milestoneTitles[0]
-			}
-			openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+			openURL, err = shared.WithPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestoneTitles)
 			if err != nil {
 				return err
 			}
@@ -533,9 +461,9 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(baseRepo))
 	}
 
-	action := SubmitAction
-	tb := issueMetadataState{
-		Type:       issueMetadata,
+	action := shared.SubmitAction
+	tb := shared.IssueMetadataState{
+		Type:       shared.IssueMetadata,
 		Assignees:  assignees,
 		Labels:     labelNames,
 		Projects:   projectNames,
@@ -556,14 +484,20 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
 			}
 		}
-		err := titleBodySurvey(cmd, &tb, apiClient, baseRepo, title, body, defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
+
+		editorCommand, err := cmdutil.DetermineEditor(ctx.Config)
+		if err != nil {
+			return err
+		}
+
+		err = shared.TitleBodySurvey(defaultStreams, editorCommand, &tb, apiClient, baseRepo, title, body, shared.Defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
 		if err != nil {
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
 
 		action = tb.Action
 
-		if tb.Action == CancelAction {
+		if tb.Action == shared.CancelAction {
 			fmt.Fprintln(cmd.ErrOrStderr(), "Discarding.")
 
 			return nil
@@ -581,26 +515,22 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if action == PreviewAction {
+	if action == shared.PreviewAction {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		milestone := ""
-		if len(milestoneTitles) > 0 {
-			milestone = milestoneTitles[0]
-		}
-		openURL, err = withPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestone)
+		openURL, err = shared.WithPrAndIssueQueryParams(openURL, title, body, assignees, labelNames, projectNames, milestoneTitles)
 		if err != nil {
 			return err
 		}
 		// TODO could exceed max url length for explorer
 		fmt.Fprintf(cmd.ErrOrStderr(), "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		return utils.OpenInBrowser(openURL)
-	} else if action == SubmitAction {
+	} else if action == shared.SubmitAction {
 		params := map[string]interface{}{
 			"title": title,
 			"body":  body,
 		}
 
-		err = addMetadataToIssueParams(apiClient, baseRepo, params, &tb)
+		err = shared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
 		if err != nil {
 			return err
 		}
@@ -618,84 +548,10 @@ func issueCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func addMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *issueMetadataState) error {
-	if !tb.HasMetadata() {
-		return nil
-	}
-
-	if tb.MetadataResult == nil {
-		resolveInput := api.RepoResolveInput{
-			Reviewers:  tb.Reviewers,
-			Assignees:  tb.Assignees,
-			Labels:     tb.Labels,
-			Projects:   tb.Projects,
-			Milestones: tb.Milestones,
-		}
-
-		var err error
-		tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
-		if err != nil {
-			return err
-		}
-	}
-
-	assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
-	if err != nil {
-		return fmt.Errorf("could not assign user: %w", err)
-	}
-	params["assigneeIds"] = assigneeIDs
-
-	labelIDs, err := tb.MetadataResult.LabelsToIDs(tb.Labels)
-	if err != nil {
-		return fmt.Errorf("could not add label: %w", err)
-	}
-	params["labelIds"] = labelIDs
-
-	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
-	if err != nil {
-		return fmt.Errorf("could not add to project: %w", err)
-	}
-	params["projectIds"] = projectIDs
-
-	if len(tb.Milestones) > 0 {
-		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])
-		if err != nil {
-			return fmt.Errorf("could not add to milestone '%s': %w", tb.Milestones[0], err)
-		}
-		params["milestoneId"] = milestoneID
-	}
-
-	if len(tb.Reviewers) == 0 {
-		return nil
-	}
-
-	var userReviewers []string
-	var teamReviewers []string
-	for _, r := range tb.Reviewers {
-		if strings.ContainsRune(r, '/') {
-			teamReviewers = append(teamReviewers, r)
-		} else {
-			userReviewers = append(userReviewers, r)
-		}
-	}
-
-	userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
-	if err != nil {
-		return fmt.Errorf("could not request reviewer: %w", err)
-	}
-	params["userReviewerIds"] = userReviewerIDs
-
-	teamReviewerIDs, err := tb.MetadataResult.TeamsToIDs(teamReviewers)
-	if err != nil {
-		return fmt.Errorf("could not request reviewer: %w", err)
-	}
-	params["teamReviewerIds"] = teamReviewerIDs
-
-	return nil
-}
-
 func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue) {
-	table := utils.NewTablePrinter(w)
+	io := &iostreams.IOStreams{Out: w}
+	io.SetStdoutTTY(utils.IsTerminal(w))
+	table := utils.NewTablePrinter(io)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
@@ -708,11 +564,11 @@ func printIssues(w io.Writer, prefix string, totalCount int, issues []api.Issue)
 		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, colorFuncForState(issue.State))
+		table.AddField(issueNum, nil, shared.ColorFuncForState(issue.State))
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}
-		table.AddField(replaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(labels, nil, utils.Gray)
 		if table.IsTTY() {
 			table.AddField(utils.FuzzyAgo(ago), nil, utils.Gray)

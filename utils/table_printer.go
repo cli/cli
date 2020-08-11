@@ -3,11 +3,9 @@ package utils
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
 )
 
@@ -18,28 +16,15 @@ type TablePrinter interface {
 	Render() error
 }
 
-func NewTablePrinter(w io.Writer) TablePrinter {
-	if IsTerminal(w) {
-		isCygwin := IsCygwinTerminal(w)
-		ttyWidth := 80
-		if termWidth, _, err := TerminalSize(w); err == nil {
-			ttyWidth = termWidth
-		} else if isCygwin {
-			tputCmd := exec.Command("tput", "cols")
-			tputCmd.Stdin = os.Stdin
-			if out, err := tputCmd.Output(); err == nil {
-				if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
-					ttyWidth = w
-				}
-			}
-		}
+func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
+	if io.IsStdoutTTY() {
 		return &ttyTablePrinter{
-			out:      NewColorable(w),
-			maxWidth: ttyWidth,
+			out:      io.Out,
+			maxWidth: io.TerminalWidth(),
 		}
 	}
 	return &tsvTablePrinter{
-		out: w,
+		out: io.Out,
 	}
 }
 

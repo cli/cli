@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/henvic/httpretty"
 	"github.com/shurcooL/graphql"
 )
@@ -43,25 +45,21 @@ func NewClientFromHTTP(httpClient *http.Client) *Client {
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			// prevent the token from leaking to non-GitHub hosts
-			// TODO: GHE support
-			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
-				req.Header.Add(name, value)
-			}
+			req.Header.Add(name, value)
 			return tr.RoundTrip(req)
 		}}
 	}
 }
 
 // AddHeaderFunc is an AddHeader that gets the string value from a function
-func AddHeaderFunc(name string, value func() string) ClientOption {
+func AddHeaderFunc(name string, getValue func(*http.Request) (string, error)) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			// prevent the token from leaking to non-GitHub hosts
-			// TODO: GHE support
-			if !strings.EqualFold(name, "Authorization") || strings.HasSuffix(req.URL.Hostname(), ".github.com") {
-				req.Header.Add(name, value())
+			value, err := getValue(req)
+			if err != nil {
+				return nil, err
 			}
+			req.Header.Add(name, value)
 			return tr.RoundTrip(req)
 		}}
 	}
@@ -198,19 +196,18 @@ func (err HTTPError) Error() string {
 	return fmt.Sprintf("HTTP %d (%s)", err.StatusCode, err.RequestURL)
 }
 
-// Returns whether or not scopes are present, appID, and error
-func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
-	url := "https://api.github.com/user"
-	req, err := http.NewRequest("GET", url, nil)
+func (c Client) HasMinimumScopes(hostname string) (bool, error) {
+	apiEndpoint := ghinstance.RESTPrefix(hostname)
+
+	req, err := http.NewRequest("GET", apiEndpoint, nil)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
 	res, err := c.http.Do(req)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
 
 	defer func() {
@@ -221,37 +218,46 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	}()
 
 	if res.StatusCode != 200 {
-		return false, "", handleHTTPError(res)
+		return false, handleHTTPError(res)
 	}
 
-	appID := res.Header.Get("X-Oauth-Client-Id")
 	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
 
-	found := 0
+	search := map[string]bool{
+		"repo":      false,
+		"read:org":  false,
+		"admin:org": false,
+	}
+
 	for _, s := range hasScopes {
-		for _, w := range wantedScopes {
-			if w == strings.TrimSpace(s) {
-				found++
-			}
-		}
+		search[strings.TrimSpace(s)] = true
 	}
 
-	if found == len(wantedScopes) {
-		return true, appID, nil
+	errorMsgs := []string{}
+	if !search["repo"] {
+		errorMsgs = append(errorMsgs, "missing required scope 'repo'")
 	}
 
-	return false, appID, nil
+	if !search["read:org"] && !search["admin:org"] {
+		errorMsgs = append(errorMsgs, "missing required scope 'read:org'")
+	}
+
+	if len(errorMsgs) > 0 {
+		return false, errors.New(strings.Join(errorMsgs, ";"))
+	}
+
+	return true, nil
+
 }
 
 // GraphQL performs a GraphQL request and parses the response
-func (c Client) GraphQL(query string, variables map[string]interface{}, data interface{}) error {
-	url := "https://api.github.com/graphql"
+func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", ghinstance.GraphQLEndpoint(hostname), bytes.NewBuffer(reqBody))
 	if err != nil {
 		return err
 	}
@@ -267,13 +273,13 @@ func (c Client) GraphQL(query string, variables map[string]interface{}, data int
 	return handleResponse(resp, data)
 }
 
-func graphQLClient(h *http.Client) *graphql.Client {
-	return graphql.NewClient("https://api.github.com/graphql", h)
+func graphQLClient(h *http.Client, hostname string) *graphql.Client {
+	return graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), h)
 }
 
 // REST performs a REST request and parses the response.
-func (c Client) REST(method string, p string, body io.Reader, data interface{}) error {
-	url := "https://api.github.com/" + p
+func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
+	url := ghinstance.RESTPrefix(hostname) + p
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err

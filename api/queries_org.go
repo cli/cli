@@ -3,11 +3,12 @@ package api
 import (
 	"context"
 
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
 // OrganizationProjects fetches all open projects for an organization
-func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
+func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	var query struct {
 		Organization struct {
 			Projects struct {
@@ -21,11 +22,11 @@ func OrganizationProjects(client *Client, owner string) ([]RepoProject, error) {
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(owner),
+		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var projects []RepoProject
 	for {
@@ -50,7 +51,7 @@ type OrgTeam struct {
 }
 
 // OrganizationTeams fetches all the teams in an organization
-func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
+func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error) {
 	var query struct {
 		Organization struct {
 			Teams struct {
@@ -64,11 +65,11 @@ func OrganizationTeams(client *Client, owner string) ([]OrgTeam, error) {
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(owner),
+		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http)
+	gql := graphQLClient(client.http, repo.RepoHost())
 
 	var teams []OrgTeam
 	for {

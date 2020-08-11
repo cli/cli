@@ -2,8 +2,6 @@ package command
 
 import (
 	"testing"
-
-	"github.com/cli/cli/internal/ghrepo"
 )
 
 func TestChangelogURL(t *testing.T) {
@@ -41,23 +39,4 @@ func TestChangelogURL(t *testing.T) {
 	if result != url {
 		t.Errorf("expected %s to create url %s but got %s", tag, url, result)
 	}
-}
-
-func TestRemoteURLFormatting_no_config(t *testing.T) {
-	initBlankContext("", "OWNER/REPO", "master")
-	result := formatRemoteURL(prCheckoutCmd, ghrepo.New("OWNER", "REPO"))
-	eq(t, result, "https://github.com/OWNER/REPO.git")
-}
-
-func TestRemoteURLFormatting_ssh_config(t *testing.T) {
-	cfg := `---
-hosts:
-  github.com:
-    user: OWNER
-    oauth_token: MUSTBEHIGHCUZIMATOKEN
-git_protocol: ssh
-`
-	initBlankContext(cfg, "OWNER/REPO", "master")
-	result := formatRemoteURL(prCheckoutCmd, ghrepo.New("OWNER", "REPO"))
-	eq(t, result, "git@github.com:OWNER/REPO.git")
 }

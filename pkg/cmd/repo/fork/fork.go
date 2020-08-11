@@ -125,7 +125,6 @@ func forkRun(opts *ForkOptions) error {
 
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()
 
-	greenCheck := utils.Green("✓")
 	stderr := opts.IO.ErrOut
 	s := utils.Spinner(stderr)
 	stopSpinner := func() {}
@@ -173,7 +172,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 	} else {
 		if connectedToTerminal {
-			fmt.Fprintf(stderr, "%s Created fork %s\n", greenCheck, utils.Bold(ghrepo.FullName(forkedRepo)))
+			fmt.Fprintf(stderr, "%s Created fork %s\n", utils.GreenCheck(), utils.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
@@ -186,6 +185,7 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
+	// TODO: GHE support
 	protocol, err := cfg.Get("", "git_protocol")
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Using existing remote %s\n", greenCheck, utils.Bold(remote.Name))
+				fmt.Fprintf(stderr, "%s Using existing remote %s\n", utils.GreenCheck(), utils.Bold(remote.Name))
 			}
 			return nil
 		}
@@ -225,7 +225,7 @@ func forkRun(opts *ForkOptions) error {
 					return err
 				}
 				if connectedToTerminal {
-					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", greenCheck, utils.Bold(remoteName), utils.Bold(renameTarget))
+					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", utils.GreenCheck(), utils.Bold(remoteName), utils.Bold(renameTarget))
 				}
 			}
 
@@ -237,7 +237,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, utils.Bold(remoteName))
+				fmt.Fprintf(stderr, "%s Added remote %s\n", utils.GreenCheck(), utils.Bold(remoteName))
 			}
 		}
 	} else {
@@ -262,7 +262,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Cloned fork\n", greenCheck)
+				fmt.Fprintf(stderr, "%s Cloned fork\n", utils.GreenCheck())
 			}
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -78,6 +79,7 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil {
 		return err
 	}
+	// TODO: GHE support
 	protocol, err := cfg.Get("", "git_protocol")
 	if err != nil {
 		return err
@@ -87,7 +89,8 @@ func cloneRun(opts *CloneOptions) error {
 	cloneURL := opts.Repository
 	if !strings.Contains(cloneURL, ":") {
 		if !strings.Contains(cloneURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient)
+			// TODO: GHE compat
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 			if err != nil {
 				return err
 			}

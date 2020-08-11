@@ -24,7 +24,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface) (*RepoReadme, 
 		Content string
 	}
 
-	err := apiClient.REST("GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
+	err := apiClient.REST(repo.RepoHost(), "GET", fmt.Sprintf("repos/%s/readme", ghrepo.FullName(repo)), nil, &response)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {

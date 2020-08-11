@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
+	"github.com/cli/cli/utils"
 )
 
 var (
@@ -67,14 +68,14 @@ func authFlow(oauthHost, notice string) (string, string, error) {
 	}
 
 	fmt.Fprintln(os.Stderr, notice)
-	fmt.Fprintf(os.Stderr, "Press Enter to open %s in your browser... ", flow.Hostname)
+	fmt.Fprintf(os.Stderr, "- %s to open %s in your browser... ", utils.Bold("Press Enter"), flow.Hostname)
 	_ = waitForEnter(os.Stdin)
 	token, err := flow.ObtainAccessToken()
 	if err != nil {
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(token)
+	userLogin, err := getViewer(oauthHost, token)
 	if err != nil {
 		return "", "", err
 	}
@@ -83,13 +84,14 @@ func authFlow(oauthHost, notice string) (string, string, error) {
 }
 
 func AuthFlowComplete() {
-	fmt.Fprintln(os.Stderr, "Authentication complete. Press Enter to continue... ")
+	fmt.Fprintf(os.Stderr, "%s Authentication complete. %s to continue...\n",
+		utils.GreenCheck(), utils.Bold("Press Enter"))
 	_ = waitForEnter(os.Stdin)
 }
 
-func getViewer(token string) (string, error) {
+func getViewer(hostname, token string) (string, error) {
 	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-	return api.CurrentLoginName(http)
+	return api.CurrentLoginName(http, hostname)
 }
 
 func waitForEnter(r io.Reader) error {

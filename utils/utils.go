@@ -114,3 +114,7 @@ func DisplayURL(urlStr string) string {
 	}
 	return u.Hostname() + u.Path
 }
+
+func GreenCheck() string {
+	return Green("✓")
+}

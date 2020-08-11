@@ -1,41 +1,103 @@
-package command
+package checkout
 
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
+	"github.com/spf13/cobra"
 )
 
-func prCheckout(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	currentBranch, _ := ctx.Branch()
-	remotes, err := ctx.Remotes()
+type CheckoutOptions struct {
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (context.Remotes, error)
+	Branch     func() (string, error)
+
+	SelectorArg string
+}
+
+func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
+	opts := &CheckoutOptions{
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Config:     f.Config,
+		Remotes:    f.Remotes,
+		Branch:     f.Branch,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "checkout {<number> | <url> | <branch>}",
+		Short: "Check out a pull request in git",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("argument required")}
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
+			if len(args) > 0 {
+				opts.SelectorArg = args[0]
+			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+			return checkoutRun(opts)
+		},
+	}
+
+	return cmd
+}
+
+func checkoutRun(opts *CheckoutOptions) error {
+	currentBranch, err := opts.Branch()
 	if err != nil {
 		return err
 	}
 
-	apiClient, err := apiClientForContext(ctx)
+	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
 	}
 
-	pr, baseRepo, err := prFromArgs(ctx, apiClient, cmd, args)
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+	protocol, _ := cfg.Get(baseRepo.RepoHost(), "git_protocol")
 
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
-	baseURLOrName := formatRemoteURL(cmd, baseRepo)
+	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
 	if baseRemote != nil {
 		baseURLOrName = baseRemote.Name
 	}
@@ -95,7 +157,7 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 		mergeRef := ref
 		if pr.MaintainerCanModify {
 			headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
-			remote = formatRemoteURL(cmd, headRepo)
+			remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 		}
 		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
@@ -114,16 +176,4 @@ func prCheckout(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-var prCheckoutCmd = &cobra.Command{
-	Use:   "checkout {<number> | <url> | <branch>}",
-	Short: "Check out a pull request in Git",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("requires a pull request number as an argument")
-		}
-		return nil
-	},
-	RunE: prCheckout,
 }
