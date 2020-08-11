@@ -2,12 +2,17 @@ package iostreams
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type IOStreams struct {
@@ -74,6 +79,29 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
+func (s *IOStreams) TerminalWidth() int {
+	defaultWidth := 80
+	if s.stdoutTTYOverride {
+		return defaultWidth
+	}
+
+	if w, _, err := terminalSize(s.Out); err == nil {
+		return w
+	}
+
+	if isCygwinTerminal(s.Out) {
+		tputCmd := exec.Command("tput", "cols")
+		tputCmd.Stdin = os.Stdin
+		if out, err := tputCmd.Output(); err == nil {
+			if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+				return w
+			}
+		}
+	}
+
+	return defaultWidth
+}
+
 func System() *IOStreams {
 	var out io.Writer = os.Stdout
 	var colorEnabled bool
@@ -103,4 +131,18 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 
 func isTerminal(f *os.File) bool {
 	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+}
+
+func isCygwinTerminal(w io.Writer) bool {
+	if f, isFile := w.(*os.File); isFile {
+		return isatty.IsCygwinTerminal(f.Fd())
+	}
+	return false
+}
+
+func terminalSize(w io.Writer) (int, int, error) {
+	if f, isFile := w.(*os.File); isFile {
+		return terminal.GetSize(int(f.Fd()))
+	}
+	return 0, 0, fmt.Errorf("%v is not a file", w)
 }

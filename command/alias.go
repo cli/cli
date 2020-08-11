@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -166,9 +167,9 @@ func aliasList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	stdout := colorableOut(cmd)
-
-	tp := utils.NewTablePrinter(stdout)
+	tp := utils.NewTablePrinter(&iostreams.IOStreams{
+		Out: cmd.OutOrStdout(),
+	})
 
 	aliasMap := aliasCfg.All()
 	keys := []string{}
@@ -193,7 +194,7 @@ func aliasList(cmd *cobra.Command, args []string) error {
 
 var aliasDeleteCmd = &cobra.Command{
 	Use:   "delete <alias>",
-	Short: "Delete an alias.",
+	Short: "Delete an alias",
 	Args:  cobra.ExactArgs(1),
 	RunE:  aliasDelete,
 }

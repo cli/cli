@@ -145,7 +145,7 @@ func TestIssueList_tty(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), `
-Showing 3 of 3 issues in OWNER/REPO
+Showing 3 of 3 open issues in OWNER/REPO
 
 `)
 
@@ -834,117 +834,6 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	eq(t, output.String(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
 
-func Test_listHeader(t *testing.T) {
-	type args struct {
-		repoName        string
-		itemName        string
-		matchCount      int
-		totalMatchCount int
-		hasFilters      bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "no results",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "table",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      false,
-			},
-			want: "There are no open tables in REPO",
-		},
-		{
-			name: "no matches after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "Luftballon",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      true,
-			},
-			want: "No Luftballons match your search in REPO",
-		},
-		{
-			name: "one result",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "genie",
-				matchCount:      1,
-				totalMatchCount: 23,
-				hasFilters:      false,
-			},
-			want: "Showing 1 of 23 genies in REPO",
-		},
-		{
-			name: "one result after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "tiny cup",
-				matchCount:      1,
-				totalMatchCount: 23,
-				hasFilters:      true,
-			},
-			want: "Showing 1 of 23 tiny cups in REPO that match your search",
-		},
-		{
-			name: "one result in total",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "chip",
-				matchCount:      1,
-				totalMatchCount: 1,
-				hasFilters:      false,
-			},
-			want: "Showing 1 of 1 chip in REPO",
-		},
-		{
-			name: "one result in total after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "spicy noodle",
-				matchCount:      1,
-				totalMatchCount: 1,
-				hasFilters:      true,
-			},
-			want: "Showing 1 of 1 spicy noodle in REPO that matches your search",
-		},
-		{
-			name: "multiple results",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "plant",
-				matchCount:      4,
-				totalMatchCount: 23,
-				hasFilters:      false,
-			},
-			want: "Showing 4 of 23 plants in REPO",
-		},
-		{
-			name: "multiple results after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "boomerang",
-				matchCount:      4,
-				totalMatchCount: 23,
-				hasFilters:      true,
-			},
-			want: "Showing 4 of 23 boomerangs in REPO that match your search",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := listHeader(tt.args.repoName, tt.args.itemName, tt.args.matchCount, tt.args.totalMatchCount, tt.args.hasFilters); got != tt.want {
-				t.Errorf("listHeader() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIssueStateTitleWithColor(t *testing.T) {
 	tests := map[string]struct {
 		state string
@@ -1100,73 +989,5 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	_, err := RunCommand("issue reopen 2")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Fatalf("got error: %v", err)
-	}
-}
-
-func Test_listURLWithQuery(t *testing.T) {
-	type args struct {
-		listURL string
-		options filterOptions
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{
-		{
-			name: "blank",
-			args: args{
-				listURL: "https://example.com/path?a=b",
-				options: filterOptions{
-					entity: "issue",
-					state:  "open",
-				},
-			},
-			want:    "https://example.com/path?a=b&q=is%3Aissue+is%3Aopen",
-			wantErr: false,
-		},
-		{
-			name: "all",
-			args: args{
-				listURL: "https://example.com/path",
-				options: filterOptions{
-					entity:     "issue",
-					state:      "open",
-					assignee:   "bo",
-					author:     "ka",
-					baseBranch: "trunk",
-					mention:    "nu",
-				},
-			},
-			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+base%3Atrunk+mentions%3Anu",
-			wantErr: false,
-		},
-		{
-			name: "spaces in values",
-			args: args{
-				listURL: "https://example.com/path",
-				options: filterOptions{
-					entity:    "pr",
-					state:     "open",
-					labels:    []string{"docs", "help wanted"},
-					milestone: `Codename "What Was Missing"`,
-				},
-			},
-			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+label%3Adocs+label%3A%22help+wanted%22+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22",
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := listURLWithQuery(tt.args.listURL, tt.args.options)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("listURLWithQuery() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("listURLWithQuery() = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }

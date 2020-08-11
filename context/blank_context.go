@@ -16,10 +16,9 @@ func NewBlank() *blankContext {
 
 // A Context implementation that queries the filesystem
 type blankContext struct {
-	authToken string
-	branch    string
-	baseRepo  ghrepo.Interface
-	remotes   Remotes
+	branch   string
+	baseRepo ghrepo.Interface
+	remotes  Remotes
 }
 
 func (c *blankContext) Config() (config.Config, error) {
@@ -28,14 +27,6 @@ func (c *blankContext) Config() (config.Config, error) {
 		panic(fmt.Sprintf("failed to parse config during tests. did you remember to stub? error: %s", err))
 	}
 	return cfg, nil
-}
-
-func (c *blankContext) AuthToken() (string, error) {
-	return c.authToken, nil
-}
-
-func (c *blankContext) SetAuthToken(t string) {
-	c.authToken = t
 }
 
 func (c *blankContext) Branch() (string, error) {

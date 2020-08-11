@@ -13,10 +13,10 @@ import (
 
 func httpRequest(client *http.Client, method string, p string, params interface{}, headers []string) (*http.Response, error) {
 	var requestURL string
-	// TODO: GHE support
 	if strings.Contains(p, "://") {
 		requestURL = p
 	} else {
+		// TODO: GHE support
 		requestURL = "https://api.github.com/" + p
 	}
 

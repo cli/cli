@@ -2,8 +2,9 @@ package command
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"reflect"
+	"testing"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -13,6 +14,13 @@ import (
 	"github.com/google/shlex"
 	"github.com/spf13/pflag"
 )
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 const defaultTestConfig = `hosts:
   github.com:
@@ -100,18 +108,6 @@ func RunCommand(args string) (*cmdOut, error) {
 	cmd.SetErr(nil)
 
 	return &cmdOut{&outBuf, &errBuf}, err
-}
-
-type errorStub struct {
-	message string
-}
-
-func (s errorStub) Output() ([]byte, error) {
-	return nil, errors.New(s.message)
-}
-
-func (s errorStub) Run() error {
-	return errors.New(s.message)
 }
 
 func stubTerminal(connected bool) func() {

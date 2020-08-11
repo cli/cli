@@ -1,6 +1,7 @@
 package clone
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -8,10 +9,12 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type CloneOptions struct {
@@ -32,16 +35,18 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "clone <repository> [<directory>]",
+		DisableFlagsInUseLine: true,
+
+		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
 		Args:  cobra.MinimumNArgs(1),
 		Short: "Clone a repository locally",
-		Long: heredoc.Doc(
-			`Clone a GitHub repository locally.
+		Long: heredoc.Doc(`
+			Clone a GitHub repository locally.
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
 			
-			To pass 'git clone' flags, separate them with '--'.
+			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -54,6 +59,13 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			return cloneRun(opts)
 		},
 	}
+
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		if err == pflag.ErrHelp {
+			return err
+		}
+		return &cmdutil.FlagError{Err: fmt.Errorf("%w\nSeparate git clone flags with '--'.", err)}
+	})
 
 	return cmd
 }
@@ -69,6 +81,7 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil {
 		return err
 	}
+	// TODO: GHE support
 	protocol, err := cfg.Get("", "git_protocol")
 	if err != nil {
 		return err
@@ -78,7 +91,8 @@ func cloneRun(opts *CloneOptions) error {
 	cloneURL := opts.Repository
 	if !strings.Contains(cloneURL, ":") {
 		if !strings.Contains(cloneURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient)
+			// TODO: GHE compat
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 			if err != nil {
 				return err
 			}
