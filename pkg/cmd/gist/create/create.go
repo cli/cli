@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -92,19 +93,25 @@ func createRun(opts *CreateOptions) error {
 		fileArgs = []string{"-"}
 	}
 
-	files, nonGistFilesSorted, err := processFiles(opts.IO.In, fileArgs)
+	files, err := processFiles(opts.IO.In, fileArgs)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	gistName, err := guessGistName(files)
+	if err != nil {
+		return fmt.Errorf("failed to guess gist name: %w", err)
+	}
+
 	processMessage := "Creating gist..."
 	completionMessage := "Created gist"
-	if len(files) > 1 && len(nonGistFilesSorted) >= 1 {
-		processMessage = "Creating gist with multiple files"
-		completionMessage = fmt.Sprintf("Created gist %s", nonGistFilesSorted[0])
-	} else if len(nonGistFilesSorted) == 1 {
-		processMessage = fmt.Sprintf("Creating gist %s", nonGistFilesSorted[0])
-		completionMessage = fmt.Sprintf("Created gist %s", nonGistFilesSorted[0])
+	if gistName != "" {
+		if len(files) > 1 {
+			processMessage = "Creating gist with multiple files"
+		} else {
+			processMessage = fmt.Sprintf("Creating gist %s", gistName)
+		}
+		completionMessage = fmt.Sprintf("Created gist %s", gistName)
 	}
 
 	errOut := opts.IO.ErrOut
@@ -134,12 +141,11 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, []string, error) {
+func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, error) {
 	fs := map[string]string{}
-	nonGistFilesSorted := make([]string, 0, len(filenames))
 
 	if len(filenames) == 0 {
-		return nil, nil, errors.New("no files passed")
+		return nil, errors.New("no files passed")
 	}
 
 	for i, f := range filenames {
@@ -150,21 +156,39 @@ func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, [
 			filename = fmt.Sprintf("gistfile%d.txt", i)
 			content, err = ioutil.ReadAll(stdin)
 			if err != nil {
-				return fs, nonGistFilesSorted, fmt.Errorf("failed to read from stdin: %w", err)
+				return fs, fmt.Errorf("failed to read from stdin: %w", err)
 			}
 			stdin.Close()
 		} else {
 			content, err = ioutil.ReadFile(f)
 			if err != nil {
-				return fs, nonGistFilesSorted, fmt.Errorf("failed to read file %s: %w", f, err)
+				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 			filename = path.Base(f)
-			nonGistFilesSorted = append(nonGistFilesSorted, filename)
 		}
 
 		fs[filename] = string(content)
 	}
-	sort.Strings(nonGistFilesSorted)
 
-	return fs, nonGistFilesSorted, nil
+	return fs, nil
+}
+
+func guessGistName(files map[string]string) (string, error) {
+	filenames := make([]string, 0, len(files))
+	gistName := ""
+
+	re := regexp.MustCompile(`^gistfile[0-9]\.txt$`)
+	for k, _ := range files {
+		match := re.MatchString(k)
+		if !match {
+			filenames = append(filenames, k)
+		}
+	}
+
+	if len(filenames) > 0 {
+		sort.Strings(filenames)
+		gistName = filenames[0]
+	}
+
+	return gistName, nil
 }
