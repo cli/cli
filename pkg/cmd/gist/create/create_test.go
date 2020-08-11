@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	fixtureFile  = "../fixture.txt"
+	fixtureFile = "../fixture.txt"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -43,8 +43,8 @@ func Test_guessGistName_stdin(t *testing.T) {
 
 func Test_guessGistName_userFiles(t *testing.T) {
 	files := map[string]string{
-		"fig.txt": "I am a fig.",
-		"apple.txt": "I am an apple.",
+		"fig.txt":       "I am a fig.",
+		"apple.txt":     "I am an apple.",
 		"gistfile0.txt": "sample content",
 	}
 
