@@ -99,9 +99,6 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	gistName := guessGistName(files)
-	if err != nil {
-		return fmt.Errorf("failed to guess gist name: %w", err)
-	}
 
 	processMessage := "Creating gist..."
 	completionMessage := "Created gist"

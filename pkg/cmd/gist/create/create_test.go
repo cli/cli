@@ -205,7 +205,7 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple files sorted",
+			name: "multiple files",
 			opts: &CreateOptions{
 				Filenames: []string{fixtureFile, "-"},
 			},
