@@ -265,6 +265,17 @@ func Test_apiRun(t *testing.T) {
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 		},
 		{
+			name: "REST string errors",
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": ["ALSO", "FINE"]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": ["ALSO", "FINE"]}`,
+			stderr: "gh: ALSO\nFINE\n",
+		},
+		{
 			name: "GraphQL error",
 			options: ApiOptions{
 				RequestPath: "graphql",

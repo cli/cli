@@ -193,7 +193,7 @@ func aliasList(cmd *cobra.Command, args []string) error {
 
 var aliasDeleteCmd = &cobra.Command{
 	Use:   "delete <alias>",
-	Short: "Delete an alias.",
+	Short: "Delete an alias",
 	Args:  cobra.ExactArgs(1),
 	RunE:  aliasDelete,
 }
