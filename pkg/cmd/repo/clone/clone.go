@@ -35,16 +35,18 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "clone <repository> [<directory>] -- [<gitflags>...]",
+		DisableFlagsInUseLine: true,
+
+		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
 		Args:  cobra.MinimumNArgs(1),
 		Short: "Clone a repository locally",
-		Long: heredoc.Doc(
-			`Clone a GitHub repository locally.
+		Long: heredoc.Doc(`
+			Clone a GitHub repository locally.
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
 			
-			To pass 'git clone' flags, separate them with '--'.
+			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -62,7 +64,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		if err == pflag.ErrHelp {
 			return err
 		}
-		return &cmdutil.FlagError{Err: fmt.Errorf("%v\nSeparate git clone flags with `--`.", err)}
+		return &cmdutil.FlagError{Err: fmt.Errorf("%w\nSeparate git clone flags with '--'.", err)}
 	})
 
 	return cmd

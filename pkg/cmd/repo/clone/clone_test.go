@@ -181,11 +181,8 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 }
 
 func Test_RepoClone_flagError(t *testing.T) {
-	reg := &httpmock.Registry{}
-	httpClient := &http.Client{Transport: reg}
-
-	_, err := runCloneCommand(httpClient, "--depth 1 OWNER/REPO")
-	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with `--`." {
+	_, err := runCloneCommand(nil, "--depth 1 OWNER/REPO")
+	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
 		t.Errorf("unexpected error %v", err)
 	}
 }
