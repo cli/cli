@@ -290,6 +290,9 @@ func Test_statusRun(t *testing.T) {
 				assert.True(t, tt.wantErrOut.MatchString(stderr.String()))
 			}
 
+			assert.Equal(t, "", mainBuf.String())
+			assert.Equal(t, "", hostsBuf.String())
+
 			reg.Verify(t)
 		})
 	}
