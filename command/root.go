@@ -3,7 +3,6 @@ package command
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,12 +16,10 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
-	configCmd "github.com/cli/cli/pkg/cmd/config"
 	"github.com/cli/cli/pkg/cmd/factory"
 	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
-
 	"github.com/spf13/cobra"
 )
 
@@ -43,9 +40,6 @@ func init() {
 
 	cmdFactory := factory.New(Version)
 	RootCmd = root.NewCmdRoot(cmdFactory, Version, BuildDate)
-	RootCmd.AddCommand(aliasCmd)
-	RootCmd.AddCommand(root.NewCmdCompletion(cmdFactory.IOStreams))
-	RootCmd.AddCommand(configCmd.NewCmdConfig(cmdFactory))
 }
 
 // overridden in tests
@@ -74,22 +68,10 @@ func BasicClient() (*api.Client, error) {
 	return api.NewClient(opts...), nil
 }
 
-func contextForCommand(cmd *cobra.Command) context.Context {
-	return initContext()
-}
-
 func apiVerboseLog() api.ClientOption {
 	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
 	colorize := utils.IsTerminal(os.Stderr)
 	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
-}
-
-func colorableErr(cmd *cobra.Command) io.Writer {
-	err := cmd.ErrOrStderr()
-	if outFile, isFile := err.(*os.File); isFile {
-		return utils.NewColorable(outFile)
-	}
-	return err
 }
 
 func ExecuteShellAlias(args []string) error {
@@ -197,8 +179,4 @@ func ExpandAlias(args []string) (expanded []string, isShell bool, err error) {
 
 	expanded = args[1:]
 	return
-}
-
-func connectedToTerminal(cmd *cobra.Command) bool {
-	return utils.IsTerminal(cmd.InOrStdin()) && utils.IsTerminal(cmd.OutOrStdout())
 }

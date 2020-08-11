@@ -9,7 +9,9 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
+	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
+	configCmd "github.com/cli/cli/pkg/cmd/config"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
@@ -94,9 +96,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// CHILD COMMANDS
 
+	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(apiCmd.NewCmdApi(f, nil))
-	cmd.AddCommand(gistCmd.NewCmdGist(f))
+	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+	cmd.AddCommand(gistCmd.NewCmdGist(f))
+	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
