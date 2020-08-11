@@ -200,18 +200,18 @@ type MissingScopesError struct {
 	error
 }
 
-func (c Client) HasMinimumScopes(hostname string) (bool, error) {
+func (c Client) HasMinimumScopes(hostname string) error {
 	apiEndpoint := ghinstance.RESTPrefix(hostname)
 
 	req, err := http.NewRequest("GET", apiEndpoint, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	res, err := c.http.Do(req)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	defer func() {
@@ -222,7 +222,7 @@ func (c Client) HasMinimumScopes(hostname string) (bool, error) {
 	}()
 
 	if res.StatusCode != 200 {
-		return false, handleHTTPError(res)
+		return handleHTTPError(res)
 	}
 
 	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
@@ -247,10 +247,10 @@ func (c Client) HasMinimumScopes(hostname string) (bool, error) {
 	}
 
 	if len(errorMsgs) > 0 {
-		return false, &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
+		return &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
 	}
 
-	return true, nil
+	return nil
 }
 
 // GraphQL performs a GraphQL request and parses the response

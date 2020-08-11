@@ -84,7 +84,7 @@ func statusRun(opts *StatusOptions) error {
 			return err
 		}
 
-		_, err = apiClient.HasMinimumScopes(hostname)
+		err = apiClient.HasMinimumScopes(hostname)
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
@@ -145,7 +145,7 @@ func statusRun(opts *StatusOptions) error {
 			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
 		}
 
-		_, err = apiClient.HasMinimumScopes(hostname)
+		err = apiClient.HasMinimumScopes(hostname)
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {

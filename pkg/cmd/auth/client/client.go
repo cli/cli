@@ -14,7 +14,7 @@ func ValidateHostCfg(hostname string, cfg config.Config) error {
 		return err
 	}
 
-	_, err = apiClient.HasMinimumScopes(hostname)
+	err = apiClient.HasMinimumScopes(hostname)
 	if err != nil {
 		return fmt.Errorf("could not validate token: %w", err)
 	}
