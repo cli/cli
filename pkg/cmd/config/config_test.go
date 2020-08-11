@@ -36,6 +36,13 @@ func (c configStub) Aliases() (*config.AliasConfig, error) {
 	return nil, nil
 }
 
+func (c configStub) Hosts() ([]string, error) {
+	return nil, nil
+}
+
+func (c configStub) UnsetHost(hostname string) {
+}
+
 func (c configStub) Write() error {
 	c["_written"] = "true"
 	return nil
