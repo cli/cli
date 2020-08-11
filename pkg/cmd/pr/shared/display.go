@@ -45,3 +45,22 @@ func PrintHeader(w io.Writer, s string) {
 func PrintMessage(w io.Writer, s string) {
 	fmt.Fprintln(w, utils.Gray(s))
 }
+
+func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
+	if totalMatchCount == 0 {
+		if hasFilters {
+			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
+		}
+		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
+	}
+
+	if hasFilters {
+		matchVerb := "match"
+		if totalMatchCount == 1 {
+			matchVerb = "matches"
+		}
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+	}
+
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
+}

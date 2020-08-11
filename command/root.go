@@ -26,12 +26,7 @@ import (
 	authLoginCmd "github.com/cli/cli/pkg/cmd/auth/login"
 	authLogoutCmd "github.com/cli/cli/pkg/cmd/auth/logout"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
-	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
-	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
-	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
-	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
-	prStatusCmd "github.com/cli/cli/pkg/cmd/pr/status"
-	prViewCmd "github.com/cli/cli/pkg/cmd/pr/view"
+	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
@@ -180,13 +175,7 @@ func init() {
 	repoCmd.Cmd.AddCommand(repoCreateCmd.NewCmdCreate(cmdFactory, nil))
 	repoCmd.Cmd.AddCommand(creditsCmd.NewCmdRepoCredits(&repoResolvingCmdFactory, nil))
 
-	prCmd.AddCommand(prReviewCmd.NewCmdReview(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
-	prCmd.AddCommand(prStatusCmd.NewCmdStatus(&repoResolvingCmdFactory, nil))
-
+	RootCmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
 
@@ -403,41 +392,6 @@ func determineBaseRepo(apiClient *api.Client, cmd *cobra.Command, ctx context.Co
 	}
 
 	return baseRepo, nil
-}
-
-// TODO there is a parallel implementation for isolated commands
-func formatRemoteURL(cmd *cobra.Command, repo ghrepo.Interface) string {
-	ctx := contextForCommand(cmd)
-
-	var protocol string
-	cfg, err := ctx.Config()
-	if err != nil {
-		fmt.Fprintf(colorableErr(cmd), "%s failed to load config: %s. using defaults\n", utils.Yellow("!"), err)
-	} else {
-		protocol, _ = cfg.Get(repo.RepoHost(), "git_protocol")
-	}
-
-	if protocol == "ssh" {
-		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
-	}
-
-	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
-}
-
-// TODO there is a parallel implementation for isolated commands
-func determineEditor(cmd *cobra.Command) (string, error) {
-	editorCommand := os.Getenv("GH_EDITOR")
-	if editorCommand == "" {
-		ctx := contextForCommand(cmd)
-		cfg, err := ctx.Config()
-		if err != nil {
-			return "", fmt.Errorf("could not read config: %w", err)
-		}
-		// TODO: consider supporting setting an editor per GHE host
-		editorCommand, _ = cfg.Get(ghinstance.Default(), "editor")
-	}
-
-	return editorCommand, nil
 }
 
 func ExecuteShellAlias(args []string) error {

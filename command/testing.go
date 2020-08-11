@@ -3,6 +3,8 @@ package command
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"testing"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -12,6 +14,13 @@ import (
 	"github.com/google/shlex"
 	"github.com/spf13/pflag"
 )
+
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 const defaultTestConfig = `hosts:
   github.com:

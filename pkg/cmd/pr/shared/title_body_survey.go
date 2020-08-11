@@ -1,4 +1,4 @@
-package command
+package shared
 
 import (
 	"fmt"
@@ -7,21 +7,26 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/githubtemplate"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/utils"
-	"github.com/spf13/cobra"
 )
+
+type Defaults struct {
+	Title string
+	Body  string
+}
 
 type Action int
 type metadataStateType int
 
 const (
-	issueMetadata metadataStateType = iota
-	prMetadata
+	IssueMetadata metadataStateType = iota
+	PRMetadata
 )
 
-type issueMetadataState struct {
+type IssueMetadataState struct {
 	Type metadataStateType
 
 	Body   string
@@ -38,7 +43,7 @@ type issueMetadataState struct {
 	MetadataResult *api.RepoMetadataResult
 }
 
-func (tb *issueMetadataState) HasMetadata() bool {
+func (tb *IssueMetadataState) HasMetadata() bool {
 	return len(tb.Reviewers) > 0 ||
 		len(tb.Assignees) > 0 ||
 		len(tb.Labels) > 0 ||
@@ -112,9 +117,9 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 	for _, p := range nonLegacyTemplatePaths {
 		templateNames = append(templateNames, githubtemplate.ExtractName(p))
 	}
-	if metadataType == issueMetadata {
+	if metadataType == IssueMetadata {
 		templateNames = append(templateNames, "Open a blank issue")
-	} else if metadataType == prMetadata {
+	} else if metadataType == PRMetadata {
 		templateNames = append(templateNames, "Open a blank pull request")
 	}
 
@@ -143,12 +148,8 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 	return string(templateContents), nil
 }
 
-func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
-	editorCommand, err := determineEditor(cmd)
-	if err != nil {
-		return err
-	}
-
+// FIXME: this command has too many parameters and responsibilities
+func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *IssueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs Defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
 	issueState.Title = defs.Title
 	templateContents := ""
 
@@ -198,7 +199,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 		qs = append(qs, bodyQuestion)
 	}
 
-	err = prompt.SurveyAsk(qs, issueState)
+	err := prompt.SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
@@ -249,7 +250,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 			Projects:   isChosen("Projects"),
 			Milestones: isChosen("Milestone"),
 		}
-		s := utils.Spinner(cmd.OutOrStderr())
+		s := utils.Spinner(io.ErrOut)
 		utils.StartSpinner(s)
 		issueState.MetadataResult, err = api.RepoMetadata(apiClient, repo, metadataInput)
 		utils.StopSpinner(s)
@@ -297,7 +298,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 					},
 				})
 			} else {
-				cmd.PrintErrln("warning: no available reviewers")
+				fmt.Fprintln(io.ErrOut, "warning: no available reviewers")
 			}
 		}
 		if isChosen("Assignees") {
@@ -311,7 +312,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 					},
 				})
 			} else {
-				cmd.PrintErrln("warning: no assignable users")
+				fmt.Fprintln(io.ErrOut, "warning: no assignable users")
 			}
 		}
 		if isChosen("Labels") {
@@ -325,7 +326,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 					},
 				})
 			} else {
-				cmd.PrintErrln("warning: no labels in the repository")
+				fmt.Fprintln(io.ErrOut, "warning: no labels in the repository")
 			}
 		}
 		if isChosen("Projects") {
@@ -339,7 +340,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 					},
 				})
 			} else {
-				cmd.PrintErrln("warning: no projects to choose from")
+				fmt.Fprintln(io.ErrOut, "warning: no projects to choose from")
 			}
 		}
 		if isChosen("Milestone") {
@@ -357,7 +358,7 @@ func titleBodySurvey(cmd *cobra.Command, issueState *issueMetadataState, apiClie
 					},
 				})
 			} else {
-				cmd.PrintErrln("warning: no milestones in the repository")
+				fmt.Fprintln(io.ErrOut, "warning: no milestones in the repository")
 			}
 		}
 		values := metadataValues{}
