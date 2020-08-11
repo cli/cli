@@ -133,6 +133,19 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 	}
 }
 
+func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
+	return func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 200,
+			Request:    req,
+			Header: map[string][]string{
+				"X-Oauth-Scopes": {scopes},
+			},
+			Body: ioutil.NopCloser(bytes.NewBufferString("")),
+		}, nil
+	}
+}
+
 func httpResponse(status int, req *http.Request, body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: status,
