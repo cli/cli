@@ -118,6 +118,8 @@ func statusRun(opts *StatusOptions) error {
 		return nil
 	}
 
+	statusInfo := map[string][]string{}
+
 	hostnames, err := cfg.Hosts()
 	if len(hostnames) == 0 || err != nil {
 		fmt.Fprintf(stderr,
@@ -137,41 +139,50 @@ func statusRun(opts *StatusOptions) error {
 		if opts.Hostname != "" && opts.Hostname != hostname {
 			continue
 		}
+
+		statusInfo[hostname] = []string{}
+		addMsg := func(x string, ys ...interface{}) {
+			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
+		}
+
 		_, err = apiClient.HasMinimumScopes(hostname)
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
-				fmt.Fprintf(stderr, "%s %s: %s\n", utils.Red("X"), hostname, err)
-				fmt.Fprintf(stderr, "To enable the missing scopes, please run %s %s\n",
+				addMsg("%s %s: %s\n", utils.Red("X"), hostname, err)
+				addMsg("- To enable the missing scopes, please run %s %s\n",
 					utils.Bold("gh auth refresh -h"),
 					utils.Bold(hostname))
 			} else {
-				fmt.Fprintf(stderr, "%s %s: authentication failed\n", utils.Red("X"), hostname)
-				fmt.Fprintln(stderr)
-				fmt.Fprintf(stderr, "The configured token for %s is no longer valid.\n", utils.Bold(hostname))
-				fmt.Fprintf(stderr, "To re-authenticate, please run %s %s\n",
+				addMsg("%s %s: authentication failed\n", utils.Red("X"), hostname)
+				addMsg("- The configured token for %s is no longer valid.", utils.Bold(hostname))
+				addMsg("- To re-authenticate, please run %s %s",
 					utils.Bold("gh auth login -h"), utils.Bold(hostname))
-				fmt.Fprintf(stderr, "To forget about this host, please run %s %s\n",
+				addMsg("- To forget about this host, please run %s %s",
 					utils.Bold("gh auth logout -h"), utils.Bold(hostname))
 			}
 			failed = true
 		} else {
 			username, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
-				fmt.Fprintf(stderr, "%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
+				addMsg("%s %s: api call failed: %s\n", utils.Red("X"), hostname, err)
 			}
-			fmt.Fprintf(stderr, "%s Logged in to %s as %s\n", utils.GreenCheck(), hostname, utils.Bold(username))
+			addMsg("%s Logged in to %s as %s", utils.GreenCheck(), hostname, utils.Bold(username))
 			proto, _ := cfg.Get(hostname, "git_protocol")
 			if proto != "" {
-				fmt.Fprintln(stderr)
-				fmt.Fprintf(stderr,
-					"Git operations for %s configured to use %s protocol.\n", hostname, utils.Bold(proto))
-				fmt.Fprintln(stderr)
+				addMsg("Git operations for %s configured to use %s protocol.", hostname, utils.Bold(proto))
 			}
 		}
 
 		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
 		// not to since I wanted this command to be read-only.
+	}
+
+	for hostname, lines := range statusInfo {
+		fmt.Fprintf(stderr, "%s\n", utils.Bold(hostname))
+		for _, line := range lines {
+			fmt.Fprintf(stderr, "\t%s\n", line)
+		}
 	}
 
 	if failed {
