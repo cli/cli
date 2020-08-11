@@ -17,18 +17,43 @@ import (
 
 const (
 	fixtureFile  = "../fixture.txt"
-	buildingFile = "../building.txt"
 )
 
 func Test_processFiles(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
-	files, _, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
+	files, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
 
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"])
+}
+
+func Test_guessGistName_stdin(t *testing.T) {
+	files := map[string]string{"gistfile0.txt": "sample content"}
+
+	gistName, err := guessGistName(files)
+	if err != nil {
+		t.Fatalf("unexpected error guessing gist name: %s", err)
+	}
+
+	assert.Equal(t, "", gistName)
+}
+
+func Test_guessGistName_userFiles(t *testing.T) {
+	files := map[string]string{
+		"fig.txt": "I am a fig.",
+		"apple.txt": "I am an apple.",
+		"gistfile0.txt": "sample content",
+	}
+
+	gistName, err := guessGistName(files)
+	if err != nil {
+		t.Fatalf("unexpected error guessing gist name: %s", err)
+	}
+
+	assert.Equal(t, "apple.txt", gistName)
 }
 
 func TestNewCmdCreate(t *testing.T) {
@@ -203,25 +228,6 @@ func Test_createRun(t *testing.T) {
 					},
 					"gistfile1.txt": map[string]interface{}{
 						"content": "cool stdin content",
-					},
-				},
-			},
-		},
-		{
-			name: "multiple files unsorted",
-			opts: &CreateOptions{
-				Filenames: []string{fixtureFile, buildingFile},
-			},
-			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist with multiple files\n✓ Created gist building.txt\n",
-			wantErr:    false,
-			wantParams: map[string]interface{}{
-				"files": map[string]interface{}{
-					"fixture.txt": map[string]interface{}{
-						"content": "{}",
-					},
-					"building.txt": map[string]interface{}{
-						"content": "{}",
 					},
 				},
 			},
