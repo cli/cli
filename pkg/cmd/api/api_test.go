@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -756,18 +757,34 @@ func Test_fillPlaceholders(t *testing.T) {
 		{
 			name: "has branch placeholder",
 			args: args{
-				value: "repos/:owner/:repo/branches/:branch",
+				value: "repos/cli/cli/branches/:branch",
 				opts: &ApiOptions{
 					BaseRepo: func() (ghrepo.Interface, error) {
 						return ghrepo.New("hubot", "robot-uprising"), nil
 					},
 					CurrentBranch: func() (string, error) {
-						return "feature", nil
+						return "trunk", nil
 					},
 				},
 			},
-			want:    "repos/hubot/robot-uprising/branches/feature",
+			want:    "repos/cli/cli/branches/trunk",
 			wantErr: false,
+		},
+		{
+			name: "has branch placeholder and git is on detached head",
+			args: args{
+				value: "repos/cli/cli/branches/:branch",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("cli", "cli"), nil
+					},
+					CurrentBranch: func() (string, error) {
+						return "", git.ErrNotOnAnyBranch
+					},
+				},
+			},
+			want:    "repos/cli/cli/branches/:branch",
+			wantErr: true,
 		},
 		{
 			name: "no greedy substitutes",

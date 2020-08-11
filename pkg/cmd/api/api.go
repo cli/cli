@@ -301,6 +301,14 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 		return value, err
 	}
 
+	var branch string
+	if strings.Contains(value, ":branch") {
+		branch, err = opts.CurrentBranch()
+		if err != nil {
+			return value, err
+		}
+	}
+
 	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
 		switch m {
 		case ":owner":
@@ -308,10 +316,6 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 		case ":repo":
 			return baseRepo.RepoName()
 		case ":branch":
-			branch, err := opts.CurrentBranch()
-			if err != nil {
-				panic(err)
-			}
 			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
