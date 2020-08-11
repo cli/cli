@@ -28,7 +28,10 @@ import (
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	prCheckoutCmd "github.com/cli/cli/pkg/cmd/pr/checkout"
 	prDiffCmd "github.com/cli/cli/pkg/cmd/pr/diff"
+	prMergeCmd "github.com/cli/cli/pkg/cmd/pr/merge"
 	prReviewCmd "github.com/cli/cli/pkg/cmd/pr/review"
+	prStatusCmd "github.com/cli/cli/pkg/cmd/pr/status"
+	prViewCmd "github.com/cli/cli/pkg/cmd/pr/view"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
@@ -180,6 +183,9 @@ func init() {
 	prCmd.AddCommand(prReviewCmd.NewCmdReview(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prDiffCmd.NewCmdDiff(&repoResolvingCmdFactory, nil))
 	prCmd.AddCommand(prCheckoutCmd.NewCmdCheckout(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prViewCmd.NewCmdView(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prMergeCmd.NewCmdMerge(&repoResolvingCmdFactory, nil))
+	prCmd.AddCommand(prStatusCmd.NewCmdStatus(&repoResolvingCmdFactory, nil))
 
 	RootCmd.AddCommand(creditsCmd.NewCmdCredits(cmdFactory, nil))
 }
@@ -280,6 +286,9 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, setAccept bool) *htt
 
 	opts = append(opts,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", Version)),
+		// antiope-preview: Checks
+		// FIXME: avoid setting this header for `api` command
+		api.AddHeader("Accept", "application/vnd.github.antiope-preview+json"),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
 			if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 				return fmt.Sprintf("token %s", token), nil
