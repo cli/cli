@@ -178,7 +178,7 @@ func guessGistName(files map[string]string) (string, error) {
 	gistName := ""
 
 	re := regexp.MustCompile(`^gistfile[0-9]\.txt$`)
-	for k, _ := range files {
+	for k := range files {
 		match := re.MatchString(k)
 		if !match {
 			filenames = append(filenames, k)
