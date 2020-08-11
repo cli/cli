@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -250,25 +251,24 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	if milestoneString != "" {
-		milestones, err := RepoMilestones(client, repo)
-		if err != nil {
-			return nil, err
-		}
-
-		for i := range milestones {
-			if strings.EqualFold(milestones[i].Title, milestoneString) {
-				id, err := milestoneNodeIdToDatabaseId(milestones[i].ID)
-				if err != nil {
-					return nil, err
-				}
-				variables["milestone"] = id
-				break
+		var milestone *RepoMilestone
+		if milestoneNumber, err := strconv.Atoi(milestoneString); err == nil {
+			milestone, err = MilestoneByNumber(client, repo, milestoneNumber)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			milestone, err = MilestoneByTitle(client, repo, milestoneString)
+			if err != nil {
+				return nil, err
 			}
 		}
 
-		if variables["milestone"] == nil {
-			return nil, fmt.Errorf("no milestone found with title: %q", milestoneString)
+		milestoneRESTID, err := milestoneNodeIdToDatabaseId(milestone.ID)
+		if err != nil {
+			return nil, err
 		}
+		variables["milestone"] = milestoneRESTID
 	}
 
 	var response struct {

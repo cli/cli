@@ -46,7 +46,7 @@ func init() {
 	issueListCmd.Flags().IntP("limit", "L", 30, "Maximum number of issues to fetch")
 	issueListCmd.Flags().StringP("author", "A", "", "Filter by author")
 	issueListCmd.Flags().String("mention", "", "Filter by mention")
-	issueListCmd.Flags().StringP("milestone", "m", "", "Filter by milestone `name`")
+	issueListCmd.Flags().StringP("milestone", "m", "", "Filter by milestone `number` or title")
 
 	issueCmd.AddCommand(issueViewCmd)
 	issueViewCmd.Flags().BoolP("web", "w", false, "Open an issue in the browser")

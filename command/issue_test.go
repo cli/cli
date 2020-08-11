@@ -285,11 +285,8 @@ func TestIssueList_web(t *testing.T) {
 func TestIssueList_milestoneNotFound(t *testing.T) {
 	initBlankContext("", "OWNER/REPO", "master")
 	http := initFakeHTTP()
+	defer http.Verify(t)
 	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query IssueList\b`),
-		httpmock.FileResponse("../test/fixtures/issueList.json"),
-	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
@@ -300,8 +297,36 @@ func TestIssueList_milestoneNotFound(t *testing.T) {
 		`))
 
 	_, err := RunCommand("issue list --milestone NotFound")
-	if err == nil || err.Error() != `no milestone found with title: "NotFound"` {
+	if err == nil || err.Error() != `no milestone found with title "NotFound"` {
 		t.Errorf("error running command `issue list`: %v", err)
+	}
+}
+
+func TestIssueList_milestoneByNumber(t *testing.T) {
+	initBlankContext("", "OWNER/REPO", "master")
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneByNumber\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestone": {
+			"id": "MDk6TWlsZXN0b25lMTIzNDU="
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "12345", params["milestone"].(string)) // Database ID for the Milestone (see #1462)
+		}))
+
+	_, err := RunCommand("issue list --milestone 13")
+	if err != nil {
+		t.Fatalf("error running issue list: %v", err)
 	}
 }
 
