@@ -754,6 +754,22 @@ func Test_fillPlaceholders(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "has branch placeholder",
+			args: args{
+				value: "repos/:owner/:repo/branches/:branch",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+					CurrentBranch: func() (string, error) {
+						return "feature", nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/branches/feature",
+			wantErr: false,
+		},
+		{
 			name: "no greedy substitutes",
 			args: args{
 				value: ":ownership/:repository",

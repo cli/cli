@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -36,15 +37,17 @@ type ApiOptions struct {
 	Paginate            bool
 	Silent              bool
 
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
+	HttpClient    func() (*http.Client, error)
+	BaseRepo      func() (ghrepo.Interface, error)
+	CurrentBranch func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
+		IO:            f.IOStreams,
+		HttpClient:    f.HttpClient,
+		BaseRepo:      f.BaseRepo,
+		CurrentBranch: git.CurrentBranch,
 	}
 
 	cmd := &cobra.Command{
@@ -285,7 +288,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	return
 }
 
-var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
+var placeholderRE = regexp.MustCompile(`\:(owner|repo|branch)\b`)
 
 // fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
@@ -304,6 +307,12 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 			return baseRepo.RepoOwner()
 		case ":repo":
 			return baseRepo.RepoName()
+		case ":branch":
+			branch, err := opts.CurrentBranch()
+			if err != nil {
+				panic(err)
+			}
+			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
 		}
