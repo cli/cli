@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
@@ -31,7 +30,11 @@ func New(appVersion string) *cmdutil.Factory {
 		return cachedConfig, configError
 	}
 
-	remotesFunc := remotesResolver()
+	rr := &remoteResolver{
+		readRemotes: git.Remotes,
+		getConfig:   configFunc,
+	}
+	remotesFunc := rr.Resolver()
 
 	return &cmdutil.Factory{
 		IOStreams: io,
@@ -51,7 +54,7 @@ func New(appVersion string) *cmdutil.Factory {
 			if err != nil {
 				return nil, err
 			}
-			return remotes.FindByName("upstream", "github", "origin", "*")
+			return remotes[0], nil
 		},
 		Branch: func() (string, error) {
 			currentBranch, err := git.CurrentBranch()
@@ -60,46 +63,5 @@ func New(appVersion string) *cmdutil.Factory {
 			}
 			return currentBranch, nil
 		},
-	}
-}
-
-// TODO: pass in a Config instance to parse remotes based on pre-authenticated hostnames
-func remotesResolver() func() (context.Remotes, error) {
-	var cachedRemotes context.Remotes
-	var remotesError error
-
-	return func() (context.Remotes, error) {
-		if cachedRemotes != nil || remotesError != nil {
-			return cachedRemotes, remotesError
-		}
-
-		gitRemotes, err := git.Remotes()
-		if err != nil {
-			remotesError = err
-			return nil, err
-		}
-		if len(gitRemotes) == 0 {
-			remotesError = errors.New("no git remotes found")
-			return nil, remotesError
-		}
-
-		sshTranslate := git.ParseSSHConfig().Translator()
-		resolvedRemotes := context.TranslateRemotes(gitRemotes, sshTranslate)
-
-		// determine hostname by looking at the primary remotes
-		var hostname string
-		if mainRemote, err := resolvedRemotes.FindByName("upstream", "github", "origin", "*"); err == nil {
-			hostname = mainRemote.RepoHost()
-		}
-
-		// filter the rest of the remotes to just that hostname
-		cachedRemotes = context.Remotes{}
-		for _, r := range resolvedRemotes {
-			if r.RepoHost() != hostname {
-				continue
-			}
-			cachedRemotes = append(cachedRemotes, r)
-		}
-		return cachedRemotes, nil
 	}
 }
