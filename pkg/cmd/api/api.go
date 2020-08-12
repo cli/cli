@@ -38,6 +38,7 @@ type ApiOptions struct {
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -45,6 +46,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -285,7 +287,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	return
 }
 
-var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
+var placeholderRE = regexp.MustCompile(`\:(owner|repo|branch)\b`)
 
 // fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
@@ -298,18 +300,28 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 		return value, err
 	}
 
-	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
 		switch m {
 		case ":owner":
 			return baseRepo.RepoOwner()
 		case ":repo":
 			return baseRepo.RepoName()
+		case ":branch":
+			branch, e := opts.Branch()
+			if e != nil {
+				err = e
+			}
+			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
 		}
 	})
 
-	return value, nil
+	if err != nil {
+		return value, err
+	}
+
+	return filled, nil
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
