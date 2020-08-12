@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"testing"
 
 	"github.com/cli/cli/internal/run"
 )
@@ -86,7 +85,13 @@ func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
 	}
 }
 
-func ExpectLines(t *testing.T, output string, lines ...string) {
+type T interface {
+	Helper()
+	Errorf(string, ...interface{})
+}
+
+func ExpectLines(t T, output string, lines ...string) {
+	t.Helper()
 	var r *regexp.Regexp
 	for _, l := range lines {
 		r = regexp.MustCompile(l)

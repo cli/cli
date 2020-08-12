@@ -126,6 +126,16 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+// NewFromString initializes a Config from a yaml string
+func NewFromString(str string) Config {
+	root, err := parseConfigData([]byte(str))
+	if err != nil {
+		panic(err)
+	}
+	return NewConfig(root)
+}
+
+// NewBlankConfig initializes a config file pre-populated with comments and default values
 func NewBlankConfig() Config {
 	return NewConfig(NewBlankRoot())
 }

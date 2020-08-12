@@ -7,7 +7,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
+	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -31,8 +31,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "close {<number> | <url> | <branch>}",
-		Short: "Close a pull request",
+		Use:   "close {<number> | <url>}",
+		Short: "Close issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -59,25 +59,22 @@ func closeRun(opts *CloseOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, nil, nil, opts.SelectorArg)
+	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
 
-	if pr.State == "MERGED" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be closed because it was already merged", utils.Red("!"), pr.Number, pr.Title)
-		return cmdutil.SilentError
-	} else if pr.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already closed\n", utils.Yellow("!"), pr.Number, pr.Title)
+	if issue.Closed {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", utils.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
 
-	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
+		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", utils.Red("✔"), issue.Number, issue.Title)
 
 	return nil
 }
