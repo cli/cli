@@ -1,0 +1,7 @@
+Origin: gh
+Label: gh
+Codename: stable
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI
+SignWith: AAF54DEE6E729CC740730F5728663C84883F8DE3
