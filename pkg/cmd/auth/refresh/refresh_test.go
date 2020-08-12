@@ -25,7 +25,6 @@ func Test_NewCmdRefresh(t *testing.T) {
 			name: "no arguments",
 			wants: RefreshOptions{
 				Hostname: "",
-				Scopes:   []string{},
 			},
 		},
 		{
@@ -33,7 +32,6 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cli:  "-h aline.cedrac",
 			wants: RefreshOptions{
 				Hostname: "aline.cedrac",
-				Scopes:   []string{},
 			},
 		},
 		{
@@ -136,11 +134,10 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname: "obed.morton",
-				Scopes:   []string{},
 			},
 			wantAuthArgs: authArgs{
 				hostname: "obed.morton",
-				scopes:   []string{},
+				scopes:   nil,
 			},
 		},
 		{
@@ -150,11 +147,10 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname: "",
-				Scopes:   []string{},
 			},
 			wantAuthArgs: authArgs{
 				hostname: "github.com",
-				scopes:   []string{},
+				scopes:   nil,
 			},
 		},
 		{
@@ -165,14 +161,13 @@ func Test_refreshRun(t *testing.T) {
 			},
 			opts: &RefreshOptions{
 				Hostname: "",
-				Scopes:   []string{},
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne("github.com")
 			},
 			wantAuthArgs: authArgs{
 				hostname: "github.com",
-				scopes:   []string{},
+				scopes:   nil,
 			},
 		},
 		{
@@ -192,7 +187,7 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			doAuthFlow = func(_ config.Config, hostname string, scopes []string) error {
+			tt.opts.AuthFlow = func(_ config.Config, hostname string, scopes []string) error {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				return nil

@@ -19,40 +19,34 @@ type RefreshOptions struct {
 
 	Hostname string
 	Scopes   []string
+	AuthFlow func(config.Config, string, []string) error
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
+		AuthFlow: func(cfg config.Config, hostname string, scopes []string) error {
+			_, err := config.AuthFlowWithConfig(cfg, hostname, "", scopes)
+			return err
+		},
 	}
 
 	cmd := &cobra.Command{
 		Use:   "refresh",
 		Args:  cobra.ExactArgs(0),
-		Short: "Request new scopes for a token",
-		Long: heredoc.Doc(`Expand the permission scopes for a given host's token.
+		Short: "Refresh stored authentication credentials",
+		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials
 
-			This command allows you to add additional scopes to an existing authentication token via a web
-			browser. This enables gh to access more of the GitHub API, which may be required as gh adds
-			features or as you use the gh api command. 
-
-			Unfortunately at this time there is no way to add scopes without a web browser's involvement
-			due to how GitHub authentication works.
-
-			The --hostname flag allows you to operate on a GitHub host other than github.com.
-
-			The --scopes flag accepts a comma separated list of scopes you want to add to a token. If
-			absent, this command ensures that a host's token has the default set of scopes required by gh.
-
-			Note that if GITHUB_TOKEN is in the current environment, this command will not work.
+			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
+			absent, this command ensures that gh has access to a minimum set of scopes.
 		`),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
 			# => open a browser to add write:org and read:public_key scopes for use with gh api
 
 			$ gh auth refresh
-			# => ensure that the required minimum scopes are enabled for a token and open a browser to add if not
+			# => open a browser to ensure your authentication credentials have the correct minimum scopes
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
@@ -64,7 +58,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
-	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", []string{}, "Additional scopes to add to a token")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 
 	return cmd
 }
@@ -118,10 +112,5 @@ func refreshRun(opts *RefreshOptions) error {
 		}
 	}
 
-	return doAuthFlow(cfg, hostname, opts.Scopes)
-}
-
-var doAuthFlow = func(cfg config.Config, hostname string, scopes []string) error {
-	_, err := config.AuthFlowWithConfig(cfg, hostname, "", scopes)
-	return err
+	return opts.AuthFlow(cfg, hostname, opts.Scopes)
 }
