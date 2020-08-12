@@ -179,3 +179,10 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 	assert.Equal(t, 1, cs.Count)
 	assert.Equal(t, "git clone https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[0].Args, " "))
 }
+
+func Test_RepoClone_flagError(t *testing.T) {
+	_, err := runCloneCommand(nil, "--depth 1 OWNER/REPO")
+	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
+		t.Errorf("unexpected error %v", err)
+	}
+}

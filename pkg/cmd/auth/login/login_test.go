@@ -2,7 +2,6 @@ package login
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/cmd/auth/client"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -164,19 +164,6 @@ func Test_NewCmdLogin(t *testing.T) {
 	}
 }
 
-func scopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
-	return func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 200,
-			Request:    req,
-			Header: map[string][]string{
-				"X-Oauth-Scopes": {scopes},
-			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("")),
-		}, nil
-	}
-}
-
 func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -200,7 +187,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc123",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 			},
 			wantHosts: "albert.wesker:\n    oauth_token: abc123\n",
 		},
@@ -211,7 +198,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("read:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("read:org"))
 			},
 			wantErr: regexp.MustCompile(`missing required scope 'repo'`),
 		},
@@ -222,7 +209,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo"))
 			},
 			wantErr: regexp.MustCompile(`missing required scope 'read:org'`),
 		},
@@ -233,7 +220,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,admin:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
 			},
 			wantHosts: "github.com:\n    oauth_token: abc456\n",
 		},
@@ -252,11 +239,11 @@ func Test_loginRun_nontty(t *testing.T) {
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := clientFromCfg
+			origClientFromCfg := client.ClientFromCfg
 			defer func() {
-				clientFromCfg = origClientFromCfg
+				client.ClientFromCfg = origClientFromCfg
 			}()
-			clientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+			client.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
 				httpClient := &http.Client{Transport: reg}
 				return api.NewClientFromHTTP(httpClient), nil
 			}
@@ -264,7 +251,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			} else {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			}
 
 			mainBuf := bytes.Buffer{}
@@ -305,7 +292,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				_ = cfg.Set("github.com", "oauth_token", "ghi789")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -328,7 +315,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne("HTTPS")  // git_protocol
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -345,7 +332,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne("HTTPS")        // git_protocol
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), scopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -397,18 +384,18 @@ func Test_loginRun_Survey(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := clientFromCfg
+			origClientFromCfg := client.ClientFromCfg
 			defer func() {
-				clientFromCfg = origClientFromCfg
+				client.ClientFromCfg = origClientFromCfg
 			}()
-			clientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+			client.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
 				httpClient := &http.Client{Transport: reg}
 				return api.NewClientFromHTTP(httpClient), nil
 			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			} else {
-				reg.Register(httpmock.REST("GET", ""), scopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
