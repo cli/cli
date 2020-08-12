@@ -760,9 +760,9 @@ func Test_fillPlaceholders(t *testing.T) {
 				value: "repos/cli/cli/branches/:branch",
 				opts: &ApiOptions{
 					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
+						return ghrepo.New("cli", "cli"), nil
 					},
-					CurrentBranch: func() (string, error) {
+					Branch: func() (string, error) {
 						return "trunk", nil
 					},
 				},
@@ -778,7 +778,7 @@ func Test_fillPlaceholders(t *testing.T) {
 					BaseRepo: func() (ghrepo.Interface, error) {
 						return ghrepo.New("cli", "cli"), nil
 					},
-					CurrentBranch: func() (string, error) {
+					Branch: func() (string, error) {
 						return "", git.ErrNotOnAnyBranch
 					},
 				},

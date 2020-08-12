@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -37,17 +36,17 @@ type ApiOptions struct {
 	Paginate            bool
 	Silent              bool
 
-	HttpClient    func() (*http.Client, error)
-	BaseRepo      func() (ghrepo.Interface, error)
-	CurrentBranch func() (string, error)
+	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		IO:            f.IOStreams,
-		HttpClient:    f.HttpClient,
-		BaseRepo:      f.BaseRepo,
-		CurrentBranch: git.CurrentBranch,
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
+		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -302,27 +301,26 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 	}
 
 	var branch string
-	if strings.Contains(value, ":branch") {
-		branch, err = opts.CurrentBranch()
-		if err != nil {
-			return value, err
-		}
-	}
 
-	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
 		switch m {
 		case ":owner":
 			return baseRepo.RepoOwner()
 		case ":repo":
 			return baseRepo.RepoName()
 		case ":branch":
+			branch, err = opts.Branch()
 			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
 		}
 	})
 
-	return value, nil
+	if err != nil {
+		return value, err
+	}
+
+	return filled, nil
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
