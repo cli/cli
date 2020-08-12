@@ -57,6 +57,6 @@ jobs:
         # (this makes reprepro runs stateless)
         run: cp -a dists/ pool/ upload/
       - name: upload to blob storage
-        run: ./blobxfer upload --local-path upload/ --storage-account focusedelgamal --rmote-path '$web'
+        run: ./blobxfer upload --local-path upload/ --storage-account focusedelgamal --remote-path '$web'
         env:
           BLOBXFER_STORAGE_ACCOUNT_KEY: ${{secrets.AZURE_STORAGE_KEY}}
