@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -195,9 +196,11 @@ func apiRun(opts *ApiOptions) error {
 		opts.IO.Out = ioutil.Discard
 	}
 
+	host := ghinstance.OverridableDefault()
+
 	hasNextPage := true
 	for hasNextPage {
-		resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
+		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
 		if err != nil {
 			return err
 		}

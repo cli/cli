@@ -40,7 +40,7 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 			continue
 		}
 		repos = append(repos, r)
-		if ghrepo.IsSame(r, baseOverride) {
+		if baseOverride != nil && ghrepo.IsSame(r, baseOverride) {
 			foundBaseOverride = true
 		}
 		if len(repos) == maxRemotesForLookup {

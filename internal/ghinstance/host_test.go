@@ -4,6 +4,29 @@ import (
 	"testing"
 )
 
+func TestOverridableDefault(t *testing.T) {
+	oldOverride := hostnameOverride
+	t.Cleanup(func() {
+		hostnameOverride = oldOverride
+	})
+
+	host := OverridableDefault()
+	if host != "github.com" {
+		t.Errorf("expected github.com, got %q", host)
+	}
+
+	OverrideDefault("example.org")
+
+	host = OverridableDefault()
+	if host != "example.org" {
+		t.Errorf("expected example.org, got %q", host)
+	}
+	host = Default()
+	if host != "github.com" {
+		t.Errorf("expected github.com, got %q", host)
+	}
+}
+
 func TestIsEnterprise(t *testing.T) {
 	tests := []struct {
 		host string
