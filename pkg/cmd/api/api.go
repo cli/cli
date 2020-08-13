@@ -57,8 +57,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 "graphql" to access the GitHub API v4.
 
-Placeholder values ":owner" and ":repo" in the endpoint argument will get replaced
-with values from the repository of the current directory.
+Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
+get replaced with values from the repository of the current directory.
 
 The default HTTP request method is "GET" normally and "POST" if any parameters
 were added. Override the method with '--method'.
@@ -71,8 +71,8 @@ on the format of the value:
 
 - literal values "true", "false", "null", and integer numbers get converted to
   appropriate JSON types;
-- placeholder values ":owner" and ":repo" get populated with values from the
-  repository of the current directory;
+- placeholder values ":owner", ":repo", and ":branch" get populated with values
+  from the repository of the current directory;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
 
