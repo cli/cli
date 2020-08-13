@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -96,8 +98,21 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	gistName := guessGistName(files)
+
+	processMessage := "Creating gist..."
+	completionMessage := "Created gist"
+	if gistName != "" {
+		if len(files) > 1 {
+			processMessage = "Creating gist with multiple files"
+		} else {
+			processMessage = fmt.Sprintf("Creating gist %s", gistName)
+		}
+		completionMessage = fmt.Sprintf("Created gist %s", gistName)
+	}
+
 	errOut := opts.IO.ErrOut
-	fmt.Fprintf(errOut, "%s Creating gist...\n", utils.Gray("-"))
+	fmt.Fprintf(errOut, "%s %s\n", utils.Gray("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -116,7 +131,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s Created gist\n", utils.Green("✓"))
+	fmt.Fprintf(errOut, "%s %s\n", utils.Green("✓"), completionMessage)
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
@@ -153,4 +168,23 @@ func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, e
 	}
 
 	return fs, nil
+}
+
+func guessGistName(files map[string]string) string {
+	filenames := make([]string, 0, len(files))
+	gistName := ""
+
+	re := regexp.MustCompile(`^gistfile\d+\.txt$`)
+	for k := range files {
+		if !re.MatchString(k) {
+			filenames = append(filenames, k)
+		}
+	}
+
+	if len(filenames) > 0 {
+		sort.Strings(filenames)
+		gistName = filenames[0]
+	}
+
+	return gistName
 }
