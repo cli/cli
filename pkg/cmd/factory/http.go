@@ -35,7 +35,7 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, s
 				// TODO: check if stdout is TTY too
 				if errors.As(err, &notFound) && io.IsStdinTTY() {
 					// interactive OAuth flow
-					token, err = config.AuthFlowWithConfig(cfg, hostname, "Notice: authentication required")
+					token, err = config.AuthFlowWithConfig(cfg, hostname, "Notice: authentication required", nil)
 				}
 				if err != nil {
 					return "", err

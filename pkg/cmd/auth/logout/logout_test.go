@@ -3,6 +3,7 @@ package logout
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"regexp"
 	"testing"
 
@@ -183,6 +184,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 		cfgHosts  []string
 		wantHosts string
 		wantErr   *regexp.Regexp
+		ghtoken   string
 	}{
 		{
 			name:    "no arguments",
@@ -211,10 +213,21 @@ func Test_logoutRun_nontty(t *testing.T) {
 			},
 			wantErr: regexp.MustCompile(`not logged in to any hosts`),
 		},
+		{
+			name:    "gh token is set",
+			opts:    &LogoutOptions{},
+			ghtoken: "abc123",
+			wantErr: regexp.MustCompile(`GITHUB_TOKEN is set in your environment`),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ghtoken := os.Getenv("GITHUB_TOKEN")
+			defer func() {
+				os.Setenv("GITHUB_TOKEN", ghtoken)
+			}()
+			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
 			io, _, _, stderr := iostreams.Test()
 
 			io.SetStdinTTY(false)

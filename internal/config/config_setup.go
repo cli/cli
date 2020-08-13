@@ -26,8 +26,8 @@ func IsGitHubApp(id string) bool {
 	return id == "178c6fc778ccc68e1d6a" || id == "4d747ba5675d5d66553f"
 }
 
-func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
-	token, userLogin, err := authFlow(hostname, notice)
+func AuthFlowWithConfig(cfg Config, hostname, notice string, additionalScopes []string) (string, error) {
+	token, userLogin, err := authFlow(hostname, notice, additionalScopes)
 	if err != nil {
 		return "", err
 	}
@@ -50,17 +50,20 @@ func AuthFlowWithConfig(cfg Config, hostname, notice string) (string, error) {
 	return token, nil
 }
 
-func authFlow(oauthHost, notice string) (string, string, error) {
+func authFlow(oauthHost, notice string, additionalScopes []string) (string, string, error) {
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = os.Stderr
 	}
 
+	minimumScopes := []string{"repo", "read:org", "gist"}
+	scopes := append(minimumScopes, additionalScopes...)
+
 	flow := &auth.OAuthFlow{
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
-		Scopes:       []string{"repo", "read:org", "gist"},
+		Scopes:       scopes,
 		WriteSuccessHTML: func(w io.Writer) {
 			fmt.Fprintln(w, oauthSuccessPage)
 		},
