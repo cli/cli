@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/auth"
+	"github.com/cli/cli/pkg/browser"
 	"github.com/cli/cli/utils"
 )
 
@@ -65,11 +67,30 @@ func authFlow(oauthHost, notice string) (string, string, error) {
 			fmt.Fprintln(w, oauthSuccessPage)
 		},
 		VerboseStream: verboseStream,
+		HTTPClient:    http.DefaultClient,
+		OpenInBrowser: func(url, code string) error {
+			if code != "" {
+				fmt.Fprintf(os.Stderr, "%s First copy your one-time code: %s\n", utils.Yellow("!"), utils.Bold(code))
+			}
+			fmt.Fprintf(os.Stderr, "- %s to open %s in your browser... ", utils.Bold("Press Enter"), oauthHost)
+			_ = waitForEnter(os.Stdin)
+
+			browseCmd, err := browser.Command(url)
+			if err != nil {
+				return err
+			}
+			err = browseCmd.Run()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s Failed opening a web browser at %s\n", utils.Red("!"), url)
+				fmt.Fprintf(os.Stderr, "  %s\n", err)
+				fmt.Fprint(os.Stderr, "  Please try entering the URL in your browser manually\n")
+			}
+			return nil
+		},
 	}
 
 	fmt.Fprintln(os.Stderr, notice)
-	fmt.Fprintf(os.Stderr, "- %s to open %s in your browser... ", utils.Bold("Press Enter"), flow.Hostname)
-	_ = waitForEnter(os.Stdin)
+
 	token, err := flow.ObtainAccessToken()
 	if err != nil {
 		return "", "", err

@@ -10,11 +10,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/browser"
 )
 
 func randomString(length int) (string, error) {
@@ -32,13 +32,130 @@ type OAuthFlow struct {
 	ClientID         string
 	ClientSecret     string
 	Scopes           []string
+	OpenInBrowser    func(string, string) error
 	WriteSuccessHTML func(io.Writer)
 	VerboseStream    io.Writer
+	HTTPClient       *http.Client
+	TimeNow          func() time.Time
+	TimeSleep        func(time.Duration)
 }
 
 // ObtainAccessToken guides the user through the browser OAuth flow on GitHub
 // and returns the OAuth access token upon completion.
 func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
+	// first, check if OAuth Device Flow is supported
+	initURL := fmt.Sprintf("https://%s/login/device/code", oa.Hostname)
+	tokenURL := fmt.Sprintf("https://%s/login/oauth/access_token", oa.Hostname)
+
+	oa.logf("POST %s\n", initURL)
+	resp, err := oa.HTTPClient.PostForm(initURL, url.Values{
+		"client_id": {oa.ClientID},
+		"scope":     {strings.Join(oa.Scopes, " ")},
+	})
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		// OAuth Device Flow is not available; continue with OAuth browser flow with a
+		// local server endpoint as callback target
+		return oa.localServerFlow()
+	} else if resp.StatusCode != 200 {
+		return "", fmt.Errorf("error: HTTP %d (%s)", resp.StatusCode, initURL)
+	}
+
+	bb, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	values, err := url.ParseQuery(string(bb))
+	if err != nil {
+		return
+	}
+
+	timeNow := oa.TimeNow
+	if timeNow == nil {
+		timeNow = time.Now
+	}
+	timeSleep := oa.TimeSleep
+	if timeSleep == nil {
+		timeSleep = time.Sleep
+	}
+
+	intervalSeconds, err := strconv.Atoi(values.Get("interval"))
+	if err != nil {
+		return "", fmt.Errorf("could not parse interval=%q as integer: %w", values.Get("interval"), err)
+	}
+	checkInterval := time.Duration(intervalSeconds) * time.Second
+
+	expiresIn, err := strconv.Atoi(values.Get("expires_in"))
+	if err != nil {
+		return "", fmt.Errorf("could not parse expires_in=%q as integer: %w", values.Get("expires_in"), err)
+	}
+	expiresAt := timeNow().Add(time.Duration(expiresIn) * time.Second)
+
+	err = oa.OpenInBrowser(values.Get("verification_uri"), values.Get("user_code"))
+	if err != nil {
+		return
+	}
+
+	for {
+		timeSleep(checkInterval)
+		accessToken, err = oa.deviceFlowPing(tokenURL, values.Get("device_code"))
+		if accessToken == "" && err == nil {
+			if timeNow().After(expiresAt) {
+				err = errors.New("authentication timed out")
+			} else {
+				continue
+			}
+		}
+		break
+	}
+
+	return
+}
+
+func (oa *OAuthFlow) deviceFlowPing(tokenURL, deviceCode string) (accessToken string, err error) {
+	oa.logf("POST %s\n", tokenURL)
+	resp, err := oa.HTTPClient.PostForm(tokenURL, url.Values{
+		"client_id":   {oa.ClientID},
+		"device_code": {deviceCode},
+		"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
+	})
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("error: HTTP %d (%s)", resp.StatusCode, tokenURL)
+	}
+
+	bb, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	values, err := url.ParseQuery(string(bb))
+	if err != nil {
+		return "", err
+	}
+
+	if accessToken := values.Get("access_token"); accessToken != "" {
+		return accessToken, nil
+	}
+
+	errorType := values.Get("error")
+	if errorType == "authorization_pending" {
+		return "", nil
+	}
+
+	if errorDescription := values.Get("error_description"); errorDescription != "" {
+		return "", errors.New(errorDescription)
+	}
+	return "", errors.New("OAuth device flow error")
+}
+
+func (oa *OAuthFlow) localServerFlow() (accessToken string, err error) {
 	state, _ := randomString(20)
 
 	code := ""
@@ -70,15 +187,9 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 
 	startURL := fmt.Sprintf("https://%s/login/oauth/authorize?%s", oa.Hostname, q.Encode())
 	oa.logf("open %s\n", startURL)
-	if err := openInBrowser(startURL); err != nil {
-		fmt.Fprintf(os.Stderr, "error opening web browser: %s\n", err)
-		fmt.Fprintf(os.Stderr, "")
-		fmt.Fprintf(os.Stderr, "Please open the following URL manually:\n%s\n", startURL)
-		fmt.Fprintf(os.Stderr, "")
-		// TODO: Temporary workaround for https://github.com/cli/cli/issues/297
-		fmt.Fprintf(os.Stderr, "If you are on a server or other headless system, use this workaround instead:\n")
-		fmt.Fprintf(os.Stderr, "  1. Complete authentication on a GUI system;\n")
-		fmt.Fprintf(os.Stderr, "  2. Copy the contents of `~/.config/gh/hosts.yml` to this system.\n")
+	err = oa.OpenInBrowser(startURL, "")
+	if err != nil {
+		return
 	}
 
 	_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +216,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 
 	tokenURL := fmt.Sprintf("https://%s/login/oauth/access_token", oa.Hostname)
 	oa.logf("POST %s\n", tokenURL)
-	resp, err := http.PostForm(tokenURL,
+	resp, err := oa.HTTPClient.PostForm(tokenURL,
 		url.Values{
 			"client_id":     {oa.ClientID},
 			"client_secret": {oa.ClientSecret},
@@ -142,12 +253,4 @@ func (oa *OAuthFlow) logf(format string, args ...interface{}) {
 		return
 	}
 	fmt.Fprintf(oa.VerboseStream, format, args...)
-}
-
-func openInBrowser(url string) error {
-	cmd, err := browser.Command(url)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
 }
