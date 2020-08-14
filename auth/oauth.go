@@ -57,7 +57,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 {
 		// OAuth Device Flow is not available; continue with OAuth browser flow with a
 		// local server endpoint as callback target
 		return oa.localServerFlow()
