@@ -1,10 +1,10 @@
 # Installation from source
 
-0. Verify that you have Go 1.13.8+ installed
+0. Verify that you have Go 1.15+ installed
 
    ```sh
    $ go version
-   go version go1.14
+   go version go1.15
    ```
 
    If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
