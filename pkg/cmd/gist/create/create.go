@@ -104,7 +104,6 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	// TODO: GHE support
 	gist, err := apiCreate(httpClient, ghinstance.OverridableDefault(), opts.Description, opts.Public, files)
 	if err != nil {
 		var httpError api.HTTPError
