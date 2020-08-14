@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
 	"github.com/cli/cli/pkg/cmd/factory"
@@ -34,6 +35,10 @@ func main() {
 	}()
 
 	hasDebug := os.Getenv("DEBUG") != ""
+
+	if hostFromEnv := os.Getenv("GH_HOST"); hostFromEnv != "" {
+		ghinstance.OverrideDefault(hostFromEnv)
+	}
 
 	cmdFactory := factory.New(command.Version)
 	stderr := cmdFactory.IOStreams.ErrOut

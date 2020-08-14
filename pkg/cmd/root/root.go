@@ -45,8 +45,11 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 				GITHUB_TOKEN: an authentication token for API requests. Setting this avoids being
 				prompted to authenticate and overrides any previously stored credentials.
 	
-				GH_REPO: specify the GitHub repository in "OWNER/REPO" format for commands that
-				otherwise operate on a local repository.
+				GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
+				that otherwise operate on a local repository.
+
+				GH_HOST: specify the GitHub hostname for commands that would otherwise assume
+				the "github.com" host when not in a context of an existing repository.
 	
 				GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
 				for authoring text.
