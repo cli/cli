@@ -144,6 +144,11 @@ Arch Linux users can install from the community repo: https://www.archlinux.org/
 ```bash
 pacman -S github-cli
 ```
+### Android (Termux)
+For android user it can install via termux.
+```bash
+pkg install gh
+```
 
 ### Other platforms
 
