@@ -7,7 +7,7 @@ about: Fix a bug in GitHub CLI
 <!--
 Please make sure you read our contributing guidelines at
 https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
-before opening a pull request. Thanks!
+before opening opening a pull request. Thanks!
 -->
 
 ## Summary
