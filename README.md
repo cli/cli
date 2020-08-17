@@ -113,43 +113,53 @@ MSI installers are available for download on the [releases page][].
 
 Install and upgrade:
 
-1. Download the `.deb` file from the [releases page][]
-2. `sudo apt install ./gh_*_linux_amd64.deb` install the downloaded file
+1. Download the `.deb` file from the [releases page][];
+2. Install the downloaded file: `sudo apt install ./gh_*_linux_amd64.deb`
 
 ### Fedora Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo dnf install gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo dnf install gh_*_linux_amd64.rpm`
 
 ### Centos Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo yum localinstall gh_*_linux_amd64.rpm` 
 
 ### openSUSE/SUSE Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
 
 ### Arch Linux
 
-Arch Linux users can install from the community repo: https://www.archlinux.org/packages/community/x86_64/github-cli/
+Arch Linux users can install from the [community repo](https://www.archlinux.org/packages/community/x86_64/github-cli/):
 
 ```bash
 pacman -S github-cli
 ```
 
+### Android
+
+Android users can install via Termux:
+
+```bash
+pkg install gh
+```
+
 ### Other platforms
 
-Install a prebuilt binary from the [releases page][]
+Download packaged binaries from the [releases page][].
 
-### [Build from source](/docs/source.md)
+### Build from source
+
+See here on how to [build GitHub CLI from source](/docs/source.md).
 
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
