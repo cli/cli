@@ -12,6 +12,11 @@ import (
 
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/alias/expand"
+	"github.com/cli/cli/pkg/cmd/factory"
+	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
@@ -31,25 +36,48 @@ func main() {
 
 	hasDebug := os.Getenv("DEBUG") != ""
 
-	stderr := utils.NewColorable(os.Stderr)
+	if hostFromEnv := os.Getenv("GH_HOST"); hostFromEnv != "" {
+		ghinstance.OverrideDefault(hostFromEnv)
+	}
+
+	cmdFactory := factory.New(command.Version)
+	stderr := cmdFactory.IOStreams.ErrOut
+	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
 
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
 	}
 
-	cmd, _, err := command.RootCmd.Traverse(expandedArgs)
-	if err != nil || cmd == command.RootCmd {
+	cmd, _, err := rootCmd.Traverse(expandedArgs)
+	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
-		expandedArgs, isShell, err = command.ExpandAlias(os.Args)
+
+		cfg, err := cmdFactory.Config()
+		if err != nil {
+			fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+			os.Exit(2)
+		}
+
+		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			os.Exit(2)
 		}
 
+		if hasDebug {
+			fmt.Fprintf(stderr, "%v -> %v\n", originalArgs, expandedArgs)
+		}
+
 		if isShell {
-			err = command.ExecuteShellAlias(expandedArgs)
+			externalCmd := exec.Command(expandedArgs[0], expandedArgs[1:]...)
+			externalCmd.Stderr = os.Stderr
+			externalCmd.Stdout = os.Stdout
+			externalCmd.Stdin = os.Stdin
+			preparedCmd := run.PrepareCmd(externalCmd)
+
+			err = preparedCmd.Run()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {
 					os.Exit(ee.ExitCode())
@@ -61,19 +89,15 @@ func main() {
 
 			os.Exit(0)
 		}
-
-		if hasDebug {
-			fmt.Fprintf(stderr, "%v -> %v\n", originalArgs, expandedArgs)
-		}
 	}
 
-	command.RootCmd.SetArgs(expandedArgs)
+	rootCmd.SetArgs(expandedArgs)
 
-	if cmd, err := command.RootCmd.ExecuteC(); err != nil {
-		printError(os.Stderr, err, cmd, hasDebug)
+	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		printError(stderr, err, cmd, hasDebug)
 		os.Exit(1)
 	}
-	if command.HasFailed() {
+	if root.HasFailed() {
 		os.Exit(1)
 	}
 
@@ -85,7 +109,6 @@ func main() {
 			ansi.Color(newRelease.Version, "cyan"),
 			ansi.Color(newRelease.URL, "yellow"))
 
-		stderr := utils.NewColorable(os.Stderr)
 		fmt.Fprintf(stderr, "\n\n%s\n\n", msg)
 	}
 }

@@ -30,6 +30,24 @@ func Test_processFiles(t *testing.T) {
 	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"])
 }
 
+func Test_guessGistName_stdin(t *testing.T) {
+	files := map[string]string{"gistfile0.txt": "sample content"}
+
+	gistName := guessGistName(files)
+	assert.Equal(t, "", gistName)
+}
+
+func Test_guessGistName_userFiles(t *testing.T) {
+	files := map[string]string{
+		"fig.txt":       "I am a fig.",
+		"apple.txt":     "I am an apple.",
+		"gistfile0.txt": "sample content",
+	}
+
+	gistName := guessGistName(files)
+	assert.Equal(t, "apple.txt", gistName)
+}
+
 func TestNewCmdCreate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -157,7 +175,7 @@ func Test_createRun(t *testing.T) {
 				Filenames: []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"public": true,
@@ -175,7 +193,7 @@ func Test_createRun(t *testing.T) {
 				Filenames:   []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
@@ -193,7 +211,7 @@ func Test_createRun(t *testing.T) {
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"files": map[string]interface{}{

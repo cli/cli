@@ -76,7 +76,7 @@ func (r Remote) RepoHost() string {
 }
 
 // TODO: accept an interface instead of git.RemoteSet
-func translateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
+func TranslateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
 	for _, r := range gitRemotes {
 		var repo ghrepo.Interface
 		if r.FetchURL != nil {

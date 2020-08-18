@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -195,19 +196,22 @@ func (err HTTPError) Error() string {
 	return fmt.Sprintf("HTTP %d (%s)", err.StatusCode, err.RequestURL)
 }
 
-// Returns whether or not scopes are present, appID, and error
-func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
-	url := "https://api.github.com/user"
-	req, err := http.NewRequest("GET", url, nil)
+type MissingScopesError struct {
+	error
+}
+
+func (c Client) HasMinimumScopes(hostname string) error {
+	apiEndpoint := ghinstance.RESTPrefix(hostname)
+
+	req, err := http.NewRequest("GET", apiEndpoint, nil)
 	if err != nil {
-		return false, "", err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
 	res, err := c.http.Do(req)
 	if err != nil {
-		return false, "", err
+		return err
 	}
 
 	defer func() {
@@ -218,26 +222,35 @@ func (c Client) HasScopes(wantedScopes ...string) (bool, string, error) {
 	}()
 
 	if res.StatusCode != 200 {
-		return false, "", handleHTTPError(res)
+		return handleHTTPError(res)
 	}
 
-	appID := res.Header.Get("X-Oauth-Client-Id")
 	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
 
-	found := 0
+	search := map[string]bool{
+		"repo":      false,
+		"read:org":  false,
+		"admin:org": false,
+	}
+
 	for _, s := range hasScopes {
-		for _, w := range wantedScopes {
-			if w == strings.TrimSpace(s) {
-				found++
-			}
-		}
+		search[strings.TrimSpace(s)] = true
 	}
 
-	if found == len(wantedScopes) {
-		return true, appID, nil
+	errorMsgs := []string{}
+	if !search["repo"] {
+		errorMsgs = append(errorMsgs, "missing required scope 'repo'")
 	}
 
-	return false, appID, nil
+	if !search["read:org"] && !search["admin:org"] {
+		errorMsgs = append(errorMsgs, "missing required scope 'read:org'")
+	}
+
+	if len(errorMsgs) > 0 {
+		return &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
+	}
+
+	return nil
 }
 
 // GraphQL performs a GraphQL request and parses the response

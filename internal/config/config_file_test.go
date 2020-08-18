@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -71,17 +70,29 @@ github.com:
 	eq(t, token, "OTOKEN")
 }
 
-func Test_parseConfig_notFound(t *testing.T) {
+func Test_parseConfig_hostFallback(t *testing.T) {
 	defer StubConfig(`---
-hosts:
-  example.com:
+git_protocol: ssh
+`, `---
+github.com:
+    user: monalisa
+    oauth_token: OTOKEN
+example.com:
     user: wronguser
     oauth_token: NOTTHIS
-`, "")()
+    git_protocol: https
+`)()
 	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
-	_, err = config.Get("github.com", "user")
-	eq(t, err, &NotFoundError{errors.New(`could not find config entry for "github.com"`)})
+	val, err := config.Get("example.com", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "https")
+	val, err = config.Get("github.com", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "ssh")
+	val, err = config.Get("nonexist.io", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "ssh")
 }
 
 func Test_ParseConfig_migrateConfig(t *testing.T) {

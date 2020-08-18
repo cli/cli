@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/shurcooL/githubv4"
-
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 type PullRequestReviewState int
@@ -210,8 +210,8 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 }
 
 func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d",
-		ghrepo.FullName(baseRepo), prNumber)
+	url := fmt.Sprintf("%srepos/%s/pulls/%d",
+		ghinstance.RESTPrefix(baseRepo.RepoHost()), ghrepo.FullName(baseRepo), prNumber)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

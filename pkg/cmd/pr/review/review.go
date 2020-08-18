@@ -40,7 +40,6 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
@@ -68,6 +67,9 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}

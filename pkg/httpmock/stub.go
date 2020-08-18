@@ -43,7 +43,7 @@ func GraphQL(q string) Matcher {
 		if !strings.EqualFold(req.Method, "POST") {
 			return false
 		}
-		if req.URL.Path != "/graphql" {
+		if req.URL.Path != "/graphql" && req.URL.Path != "/api/graphql" {
 			return false
 		}
 
@@ -130,6 +130,19 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 		cb(bodyData.Query, bodyData.Variables)
 
 		return httpResponse(200, req, bytes.NewBufferString(body)), nil
+	}
+}
+
+func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
+	return func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 200,
+			Request:    req,
+			Header: map[string][]string{
+				"X-Oauth-Scopes": {scopes},
+			},
+			Body: ioutil.NopCloser(bytes.NewBufferString("")),
+		}, nil
 	}
 }
 

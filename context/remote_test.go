@@ -57,7 +57,7 @@ func Test_translateRemotes(t *testing.T) {
 	identityURL := func(u *url.URL) *url.URL {
 		return u
 	}
-	result := translateRemotes(gitRemotes, identityURL)
+	result := TranslateRemotes(gitRemotes, identityURL)
 
 	if len(result) != 1 {
 		t.Errorf("got %d results", len(result))

@@ -93,8 +93,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 func createRun(opts *CreateOptions) error {
 	projectDir, projectDirErr := git.ToplevelDir()
 
-	orgName := ""
-	name := opts.Name
+	var repoToCreate ghrepo.Interface
 
 	isNameAnArg := false
 	isDescEmpty := opts.Description == ""
@@ -107,14 +106,14 @@ func createRun(opts *CreateOptions) error {
 			if err != nil {
 				return fmt.Errorf("argument error: %w", err)
 			}
-			orgName = newRepo.RepoOwner()
-			name = newRepo.RepoName()
+		} else {
+			repoToCreate = ghrepo.New("", opts.Name)
 		}
 	} else {
 		if projectDirErr != nil {
 			return projectDirErr
 		}
-		name = path.Base(projectDir)
+		repoToCreate = ghrepo.New("", path.Base(projectDir))
 	}
 
 	enabledFlagCount := 0
@@ -165,9 +164,9 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:             name,
+		Name:             repoToCreate.RepoName(),
 		Visibility:       visibility,
-		OwnerID:          orgName,
+		OwnerID:          repoToCreate.RepoOwner(),
 		TeamID:           opts.Team,
 		Description:      opts.Description,
 		HomepageURL:      opts.Homepage,
