@@ -72,7 +72,7 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		}
 
 		if len(cachedRemotes) == 0 {
-			remotesError = errors.New("none of the git remotes point to a known GitHub host")
+			remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
 			return nil, remotesError
 		}
 		return cachedRemotes, nil
