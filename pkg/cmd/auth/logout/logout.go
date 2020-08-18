@@ -57,6 +57,8 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 		},
 	}
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
 
 	return cmd

@@ -56,6 +56,8 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 		},
 	}
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	cmd.Flags().StringVarP(&shellType, "shell", "s", "", "Shell type: {bash|zsh|fish|powershell}")
 
 	return cmd

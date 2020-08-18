@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
@@ -50,6 +51,7 @@ func main() {
 	}
 
 	cmd, _, err := rootCmd.Traverse(expandedArgs)
+	_, skipAuthCheck := cmd.Annotations["skipAuthCheck"]
 	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
@@ -90,6 +92,50 @@ func main() {
 			os.Exit(0)
 		}
 	}
+
+	// TODO support other names
+	ghtoken := os.Getenv("GITHUB_TOKEN")
+	if ghtoken != "" {
+		skipAuthCheck = true
+	}
+
+	if !skipAuthCheck {
+		hasAuth := false
+
+		cfg, err := cmdFactory.Config()
+		if err == nil {
+			hasAuth = cmdutil.CheckAuth(cfg)
+		}
+
+		if !hasAuth {
+			authMessage := heredoc.Doc(`
+       %s                   'cxO0KK0Oxc'
+                                            'oONMMMMMMMMMMMMNOo'
+                                         'dXMMMMMMMMMMMMMMMMMMMMXd'
+                                       .kMMMMMMMMMMMMMMMMMMMMMMMMMMk.
+       To authenticate, please        lWMMMM:.'ckXKOkkkkOKXkc'.:MMMMWl
+       run 'gh auth login'.          oMMMMMM.                  .MMMMMMo
+                                    ;WMMMMMX.                  .XMMMMMW;
+                                    0MMMMMK.                    .KMMMMM0
+       You can also set the         MMMMMMl                      lMMMMMM
+       GITHUB_TOKEN environment     MMMMMMd                      dMMMMMM
+       variable, if preferred.      KMMMMMN'                    'NMMMMMK
+                                    cMMMMMMNc                  cNMMMMMMc
+                                     xMMNdkXMNkl;,.      .,;lkNMMMMMMMx
+                                      xWMNx;kWMMMK.      .KMMMMMMMMMWx
+                                       ,KMM0;.;:;.        dMMMMMMMMK,
+                                         :OWMXOOOc        dMMMMMWO:
+                                           .:kXMMd        dMMXk:.
+       Have a good one~                        ,l.        .l,
+			`)
+
+			fmt.Fprintf(stderr, authMessage, utils.Bold("Welcome to GitHub CLI!"))
+			os.Exit(4)
+		}
+	}
+
+	// TODO verify host auth in heavy user input commands (creates, review)
+	// TODO handle 401 for GHES case with clear error
 
 	rootCmd.SetArgs(expandedArgs)
 
