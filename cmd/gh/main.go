@@ -135,7 +135,8 @@ func main() {
 	}
 
 	// TODO verify host auth in heavy user input commands (creates, review)
-	// TODO handle 401 for GHES case with clear error
+	// TODO improve error messaging for 401
+	// TODO remove old auth flow path
 
 	rootCmd.SetArgs(expandedArgs)
 
