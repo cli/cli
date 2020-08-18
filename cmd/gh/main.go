@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
@@ -134,12 +135,16 @@ func main() {
 		}
 	}
 
-	// TODO improve error messaging for 401
-
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
 		printError(stderr, err, cmd, hasDebug)
+
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+			fmt.Println("hint: try authenticating with `gh auth login`")
+		}
+
 		os.Exit(1)
 	}
 	if root.HasFailed() {
