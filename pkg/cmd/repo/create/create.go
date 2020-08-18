@@ -99,10 +99,11 @@ func createRun(opts *CreateOptions) error {
 	isDescEmpty := opts.Description == ""
 	isVisibilityPassed := false
 
-	if name != "" {
+	if opts.Name != "" {
 		isNameAnArg = true
-		if strings.Contains(name, "/") {
-			newRepo, err := ghrepo.FromFullName(name)
+		if strings.Contains(opts.Name, "/") {
+			var err error
+			repoToCreate, err = ghrepo.FromFullName(opts.Name)
 			if err != nil {
 				return fmt.Errorf("argument error: %w", err)
 			}
@@ -139,12 +140,12 @@ func createRun(opts *CreateOptions) error {
 
 	// Trigger interactive prompt if name is not passed
 	if !isNameAnArg {
-		newName, newDesc, newVisibility, err := interactiveRepoCreate(isDescEmpty, isVisibilityPassed, name)
+		newName, newDesc, newVisibility, err := interactiveRepoCreate(isDescEmpty, isVisibilityPassed, repoToCreate.RepoName())
 		if err != nil {
 			return err
 		}
 		if newName != "" {
-			name = newName
+			opts.Name = newName
 		}
 		if newDesc != "" {
 			opts.Description = newDesc
@@ -187,7 +188,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.ConfirmSubmit {
-		repo, err := repoCreate(httpClient, input)
+		repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 		if err != nil {
 			return err
 		}
@@ -208,7 +209,7 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		protocol, err := cfg.Get("", "git_protocol")
+		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -248,7 +249,7 @@ func createRun(opts *CreateOptions) error {
 					return err
 				}
 
-				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", greenCheck, path)
+				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", utils.GreenCheck(), path)
 			}
 		}
 		return nil
@@ -256,6 +257,7 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintln(opts.IO.Out, "Discarding...")
 	return nil
 }
+
 func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName string) (string, string, string, error) {
 	qs := []*survey.Question{}
 
@@ -284,7 +286,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 			Name: "repoVisibility",
 			Prompt: &survey.Select{
 				Message: "Visibility",
-				Options: []string{"PUBLIC", "PRIVATE", "INTERNAL"},
+				Options: []string{"Public", "Private", "Internal"},
 			},
 		}
 		qs = append(qs, repoVisibilityQuestion)
@@ -302,7 +304,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 		return "", "", "", err
 	}
 
-	return answers.RepoOwner, answers.RepoDescription, answers.RepoVisibility, nil
+	return answers.RepoOwner, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 
 }
 
@@ -311,15 +313,16 @@ func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *b
 
 	promptString := ""
 	if repoOwner != "" {
-		promptString = fmt.Sprintf("This will create %s/%s in your current directory. Continue? ", repoOwner, repoName)
+		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
 	} else {
-		promptString = fmt.Sprintf("This will create %s in your current directory. Continue? ", repoName)
+		promptString = fmt.Sprintf("This will create '%s' in your current directory. Continue? ", repoName)
 	}
 
 	confirmSubmitQuestion := &survey.Question{
 		Name: "confirmSubmit",
 		Prompt: &survey.Confirm{
 			Message: promptString,
+			Default: true,
 		},
 	}
 	qs = append(qs, confirmSubmitQuestion)
