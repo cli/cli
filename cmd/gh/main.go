@@ -134,9 +134,7 @@ func main() {
 		}
 	}
 
-	// TODO verify host auth in heavy user input commands (creates, review)
 	// TODO improve error messaging for 401
-	// TODO remove old auth flow path
 
 	rootCmd.SetArgs(expandedArgs)
 
