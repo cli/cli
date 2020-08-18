@@ -21,14 +21,14 @@ func Test_CheckAuth(t *testing.T) {
 		{
 			name: "host, no token",
 			cfg: func(c config.Config) {
-				c.Set("github.com", "oauth_token", "")
+				_ = c.Set("github.com", "oauth_token", "")
 			},
 			expected: false,
 		},
 		{
 			name: "host, token",
 			cfg: func(c config.Config) {
-				c.Set("github.com", "oauth_token", "a token")
+				_ = c.Set("github.com", "oauth_token", "a token")
 			},
 			expected: true,
 		},
