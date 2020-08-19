@@ -119,25 +119,25 @@ func main() {
 				fmt.Fprintln(stderr, "You can also set the GITHUB_TOKEN environment variable, if preferred.")
 			} else {
 				authMessage := heredoc.Doc(`
-       %s                 'cxO0KK0Oxc'
-                                          'oONMMMMMMMMMMMMNOo'
-                                       'dXMMMMMMMMMMMMMMMMMMMMXd'
-                                     .kMMMMMMMMMMMMMMMMMMMMMMMMMMk.
-       To authenticate, please      lWMMMM:.'ckXKOkkkkOKXkc'.:MMMMWl
-       run 'gh auth login'.        oMMMMMM.                  .MMMMMMo
-                                  ;WMMMMMX.                  .XMMMMMW;
-                                  0MMMMMK.                    .KMMMMM0
-       You can also set the       MMMMMMl                      lMMMMMM
-       GITHUB_TOKEN environment   MMMMMMd                      dMMMMMM
-       variable, if preferred.    KMMMMMN'                    'NMMMMMK
-                                  cMMMMMMNc                  cNMMMMMMc
-                                   xMMNdkXMNkl;,.      .,;lkNMMMMMMMx
-                                    xWMNx;kWMMMK.      .KMMMMMMMMMWx
-                                     ,KMM0;.;:;.        dMMMMMMMMK,
-                                       :OWMXOOOc        dMMMMMWO:
-                                         .:kXMMd        dMMXk:.
-       Have a good day~                      ,l.        .l,
-			`)
+          %s                 'cxO0KK0Oxc'
+                                             'oONMMMMMMMMMMMMNOo'
+                                          'dXMMMMMMMMMMMMMMMMMMMMXd'
+                                        .kMMMMMMMMMMMMMMMMMMMMMMMMMMk.
+          To authenticate, please      lWMMMM:.'ckXKOkkkkOKXkc'.:MMMMWl
+          run 'gh auth login'.        oMMMMMM.                  .MMMMMMo
+                                     ;WMMMMMX.                  .XMMMMMW;
+                                     0MMMMMK.                    .KMMMMM0
+          You can also set the       MMMMMMl                      lMMMMMM
+          GITHUB_TOKEN environment   MMMMMMd                      dMMMMMM
+          variable, if preferred.    KMMMMMN'                    'NMMMMMK
+                                     cMMMMMMNc                  cNMMMMMMc
+                                      xMMNdkXMNkl;,.      .,;lkNMMMMMMMx
+                                       xWMNx;kWMMMK.      .KMMMMMMMMMWx
+                                        ,KMM0;.;:;.        dMMMMMMMMK,
+                                          :OWMXOOOc        dMMMMMWO:
+                                            .:kXMMd        dMMXk:.
+          Have a good day~                      ,l.        .l,
+			   `)
 
 				fmt.Fprintf(stderr, authMessage, utils.Bold("Welcome to GitHub CLI!"))
 			}
