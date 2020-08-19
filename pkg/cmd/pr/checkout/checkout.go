@@ -3,11 +3,6 @@ package checkout
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"os"
-	"os/exec"
-	"strings"
-
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -18,6 +13,10 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 type CheckoutOptions struct {
@@ -28,7 +27,8 @@ type CheckoutOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
-	SelectorArg string
+	SelectorArg       string
+	RecurseSubmodules bool
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -63,6 +63,8 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			return checkoutRun(opts)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all active submodules (recursively)")
 
 	return cmd
 }
@@ -164,6 +166,11 @@ func checkoutRun(opts *CheckoutOptions) error {
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
 		}
+	}
+
+	if opts.RecurseSubmodules {
+		cmdQueue = append(cmdQueue, []string{"git", "submodule", "sync", "--recursive"})
+		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
 	}
 
 	for _, args := range cmdQueue {
