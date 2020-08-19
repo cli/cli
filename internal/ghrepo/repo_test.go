@@ -114,3 +114,87 @@ func Test_repoFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestFromFullName(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantOwner string
+		wantName  string
+		wantHost  string
+		wantErr   error
+	}{
+		{
+			name:      "OWNER/REPO combo",
+			input:     "OWNER/REPO",
+			wantHost:  "github.com",
+			wantOwner: "OWNER",
+			wantName:  "REPO",
+			wantErr:   nil,
+		},
+		{
+			name:    "too few elements",
+			input:   "OWNER",
+			wantErr: errors.New(`expected the "[HOST/]OWNER/REPO" format, got "OWNER"`),
+		},
+		{
+			name:    "too many elements",
+			input:   "a/b/c/d",
+			wantErr: errors.New(`expected the "[HOST/]OWNER/REPO" format, got "a/b/c/d"`),
+		},
+		{
+			name:    "blank value",
+			input:   "a/",
+			wantErr: errors.New(`expected the "[HOST/]OWNER/REPO" format, got "a/"`),
+		},
+		{
+			name:      "with hostname",
+			input:     "example.org/OWNER/REPO",
+			wantHost:  "example.org",
+			wantOwner: "OWNER",
+			wantName:  "REPO",
+			wantErr:   nil,
+		},
+		{
+			name:      "full URL",
+			input:     "https://example.org/OWNER/REPO.git",
+			wantHost:  "example.org",
+			wantOwner: "OWNER",
+			wantName:  "REPO",
+			wantErr:   nil,
+		},
+		{
+			name:      "SSH URL",
+			input:     "git@example.org:OWNER/REPO.git",
+			wantHost:  "example.org",
+			wantOwner: "OWNER",
+			wantName:  "REPO",
+			wantErr:   nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := FromFullName(tt.input)
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("no error in result, expected %v", tt.wantErr)
+				} else if err.Error() != tt.wantErr.Error() {
+					t.Fatalf("expected error %q, got %q", tt.wantErr.Error(), err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("got error %v", err)
+			}
+			if r.RepoHost() != tt.wantHost {
+				t.Errorf("expected host %q, got %q", tt.wantHost, r.RepoHost())
+			}
+			if r.RepoOwner() != tt.wantOwner {
+				t.Errorf("expected owner %q, got %q", tt.wantOwner, r.RepoOwner())
+			}
+			if r.RepoName() != tt.wantName {
+				t.Errorf("expected name %q, got %q", tt.wantName, r.RepoName())
+			}
+		})
+	}
+}

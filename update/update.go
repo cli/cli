@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
@@ -42,7 +43,7 @@ func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersio
 	}
 
 	var latestRelease ReleaseInfo
-	err = client.REST("GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
+	err = client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
 	if err != nil {
 		return nil, err
 	}
