@@ -567,16 +567,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 }
 
 func TestPRCheckout_recurseSubmodules(t *testing.T) {
-	ctx := context.NewBlank()
-	ctx.SetBranch("master")
-	ctx.SetRemotes(map[string]string{
-		"origin": "OWNER/REPO",
-	})
-	initContext = func() context.Context {
-		return ctx
-	}
-	http := initFakeHTTP()
-	http.StubRepoResponse("OWNER", "REPO")
+	http := &httpmock.Registry{}
 
 	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
 	{ "data": { "repository": { "pullRequest": {
@@ -605,7 +596,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	})
 	defer restoreCmd()
 
-	output, err := RunCommand(`pr checkout 123 --recurse-submodules`)
+	output, err := runCommand(http, nil, "master", `123 --recurse-submodules`)
 	eq(t, err, nil)
 	eq(t, output.String(), "")
 
