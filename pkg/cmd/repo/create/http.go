@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
 )
 
 // repoCreateInput represents input parameters for repoCreate
@@ -23,7 +22,7 @@ type repoCreateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, error) {
+func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	var response struct {
@@ -33,14 +32,14 @@ func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, er
 	}
 
 	if input.TeamID != "" {
-		orgID, teamID, err := resolveOrganizationTeam(apiClient, input.OwnerID, input.TeamID)
+		orgID, teamID, err := resolveOrganizationTeam(apiClient, hostname, input.OwnerID, input.TeamID)
 		if err != nil {
 			return nil, err
 		}
 		input.TeamID = teamID
 		input.OwnerID = orgID
 	} else if input.OwnerID != "" {
-		orgID, err := resolveOrganization(apiClient, input.OwnerID)
+		orgID, err := resolveOrganization(apiClient, hostname, input.OwnerID)
 		if err != nil {
 			return nil, err
 		}
@@ -50,9 +49,6 @@ func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, er
 	variables := map[string]interface{}{
 		"input": input,
 	}
-
-	// TODO: GHE support
-	hostname := ghinstance.Default()
 
 	err := apiClient.GraphQL(hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
@@ -74,24 +70,22 @@ func repoCreate(client *http.Client, input repoCreateInput) (*api.Repository, er
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
-func resolveOrganization(client *api.Client, orgName string) (string, error) {
+func resolveOrganization(client *api.Client, hostname, orgName string) (string, error) {
 	var response struct {
 		NodeID string `json:"node_id"`
 	}
-	// TODO: GHE support
-	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
+	err := client.REST(hostname, "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
 	return response.NodeID, err
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
-func resolveOrganizationTeam(client *api.Client, orgName, teamSlug string) (string, string, error) {
+func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (string, string, error) {
 	var response struct {
 		NodeID       string `json:"node_id"`
 		Organization struct {
 			NodeID string `json:"node_id"`
 		}
 	}
-	// TODO: GHE support
-	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return response.Organization.NodeID, response.NodeID, err
 }

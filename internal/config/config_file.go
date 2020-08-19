@@ -75,22 +75,30 @@ func parseConfigFile(filename string) ([]byte, *yaml.Node, error) {
 		return nil, nil, err
 	}
 
-	var root yaml.Node
-	err = yaml.Unmarshal(data, &root)
+	root, err := parseConfigData(data)
 	if err != nil {
-		return data, nil, err
+		return nil, nil, err
 	}
+	return data, root, err
+}
+
+func parseConfigData(data []byte) (*yaml.Node, error) {
+	var root yaml.Node
+	err := yaml.Unmarshal(data, &root)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(root.Content) == 0 {
-		return data, &yaml.Node{
+		return &yaml.Node{
 			Kind:    yaml.DocumentNode,
 			Content: []*yaml.Node{{Kind: yaml.MappingNode}},
 		}, nil
 	}
 	if root.Content[0].Kind != yaml.MappingNode {
-		return data, &root, fmt.Errorf("expected a top level map")
+		return &root, fmt.Errorf("expected a top level map")
 	}
-
-	return data, &root, nil
+	return &root, nil
 }
 
 func isLegacy(root *yaml.Node) bool {

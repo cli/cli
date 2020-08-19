@@ -76,13 +76,7 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 
-	// TODO This is overly wordy and I'd like to streamline this.
 	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-	// TODO: GHE support
-	protocol, err := cfg.Get("", "git_protocol")
 	if err != nil {
 		return err
 	}
@@ -91,8 +85,7 @@ func cloneRun(opts *CloneOptions) error {
 	cloneURL := opts.Repository
 	if !strings.Contains(cloneURL, ":") {
 		if !strings.Contains(cloneURL, "/") {
-			// TODO: GHE compat
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
 			if err != nil {
 				return err
 			}
@@ -103,6 +96,10 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 
+		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		if err != nil {
+			return err
+		}
 		cloneURL = ghrepo.FormatRemoteURL(repo, protocol)
 	}
 
@@ -128,9 +125,13 @@ func cloneRun(opts *CloneOptions) error {
 	}
 
 	if parentRepo != nil {
+		protocol, err := cfg.Get(parentRepo.RepoHost(), "git_protocol")
+		if err != nil {
+			return err
+		}
 		upstreamURL := ghrepo.FormatRemoteURL(parentRepo, protocol)
 
-		err := git.AddUpstreamRemote(upstreamURL, cloneDir)
+		err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 		if err != nil {
 			return err
 		}

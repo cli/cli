@@ -9,20 +9,23 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/cli/cli/internal/ghinstance"
 )
 
-func httpRequest(client *http.Client, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+func httpRequest(client *http.Client, hostname string, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+	isGraphQL := p == "graphql"
 	var requestURL string
 	if strings.Contains(p, "://") {
 		requestURL = p
+	} else if isGraphQL {
+		requestURL = ghinstance.GraphQLEndpoint(hostname)
 	} else {
-		// TODO: GHE support
-		requestURL = "https://api.github.com/" + p
+		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
 	}
 
 	var body io.Reader
 	var bodyIsJSON bool
-	isGraphQL := p == "graphql"
 
 	switch pp := params.(type) {
 	case map[string]interface{}:

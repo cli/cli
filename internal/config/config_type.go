@@ -126,6 +126,16 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+// NewFromString initializes a Config from a yaml string
+func NewFromString(str string) Config {
+	root, err := parseConfigData([]byte(str))
+	if err != nil {
+		panic(err)
+	}
+	return NewConfig(root)
+}
+
+// NewBlankConfig initializes a config file pre-populated with comments and default values
 func NewBlankConfig() Config {
 	return NewConfig(NewBlankRoot())
 }
@@ -191,16 +201,19 @@ func (c *fileConfig) Root() *yaml.Node {
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
 	if hostname != "" {
+		var notFound *NotFoundError
+
 		hostCfg, err := c.configForHost(hostname)
-		if err != nil {
+		if err != nil && !errors.As(err, &notFound) {
 			return "", err
 		}
 
-		hostValue, err := hostCfg.GetStringValue(key)
-		var notFound *NotFoundError
-
-		if err != nil && !errors.As(err, &notFound) {
-			return "", err
+		var hostValue string
+		if hostCfg != nil {
+			hostValue, err = hostCfg.GetStringValue(key)
+			if err != nil && !errors.As(err, &notFound) {
+				return "", err
+			}
 		}
 
 		if hostValue != "" {
@@ -375,7 +388,7 @@ func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	return hostConfigs, nil
 }
 
-// Hosts returns a list of all known hostnames configred in hosts.yml
+// Hosts returns a list of all known hostnames configured in hosts.yml
 func (c *fileConfig) Hosts() ([]string, error) {
 	entries, err := c.hostEntries()
 	if err != nil {

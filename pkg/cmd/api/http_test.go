@@ -93,6 +93,7 @@ func Test_httpRequest(t *testing.T) {
 
 	type args struct {
 		client  *http.Client
+		host    string
 		method  string
 		p       string
 		params  interface{}
@@ -114,6 +115,7 @@ func Test_httpRequest(t *testing.T) {
 			name: "simple GET",
 			args: args{
 				client:  &httpClient,
+				host:    "github.com",
 				method:  "GET",
 				p:       "repos/octocat/spoon-knife",
 				params:  nil,
@@ -128,9 +130,46 @@ func Test_httpRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "GET with leading slash",
+			args: args{
+				client:  &httpClient,
+				host:    "github.com",
+				method:  "GET",
+				p:       "/repos/octocat/spoon-knife",
+				params:  nil,
+				headers: []string{},
+			},
+			wantErr: false,
+			want: expects{
+				method:  "GET",
+				u:       "https://api.github.com/repos/octocat/spoon-knife",
+				body:    "",
+				headers: "",
+			},
+		},
+		{
+			name: "Enterprise REST",
+			args: args{
+				client:  &httpClient,
+				host:    "example.org",
+				method:  "GET",
+				p:       "repos/octocat/spoon-knife",
+				params:  nil,
+				headers: []string{},
+			},
+			wantErr: false,
+			want: expects{
+				method:  "GET",
+				u:       "https://example.org/api/v3/repos/octocat/spoon-knife",
+				body:    "",
+				headers: "",
+			},
+		},
+		{
 			name: "GET with params",
 			args: args{
 				client: &httpClient,
+				host:   "github.com",
 				method: "GET",
 				p:      "repos/octocat/spoon-knife",
 				params: map[string]interface{}{
@@ -150,6 +189,7 @@ func Test_httpRequest(t *testing.T) {
 			name: "POST with params",
 			args: args{
 				client: &httpClient,
+				host:   "github.com",
 				method: "POST",
 				p:      "repos",
 				params: map[string]interface{}{
@@ -169,6 +209,7 @@ func Test_httpRequest(t *testing.T) {
 			name: "POST GraphQL",
 			args: args{
 				client: &httpClient,
+				host:   "github.com",
 				method: "POST",
 				p:      "graphql",
 				params: map[string]interface{}{
@@ -185,9 +226,28 @@ func Test_httpRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "Enterprise GraphQL",
+			args: args{
+				client:  &httpClient,
+				host:    "example.org",
+				method:  "POST",
+				p:       "graphql",
+				params:  map[string]interface{}{},
+				headers: []string{},
+			},
+			wantErr: false,
+			want: expects{
+				method:  "POST",
+				u:       "https://example.org/api/graphql",
+				body:    `{}`,
+				headers: "Content-Type: application/json; charset=utf-8\r\n",
+			},
+		},
+		{
 			name: "POST with body and type",
 			args: args{
 				client: &httpClient,
+				host:   "github.com",
 				method: "POST",
 				p:      "repos",
 				params: bytes.NewBufferString("CUSTOM"),
@@ -207,7 +267,7 @@ func Test_httpRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := httpRequest(tt.args.client, tt.args.method, tt.args.p, tt.args.params, tt.args.headers)
+			got, err := httpRequest(tt.args.client, tt.args.host, tt.args.method, tt.args.p, tt.args.params, tt.args.headers)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("httpRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return

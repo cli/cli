@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -71,22 +70,10 @@ func viewRun(opts *ViewOptions) error {
 			return err
 		}
 	} else {
-		if utils.IsURL(opts.RepoArg) {
-			parsedURL, err := url.Parse(opts.RepoArg)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-
-			toView, err = ghrepo.FromURL(parsedURL)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-		} else {
-			var err error
-			toView, err = ghrepo.FromFullName(opts.RepoArg)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
+		var err error
+		toView, err = ghrepo.FromFullName(opts.RepoArg)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
 		}
 	}
 

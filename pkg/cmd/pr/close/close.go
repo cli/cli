@@ -77,7 +77,7 @@ func closeRun(opts *CloseOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", utils.Green("✔"), pr.Number, pr.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
 
 	return nil
 }

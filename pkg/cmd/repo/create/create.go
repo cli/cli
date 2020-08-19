@@ -86,23 +86,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 func createRun(opts *CreateOptions) error {
 	projectDir, projectDirErr := git.ToplevelDir()
 
-	orgName := ""
-	name := opts.Name
+	var repoToCreate ghrepo.Interface
 
-	if name != "" {
-		if strings.Contains(name, "/") {
-			newRepo, err := ghrepo.FromFullName(name)
+	if opts.Name != "" {
+		if strings.Contains(opts.Name, "/") {
+			var err error
+			repoToCreate, err = ghrepo.FromFullName(opts.Name)
 			if err != nil {
 				return fmt.Errorf("argument error: %w", err)
 			}
-			orgName = newRepo.RepoOwner()
-			name = newRepo.RepoName()
+		} else {
+			repoToCreate = ghrepo.New("", opts.Name)
 		}
 	} else {
 		if projectDirErr != nil {
 			return projectDirErr
 		}
-		name = path.Base(projectDir)
+		repoToCreate = ghrepo.New("", path.Base(projectDir))
 	}
 
 	visibility := "PRIVATE"
@@ -111,9 +111,9 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:             name,
+		Name:             repoToCreate.RepoName(),
 		Visibility:       visibility,
-		OwnerID:          orgName,
+		OwnerID:          repoToCreate.RepoOwner(),
 		TeamID:           opts.Team,
 		Description:      opts.Description,
 		HomepageURL:      opts.Homepage,
@@ -126,7 +126,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	repo, err := repoCreate(httpClient, input)
+	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
@@ -146,8 +146,7 @@ func createRun(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	}
-	// TODO: GHE support
-	protocol, err := cfg.Get("", "git_protocol")
+	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}

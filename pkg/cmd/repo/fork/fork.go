@@ -180,13 +180,11 @@ func forkRun(opts *ForkOptions) error {
 		return nil
 	}
 
-	// TODO This is overly wordy and I'd like to streamline this.
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
-	// TODO: GHE support
-	protocol, err := cfg.Get("", "git_protocol")
+	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}

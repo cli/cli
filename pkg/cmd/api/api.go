@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -38,6 +39,7 @@ type ApiOptions struct {
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -45,6 +47,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -55,8 +58,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 "graphql" to access the GitHub API v4.
 
-Placeholder values ":owner" and ":repo" in the endpoint argument will get replaced
-with values from the repository of the current directory.
+Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
+get replaced with values from the repository of the current directory.
 
 The default HTTP request method is "GET" normally and "POST" if any parameters
 were added. Override the method with '--method'.
@@ -69,8 +72,8 @@ on the format of the value:
 
 - literal values "true", "false", "null", and integer numbers get converted to
   appropriate JSON types;
-- placeholder values ":owner" and ":repo" get populated with values from the
-  repository of the current directory;
+- placeholder values ":owner", ":repo", and ":branch" get populated with values
+  from the repository of the current directory;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
 
@@ -193,9 +196,11 @@ func apiRun(opts *ApiOptions) error {
 		opts.IO.Out = ioutil.Discard
 	}
 
+	host := ghinstance.OverridableDefault()
+
 	hasNextPage := true
 	for hasNextPage {
-		resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
+		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
 		if err != nil {
 			return err
 		}
@@ -285,7 +290,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	return
 }
 
-var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
+var placeholderRE = regexp.MustCompile(`\:(owner|repo|branch)\b`)
 
 // fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
@@ -298,18 +303,28 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 		return value, err
 	}
 
-	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
 		switch m {
 		case ":owner":
 			return baseRepo.RepoOwner()
 		case ":repo":
 			return baseRepo.RepoName()
+		case ":branch":
+			branch, e := opts.Branch()
+			if e != nil {
+				err = e
+			}
+			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
 		}
 	})
 
-	return value, nil
+	if err != nil {
+		return value, err
+	}
+
+	return filled, nil
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {

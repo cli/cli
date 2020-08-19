@@ -1,4 +1,4 @@
-package command
+package root
 
 import (
 	"bytes"
@@ -67,8 +67,12 @@ func nestedSuggestFunc(command *cobra.Command, arg string) {
 	_ = rootUsageFunc(command)
 }
 
+func isRootCmd(command *cobra.Command) bool {
+	return command != nil && !command.HasParent()
+}
+
 func rootHelpFunc(command *cobra.Command, args []string) {
-	if command.Parent() == RootCmd && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
+	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
 		nestedSuggestFunc(command, args[1])
 		hasFailed = true
 		return
@@ -141,7 +145,7 @@ Read the manual at https://cli.github.com/manual`})
 		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
 	}
 
-	out := colorableOut(command)
+	out := command.OutOrStdout()
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
