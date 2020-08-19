@@ -136,7 +136,7 @@ func main() {
                                      ,KMM0;.;:;.        dMMMMMMMMK,
                                        :OWMXOOOc        dMMMMMWO:
                                          .:kXMMd        dMMXk:.
-       Have a good one~                      ,l.        .l,
+       Have a good day~                      ,l.        .l,
 			`)
 
 				fmt.Fprintf(stderr, authMessage, utils.Bold("Welcome to GitHub CLI!"))
