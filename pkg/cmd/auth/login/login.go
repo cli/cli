@@ -54,7 +54,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# => read token from mytoken.txt and authenticate against github.com
 
 			$ gh auth login --hostname enterprise.internal --with-token < mytoken.txt
-			# => read token from mytoken.txt and authenticate against a GitHub Enterprise instance
+			# => read token from mytoken.txt and authenticate against a GitHub Enterprise Server instance
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			isTTY := opts.IO.IsStdinTTY()
@@ -142,7 +142,7 @@ func loginRun(opts *LoginOptions) error {
 			Message: "What account do you want to log into?",
 			Options: []string{
 				"GitHub.com",
-				"GitHub Enterprise",
+				"GitHub Enterprise Server",
 			},
 		}, &hostType)
 
