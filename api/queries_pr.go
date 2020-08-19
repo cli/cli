@@ -227,7 +227,7 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 	if resp.StatusCode == 404 {
 		return nil, &NotFoundError{errors.New("pull request not found")}
 	} else if resp.StatusCode != 200 {
-		return nil, handleHTTPError(resp)
+		return nil, HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil
