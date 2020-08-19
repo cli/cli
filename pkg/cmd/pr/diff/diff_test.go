@@ -2,8 +2,10 @@ package diff
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/context"
@@ -131,8 +133,13 @@ func TestPRDiff_notty(t *testing.T) {
 }
 
 func TestPRDiff_tty(t *testing.T) {
+	pager := os.Getenv("PAGER")
 	http := &httpmock.Registry{}
-	defer http.Verify(t)
+	defer func() {
+		os.Setenv("PAGER", pager)
+		http.Verify(t)
+	}()
+	os.Setenv("PAGER", "")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "url": "https://github.com/OWNER/REPO/pull/123",
@@ -147,6 +154,38 @@ func TestPRDiff_tty(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	assert.Contains(t, output.String(), "\x1b[32m+site: bin/gh\x1b[m")
+}
+
+func TestPRDiff_pager(t *testing.T) {
+	realRunPager := runPager
+	pager := os.Getenv("PAGER")
+	http := &httpmock.Registry{}
+	defer func() {
+		runPager = realRunPager
+		os.Setenv("PAGER", pager)
+		http.Verify(t)
+	}()
+	runPager = func(pager string, diff io.Reader, out io.Writer) error {
+		_, err := io.Copy(out, diff)
+		return err
+	}
+	os.Setenv("PAGER", "fakepager")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "url": "https://github.com/OWNER/REPO/pull/123",
+		  "number": 123,
+		  "id": "foobar123",
+		  "headRefName": "feature",
+			"baseRefName": "master" }
+	] } } } }`))
+	http.StubResponse(200, bytes.NewBufferString(testDiff))
+	output, err := runCommand(http, nil, true, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
+		t.Errorf("command output did not match:\n%s", diff)
+	}
 }
 
 const testDiff = `diff --git a/.github/workflows/releases.yml b/.github/workflows/releases.yml
