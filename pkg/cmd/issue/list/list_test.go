@@ -122,10 +122,19 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 			assert.Equal(t, "probablyCher", params["assignee"].(string))
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
-			assert.Equal(t, "1.x", params["milestone"].(string))
+			assert.Equal(t, "12345", params["milestone"].(string))
 			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
 			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
 		}))
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [{ "title":"1.x", "id": "MDk6TWlsZXN0b25lMTIzNDU=" }],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 
 	output, err := runCommand(http, true, "-a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
 	if err != nil {
@@ -220,4 +229,49 @@ func TestIssueList_web(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, expectedURL)
+}
+
+func TestIssueList_milestoneNotFound(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestones": {
+			"nodes": [{ "title":"1.x", "id": "MDk6TWlsZXN0b25lMTIzNDU=" }],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+
+	_, err := runCommand(http, true, "--milestone NotFound")
+	if err == nil || err.Error() != `no milestone found with title "NotFound"` {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+}
+
+func TestIssueList_milestoneByNumber(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneByNumber\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "milestone": {
+			"id": "MDk6TWlsZXN0b25lMTIzNDU="
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "12345", params["milestone"].(string)) // Database ID for the Milestone (see #1462)
+		}))
+
+	_, err := runCommand(http, true, "--milestone 13")
+	if err != nil {
+		t.Fatalf("error running issue list: %v", err)
+	}
 }

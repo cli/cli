@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -246,8 +249,26 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	if mentionString != "" {
 		variables["mention"] = mentionString
 	}
+
 	if milestoneString != "" {
-		variables["milestone"] = milestoneString
+		var milestone *RepoMilestone
+		if milestoneNumber, err := strconv.Atoi(milestoneString); err == nil {
+			milestone, err = MilestoneByNumber(client, repo, milestoneNumber)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			milestone, err = MilestoneByTitle(client, repo, milestoneString)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		milestoneRESTID, err := milestoneNodeIdToDatabaseId(milestone.ID)
+		if err != nil {
+			return nil, err
+		}
+		variables["milestone"] = milestoneRESTID
 	}
 
 	var response struct {
@@ -418,4 +439,21 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
 
 	return err
+}
+
+// milestoneNodeIdToDatabaseId extracts the REST Database ID from the GraphQL Node ID
+// This conversion is necessary since the GraphQL API requires the use of the milestone's database ID
+// for querying the related issues.
+func milestoneNodeIdToDatabaseId(nodeId string) (string, error) {
+	// The Node ID is Base64 obfuscated, with an underlying pattern:
+	// "09:Milestone12345", where "12345" is the database ID
+	decoded, err := base64.StdEncoding.DecodeString(nodeId)
+	if err != nil {
+		return "", err
+	}
+	splitted := strings.Split(string(decoded), "Milestone")
+	if len(splitted) != 2 {
+		return "", fmt.Errorf("couldn't get database id from node id")
+	}
+	return splitted[1], nil
 }
