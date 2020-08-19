@@ -31,3 +31,16 @@ func CheckAuth(cfg config.Config) bool {
 
 	return false
 }
+
+func IsAuthCheckEnabled(cmd *cobra.Command) bool {
+	if !cmd.Runnable() {
+		return false
+	}
+	for c := cmd; c.Parent() != nil; c = c.Parent() {
+		if c.Annotations != nil && c.Annotations["skipAuthCheck"] == "true" {
+			return false
+		}
+	}
+
+	return true
+}

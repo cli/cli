@@ -93,15 +93,15 @@ func main() {
 		}
 	}
 
-	_, skipAuthCheck := cmd.Annotations["skipAuthCheck"]
+	authCheckEnabled := cmdutil.IsAuthCheckEnabled(cmd)
 
 	// TODO support other names
 	ghtoken := os.Getenv("GITHUB_TOKEN")
 	if ghtoken != "" {
-		skipAuthCheck = true
+		authCheckEnabled = false
 	}
 
-	if !skipAuthCheck {
+	if authCheckEnabled {
 		hasAuth := false
 
 		cfg, err := cmdFactory.Config()

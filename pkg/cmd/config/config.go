@@ -58,8 +58,6 @@ func NewCmdConfigGet(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmdutil.DisableAuthCheck(cmd)
-
 	cmd.Flags().StringVarP(&hostname, "host", "h", "", "Get per-host setting")
 
 	return cmd
@@ -95,8 +93,6 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 			return nil
 		},
 	}
-
-	cmdutil.DisableAuthCheck(cmd)
 
 	cmd.Flags().StringVarP(&hostname, "host", "h", "", "Set per-host setting")
 

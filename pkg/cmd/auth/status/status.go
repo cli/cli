@@ -57,8 +57,6 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmdutil.DisableAuthCheck(cmd)
-
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
 
 	return cmd

@@ -95,8 +95,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		},
 	}
 
-	cmdutil.DisableAuthCheck(cmd)
-
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
 	cmd.Flags().Bool("with-token", false, "Read token from standard input")
 
