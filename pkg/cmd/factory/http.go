@@ -31,7 +31,7 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, s
 			token, err := cfg.Get(hostname, "oauth_token")
 			if err != nil || token == "" {
 				// Users shouldn't see this because of the pre-execute auth check on commands
-				return "", fmt.Errorf("authentication required for %s; please run `gh auth login -h%s", hostname, hostname)
+				return "", fmt.Errorf("authentication required for %s; please run `gh auth login -h %s", hostname, hostname)
 			}
 
 			return fmt.Sprintf("token %s", token), nil

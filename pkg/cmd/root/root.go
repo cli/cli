@@ -98,7 +98,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		return &cmdutil.FlagError{Err: err}
 	})
 
-	// TODO does this make sense? I'd like people to be able to see usage without an auth message.
 	cmdutil.DisableAuthCheck(cmd)
 
 	// CHILD COMMANDS
