@@ -141,8 +141,8 @@ func main() {
 
 				fmt.Fprintf(stderr, authMessage, utils.Bold("Welcome to GitHub CLI!"))
 			}
+			os.Exit(4)
 		}
-		os.Exit(4)
 	}
 
 	rootCmd.SetArgs(expandedArgs)
