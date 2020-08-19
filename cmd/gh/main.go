@@ -52,7 +52,6 @@ func main() {
 	}
 
 	cmd, _, err := rootCmd.Traverse(expandedArgs)
-	_, skipAuthCheck := cmd.Annotations["skipAuthCheck"]
 	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
@@ -93,6 +92,8 @@ func main() {
 			os.Exit(0)
 		}
 	}
+
+	_, skipAuthCheck := cmd.Annotations["skipAuthCheck"]
 
 	// TODO support other names
 	ghtoken := os.Getenv("GITHUB_TOKEN")
