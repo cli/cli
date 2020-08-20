@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
@@ -72,12 +73,19 @@ type PullRequest struct {
 		TotalCount int
 		Nodes      []struct {
 			Commit struct {
+				Oid               string
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
-							State      string
-							Status     string
-							Conclusion string
+							Name        string
+							Context     string
+							State       string
+							Status      string
+							Conclusion  string
+							StartedAt   time.Time
+							CompletedAt time.Time
+							DetailsURL  string
+							TargetURL   string
 						}
 					}
 				}
@@ -272,9 +280,11 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 						contexts(last: 100) {
 							nodes {
 								...on StatusContext {
+									context
 									state
 								}
 								...on CheckRun {
+									name
 									status
 									conclusion
 								}
@@ -418,8 +428,32 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				author {
 				  login
 				}
-				commits {
+				commits(last: 1) {
 				  totalCount
+					nodes {
+						commit {
+              oid
+						  statusCheckRollup {
+						    contexts(last: 100) {
+						      nodes {
+						  		  ...on StatusContext {
+						  			  context
+						  				state
+											targetUrl
+						  			}
+						  			...on CheckRun {
+											name
+											status
+											conclusion
+											startedAt
+											completedAt
+											detailsUrl
+						  			}
+						  		}
+						  	}
+						  }
+            }
+          }
 				}
 				baseRefName
 				headRefName
@@ -524,8 +558,32 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					author {
 						login
 					}
-					commits {
+					commits(last: 1) {
 						totalCount
+					  nodes {
+						  commit {
+							  oid
+								statusCheckRollup {
+								  contexts(last: 100) {
+								    nodes {
+										  ...on StatusContext {
+											  context
+												state
+											  targetUrl
+											}
+											...on CheckRun {
+												name
+												status
+												conclusion
+												startedAt
+												completedAt
+												detailsUrl
+											}
+										}
+									}
+								}
+							}
+					  }
 					}
 					url
 					baseRefName
