@@ -3,6 +3,7 @@ package release
 import (
 	cmdCreate "github.com/cli/cli/pkg/cmd/release/create"
 	cmdList "github.com/cli/cli/pkg/cmd/release/list"
+	cmdUpload "github.com/cli/cli/pkg/cmd/release/upload"
 	cmdView "github.com/cli/cli/pkg/cmd/release/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
+	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))
 
 	return cmd
 }

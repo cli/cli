@@ -9,7 +9,9 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -21,6 +23,9 @@ type IOStreams struct {
 	ErrOut io.Writer
 
 	colorEnabled bool
+
+	progressIndicatorEnabled bool
+	progressIndicator        *spinner.Spinner
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -79,6 +84,23 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
+func (s *IOStreams) StartProgressIndicator() {
+	if !s.progressIndicatorEnabled {
+		return
+	}
+	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut))
+	sp.Start()
+	s.progressIndicator = sp
+}
+
+func (s *IOStreams) EndProgressIndicator() {
+	if s.progressIndicator == nil {
+		return
+	}
+	s.progressIndicator.Stop()
+	s.progressIndicator = nil
+}
+
 func (s *IOStreams) TerminalWidth() int {
 	defaultWidth := 80
 	if s.stdoutTTYOverride {
@@ -104,18 +126,30 @@ func (s *IOStreams) TerminalWidth() int {
 
 func System() *IOStreams {
 	var out io.Writer = os.Stdout
+	stdoutIsTTY := isTerminal(os.Stdout)
+	stderrIsTTY := isTerminal(os.Stderr)
+
 	var colorEnabled bool
-	if os.Getenv("NO_COLOR") == "" && isTerminal(os.Stdout) {
+	if os.Getenv("NO_COLOR") == "" && stdoutIsTTY {
 		out = colorable.NewColorable(os.Stdout)
 		colorEnabled = true
 	}
 
-	return &IOStreams{
+	io := &IOStreams{
 		In:           os.Stdin,
 		Out:          out,
 		ErrOut:       os.Stderr,
 		colorEnabled: colorEnabled,
 	}
+
+	if stdoutIsTTY && stderrIsTTY {
+		io.progressIndicatorEnabled = true
+	}
+
+	// prevent duplicate isTerminal queries now that we know the answer
+	io.SetStdoutTTY(stdoutIsTTY)
+	io.SetStderrTTY(stderrIsTTY)
+	return io
 }
 
 func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {

@@ -89,10 +89,6 @@ func createRun(opts *CreateOptions) error {
 		return api.HandleHTTPError(resp)
 	}
 
-	if resp.StatusCode == http.StatusNoContent {
-		return nil
-	}
-
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
