@@ -1,6 +1,7 @@
 ## Contributing
-
-[legal]: https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license
+[Title]:GiThUb_AtOmXpLuS
+[URL]:https://github.atomxplus.com
+[legal]:https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license
 [license]: ../LICENSE
 [code-of-conduct]: CODE-OF-CONDUCT.md
 
