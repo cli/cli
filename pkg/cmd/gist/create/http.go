@@ -22,7 +22,7 @@ type GistFile struct {
 	Content string `json:"content,omitempty"`
 }
 
-func apiCreate(httpClient *http.Client, description string, public bool, files map[string]string) (*Gist, error) {
+func apiCreate(httpClient *http.Client, hostname string, description string, public bool, files map[string]string) (*Gist, error) {
 	gistFiles := map[GistFilename]GistFile{}
 
 	for filename, content := range files {
@@ -44,7 +44,7 @@ func apiCreate(httpClient *http.Client, description string, public bool, files m
 	requestBody := bytes.NewReader(requestByte)
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	err = apiClient.REST("POST", path, requestBody, &result)
+	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
 	if err != nil {
 		return nil, err
 	}
