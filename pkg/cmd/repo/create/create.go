@@ -346,7 +346,7 @@ func getVisibility() (string, error) {
 		Name: "repoVisibility",
 		Prompt: &survey.Select{
 			Message: "Visibility",
-			Options: []string{"PUBLIC", "PRIVATE", "INTERNAL"},
+			Options: []string{"Public", "Private", "Internal"},
 		},
 	}
 	qs = append(qs, getVisibilityQuestion)
@@ -360,5 +360,5 @@ func getVisibility() (string, error) {
 		return "", err
 	}
 
-	return answer.RepoVisibility, nil
+	return strings.ToUpper(answer.RepoVisibility), nil
 }
