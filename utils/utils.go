@@ -118,3 +118,13 @@ func DisplayURL(urlStr string) string {
 func GreenCheck() string {
 	return Green("✓")
 }
+
+func YellowDot() string {
+	// TODO
+	//return Yellow("•") // this had spacing issues
+	return Yellow(".")
+}
+
+func RedX() string {
+	return Red("X")
+}

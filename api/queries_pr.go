@@ -72,6 +72,7 @@ type PullRequest struct {
 		TotalCount int
 		Nodes      []struct {
 			Commit struct {
+				Oid               string
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
@@ -418,8 +419,13 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				author {
 				  login
 				}
-				commits {
+				commits(last: 1) {
 				  totalCount
+					nodes {
+						commit {
+              oid
+            }
+          }
 				}
 				baseRefName
 				headRefName
@@ -524,8 +530,13 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					author {
 						login
 					}
-					commits {
+					commits(last: 1) {
 						totalCount
+					  nodes {
+						  commit {
+							  oid
+							}
+					  }
 					}
 					url
 					baseRefName
