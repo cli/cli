@@ -180,6 +180,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
 		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, &opts.ConfirmSubmit)
 		if err != nil {
@@ -224,7 +225,7 @@ func createRun(opts *CreateOptions) error {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
 			}
 		} else if isTTY {
-			doSetup := opts.ConfirmSubmit
+			doSetup := createLocalDirectory
 			if !doSetup {
 				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
 				if err != nil {
