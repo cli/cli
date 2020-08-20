@@ -1,14 +1,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -21,9 +19,7 @@ type ChecksOptions struct {
 	Branch     func() (string, error)
 	Remotes    func() (context.Remotes, error)
 
-	HasRepoOverride bool
-
-	// TODO cli options
+	SelectorArg string
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
@@ -62,26 +58,9 @@ func checksRun(opts *ChecksOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	baseRepo, err := opts.BaseRepo()
+	pr, _, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
-	}
-
-	var currentBranch string
-	var currentPRNumber int
-	var currentPRHeadRef string
-
-	if !opts.HasRepoOverride {
-		currentBranch, err = opts.Branch()
-		if err != nil && !errors.Is(err, git.ErrNotOnAnyBranch) {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
-		}
-
-		remotes, _ := opts.Remotes()
-		currentPRNumber, currentPRHeadRef, err = prSelectorForCurrentBranch(baseRepo, currentBranch, remotes)
-		if err != nil {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
-		}
 	}
 
 	// TODO get boiler plate finished, produce current or provided PR
