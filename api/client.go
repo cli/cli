@@ -190,10 +190,9 @@ type HTTPError struct {
 }
 
 func (err HTTPError) Error() string {
-	if err.Message != "" {
-		if msgs := strings.SplitN(err.Message, "\n", 2); len(msgs) > 1 {
-			return fmt.Sprintf("HTTP %d: %s (%s)\n%s", err.StatusCode, msgs[0], err.RequestURL, msgs[1])
-		}
+	if msgs := strings.SplitN(err.Message, "\n", 2); len(msgs) > 1 {
+		return fmt.Sprintf("HTTP %d: %s (%s)\n%s", err.StatusCode, msgs[0], err.RequestURL, msgs[1])
+	} else if err.Message != "" {
 		return fmt.Sprintf("HTTP %d: %s (%s)", err.StatusCode, err.Message, err.RequestURL)
 	}
 	return fmt.Sprintf("HTTP %d (%s)", err.StatusCode, err.RequestURL)

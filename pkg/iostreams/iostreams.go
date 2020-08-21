@@ -93,7 +93,7 @@ func (s *IOStreams) StartProgressIndicator() {
 	s.progressIndicator = sp
 }
 
-func (s *IOStreams) EndProgressIndicator() {
+func (s *IOStreams) StopProgressIndicator() {
 	if s.progressIndicator == nil {
 		return
 	}
@@ -122,6 +122,10 @@ func (s *IOStreams) TerminalWidth() int {
 	}
 
 	return defaultWidth
+}
+
+func (s *IOStreams) ColorScheme() *ColorScheme {
+	return NewColorScheme(s.IsStdoutTTY())
 }
 
 func System() *IOStreams {

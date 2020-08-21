@@ -2,6 +2,7 @@ package release
 
 import (
 	cmdCreate "github.com/cli/cli/pkg/cmd/release/create"
+	cmdDownload "github.com/cli/cli/pkg/cmd/release/download"
 	cmdList "github.com/cli/cli/pkg/cmd/release/list"
 	cmdUpload "github.com/cli/cli/pkg/cmd/release/upload"
 	cmdView "github.com/cli/cli/pkg/cmd/release/view"
@@ -21,6 +22,7 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
+	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))

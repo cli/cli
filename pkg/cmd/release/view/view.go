@@ -3,8 +3,10 @@ package view
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -56,20 +58,61 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	release, err := fetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", release.TagName)
+	iofmt := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Bold(release.TagName))
+	if release.IsDraft {
+		fmt.Fprintf(opts.IO.Out, "%s • ", iofmt.Red("Draft"))
+	} else if release.IsPrerelease {
+		fmt.Fprintf(opts.IO.Out, "%s • ", iofmt.Yellow("Pre-release"))
+	}
+	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
 
-	renderedDescription, err := utils.RenderMarkdown(release.Description)
+	renderedDescription, err := utils.RenderMarkdown(release.Body)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintln(opts.IO.Out, renderedDescription)
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", release.URL)
+	if len(release.Assets) > 0 {
+		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Bold("Assets"))
+		table := utils.NewTablePrinter(opts.IO)
+		for _, a := range release.Assets {
+			table.AddField(a.Name, nil, nil)
+			table.AddField(humanFileSize(a.Size), nil, nil)
+			table.EndRow()
+		}
+		err := table.Render()
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(opts.IO.Out, "\n")
+	}
+
+	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("View on GitHub: %s", release.HTMLURL)))
 
 	return nil
+}
+
+func humanFileSize(s int64) string {
+	if s < 1024 {
+		return fmt.Sprintf("%d B", s)
+	}
+
+	kb := float64(s) / 1024
+	if kb < 1024 {
+		return fmt.Sprintf("%.2f KiB", kb)
+	}
+
+	mb := float64(kb) / 1024
+	if mb < 1024 {
+		return fmt.Sprintf("%.2f MiB", mb)
+	}
+
+	gb := float64(kb) / 1024
+	return fmt.Sprintf("%.2f GiB", gb)
 }
