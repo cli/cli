@@ -6,16 +6,21 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
 
 type CreateOptions struct {
-	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
+	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	TagName      string
@@ -28,6 +33,9 @@ type CreateOptions struct {
 
 	Assets []*shared.AssetForUpload
 
+	// for interactive flow
+	SubmitAction string
+
 	// maximum number of simultaneous uploads
 	Concurrency int
 }
@@ -36,6 +44,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 	}
 
 	var notesFile string
@@ -101,6 +110,68 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	if !opts.BodyProvided && opts.IO.CanPrompt() {
+		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return err
+		}
+
+		qs := []*survey.Question{
+			{
+				Name: "name",
+				Prompt: &survey.Input{
+					Message: "Title",
+					Default: opts.Name,
+				},
+			},
+			{
+				Name: "body",
+				Prompt: &surveyext.GhEditor{
+					BlankAllowed:  true,
+					EditorCommand: editorCommand,
+					Editor: &survey.Editor{
+						Message:     "Release notes",
+						FileName:    "*.md",
+						Default:     opts.Body,
+						HideDefault: true,
+					},
+				},
+			},
+			{
+				Name: "prerelease",
+				Prompt: &survey.Confirm{
+					Message: "Is this a prerelease?",
+					Default: opts.Prerelease,
+				},
+			},
+			{
+				Name: "submitAction",
+				Prompt: &survey.Select{
+					Message: "Submit?",
+					Options: []string{
+						"Publish release",
+						"Save as draft",
+						"Cancel",
+					},
+				},
+			},
+		}
+
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+
+		switch opts.SubmitAction {
+		case "Publish release":
+			opts.Draft = false
+		case "Save as draft":
+			opts.Draft = true
+		case "Cancel":
+			return cmdutil.SilentError
+		}
+	}
+
 	params := map[string]interface{}{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
@@ -113,6 +184,8 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	hasAssets := len(opts.Assets) > 0
+
+	// Avoid publishing the release until all assets have finished uploading
 	if hasAssets {
 		params["draft"] = true
 	}

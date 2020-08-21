@@ -84,6 +84,10 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
+func (s *IOStreams) CanPrompt() bool {
+	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
 func (s *IOStreams) StartProgressIndicator() {
 	if !s.progressIndicatorEnabled {
 		return
