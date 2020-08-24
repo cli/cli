@@ -10,7 +10,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
