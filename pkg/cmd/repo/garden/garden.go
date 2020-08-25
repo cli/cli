@@ -99,9 +99,10 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "garden [<repository>]",
-		Short: "Explore a git repository as a garden",
-		Long:  "Use WASD or vi keys to move. q to quit.",
+		Use:    "garden [<repository>]",
+		Short:  "Explore a git repository as a garden",
+		Long:   "Use WASD or vi keys to move. q to quit.",
+		Hidden: true,
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.RepoArg = args[0]
