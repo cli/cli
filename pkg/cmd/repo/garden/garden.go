@@ -250,7 +250,7 @@ func isQuit(b []byte) bool {
 
 func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 	cellIx := 0
-	grassCell := &Cell{utils.RGB(0, 200, 0, ","), "You're standing on a patch of grass in a field of wildflowers."}
+	grassCell := &Cell{RGB(0, 200, 0, ","), "You're standing on a patch of grass in a field of wildflowers."}
 	garden := [][]*Cell{}
 	streamIx := rand.Intn(geo.Width - 1)
 	if streamIx == geo.Width/2 {
@@ -265,14 +265,14 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 		for x := 0; x < geo.Width; x++ {
 			if (y > 0 && (x == 0 || x == geo.Width-1)) || y == geo.Height-1 {
 				garden[y] = append(garden[y], &Cell{
-					Char:       utils.RGB(0, 150, 0, "^"),
+					Char:       RGB(0, 150, 0, "^"),
 					StatusLine: "You're standing under a tall, leafy tree.",
 				})
 				continue
 			}
 			if x == streamIx {
 				garden[y] = append(garden[y], &Cell{
-					Char:       utils.RGB(tint, tint, 255, "#"),
+					Char:       RGB(tint, tint, 255, "#"),
 					StatusLine: "You're standing in a shallow stream. It's refreshing.",
 				})
 				tint += 15
@@ -290,13 +290,13 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 			}
 			if y == 0 && (x < geo.Width/2 || x > geo.Width/2) {
 				garden[y] = append(garden[y], &Cell{
-					Char:       utils.RGB(0, 200, 0, ","),
+					Char:       RGB(0, 200, 0, ","),
 					StatusLine: "You're standing by a wildflower garden. There is a light breeze.",
 				})
 				continue
 			} else if y == 0 && x == geo.Width/2 {
 				garden[y] = append(garden[y], &Cell{
-					Char:       utils.RGB(139, 69, 19, "+"),
+					Char:       RGB(139, 69, 19, "+"),
 					StatusLine: fmt.Sprintf("You're standing in front of a weather-beaten sign that says %s.", ghrepo.FullName(geo.Repository)),
 				})
 				continue
@@ -400,4 +400,8 @@ func clear(io *iostreams.IOStreams) {
 	cmd := exec.Command("clear")
 	cmd.Stdout = io.Out
 	_ = cmd.Run()
+}
+
+func RGB(r, g, b int, x string) string {
+	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, x)
 }
