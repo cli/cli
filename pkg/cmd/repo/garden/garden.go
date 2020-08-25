@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -69,9 +68,9 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 	return commits, nil
 }
 
-func getResponse(client *http.Client, path string, body io.Reader) (*http.Response, error) {
-	url := "https://api.github.com/" + p
-	req, err := http.NewRequest("GET", url, body)
+func getResponse(client *http.Client, path string, data interface{}) (*http.Response, error) {
+	url := "https://api.github.com/" + path
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
