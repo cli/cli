@@ -293,7 +293,7 @@ func (c Client) RESTWithResponse(method string, p string, body io.Reader, data i
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
-		return nil, handleHTTPError(resp)
+		return nil, errors.New("api call failed")
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
