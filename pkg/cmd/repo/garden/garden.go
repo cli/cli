@@ -1,4 +1,4 @@
-package command
+package garden
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -13,10 +14,12 @@ import (
 	"time"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 type Geometry struct {
@@ -80,54 +83,77 @@ func (p *Player) move(direction Direction) {
 	}
 }
 
-func init() {
-	repoCmd.AddCommand(repoGardenCmd)
+type GardenOptions struct {
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+
+	RepoArg string
 }
 
-var repoGardenCmd = &cobra.Command{
-	Use:   "garden",
-	Short: "Wander around a repository as a garden",
-	Long:  "Use WASD or vi keys to move and q to quit.",
-	RunE:  repoGarden,
+func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Command {
+	opts := GardenOptions{
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "garden [<repository>]",
+		Short: "Explore a git repository as a garden",
+		Long:  "Use WASD or vi keys to move. q to quit.",
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				opts.RepoArg = args[0]
+			}
+			if runF != nil {
+				return runF(&opts)
+			}
+			return gardenRun(&opts)
+		},
+	}
 }
 
-func repoGarden(cmd *cobra.Command, args []string) error {
-	ctx := contextForCommand(cmd)
-	client, err := apiClientForContext(ctx)
-	if err != nil {
-		return err
-	}
+func gardenRun(opts *GardenOptions) error {
+	out := opts.IO.Out
 
-	out := colorableOut(cmd)
-
-	isTTY := false
-	outFile, isFile := out.(*os.File)
-	if isFile {
-		isTTY = utils.IsTerminal(outFile)
-		if isTTY {
-			// FIXME: duplicates colorableOut
-			out = utils.NewColorable(outFile)
-		}
-	}
-
-	if !isTTY {
+	if opts.IO.IsStdoutTTY() {
 		return errors.New("must be connected to a terminal")
 	}
 
-	var baseRepo ghrepo.Interface
-	if len(args) > 0 {
-		baseRepo, err = ghrepo.FromFullName(args[0])
+	var toView ghrepo.Interface
+	apiClient := api.NewClientFromHTTP(httpClient)
+	if opts.RepoArg == "" {
+		var err error
+		toView, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
 	} else {
-		baseRepo, err = determineBaseRepo(client, cmd, ctx)
+		var err error
+		viewURL := opts.RepoArg
+		if !strings.Contains(viewURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			viewURL = currentUser + "/" + viewURL
+		}
+		toView, err = ghrepo.FromFullName(viewURL)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
 	}
+
+	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
 		return err
 	}
 
-	seed := computeSeed(ghrepo.FullName(baseRepo))
+	seed := computeSeed(ghrepo.FullName(repo))
 	rand.Seed(seed)
 
-	termWidth, termHeight, err := terminal.GetSize(int(outFile.Fd()))
+	termWidth, termHeight, err := utils.TerminalSize(out)
 	if err != nil {
 		return err
 	}
