@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -87,6 +88,22 @@ func TestRepoCreate(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	as, surveyTearDown := prompt.InitAskStubber()
+	defer surveyTearDown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
+	})
+
 	output, err := runCommand(httpClient, "REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
@@ -153,6 +170,22 @@ func TestRepoCreate_org(t *testing.T) {
 	})
 	defer restoreCmd()
 
+	as, surveyTearDown := prompt.InitAskStubber()
+	defer surveyTearDown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
+	})
+
 	output, err := runCommand(httpClient, "ORG/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
@@ -218,6 +251,22 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		return &test.OutputStub{}
 	})
 	defer restoreCmd()
+
+	as, surveyTearDown := prompt.InitAskStubber()
+	defer surveyTearDown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
+	})
 
 	output, err := runCommand(httpClient, "ORG/REPO --team monkeys")
 	if err != nil {
