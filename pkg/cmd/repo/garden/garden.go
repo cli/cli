@@ -112,13 +112,20 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 			return gardenRun(&opts)
 		},
 	}
+
+	return cmd
 }
 
 func gardenRun(opts *GardenOptions) error {
 	out := opts.IO.Out
 
-	if opts.IO.IsStdoutTTY() {
+	if !opts.IO.IsStdoutTTY() {
 		return errors.New("must be connected to a terminal")
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
 	}
 
 	var toView ghrepo.Interface
@@ -145,12 +152,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 	}
 
-	repo, err := api.GitHubRepo(apiClient, toView)
-	if err != nil {
-		return err
-	}
-
-	seed := computeSeed(ghrepo.FullName(repo))
+	seed := computeSeed(ghrepo.FullName(toView))
 	rand.Seed(seed)
 
 	termWidth, termHeight, err := utils.TerminalSize(out)
@@ -164,21 +166,21 @@ func gardenRun(opts *GardenOptions) error {
 	geo := &Geometry{
 		Width:      termWidth,
 		Height:     termHeight,
-		Repository: baseRepo,
+		Repository: toView,
 		// TODO based on number of commits/cells instead of just hardcoding
 		Density: 0.3,
 	}
 
 	maxCommits := geo.Width * geo.Height
 
-	commits, err := getCommits(client, baseRepo, maxCommits)
+	commits, err := getCommits(apiClient, toView, maxCommits)
 	if err != nil {
 		return err
 	}
 	player := &Player{0, 0, utils.Bold("@"), geo, 0}
 
-	clear()
 	garden := plantGarden(commits, geo)
+	fmt.Printf("\033[2J")
 	drawGarden(out, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
@@ -210,7 +212,7 @@ func gardenRun(opts *GardenOptions) error {
 			break
 		}
 
-		clear()
+		fmt.Printf("\033[2J")
 		drawGarden(out, garden, player)
 	}
 
