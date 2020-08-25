@@ -21,6 +21,10 @@ type RunOptions struct {
 	Remotes    func() (context.Remotes, error)
 
 	SelectorArg string
+	Failed      bool
+	All         bool
+	Check       string
+	Suite       string
 }
 
 func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command {
@@ -50,6 +54,11 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		},
 	}
 
+	cmd.Flags().BoolVarP(&opts.Failed, "failed", "f", false, "Rerun all failed checks")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Rerun all checks")
+	cmd.Flags().StringVarP(&opts.Check, "check", "c", "", "Rerun a check by name")
+	cmd.Flags().StringVarP(&opts.Suite, "suite", "s", "", "Rerun all checks in a suite")
+
 	return cmd
 }
 
@@ -72,6 +81,13 @@ func runRun(opts *RunOptions) error {
 
 	fmt.Printf("DEBUG %#v\n", pr)
 	fmt.Printf("DEBUG %#v\n", repo)
+
+	// gh pr run
+	// => interactive multi select of checks to re-run
+	// gh pr run --failed
+	// gh pr run --all
+	// gh pr run --suite="foo"
+	// gh pr run --check="foo"
 
 	return nil
 }
