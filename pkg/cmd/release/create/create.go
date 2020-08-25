@@ -1,19 +1,24 @@
 package create
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -35,6 +40,11 @@ type CreateOptions struct {
 
 	// for interactive flow
 	SubmitAction string
+	// for interactive flow
+	ReleaseNotesAction string
+
+	// the value from the --repo flag
+	RepoOverride string
 
 	// maximum number of simultaneous uploads
 	Concurrency int
@@ -56,6 +66,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
 			opts.TagName = args[0]
 
@@ -116,6 +127,35 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
+		var tagDescription string
+		var generatedChangelog string
+		if opts.RepoOverride == "" {
+			headRef := opts.TagName
+			tagDescription, _ = gitTagInfo(opts.TagName)
+			if tagDescription == "" {
+				if opts.Target != "" {
+					// TODO: use the remote-tracking version of the branch ref
+					headRef = opts.Target
+				} else {
+					headRef = "HEAD"
+				}
+			}
+
+			if prevTag, err := detectPreviousTag(headRef); err == nil {
+				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+				generatedChangelog = generateChangelog(commits)
+			}
+		}
+
+		editorOptions := []string{"Write my own"}
+		if generatedChangelog != "" {
+			editorOptions = append(editorOptions, "Write using commit log as template")
+		}
+		if tagDescription != "" {
+			editorOptions = append(editorOptions, "Write using git tag message as template")
+		}
+		editorOptions = append(editorOptions, "Leave blank")
+
 		qs := []*survey.Question{
 			{
 				Name: "name",
@@ -125,18 +165,46 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 			{
-				Name: "body",
-				Prompt: &surveyext.GhEditor{
-					BlankAllowed:  true,
-					EditorCommand: editorCommand,
-					Editor: &survey.Editor{
-						Message:     "Release notes",
-						FileName:    "*.md",
-						Default:     opts.Body,
-						HideDefault: true,
-					},
+				Name: "releaseNotesAction",
+				Prompt: &survey.Select{
+					Message: "Release notes",
+					Options: editorOptions,
 				},
 			},
+		}
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+
+		var openEditor bool
+		var editorContents string
+
+		switch opts.ReleaseNotesAction {
+		case "Write my own":
+			openEditor = true
+		case "Write using commit log as template":
+			openEditor = true
+			editorContents = generatedChangelog
+		case "Write using git tag message as template":
+			openEditor = true
+			editorContents = tagDescription
+		case "Leave blank":
+			openEditor = false
+		default:
+			return fmt.Errorf("invalid action: %v", opts.ReleaseNotesAction)
+		}
+
+		if openEditor {
+			// TODO: consider using iostreams here
+			text, err := surveyext.Edit(editorCommand, "*.md", editorContents, os.Stdin, os.Stdout, os.Stderr, nil)
+			if err != nil {
+				return err
+			}
+			opts.Body = text
+		}
+
+		qs = []*survey.Question{
 			{
 				Name: "prerelease",
 				Prompt: &survey.Confirm{
@@ -169,6 +237,8 @@ func createRun(opts *CreateOptions) error {
 			opts.Draft = true
 		case "Cancel":
 			return cmdutil.SilentError
+		default:
+			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}
 	}
 
@@ -219,4 +289,62 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.HTMLURL)
 
 	return nil
+}
+
+func gitTagInfo(tagName string) (string, error) {
+	cmd := exec.Command("git", "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	b, err := run.PrepareCmd(cmd).Output()
+	return string(b), err
+}
+
+func detectPreviousTag(headRef string) (string, error) {
+	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
+	b, err := run.PrepareCmd(cmd).Output()
+	return strings.TrimSpace(string(b)), err
+}
+
+type logEntry struct {
+	Subject string
+	Body    string
+}
+
+func changelogForRange(refRange string) ([]logEntry, error) {
+	cmd := exec.Command("git", "-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
+	b, err := run.PrepareCmd(cmd).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []logEntry
+	for _, cb := range bytes.Split(b, []byte{'\000'}) {
+		c := strings.ReplaceAll(string(cb), "\r\n", "\n")
+		c = strings.TrimPrefix(c, "\n")
+		if len(c) == 0 {
+			continue
+		}
+		parts := strings.SplitN(c, "\n\n", 2)
+		var body string
+		subject := strings.ReplaceAll(parts[0], "\n", " ")
+		if len(parts) > 1 {
+			body = parts[1]
+		}
+		entries = append(entries, logEntry{
+			Subject: subject,
+			Body:    body,
+		})
+	}
+
+	return entries, nil
+}
+
+func generateChangelog(commits []logEntry) string {
+	var parts []string
+	for _, c := range commits {
+		// TODO: consider rendering "Merge pull request #123 from owner/branch" differently
+		parts = append(parts, fmt.Sprintf("* %s", c.Subject))
+		if c.Body != "" {
+			parts = append(parts, text.Indent(c.Body, "  "))
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }
