@@ -120,6 +120,10 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 func gardenRun(opts *GardenOptions) error {
 	out := opts.IO.Out
 
+	if runtime.GOOS == "windows" {
+		return errors.New("sorry :( this command only works on linux and macos")
+	}
+
 	if !opts.IO.IsStdoutTTY() {
 		return errors.New("must be connected to a terminal")
 	}
@@ -450,12 +454,7 @@ func getCommits(client *api.Client, repo ghrepo.Interface, maxCommits int) ([]*C
 }
 
 func clear(io *iostreams.IOStreams) {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls")
-	} else {
-		cmd = exec.Command("clear")
-	}
+	cmd := exec.Command("clear")
 	cmd.Stdout = io.Out
 	_ = cmd.Run()
 }
