@@ -3,7 +3,6 @@ package checks
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -74,7 +73,7 @@ func checksRun(opts *ChecksOptions) error {
 		return err
 	}
 
-	runList, err := checkRuns(apiClient, repo, pr)
+	runList, err := shared.CheckRuns(apiClient, repo, pr)
 	if err != nil {
 		return err
 	}
@@ -122,44 +121,4 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	return tp.Render()
-}
-
-type checkRun struct {
-	Name    string
-	Status  string
-	Link    string
-	Elapsed time.Duration
-}
-
-type checkRunList struct {
-	Passing   int
-	Failing   int
-	Pending   int
-	CheckRuns []checkRun
-}
-
-func (runList *checkRunList) Summary() string {
-	fails := runList.Failing
-	passes := runList.Passing
-	pending := runList.Pending
-
-	if fails+passes+pending == 0 {
-		return ""
-	}
-
-	summary := ""
-
-	if runList.Failing > 0 {
-		summary = "Some checks were not successful"
-	} else if runList.Pending > 0 {
-		summary = "Some checks are still pending"
-	} else {
-		summary = "All checks were successful"
-	}
-
-	tallies := fmt.Sprintf(
-		"%d failing, %d successful, and %d pending checks",
-		fails, passes, pending)
-
-	return fmt.Sprintf("%s\n%s", utils.Bold(summary), tallies)
 }

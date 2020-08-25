@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -75,7 +76,7 @@ func startedAt() time.Time {
 func Test_checksRun_tty(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload checkRunsPayload
+		payload shared.CheckRunsPayload
 		stubs   func(*httpmock.Registry)
 		wantOut string
 	}{
@@ -91,14 +92,14 @@ func Test_checksRun_tty(t *testing.T) {
 		},
 		{
 			name: "no checks",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{},
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{},
 			},
 		},
 		{
 			name: "some failing",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "sad tests",
 						Status:      "completed",
@@ -129,8 +130,8 @@ func Test_checksRun_tty(t *testing.T) {
 		},
 		{
 			name: "some pending",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "rad tests",
 						Status:      "completed",
@@ -161,8 +162,8 @@ func Test_checksRun_tty(t *testing.T) {
 		},
 		{
 			name: "all passing",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "rad tests",
 						Status:      "completed",
@@ -234,7 +235,7 @@ func Test_checksRun_tty(t *testing.T) {
 func Test_checksRun_nontty(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload checkRunsPayload
+		payload shared.CheckRunsPayload
 		stubs   func(*httpmock.Registry)
 		wantOut string
 	}{
@@ -250,14 +251,14 @@ func Test_checksRun_nontty(t *testing.T) {
 		},
 		{
 			name: "no checks",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{},
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{},
 			},
 		},
 		{
 			name: "some failing",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "sad tests",
 						Status:      "completed",
@@ -288,8 +289,8 @@ func Test_checksRun_nontty(t *testing.T) {
 		},
 		{
 			name: "some pending",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "rad tests",
 						Status:      "completed",
@@ -320,8 +321,8 @@ func Test_checksRun_nontty(t *testing.T) {
 		},
 		{
 			name: "all passing",
-			payload: checkRunsPayload{
-				CheckRuns: []checkRunPayload{
+			payload: shared.CheckRunsPayload{
+				CheckRuns: []shared.CheckRunPayload{
 					{
 						Name:        "rad tests",
 						Status:      "completed",

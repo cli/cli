@@ -1,4 +1,4 @@
-package checks
+package shared
 
 import (
 	"fmt"
@@ -6,9 +6,10 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/utils"
 )
 
-type checkRunPayload struct {
+type CheckRunPayload struct {
 	Name        string
 	Status      string
 	Conclusion  string
@@ -17,12 +18,26 @@ type checkRunPayload struct {
 	HtmlUrl     string    `json:"html_url"`
 }
 
-type checkRunsPayload struct {
-	CheckRuns []checkRunPayload `json:"check_runs"`
+type CheckRunsPayload struct {
+	CheckRuns []CheckRunPayload `json:"check_runs"`
 }
 
-func checkRuns(client *api.Client, repo ghrepo.Interface, pr *api.PullRequest) (*checkRunList, error) {
-	list := checkRunList{}
+type CheckRun struct {
+	Name    string
+	Status  string
+	Link    string
+	Elapsed time.Duration
+}
+
+type CheckRunList struct {
+	Passing   int
+	Failing   int
+	Pending   int
+	CheckRuns []CheckRun
+}
+
+func CheckRuns(client *api.Client, repo ghrepo.Interface, pr *api.PullRequest) (*CheckRunList, error) {
+	list := CheckRunList{}
 
 	if len(pr.Commits.Nodes) == 0 {
 		return &list, nil
@@ -30,7 +45,7 @@ func checkRuns(client *api.Client, repo ghrepo.Interface, pr *api.PullRequest) (
 
 	path := fmt.Sprintf("repos/%s/%s/commits/%s/check-runs",
 		repo.RepoOwner(), repo.RepoName(), pr.Commits.Nodes[0].Commit.Oid)
-	var response checkRunsPayload
+	var response CheckRunsPayload
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &response)
 	if err != nil {
@@ -40,7 +55,7 @@ func checkRuns(client *api.Client, repo ghrepo.Interface, pr *api.PullRequest) (
 	for _, cr := range response.CheckRuns {
 		elapsed := cr.CompletedAt.Sub(cr.StartedAt)
 
-		run := checkRun{
+		run := CheckRun{
 			Elapsed: elapsed,
 			Name:    cr.Name,
 			Link:    cr.HtmlUrl,
@@ -67,4 +82,30 @@ func checkRuns(client *api.Client, repo ghrepo.Interface, pr *api.PullRequest) (
 	}
 
 	return &list, nil
+}
+
+func (runList *CheckRunList) Summary() string {
+	fails := runList.Failing
+	passes := runList.Passing
+	pending := runList.Pending
+
+	if fails+passes+pending == 0 {
+		return ""
+	}
+
+	summary := ""
+
+	if runList.Failing > 0 {
+		summary = "Some checks were not successful"
+	} else if runList.Pending > 0 {
+		summary = "Some checks are still pending"
+	} else {
+		summary = "All checks were successful"
+	}
+
+	tallies := fmt.Sprintf(
+		"%d failing, %d successful, and %d pending checks",
+		fails, passes, pending)
+
+	return fmt.Sprintf("%s\n%s", utils.Bold(summary), tallies)
 }
