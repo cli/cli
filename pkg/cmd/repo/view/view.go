@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -63,6 +64,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	var toView ghrepo.Interface
+	apiClient := api.NewClientFromHTTP(httpClient)
 	if opts.RepoArg == "" {
 		var err error
 		toView, err = opts.BaseRepo()
@@ -71,13 +73,19 @@ func viewRun(opts *ViewOptions) error {
 		}
 	} else {
 		var err error
-		toView, err = ghrepo.FromFullName(opts.RepoArg)
+		viewURL := opts.RepoArg
+		if !strings.Contains(viewURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			viewURL = currentUser + "/" + viewURL
+		}
+		toView, err = ghrepo.FromFullName(viewURL)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	}
-
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	repo, err := api.GitHubRepo(apiClient, toView)
 	if err != nil {
