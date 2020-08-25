@@ -284,7 +284,7 @@ func Test_checksRun_nontty(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "sad tests\tfail\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nslow tests\tpending\t24h0m0s\tsweet link\nSome checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\n",
+			wantOut: "sad tests\tfail\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nslow tests\tpending\t24h0m0s\tsweet link\n",
 		},
 		{
 			name: "some pending",
@@ -316,7 +316,7 @@ func Test_checksRun_nontty(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "rad tests\tpass\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nslow tests\tpending\t24h0m0s\tsweet link\nSome checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n",
+			wantOut: "rad tests\tpass\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nslow tests\tpending\t24h0m0s\tsweet link\n",
 		},
 		{
 			name: "all passing",
@@ -348,7 +348,7 @@ func Test_checksRun_nontty(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "rad tests\tpass\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nawesome tests\tpass\t24h0m0s\tsweet link\nAll checks were successful\n0 failing, 3 successful, and 0 pending checks\n\n",
+			wantOut: "rad tests\tpass\t24h0m0s\tsweet link\ncool tests\tpass\t24h0m0s\tsweet link\nawesome tests\tpass\t24h0m0s\tsweet link\n",
 		},
 	}
 

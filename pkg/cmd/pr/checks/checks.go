@@ -116,8 +116,10 @@ func checksRun(opts *ChecksOptions) error {
 		tp.EndRow()
 	}
 
-	fmt.Fprintln(opts.IO.Out, runList.Summary())
-	fmt.Fprintln(opts.IO.Out)
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintln(opts.IO.Out, runList.Summary())
+		fmt.Fprintln(opts.IO.Out)
+	}
 
 	return tp.Render()
 }
