@@ -96,7 +96,7 @@ func checksRun(opts *ChecksOptions) error {
 			mark = utils.RedX()
 		}
 
-		elapsed := fmt.Sprintf("%s", cr.Elapsed)
+		elapsed := cr.Elapsed.String()
 		if cr.Elapsed < 0 {
 			elapsed = "0"
 		}
