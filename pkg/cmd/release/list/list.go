@@ -1,6 +1,7 @@
 package list
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -64,10 +65,45 @@ func listRun(opts *ListOptions) error {
 
 	now := time.Now()
 	table := utils.NewTablePrinter(opts.IO)
+	iofmt := opts.IO.ColorScheme()
+	seenLatest := false
 	for _, rel := range releases {
-		table.AddField(rel.TagName, nil, nil)
-		table.AddField(text.ReplaceExcessiveWhitespace(rel.Name), nil, nil)
-		table.AddField(utils.FuzzyAgo(now.Sub(rel.PublishedAt)), nil, nil)
+		title := text.ReplaceExcessiveWhitespace(rel.Name)
+		if title == "" {
+			title = rel.TagName
+		}
+		table.AddField(title, nil, nil)
+
+		badge := ""
+		var badgeColor func(string) string
+		if !rel.IsDraft && !rel.IsPrerelease && !seenLatest {
+			badge = "Latest"
+			badgeColor = iofmt.Green
+			seenLatest = true
+		} else if rel.IsDraft {
+			badge = "Draft"
+			badgeColor = iofmt.Red
+		} else if rel.IsPrerelease {
+			badge = "Pre-release"
+			badgeColor = iofmt.Yellow
+		}
+		table.AddField(badge, nil, badgeColor)
+
+		tagName := rel.TagName
+		if table.IsTTY() {
+			tagName = fmt.Sprintf("(%s)", tagName)
+		}
+		table.AddField(tagName, nil, nil)
+
+		pubDate := rel.PublishedAt
+		if rel.PublishedAt.IsZero() {
+			pubDate = rel.CreatedAt
+		}
+		publishedAt := pubDate.String()
+		if table.IsTTY() {
+			publishedAt = utils.FuzzyAgo(now.Sub(pubDate))
+		}
+		table.AddField(publishedAt, nil, iofmt.Gray)
 		table.EndRow()
 	}
 	err = table.Render()
