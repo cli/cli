@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -180,7 +181,7 @@ func gardenRun(opts *GardenOptions) error {
 	player := &Player{0, 0, utils.Bold("@"), geo, 0}
 
 	garden := plantGarden(commits, geo)
-	fmt.Printf("\033[2J")
+	clear(opts.IO)
 	drawGarden(out, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
@@ -212,7 +213,7 @@ func gardenRun(opts *GardenOptions) error {
 			break
 		}
 
-		fmt.Printf("\033[2J")
+		clear(opts.IO)
 		drawGarden(out, garden, player)
 	}
 
@@ -446,4 +447,15 @@ func getCommits(client *api.Client, repo ghrepo.Interface, maxCommits int) ([]*C
 	}
 
 	return commits, nil
+}
+
+func clear(io *iostreams.IOStreams) {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+	cmd.Stdout = io.Out
+	_ = cmd.Run()
 }
