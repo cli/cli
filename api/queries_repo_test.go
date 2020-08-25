@@ -1,51 +1,12 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 )
 
-func Test_RepoCreate(t *testing.T) {
-	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
-
-	http.StubResponse(200, bytes.NewBufferString(`{}`))
-
-	input := RepoCreateInput{
-		Description: "roasted chesnuts",
-		HomepageURL: "http://example.com",
-	}
-
-	_, err := RepoCreate(client, input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(http.Requests) != 1 {
-		t.Fatalf("expected 1 HTTP request, seen %d", len(http.Requests))
-	}
-
-	var reqBody struct {
-		Query     string
-		Variables struct {
-			Input map[string]interface{}
-		}
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if description := reqBody.Variables.Input["description"].(string); description != "roasted chesnuts" {
-		t.Errorf("expected description to be %q, got %q", "roasted chesnuts", description)
-	}
-	if homepage := reqBody.Variables.Input["homepageUrl"].(string); homepage != "http://example.com" {
-		t.Errorf("expected homepageUrl to be %q, got %q", "http://example.com", homepage)
-	}
-}
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
@@ -60,7 +21,7 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 
 	http.Register(
-		httpmock.GraphQL(`\bassignableUsers\(`),
+		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
@@ -71,7 +32,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\blabels\(`),
+		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "labels": {
 			"nodes": [
@@ -83,7 +44,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\bmilestones\(`),
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
@@ -94,7 +55,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\brepository\(.+\bprojects\(`),
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
@@ -105,7 +66,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bprojects\(`),
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [
@@ -115,7 +76,7 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`\borganization\(.+\bteams\(`),
+		httpmock.GraphQL(`query OrganizationTeamList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "teams": {
 			"nodes": [
@@ -188,7 +149,7 @@ func Test_RepoResolveMetadataIDs(t *testing.T) {
 		Labels:    []string{"bug", "help wanted"},
 	}
 
-	expectedQuery := `{
+	expectedQuery := `query RepositoryResolveMetadataIDs {
 u000: user(login:"monalisa"){id,login}
 u001: user(login:"hubot"){id,login}
 u002: user(login:"octocat"){id,login}
@@ -219,7 +180,7 @@ t001: team(slug:"robots"){id,slug}
 	`
 
 	http.Register(
-		httpmock.MatchAny,
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.GraphQLQuery(responseJSON, func(q string, _ map[string]interface{}) {
 			if q != expectedQuery {
 				t.Errorf("expected query %q, got %q", expectedQuery, q)

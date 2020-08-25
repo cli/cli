@@ -3,14 +3,10 @@ package utils
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
-	"github.com/mattn/go-isatty"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 type TablePrinter interface {
@@ -20,31 +16,15 @@ type TablePrinter interface {
 	Render() error
 }
 
-func NewTablePrinter(w io.Writer) TablePrinter {
-	if outFile, isFile := w.(*os.File); isFile {
-		// TODO: use utils.IsTerminal()
-		isCygwin := isatty.IsCygwinTerminal(outFile.Fd())
-		if isatty.IsTerminal(outFile.Fd()) || isCygwin {
-			ttyWidth := 80
-			if w, _, err := terminal.GetSize(int(outFile.Fd())); err == nil {
-				ttyWidth = w
-			} else if isCygwin {
-				tputCmd := exec.Command("tput", "cols")
-				tputCmd.Stdin = os.Stdin
-				if out, err := tputCmd.Output(); err == nil {
-					if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
-						ttyWidth = w
-					}
-				}
-			}
-			return &ttyTablePrinter{
-				out:      NewColorable(outFile),
-				maxWidth: ttyWidth,
-			}
+func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
+	if io.IsStdoutTTY() {
+		return &ttyTablePrinter{
+			out:      io.Out,
+			maxWidth: io.TerminalWidth(),
 		}
 	}
 	return &tsvTablePrinter{
-		out: w,
+		out: io.Out,
 	}
 }
 

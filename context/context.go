@@ -5,25 +5,15 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-// TODO these are sprinkled across command, context, config, and ghrepo
-const defaultHostname = "github.com"
-
 // Context represents the interface for querying information about the current environment
 type Context interface {
-	AuthToken() (string, error)
-	SetAuthToken(string)
-	Branch() (string, error)
-	SetBranch(string)
-	Remotes() (Remotes, error)
-	BaseRepo() (ghrepo.Interface, error)
-	SetBaseRepo(string)
 	Config() (config.Config, error)
 }
 
@@ -31,21 +21,30 @@ type Context interface {
 // unusually large number of git remotes
 const maxRemotesForLookup = 5
 
+// ResolveRemotesToRepos takes in a list of git remotes and fetches more information about the repositories they map to.
+// Only the git remotes belonging to the same hostname are ever looked up; all others are ignored.
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
 	sort.Stable(remotes)
-	lenRemotesForLookup := len(remotes)
-	if lenRemotesForLookup > maxRemotesForLookup {
-		lenRemotesForLookup = maxRemotesForLookup
-	}
 
 	hasBaseOverride := base != ""
 	baseOverride, _ := ghrepo.FromFullName(base)
 	foundBaseOverride := false
-	repos := make([]ghrepo.Interface, 0, lenRemotesForLookup)
-	for _, r := range remotes[:lenRemotesForLookup] {
+
+	var hostname string
+	var repos []ghrepo.Interface
+	for i, r := range remotes {
+		if i == 0 {
+			hostname = r.RepoHost()
+		} else if !strings.EqualFold(r.RepoHost(), hostname) {
+			// ignore all remotes for a hostname different to that of the 1st remote
+			continue
+		}
 		repos = append(repos, r)
-		if ghrepo.IsSame(r, baseOverride) {
+		if baseOverride != nil && ghrepo.IsSame(r, baseOverride) {
 			foundBaseOverride = true
+		}
+		if len(repos) == maxRemotesForLookup {
+			break
 		}
 	}
 	if hasBaseOverride && !foundBaseOverride {
@@ -154,11 +153,7 @@ func New() Context {
 
 // A Context implementation that queries the filesystem
 type fsContext struct {
-	config    config.Config
-	remotes   Remotes
-	branch    string
-	baseRepo  ghrepo.Interface
-	authToken string
+	config config.Config
 }
 
 func (c *fsContext) Config() (config.Config, error) {
@@ -170,93 +165,6 @@ func (c *fsContext) Config() (config.Config, error) {
 			return nil, err
 		}
 		c.config = cfg
-		c.authToken = ""
 	}
 	return c.config, nil
-}
-
-func (c *fsContext) AuthToken() (string, error) {
-	if c.authToken != "" {
-		return c.authToken, nil
-	}
-
-	cfg, err := c.Config()
-	if err != nil {
-		return "", err
-	}
-
-	var notFound *config.NotFoundError
-	token, err := cfg.Get(defaultHostname, "oauth_token")
-	if token == "" || errors.As(err, &notFound) {
-		// interactive OAuth flow
-		return config.AuthFlowWithConfig(cfg, defaultHostname, "Notice: authentication required")
-	} else if err != nil {
-		return "", err
-	}
-
-	return token, nil
-}
-
-func (c *fsContext) SetAuthToken(t string) {
-	c.authToken = t
-}
-
-func (c *fsContext) Branch() (string, error) {
-	if c.branch != "" {
-		return c.branch, nil
-	}
-
-	currentBranch, err := git.CurrentBranch()
-	if err != nil {
-		return "", fmt.Errorf("could not determine current branch: %w", err)
-	}
-
-	c.branch = currentBranch
-	return c.branch, nil
-}
-
-func (c *fsContext) SetBranch(b string) {
-	c.branch = b
-}
-
-func (c *fsContext) Remotes() (Remotes, error) {
-	if c.remotes == nil {
-		gitRemotes, err := git.Remotes()
-		if err != nil {
-			return nil, err
-		}
-		if len(gitRemotes) == 0 {
-			return nil, errors.New("no git remotes found")
-		}
-
-		sshTranslate := git.ParseSSHConfig().Translator()
-		c.remotes = translateRemotes(gitRemotes, sshTranslate)
-	}
-
-	if len(c.remotes) == 0 {
-		return nil, errors.New("no git remote found for a github.com repository")
-	}
-	return c.remotes, nil
-}
-
-func (c *fsContext) BaseRepo() (ghrepo.Interface, error) {
-	if c.baseRepo != nil {
-		return c.baseRepo, nil
-	}
-
-	remotes, err := c.Remotes()
-	if err != nil {
-		return nil, err
-	}
-	rem, err := remotes.FindByName("upstream", "github", "origin", "*")
-	if err != nil {
-		return nil, err
-	}
-
-	c.baseRepo = rem
-	return c.baseRepo, nil
-}
-
-func (c *fsContext) SetBaseRepo(nwo string) {
-	c.baseRepo, _ = ghrepo.FromFullName(nwo)
 }

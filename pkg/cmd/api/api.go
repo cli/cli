@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -32,9 +34,12 @@ type ApiOptions struct {
 	RawFields           []string
 	RequestHeaders      []string
 	ShowResponseHeaders bool
+	Paginate            bool
+	Silent              bool
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
@@ -42,6 +47,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -52,8 +58,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 "graphql" to access the GitHub API v4.
 
-Placeholder values ":owner" and ":repo" in the endpoint argument will get replaced
-with values from the repository of the current directory.
+Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
+get replaced with values from the repository of the current directory.
 
 The default HTTP request method is "GET" normally and "POST" if any parameters
 were added. Override the method with '--method'.
@@ -66,32 +72,65 @@ on the format of the value:
 
 - literal values "true", "false", "null", and integer numbers get converted to
   appropriate JSON types;
-- placeholder values ":owner" and ":repo" get populated with values from the
-  repository of the current directory;
+- placeholder values ":owner", ":repo", and ":branch" get populated with values
+  from the repository of the current directory;
 - if the value starts with "@", the rest of the value is interpreted as a
   filename to read the value from. Pass "-" to read from standard input.
+
+For GraphQL requests, all fields other than "query" and "operationName" are
+interpreted as GraphQL variables.
 
 Raw request body may be passed from the outside via a file specified by '--input'.
 Pass "-" to read from standard input. In this mode, parameters specified via
 '--field' flags are serialized into URL query parameters.
-`,
+
+In '--paginate' mode, all pages of results will sequentially be requested until
+there are no more pages of results. For GraphQL requests, this requires that the
+original query accepts an '$endCursor: String' variable and that it fetches the
+'pageInfo{ hasNextPage, endCursor }' set of fields from a collection.`,
 		Example: heredoc.Doc(`
 			$ gh api repos/:owner/:repo/releases
 
 			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
-				query($name: String!, $owner: String!) {
-					repository(owner: $owner, name: $name) {
-						releases(last: 3) {
-							nodes { tagName }
-						}
-					}
-				}
+			  query($name: String!, $owner: String!) {
+			    repository(owner: $owner, name: $name) {
+			      releases(last: 3) {
+			        nodes { tagName }
+			      }
+			    }
+			  }
+			'
+			
+			$ gh api graphql --paginate -f query='
+			  query($endCursor: String) {
+			    viewer {
+			      repositories(first: 100, after: $endCursor) {
+			        nodes { nameWithOwner }
+			        pageInfo {
+			          hasNextPage
+			          endCursor
+			        }
+			      }
+			    }
+			  }
 			'
 		`),
+		Annotations: map[string]string{
+			"help:environment": heredoc.Doc(`
+				GITHUB_TOKEN: an authentication token for API requests.
+			`),
+		},
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
+
+			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported for non-GET requests`)}
+			}
+			if opts.Paginate && opts.RequestInputFile != "" {
+				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
+			}
 
 			if runF != nil {
 				return runF(&opts)
@@ -105,7 +144,9 @@ Pass "-" to read from standard input. In this mode, parameters specified via
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
+	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	return cmd
 }
 
@@ -115,6 +156,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	isGraphQL := opts.RequestPath == "graphql"
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -125,6 +167,10 @@ func apiRun(opts *ApiOptions) error {
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
+	}
+
+	if opts.Paginate && !isGraphQL {
+		requestPath = addPerPage(requestPath, 100, params)
 	}
 
 	if opts.RequestInputFile != "" {
@@ -145,19 +191,55 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	resp, err := httpRequest(httpClient, method, requestPath, requestBody, requestHeaders)
-	if err != nil {
-		return err
+	headersOutputStream := opts.IO.Out
+	if opts.Silent {
+		opts.IO.Out = ioutil.Discard
 	}
 
+	host := ghinstance.OverridableDefault()
+
+	hasNextPage := true
+	for hasNextPage {
+		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
+		if err != nil {
+			return err
+		}
+
+		endCursor, err := processResponse(resp, opts, headersOutputStream)
+		if err != nil {
+			return err
+		}
+
+		if !opts.Paginate {
+			break
+		}
+
+		if isGraphQL {
+			hasNextPage = endCursor != ""
+			if hasNextPage {
+				params["endCursor"] = endCursor
+			}
+		} else {
+			requestPath, hasNextPage = findNextPage(resp)
+		}
+
+		if hasNextPage && opts.ShowResponseHeaders {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
+	}
+
+	return nil
+}
+
+func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
-		fmt.Fprintln(opts.IO.Out, resp.Proto, resp.Status)
-		printHeaders(opts.IO.Out, resp.Header, opts.IO.ColorEnabled())
-		fmt.Fprint(opts.IO.Out, "\r\n")
+		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
+		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersOutputStream, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
-		return nil
+		return
 	}
 	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
@@ -168,34 +250,47 @@ func apiRun(opts *ApiOptions) error {
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
 		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
-			return err
+			return
 		}
+	}
+
+	var bodyCopy *bytes.Buffer
+	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
+	if isGraphQLPaginate {
+		bodyCopy = &bytes.Buffer{}
+		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
 	if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 		if err != nil {
-			return err
+			return
 		}
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	} else if resp.StatusCode > 299 {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
-		return cmdutil.SilentError
+		err = cmdutil.SilentError
+		return
 	}
 
-	return nil
+	if isGraphQLPaginate {
+		endCursor = findEndCursor(bodyCopy)
+	}
+
+	return
 }
 
-var placeholderRE = regexp.MustCompile(`\:(owner|repo)\b`)
+var placeholderRE = regexp.MustCompile(`\:(owner|repo|branch)\b`)
 
 // fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
@@ -208,18 +303,28 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 		return value, err
 	}
 
-	value = placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
 		switch m {
 		case ":owner":
 			return baseRepo.RepoOwner()
 		case ":repo":
 			return baseRepo.RepoName()
+		case ":branch":
+			branch, e := opts.Branch()
+			if e != nil {
+				err = e
+			}
+			return branch
 		default:
 			panic(fmt.Sprintf("invalid placeholder: %q", m))
 		}
 	})
 
-	return value, nil
+	if err != nil {
+		return value, err
+	}
+
+	return filled, nil
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
@@ -336,23 +441,43 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 
 	var parsedBody struct {
 		Message string
-		Errors  []struct {
-			Message string
-		}
+		Errors  []json.RawMessage
 	}
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
 		return r, "", err
 	}
-
 	if parsedBody.Message != "" {
 		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
-	} else if len(parsedBody.Errors) > 0 {
-		msgs := make([]string, len(parsedBody.Errors))
-		for i, e := range parsedBody.Errors {
-			msgs[i] = e.Message
+	}
+
+	type errorMessage struct {
+		Message string
+	}
+	var errors []string
+	for _, rawErr := range parsedBody.Errors {
+		if len(rawErr) == 0 {
+			continue
 		}
-		return bodyCopy, strings.Join(msgs, "\n"), nil
+		if rawErr[0] == '{' {
+			var objectError errorMessage
+			err := json.Unmarshal(rawErr, &objectError)
+			if err != nil {
+				return r, "", err
+			}
+			errors = append(errors, objectError.Message)
+		} else if rawErr[0] == '"' {
+			var stringError string
+			err := json.Unmarshal(rawErr, &stringError)
+			if err != nil {
+				return r, "", err
+			}
+			errors = append(errors, stringError)
+		}
+	}
+
+	if len(errors) > 0 {
+		return bodyCopy, strings.Join(errors, "\n"), nil
 	}
 
 	return bodyCopy, "", nil

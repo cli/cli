@@ -61,7 +61,7 @@ brews:
     folder: Formula
     custom_block: |
       head do
-        url "https://github.com/cli/cli.git"
+        url "https://github.com/cli/cli.git", :branch => "trunk"
         depends_on "go"
       end
     install: |
@@ -82,6 +82,7 @@ nfpms:
     bindir: /usr/local
     dependencies:
       - git
+    description: GitHub’s official command line tool.
     formats:
       - deb
       - rpm

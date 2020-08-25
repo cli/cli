@@ -7,11 +7,11 @@ the terminal next to where you are already working with `git` and your code.
 
 ## Availability
 
-While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It does not currently support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning support for GitHub Enterprise Server after GitHub CLI is out of beta (likely toward the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on.
+While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It currently does not support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning on adding support for GitHub Enterprise Server after GitHub CLI is out of beta (likely towards the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on.
 
 ## We need your feedback
 
-GitHub CLI is currently early in its development, and we're hoping to get feedback from people using it.
+GitHub CLI is currently in its early development stages, and we're hoping to get feedback from people using it.
 
 If you've installed and used `gh`, we'd love for you to take a short survey here (no more than five minutes): https://forms.gle/umxd3h31c7aMQFKG7
 
@@ -31,9 +31,9 @@ Read the [official docs](https://cli.github.com/manual/) for more information.
 
 ## Comparison with hub
 
-For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new project for us to explore
+For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new project that helps us explore
 what an official GitHub CLI tool can look like with a fundamentally different design. While both
-tools bring GitHub to the terminal, `hub` behaves as a proxy to `git` and `gh` is a standalone
+tools bring GitHub to the terminal, `hub` behaves as a proxy to `git`, and `gh` is a standalone
 tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn more.
 
 
@@ -46,15 +46,31 @@ tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn mor
 
 #### Homebrew
 
-Install: `brew install github/gh/gh`
+Install:
 
-Upgrade: `brew upgrade gh`
+```bash
+brew install github/gh/gh
+```
+
+Upgrade:
+
+```bash
+brew upgrade gh
+```
 
 #### MacPorts
 
-Install: `sudo port install gh`
+Install:
 
-Upgrade: `sudo port selfupdate && sudo port upgrade gh`
+```bash
+sudo port install gh
+```
+
+Upgrade:
+
+```bash
+sudo port selfupdate && sudo port upgrade gh
+```
 
 ### Windows
 
@@ -64,24 +80,28 @@ Upgrade: `sudo port selfupdate && sudo port upgrade gh`
 
 Install:
 
-```
+```powershell
 scoop bucket add github-gh https://github.com/cli/scoop-gh.git
 scoop install gh
 ```
 
-Upgrade: `scoop update gh`
+Upgrade:
+
+```powershell
+scoop update gh
+```
 
 #### Chocolatey
 
 Install:
 
-```
+```powershell
 choco install gh
 ```
 
 Upgrade:
 
-```
+```powershell
 choco upgrade gh
 ```
 
@@ -93,43 +113,53 @@ MSI installers are available for download on the [releases page][].
 
 Install and upgrade:
 
-1. Download the `.deb` file from the [releases page][]
-2. `sudo apt install ./gh_*_linux_amd64.deb` install the downloaded file
+1. Download the `.deb` file from the [releases page][];
+2. Install the downloaded file: `sudo apt install ./gh_*_linux_amd64.deb`
 
 ### Fedora Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo dnf install gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo dnf install gh_*_linux_amd64.rpm`
 
 ### Centos Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo yum localinstall gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo yum localinstall gh_*_linux_amd64.rpm` 
 
 ### openSUSE/SUSE Linux
 
 Install and upgrade:
 
-1. Download the `.rpm` file from the [releases page][]
-2. `sudo zypper in gh_*_linux_amd64.rpm` install the downloaded file
+1. Download the `.rpm` file from the [releases page][];
+2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
 
 ### Arch Linux
 
-Arch Linux users can install from the AUR: https://aur.archlinux.org/packages/github-cli/
+Arch Linux users can install from the [community repo](https://www.archlinux.org/packages/community/x86_64/github-cli/):
 
 ```bash
-$ yay -S github-cli
+pacman -S github-cli
+```
+
+### Android
+
+Android users can install via Termux:
+
+```bash
+pkg install gh
 ```
 
 ### Other platforms
 
-Install a prebuilt binary from the [releases page][]
+Download packaged binaries from the [releases page][].
 
-### [Build from source](/docs/source.md)
+### Build from source
+
+See here on how to [build GitHub CLI from source](/docs/source.md).
 
 [docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh

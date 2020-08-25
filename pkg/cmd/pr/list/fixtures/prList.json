@@ -1,0 +1,49 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 3,
+        "edges": [
+          {
+            "node": {
+              "number": 32,
+              "title": "New feature",
+              "url": "https://github.com/monalisa/hello/pull/32",
+              "headRefName": "feature",
+              "state": "OPEN",
+              "isDraft": true
+            }
+          },
+          {
+            "node": {
+              "number": 29,
+              "title": "Fixed bad bug",
+              "url": "https://github.com/monalisa/hello/pull/29",
+              "headRefName": "bug-fix",
+              "state": "OPEN",
+              "isDraft": false,
+              "isCrossRepository": true,
+              "headRepositoryOwner": {
+                "login": "hubot"
+              }
+            }
+          },
+          {
+            "node": {
+              "number": 28,
+              "state": "MERGED",
+              "isDraft": false,
+              "title": "Improve documentation",
+              "url": "https://github.com/monalisa/hello/pull/28",
+              "headRefName": "docs"
+            }
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": ""
+        }
+      }
+    }
+  }
+}

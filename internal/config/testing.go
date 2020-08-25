@@ -42,7 +42,11 @@ func StubConfig(main, hosts string) func() {
 	ReadConfigFile = func(fn string) ([]byte, error) {
 		switch path.Base(fn) {
 		case "config.yml":
-			return []byte(main), nil
+			if main == "" {
+				return []byte(nil), os.ErrNotExist
+			} else {
+				return []byte(main), nil
+			}
 		case "hosts.yml":
 			if hosts == "" {
 				return []byte(nil), os.ErrNotExist

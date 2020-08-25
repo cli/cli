@@ -9,20 +9,23 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/cli/cli/internal/ghinstance"
 )
 
-func httpRequest(client *http.Client, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+func httpRequest(client *http.Client, hostname string, method string, p string, params interface{}, headers []string) (*http.Response, error) {
+	isGraphQL := p == "graphql"
 	var requestURL string
-	// TODO: GHE support
 	if strings.Contains(p, "://") {
 		requestURL = p
+	} else if isGraphQL {
+		requestURL = ghinstance.GraphQLEndpoint(hostname)
 	} else {
-		requestURL = "https://api.github.com/" + p
+		requestURL = ghinstance.RESTPrefix(hostname) + strings.TrimPrefix(p, "/")
 	}
 
 	var body io.Reader
 	var bodyIsJSON bool
-	isGraphQL := p == "graphql"
 
 	switch pp := params.(type) {
 	case map[string]interface{}:
@@ -87,7 +90,7 @@ func groupGraphQLVariables(params map[string]interface{}) map[string]interface{}
 
 	for key, val := range params {
 		switch key {
-		case "query":
+		case "query", "operationName":
 			topLevel[key] = val
 		default:
 			variables[key] = val

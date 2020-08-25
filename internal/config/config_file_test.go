@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -71,17 +70,29 @@ github.com:
 	eq(t, token, "OTOKEN")
 }
 
-func Test_parseConfig_notFound(t *testing.T) {
+func Test_parseConfig_hostFallback(t *testing.T) {
 	defer StubConfig(`---
-hosts:
-  example.com:
+git_protocol: ssh
+`, `---
+github.com:
+    user: monalisa
+    oauth_token: OTOKEN
+example.com:
     user: wronguser
     oauth_token: NOTTHIS
-`, "")()
+    git_protocol: https
+`)()
 	config, err := ParseConfig("config.yml")
 	eq(t, err, nil)
-	_, err = config.Get("github.com", "user")
-	eq(t, err, &NotFoundError{errors.New(`could not find config entry for "github.com"`)})
+	val, err := config.Get("example.com", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "https")
+	val, err = config.Get("github.com", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "ssh")
+	val, err = config.Get("nonexist.io", "git_protocol")
+	eq(t, err, nil)
+	eq(t, val, "ssh")
 }
 
 func Test_ParseConfig_migrateConfig(t *testing.T) {
@@ -110,14 +121,36 @@ github.com:
 }
 
 func Test_parseConfigFile(t *testing.T) {
-	fileContents := []string{"", " ", "\n"}
-	for _, contents := range fileContents {
-		t.Run(fmt.Sprintf("contents: %q", contents), func(t *testing.T) {
-			defer StubConfig(contents, "")()
+	tests := []struct {
+		contents string
+		wantsErr bool
+	}{
+		{
+			contents: "",
+			wantsErr: true,
+		},
+		{
+			contents: " ",
+			wantsErr: false,
+		},
+		{
+			contents: "\n",
+			wantsErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("contents: %q", tt.contents), func(t *testing.T) {
+			defer StubConfig(tt.contents, "")()
 			_, yamlRoot, err := parseConfigFile("config.yml")
-			eq(t, err, nil)
-			eq(t, yamlRoot.Content[0].Kind, yaml.MappingNode)
-			eq(t, len(yamlRoot.Content[0].Content), 0)
+			if tt.wantsErr != (err != nil) {
+				t.Fatalf("got error: %v", err)
+			}
+			if tt.wantsErr {
+				return
+			}
+			assert.Equal(t, yaml.MappingNode, yamlRoot.Content[0].Kind)
+			assert.Equal(t, 0, len(yamlRoot.Content[0].Content))
 		})
 	}
 }
