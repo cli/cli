@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
@@ -91,10 +92,41 @@ func main() {
 		}
 	}
 
+	authCheckEnabled := cmdutil.IsAuthCheckEnabled(cmd)
+
+	// TODO support other names
+	ghtoken := os.Getenv("GITHUB_TOKEN")
+	if ghtoken != "" {
+		authCheckEnabled = false
+	}
+
+	if authCheckEnabled {
+		hasAuth := false
+
+		cfg, err := cmdFactory.Config()
+		if err == nil {
+			hasAuth = cmdutil.CheckAuth(cfg)
+		}
+
+		if !hasAuth {
+			fmt.Fprintln(stderr, utils.Bold("Welcome to GitHub CLI!"))
+			fmt.Fprintln(stderr)
+			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+			fmt.Fprintln(stderr, "You can also set the GITHUB_TOKEN environment variable, if preferred.")
+			os.Exit(4)
+		}
+	}
+
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
 		printError(stderr, err, cmd, hasDebug)
+
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+			fmt.Println("hint: try authenticating with `gh auth login`")
+		}
+
 		os.Exit(1)
 	}
 	if root.HasFailed() {

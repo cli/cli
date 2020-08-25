@@ -98,6 +98,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		return &cmdutil.FlagError{Err: err}
 	})
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	// CHILD COMMANDS
 
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))

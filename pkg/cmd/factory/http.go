@@ -1,7 +1,6 @@
 package factory
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -30,20 +29,9 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, s
 
 			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
 			token, err := cfg.Get(hostname, "oauth_token")
-			if token == "" {
-				var notFound *config.NotFoundError
-				// TODO: check if stdout is TTY too
-				if errors.As(err, &notFound) && io.IsStdinTTY() {
-					// interactive OAuth flow
-					token, err = config.AuthFlowWithConfig(cfg, hostname, "Notice: authentication required", nil)
-				}
-				if err != nil {
-					return "", err
-				}
-				if token == "" {
-					// TODO: instruct user how to manually authenticate
-					return "", fmt.Errorf("authentication required for %s", hostname)
-				}
+			if err != nil || token == "" {
+				// Users shouldn't see this because of the pre-execute auth check on commands
+				return "", fmt.Errorf("authentication required for %s; please run `gh auth login -h %s`", hostname, hostname)
 			}
 
 			return fmt.Sprintf("token %s", token), nil
