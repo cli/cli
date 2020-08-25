@@ -276,43 +276,6 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 	return handleResponse(resp, data)
 }
 
-func (c Client) RESTWithResponse(method string, p string, body io.Reader, data interface{}) (*http.Response, error) {
-	url := "https://api.github.com/" + p
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
-		return nil, errors.New("api call failed")
-	}
-
-	if resp.StatusCode == http.StatusNoContent {
-		return resp, nil
-	}
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(b, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 func graphQLClient(h *http.Client, hostname string) *graphql.Client {
 	return graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), h)
 }
