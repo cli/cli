@@ -48,7 +48,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			Without an argument, the pull request that belongs to the current branch
 			is displayed.
-			
+
 			With '--web', open the pull request in a web browser instead.
     	`),
 		Args: cobra.MaximumNArgs(1),
@@ -114,6 +114,8 @@ func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "reviewers:\t%s\n", reviewers)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
 	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
+	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
+	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
 
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, pr.Body)

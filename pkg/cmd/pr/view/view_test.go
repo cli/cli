@@ -97,6 +97,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`url:\thttps://github.com/OWNER/REPO/pull/12\n`,
+				`number:\t12\n`,
 				`blueberries taste good`,
 			},
 		},
