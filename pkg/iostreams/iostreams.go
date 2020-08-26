@@ -103,18 +103,11 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func System() *IOStreams {
-	var out io.Writer = os.Stdout
-	var colorEnabled bool
-	if os.Getenv("NO_COLOR") == "" && isTerminal(os.Stdout) {
-		out = colorable.NewColorable(os.Stdout)
-		colorEnabled = true
-	}
-
 	return &IOStreams{
 		In:           os.Stdin,
-		Out:          out,
-		ErrOut:       os.Stderr,
-		colorEnabled: colorEnabled,
+		Out:          colorable.NewColorable(os.Stdout),
+		ErrOut:       colorable.NewColorable(os.Stderr),
+		colorEnabled: os.Getenv("NO_COLOR") == "" && isTerminal(os.Stdout),
 	}
 }
 
