@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -24,7 +25,6 @@ type RunOptions struct {
 	Failed      bool
 	All         bool
 	Check       string
-	Suite       string
 }
 
 func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command {
@@ -57,7 +57,6 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().BoolVarP(&opts.Failed, "failed", "f", false, "Rerun all failed checks")
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Rerun all checks")
 	cmd.Flags().StringVarP(&opts.Check, "check", "c", "", "Rerun a check by name")
-	cmd.Flags().StringVarP(&opts.Suite, "suite", "s", "", "Rerun all checks in a suite")
 
 	return cmd
 }
@@ -79,15 +78,78 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
-	fmt.Printf("DEBUG %#v\n", pr)
-	fmt.Printf("DEBUG %#v\n", repo)
+	oid := ""
+	if len(pr.Commits.Nodes) > 0 {
+		oid = pr.Commits.Nodes[0].Commit.Oid
+	}
 
-	// gh pr run
-	// => interactive multi select of checks to re-run
-	// gh pr run --failed
-	// gh pr run --all
-	// gh pr run --suite="foo"
-	// gh pr run --check="foo"
+	if oid == "" {
+		return fmt.Errorf("no commits could be found for pull request %d", pr.Number)
+	}
 
+	runList, err := shared.CheckRuns(apiClient, repo, pr)
+	if err != nil || len(runList.CheckRuns) == 0 {
+		return fmt.Errorf("could not find any runs for oid %s: %w", oid, err)
+	}
+
+	// now we have a run list. need to figure out which ones to request a rerun for.
+
+	runner := &Runner{oid, opts, runList}
+
+	switch {
+	case opts.Failed:
+		return runner.Failed()
+	case opts.All:
+		return runner.All()
+	case opts.Check != "":
+		return runner.Check()
+	}
+
+	// TODO Interactive multi-select of checks
+
+	return nil
+}
+
+type Runner struct {
+	Oid  string
+	Opts *RunOptions
+	Runs *shared.CheckRunList
+}
+
+func (r *Runner) All() error {
+	return r.run(r.Runs.CheckRuns)
+}
+
+func (r *Runner) Failed() error {
+	toRun := []shared.CheckRun{}
+	for _, checkRun := range r.Runs.CheckRuns {
+		if checkRun.Status == "fail" {
+			toRun = append(toRun, checkRun)
+		}
+	}
+	return r.run(toRun)
+}
+
+func (r *Runner) Check() error {
+	checkName := r.Opts.Check
+	if checkName == "" {
+		return errors.New("check name can't be blank")
+	}
+	toRun := []shared.CheckRun{
+		{
+			Name: checkName,
+		},
+	}
+
+	return r.run(toRun)
+}
+
+func (r *Runner) run(checkRuns []shared.CheckRun) error {
+	// TODO
+
+	for _, r := range checkRuns {
+		fmt.Printf("DEBUG %#v\n", r)
+
+	}
 	return nil
 }
