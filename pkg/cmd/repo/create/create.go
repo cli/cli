@@ -78,7 +78,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || !opts.EnableIssues || !opts.EnableWiki) {
-				return &cmdutil.FlagError{Err: errors.New(`the '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
+				return &cmdutil.FlagError{Err: errors.New(`The '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
 			}
 
 			return createRun(opts)
@@ -173,8 +173,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	// find template ID
-
+	// Find template repo ID
 	if opts.Template != "" {
 		httpClient, err := opts.HttpClient()
 		if err != nil {
@@ -210,7 +209,6 @@ func createRun(opts *CreateOptions) error {
 		Visibility:       visibility,
 		OwnerID:          repoToCreate.RepoOwner(),
 		TeamID:           opts.Team,
-		RepositoryID:     opts.Template,
 		Description:      opts.Description,
 		HomepageURL:      opts.Homepage,
 		HasIssuesEnabled: opts.EnableIssues,
@@ -231,7 +229,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.ConfirmSubmit {
-		repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+		repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input, opts.Template)
 		if err != nil {
 			return err
 		}

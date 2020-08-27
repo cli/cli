@@ -379,7 +379,7 @@ func TestRepoCreate_template(t *testing.T) {
 	}
 
 	if len(reg.Requests) != 3 {
-		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
+		t.Fatalf("expected 3 HTTP requests, got %d", len(reg.Requests))
 	}
 
 	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)

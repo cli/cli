@@ -14,8 +14,6 @@ type repoCreateInput struct {
 	HomepageURL string `json:"homepageUrl,omitempty"`
 	Description string `json:"description,omitempty"`
 
-	RepositoryID string `json:"repositoryId,omitempty"`
-
 	OwnerID string `json:"ownerId,omitempty"`
 	TeamID  string `json:"teamId,omitempty"`
 
@@ -33,7 +31,7 @@ type repoTemplateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*api.Repository, error) {
+func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
@@ -51,7 +49,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		input.OwnerID = orgID
 	}
 
-	if input.RepositoryID != "" {
+	if templateRepositoryID != "" {
 		var response struct {
 			CloneTemplateRepository struct {
 				Repository api.Repository
@@ -70,7 +68,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			Name:         input.Name,
 			Visibility:   input.Visibility,
 			OwnerID:      input.OwnerID,
-			RepositoryID: input.RepositoryID,
+			RepositoryID: templateRepositoryID,
 		}
 
 		variables := map[string]interface{}{
