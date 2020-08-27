@@ -29,6 +29,7 @@ type repoTemplateInput struct {
 	OwnerID    string `json:"ownerId,omitempty"`
 
 	RepositoryID string `json:"repositoryId,omitempty"`
+	Description  string `json:"description,omitempty"`
 }
 
 // repoCreate creates a new GitHub repository

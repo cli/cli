@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -74,6 +75,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if runF != nil {
 				return runF(opts)
+			}
+
+			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || !opts.EnableIssues || !opts.EnableWiki) {
+				return &cmdutil.FlagError{Err: errors.New(`the '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
 			}
 
 			return createRun(opts)
