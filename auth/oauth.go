@@ -57,21 +57,28 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 {
-		// OAuth Device Flow is not available; continue with OAuth browser flow with a
-		// local server endpoint as callback target
-		return oa.localServerFlow()
-	} else if resp.StatusCode != 200 {
-		return "", fmt.Errorf("error: HTTP %d (%s)", resp.StatusCode, initURL)
-	}
-
+	var values url.Values
 	bb, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
-	values, err := url.ParseQuery(string(bb))
-	if err != nil {
-		return
+	if resp.StatusCode == 200 || strings.HasPrefix(resp.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		values, err = url.ParseQuery(string(bb))
+		if err != nil {
+			return
+		}
+	}
+
+	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 ||
+		(resp.StatusCode == 400 && values != nil && values.Get("error") == "unauthorized_client") {
+		// OAuth Device Flow is not available; continue with OAuth browser flow with a
+		// local server endpoint as callback target
+		return oa.localServerFlow()
+	} else if resp.StatusCode != 200 {
+		if values != nil && values.Get("error_description") != "" {
+			return "", fmt.Errorf("HTTP %d: %s (%s)", resp.StatusCode, values.Get("error_description"), initURL)
+		}
+		return "", fmt.Errorf("error: HTTP %d (%s)", resp.StatusCode, initURL)
 	}
 
 	timeNow := oa.TimeNow
