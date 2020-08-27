@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -189,12 +188,17 @@ func gardenRun(opts *GardenOptions) error {
 	drawGarden(out, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
-	_ = exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	_ = exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+	if runtime.GOOS == "darwin" {
+		_ = exec.Command("stty", "-f", "/dev/tty", "cbreak", "min", "1").Run()
+		_ = exec.Command("stty", "-f", "/dev/tty", "-echo").Run()
+	} else {
+		_ = exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+		_ = exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+	}
 
 	var b []byte = make([]byte, 1)
 	for {
-		_, err := os.Stdin.Read(b)
+		_, err := opts.IO.In.Read(b)
 		if err != nil {
 			return err
 		}
