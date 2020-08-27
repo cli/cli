@@ -16,7 +16,79 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdReady(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    ReadyOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: ReadyOptions{
+				SelectorArg: "123",
+			},
+		},
+		{
+			name:  "no argument",
+			args:  "",
+			isTTY: true,
+			want: ReadyOptions{
+				SelectorArg: "",
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *ReadyOptions
+			cmd := NewCmdReady(f, func(o *ReadyOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()

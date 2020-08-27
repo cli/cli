@@ -19,7 +19,90 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdView(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    ViewOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: ViewOptions{
+				SelectorArg: "123",
+				BrowserMode: false,
+			},
+		},
+		{
+			name:  "no argument",
+			args:  "",
+			isTTY: true,
+			want: ViewOptions{
+				SelectorArg: "",
+				BrowserMode: false,
+			},
+		},
+		{
+			name:  "web mode",
+			args:  "123 -w",
+			isTTY: true,
+			want: ViewOptions{
+				SelectorArg: "123",
+				BrowserMode: true,
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *ViewOptions
+			cmd := NewCmdView(f, func(o *ViewOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+		})
+	}
+}
 
 func eq(t *testing.T, got interface{}, expected interface{}) {
 	t.Helper()
