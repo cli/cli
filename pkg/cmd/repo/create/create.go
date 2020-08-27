@@ -181,24 +181,23 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		var toView ghrepo.Interface
+		var toClone ghrepo.Interface
 		apiClient := api.NewClientFromHTTP(httpClient)
 
-		// var err errors
-		viewURL := opts.Template
-		if !strings.Contains(viewURL, "/") {
+		cloneURL := opts.Template
+		if !strings.Contains(cloneURL, "/") {
 			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 			if err != nil {
 				return err
 			}
-			viewURL = currentUser + "/" + viewURL
+			cloneURL = currentUser + "/" + cloneURL
 		}
-		toView, err = ghrepo.FromFullName(viewURL)
+		toClone, err = ghrepo.FromFullName(cloneURL)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
 
-		repo, err := api.GitHubRepo(apiClient, toView)
+		repo, err := api.GitHubRepo(apiClient, toClone)
 		if err != nil {
 			return err
 		}
