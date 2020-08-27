@@ -26,10 +26,22 @@ const maxRemotesForLookup = 5
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (ResolvedRemotes, error) {
 	sort.Stable(remotes)
 
-	hasBaseOverride := base != ""
-	baseOverride, _ := ghrepo.FromFullName(base)
-	foundBaseOverride := false
+	result := ResolvedRemotes{
+		Remotes:   remotes,
+		apiClient: client,
+	}
 
+	var baseOverride ghrepo.Interface
+	if base != "" {
+		var err error
+		baseOverride, err = ghrepo.FromFullName(base)
+		if err != nil {
+			return result, err
+		}
+		result.BaseOverride = baseOverride
+	}
+
+	foundBaseOverride := false
 	var hostname string
 	var repos []ghrepo.Interface
 	for i, r := range remotes {
@@ -47,19 +59,12 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (Re
 			break
 		}
 	}
-	if hasBaseOverride && !foundBaseOverride {
+	if baseOverride != nil && !foundBaseOverride {
 		// additionally, look up the explicitly specified base repo if it's not
 		// already covered by git remotes
 		repos = append(repos, baseOverride)
 	}
 
-	result := ResolvedRemotes{
-		Remotes:   remotes,
-		apiClient: client,
-	}
-	if hasBaseOverride {
-		result.BaseOverride = baseOverride
-	}
 	networkResult, err := api.RepoNetwork(client, repos)
 	if err != nil {
 		return result, err
