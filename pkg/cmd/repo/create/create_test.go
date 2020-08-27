@@ -303,3 +303,94 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		t.Errorf("expected %q, got %q", "TEAMID", teamID)
 	}
 }
+
+func TestRepoCreate_template(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
+		httpmock.StringResponse(`
+		{ "data": { "cloneTemplateRepository": {
+			"repository": {
+				"id": "REPOID",
+				"name": "REPO",
+				"owner": {
+					"login": "OWNER"
+				},
+				"url": "https://github.com/OWNER/REPO"
+			}
+		} } }`))
+
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+	{ "data": {
+		"repository": {
+			"id": "REPOID",
+			"description": "DESCRIPTION"
+	} } }`))
+
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"ID":"OWNERID"}}}`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	as, surveyTearDown := prompt.InitAskStubber()
+	defer surveyTearDown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
+	})
+
+	output, err := runCommand(httpClient, "REPO --template='OWNER/REPO'")
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	assert.Equal(t, "https://github.com/OWNER/REPO\n", output.String())
+	assert.Equal(t, "", output.Stderr())
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	if len(reg.Requests) != 3 {
+		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
+		t.Errorf("expected %q, got %q", "REPO", repoName)
+	}
+	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
+		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
+	}
+	if ownerId := reqBody.Variables.Input["ownerId"].(string); ownerId != "OWNERID" {
+		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
+	}
+}
