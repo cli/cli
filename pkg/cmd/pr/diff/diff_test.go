@@ -19,7 +19,96 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdDiff(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    DiffOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    "auto",
+			},
+		},
+		{
+			name:  "no argument",
+			args:  "",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    "auto",
+			},
+		},
+		{
+			name:  "no color when redirected",
+			args:  "",
+			isTTY: false,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    "never",
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+		{
+			name:    "invalid --color argument",
+			args:    "--color doublerainbow",
+			isTTY:   true,
+			wantErr: `did not understand color: "doublerainbow". Expected one of always, never, or auto`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *DiffOptions
+			cmd := NewCmdDiff(f, func(o *DiffOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+			assert.Equal(t, tt.want.UseColor, opts.UseColor)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -72,14 +161,6 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 		OutBuf: stdout,
 		ErrBuf: stderr,
 	}, err
-}
-
-func TestPRDiff_validation(t *testing.T) {
-	_, err := runCommand(nil, nil, false, "--color=doublerainbow")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, `did not understand color: "doublerainbow". Expected one of always, never, or auto`, err.Error())
 }
 
 func TestPRDiff_no_current_pr(t *testing.T) {

@@ -28,11 +28,10 @@ type ReviewOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
-	SelectorArg    string
-	Approve        bool
-	RequestChanges bool
-	Comment        bool
-	Body           string
+	SelectorArg     string
+	InteractiveMode bool
+	ReviewType      api.PullRequestReviewState
+	Body            string
 }
 
 func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Command {
@@ -43,6 +42,12 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
+
+	var (
+		flagApprove        bool
+		flagRequestChanges bool
+		flagComment        bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "review [<number> | <url> | <branch>]",
@@ -70,8 +75,43 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+			}
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			}
+
+			found := 0
+			if flagApprove {
+				found++
+				opts.ReviewType = api.ReviewApprove
+			}
+			if flagRequestChanges {
+				found++
+				opts.ReviewType = api.ReviewRequestChanges
+				if opts.Body == "" {
+					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for request-changes review")}
+				}
+			}
+			if flagComment {
+				found++
+				opts.ReviewType = api.ReviewComment
+				if opts.Body == "" {
+					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for comment review")}
+				}
+			}
+
+			if found == 0 && opts.Body == "" {
+				if !opts.IO.IsStdoutTTY() || !opts.IO.IsStdinTTY() {
+					return &cmdutil.FlagError{Err: errors.New("--approve, --request-changes, or --comment required when not attached to a tty")}
+				}
+				opts.InteractiveMode = true
+			} else if found == 0 && opts.Body != "" {
+				return &cmdutil.FlagError{Err: errors.New("--body unsupported without --approve, --request-changes, or --comment")}
+			} else if found > 1 {
+				return &cmdutil.FlagError{Err: errors.New("need exactly one of --approve, --request-changes, or --comment")}
 			}
 
 			if runF != nil {
@@ -81,9 +121,9 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Approve, "approve", "a", false, "Approve pull request")
-	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "r", false, "Request changes on a pull request")
-	cmd.Flags().BoolVarP(&opts.Comment, "comment", "c", false, "Comment on a pull request")
+	cmd.Flags().BoolVarP(&flagApprove, "approve", "a", false, "Approve pull request")
+	cmd.Flags().BoolVarP(&flagRequestChanges, "request-changes", "r", false, "Request changes on a pull request")
+	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
 
 	return cmd
@@ -96,17 +136,13 @@ func reviewRun(opts *ReviewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	reviewData, err := processReviewOpt(opts)
-	if err != nil {
-		return fmt.Errorf("did not understand desired review action: %w", err)
-	}
-
 	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
 
-	if reviewData == nil {
+	var reviewData *api.PullRequestReviewInput
+	if opts.InteractiveMode {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
@@ -118,6 +154,11 @@ func reviewRun(opts *ReviewOptions) error {
 		if reviewData == nil && err == nil {
 			fmt.Fprint(opts.IO.ErrOut, "Discarding.\n")
 			return nil
+		}
+	} else {
+		reviewData = &api.PullRequestReviewInput{
+			State: opts.ReviewType,
+			Body:  opts.Body,
 		}
 	}
 
@@ -140,51 +181,6 @@ func reviewRun(opts *ReviewOptions) error {
 	}
 
 	return nil
-}
-
-// TODO: move to Command.Args, raise FlagError
-func processReviewOpt(opts *ReviewOptions) (*api.PullRequestReviewInput, error) {
-	found := 0
-	flag := ""
-	var state api.PullRequestReviewState
-
-	if opts.Approve {
-		found++
-		flag = "approve"
-		state = api.ReviewApprove
-	}
-	if opts.RequestChanges {
-		found++
-		flag = "request-changes"
-		state = api.ReviewRequestChanges
-	}
-	if opts.Comment {
-		found++
-		flag = "comment"
-		state = api.ReviewComment
-	}
-
-	body := opts.Body
-
-	if found == 0 && body == "" {
-		if opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() {
-			return nil, nil // signal interactive mode
-		}
-		return nil, errors.New("--approve, --request-changes, or --comment required when not attached to a tty")
-	} else if found == 0 && body != "" {
-		return nil, errors.New("--body unsupported without --approve, --request-changes, or --comment")
-	} else if found > 1 {
-		return nil, errors.New("need exactly one of --approve, --request-changes, or --comment")
-	}
-
-	if (flag == "request-changes" || flag == "comment") && body == "" {
-		return nil, fmt.Errorf("body cannot be blank for %s review", flag)
-	}
-
-	return &api.PullRequestReviewInput{
-		Body:  body,
-		State: state,
-	}, nil
 }
 
 func reviewSurvey(io *iostreams.IOStreams, editorCommand string) (*api.PullRequestReviewInput, error) {
