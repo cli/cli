@@ -23,6 +23,8 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
+	RootDirOverride string
+
 	RepoOverride string
 	WebMode      bool
 
@@ -94,9 +96,10 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	var nonLegacyTemplateFiles []string
-	if opts.RepoOverride == "" {
+	if opts.RootDirOverride != "" {
+		nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(opts.RootDirOverride, "ISSUE_TEMPLATE")
+	} else if opts.RepoOverride == "" {
 		if rootDir, err := git.ToplevelDir(); err == nil {
-			// TODO: figure out how to stub this in tests
 			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
 		}
 	}
