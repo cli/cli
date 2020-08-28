@@ -129,7 +129,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.IsStdoutTTY())
+	return NewColorScheme(s.ColorEnabled())
 }
 
 func System() *IOStreams {

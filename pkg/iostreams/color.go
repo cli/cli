@@ -82,5 +82,5 @@ func (c *ColorScheme) SuccessIcon() string {
 }
 
 func (c *ColorScheme) WarningIcon() string {
-	return c.Yellow("✓")
+	return c.Yellow("!")
 }
