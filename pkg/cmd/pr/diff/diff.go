@@ -2,9 +2,12 @@ package diff
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/cli/cli/api"
@@ -13,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +46,10 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+			}
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
@@ -90,6 +98,12 @@ func diffRun(opts *DiffOptions) error {
 		return err
 	}
 
+	if opts.IO.IsStdoutTTY() {
+		if pager := os.Getenv("PAGER"); pager != "" {
+			return runPager(pager, diff, opts.IO.Out)
+		}
+	}
+
 	diffLines := bufio.NewScanner(diff)
 	for diffLines.Scan() {
 		diffLine := diffLines.Text()
@@ -133,4 +147,15 @@ func isRemovalLine(dl string) bool {
 
 func validColorFlag(c string) bool {
 	return c == "auto" || c == "always" || c == "never"
+}
+
+var runPager = func(pager string, diff io.Reader, out io.Writer) error {
+	args, err := shlex.Split(pager)
+	if err != nil {
+		return err
+	}
+	pagerCmd := exec.Command(args[0], args[1:]...)
+	pagerCmd.Stdin = diff
+	pagerCmd.Stdout = out
+	return pagerCmd.Run()
 }

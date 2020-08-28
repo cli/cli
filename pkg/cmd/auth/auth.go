@@ -16,6 +16,8 @@ func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 		Long:  `Manage gh's authentication state.`,
 	}
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	cmd.AddCommand(authLoginCmd.NewCmdLogin(f, nil))
 	cmd.AddCommand(authLogoutCmd.NewCmdLogout(f, nil))
 	cmd.AddCommand(authStatusCmd.NewCmdStatus(f, nil))

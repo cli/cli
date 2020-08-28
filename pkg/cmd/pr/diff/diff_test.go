@@ -2,8 +2,10 @@ package diff
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/context"
@@ -17,7 +19,96 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdDiff(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    DiffOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    "auto",
+			},
+		},
+		{
+			name:  "no argument",
+			args:  "",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    "auto",
+			},
+		},
+		{
+			name:  "no color when redirected",
+			args:  "",
+			isTTY: false,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    "never",
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+		{
+			name:    "invalid --color argument",
+			args:    "--color doublerainbow",
+			isTTY:   true,
+			wantErr: `did not understand color: "doublerainbow". Expected one of always, never, or auto`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *DiffOptions
+			cmd := NewCmdDiff(f, func(o *DiffOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+			assert.Equal(t, tt.want.UseColor, opts.UseColor)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -72,14 +163,6 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 	}, err
 }
 
-func TestPRDiff_validation(t *testing.T) {
-	_, err := runCommand(nil, nil, false, "--color=doublerainbow")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, `did not understand color: "doublerainbow". Expected one of always, never, or auto`, err.Error())
-}
-
 func TestPRDiff_no_current_pr(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
@@ -131,8 +214,13 @@ func TestPRDiff_notty(t *testing.T) {
 }
 
 func TestPRDiff_tty(t *testing.T) {
+	pager := os.Getenv("PAGER")
 	http := &httpmock.Registry{}
-	defer http.Verify(t)
+	defer func() {
+		os.Setenv("PAGER", pager)
+		http.Verify(t)
+	}()
+	os.Setenv("PAGER", "")
 	http.StubResponse(200, bytes.NewBufferString(`
 		{ "data": { "repository": { "pullRequests": { "nodes": [
 			{ "url": "https://github.com/OWNER/REPO/pull/123",
@@ -147,6 +235,38 @@ func TestPRDiff_tty(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	assert.Contains(t, output.String(), "\x1b[32m+site: bin/gh\x1b[m")
+}
+
+func TestPRDiff_pager(t *testing.T) {
+	realRunPager := runPager
+	pager := os.Getenv("PAGER")
+	http := &httpmock.Registry{}
+	defer func() {
+		runPager = realRunPager
+		os.Setenv("PAGER", pager)
+		http.Verify(t)
+	}()
+	runPager = func(pager string, diff io.Reader, out io.Writer) error {
+		_, err := io.Copy(out, diff)
+		return err
+	}
+	os.Setenv("PAGER", "fakepager")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequests": { "nodes": [
+		{ "url": "https://github.com/OWNER/REPO/pull/123",
+		  "number": 123,
+		  "id": "foobar123",
+		  "headRefName": "feature",
+			"baseRefName": "master" }
+	] } } } }`))
+	http.StubResponse(200, bytes.NewBufferString(testDiff))
+	output, err := runCommand(http, nil, true, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
+		t.Errorf("command output did not match:\n%s", diff)
+	}
 }
 
 const testDiff = `diff --git a/.github/workflows/releases.yml b/.github/workflows/releases.yml

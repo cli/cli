@@ -21,6 +21,8 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 		`),
 	}
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	cmd.AddCommand(NewCmdConfigGet(f))
 	cmd.AddCommand(NewCmdConfigSet(f))
 

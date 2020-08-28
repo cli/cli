@@ -19,7 +19,113 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdReview(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    ReviewOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: ReviewOptions{
+				SelectorArg: "123",
+				ReviewType:  0,
+				Body:        "",
+			},
+		},
+		{
+			name:  "no argument",
+			args:  "",
+			isTTY: true,
+			want: ReviewOptions{
+				SelectorArg: "",
+				ReviewType:  0,
+				Body:        "",
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+		{
+			name:    "no arguments in non-interactive mode",
+			args:    "",
+			isTTY:   false,
+			wantErr: "--approve, --request-changes, or --comment required when not attached to a tty",
+		},
+		{
+			name:    "mutually exclusive review types",
+			args:    `--approve --comment -b hello`,
+			isTTY:   true,
+			wantErr: "need exactly one of --approve, --request-changes, or --comment",
+		},
+		{
+			name:    "comment without body",
+			args:    `--comment`,
+			isTTY:   true,
+			wantErr: "body cannot be blank for comment review",
+		},
+		{
+			name:    "request changes without body",
+			args:    `--request-changes`,
+			isTTY:   true,
+			wantErr: "body cannot be blank for request-changes review",
+		},
+		{
+			name:    "only body argument",
+			args:    `-b hello`,
+			isTTY:   true,
+			wantErr: "--body unsupported without --approve, --request-changes, or --comment",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *ReviewOptions
+			cmd := NewCmdReview(f, func(o *ReviewOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+			assert.Equal(t, tt.want.Body, opts.Body)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -72,36 +178,6 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 		OutBuf: stdout,
 		ErrBuf: stderr,
 	}, err
-}
-
-func TestPRReview_validation(t *testing.T) {
-	for _, cmd := range []string{
-		`--approve --comment 123`,
-		`--approve --comment -b"hey" 123`,
-	} {
-		t.Run(cmd, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			defer http.Verify(t)
-
-			_, err := runCommand(http, nil, false, cmd)
-			if err == nil {
-				t.Fatal("expected error")
-			}
-			assert.Equal(t, "did not understand desired review action: need exactly one of --approve, --request-changes, or --comment", err.Error())
-		})
-
-	}
-}
-
-func TestPRReview_bad_body(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, nil, false, `123 -b "radical"`)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, "did not understand desired review action: --body unsupported without --approve, --request-changes, or --comment", err.Error())
 }
 
 func TestPRReview_url_arg(t *testing.T) {
@@ -233,22 +309,6 @@ func TestPRReview_no_arg(t *testing.T) {
 	assert.Equal(t, "cool story", reqBody.Variables.Input.Body)
 }
 
-func TestPRReview_blank_comment(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, nil, false, `--comment 123`)
-	assert.Equal(t, "did not understand desired review action: body cannot be blank for comment review", err.Error())
-}
-
-func TestPRReview_blank_request_changes(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, nil, false, `-r 123`)
-	assert.Equal(t, "did not understand desired review action: body cannot be blank for request-changes review", err.Error())
-}
-
 func TestPRReview(t *testing.T) {
 	type c struct {
 		Cmd           string
@@ -296,20 +356,6 @@ func TestPRReview(t *testing.T) {
 			assert.Equal(t, kase.ExpectedBody, reqBody.Variables.Input.Body)
 		})
 	}
-}
-
-func TestPRReview_nontty_insufficient_flags(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	output, err := runCommand(http, nil, false, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	assert.Equal(t, "", output.String())
-
-	assert.Equal(t, "did not understand desired review action: --approve, --request-changes, or --comment required when not attached to a tty", err.Error())
 }
 
 func TestPRReview_nontty(t *testing.T) {

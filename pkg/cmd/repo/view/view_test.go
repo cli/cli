@@ -469,3 +469,49 @@ func Test_ViewRun_NoDescription(t *testing.T) {
 		})
 	}
 }
+
+func Test_ViewRun_WithoutUsername(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": {
+			"login": "OWNER"
+		}}}`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+	{ "data": {
+		"repository": {
+		"description": "social distancing"
+	} } }`))
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/readme"),
+		httpmock.StringResponse(`
+	{ "name": "readme.md",
+	"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
+
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(false)
+
+	opts := &ViewOptions{
+		RepoArg: "REPO",
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		IO: io,
+	}
+
+	if err := viewRun(opts); err != nil {
+		t.Errorf("viewRun() error = %v", err)
+	}
+
+	assert.Equal(t, heredoc.Doc(`
+			name:	OWNER/REPO
+			description:	social distancing
+			--
+			# truly cool readme check it out
+			`), stdout.String())
+	assert.Equal(t, "", stderr.String())
+	reg.Verify(t)
+}

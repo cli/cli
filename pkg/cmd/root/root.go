@@ -39,7 +39,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		`),
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
-				Fill out our feedback form https://forms.gle/umxd3h31c7aMQFKG7
 				Open an issue using “gh issue create -R cli/cli”
 			`),
 			"help:environment": heredoc.Doc(`
@@ -98,6 +97,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		}
 		return &cmdutil.FlagError{Err: err}
 	})
+
+	cmdutil.DisableAuthCheck(cmd)
 
 	// CHILD COMMANDS
 

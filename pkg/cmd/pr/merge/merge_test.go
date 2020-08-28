@@ -20,7 +20,96 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCmdMerge(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		isTTY   bool
+		want    MergeOptions
+		wantErr string
+	}{
+		{
+			name:  "number argument",
+			args:  "123",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:       "123",
+				DeleteBranch:      true,
+				DeleteLocalBranch: true,
+				MergeMethod:       api.PullRequestMergeMethodMerge,
+				InteractiveMode:   true,
+			},
+		},
+		{
+			name:    "no argument with --repo override",
+			args:    "-R owner/repo",
+			isTTY:   true,
+			wantErr: "argument required when using the --repo flag",
+		},
+		{
+			name:    "insufficient flags in non-interactive mode",
+			args:    "123",
+			isTTY:   false,
+			wantErr: "--merge, --rebase, or --squash required when not attached to a terminal",
+		},
+		{
+			name:    "multiple merge methods",
+			args:    "123 --merge --rebase",
+			isTTY:   true,
+			wantErr: "only one of --merge, --rebase, or --squash can be enabled",
+		},
+		{
+			name:    "multiple merge methods, non-tty",
+			args:    "123 --merge --rebase",
+			isTTY:   false,
+			wantErr: "only one of --merge, --rebase, or --squash can be enabled",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *MergeOptions
+			cmd := NewCmdMerge(f, func(o *MergeOptions) error {
+				opts = o
+				return nil
+			})
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
+			assert.Equal(t, tt.want.DeleteBranch, opts.DeleteBranch)
+			assert.Equal(t, tt.want.DeleteLocalBranch, opts.DeleteLocalBranch)
+			assert.Equal(t, tt.want.MergeMethod, opts.MergeMethod)
+			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -166,16 +255,6 @@ func TestPrMerge_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-}
-
-func TestPrMerge_nontty_insufficient_flags(t *testing.T) {
-	output, err := runCommand(nil, "master", false, "pr merge 1")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	assert.Equal(t, "--merge, --rebase, or --squash required when not attached to a terminal", err.Error())
-	assert.Equal(t, "", output.String())
 }
 
 func TestPrMerge_withRepoFlag(t *testing.T) {
@@ -488,18 +567,4 @@ func TestPRMerge_interactive(t *testing.T) {
 	}
 
 	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", `Deleted branch.*blueberries`)
-}
-
-func TestPrMerge_multipleMergeMethods(t *testing.T) {
-	_, err := runCommand(nil, "master", true, "1 --merge --squash")
-	if err == nil {
-		t.Fatal("expected error running `pr merge` with multiple merge methods")
-	}
-}
-
-func TestPrMerge_multipleMergeMethods_nontty(t *testing.T) {
-	_, err := runCommand(nil, "master", false, "1 --merge --squash")
-	if err == nil {
-		t.Fatal("expected error running `pr merge` with multiple merge methods")
-	}
 }

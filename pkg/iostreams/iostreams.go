@@ -133,21 +133,14 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 }
 
 func System() *IOStreams {
-	var out io.Writer = os.Stdout
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	var colorEnabled bool
-	if os.Getenv("NO_COLOR") == "" && stdoutIsTTY {
-		out = colorable.NewColorable(os.Stdout)
-		colorEnabled = true
-	}
-
 	io := &IOStreams{
 		In:           os.Stdin,
-		Out:          out,
-		ErrOut:       os.Stderr,
-		colorEnabled: colorEnabled,
+		Out:          colorable.NewColorable(os.Stdout),
+		ErrOut:       colorable.NewColorable(os.Stderr),
+		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
