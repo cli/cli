@@ -135,6 +135,7 @@ func creditsRun(opts *CreditsOptions) error {
 
 	type Contributor struct {
 		Login string
+		Type  string
 	}
 
 	type Result []Contributor
@@ -161,6 +162,10 @@ func creditsRun(opts *CreditsOptions) error {
 
 	logins := []string{}
 	for x, c := range result {
+		if c.Type != "User" {
+			continue
+		}
+
 		if isTTY && !static {
 			logins = append(logins, getColor(x)(c.Login))
 		} else {
