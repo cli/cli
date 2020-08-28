@@ -70,7 +70,11 @@ func viewRun(opts *ViewOptions) error {
 	} else if release.IsPrerelease {
 		fmt.Fprintf(opts.IO.Out, "%s • ", iofmt.Yellow("Pre-release"))
 	}
-	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
+	if release.IsDraft {
+		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.CreatedAt)))))
+	} else {
+		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
+	}
 
 	renderedDescription, err := utils.RenderMarkdown(release.Body)
 	if err != nil {

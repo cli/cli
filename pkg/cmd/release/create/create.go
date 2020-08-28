@@ -279,7 +279,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if !opts.Draft {
-			err := publishRelease(httpClient, newRelease.URL)
+			err := publishRelease(httpClient, newRelease.APIURL)
 			if err != nil {
 				return err
 			}

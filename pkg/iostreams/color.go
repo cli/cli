@@ -76,3 +76,11 @@ func (c *ColorScheme) Blue(t string) string {
 	}
 	return blue(t)
 }
+
+func (c *ColorScheme) SuccessIcon() string {
+	return c.Green("✓")
+}
+
+func (c *ColorScheme) WarningIcon() string {
+	return c.Yellow("✓")
+}

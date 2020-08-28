@@ -2,6 +2,7 @@ package shared
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -18,9 +19,10 @@ type Release struct {
 	Body         string    `json:"body"`
 	IsDraft      bool      `json:"draft"`
 	IsPrerelease bool      `json:"prerelease"`
+	CreatedAt    time.Time `json:"created_at"`
 	PublishedAt  time.Time `json:"published_at"`
 
-	URL       string `json:"url"`
+	APIURL    string `json:"url"`
 	UploadURL string `json:"upload_url"`
 	HTMLURL   string `json:"html_url"`
 	Assets    []ReleaseAsset
@@ -37,8 +39,8 @@ type ReleaseAsset struct {
 	URL   string
 }
 
+// FetchRelease finds a repository release by its tagName.
 func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*Release, error) {
-	// FIXME: this doesn't find draft releases
 	path := fmt.Sprintf("repos/%s/%s/releases/tags/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), tagName)
 	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
 	req, err := http.NewRequest("GET", url, nil)
@@ -46,16 +48,21 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	success := resp.StatusCode >= 200 && resp.StatusCode < 300
-	if !success {
+	if resp.StatusCode == 404 {
+		if canPush, err := api.CanPushToRepo(httpClient, baseRepo); err == nil && canPush {
+			return FindDraftRelease(httpClient, baseRepo, tagName)
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
 
@@ -71,4 +78,53 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 	}
 
 	return &release, nil
+}
+
+// FindDraftRelease interates over all releases in a repository until it finds one that matches tagName.
+func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*Release, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases", baseRepo.RepoOwner(), baseRepo.RepoName())
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+
+	perPage := 100
+	page := 1
+	for {
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s?per_page=%d&page=%d", url, perPage, page), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode > 299 {
+			return nil, api.HandleHTTPError(resp)
+		}
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var releases []Release
+		err = json.Unmarshal(b, &releases)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range releases {
+			if r.TagName == tagName {
+				return &r, nil
+			}
+		}
+
+		if len(releases) < perPage {
+			break
+		}
+		page++
+	}
+
+	return nil, errors.New("release not found")
 }
