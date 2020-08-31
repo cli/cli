@@ -9,9 +9,9 @@ the terminal next to where you are already working with `git` and your code.
 
 While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It currently does not support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning on adding support for GitHub Enterprise Server after GitHub CLI is out of beta (likely towards the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on.
 
-## Feedback
+## We want your feedback
 
-We love to hear feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
+We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please open an [issue][] and check out the [contributing page][].
 
 ## Usage
 
@@ -23,14 +23,14 @@ We love to hear feedback about `gh`. If you spot bugs or have features that you'
 
 ## Documentation
 
-Read the [official docs](https://cli.github.com/manual/) for more information.
+Read the [official docs][] for more information.
 
 ## Comparison with hub
 
 For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new project that helps us explore
 what an official GitHub CLI tool can look like with a fundamentally different design. While both
 tools bring GitHub to the terminal, `hub` behaves as a proxy to `git`, and `gh` is a standalone
-tool. Check out our [more detailed explanation](/docs/gh-vs-hub.md) to learn more.
+tool. Check out our [more detailed explanation][] to learn more.
 
 
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
@@ -135,7 +135,7 @@ Install and upgrade:
 
 ### Arch Linux
 
-Arch Linux users can install from the [community repo](https://www.archlinux.org/packages/community/x86_64/github-cli/):
+Arch Linux users can install from the [community repo][]:
 
 ```bash
 pacman -S github-cli
@@ -155,11 +155,15 @@ Download packaged binaries from the [releases page][].
 
 ### Build from source
 
-See here on how to [build GitHub CLI from source](/docs/source.md).
+See here on how to [build GitHub CLI from source][].
 
-[docs]: https://cli.github.com/manual
+[official docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
+[issue]: https://github.com/cli/cli/issues/new/choose
+[more detailed explanation]: /docs/gh-vs-hub.md
+[community repo]: https://www.archlinux.org/packages/community/x86_64/github-cli/
+[build GitHub CLI from source]: /docs/source.md
