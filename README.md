@@ -9,13 +9,9 @@ the terminal next to where you are already working with `git` and your code.
 
 While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It currently does not support repositories hosted on GitHub Enterprise Server or other hosting providers. We are planning on adding support for GitHub Enterprise Server after GitHub CLI is out of beta (likely towards the end of 2020), and we want to ensure that the API endpoints we use are more widely available for GHES versions that most GitHub customers are on.
 
-## We need your feedback
+## Feedback
 
-GitHub CLI is currently in its early development stages, and we're hoping to get feedback from people using it.
-
-If you've installed and used `gh`, we'd love for you to take a short survey here (no more than five minutes): https://forms.gle/umxd3h31c7aMQFKG7
-
-And if you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][]
+We love to hear feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
 
 ## Usage
 
@@ -128,7 +124,7 @@ Install and upgrade:
 Install and upgrade:
 
 1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo yum localinstall gh_*_linux_amd64.rpm` 
+2. Install the downloaded file: `sudo yum localinstall gh_*_linux_amd64.rpm`
 
 ### openSUSE/SUSE Linux
 
