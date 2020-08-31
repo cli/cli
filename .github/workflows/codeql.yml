@@ -1,5 +1,19 @@
 name: Code Scanning
+`<! -   one step: deploy using GitHub token ->
 
+ Use - Dregistry = https://maven.pkg.github.com/101 -Dtoken = GH_TOKEN`
+
+# Step 1: Authentication
+
+ $ Cat ~ / GH_TOKEN.txt | docker login docker.pkg.github.com -u tex 101 -password -stdin
+
+ #Step 2: tag
+
+ $ Docker tag IMAGE_ID docker.pkg.github.com/101/ eth hub / IMAGE_NAME: version
+
+ #Step 3: Publish
+
+ $ Docker.pkg.github.com/101/ eth hub / IMAGE_NAME: version
 on:
   push:
   schedule:
