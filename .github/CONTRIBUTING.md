@@ -4,7 +4,7 @@
 [license]: ../LICENSE
 [code-of-conduct]: CODE-OF-CONDUCT.md
 [bug issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Abug
-[feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3A+label%3Aenhancement
+[feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
