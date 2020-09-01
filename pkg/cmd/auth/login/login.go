@@ -87,6 +87,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				}
 			}
 
+			if err := hostnameValidator(opts.Hostname); err != nil {
+				return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
