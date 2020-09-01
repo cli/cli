@@ -45,7 +45,7 @@ func NewClientFromHTTP(httpClient *http.Client) *Client {
 func AddHeader(name, value string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			if len(req.Header.Values(name)) == 0 {
+			if req.Header.Get(name) == "" {
 				req.Header.Add(name, value)
 			}
 			return tr.RoundTrip(req)
@@ -57,7 +57,7 @@ func AddHeader(name, value string) ClientOption {
 func AddHeaderFunc(name string, getValue func(*http.Request) (string, error)) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
 		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			if len(req.Header.Values(name)) > 0 {
+			if req.Header.Get(name) != "" {
 				return tr.RoundTrip(req)
 			}
 			value, err := getValue(req)
