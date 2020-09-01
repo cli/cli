@@ -154,18 +154,24 @@ func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *
 	templateContents := ""
 
 	if providedBody == "" {
+		issueState.Body = defs.Body
+
 		if len(nonLegacyTemplatePaths) > 0 {
 			var err error
 			templateContents, err = selectTemplate(nonLegacyTemplatePaths, legacyTemplatePath, issueState.Type)
 			if err != nil {
 				return err
 			}
-			issueState.Body = templateContents
+
 		} else if legacyTemplatePath != nil {
 			templateContents = string(githubtemplate.ExtractContents(*legacyTemplatePath))
-			issueState.Body = templateContents
-		} else {
-			issueState.Body = defs.Body
+		}
+
+		if templateContents != "" {
+			if issueState.Body != "" {
+				issueState.Body += "\n\n"
+			}
+			issueState.Body += templateContents
 		}
 	}
 
