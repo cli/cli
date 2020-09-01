@@ -75,6 +75,9 @@ func Test_NewCmdList(t *testing.T) {
 }
 
 func Test_listRun(t *testing.T) {
+	frozenTime, err := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
+	require.NoError(t, err)
+
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -97,6 +100,20 @@ func Test_listRun(t *testing.T) {
 			`),
 			wantStderr: ``,
 		},
+		{
+			name:  "machine-readable",
+			isTTY: false,
+			opts: ListOptions{
+				LimitResults: 30,
+			},
+			wantStdout: heredoc.Doc(`
+				v1.1.0	Draft	v1.1.0	2020-08-31T15:44:24+02:00
+				The big 1.0	Latest	v1.0.0	2020-08-31T15:44:24+02:00
+				1.0 release candidate	Pre-release	v1.0.0-pre.2	2020-08-31T15:44:24+02:00
+				New features		v0.9.2	2020-08-31T15:44:24+02:00
+			`),
+			wantStderr: ``,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -105,7 +122,10 @@ func Test_listRun(t *testing.T) {
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
 
-			relativeTime := time.Now().Add(time.Duration(-24) * time.Hour)
+			createdAt := frozenTime
+			if tt.isTTY {
+				createdAt = time.Now().Add(time.Duration(-24) * time.Hour)
+			}
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.GraphQL(`\bRepositoryReleaseList\(`), httpmock.StringResponse(fmt.Sprintf(`
@@ -144,7 +164,7 @@ func Test_listRun(t *testing.T) {
 						"publishedAt": "%[1]s"
 					}
 				]
-			} } } }`, relativeTime.Format(time.RFC3339))))
+			} } } }`, createdAt.Format(time.RFC3339))))
 
 			tt.opts.IO = io
 			tt.opts.HttpClient = func() (*http.Client, error) {

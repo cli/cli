@@ -155,8 +155,8 @@ func Test_viewRun(t *testing.T) {
 				draft:	false
 				prerelease:	false
 				author:	MonaLisa
-				created:	2020-08-31 15:44:24 +0200 CEST
-				published:	2020-08-31 15:44:24 +0200 CEST
+				created:	2020-08-31T15:44:24+02:00
+				published:	2020-08-31T15:44:24+02:00
 				url:	https://github.com/OWNER/REPO/releases/tags/v1.2.3
 				asset:	windows.zip
 				asset:	linux.tgz

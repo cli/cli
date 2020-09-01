@@ -136,9 +136,9 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
 	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
 	fmt.Fprintf(w, "author:\t%s\n", release.Author.Login)
-	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt)
+	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt.Format(time.RFC3339))
 	if !release.IsDraft {
-		fmt.Fprintf(w, "published:\t%s\n", release.PublishedAt)
+		fmt.Fprintf(w, "published:\t%s\n", release.PublishedAt.Format(time.RFC3339))
 	}
 	fmt.Fprintf(w, "url:\t%s\n", release.HTMLURL)
 	for _, a := range release.Assets {

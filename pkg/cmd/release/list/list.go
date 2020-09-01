@@ -99,7 +99,7 @@ func listRun(opts *ListOptions) error {
 		if rel.PublishedAt.IsZero() {
 			pubDate = rel.CreatedAt
 		}
-		publishedAt := pubDate.String()
+		publishedAt := pubDate.Format(time.RFC3339)
 		if table.IsTTY() {
 			publishedAt = utils.FuzzyAgo(now.Sub(pubDate))
 		}
