@@ -10,6 +10,7 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
+* check existing issues to verify that the bug or feature request has not already been submitted
 * open an issue if things aren't working as expected
 * open an issue to propose a significant change
 * open a pull request to fix a bug

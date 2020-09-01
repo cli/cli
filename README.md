@@ -11,7 +11,7 @@ While in beta, GitHub CLI is available for repos hosted on GitHub.com only. It c
 
 ## We want your feedback
 
-We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please open an [issue][] and check out the [contributing page][].
+We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
 
 ## Usage
 
@@ -30,7 +30,7 @@ Read the [official docs][] for more information.
 For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new project that helps us explore
 what an official GitHub CLI tool can look like with a fundamentally different design. While both
 tools bring GitHub to the terminal, `hub` behaves as a proxy to `git`, and `gh` is a standalone
-tool. Check out our [more detailed explanation][] to learn more.
+tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 
 
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
@@ -135,7 +135,7 @@ Install and upgrade:
 
 ### Arch Linux
 
-Arch Linux users can install from the [community repo][]:
+Arch Linux users can install from the [community repo][arch linux repo]:
 
 ```bash
 pacman -S github-cli
@@ -155,7 +155,7 @@ Download packaged binaries from the [releases page][].
 
 ### Build from source
 
-See here on how to [build GitHub CLI from source][].
+See here on how to [build GitHub CLI from source][build from source].
 
 [official docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh
@@ -163,7 +163,6 @@ See here on how to [build GitHub CLI from source][].
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
-[issue]: https://github.com/cli/cli/issues/new/choose
-[more detailed explanation]: /docs/gh-vs-hub.md
-[community repo]: https://www.archlinux.org/packages/community/x86_64/github-cli/
-[build GitHub CLI from source]: /docs/source.md
+[gh-vs-hub]: /docs/gh-vs-hub.md
+[arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
+[build from source]: /docs/source.md
