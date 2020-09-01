@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -155,14 +156,21 @@ func humanFileSize(s int64) string {
 
 	kb := float64(s) / 1024
 	if kb < 1024 {
-		return fmt.Sprintf("%.2f KiB", kb)
+		return fmt.Sprintf("%s KiB", floatToString(kb, 2))
 	}
 
-	mb := float64(kb) / 1024
+	mb := kb / 1024
 	if mb < 1024 {
-		return fmt.Sprintf("%.2f MiB", mb)
+		return fmt.Sprintf("%s MiB", floatToString(mb, 2))
 	}
 
-	gb := float64(kb) / 1024
-	return fmt.Sprintf("%.2f GiB", gb)
+	gb := mb / 1024
+	return fmt.Sprintf("%s GiB", floatToString(gb, 2))
+}
+
+// render float to fixed precision using truncation instead of rounding
+func floatToString(f float64, p uint8) string {
+	fs := fmt.Sprintf("%#f%0*s", f, p, "")
+	idx := strings.IndexRune(fs, '.')
+	return fs[:idx+int(p)+1]
 }

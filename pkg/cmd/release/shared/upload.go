@@ -56,9 +56,24 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 }
 
 func typeForFilename(fn string) string {
-	ext := path.Ext(fn)
-	t := mime.TypeByExtension(ext)
+	fn = strings.ToLower(fn)
+	if strings.HasSuffix(fn, ".tar.gz") {
+		return "application/x-gtar"
+	}
 
+	ext := path.Ext(fn)
+	switch ext {
+	case ".tgz":
+		return "application/x-gtar"
+	case ".bz2":
+		return "application/x-bzip2"
+	case ".dmg":
+		return "application/x-apple-diskimage"
+	case ".rpm":
+		return "application/x-rpm"
+	}
+
+	t := mime.TypeByExtension(ext)
 	if t == "" {
 		return "application/octet-stream"
 	}
@@ -72,6 +87,10 @@ func ConcurrentUpload(httpClient *http.Client, uploadURL string, numWorkers int,
 
 	jobs := make(chan AssetForUpload, len(assets))
 	results := make(chan error, len(assets))
+
+	if len(assets) < numWorkers {
+		numWorkers = len(assets)
+	}
 
 	for w := 1; w <= numWorkers; w++ {
 		go func() {

@@ -56,7 +56,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Destination, "destination", "C", ".", "The directory to download files into")
+	cmd.Flags().StringVarP(&opts.Destination, "dir", "C", ".", "The directory to download files into")
 
 	return cmd
 }
@@ -87,6 +87,13 @@ func downloadRun(opts *DownloadOptions) error {
 		toDownload = append(toDownload, a)
 	}
 
+	if len(toDownload) == 0 {
+		if len(release.Assets) > 0 {
+			return errors.New("no assets match the file pattern")
+		}
+		return errors.New("no assets to download")
+	}
+
 	if opts.Destination != "." {
 		err := os.MkdirAll(opts.Destination, 0755)
 		if err != nil {
@@ -108,10 +115,14 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	jobs := make(chan shared.ReleaseAsset, len(toDownload))
 	results := make(chan error, len(toDownload))
 
+	if len(toDownload) < numWorkers {
+		numWorkers = len(toDownload)
+	}
+
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.URL, filepath.Join(destDir, a.Name))
+				results <- downloadAsset(httpClient, a.APIURL, filepath.Join(destDir, a.Name))
 			}
 		}()
 	}

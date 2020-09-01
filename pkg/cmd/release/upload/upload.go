@@ -86,7 +86,7 @@ func uploadRun(opts *UploadOptions) error {
 	for _, a := range opts.Assets {
 		for _, ea := range release.Assets {
 			if ea.Name == a.Name {
-				a.ExistingURL = ea.URL
+				a.ExistingURL = ea.APIURL
 				existingNames = append(existingNames, ea.Name)
 				break
 			}

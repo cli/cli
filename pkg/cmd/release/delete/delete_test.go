@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_NewCmdReady(t *testing.T) {
+func Test_NewCmdDelete(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    string
@@ -25,7 +25,7 @@ func Test_NewCmdReady(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "number argument",
+			name:  "version argument",
 			args:  "v1.2.3",
 			isTTY: true,
 			want: DeleteOptions{

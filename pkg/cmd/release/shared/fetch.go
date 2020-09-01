@@ -33,10 +33,10 @@ type Release struct {
 }
 
 type ReleaseAsset struct {
-	Name  string
-	Size  int64
-	State string
-	URL   string
+	Name   string
+	Size   int64
+	State  string
+	APIURL string `json:"url"`
 }
 
 // FetchRelease finds a repository release by its tagName.
