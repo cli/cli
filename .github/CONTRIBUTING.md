@@ -3,6 +3,8 @@
 [legal]: https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license
 [license]: ../LICENSE
 [code-of-conduct]: CODE-OF-CONDUCT.md
+[bug issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Abug
+[feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3A+label%3Aenhancement
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
@@ -10,7 +12,7 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
-* check existing issues to verify that the bug or feature request has not already been submitted
+* check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted
 * open an issue if things aren't working as expected
 * open an issue to propose a significant change
 * open a pull request to fix a bug
