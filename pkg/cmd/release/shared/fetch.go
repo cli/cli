@@ -80,6 +80,39 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 	return &release, nil
 }
 
+// FetchLatestRelease finds the latest published release for a repository.
+func FetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*Release, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases/latest", baseRepo.RepoOwner(), baseRepo.RepoName())
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var release Release
+	err = json.Unmarshal(b, &release)
+	if err != nil {
+		return nil, err
+	}
+
+	return &release, nil
+}
+
 // FindDraftRelease interates over all releases in a repository until it finds one that matches tagName.
 func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*Release, error) {
 	path := fmt.Sprintf("repos/%s/%s/releases", baseRepo.RepoOwner(), baseRepo.RepoName())

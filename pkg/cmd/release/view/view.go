@@ -28,14 +28,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view <tag>",
+		Use:   "view [<tag>]",
 		Short: "View information about a release",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.TagName = args[0]
+			if len(args) > 0 {
+				opts.TagName = args[0]
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -58,9 +60,18 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
-	if err != nil {
-		return err
+	var release *shared.Release
+
+	if opts.TagName == "" {
+		release, err = shared.FetchLatestRelease(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+	} else {
+		release, err = shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
 	}
 
 	iofmt := opts.IO.ColorScheme()
