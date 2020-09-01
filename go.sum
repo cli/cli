@@ -25,8 +25,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/briandowns/spinner v1.11.1 h1:OixPqDEcX3juo5AjQZAnFPbeUA0jvkp2qzB5gOZJ/L0=
 github.com/briandowns/spinner v1.11.1/go.mod h1:QOuQk7x+EaDASo80FEXwlwiA+j/PPIcX3FScO+3/ZPQ=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
-github.com/charmbracelet/glamour v0.1.1-0.20200527150725-d3564681b966 h1:UCm+1X58J8Q1E6PrkoQ/jQSIkie+9Ka2QjVe9osXd/4=
-github.com/charmbracelet/glamour v0.1.1-0.20200527150725-d3564681b966/go.mod h1:ECr5vYu2tKCePqAbZNUh94HiZDPMtbc9ggAy4n585JU=
+github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684 h1:YMyvXRstOQc7n6eneHfudVMbARSCmZ7EZGjtTkkeB3A=
+github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684/go.mod h1:UA27Kwj3QHialP74iU6C+Gpc8Y7IOAKupeKMLLBURWM=
 github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e h1:aq/1jlmtZoS6nlSp3yLOTZQ50G+dzHdeRNENgE/iBew=
 github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e/go.mod h1:it23pLwxmz6OyM6I5O0ATIXQS1S190Nas26L5Kahp4U=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
@@ -124,8 +124,8 @@ github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrk
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/muesli/reflow v0.1.0 h1:oQdpLfO56lr5pgLvqD0TcjW85rDjSYSBVdiG1Ch1ddM=
 github.com/muesli/reflow v0.1.0/go.mod h1:I9bWAt7QTg/que/qmUCJBGlj7wEq8OAFBjPNjc6xK4I=
-github.com/muesli/termenv v0.5.2 h1:N1Y1dHRtx6OizOgaIQXd8SkJl4T/cCOV+YyWXiuLUEA=
-github.com/muesli/termenv v0.5.2/go.mod h1:O1/I6sw+6KcrgAmcs6uiUVr7Lui+DNVbHTzt9Lm/PlI=
+github.com/muesli/termenv v0.6.0 h1:zxvzTBmo4ZcxhNGGWeMz+Tttm51eF5bmPjfy4MCRYlk=
+github.com/muesli/termenv v0.6.0/go.mod h1:SohX91w6swWA4AYU+QmPx+aSgXhWO0juiyID9UZmbpA=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.4 h1:vHD/YYe1Wolo78koG299f7V/VAS08c6IpCLn+Ejf/w8=
@@ -182,8 +182,8 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-github.com/yuin/goldmark v1.1.30 h1:j4d4Lw3zqZelDhBksEo3BnWg9xhXRQGJPPSL6OApZjI=
-github.com/yuin/goldmark v1.1.30/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
+github.com/yuin/goldmark v1.2.0 h1:WOOcyaJPlzb8fZ8TloxFe8QZkhOOJx87leDa9MIT9dc=
+github.com/yuin/goldmark v1.2.0/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=

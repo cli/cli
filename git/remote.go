@@ -14,6 +14,15 @@ var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 // RemoteSet is a slice of git remotes
 type RemoteSet []*Remote
 
+func NewRemote(name string, u string) *Remote {
+	pu, _ := url.Parse(u)
+	return &Remote{
+		Name:     name,
+		FetchURL: pu,
+		PushURL:  pu,
+	}
+}
+
 // Remote is a parsed git remote
 type Remote struct {
 	Name     string

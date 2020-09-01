@@ -33,6 +33,21 @@ func (r *Registry) StubWithFixture(status int, fixtureFileName string) func() {
 	}
 }
 
+func (r *Registry) StubWithFixturePath(status int, fixturePath string) func() {
+	fixtureFile, err := os.Open(fixturePath)
+	r.Register(MatchAny, func(req *http.Request) (*http.Response, error) {
+		if err != nil {
+			return nil, err
+		}
+		return httpResponse(200, req, fixtureFile), nil
+	})
+	return func() {
+		if err == nil {
+			fixtureFile.Close()
+		}
+	}
+}
+
 func (r *Registry) StubRepoResponse(owner, repo string) {
 	r.StubRepoResponseWithPermission(owner, repo, "WRITE")
 }

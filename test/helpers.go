@@ -6,10 +6,22 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"testing"
 
 	"github.com/cli/cli/internal/run"
 )
+
+// TODO copypasta from command package
+type CmdOut struct {
+	OutBuf, ErrBuf *bytes.Buffer
+}
+
+func (c CmdOut) String() string {
+	return c.OutBuf.String()
+}
+
+func (c CmdOut) Stderr() string {
+	return c.ErrBuf.String()
+}
 
 // OutputStub implements a simple utils.Runnable
 type OutputStub struct {
@@ -73,7 +85,13 @@ func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
 	}
 }
 
-func ExpectLines(t *testing.T, output string, lines ...string) {
+type T interface {
+	Helper()
+	Errorf(string, ...interface{})
+}
+
+func ExpectLines(t T, output string, lines ...string) {
+	t.Helper()
 	var r *regexp.Regexp
 	for _, l := range lines {
 		r = regexp.MustCompile(l)

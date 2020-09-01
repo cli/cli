@@ -10,6 +10,10 @@ var (
 	protocolRe = regexp.MustCompile("^[a-zA-Z_+-]+://")
 )
 
+func IsURL(u string) bool {
+	return strings.HasPrefix(u, "git@") || protocolRe.MatchString(u)
+}
+
 // ParseURL normalizes git remote urls
 func ParseURL(rawURL string) (u *url.URL, err error) {
 	if !protocolRe.MatchString(rawURL) &&
