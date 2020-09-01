@@ -156,7 +156,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(survey.Required))
+			}, &hostname, survey.WithValidator(hostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
@@ -286,5 +286,16 @@ func loginRun(opts *LoginOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
 
+	return nil
+}
+
+func hostnameValidator(v interface{}) error {
+	val := v.(string)
+	if len(strings.TrimSpace(val)) < 1 {
+		return errors.New("a value is required")
+	}
+	if strings.ContainsRune(val, '/') || strings.ContainsRune(val, ':') {
+		return errors.New("invalid hostname")
+	}
 	return nil
 }
