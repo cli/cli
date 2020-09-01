@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -74,28 +75,44 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	iofmt := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Bold(release.TagName))
+	if opts.IO.IsStdoutTTY() {
+		if err := renderReleaseTTY(opts.IO, release); err != nil {
+			return err
+		}
+	} else {
+		if err := renderReleasePlain(opts.IO.Out, release); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
+	iofmt := io.ColorScheme()
+	w := io.Out
+
+	fmt.Fprintf(w, "%s\n", iofmt.Bold(release.TagName))
 	if release.IsDraft {
-		fmt.Fprintf(opts.IO.Out, "%s • ", iofmt.Red("Draft"))
+		fmt.Fprintf(w, "%s • ", iofmt.Red("Draft"))
 	} else if release.IsPrerelease {
-		fmt.Fprintf(opts.IO.Out, "%s • ", iofmt.Yellow("Pre-release"))
+		fmt.Fprintf(w, "%s • ", iofmt.Yellow("Pre-release"))
 	}
 	if release.IsDraft {
-		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.CreatedAt)))))
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.CreatedAt)))))
 	} else {
-		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
 	}
 
 	renderedDescription, err := utils.RenderMarkdown(release.Body)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(opts.IO.Out, renderedDescription)
+	fmt.Fprintln(w, renderedDescription)
 
 	if len(release.Assets) > 0 {
-		fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Bold("Assets"))
-		table := utils.NewTablePrinter(opts.IO)
+		fmt.Fprintf(w, "%s\n", iofmt.Bold("Assets"))
+		table := utils.NewTablePrinter(io)
 		for _, a := range release.Assets {
 			table.AddField(a.Name, nil, nil)
 			table.AddField(humanFileSize(a.Size), nil, nil)
@@ -105,11 +122,29 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(opts.IO.Out, "\n")
+		fmt.Fprint(w, "\n")
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", iofmt.Gray(fmt.Sprintf("View on GitHub: %s", release.HTMLURL)))
+	fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("View on GitHub: %s", release.HTMLURL)))
+	return nil
+}
 
+func renderReleasePlain(w io.Writer, release *shared.Release) error {
+	fmt.Fprintf(w, "title:\t%s\n", release.Name)
+	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
+	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
+	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
+	fmt.Fprintf(w, "author:\t%s\n", release.Author.Login)
+	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt)
+	if !release.IsDraft {
+		fmt.Fprintf(w, "published:\t%s\n", release.PublishedAt)
+	}
+	fmt.Fprintf(w, "url:\t%s\n", release.HTMLURL)
+	for _, a := range release.Assets {
+		fmt.Fprintf(w, "asset:\t%s\n", a.Name)
+	}
+	fmt.Fprint(w, "--\n")
+	fmt.Fprint(w, release.Body)
 	return nil
 }
 
