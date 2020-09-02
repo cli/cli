@@ -53,7 +53,24 @@ func Truncate(max int, s string) string {
 	return res
 }
 
+var runeDisplayWidthOverrides = map[rune]int{
+	'“': 1,
+	'”': 1,
+	'‘': 1,
+	'’': 1,
+	'–': 1, // en dash
+	'—': 1, // em dash
+	'→': 1,
+	'…': 1,
+	'•': 1, // bullet
+	'·': 1, // middle dot
+}
+
 func runeDisplayWidth(r rune) int {
+	if w, ok := runeDisplayWidthOverrides[r]; ok {
+		return w
+	}
+
 	switch width.LookupRune(r).Kind() {
 	case width.EastAsianWide, width.EastAsianAmbiguous, width.EastAsianFullwidth:
 		return 2

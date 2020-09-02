@@ -1,6 +1,8 @@
 package text
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestTruncate(t *testing.T) {
 	type args struct {
@@ -65,6 +67,72 @@ func TestTruncate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Truncate(tt.args.max, tt.args.s); got != tt.want {
 				t.Errorf("Truncate() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDisplayWidth(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want int
+	}{
+		{
+			name: "check mark",
+			text: `✓`,
+			want: 1,
+		},
+		{
+			name: "bullet icon",
+			text: `•`,
+			want: 1,
+		},
+		{
+			name: "middle dot",
+			text: `·`,
+			want: 1,
+		},
+		{
+			name: "ellipsis",
+			text: `…`,
+			want: 1,
+		},
+		{
+			name: "right arrow",
+			text: `→`,
+			want: 1,
+		},
+		{
+			name: "smart double quotes",
+			text: `“”`,
+			want: 2,
+		},
+		{
+			name: "smart single quotes",
+			text: `‘’`,
+			want: 2,
+		},
+		{
+			name: "em dash",
+			text: `—`,
+			want: 1,
+		},
+		{
+			name: "en dash",
+			text: `–`,
+			want: 1,
+		},
+		{
+			name: "emoji",
+			text: `👍`,
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := DisplayWidth(tt.text); got != tt.want {
+				t.Errorf("DisplayWidth() = %v, want %v", got, tt.want)
 			}
 		})
 	}
