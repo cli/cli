@@ -103,7 +103,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "notes from file",
-			args:  "v1.2.3 -F" + tf.Name(),
+			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: true,
 			want: CreateOptions{
 				TagName:      "v1.2.3",

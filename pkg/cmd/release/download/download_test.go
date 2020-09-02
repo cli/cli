@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -129,9 +128,9 @@ func Test_downloadRun(t *testing.T) {
 			wantStdout: ``,
 			wantStderr: ``,
 			wantFiles: []string{
-				"./linux.tgz",
-				"./windows-32bit.zip",
-				"./windows-64bit.zip",
+				"linux.tgz",
+				"windows-32bit.zip",
+				"windows-64bit.zip",
 			},
 		},
 		{
@@ -146,8 +145,8 @@ func Test_downloadRun(t *testing.T) {
 			wantStdout: ``,
 			wantStderr: ``,
 			wantFiles: []string{
-				"./tmp/assets/windows-32bit.zip",
-				"./tmp/assets/windows-64bit.zip",
+				"tmp/assets/windows-32bit.zip",
+				"tmp/assets/windows-64bit.zip",
 			},
 		},
 		{
@@ -221,7 +220,11 @@ func listFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(p string, f os.FileInfo, err error) error {
 		if !f.IsDir() {
-			files = append(files, "."+strings.TrimPrefix(p, dir))
+			rp, err := filepath.Rel(dir, p)
+			if err != nil {
+				return err
+			}
+			files = append(files, filepath.ToSlash(rp))
 		}
 		return err
 	})
