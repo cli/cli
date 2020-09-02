@@ -171,7 +171,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		},
 	})
 
-	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./repoWithNonLegacyIssueTemplates")
+	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}

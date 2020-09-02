@@ -31,6 +31,10 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
+}
+
+func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
 	io.SetStdinTTY(isTTY)
@@ -60,7 +64,10 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, is
 		},
 	}
 
-	cmd := NewCmdCreate(factory, nil)
+	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
+		opts.RootDirOverride = rootDir
+		return createRun(opts)
+	})
 	cmd.PersistentFlags().StringP("repo", "R", "", "")
 
 	argv, err := shlex.Split(cli)
@@ -234,6 +241,80 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "my title")
 	eq(t, reqBody.Variables.Input.Body, "my body")
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+func TestPRCreate_nonLegacyTemplate(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "index",
+			Value: 0,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title"`, "./fixtures/repoWithNonLegacyPRTemplates")
+	require.NoError(t, err)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "my title")
+	eq(t, reqBody.Variables.Input.Body, "Fixes a bug  \nCloses an issue")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
