@@ -6,7 +6,6 @@ on:
       - "repos-rc*"
 
 # [x] generate new GPG key and get it into secrets
-#   - TODO put public key in repo
 #   - TODO test key flow
 # TODO get site repo checked out
 # TODO add packages to site, commit, push
@@ -52,7 +51,7 @@ jobs:
           echo "Resetting gpg-agent and ingesting passphrase"
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          echo ${{secrets.GPG_PASSPHRASE}} | /usr/lib/gnupg2/gpg-preset-passphrase --preset 6D05600E91B6B2104C6E291A2072C6F511C291AE
+          echo ${{secrets.GPG_PASSPHRASE}} | /usr/lib/gnupg2/gpg-preset-passphrase --preset gh:ppp
           echo "Moving on to reprepro..."
           mkdir upload
           for file in *.deb ; do /usr/bin/reprepro --confdir="+b/script" includedeb stable $file ; done
