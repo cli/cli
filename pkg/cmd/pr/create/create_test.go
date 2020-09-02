@@ -889,7 +889,7 @@ func TestPRCreate_survey_defaults_monocommit_template(t *testing.T) {
 
 	templateFp := path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE.md")
 	_ = os.MkdirAll(path.Dir(templateFp), 0700)
-	ioutil.WriteFile(templateFp, []byte("... turned to a dead channel"), 0700)
+	_ = ioutil.WriteFile(templateFp, []byte("... turned to a dead channel"), 0700)
 
 	cs.Stub("")                                  // git config --get-regexp (determineTrackingBranch)
 	cs.Stub("")                                  // git show-ref --verify   (determineTrackingBranch)
