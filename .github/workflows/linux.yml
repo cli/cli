@@ -5,7 +5,9 @@ on:
     tags:
       - "repos-rc*"
 
-# TODO get gpg secrets in place
+# TODO generate new GPG key and get it into secrets
+# TODO get site repo checked out
+# TODO add packages to site, commit, push
 
 jobs:
   repos:
