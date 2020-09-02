@@ -68,6 +68,7 @@ func Test_checksRun(t *testing.T) {
 		stubs   func(*httpmock.Registry)
 		wantOut string
 		nontty  bool
+		wantErr bool
 	}{
 		{
 			name: "no commits",
@@ -96,11 +97,13 @@ func Test_checksRun(t *testing.T) {
 			name:    "some failing",
 			fixture: "./fixtures/someFailing.json",
 			wantOut: "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantErr: true,
 		},
 		{
 			name:    "some pending",
 			fixture: "./fixtures/somePending.json",
 			wantOut: "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantErr: true,
 		},
 		{
 			name:    "all passing",
@@ -111,6 +114,7 @@ func Test_checksRun(t *testing.T) {
 			name:    "with statuses",
 			fixture: "./fixtures/withStatuses.json",
 			wantOut: "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantErr: true,
 		},
 		{
 			name:   "no commits",
@@ -142,12 +146,14 @@ func Test_checksRun(t *testing.T) {
 			nontty:  true,
 			fixture: "./fixtures/someFailing.json",
 			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantErr: true,
 		},
 		{
 			name:    "some pending",
 			nontty:  true,
 			fixture: "./fixtures/somePending.json",
 			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantErr: true,
 		},
 		{
 			name:    "all passing",
@@ -160,6 +166,7 @@ func Test_checksRun(t *testing.T) {
 			nontty:  true,
 			fixture: "./fixtures/withStatuses.json",
 			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantErr: true,
 		},
 	}
 
@@ -191,7 +198,11 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			err := checksRun(opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Equal(t, "SilentError", err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			reg.Verify(t)

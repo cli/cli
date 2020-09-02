@@ -284,9 +284,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 									state
 								}
 								...on CheckRun {
-									name
 									status
-									conclusion
 								}
 							}
 						}

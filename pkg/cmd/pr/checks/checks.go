@@ -89,19 +89,21 @@ func checksRun(opts *ChecksOptions) error {
 	pending := 0
 
 	type output struct {
-		mark    string
-		bucket  string
-		name    string
-		elapsed string
-		link    string
+		mark      string
+		bucket    string
+		name      string
+		elapsed   string
+		link      string
+		markColor func(string) string
 	}
 
 	outputs := []output{}
 
 	for _, c := range pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
-		mark := ""
-		bucket := ""
+		mark := "✓"
+		bucket := "pass"
 		state := c.State
+		markColor := utils.Green
 		if state == "" {
 			if c.Status == "COMPLETED" {
 				state = c.Conclusion
@@ -111,15 +113,15 @@ func checksRun(opts *ChecksOptions) error {
 		}
 		switch state {
 		case "SUCCESS", "NEUTRAL", "SKIPPED":
-			mark = utils.GreenCheck()
 			passing++
-			bucket = "pass"
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-			mark = utils.RedX()
+			mark = "X"
+			markColor = utils.Red
 			failing++
 			bucket = "fail"
 		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
-			mark = utils.YellowDash()
+			mark = "-"
+			markColor = utils.Yellow
 			pending++
 			bucket = "pending"
 		default:
@@ -146,28 +148,33 @@ func checksRun(opts *ChecksOptions) error {
 			name = c.Context
 		}
 
-		outputs = append(outputs, output{mark, bucket, name, elapsed, link})
+		outputs = append(outputs, output{mark, bucket, name, elapsed, link, markColor})
 	}
 
 	sort.Slice(outputs, func(i, j int) bool {
-		if outputs[i].bucket == outputs[j].bucket {
-			return outputs[i].name < outputs[j].name
-		} else {
-			if outputs[i].bucket == "fail" {
-				return true
-			} else if outputs[i].bucket == "pending" && outputs[j].bucket == "success" {
-				return true
+		b0 := outputs[i].bucket
+		n0 := outputs[i].name
+		l0 := outputs[i].link
+		b1 := outputs[j].bucket
+		n1 := outputs[j].name
+		l1 := outputs[j].link
+
+		if b0 == b1 {
+			if n0 == n1 {
+				return l0 < l1
+			} else {
+				return n0 < n1
 			}
 		}
 
-		return false
+		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
 	})
 
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, o := range outputs {
 		if opts.IO.IsStdoutTTY() {
-			tp.AddField(o.mark, nil, nil)
+			tp.AddField(o.mark, nil, o.markColor)
 			tp.AddField(o.name, nil, nil)
 			tp.AddField(o.elapsed, nil, nil)
 			tp.AddField(o.link, nil, nil)
@@ -207,5 +214,14 @@ func checksRun(opts *ChecksOptions) error {
 		fmt.Fprintln(opts.IO.Out)
 	}
 
-	return tp.Render()
+	err = tp.Render()
+	if err != nil {
+		return err
+	}
+
+	if failing+pending > 0 {
+		return cmdutil.SilentError
+	}
+
+	return nil
 }
