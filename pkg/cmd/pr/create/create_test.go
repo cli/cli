@@ -314,7 +314,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "my title")
-	eq(t, reqBody.Variables.Input.Body, "Fixes a bug  \nCloses an issue")
+	eq(t, reqBody.Variables.Input.Body, "Fixes a bug and Closes an issue")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 

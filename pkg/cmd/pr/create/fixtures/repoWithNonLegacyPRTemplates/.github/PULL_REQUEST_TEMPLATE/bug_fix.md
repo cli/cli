@@ -4,5 +4,4 @@ about: Fix a bug
 
 ---
 
-Fixes a bug  
-Closes an issue
+Fixes a bug and Closes an issue
