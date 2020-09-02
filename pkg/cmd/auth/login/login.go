@@ -87,6 +87,12 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				}
 			}
 
+			if cmd.Flags().Changed("hostname") {
+				if err := hostnameValidator(opts.Hostname); err != nil {
+					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -156,7 +162,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(survey.Required))
+			}, &hostname, survey.WithValidator(hostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
@@ -256,7 +262,7 @@ func loginRun(opts *LoginOptions) error {
 
 	gitProtocol = strings.ToLower(gitProtocol)
 
-	fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h%s git_protocol %s\n", hostname, gitProtocol)
+	fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
 	err = cfg.Set(hostname, "git_protocol", gitProtocol)
 	if err != nil {
 		return err
@@ -286,5 +292,16 @@ func loginRun(opts *LoginOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
 
+	return nil
+}
+
+func hostnameValidator(v interface{}) error {
+	val := v.(string)
+	if len(strings.TrimSpace(val)) < 1 {
+		return errors.New("a value is required")
+	}
+	if strings.ContainsRune(val, '/') || strings.ContainsRune(val, ':') {
+		return errors.New("invalid hostname")
+	}
 	return nil
 }
