@@ -103,12 +103,20 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func System() *IOStreams {
-	return &IOStreams{
+	stdoutIsTTY := isTerminal(os.Stdout)
+	stderrIsTTY := isTerminal(os.Stderr)
+
+	io := &IOStreams{
 		In:           os.Stdin,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
-		colorEnabled: os.Getenv("NO_COLOR") == "" && isTerminal(os.Stdout),
+		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
 	}
+
+	// prevent duplicate isTerminal queries now that we know the answer
+	io.SetStdoutTTY(stdoutIsTTY)
+	io.SetStderrTTY(stderrIsTTY)
+	return io
 }
 
 func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {

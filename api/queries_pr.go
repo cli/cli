@@ -739,7 +739,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 		err := client.GraphQL(repo.RepoHost(), updateQuery, variables, &result)
 		if err != nil {
-			return nil, err
+			return pr, err
 		}
 	}
 
@@ -764,7 +764,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 		err := client.GraphQL(repo.RepoHost(), reviewQuery, variables, &result)
 		if err != nil {
-			return nil, err
+			return pr, err
 		}
 	}
 
