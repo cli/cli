@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
@@ -35,16 +36,32 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "download <tag> [<pattern>]",
+		Use:   "download [<tag>]",
 		Short: "Download release assets",
-		Args:  cobra.MinimumNArgs(1),
+		Long: heredoc.Doc(`
+			Download assets from a GitHub release.
+
+			Without an explicit tag name argument, assets are downloaded from the
+			latest release in the project. In this case, '--pattern' is required.
+		`),
+		Example: heredoc.Doc(`
+			# download all assets from a specific release
+			$ gh release download v1.2.3
+			
+			# download only Debian packages for the latest release
+			$ gh release download --pattern '*.deb'
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.TagName = args[0]
-			if len(args) > 1 {
-				opts.FilePattern = args[1]
+			if len(args) == 0 {
+				if opts.FilePattern == "" {
+					return &cmdutil.FlagError{Err: errors.New("the '--pattern' flag is required when downloading the latest release")}
+				}
+			} else {
+				opts.TagName = args[0]
 			}
 
 			opts.Concurrency = 5
@@ -56,7 +73,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Destination, "dir", "C", ".", "The directory to download files into")
+	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
+	cmd.Flags().StringVarP(&opts.FilePattern, "pattern", "p", "", "Download only assets that match the glob pattern")
 
 	return cmd
 }
@@ -72,9 +90,18 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
-	if err != nil {
-		return err
+	var release *shared.Release
+
+	if opts.TagName == "" {
+		release, err = shared.FetchLatestRelease(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+	} else {
+		release, err = shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
 	}
 
 	var toDownload []shared.ReleaseAsset

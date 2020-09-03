@@ -38,7 +38,7 @@ func Test_NewCmdDownload(t *testing.T) {
 		},
 		{
 			name:  "version and file pattern",
-			args:  "v1.2.3 *.tgz",
+			args:  "v1.2.3 -p *.tgz",
 			isTTY: true,
 			want: DownloadOptions{
 				TagName:     "v1.2.3",
@@ -49,7 +49,7 @@ func Test_NewCmdDownload(t *testing.T) {
 		},
 		{
 			name:  "version and destination",
-			args:  "v1.2.3 -C tmp/assets",
+			args:  "v1.2.3 -D tmp/assets",
 			isTTY: true,
 			want: DownloadOptions{
 				TagName:     "v1.2.3",
@@ -59,10 +59,21 @@ func Test_NewCmdDownload(t *testing.T) {
 			},
 		},
 		{
+			name:  "download latest",
+			args:  "-p *",
+			isTTY: true,
+			want: DownloadOptions{
+				TagName:     "",
+				FilePattern: "*",
+				Destination: ".",
+				Concurrency: 5,
+			},
+		},
+		{
 			name:    "no arguments",
 			args:    "",
 			isTTY:   true,
-			wantErr: "requires at least 1 arg(s), only received 0",
+			wantErr: "the '--pattern' flag is required when downloading the latest release",
 		},
 	}
 	for _, tt := range tests {
