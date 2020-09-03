@@ -113,7 +113,7 @@ func FetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*Re
 	return &release, nil
 }
 
-// FindDraftRelease interates over all releases in a repository until it finds one that matches tagName.
+// FindDraftRelease returns the latest draft release that matches tagName.
 func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*Release, error) {
 	path := fmt.Sprintf("repos/%s/%s/releases", baseRepo.RepoOwner(), baseRepo.RepoName())
 	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
@@ -148,7 +148,7 @@ func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagNam
 		}
 
 		for _, r := range releases {
-			if r.TagName == tagName {
+			if r.IsDraft && r.TagName == tagName {
 				return &r, nil
 			}
 		}
