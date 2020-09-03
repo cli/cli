@@ -107,47 +107,39 @@ MSI installers are available for download on the [releases page][].
 
 ### Debian/Ubuntu Linux
 
-Install and upgrade:
-
-1. Download the `.deb` file from the [releases page][];
-2. Install the downloaded file: `sudo apt install ./gh_*_linux_amd64.deb`
-
-### Fedora Linux
-
-Install and upgrade:
-
-1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo dnf install gh_*_linux_amd64.rpm`
-
-### Centos Linux
-
-Install and upgrade:
-
-1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo yum localinstall gh_*_linux_amd64.rpm`
-
-### openSUSE/SUSE Linux
-
-Install and upgrade:
-
-1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
-
-### Arch Linux
-
-Arch Linux users can install from the [community repo][arch linux repo]:
+Install:
 
 ```bash
-pacman -S github-cli
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+sudo apt-add-repository -u https://cli.github.com/packages
+sudo apt install gh
 ```
 
-### Android
+Upgrade:
 
-Android users can install via Termux:
+```
+sudo apt update
+sudo apt install gh
+```
+
+### Fedora, Centos, Red Hat Linux
+
+Install:
 
 ```bash
-pkg install gh
+sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
 ```
+
+Upgrade:
+
+```bash
+sudo dnf install gh
+```
+
+### Other Linux
+
+See [Linux installation docs](/docs/install_linux.md)
 
 ### Other platforms
 
@@ -164,5 +156,4 @@ See here on how to [build GitHub CLI from source][build from source].
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
 [gh-vs-hub]: /docs/gh-vs-hub.md
-[arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [build from source]: /docs/source.md
