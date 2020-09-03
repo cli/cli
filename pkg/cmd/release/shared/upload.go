@@ -58,9 +58,9 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 func typeForFilename(fn string) string {
 	ext := fileExt(fn)
 	switch ext {
-	case "zip":
+	case ".zip":
 		return "application/zip"
-	case "js":
+	case ".js":
 		return "application/javascript"
 	case ".tgz", ".tar.gz":
 		return "application/x-gtar"
