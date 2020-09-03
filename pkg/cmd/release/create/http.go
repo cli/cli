@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -50,24 +49,30 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string) error {
+func publishRelease(httpClient *http.Client, releaseURL string) (*shared.Release, error) {
 	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBufferString(`{"draft":false}`))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
+		return nil, api.HandleHTTPError(resp)
 	}
 
-	_, err = io.Copy(ioutil.Discard, resp.Body)
-	return err
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var release shared.Release
+	err = json.Unmarshal(b, &release)
+	return &release, err
 }

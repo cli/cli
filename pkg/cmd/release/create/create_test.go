@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -290,6 +291,36 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
 		},
+		{
+			name:  "publish after uploading files",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				Target:       "",
+				Assets: []*shared.AssetForUpload{
+					{
+						Name: "ball.tgz",
+						Open: func() (io.ReadCloser, error) {
+							return ioutil.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+						},
+					},
+				},
+				Concurrency: 1,
+			},
+			wantParams: map[string]interface{}{
+				"tag_name":   "v1.2.3",
+				"name":       "",
+				"body":       "",
+				"draft":      true,
+				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
+			wantStderr: ``,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -300,7 +331,13 @@ func Test_createRun(t *testing.T) {
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+				"url": "https://api.github.com/releases/123",
+				"upload_url": "https://api.github.com/assets/upload",
 				"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+			}`))
+			fakeHTTP.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(201, `{}`))
+			fakeHTTP.Register(httpmock.REST("PATCH", "releases/123"), httpmock.StatusStringResponse(201, `{
+				"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
 			}`))
 
 			tt.opts.IO = io
@@ -325,6 +362,19 @@ func Test_createRun(t *testing.T) {
 			err = json.Unmarshal(bb, &params)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantParams, params)
+
+			if len(tt.opts.Assets) > 0 {
+				q := fakeHTTP.Requests[1].URL.Query()
+				assert.Equal(t, tt.opts.Assets[0].Name, q.Get("name"))
+				assert.Equal(t, tt.opts.Assets[0].Label, q.Get("label"))
+
+				bb, err := ioutil.ReadAll(fakeHTTP.Requests[2].Body)
+				require.NoError(t, err)
+				var updateParams interface{}
+				err = json.Unmarshal(bb, &updateParams)
+				require.NoError(t, err)
+				assert.Equal(t, map[string]interface{}{"draft": false}, updateParams)
+			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
