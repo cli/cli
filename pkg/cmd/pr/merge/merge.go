@@ -33,6 +33,7 @@ type MergeOptions struct {
 	DeleteLocalBranch bool
 	MergeMethod       api.PullRequestMergeMethod
 	InteractiveMode   bool
+	ConfirmSubmit     bool
 }
 
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
@@ -107,7 +108,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
-
+	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm Merging the PR (default: false)")
 	return cmd
 }
 
@@ -145,79 +146,92 @@ func mergeRun(opts *MergeOptions) error {
 		}
 	}
 
-	var action string
-	if mergeMethod == api.PullRequestMergeMethodRebase {
-		action = "Rebased and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
-	} else if mergeMethod == api.PullRequestMergeMethodSquash {
-		action = "Squashed and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
-	} else if mergeMethod == api.PullRequestMergeMethodMerge {
-		action = "Merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
-	} else {
-		err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
-		return err
+	shouldSubmitFromFlag := opts.ConfirmSubmit
+	if !shouldSubmitFromFlag {
+		fmt.Println(opts.ConfirmSubmit)
+		err := prompt.Confirm("Submit? ", &shouldSubmitFromFlag)
+		if err != nil {
+			return err
+		}
 	}
 
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
-
-	isTerminal := opts.IO.IsStdoutTTY()
-
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
-	}
-
-	if deleteBranch {
-		branchSwitchString := ""
-
-		if opts.DeleteLocalBranch && !crossRepoPR {
-			currentBranch, err := opts.Branch()
-			if err != nil {
-				return err
-			}
-
-			var branchToSwitchTo string
-			if currentBranch == pr.HeadRefName {
-				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-				err = git.CheckoutBranch(branchToSwitchTo)
-				if err != nil {
-					return err
-				}
-			}
-
-			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-			if localBranchExists {
-				err = git.DeleteLocalBranch(pr.HeadRefName)
-				if err != nil {
-					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-					return err
-				}
-			}
-
-			if branchToSwitchTo != "" {
-				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
-			}
+	if shouldSubmitFromFlag {
+		var action string
+		if mergeMethod == api.PullRequestMergeMethodRebase {
+			action = "Rebased and merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
+		} else if mergeMethod == api.PullRequestMergeMethodSquash {
+			action = "Squashed and merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
+		} else if mergeMethod == api.PullRequestMergeMethodMerge {
+			action = "Merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+		} else {
+			err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
+			return err
 		}
 
-		if !crossRepoPR {
-			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-			var httpErr api.HTTPError
-			// The ref might have already been deleted by GitHub
-			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
-				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
-				return err
-			}
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
 		}
+
+		isTerminal := opts.IO.IsStdoutTTY()
 
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
 		}
+
+		if deleteBranch {
+			branchSwitchString := ""
+
+			if opts.DeleteLocalBranch && !crossRepoPR {
+				currentBranch, err := opts.Branch()
+				if err != nil {
+					return err
+				}
+
+				var branchToSwitchTo string
+				if currentBranch == pr.HeadRefName {
+					branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+					if err != nil {
+						return err
+					}
+					err = git.CheckoutBranch(branchToSwitchTo)
+					if err != nil {
+						return err
+					}
+				}
+
+				localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+				if localBranchExists {
+					err = git.DeleteLocalBranch(pr.HeadRefName)
+					if err != nil {
+						err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+						return err
+					}
+				}
+
+				if branchToSwitchTo != "" {
+					branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
+				}
+			}
+
+			if !crossRepoPR {
+				err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
+				var httpErr api.HTTPError
+				// The ref might have already been deleted by GitHub
+				if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
+					err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					return err
+				}
+			}
+
+			if isTerminal {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+			}
+		}
+	} else {
+		fmt.Println("Discarding")
 	}
 
 	return nil
