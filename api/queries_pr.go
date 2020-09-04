@@ -981,10 +981,12 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		} `graphql:"mergePullRequest(input: $input)"`
 	}
 
+	commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
 	variables := map[string]interface{}{
 		"input": githubv4.MergePullRequestInput{
-			PullRequestID: pr.ID,
-			MergeMethod:   &mergeMethod,
+			PullRequestID:  pr.ID,
+			MergeMethod:    &mergeMethod,
+			CommitHeadline: &commitHeadline,
 		},
 	}
 
