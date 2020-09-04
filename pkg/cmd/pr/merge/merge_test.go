@@ -197,6 +197,8 @@ func TestPrMerge(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
 	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
@@ -242,6 +244,8 @@ func TestPrMerge_nontty(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
 	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
@@ -284,6 +288,8 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
@@ -318,6 +324,8 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("") // git checkout master
 	cs.Stub("") // git rev-parse --verify blueberries`
@@ -351,6 +359,9 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
+
+	prompt.StubConfirm(true)
+
 	// We don't expect the default branch to be checked out, just that blueberries is deleted
 	cs.Stub("") // git rev-parse --verify blueberries
 	cs.Stub("") // git branch -d blueberries
@@ -383,6 +394,8 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
+
+	prompt.StubConfirm(true)
 
 	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
 	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
@@ -429,6 +442,8 @@ func TestPrMerge_rebase(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("") // git symbolic-ref --quiet --short HEAD
 	cs.Stub("") // git checkout master
@@ -473,6 +488,8 @@ func TestPrMerge_squash(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
+	prompt.StubConfirm(true)
+
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("") // git symbolic-ref --quiet --short HEAD
 	cs.Stub("") // git checkout master
@@ -498,6 +515,8 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
+
+	prompt.StubConfirm(true)
 
 	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
 	cs.Stub("") // git symbolic-ref --quiet --short HEAD
@@ -560,6 +579,8 @@ func TestPRMerge_interactive(t *testing.T) {
 			Value: true,
 		},
 	})
+
+	prompt.StubConfirm(true)
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if err != nil {
