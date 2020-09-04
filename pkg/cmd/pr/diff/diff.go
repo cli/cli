@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/cli/cli/api"
@@ -16,7 +14,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
@@ -93,15 +90,15 @@ func diffRun(opts *DiffOptions) error {
 	}
 	defer diff.Close()
 
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	if opts.UseColor == "never" {
 		_, err = io.Copy(opts.IO.Out, diff)
 		return err
-	}
-
-	if opts.IO.IsStdoutTTY() {
-		if pager := os.Getenv("PAGER"); pager != "" {
-			return runPager(pager, diff, opts.IO.Out)
-		}
 	}
 
 	diffLines := bufio.NewScanner(diff)
@@ -147,15 +144,4 @@ func isRemovalLine(dl string) bool {
 
 func validColorFlag(c string) bool {
 	return c == "auto" || c == "always" || c == "never"
-}
-
-var runPager = func(pager string, diff io.Reader, out io.Writer) error {
-	args, err := shlex.Split(pager)
-	if err != nil {
-		return err
-	}
-	pagerCmd := exec.Command(args[0], args[1:]...)
-	pagerCmd.Stdin = diff
-	pagerCmd.Stdout = out
-	return pagerCmd.Run()
 }

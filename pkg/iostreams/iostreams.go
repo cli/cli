@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -28,6 +29,9 @@ type IOStreams struct {
 	stdoutIsTTY       bool
 	stderrTTYOverride bool
 	stderrIsTTY       bool
+
+	pagerCommand string
+	pagerProcess *os.Process
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -79,6 +83,51 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
+func (s *IOStreams) StartPager() error {
+	if s.pagerCommand == "" || !s.IsStdoutTTY() {
+		return nil
+	}
+
+	pagerArgs, err := shlex.Split(s.pagerCommand)
+	if err != nil {
+		return err
+	}
+
+	pagerEnv := os.Environ()
+	if _, ok := os.LookupEnv("LESS"); !ok {
+		pagerEnv = append(pagerEnv, "LESS=FRX")
+	}
+	if _, ok := os.LookupEnv("LV"); !ok {
+		pagerEnv = append(pagerEnv, "LV=-c")
+	}
+
+	pagerCmd := exec.Command(pagerArgs[0], pagerArgs[1:]...)
+	pagerCmd.Env = pagerEnv
+	pagerCmd.Stdout = s.Out
+	pagerCmd.Stderr = s.ErrOut
+	pagedOut, err := pagerCmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	s.Out = pagedOut
+	err = pagerCmd.Start()
+	if err != nil {
+		return err
+	}
+	s.pagerProcess = pagerCmd.Process
+	return nil
+}
+
+func (s *IOStreams) StopPager() {
+	if s.pagerProcess == nil {
+		return
+	}
+
+	s.Out.(io.ReadCloser).Close()
+	_, _ = s.pagerProcess.Wait()
+	s.pagerProcess = nil
+}
+
 func (s *IOStreams) TerminalWidth() int {
 	defaultWidth := 80
 	if s.stdoutTTYOverride {
@@ -111,6 +160,7 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
+		pagerCommand: os.Getenv("PAGER"),
 	}
 
 	// prevent duplicate isTerminal queries now that we know the answer
