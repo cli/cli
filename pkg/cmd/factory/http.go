@@ -13,7 +13,7 @@ import (
 )
 
 // generic authenticated HTTP client for commands
-func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
+func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		logTraffic := strings.Contains(verbose, "api")
