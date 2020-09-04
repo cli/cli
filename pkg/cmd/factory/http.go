@@ -23,11 +23,15 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, s
 	opts = append(opts,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
-			if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
+
+			if token := os.Getenv("GITHUB_TOKEN"); hostname == ghinstance.Default() && token != "" {
+				return fmt.Sprintf("token %s", token), nil
+			}
+			if token := os.Getenv("GITHUB_ENTERPRISE_TOKEN"); ghinstance.IsEnterprise(hostname) && token != "" {
 				return fmt.Sprintf("token %s", token), nil
 			}
 
-			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
 			token, err := cfg.Get(hostname, "oauth_token")
 			if err != nil || token == "" {
 				// Users shouldn't see this because of the pre-execute auth check on commands
