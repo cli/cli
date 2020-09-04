@@ -39,7 +39,11 @@ func makeColorFunc(color string) func(string) string {
 }
 
 func isColorEnabled() bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0" {
+		return true
+	}
+
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0" {
 		return false
 	}
 

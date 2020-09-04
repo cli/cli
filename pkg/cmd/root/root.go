@@ -61,7 +61,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 				GLAMOUR_STYLE: the style to use for rendering Markdown. See
 				https://github.com/charmbracelet/glamour#styles
 	
-				NO_COLOR: avoid printing ANSI escape sequences for color output.
+				NO_COLOR: set to any value to avoid printing ANSI escape sequences for color output.
+
+				CLICOLOR: set to "0" to disable printing ANSI colors in output.
+
+				CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
+				even when the output is piped.
 			`),
 		},
 	}

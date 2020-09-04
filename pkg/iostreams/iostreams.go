@@ -106,11 +106,14 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
+	envNoColor := os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0"
+	envForceColor := os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0"
+
 	io := &IOStreams{
 		In:           os.Stdin,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
-		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
+		colorEnabled: envForceColor || (!envNoColor && stdoutIsTTY),
 	}
 
 	// prevent duplicate isTerminal queries now that we know the answer
