@@ -68,6 +68,10 @@ Upgrade:
 sudo port selfupdate && sudo port upgrade gh
 ```
 
+### Linux
+
+See [Linux installation docs](/docs/install_linux.md).
+
 ### Windows
 
 `gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
@@ -105,42 +109,6 @@ choco upgrade gh
 
 MSI installers are available for download on the [releases page][].
 
-### Debian/Ubuntu Linux
-
-Install:
-
-```bash
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-sudo apt-add-repository -u https://cli.github.com/packages
-sudo apt install gh
-```
-
-Upgrade:
-
-```
-sudo apt update
-sudo apt install gh
-```
-
-### Fedora, Centos, Red Hat Linux
-
-Install:
-
-```bash
-sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh
-```
-
-Upgrade:
-
-```bash
-sudo dnf install gh
-```
-
-### Other Linux
-
-See [Linux installation docs](/docs/install_linux.md)
-
 ### Other platforms
 
 Download packaged binaries from the [releases page][].
@@ -148,6 +116,7 @@ Download packaged binaries from the [releases page][].
 ### Build from source
 
 See here on how to [build GitHub CLI from source][build from source].
+
 
 [official docs]: https://cli.github.com/manual
 [scoop]: https://scoop.sh

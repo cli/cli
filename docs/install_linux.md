@@ -1,15 +1,15 @@
 # Installing gh on Linux
 
-The core, paid developers of `gh` officially support a `.deb` repository and a `.rpm` repository. We
-primarily test against Ubuntu and Fedora but do our best to support other distros that can work with
-our repositories. We focus on support for `amd64` and `i386` architectures.
+Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
+are considered official binaries. We focus on a couple of popular Linux distros and
+the following CPU architectures: `386`, `amd64`, `arm64`.
 
-All other combinations of distro, packaging, or architecture should be considered community
-supported.
+Other sources for installation are community-maintained and thus might lag behind
+our release schedule.
 
-## Official methods
+## Official sources
 
-### Debian/Ubuntu Linux (apt)
+### Debian, Ubuntu 20.04 Linux (apt)
 
 Install:
 
@@ -21,7 +21,7 @@ sudo apt install gh
 
 Upgrade:
 
-```
+```bash
 sudo apt update
 sudo apt install gh
 ```
@@ -41,17 +41,26 @@ Upgrade:
 sudo dnf install gh
 ```
 
-## Community supported methods
+### openSUSE/SUSE Linux (zypper)
 
-### openSUSE/SUSE Linux
+It's possible that https://cli.github.com/packages/rpm/gh-cli.repo will work with zypper, but
+this hasn't been tested.
 
-It's possible that https://cli.github.com/packages/rpm/gh-cli.repo will work with zypper but it
-hasn't been tested. Otherwise, to install from package:
+## Manual installation
+
+* [Download release binaries][releases page] that match your platform; or
+* [Build from source](./source.md).
+
+### openSUSE/SUSE Linux (zypper)
  
 Install and upgrade:
 
 1. Download the `.rpm` file from the [releases page][];
 2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
+
+## Community-supported methods
+
+Our team does do not directly maintain the following packages or repositories.
 
 ### Arch Linux
 
@@ -69,4 +78,6 @@ Android users can install via Termux:
 pkg install gh
 ```
 
+
+[releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
