@@ -46,15 +46,14 @@ site-docs: site
 	git -C site commit -m 'update help docs' || true
 .PHONY: site-docs
 
-site-publish: site-docs
+site-bump: site-docs
 ifndef GITHUB_REF
 	$(error GITHUB_REF is not set)
 endif
 	sed -i.bak -E 's/(assign version = )".+"/\1"$(GITHUB_REF:refs/tags/v%=%)"/' site/index.html
 	rm -f site/index.html.bak
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
-	git -C site push
-.PHONY: site-publish
+.PHONY: site-bump
 
 
 .PHONY: manpages

@@ -2,6 +2,7 @@ project_name: gh
 
 release:
   prerelease: auto
+  draft: true # we only publish after the Windows MSI gets uploaded
 
 before:
   hooks:
