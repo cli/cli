@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 )
@@ -39,11 +40,11 @@ func makeColorFunc(color string) func(string) string {
 }
 
 func isColorEnabled() bool {
-	if os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0" {
+	if iostreams.EnvColorForced() {
 		return true
 	}
 
-	if os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0" {
+	if iostreams.EnvColorDisabled() {
 		return false
 	}
 
