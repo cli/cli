@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/command"
 	"github.com/cli/cli/internal/config"
@@ -43,6 +44,10 @@ func main() {
 
 	cmdFactory := factory.New(command.Version)
 	stderr := cmdFactory.IOStreams.ErrOut
+	if !cmdFactory.IOStreams.ColorEnabled() {
+		surveyCore.DisableColor = true
+	}
+
 	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
 
 	expandedArgs := []string{}
