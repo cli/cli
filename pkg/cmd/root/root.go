@@ -2,6 +2,7 @@ package root
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
+	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
@@ -104,12 +106,23 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	// CHILD COMMANDS
 
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
-	cmd.AddCommand(apiCmd.NewCmdApi(f, nil))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
+
+	// the `api` command should not inherit any extra HTTP headers
+	bareHTTPCmdFactory := *f
+	bareHTTPCmdFactory.HttpClient = func() (*http.Client, error) {
+		cfg, err := bareHTTPCmdFactory.Config()
+		if err != nil {
+			return nil, err
+		}
+		return factory.NewHTTPClient(bareHTTPCmdFactory.IOStreams, cfg, version, false), nil
+	}
+
+	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
