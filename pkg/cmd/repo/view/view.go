@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 	"strings"
 	"syscall"
 
@@ -175,11 +174,8 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	err = tmpl.Execute(stdout, repoData)
-	if err != nil {
-		var pathError *os.PathError
-		if !errors.As(err, &pathError) || pathError.Op != "write" || pathError.Unwrap() != syscall.EPIPE {
-			return err
-		}
+	if err != nil && !errors.Is(err, syscall.EPIPE) {
+		return err
 	}
 
 	return nil
