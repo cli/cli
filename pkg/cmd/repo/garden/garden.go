@@ -234,7 +234,7 @@ func gardenRun(opts *GardenOptions) error {
 // TODO fix arrow keys
 
 func isLeft(b []byte) bool {
-	return bytes.EqualFold(b, []byte("a")) || bytes.EqualFold(b, []byte("h"))
+	return bytes.EqualFold(b, []byte("a")) || bytes.EqualFold(b, []byte("q")) || bytes.EqualFold(b, []byte("h"))
 }
 
 func isRight(b []byte) bool {
@@ -246,7 +246,7 @@ func isDown(b []byte) bool {
 }
 
 func isUp(b []byte) bool {
-	return bytes.EqualFold(b, []byte("w")) || bytes.EqualFold(b, []byte("k"))
+	return bytes.EqualFold(b, []byte("w")) || bytes.EqualFold(b, []byte("z")) || bytes.EqualFold(b, []byte("k"))
 }
 
 func isQuit(b []byte) bool {
