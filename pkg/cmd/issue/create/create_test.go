@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,10 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
+}
+
+func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
 	io.SetStdinTTY(isTTY)
@@ -47,7 +52,10 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdCreate(factory, nil)
+	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
+		opts.RootDirOverride = rootDir
+		return createRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -122,6 +130,67 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "hello")
 	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "index",
+			Value: 1,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "hello")
+	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
