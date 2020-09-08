@@ -18,6 +18,7 @@ We'd love to hear your feedback about `gh`. If you spot bugs or have features th
 - `gh pr [status, list, view, checkout, create]`
 - `gh issue [status, list, view, create]`
 - `gh repo [view, create, clone, fork]`
+- `gh auth [login, logout, refresh, status]`
 - `gh config [get, set]`
 - `gh help`
 
