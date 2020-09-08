@@ -13,4 +13,40 @@ Architectures: i386 amd64 arm64
 Components: main
 Description: The GitHub CLI - ubuntu focal repo
 SignWith: C99B11DEB97541F0
-DebOverride: override.focal
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: precise
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu focal repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: bionic
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu focal repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: trusty
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu focal repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: xenial
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu focal repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
