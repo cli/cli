@@ -3,7 +3,6 @@ package logout
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"testing"
 
@@ -213,21 +212,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			},
 			wantErr: regexp.MustCompile(`not logged in to any hosts`),
 		},
-		{
-			name:    "gh token is set",
-			opts:    &LogoutOptions{},
-			ghtoken: "abc123",
-			wantErr: regexp.MustCompile(`GITHUB_TOKEN is set in your environment`),
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ghtoken := os.Getenv("GITHUB_TOKEN")
-			defer func() {
-				os.Setenv("GITHUB_TOKEN", ghtoken)
-			}()
-			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
 			io, _, _, stderr := iostreams.Test()
 
 			io.SetStdinTTY(false)
@@ -256,7 +244,9 @@ func Test_logoutRun_nontty(t *testing.T) {
 			assert.Equal(t, tt.wantErr == nil, err == nil)
 			if err != nil {
 				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
+					if !tt.wantErr.MatchString(err.Error()) {
+						t.Errorf("got error: %v", err)
+					}
 					return
 				} else {
 					t.Fatalf("unexpected error: %s", err)

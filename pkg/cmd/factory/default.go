@@ -27,6 +27,7 @@ func New(appVersion string) *cmdutil.Factory {
 			cachedConfig = config.NewBlankConfig()
 			configError = nil
 		}
+		cachedConfig = config.InheritEnv(cachedConfig)
 		return cachedConfig, configError
 	}
 

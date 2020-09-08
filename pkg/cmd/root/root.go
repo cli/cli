@@ -43,8 +43,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 				Open an issue using “gh issue create -R cli/cli”
 			`),
 			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for API requests. Setting this avoids being
-				prompted to authenticate and overrides any previously stored credentials.
+				GITHUB_TOKEN: an authentication token for github.com API requests. Setting this avoids
+				being prompted to authenticate and takes precedence over previously stored credentials.
+	
+				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
 	
 				GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
 				that otherwise operate on a local repository.

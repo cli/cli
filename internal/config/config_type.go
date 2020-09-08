@@ -15,10 +15,12 @@ const defaultGitProtocol = "https"
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
+	GetWithSource(string, string) (string, string, error)
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)
 	Aliases() (*AliasConfig, error)
+	CheckWriteable(string, string) error
 	Write() error
 }
 
@@ -200,42 +202,51 @@ func (c *fileConfig) Root() *yaml.Node {
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
+	val, _, err := c.GetWithSource(hostname, key)
+	return val, err
+}
+
+func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error) {
 	if hostname != "" {
 		var notFound *NotFoundError
 
 		hostCfg, err := c.configForHost(hostname)
 		if err != nil && !errors.As(err, &notFound) {
-			return "", err
+			return "", "", err
 		}
 
 		var hostValue string
 		if hostCfg != nil {
 			hostValue, err = hostCfg.GetStringValue(key)
 			if err != nil && !errors.As(err, &notFound) {
-				return "", err
+				return "", "", err
 			}
 		}
 
 		if hostValue != "" {
-			return hostValue, nil
+			// TODO: avoid hardcoding this
+			return hostValue, "~/.config/gh/hosts.yml", nil
 		}
 	}
+
+	// TODO: avoid hardcoding this
+	defaultSource := "~/.config/gh/config.yml"
 
 	value, err := c.GetStringValue(key)
 
 	var notFound *NotFoundError
 
 	if err != nil && errors.As(err, &notFound) {
-		return defaultFor(key), nil
+		return defaultFor(key), defaultSource, nil
 	} else if err != nil {
-		return "", err
+		return "", defaultSource, err
 	}
 
 	if value == "" {
-		return defaultFor(key), nil
+		return defaultFor(key), defaultSource, nil
 	}
 
-	return value, nil
+	return value, defaultSource, nil
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {
@@ -279,6 +290,11 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 		}
 	}
 	return nil, &NotFoundError{fmt.Errorf("could not find config entry for %q", hostname)}
+}
+
+func (c *fileConfig) CheckWriteable(hostname, key string) error {
+	// TODO: check filesystem permissions
+	return nil
 }
 
 func (c *fileConfig) Write() error {
