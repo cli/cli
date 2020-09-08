@@ -189,6 +189,7 @@ func TestPrMerge(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -234,6 +235,7 @@ func TestPrMerge_nontty(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -276,6 +278,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -310,6 +313,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -344,6 +348,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -376,6 +381,7 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -421,6 +427,7 @@ func TestPrMerge_rebase(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "REBASE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -465,6 +472,7 @@ func TestPrMerge_squash(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "The title of the PR (#3)", input["commitHeadline"].(string))
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
@@ -533,6 +541,7 @@ func TestPRMerge_interactive(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),

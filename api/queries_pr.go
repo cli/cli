@@ -1037,11 +1037,18 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		} `graphql:"mergePullRequest(input: $input)"`
 	}
 
+	input := githubv4.MergePullRequestInput{
+		PullRequestID: pr.ID,
+		MergeMethod:   &mergeMethod,
+	}
+
+	if m == PullRequestMergeMethodSquash {
+		commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
+		input.CommitHeadline = &commitHeadline
+	}
+
 	variables := map[string]interface{}{
-		"input": githubv4.MergePullRequestInput{
-			PullRequestID: pr.ID,
-			MergeMethod:   &mergeMethod,
-		},
+		"input": input,
 	}
 
 	gql := graphQLClient(client.http, repo.RepoHost())
