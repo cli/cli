@@ -8,14 +8,15 @@
 
 GitHub CLI is available for repos hosted on GitHub.com and GitHub Enterprise Server 2.20+. It is available to install on MacOS, Windows, and Linux. 
 
-## We want your feedback
-
-We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
-
 
 ## Documentation
 
-Read the [official docs][] for more information.
+Read the [official docs][] for usage and more information.
+
+
+## We want your feedback
+
+We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
 
 
 
