@@ -21,9 +21,9 @@ type DownloadOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	TagName     string
-	FilePattern string
-	Destination string
+	TagName      string
+	FilePatterns []string
+	Destination  string
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -50,6 +50,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			
 			# download only Debian packages for the latest release
 			$ gh release download --pattern '*.deb'
+			
+			# specify multiple file patterns
+			$ gh release download -p '*.deb' -p '*.rpm'
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -57,7 +60,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			opts.BaseRepo = f.BaseRepo
 
 			if len(args) == 0 {
-				if opts.FilePattern == "" {
+				if len(opts.FilePatterns) == 0 {
 					return &cmdutil.FlagError{Err: errors.New("the '--pattern' flag is required when downloading the latest release")}
 				}
 			} else {
@@ -74,7 +77,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	}
 
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
-	cmd.Flags().StringVarP(&opts.FilePattern, "pattern", "p", "", "Download only assets that match the glob pattern")
+	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 
 	return cmd
 }
@@ -106,10 +109,8 @@ func downloadRun(opts *DownloadOptions) error {
 
 	var toDownload []shared.ReleaseAsset
 	for _, a := range release.Assets {
-		if opts.FilePattern != "" {
-			if isMatch, err := filepath.Match(opts.FilePattern, a.Name); err != nil || !isMatch {
-				continue
-			}
+		if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
+			continue
 		}
 		toDownload = append(toDownload, a)
 	}
@@ -132,6 +133,15 @@ func downloadRun(opts *DownloadOptions) error {
 	err = downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency)
 	opts.IO.StopProgressIndicator()
 	return err
+}
+
+func matchAny(patterns []string, name string) bool {
+	for _, p := range patterns {
+		if isMatch, err := filepath.Match(p, name); err == nil && isMatch {
+			return true
+		}
+	}
+	return false
 }
 
 func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int) error {

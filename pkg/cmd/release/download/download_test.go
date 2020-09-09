@@ -30,10 +30,10 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:  "v1.2.3",
 			isTTY: true,
 			want: DownloadOptions{
-				TagName:     "v1.2.3",
-				FilePattern: "",
-				Destination: ".",
-				Concurrency: 5,
+				TagName:      "v1.2.3",
+				FilePatterns: []string(nil),
+				Destination:  ".",
+				Concurrency:  5,
 			},
 		},
 		{
@@ -41,10 +41,21 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:  "v1.2.3 -p *.tgz",
 			isTTY: true,
 			want: DownloadOptions{
-				TagName:     "v1.2.3",
-				FilePattern: "*.tgz",
-				Destination: ".",
-				Concurrency: 5,
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"*.tgz"},
+				Destination:  ".",
+				Concurrency:  5,
+			},
+		},
+		{
+			name:  "multiple file patterns",
+			args:  "v1.2.3 -p 1 -p 2,3",
+			isTTY: true,
+			want: DownloadOptions{
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"1", "2,3"},
+				Destination:  ".",
+				Concurrency:  5,
 			},
 		},
 		{
@@ -52,10 +63,10 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:  "v1.2.3 -D tmp/assets",
 			isTTY: true,
 			want: DownloadOptions{
-				TagName:     "v1.2.3",
-				FilePattern: "",
-				Destination: "tmp/assets",
-				Concurrency: 5,
+				TagName:      "v1.2.3",
+				FilePatterns: []string(nil),
+				Destination:  "tmp/assets",
+				Concurrency:  5,
 			},
 		},
 		{
@@ -63,10 +74,10 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:  "-p *",
 			isTTY: true,
 			want: DownloadOptions{
-				TagName:     "",
-				FilePattern: "*",
-				Destination: ".",
-				Concurrency: 5,
+				TagName:      "",
+				FilePatterns: []string{"*"},
+				Destination:  ".",
+				Concurrency:  5,
 			},
 		},
 		{
@@ -111,7 +122,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
-			assert.Equal(t, tt.want.FilePattern, opts.FilePattern)
+			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.Destination, opts.Destination)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 		})
@@ -148,10 +159,10 @@ func Test_downloadRun(t *testing.T) {
 			name:  "download assets matching pattern into destination directory",
 			isTTY: true,
 			opts: DownloadOptions{
-				TagName:     "v1.2.3",
-				FilePattern: "windows-*.zip",
-				Destination: "tmp/assets",
-				Concurrency: 2,
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"windows-*.zip"},
+				Destination:  "tmp/assets",
+				Concurrency:  2,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -164,10 +175,10 @@ func Test_downloadRun(t *testing.T) {
 			name:  "no match for pattern",
 			isTTY: true,
 			opts: DownloadOptions{
-				TagName:     "v1.2.3",
-				FilePattern: "linux*.zip",
-				Destination: ".",
-				Concurrency: 2,
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"linux*.zip"},
+				Destination:  ".",
+				Concurrency:  2,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
