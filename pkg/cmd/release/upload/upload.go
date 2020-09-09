@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -102,6 +103,13 @@ func uploadRun(opts *UploadOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		iofmt := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "Successfully uploaded %s to %s\n",
+			utils.Pluralize(len(opts.Assets), "asset"),
+			iofmt.Bold(release.TagName))
 	}
 
 	return nil
