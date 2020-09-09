@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
@@ -169,6 +170,8 @@ func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *
 
 		if templateContents != "" {
 			if issueState.Body != "" {
+				// prevent excessive newlines between default body and template
+				issueState.Body = strings.TrimRight(issueState.Body, "\n")
 				issueState.Body += "\n\n"
 			}
 			issueState.Body += templateContents
