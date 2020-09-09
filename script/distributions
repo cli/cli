@@ -20,7 +20,7 @@ Label: gh
 Codename: precise
 Architectures: i386 amd64 arm64
 Components: main
-Description: The GitHub CLI - ubuntu focal repo
+Description: The GitHub CLI - ubuntu precise repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
 
@@ -29,7 +29,7 @@ Label: gh
 Codename: bionic
 Architectures: i386 amd64 arm64
 Components: main
-Description: The GitHub CLI - ubuntu focal repo
+Description: The GitHub CLI - ubuntu bionic repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
 
@@ -38,7 +38,7 @@ Label: gh
 Codename: trusty
 Architectures: i386 amd64 arm64
 Components: main
-Description: The GitHub CLI - ubuntu focal repo
+Description: The GitHub CLI - ubuntu trusty repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
 
@@ -47,6 +47,6 @@ Label: gh
 Codename: xenial
 Architectures: i386 amd64 arm64
 Components: main
-Description: The GitHub CLI - ubuntu focal repo
+Description: The GitHub CLI - ubuntu xenial repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
