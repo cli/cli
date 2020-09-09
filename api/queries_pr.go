@@ -280,10 +280,10 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 						contexts(last: 100) {
 							nodes {
 								...on StatusContext {
-									context
 									state
 								}
 								...on CheckRun {
+									conclusion
 									status
 								}
 							}
