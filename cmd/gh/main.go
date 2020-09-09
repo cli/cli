@@ -51,7 +51,11 @@ func main() {
 	}
 
 	cmd, _, err := rootCmd.Traverse(expandedArgs)
-	if err != nil || cmd == rootCmd {
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to parse the command:  %s\n", err)
+		os.Exit(2)
+	}
+	{
 		originalArgs := expandedArgs
 		isShell := false
 
