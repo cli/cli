@@ -174,7 +174,7 @@ func createRun(opts *CreateOptions) error {
 			{
 				Name: "name",
 				Prompt: &survey.Input{
-					Message: "Title",
+					Message: "Title (optional)",
 					Default: opts.Name,
 				},
 			},
