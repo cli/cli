@@ -91,6 +91,17 @@ func (s *IOStreams) IsStderrTTY() bool {
 }
 
 func (s *IOStreams) CanPrompt() bool {
+	cfg, err := s.Config()
+	if err == nil {
+		// TODO prompt is a global setting. Is this inconsistency ok? There's not a super strong case to
+		// set prompting by host, but it means we need to be clear about what can and can't be set per
+		// host.
+		prompt, _ := cfg.Get("", "prompt")
+		if prompt == config.NeverPrompt {
+			return false
+		}
+	}
+
 	return s.IsStdinTTY() && s.IsStdoutTTY()
 }
 
