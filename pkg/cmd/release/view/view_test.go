@@ -32,6 +32,7 @@ func Test_NewCmdView(t *testing.T) {
 			isTTY: true,
 			want: ViewOptions{
 				TagName: "v1.2.3",
+				WebMode: false,
 			},
 		},
 		{
@@ -40,6 +41,16 @@ func Test_NewCmdView(t *testing.T) {
 			isTTY: true,
 			want: ViewOptions{
 				TagName: "",
+				WebMode: false,
+			},
+		},
+		{
+			name:  "web mode",
+			args:  "-w",
+			isTTY: true,
+			want: ViewOptions{
+				TagName: "",
+				WebMode: true,
 			},
 		},
 	}
@@ -78,6 +89,7 @@ func Test_NewCmdView(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
+			assert.Equal(t, tt.want.WebMode, opts.WebMode)
 		})
 	}
 }
