@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -62,7 +63,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create <tag> [<files>...]",
 		Short: "Create a new release",
-		Args:  cobra.MinimumNArgs(1),
+		Long: heredoc.Doc(`
+			Create a new GitHub Release for a repository.
+
+			A list of asset files may be given to upload to the new release. To define a
+			display label for an asset, append text starting with '#' after the file name.
+		`),
+		Example: heredoc.Doc(`
+			# use release notes from a file
+			$ gh release create v1.2.3 -F changelog.md
+
+			# upload a release asset with a display label
+			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
+		`),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

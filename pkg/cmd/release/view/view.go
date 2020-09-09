@@ -35,7 +35,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Use:   "view [<tag>]",
 		Short: "View information about a release",
 		Long: heredoc.Doc(`
-			View information about a GitHub release.
+			View information about a GitHub Release.
 
 			Without an explicit tag name argument, the latest release in the project
 			is shown.

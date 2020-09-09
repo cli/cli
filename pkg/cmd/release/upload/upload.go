@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -35,7 +36,13 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "upload <tag> <files>...",
 		Short: "Upload assets to a release",
-		Args:  cobra.MinimumNArgs(2),
+		Long: heredoc.Doc(`
+			Upload asset files to a GitHub Release.
+
+			To define a display label for an asset, append text starting with '#' after the
+			file name.
+		`),
+		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
