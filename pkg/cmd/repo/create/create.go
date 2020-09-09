@@ -73,6 +73,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.Name = args[0]
 			}
 
+			if !opts.IO.CanPrompt() {
+				if opts.Name == "" {
+					return &cmdutil.FlagError{Err: errors.New("must pass name argument when prompts disabled")}
+				}
+				if !opts.Internal && !opts.Private && !opts.Public {
+					opts.Public = true
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -264,7 +273,7 @@ func createRun(opts *CreateOptions) error {
 			if isTTY {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
 			}
-		} else if isTTY {
+		} else if opts.IO.CanPrompt() {
 			doSetup := createLocalDirectory
 			if !doSetup {
 				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)

@@ -60,7 +60,7 @@ func Test_NewCmdReview(t *testing.T) {
 			name:    "no arguments in non-interactive mode",
 			args:    "",
 			isTTY:   false,
-			wantErr: "--approve, --request-changes, or --comment required when not attached to a tty",
+			wantErr: "--approve, --request-changes, or --comment required when prompts are disabled",
 		},
 		{
 			name:    "mutually exclusive review types",

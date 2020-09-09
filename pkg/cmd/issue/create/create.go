@@ -157,6 +157,10 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("must provide --title and --body when not attached to a terminal")
 	}
 
+	if interactive && !opts.IO.CanPrompt() {
+		return fmt.Errorf("must provide --title and --body when prompts are disabled")
+	}
+
 	if interactive {
 		var legacyTemplateFile *string
 		if opts.RepoOverride == "" {

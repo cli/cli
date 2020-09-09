@@ -75,9 +75,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			isTerminal := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
-			if !isTerminal && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return errors.New("--title or --fill required when not attached to a terminal")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
+				return errors.New("--title or --fill required when prompts are disabled")
 			}
 
 			if opts.IsDraft && opts.WebMode {

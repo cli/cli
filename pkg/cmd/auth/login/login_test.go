@@ -49,19 +49,13 @@ func Test_NewCmdLogin(t *testing.T) {
 			name:     "nontty, hostname",
 			stdinTTY: false,
 			cli:      "--hostname claire.redfield",
-			wants: LoginOptions{
-				Hostname: "claire.redfield",
-				Token:    "",
-			},
+			wantsErr: true,
 		},
 		{
 			name:     "nontty",
 			stdinTTY: false,
 			cli:      "",
-			wants: LoginOptions{
-				Hostname: "",
-				Token:    "",
-			},
+			wantsErr: true,
 		},
 		{
 			name:  "nontty, with-token, hostname",
@@ -109,6 +103,7 @@ func Test_NewCmdLogin(t *testing.T) {
 				IOStreams: io,
 			}
 
+			io.SetStdoutTTY(true)
 			io.SetStdinTTY(tt.stdinTTY)
 			if tt.stdin != "" {
 				stdin.WriteString(tt.stdin)

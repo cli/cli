@@ -135,7 +135,7 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	assert.Equal(t, "--title or --fill required when not attached to a terminal", err.Error())
+	assert.Equal(t, "--title or --fill required when prompts are disabled", err.Error())
 
 	assert.Equal(t, "", output.String())
 }
