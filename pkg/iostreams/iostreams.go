@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/cli/cli/internal/config"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -21,6 +22,9 @@ type IOStreams struct {
 	In     io.ReadCloser
 	Out    io.Writer
 	ErrOut io.Writer
+
+	// Used to understand user prefences around interactivity
+	Config func() (config.Config, error)
 
 	// the original (non-colorable) output stream
 	originalOut  io.Writer
@@ -135,7 +139,7 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 	return NewColorScheme(s.ColorEnabled())
 }
 
-func System() *IOStreams {
+func System(configFunc func() (config.Config, error)) *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
@@ -145,6 +149,7 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
+		Config:       configFunc,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -165,6 +170,9 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		In:     ioutil.NopCloser(in),
 		Out:    out,
 		ErrOut: errOut,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 	}, in, out, errOut
 }
 

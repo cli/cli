@@ -14,8 +14,6 @@ import (
 )
 
 func New(appVersion string) *cmdutil.Factory {
-	io := iostreams.System()
-
 	var cachedConfig config.Config
 	var configError error
 	configFunc := func() (config.Config, error) {
@@ -30,6 +28,8 @@ func New(appVersion string) *cmdutil.Factory {
 		cachedConfig = config.InheritEnv(cachedConfig)
 		return cachedConfig, configError
 	}
+
+	io := iostreams.System(configFunc)
 
 	rr := &remoteResolver{
 		readRemotes: git.Remotes,
