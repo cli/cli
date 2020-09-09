@@ -87,7 +87,7 @@ func TestIssueView_web(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/123 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -120,7 +120,7 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/123 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
