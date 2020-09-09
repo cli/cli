@@ -78,7 +78,7 @@ jobs:
           popd
       - name: Run reprepro
         env:
-          RELEASES: "focal stable"
+          RELEASES: "focal stable bionic trusty precise xenial"
         run: |
           mkdir -p upload
           for release in $RELEASES; do
