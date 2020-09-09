@@ -94,7 +94,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.BrowserMode {
 		if connectedToTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", openURL)
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	}
