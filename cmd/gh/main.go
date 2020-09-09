@@ -92,23 +92,17 @@ func main() {
 		}
 	}
 
-	authCheckEnabled := cmdutil.IsAuthCheckEnabled(cmd)
-
-	// TODO support other names
-	ghtoken := os.Getenv("GITHUB_TOKEN")
-	if ghtoken != "" {
-		authCheckEnabled = false
-	}
-
+	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
+		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
+		cmdutil.IsAuthCheckEnabled(cmd)
 	if authCheckEnabled {
-		hasAuth := false
-
 		cfg, err := cmdFactory.Config()
-		if err == nil {
-			hasAuth = cmdutil.CheckAuth(cfg)
+		if err != nil {
+			fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+			os.Exit(2)
 		}
 
-		if !hasAuth {
+		if !cmdutil.CheckAuth(cfg) {
 			fmt.Fprintln(stderr, utils.Bold("Welcome to GitHub CLI!"))
 			fmt.Fprintln(stderr)
 			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")

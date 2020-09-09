@@ -2,7 +2,6 @@ package refresh
 
 import (
 	"bytes"
-	"os"
 	"regexp"
 	"testing"
 
@@ -94,16 +93,9 @@ func Test_refreshRun(t *testing.T) {
 		askStubs     func(*prompt.AskStubber)
 		cfgHosts     []string
 		wantErr      *regexp.Regexp
-		ghtoken      string
 		nontty       bool
 		wantAuthArgs authArgs
 	}{
-		{
-			name:    "GITHUB_TOKEN set",
-			opts:    &RefreshOptions{},
-			ghtoken: "abc123",
-			wantErr: regexp.MustCompile(`GITHUB_TOKEN is present in your environment`),
-		},
 		{
 			name:    "non tty",
 			opts:    &RefreshOptions{},
@@ -193,11 +185,6 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			ghtoken := os.Getenv("GITHUB_TOKEN")
-			defer func() {
-				os.Setenv("GITHUB_TOKEN", ghtoken)
-			}()
-			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
 			io, _, _, _ := iostreams.Test()
 
 			io.SetStdinTTY(!tt.nontty)

@@ -22,6 +22,8 @@ type IOStreams struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
+	// the original (non-colorable) output stream
+	originalOut  io.Writer
 	colorEnabled bool
 
 	progressIndicatorEnabled bool
@@ -107,15 +109,16 @@ func (s *IOStreams) StopProgressIndicator() {
 
 func (s *IOStreams) TerminalWidth() int {
 	defaultWidth := 80
-	if s.stdoutTTYOverride {
-		return defaultWidth
+	out := s.Out
+	if s.originalOut != nil {
+		out = s.originalOut
 	}
 
-	if w, _, err := terminalSize(s.Out); err == nil {
+	if w, _, err := terminalSize(out); err == nil {
 		return w
 	}
 
-	if isCygwinTerminal(s.Out) {
+	if isCygwinTerminal(out) {
 		tputCmd := exec.Command("tput", "cols")
 		tputCmd.Stdin = os.Stdin
 		if out, err := tputCmd.Output(); err == nil {
@@ -138,6 +141,7 @@ func System() *IOStreams {
 
 	io := &IOStreams{
 		In:           os.Stdin,
+		originalOut:  os.Stdout,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,

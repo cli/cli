@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -24,9 +23,8 @@ type LoginOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (config.Config, error)
 
-	Hostname     string
-	Token        string
-	OnlyValidate bool
+	Hostname string
+	Token    string
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -34,6 +32,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:     f.IOStreams,
 		Config: f.Config,
 	}
+
+	var tokenStdin bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -57,33 +57,25 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# => read token from mytoken.txt and authenticate against a GitHub Enterprise Server instance
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			isTTY := opts.IO.IsStdinTTY()
-
-			// TODO support other ways of naming
-			ghToken := os.Getenv("GITHUB_TOKEN")
-
-			if !isTTY && (!cmd.Flags().Changed("with-token") && ghToken == "") {
-				return &cmdutil.FlagError{Err: errors.New("no terminal detected; please use '--with-token' or set GITHUB_TOKEN")}
-			}
-
-			wt, _ := cmd.Flags().GetBool("with-token")
-			if wt {
+			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("failed to read token from STDIN: %w", err)}
+					return fmt.Errorf("failed to read token from STDIN: %w", err)
 				}
-
 				opts.Token = strings.TrimSpace(string(token))
-			} else if ghToken != "" {
-				opts.OnlyValidate = true
-				opts.Token = ghToken
 			}
 
 			if opts.Token != "" {
 				// Assume non-interactive if a token is specified
 				if opts.Hostname == "" {
 					opts.Hostname = ghinstance.Default()
+				}
+			}
+
+			if cmd.Flags().Changed("hostname") {
+				if err := hostnameValidator(opts.Hostname); err != nil {
+					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}
 
@@ -96,7 +88,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
-	cmd.Flags().Bool("with-token", false, "Read token from standard input")
+	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 
 	return cmd
 }
@@ -123,10 +115,6 @@ func loginRun(opts *LoginOptions) error {
 		err = client.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
-		}
-
-		if opts.OnlyValidate {
-			return nil
 		}
 
 		return cfg.Write()
@@ -156,7 +144,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(survey.Required))
+			}, &hostname, survey.WithValidator(hostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
@@ -195,6 +183,10 @@ func loginRun(opts *LoginOptions) error {
 				return nil
 			}
 		}
+	}
+
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
 	}
 
 	var authMode int
@@ -256,7 +248,7 @@ func loginRun(opts *LoginOptions) error {
 
 	gitProtocol = strings.ToLower(gitProtocol)
 
-	fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h%s git_protocol %s\n", hostname, gitProtocol)
+	fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
 	err = cfg.Set(hostname, "git_protocol", gitProtocol)
 	if err != nil {
 		return err
@@ -286,5 +278,16 @@ func loginRun(opts *LoginOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
 
+	return nil
+}
+
+func hostnameValidator(v interface{}) error {
+	val := v.(string)
+	if len(strings.TrimSpace(val)) < 1 {
+		return errors.New("a value is required")
+	}
+	if strings.ContainsRune(val, '/') || strings.ContainsRune(val, ':') {
+		return errors.New("invalid hostname")
+	}
 	return nil
 }

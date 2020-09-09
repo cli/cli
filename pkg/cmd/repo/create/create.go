@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -28,6 +31,7 @@ type CreateOptions struct {
 	Description   string
 	Homepage      string
 	Team          string
+	Template      string
 	EnableIssues  bool
 	EnableWiki    bool
 	Public        bool
@@ -73,6 +77,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
+			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || !opts.EnableIssues || !opts.EnableWiki) {
+				return &cmdutil.FlagError{Err: errors.New(`The '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
+			}
+
 			return createRun(opts)
 		},
 	}
@@ -80,6 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of repository")
 	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page URL")
 	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The name of the organization team to be granted access")
+	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template repository")
 	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public")
@@ -164,6 +173,37 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	// Find template repo ID
+	if opts.Template != "" {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+
+		var toClone ghrepo.Interface
+		apiClient := api.NewClientFromHTTP(httpClient)
+
+		cloneURL := opts.Template
+		if !strings.Contains(cloneURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			cloneURL = currentUser + "/" + cloneURL
+		}
+		toClone, err = ghrepo.FromFullName(cloneURL)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
+
+		repo, err := api.GitHubRepo(apiClient, toClone)
+		if err != nil {
+			return err
+		}
+
+		opts.Template = repo.ID
+	}
+
 	input := repoCreateInput{
 		Name:             repoToCreate.RepoName(),
 		Visibility:       visibility,
@@ -189,7 +229,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.ConfirmSubmit {
-		repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+		repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input, opts.Template)
 		if err != nil {
 			return err
 		}

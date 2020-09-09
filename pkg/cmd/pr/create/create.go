@@ -28,6 +28,8 @@ type CreateOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
+	RootDirOverride string
+
 	RepoOverride string
 
 	Autofill bool
@@ -246,8 +248,11 @@ func createRun(opts *CreateOptions) error {
 	if !opts.WebMode && !opts.Autofill && interactive {
 		var nonLegacyTemplateFiles []string
 		var legacyTemplateFile *string
-		if rootDir, err := git.ToplevelDir(); err == nil {
-			// TODO: figure out how to stub this in tests
+
+		if opts.RootDirOverride != "" {
+			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
+			legacyTemplateFile = githubtemplate.FindLegacy(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
+		} else if rootDir, err := git.ToplevelDir(); err == nil {
 			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 			legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "PULL_REQUEST_TEMPLATE")
 		}
@@ -366,11 +371,15 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		pr, err := api.CreatePullRequest(client, baseRepo, params)
-		if err != nil {
-			return fmt.Errorf("failed to create pull request: %w", err)
+		if pr != nil {
+			fmt.Fprintln(opts.IO.Out, pr.URL)
 		}
-
-		fmt.Fprintln(opts.IO.Out, pr.URL)
+		if err != nil {
+			if pr != nil {
+				return fmt.Errorf("pull request update failed: %w", err)
+			}
+			return fmt.Errorf("pull request create failed: %w", err)
+		}
 	} else if action == shared.PreviewAction {
 		openURL, err := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
 		if err != nil {

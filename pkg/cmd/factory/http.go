@@ -13,7 +13,7 @@ import (
 )
 
 // generic authenticated HTTP client for commands
-func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
+func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		logTraffic := strings.Contains(verbose, "api")
@@ -23,17 +23,11 @@ func httpClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, s
 	opts = append(opts,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
-			if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
+			if token, err := cfg.Get(hostname, "oauth_token"); err == nil || token != "" {
 				return fmt.Sprintf("token %s", token), nil
 			}
-
-			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
-			token, err := cfg.Get(hostname, "oauth_token")
-			if err != nil || token == "" {
-				return "", nil
-			}
-
-			return fmt.Sprintf("token %s", token), nil
+			return "", nil
 		}),
 	)
 

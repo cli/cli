@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -63,10 +62,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 }
 
 func logoutRun(opts *LogoutOptions) error {
-	if os.Getenv("GITHUB_TOKEN") != "" {
-		return errors.New("GITHUB_TOKEN is set in your environment. If you no longer want to use it with gh, please unset it.")
-	}
-
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	hostname := opts.Hostname
@@ -112,6 +107,10 @@ func logoutRun(opts *LogoutOptions) error {
 		if !found {
 			return fmt.Errorf("not logged into %s", hostname)
 		}
+	}
+
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
 	}
 
 	httpClient, err := opts.HttpClient()

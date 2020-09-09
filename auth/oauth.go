@@ -69,7 +69,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		}
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 ||
+	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 || resp.StatusCode == 422 ||
 		(resp.StatusCode == 400 && values != nil && values.Get("error") == "unauthorized_client") {
 		// OAuth Device Flow is not available; continue with OAuth browser flow with a
 		// local server endpoint as callback target

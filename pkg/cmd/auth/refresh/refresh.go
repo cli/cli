@@ -2,7 +2,6 @@ package refresh
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -64,10 +63,6 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 }
 
 func refreshRun(opts *RefreshOptions) error {
-	if os.Getenv("GITHUB_TOKEN") != "" {
-		return fmt.Errorf("GITHUB_TOKEN is present in your environment and is incompatible with this command. If you'd like to modify a personal access token, see https://github.com/settings/tokens")
-	}
-
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	if !isTTY {
@@ -110,6 +105,10 @@ func refreshRun(opts *RefreshOptions) error {
 		if !found {
 			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 		}
+	}
+
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
 	}
 
 	return opts.AuthFlow(cfg, hostname, opts.Scopes)
