@@ -10,7 +10,7 @@ require (
 	github.com/google/go-cmp v0.4.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.0
-	github.com/henvic/httpretty v0.0.5
+	github.com/henvic/httpretty v0.0.6
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.6
 	github.com/mattn/go-isatty v0.0.12
