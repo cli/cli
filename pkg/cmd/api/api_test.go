@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -263,6 +264,17 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
+		{
+			name: "REST string errors",
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": ["ALSO", "FINE"]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": ["ALSO", "FINE"]}`,
+			stderr: "gh: ALSO\nFINE\n",
 		},
 		{
 			name: "GraphQL error",
@@ -741,6 +753,38 @@ func Test_fillPlaceholders(t *testing.T) {
 			},
 			want:    "repos/hubot/robot-uprising/releases",
 			wantErr: false,
+		},
+		{
+			name: "has branch placeholder",
+			args: args{
+				value: "repos/cli/cli/branches/:branch/protection/required_status_checks",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("cli", "cli"), nil
+					},
+					Branch: func() (string, error) {
+						return "trunk", nil
+					},
+				},
+			},
+			want:    "repos/cli/cli/branches/trunk/protection/required_status_checks",
+			wantErr: false,
+		},
+		{
+			name: "has branch placeholder and git is in detached head",
+			args: args{
+				value: "repos/:owner/:repo/branches/:branch",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("cli", "cli"), nil
+					},
+					Branch: func() (string, error) {
+						return "", git.ErrNotOnAnyBranch
+					},
+				},
+			},
+			want:    "repos/:owner/:repo/branches/:branch",
+			wantErr: true,
 		},
 		{
 			name: "no greedy substitutes",

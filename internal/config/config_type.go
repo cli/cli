@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,8 +15,12 @@ const defaultGitProtocol = "https"
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
+	GetWithSource(string, string) (string, string, error)
 	Set(string, string, string) error
+	UnsetHost(string)
+	Hosts() ([]string, error)
 	Aliases() (*AliasConfig, error)
+	CheckWriteable(string, string) error
 	Write() error
 }
 
@@ -29,7 +35,7 @@ type HostConfig struct {
 
 // This type implements a low-level get/set config that is backed by an in-memory tree of Yaml
 // nodes. It allows us to interact with a yaml-based config programmatically, preserving any
-// comments that were present when the yaml waas parsed.
+// comments that were present when the yaml was parsed.
 type ConfigMap struct {
 	Root *yaml.Node
 }
@@ -122,6 +128,16 @@ func NewConfig(root *yaml.Node) Config {
 	}
 }
 
+// NewFromString initializes a Config from a yaml string
+func NewFromString(str string) Config {
+	root, err := parseConfigData([]byte(str))
+	if err != nil {
+		panic(err)
+	}
+	return NewConfig(root)
+}
+
+// NewBlankConfig initializes a config file pre-populated with comments and default values
 func NewBlankConfig() Config {
 	return NewConfig(NewBlankRoot())
 }
@@ -186,39 +202,51 @@ func (c *fileConfig) Root() *yaml.Node {
 }
 
 func (c *fileConfig) Get(hostname, key string) (string, error) {
-	if hostname != "" {
-		hostCfg, err := c.configForHost(hostname)
-		if err != nil {
-			return "", err
-		}
+	val, _, err := c.GetWithSource(hostname, key)
+	return val, err
+}
 
-		hostValue, err := hostCfg.GetStringValue(key)
+func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error) {
+	if hostname != "" {
 		var notFound *NotFoundError
 
+		hostCfg, err := c.configForHost(hostname)
 		if err != nil && !errors.As(err, &notFound) {
-			return "", err
+			return "", "", err
+		}
+
+		var hostValue string
+		if hostCfg != nil {
+			hostValue, err = hostCfg.GetStringValue(key)
+			if err != nil && !errors.As(err, &notFound) {
+				return "", "", err
+			}
 		}
 
 		if hostValue != "" {
-			return hostValue, nil
+			// TODO: avoid hardcoding this
+			return hostValue, "~/.config/gh/hosts.yml", nil
 		}
 	}
+
+	// TODO: avoid hardcoding this
+	defaultSource := "~/.config/gh/config.yml"
 
 	value, err := c.GetStringValue(key)
 
 	var notFound *NotFoundError
 
 	if err != nil && errors.As(err, &notFound) {
-		return defaultFor(key), nil
+		return defaultFor(key), defaultSource, nil
 	} else if err != nil {
-		return "", err
+		return "", defaultSource, err
 	}
 
 	if value == "" {
-		return defaultFor(key), nil
+		return defaultFor(key), defaultSource, nil
 	}
 
-	return value, nil
+	return value, defaultSource, nil
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {
@@ -236,6 +264,20 @@ func (c *fileConfig) Set(hostname, key, value string) error {
 	}
 }
 
+func (c *fileConfig) UnsetHost(hostname string) {
+	if hostname == "" {
+		return
+	}
+
+	hostsEntry, err := c.FindEntry("hosts")
+	if err != nil {
+		return
+	}
+
+	cm := ConfigMap{hostsEntry.ValueNode}
+	cm.RemoveEntry(hostname)
+}
+
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 	hosts, err := c.hostEntries()
 	if err != nil {
@@ -248,6 +290,11 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 		}
 	}
 	return nil, &NotFoundError{fmt.Errorf("could not find config entry for %q", hostname)}
+}
+
+func (c *fileConfig) CheckWriteable(hostname, key string) error {
+	// TODO: check filesystem permissions
+	return nil
 }
 
 func (c *fileConfig) Write() error {
@@ -355,6 +402,23 @@ func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	}
 
 	return hostConfigs, nil
+}
+
+// Hosts returns a list of all known hostnames configured in hosts.yml
+func (c *fileConfig) Hosts() ([]string, error) {
+	entries, err := c.hostEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	hostnames := []string{}
+	for _, entry := range entries {
+		hostnames = append(hostnames, entry.Host)
+	}
+
+	sort.SliceStable(hostnames, func(i, j int) bool { return hostnames[i] == ghinstance.Default() })
+
+	return hostnames, nil
 }
 
 func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {

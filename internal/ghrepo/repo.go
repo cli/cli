@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-)
 
-const defaultHostname = "github.com"
+	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghinstance"
+)
 
 // Interface describes an object that represents a GitHub repository
 type Interface interface {
@@ -17,10 +18,7 @@ type Interface interface {
 
 // New instantiates a GitHub repository from owner and name arguments
 func New(owner, repo string) Interface {
-	return &ghRepo{
-		owner: owner,
-		name:  repo,
-	}
+	return NewWithHost(owner, repo, ghinstance.OverridableDefault())
 }
 
 // NewWithHost is like New with an explicit host name
@@ -28,7 +26,7 @@ func NewWithHost(owner, repo, hostname string) Interface {
 	return &ghRepo{
 		owner:    owner,
 		name:     repo,
-		hostname: hostname,
+		hostname: normalizeHostname(hostname),
 	}
 }
 
@@ -37,15 +35,31 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-// FromFullName extracts the GitHub repository information from an "OWNER/REPO" string
+// FromFullName extracts the GitHub repository information from the following
+// formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
-	var r ghRepo
-	parts := strings.SplitN(nwo, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return &r, fmt.Errorf("expected OWNER/REPO format, got %q", nwo)
+	if git.IsURL(nwo) {
+		u, err := git.ParseURL(nwo)
+		if err != nil {
+			return nil, err
+		}
+		return FromURL(u)
 	}
-	r.owner, r.name = parts[0], parts[1]
-	return &r, nil
+
+	parts := strings.SplitN(nwo, "/", 4)
+	for _, p := range parts {
+		if len(p) == 0 {
+			return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
+		}
+	}
+	switch len(parts) {
+	case 3:
+		return NewWithHost(parts[1], parts[2], normalizeHostname(parts[0])), nil
+	case 2:
+		return New(parts[0], parts[1]), nil
+	default:
+		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
+	}
 }
 
 // FromURL extracts the GitHub repository information from a git remote URL
@@ -59,11 +73,7 @@ func FromURL(u *url.URL) (Interface, error) {
 		return nil, fmt.Errorf("invalid path: %s", u.Path)
 	}
 
-	return &ghRepo{
-		owner:    parts[0],
-		name:     strings.TrimSuffix(parts[1], ".git"),
-		hostname: normalizeHostname(u.Hostname()),
-	}, nil
+	return NewWithHost(parts[0], strings.TrimSuffix(parts[1], ".git"), u.Hostname()), nil
 }
 
 func normalizeHostname(h string) string {
@@ -75,6 +85,23 @@ func IsSame(a, b Interface) bool {
 	return strings.EqualFold(a.RepoOwner(), b.RepoOwner()) &&
 		strings.EqualFold(a.RepoName(), b.RepoName()) &&
 		normalizeHostname(a.RepoHost()) == normalizeHostname(b.RepoHost())
+}
+
+func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
+	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	if p != "" {
+		return baseURL + "/" + fmt.Sprintf(p, args...)
+	}
+	return baseURL
+}
+
+// TODO there is a parallel implementation for non-isolated commands
+func FormatRemoteURL(repo Interface, protocol string) string {
+	if protocol == "ssh" {
+		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	}
+
+	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 }
 
 type ghRepo struct {
@@ -92,8 +119,5 @@ func (r ghRepo) RepoName() string {
 }
 
 func (r ghRepo) RepoHost() string {
-	if r.hostname != "" {
-		return r.hostname
-	}
-	return defaultHostname
+	return r.hostname
 }
