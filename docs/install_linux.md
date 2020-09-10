@@ -43,8 +43,20 @@ sudo dnf install gh
 
 ### openSUSE/SUSE Linux (zypper)
 
-It's possible that https://cli.github.com/packages/rpm/gh-cli.repo will work with zypper, but
-this hasn't been tested.
+Install:
+
+```bash
+sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo zypper ref
+sudo zypper install gh
+```
+
+Upgrade:
+
+```bash
+sudo zypper ref
+sudo zypper update gh
+```
 
 ## Manual installation
 
