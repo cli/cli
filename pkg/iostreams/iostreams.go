@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/cli/cli/internal/config"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -22,9 +21,6 @@ type IOStreams struct {
 	In     io.ReadCloser
 	Out    io.Writer
 	ErrOut io.Writer
-
-	// Used to understand user prefences around interactivity
-	Config func() (config.Config, error)
 
 	// the original (non-colorable) output stream
 	originalOut  io.Writer
@@ -39,6 +35,8 @@ type IOStreams struct {
 	stdoutIsTTY       bool
 	stderrTTYOverride bool
 	stderrIsTTY       bool
+
+	neverPrompt bool
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -91,18 +89,15 @@ func (s *IOStreams) IsStderrTTY() bool {
 }
 
 func (s *IOStreams) CanPrompt() bool {
-	cfg, err := s.Config()
-	if err == nil {
-		// TODO prompt is a global setting. Is this inconsistency ok? There's not a super strong case to
-		// set prompting by host, but it means we need to be clear about what can and can't be set per
-		// host.
-		prompt, _ := cfg.Get("", "prompt")
-		if prompt == config.NeverPrompt {
-			return false
-		}
+	if s.neverPrompt {
+		return false
 	}
 
 	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
+func (s *IOStreams) SetNeverPrompt(v bool) {
+	s.neverPrompt = v
 }
 
 func (s *IOStreams) StartProgressIndicator() {
@@ -150,7 +145,7 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 	return NewColorScheme(s.ColorEnabled())
 }
 
-func System(configFunc func() (config.Config, error)) *IOStreams {
+func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
@@ -160,7 +155,6 @@ func System(configFunc func() (config.Config, error)) *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
-		Config:       configFunc,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -181,9 +175,6 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		In:     ioutil.NopCloser(in),
 		Out:    out,
 		ErrOut: errOut,
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
 	}, in, out, errOut
 }
 

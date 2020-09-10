@@ -45,6 +45,18 @@ func main() {
 	stderr := cmdFactory.IOStreams.ErrOut
 	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
 
+	cfg, err := cmdFactory.Config()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+		os.Exit(2)
+	}
+
+	prompt, _ := cfg.Get("", "prompt")
+
+	if prompt == config.NeverPrompt {
+		cmdFactory.IOStreams.SetNeverPrompt(true)
+	}
+
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
@@ -54,12 +66,6 @@ func main() {
 	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
-
-		cfg, err := cmdFactory.Config()
-		if err != nil {
-			fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
-			os.Exit(2)
-		}
 
 		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
 		if err != nil {
