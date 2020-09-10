@@ -51,11 +51,7 @@ func main() {
 	}
 
 	cmd, _, err := rootCmd.Traverse(expandedArgs)
-	if err != nil {
-		fmt.Fprintf(stderr, "failed to parse the command:  %s\n", err)
-		os.Exit(2)
-	}
-	{
+	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
 
@@ -94,6 +90,11 @@ func main() {
 
 			os.Exit(0)
 		}
+	}
+
+	if cmd == nil {
+		fmt.Fprintf(stderr, "failed to parse command, %s\n", err)
+		os.Exit(2)
 	}
 
 	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
