@@ -18,11 +18,12 @@ import (
 
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
-		name     string
-		cli      string
-		wants    RefreshOptions
-		wantsErr bool
-		tty      bool
+		name        string
+		cli         string
+		wants       RefreshOptions
+		wantsErr    bool
+		tty         bool
+		neverPrompt bool
 	}{
 		{
 			name: "tty no arguments",
@@ -44,6 +45,22 @@ func Test_NewCmdRefresh(t *testing.T) {
 			name: "tty hostname",
 			tty:  true,
 			cli:  "-h aline.cedrac",
+			wants: RefreshOptions{
+				Hostname: "aline.cedrac",
+			},
+		},
+		{
+			name:        "prompts disabled, no args",
+			tty:         true,
+			cli:         "",
+			neverPrompt: true,
+			wantsErr:    true,
+		},
+		{
+			name:        "prompts disabled, hostname",
+			tty:         true,
+			cli:         "-h aline.cedrac",
+			neverPrompt: true,
 			wants: RefreshOptions{
 				Hostname: "aline.cedrac",
 			},
@@ -74,6 +91,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			}
 			io.SetStdinTTY(tt.tty)
 			io.SetStdoutTTY(tt.tty)
+			io.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
