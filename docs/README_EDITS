@@ -1,0 +1,1 @@
+This folder is used for documentation related to developing `gh`. Docs for `gh` installation and usage are available at [https://cli.github.com/manual](https://cli.github.com/manual).
