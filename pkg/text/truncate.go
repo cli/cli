@@ -1,80 +1,75 @@
 package text
 
 import (
-	"golang.org/x/text/width"
+	runewidth "github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
 )
-
-// DisplayWidth calculates what the rendered width of a string may be
-func DisplayWidth(s string) int {
-	w := 0
-	for _, r := range s {
-		w += runeDisplayWidth(r)
-	}
-	return w
-}
 
 const (
 	ellipsisWidth       = 3
 	minWidthForEllipsis = 5
 )
 
+// DisplayWidth calculates what the rendered width of a string may be
+func DisplayWidth(s string) int {
+	g := uniseg.NewGraphemes(s)
+	w := 0
+	for g.Next() {
+		w += graphemeWidth(g)
+	}
+	return w
+}
+
 // Truncate shortens a string to fit the maximum display width
-func Truncate(max int, s string) string {
+func Truncate(maxWidth int, s string) string {
 	w := DisplayWidth(s)
-	if w <= max {
+	if w <= maxWidth {
 		return s
 	}
 
 	useEllipsis := false
-	if max >= minWidthForEllipsis {
+	if maxWidth >= minWidthForEllipsis {
 		useEllipsis = true
-		max -= ellipsisWidth
+		maxWidth -= ellipsisWidth
 	}
 
-	cw := 0
-	ri := 0
-	for _, r := range s {
-		rw := runeDisplayWidth(r)
-		if cw+rw > max {
+	g := uniseg.NewGraphemes(s)
+	r := ""
+	rWidth := 0
+	for {
+		g.Next()
+		gWidth := graphemeWidth(g)
+
+		if rWidth+gWidth <= maxWidth {
+			r += g.Str()
+			rWidth += gWidth
+			continue
+		} else {
 			break
 		}
-		cw += rw
-		ri++
 	}
 
-	res := string([]rune(s)[:ri])
 	if useEllipsis {
-		res += "..."
+		r += "..."
 	}
-	if cw < max {
-		// compensate if truncating a wide character left an odd space
-		res += " "
+
+	if rWidth < maxWidth {
+		r += " "
 	}
-	return res
+
+	return r
 }
 
-var runeDisplayWidthOverrides = map[rune]int{
-	'“': 1,
-	'”': 1,
-	'‘': 1,
-	'’': 1,
-	'–': 1, // en dash
-	'—': 1, // em dash
-	'→': 1,
-	'…': 1,
-	'•': 1, // bullet
-	'·': 1, // middle dot
-}
-
-func runeDisplayWidth(r rune) int {
-	if w, ok := runeDisplayWidthOverrides[r]; ok {
-		return w
+// graphemeWidth calculates what the rendered width of a grapheme may be
+func graphemeWidth(g *uniseg.Graphemes) int {
+	// If grapheme spans one rune use that rune width
+	// If grapheme spans multiple runes use the first non-zero rune width
+	w := 0
+	for _, r := range g.Runes() {
+		w = runewidth.RuneWidth(r)
+		if w > 0 {
+			break
+		}
 	}
-
-	switch width.LookupRune(r).Kind() {
-	case width.EastAsianWide, width.EastAsianAmbiguous, width.EastAsianFullwidth:
-		return 2
-	default:
-		return 1
-	}
+	return w
 }

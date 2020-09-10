@@ -62,6 +62,22 @@ func TestTruncate(t *testing.T) {
 			},
 			want: "a프로젝... ",
 		},
+		{
+			name: "Emoji",
+			args: args{
+				max: 11,
+				s:   "💡💡💡💡💡💡💡💡💡💡💡💡",
+			},
+			want: "💡💡💡💡...",
+		},
+		{
+			name: "Accented characters",
+			args: args{
+				max: 11,
+				s:   "é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́",
+			},
+			want: "é́́é́́é́́é́́é́́é́́é́́é́́...",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -127,6 +143,11 @@ func TestDisplayWidth(t *testing.T) {
 			name: "emoji",
 			text: `👍`,
 			want: 2,
+		},
+		{
+			name: "accent character",
+			text: `é́́`,
+			want: 1,
 		},
 	}
 	for _, tt := range tests {
