@@ -1,4 +1,4 @@
-package view
+package shared
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ type Gist struct {
 	Files       map[string]GistFile
 }
 
-func getGist(client *http.Client, hostname, gistID string) (*Gist, error) {
+func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	gist := Gist{}
 	path := fmt.Sprintf("gists/%s", gistID)
 
