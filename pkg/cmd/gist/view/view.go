@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -65,7 +66,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	gist, err := getGist(client, ghinstance.OverridableDefault(), gistID)
+	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
 	if err != nil {
 		return err
 	}

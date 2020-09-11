@@ -7,16 +7,19 @@ import (
 	"github.com/cli/cli/api"
 )
 
+// TODO make gist create use this file
+
 type GistFile struct {
-	Filename string
-	Type     string
-	Language string
-	Content  string
+	Filename string `json:"filename"`
+	Type     string `json:"type,omitempty"`
+	Language string `json:"language,omitempty"`
+	Content  string `json:"content"`
 }
 
 type Gist struct {
-	Description string
-	Files       map[string]GistFile
+	ID          string               `json:"id,omitempty"`
+	Description string               `json:"description"`
+	Files       map[string]*GistFile `json:"files"`
 }
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
