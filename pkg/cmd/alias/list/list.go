@@ -69,12 +69,7 @@ func listRun(opts *ListOptions) error {
 	sort.Strings(keys)
 
 	for _, alias := range keys {
-		if tp.IsTTY() {
-			// ensure that screen readers pause
-			tp.AddField(alias+":", nil, nil)
-		} else {
-			tp.AddField(alias, nil, nil)
-		}
+		tp.AddField(alias+":", nil, nil)
 		tp.AddField(aliasMap[alias], nil, nil)
 		tp.EndRow()
 	}
