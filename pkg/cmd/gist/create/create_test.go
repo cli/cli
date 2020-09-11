@@ -21,7 +21,7 @@ const (
 
 func Test_processFiles(t *testing.T) {
 	fakeStdin := strings.NewReader("hey cool how is it going")
-	files, err := processFiles(ioutil.NopCloser(fakeStdin), []string{"-"})
+	files, err := processFiles(ioutil.NopCloser(fakeStdin), "", []string{"-"})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
