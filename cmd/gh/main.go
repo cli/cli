@@ -92,14 +92,9 @@ func main() {
 		}
 	}
 
-	if cmd == nil {
-		fmt.Fprintf(stderr, "failed to parse command, %s\n", err)
-		os.Exit(2)
-	}
-
 	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
 		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
-		cmdutil.IsAuthCheckEnabled(cmd)
+		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
 	if authCheckEnabled {
 		cfg, err := cmdFactory.Config()
 		if err != nil {
