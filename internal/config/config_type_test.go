@@ -19,7 +19,7 @@ func Test_fileConfig_Set(t *testing.T) {
 	assert.NoError(t, c.Set("github.com", "user", "hubot"))
 	assert.NoError(t, c.Write())
 
-	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor: nano\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor: nano\n# When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled\nprompt: enabled\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
 	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, `github.com:
     git_protocol: ssh
@@ -37,7 +37,7 @@ func Test_defaultConfig(t *testing.T) {
 	cfg := NewBlankConfig()
 	assert.NoError(t, cfg.Write())
 
-	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled\nprompt: enabled\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
 	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, "", hostsBuf.String())
 

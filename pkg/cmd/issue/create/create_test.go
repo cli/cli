@@ -78,20 +78,12 @@ func TestIssueCreate_nontty_error(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-
 	_, err := runCommand(http, false, `-t hello`)
 	if err == nil {
 		t.Fatal("expected error running command `issue create`")
 	}
 
-	assert.Equal(t, "must provide --title and --body when not attached to a terminal", err.Error())
-
+	assert.Equal(t, "must provide --title and --body when not running interactively", err.Error())
 }
 
 func TestIssueCreate(t *testing.T) {

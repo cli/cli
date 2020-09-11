@@ -14,34 +14,68 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO prompt cfg test
+
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants RefreshOptions
+		name        string
+		cli         string
+		wants       RefreshOptions
+		wantsErr    bool
+		tty         bool
+		neverPrompt bool
 	}{
 		{
-			name: "no arguments",
+			name: "tty no arguments",
+			tty:  true,
 			wants: RefreshOptions{
 				Hostname: "",
 			},
 		},
 		{
-			name: "hostname",
+			name:     "nontty no arguments",
+			wantsErr: true,
+		},
+		{
+			name:     "nontty hostname",
+			cli:      "-h aline.cedrac",
+			wantsErr: true,
+		},
+		{
+			name: "tty hostname",
+			tty:  true,
 			cli:  "-h aline.cedrac",
 			wants: RefreshOptions{
 				Hostname: "aline.cedrac",
 			},
 		},
 		{
-			name: "one scope",
+			name:        "prompts disabled, no args",
+			tty:         true,
+			cli:         "",
+			neverPrompt: true,
+			wantsErr:    true,
+		},
+		{
+			name:        "prompts disabled, hostname",
+			tty:         true,
+			cli:         "-h aline.cedrac",
+			neverPrompt: true,
+			wants: RefreshOptions{
+				Hostname: "aline.cedrac",
+			},
+		},
+		{
+			name: "tty one scope",
+			tty:  true,
 			cli:  "--scopes repo:invite",
 			wants: RefreshOptions{
 				Scopes: []string{"repo:invite"},
 			},
 		},
 		{
-			name: "scopes",
+			name: "tty scopes",
+			tty:  true,
 			cli:  "--scopes repo:invite,read:public_key",
 			wants: RefreshOptions{
 				Scopes: []string{"repo:invite", "read:public_key"},
@@ -55,6 +89,9 @@ func Test_NewCmdRefresh(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: io,
 			}
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
+			io.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -73,11 +110,14 @@ func Test_NewCmdRefresh(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 		})
-
 	}
 }
 
@@ -96,12 +136,6 @@ func Test_refreshRun(t *testing.T) {
 		nontty       bool
 		wantAuthArgs authArgs
 	}{
-		{
-			name:    "non tty",
-			opts:    &RefreshOptions{},
-			nontty:  true,
-			wantErr: regexp.MustCompile(`not attached to a terminal;`),
-		},
 		{
 			name:    "no hosts configured",
 			opts:    &RefreshOptions{},
