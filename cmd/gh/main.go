@@ -94,7 +94,7 @@ func main() {
 
 	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
 		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
-		cmdutil.IsAuthCheckEnabled(cmd)
+		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
 	if authCheckEnabled {
 		cfg, err := cmdFactory.Config()
 		if err != nil {
