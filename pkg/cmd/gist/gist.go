@@ -2,6 +2,7 @@ package gist
 
 import (
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
+	gistListCmd "github.com/cli/cli/pkg/cmd/gist/list"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -14,6 +15,7 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd.AddCommand(gistCreateCmd.NewCmdCreate(f, nil))
+	cmd.AddCommand(gistListCmd.NewCmdList(f, nil))
 
 	return cmd
 }
