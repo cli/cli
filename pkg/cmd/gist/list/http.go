@@ -11,7 +11,7 @@ import (
 )
 
 type Gist struct {
-	Description string    `json:"description"`
+	Description string
 	HTMLURL     string    `json:"html_url"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	Public      bool
