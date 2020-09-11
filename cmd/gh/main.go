@@ -53,7 +53,7 @@ func main() {
 
 	prompt, _ := cfg.Get("", "prompt")
 
-	if prompt == config.NeverPrompt {
+	if prompt == config.PromptsDisabled {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
 	}
 

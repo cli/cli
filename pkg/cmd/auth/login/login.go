@@ -74,9 +74,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				}
 			} else {
 				if !opts.IO.CanPrompt() {
-					// TODO this error message kind of sucks since the prompting might be disabled from being
-					// in a nontty or from the config setting. Is it enough info?
-					return &cmdutil.FlagError{Err: errors.New("--with-token required when prompts disabled")}
+					return &cmdutil.FlagError{Err: errors.New("--with-token required when not running interactively")}
 				}
 			}
 

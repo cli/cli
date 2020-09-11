@@ -58,7 +58,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
 				// here, we know we are attached to a TTY but prompts are disabled
-				return &cmdutil.FlagError{Err: errors.New("--hostname  required when prompts disabled")}
+				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
 			}
 
 			if runF != nil {

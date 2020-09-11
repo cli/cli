@@ -53,7 +53,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			name:    "insufficient flags in non-interactive mode",
 			args:    "123",
 			isTTY:   false,
-			wantErr: "--merge, --rebase, or --squash required when prompts are disabled",
+			wantErr: "--merge, --rebase, or --squash required when not running interactively",
 		},
 		{
 			name:    "multiple merge methods",

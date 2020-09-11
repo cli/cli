@@ -49,7 +49,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("--hostname required when prompts disabled")}
+				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
 			}
 
 			if runF != nil {

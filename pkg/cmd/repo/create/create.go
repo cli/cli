@@ -75,7 +75,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if !opts.IO.CanPrompt() {
 				if opts.Name == "" {
-					return &cmdutil.FlagError{Err: errors.New("must pass name argument when prompts disabled")}
+					return &cmdutil.FlagError{Err: errors.New("must pass name argument when not running interactively")}
 				}
 				if !opts.Internal && !opts.Private && !opts.Public {
 					opts.Public = true

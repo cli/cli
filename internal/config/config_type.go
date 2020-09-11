@@ -12,8 +12,8 @@ import (
 
 const (
 	defaultGitProtocol = "https"
-	NeverPrompt        = "never"
-	AutoPrompt         = "auto"
+	PromptsDisabled    = "disabled"
+	PromptsEnabled     = "enabled"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -172,13 +172,13 @@ func NewBlankRoot() *yaml.Node {
 						Value: "",
 					},
 					{
-						HeadComment: "When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: auto, never",
+						HeadComment: "When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled",
 						Kind:        yaml.ScalarNode,
 						Value:       "prompt",
 					},
 					{
 						Kind:  yaml.ScalarNode,
-						Value: AutoPrompt,
+						Value: PromptsEnabled,
 					},
 					{
 						HeadComment: "Aliases allow you to create nicknames for gh commands",
@@ -490,7 +490,7 @@ func defaultFor(key string) string {
 	case "git_protocol":
 		return defaultGitProtocol
 	case "prompt":
-		return AutoPrompt
+		return PromptsEnabled
 	default:
 		return ""
 	}

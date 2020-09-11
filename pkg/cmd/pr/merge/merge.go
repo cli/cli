@@ -87,7 +87,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			}
 			if methodFlags == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when prompts are disabled")}
+					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not running interactively")}
 				}
 				opts.InteractiveMode = true
 			} else if methodFlags > 1 {

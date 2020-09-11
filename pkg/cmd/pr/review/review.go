@@ -105,7 +105,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 
 			if found == 0 && opts.Body == "" {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--approve, --request-changes, or --comment required when prompts are disabled")}
+					return &cmdutil.FlagError{Err: errors.New("--approve, --request-changes, or --comment required when not running interactively")}
 				}
 				opts.InteractiveMode = true
 			} else if found == 0 && opts.Body != "" {
