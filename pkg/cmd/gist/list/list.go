@@ -77,8 +77,8 @@ func listRun(opts *ListOptions) error {
 	for _, gist := range gists {
 		// TODO i was getting confusing results with table printer's truncation
 		description := gist.Description
-		if len(description) > 40 {
-			description = description[0:37] + "..."
+		if len(description) > 30 {
+			description = description[0:27] + "..."
 		}
 
 		tp.AddField(description, nil, cs.Bold)
