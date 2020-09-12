@@ -20,6 +20,7 @@ type ViewOptions struct {
 
 	Selector string
 	Raw      bool
+	Web      bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -47,12 +48,25 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "do not try and render markdown")
+	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "open gist in browser")
 
 	return cmd
 }
 
 func viewRun(opts *ViewOptions) error {
 	gistID := opts.Selector
+
+	if opts.Web {
+		gistURL := gistID
+		if !strings.Contains(gistURL, "/") {
+			hostname := ghinstance.OverridableDefault()
+			gistURL = ghinstance.GistPrefix(hostname) + gistID
+		}
+		if opts.IO.IsStderrTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(gistURL))
+		}
+		return utils.OpenInBrowser(gistURL)
+	}
 
 	u, err := url.Parse(opts.Selector)
 	if err == nil {
