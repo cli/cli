@@ -14,6 +14,7 @@ import (
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
+	envCmd "github.com/cli/cli/pkg/cmd/env"
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
@@ -42,31 +43,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
 				Open an issue using “gh issue create -R cli/cli”
-			`),
-			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for github.com API requests. Setting this avoids
-				being prompted to authenticate and takes precedence over previously stored credentials.
-	
-				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
-	
-				GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
-				that otherwise operate on a local repository.
-
-				GH_HOST: specify the GitHub hostname for commands that would otherwise assume
-				the "github.com" host when not in a context of an existing repository.
-	
-				GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
-				for authoring text.
-	
-				BROWSER: the web browser to use for opening links.
-	
-				DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-				or "oauth" to print detailed information about HTTP requests or authentication flow.
-	
-				GLAMOUR_STYLE: the style to use for rendering Markdown. See
-				https://github.com/charmbracelet/glamour#styles
-	
-				NO_COLOR: avoid printing ANSI escape sequences for color output.
 			`),
 		},
 	}
@@ -110,6 +86,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+	cmd.AddCommand(envCmd.NewCmdEnv(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
 

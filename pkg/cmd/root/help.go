@@ -25,7 +25,7 @@ func rootUsageFunc(command *cobra.Command) error {
 		return nil
 	}
 
-	flagUsages := command.LocalFlags().FlagUsages()
+	flagUsages := command.Flags().FlagUsages()
 	if flagUsages != "" {
 		command.Println("\n\nFlags:")
 		command.Print(text.Indent(dedent(flagUsages), "  "))
