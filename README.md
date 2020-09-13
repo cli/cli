@@ -82,7 +82,6 @@ See [Linux installation docs](/docs/install_linux.md).
 Install:
 
 ```powershell
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
 scoop install gh
 ```
 
