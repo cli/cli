@@ -82,8 +82,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	// CHILD COMMANDS
-
+	// Child commands
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
@@ -91,6 +90,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
 
+	// Help Topics
 	cmd.AddCommand(NewHelpTopic("environment"))
 
 	// the `api` command should not inherit any extra HTTP headers

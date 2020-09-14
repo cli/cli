@@ -78,11 +78,6 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 		return
 	}
 
-	if helpTopic := command.Annotations["helpTopic"]; helpTopic == "true" {
-		fmt.Fprint(command.OutOrStdout(), command.Long)
-		return
-	}
-
 	coreCommands := []string{}
 	additionalCommands := []string{}
 	for _, c := range command.Commands() {
