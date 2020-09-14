@@ -54,9 +54,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login
 			# => do an interactive setup
 
-			$ gh auth login --web
-			# => open a browser to authenticate and do a non-interactive setup
-
 			$ gh auth login --with-token < mytoken.txt
 			# => read token from mytoken.txt and authenticate against github.com
 
@@ -174,7 +171,7 @@ func loginRun(opts *LoginOptions) error {
 
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
 
-	if existingToken != "" {
+	if existingToken != "" && opts.Interactive {
 		err := client.ValidateHostCfg(hostname, cfg)
 		if err == nil {
 			apiClient, err := client.ClientFromCfg(hostname, cfg)
@@ -182,26 +179,24 @@ func loginRun(opts *LoginOptions) error {
 				return err
 			}
 
-			if opts.Interactive {
-				username, err := api.CurrentLoginName(apiClient, hostname)
-				if err != nil {
-					return fmt.Errorf("error using api: %w", err)
-				}
-				var keepGoing bool
-				err = prompt.SurveyAskOne(&survey.Confirm{
-					Message: fmt.Sprintf(
-						"You're already logged into %s as %s. Do you want to re-authenticate?",
-						hostname,
-						username),
-					Default: false,
-				}, &keepGoing)
-				if err != nil {
-					return fmt.Errorf("could not prompt: %w", err)
-				}
+			username, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				return fmt.Errorf("error using api: %w", err)
+			}
+			var keepGoing bool
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: fmt.Sprintf(
+					"You're already logged into %s as %s. Do you want to re-authenticate?",
+					hostname,
+					username),
+				Default: false,
+			}, &keepGoing)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
 
-				if !keepGoing {
-					return nil
-				}
+			if !keepGoing {
+				return nil
 			}
 		}
 	}
@@ -273,15 +268,15 @@ func loginRun(opts *LoginOptions) error {
 		}
 
 		gitProtocol = strings.ToLower(gitProtocol)
-	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
-	err = cfg.Set(hostname, "git_protocol", gitProtocol)
-	if err != nil {
-		return err
-	}
+		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
+		err = cfg.Set(hostname, "git_protocol", gitProtocol)
+		if err != nil {
+			return err
+		}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
+	}
 
 	apiClient, err := client.ClientFromCfg(hostname, cfg)
 	if err != nil {
