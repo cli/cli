@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -49,6 +48,10 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			# => log out of specified host
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.Hostname == "" && !opts.IO.CanPrompt() {
+				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -63,19 +66,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 }
 
 func logoutRun(opts *LogoutOptions) error {
-	if os.Getenv("GITHUB_TOKEN") != "" {
-		return errors.New("GITHUB_TOKEN is set in your environment. If you no longer want to use it with gh, please unset it.")
-	}
-
-	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
-
 	hostname := opts.Hostname
-
-	if !isTTY && hostname == "" {
-		return errors.New("--hostname required when not attached to a terminal")
-	}
-
-	showConfirm := isTTY && hostname == ""
 
 	cfg, err := opts.Config()
 	if err != nil {
@@ -114,6 +105,10 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
+	}
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -132,7 +127,7 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
-	if showConfirm {
+	if opts.IO.CanPrompt() {
 		var keepGoing bool
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
@@ -152,6 +147,8 @@ func logoutRun(opts *LogoutOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}
+
+	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	if isTTY {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s%s\n",

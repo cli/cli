@@ -3,7 +3,6 @@ package logout
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"testing"
 
@@ -18,23 +17,39 @@ import (
 
 func Test_NewCmdLogout(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants LogoutOptions
+		name     string
+		cli      string
+		wants    LogoutOptions
+		wantsErr bool
+		tty      bool
 	}{
 		{
-			name: "with hostname",
+			name: "tty with hostname",
+			tty:  true,
 			cli:  "--hostname harry.mason",
 			wants: LogoutOptions{
 				Hostname: "harry.mason",
 			},
 		},
 		{
-			name: "no arguments",
+			name: "tty no arguments",
+			tty:  true,
 			cli:  "",
 			wants: LogoutOptions{
 				Hostname: "",
 			},
+		},
+		{
+			name: "nontty with hostname",
+			cli:  "--hostname harry.mason",
+			wants: LogoutOptions{
+				Hostname: "harry.mason",
+			},
+		},
+		{
+			name:     "nontty no arguments",
+			cli:      "",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -43,6 +58,8 @@ func Test_NewCmdLogout(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: io,
 			}
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -61,6 +78,10 @@ func Test_NewCmdLogout(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
@@ -187,11 +208,6 @@ func Test_logoutRun_nontty(t *testing.T) {
 		ghtoken   string
 	}{
 		{
-			name:    "no arguments",
-			wantErr: regexp.MustCompile(`hostname required when not`),
-			opts:    &LogoutOptions{},
-		},
-		{
 			name: "hostname, one host",
 			opts: &LogoutOptions{
 				Hostname: "harry.mason",
@@ -213,21 +229,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			},
 			wantErr: regexp.MustCompile(`not logged in to any hosts`),
 		},
-		{
-			name:    "gh token is set",
-			opts:    &LogoutOptions{},
-			ghtoken: "abc123",
-			wantErr: regexp.MustCompile(`GITHUB_TOKEN is set in your environment`),
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ghtoken := os.Getenv("GITHUB_TOKEN")
-			defer func() {
-				os.Setenv("GITHUB_TOKEN", ghtoken)
-			}()
-			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
 			io, _, _, stderr := iostreams.Test()
 
 			io.SetStdinTTY(false)
@@ -256,7 +261,9 @@ func Test_logoutRun_nontty(t *testing.T) {
 			assert.Equal(t, tt.wantErr == nil, err == nil)
 			if err != nil {
 				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
+					if !tt.wantErr.MatchString(err.Error()) {
+						t.Errorf("got error: %v", err)
+					}
 					return
 				} else {
 					t.Fatalf("unexpected error: %s", err)

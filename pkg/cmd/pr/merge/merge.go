@@ -64,6 +64,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+			}
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -82,8 +86,8 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 				methodFlags++
 			}
 			if methodFlags == 0 {
-				if !opts.IO.IsStdoutTTY() || !opts.IO.IsStdinTTY() {
-					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not attached to a terminal")}
+				if !opts.IO.CanPrompt() {
+					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not running interactively")}
 				}
 				opts.InteractiveMode = true
 			} else if methodFlags > 1 {

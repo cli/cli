@@ -1,6 +1,7 @@
 package ready
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -42,6 +43,10 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+			}
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]

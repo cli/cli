@@ -1,4 +1,4 @@
-package config
+package authflow
 
 const oauthSuccessPage = `
 <!doctype html>
