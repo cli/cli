@@ -41,7 +41,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		`),
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
-				Open an issue using “gh issue create -R cli/cli”
+				Open an issue using 'gh issue create -R cli/cli'
 			`),
 			"help:environment": heredoc.Doc(`
 				See 'gh help environment' for the list of supported environment variables.
