@@ -32,16 +32,16 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name: "private",
-			cli:  "--private",
+			name: "secret",
+			cli:  "--secret",
 			wants: ListOptions{
 				Limit:      10,
-				Visibility: "private",
+				Visibility: "secret",
 			},
 		},
 		{
-			name: "public and private",
-			cli:  "--private --public",
+			name: "public and secret",
+			cli:  "--secret --public",
 			wants: ListOptions{
 				Limit:      10,
 				Visibility: "all",
