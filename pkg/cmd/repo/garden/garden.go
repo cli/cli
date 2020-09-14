@@ -57,29 +57,31 @@ const (
 
 type Direction = int
 
-func (p *Player) move(direction Direction) {
+func (p *Player) move(direction Direction) bool {
 	switch direction {
 	case DirUp:
 		if p.Y == 0 {
-			return
+			return false
 		}
 		p.Y--
 	case DirDown:
 		if p.Y == p.Geo.Height-1 {
-			return
+			return false
 		}
 		p.Y++
 	case DirLeft:
 		if p.X == 0 {
-			return
+			return false
 		}
 		p.X--
 	case DirRight:
 		if p.X == p.Geo.Width-1 {
-			return
+			return false
 		}
 		p.X++
 	}
+
+	return true
 }
 
 type GardenOptions struct {
@@ -206,30 +208,37 @@ func gardenRun(opts *GardenOptions) error {
 		oldX := player.X
 		oldY := player.Y
 
+		moved := false
+
 		quitting := false
 		continuing := false
 		switch {
 		case isLeft(b):
-			player.move(DirLeft)
+			moved = player.move(DirLeft)
 		case isRight(b):
-			player.move(DirRight)
+			moved = player.move(DirRight)
 		case isUp(b):
-			player.move(DirUp)
+			moved = player.move(DirUp)
 		case isDown(b):
-			player.move(DirDown)
+			moved = player.move(DirDown)
 		case isQuit(b):
 			quitting = true
 		default:
 			continuing = true
 		}
 
-		if continuing {
+		if !moved || continuing {
 			continue
 		}
 
 		if quitting {
 			break
 		}
+
+		underPlayer := garden[player.Y][player.X]
+		previousCell := garden[oldY][oldX]
+
+		// print whatever was just under player
 
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for x := 0; x < oldX && x < player.Geo.Width; x++ {
@@ -238,7 +247,9 @@ func gardenRun(opts *GardenOptions) error {
 		for y := 0; y < oldY && y < player.Geo.Height; y++ {
 			fmt.Fprint(out, "\033[B")
 		}
-		fmt.Fprint(out, garden[oldY][oldX].Char)
+		fmt.Fprint(out, previousCell.Char)
+
+		// print player character
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for x := 0; x < player.X && x < player.Geo.Width; x++ {
 			fmt.Fprint(out, "\033[C")
@@ -247,6 +258,28 @@ func gardenRun(opts *GardenOptions) error {
 			fmt.Fprint(out, "\033[B")
 		}
 		fmt.Fprint(out, player.Char)
+
+		// handle stream wettening
+
+		if strings.Contains(underPlayer.StatusLine, "stream") {
+			player.ShoeMoistureContent = 5
+		} else {
+			if player.ShoeMoistureContent > 0 {
+				player.ShoeMoistureContent--
+			}
+		}
+
+		// status line stuff
+		sl := statusLine(garden, player)
+
+		fmt.Fprint(out, "\033[;H") // move to top left
+		for y := 0; y < player.Geo.Height-1; y++ {
+			fmt.Fprint(out, "\033[B")
+		}
+		fmt.Fprintln(out)
+		fmt.Fprintln(out)
+
+		fmt.Fprint(out, utils.Bold(sl))
 	}
 
 	fmt.Println()
@@ -354,22 +387,23 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 }
 
 func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
-	statusLine := ""
+	fmt.Fprint(out, "\033[?25l")
+	sl := ""
 	for y, gardenRow := range garden {
 		for x, gardenCell := range gardenRow {
 			char := ""
 			underPlayer := (player.X == x && player.Y == y)
 			if underPlayer {
-				statusLine = gardenCell.StatusLine
+				sl = gardenCell.StatusLine
 				char = utils.Bold(player.Char)
 
 				if strings.Contains(gardenCell.StatusLine, "stream") {
 					player.ShoeMoistureContent = 5
 				} else {
 					if player.ShoeMoistureContent > 1 {
-						statusLine += "\nYour shoes squish with water from the stream."
+						sl += "\nYour shoes squish with water from the stream."
 					} else if player.ShoeMoistureContent == 1 {
-						statusLine += "\nYour shoes seem to have dried out."
+						sl += "\nYour shoes seem to have dried out."
 					}
 
 					if player.ShoeMoistureContent > 0 {
@@ -386,7 +420,20 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	}
 
 	fmt.Println()
-	fmt.Fprintln(out, utils.Bold(statusLine))
+	fmt.Fprintln(out, utils.Bold(sl))
+}
+
+func statusLine(garden [][]*Cell, player *Player) string {
+	statusLine := garden[player.Y][player.X].StatusLine + "         "
+	if player.ShoeMoistureContent > 1 {
+		statusLine += "\nYour shoes squish with water from the stream."
+	} else if player.ShoeMoistureContent == 1 {
+		statusLine += "\nYour shoes seem to have dried out."
+	} else {
+		statusLine += "\n                                             "
+	}
+
+	return statusLine
 }
 
 func shaToColorFunc(sha string) func(string) string {
