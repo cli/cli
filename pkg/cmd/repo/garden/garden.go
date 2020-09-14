@@ -203,6 +203,9 @@ func gardenRun(opts *GardenOptions) error {
 			return err
 		}
 
+		oldX := player.X
+		oldY := player.Y
+
 		quitting := false
 		continuing := false
 		switch {
@@ -228,8 +231,22 @@ func gardenRun(opts *GardenOptions) error {
 			break
 		}
 
-		clear(opts.IO)
-		drawGarden(out, garden, player)
+		fmt.Fprint(out, "\033[;H") // move to top left
+		for x := 0; x < oldX && x < player.Geo.Width; x++ {
+			fmt.Fprint(out, "\033[C")
+		}
+		for y := 0; y < oldY && y < player.Geo.Height; y++ {
+			fmt.Fprint(out, "\033[B")
+		}
+		fmt.Fprint(out, garden[oldY][oldX].Char)
+		fmt.Fprint(out, "\033[;H") // move to top left
+		for x := 0; x < player.X && x < player.Geo.Width; x++ {
+			fmt.Fprint(out, "\033[C")
+		}
+		for y := 0; y < player.Y && y < player.Geo.Height; y++ {
+			fmt.Fprint(out, "\033[B")
+		}
+		fmt.Fprint(out, player.Char)
 	}
 
 	fmt.Println()
