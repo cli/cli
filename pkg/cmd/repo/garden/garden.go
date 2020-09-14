@@ -204,6 +204,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 
 		quitting := false
+		continuing := false
 		switch {
 		case isLeft(b):
 			player.move(DirLeft)
@@ -215,6 +216,12 @@ func gardenRun(opts *GardenOptions) error {
 			player.move(DirDown)
 		case isQuit(b):
 			quitting = true
+		default:
+			continuing = true
+		}
+
+		if continuing {
+			continue
 		}
 
 		if quitting {
