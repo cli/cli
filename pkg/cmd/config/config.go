@@ -18,6 +18,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 			Current respected settings:
 			- git_protocol: "https" or "ssh". Default is "https".
 			- editor: if unset, defaults to environment variables.
+			- prompt: "enabled" or "disabled". Toggles interactive prompting.
 		`),
 	}
 
