@@ -207,11 +207,10 @@ func gardenRun(opts *GardenOptions) error {
 
 		oldX := player.X
 		oldY := player.Y
-
 		moved := false
-
 		quitting := false
 		continuing := false
+
 		switch {
 		case isLeft(b):
 			moved = player.move(DirLeft)
@@ -289,6 +288,8 @@ func gardenRun(opts *GardenOptions) error {
 }
 
 // TODO fix arrow keys
+// TODO detect ctrl+c if possible
+// TODO reshow cursor and clear terminal on quit
 
 func isLeft(b []byte) bool {
 	return bytes.EqualFold(b, []byte("a")) || bytes.EqualFold(b, []byte("q")) || bytes.EqualFold(b, []byte("h"))
@@ -387,7 +388,7 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 }
 
 func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
-	fmt.Fprint(out, "\033[?25l")
+	fmt.Fprint(out, "\033[?25l") // hide cursor. it needs to be restored at command exit.
 	sl := ""
 	for y, gardenRow := range garden {
 		for x, gardenCell := range gardenRow {
