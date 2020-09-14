@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/api"
 )
@@ -20,6 +21,8 @@ type Gist struct {
 	ID          string               `json:"id,omitempty"`
 	Description string               `json:"description"`
 	Files       map[string]*GistFile `json:"files"`
+	UpdatedAt   time.Time            `json:"updated_at"`
+	Public      bool
 }
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
