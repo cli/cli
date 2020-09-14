@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -75,14 +76,24 @@ func listRun(opts *ListOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, gist := range gists {
-		// TODO i was getting confusing results with table printer's truncation
-		description := gist.Description
-		if len(description) > 30 {
-			description = description[0:27] + "..."
+		fileCount := 0
+		for _, _ = range gist.Files {
+			fileCount++
 		}
 
-		tp.AddField(description, nil, cs.Bold)
-		tp.AddField(gist.HTMLURL, nil, nil)
+		visibility := "public"
+		visColor := cs.Green
+		if !gist.Public {
+			visibility = "secret"
+			visColor = cs.Red
+		}
+
+		updatedAt := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+		tp.AddField(gist.ID, nil, nil)
+		tp.AddField(gist.Description, nil, cs.Bold)
+		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
+		tp.AddField(visibility, nil, visColor)
+		tp.AddField(updatedAt, nil, utils.Gray)
 		tp.EndRow()
 	}
 

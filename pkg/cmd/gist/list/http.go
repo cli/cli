@@ -5,20 +5,13 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"time"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/pkg/cmd/gist/shared"
 )
 
-type Gist struct {
-	Description string
-	HTMLURL     string    `json:"html_url"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Public      bool
-}
-
-func listGists(client *http.Client, hostname string, limit int, visibility string) ([]Gist, error) {
-	result := []Gist{}
+func listGists(client *http.Client, hostname string, limit int, visibility string) ([]shared.Gist, error) {
+	result := []shared.Gist{}
 
 	query := url.Values{}
 	if visibility == "all" {
@@ -33,7 +26,7 @@ func listGists(client *http.Client, hostname string, limit int, visibility strin
 		return nil, err
 	}
 
-	gists := []Gist{}
+	gists := []shared.Gist{}
 
 	for _, gist := range result {
 		if len(gists) == limit {
