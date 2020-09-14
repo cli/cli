@@ -103,6 +103,11 @@ func (s *IOStreams) StartPager() error {
 	}
 
 	pagerEnv := os.Environ()
+	for i := len(pagerEnv) - 1; i >= 0; i-- {
+		if strings.HasPrefix(pagerEnv[i], "PAGER=") {
+			pagerEnv = append(pagerEnv[0:i], pagerEnv[i+1:]...)
+		}
+	}
 	if _, ok := os.LookupEnv("LESS"); !ok {
 		pagerEnv = append(pagerEnv, "LESS=FRX")
 	}
