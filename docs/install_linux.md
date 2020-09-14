@@ -2,7 +2,7 @@
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on a couple of popular Linux distros and
-the following CPU architectures: `386`, `amd64`, `arm64`.
+the following CPU architectures: `i386`, `amd64`, `arm64`.
 
 Other sources for installation are community-maintained and thus might lag behind
 our release schedule.
@@ -43,8 +43,20 @@ sudo dnf install gh
 
 ### openSUSE/SUSE Linux (zypper)
 
-It's possible that https://cli.github.com/packages/rpm/gh-cli.repo will work with zypper, but
-this hasn't been tested.
+Install:
+
+```bash
+sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo zypper ref
+sudo zypper install gh
+```
+
+Upgrade:
+
+```bash
+sudo zypper ref
+sudo zypper update gh
+```
 
 ## Manual installation
 

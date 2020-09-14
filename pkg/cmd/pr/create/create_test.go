@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,6 +33,10 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 }
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
+}
+
+func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
 	io.SetStdinTTY(isTTY)
@@ -60,7 +66,10 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, is
 		},
 	}
 
-	cmd := NewCmdCreate(factory, nil)
+	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
+		opts.RootDirOverride = rootDir
+		return createRun(opts)
+	})
 	cmd.PersistentFlags().StringP("repo", "R", "", "")
 
 	argv, err := shlex.Split(cli)
@@ -126,7 +135,7 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	assert.Equal(t, "--title or --fill required when not attached to a terminal", err.Error())
+	assert.Equal(t, "--title or --fill required when not running interactively", err.Error())
 
 	assert.Equal(t, "", output.String())
 }
@@ -234,6 +243,80 @@ func TestPRCreate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
 	eq(t, reqBody.Variables.Input.Title, "my title")
 	eq(t, reqBody.Variables.Input.Body, "my body")
+	eq(t, reqBody.Variables.Input.BaseRefName, "master")
+	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+func TestPRCreate_nonLegacyTemplate(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoResponse("OWNER", "REPO")
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "forks": { "nodes": [
+	] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "index",
+			Value: 0,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title"`, "./fixtures/repoWithNonLegacyPRTemplates")
+	require.NoError(t, err)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[3].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "my title")
+	eq(t, reqBody.Variables.Input.Body, "- commit 1\n- commit 0\n\nFixes a bug and Closes an issue")
 	eq(t, reqBody.Variables.Input.BaseRefName, "master")
 	eq(t, reqBody.Variables.Input.HeadRefName, "feature")
 
@@ -744,6 +827,77 @@ func TestPRCreate_survey_defaults_monocommit(t *testing.T) {
 	cs.Stub("was the color of a television, turned to a dead channel") // git show
 	cs.Stub("")                                                        // git rev-parse
 	cs.Stub("")                                                        // git push
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "title",
+			Default: true,
+		},
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommand(http, nil, "feature", true, ``)
+	eq(t, err, nil)
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+}
+
+func TestPRCreate_survey_defaults_monocommit_template(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(httpmock.GraphQL(`query RepositoryNetwork\b`), httpmock.StringResponse(httpmock.RepoNetworkStubResponse("OWNER", "REPO", "master", "WRITE")))
+	http.Register(httpmock.GraphQL(`query RepositoryFindFork\b`), httpmock.StringResponse(`
+		{ "data": { "repository": { "forks": { "nodes": [
+		] } } } }
+	`))
+	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.Register(httpmock.GraphQL(`mutation PullRequestCreate\b`), httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+		eq(t, inputs["repositoryId"], "REPOID")
+		eq(t, inputs["title"], "the sky above the port")
+		eq(t, inputs["body"], "was the color of a television\n\n... turned to a dead channel")
+		eq(t, inputs["baseRefName"], "master")
+		eq(t, inputs["headRefName"], "feature")
+	}))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	tmpdir, err := ioutil.TempDir("", "gh-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	templateFp := path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE.md")
+	_ = os.MkdirAll(path.Dir(templateFp), 0700)
+	_ = ioutil.WriteFile(templateFp, []byte("... turned to a dead channel"), 0700)
+
+	cs.Stub("")                                  // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                  // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                  // git status
+	cs.Stub("1234567890,the sky above the port") // git log
+	cs.Stub("was the color of a television")     // git show
+	cs.Stub(tmpdir)                              // git rev-parse
+	cs.Stub("")                                  // git push
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()

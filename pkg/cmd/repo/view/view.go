@@ -2,9 +2,9 @@ package view
 
 import (
 	"fmt"
-	"html/template"
 	"net/http"
 	"strings"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
