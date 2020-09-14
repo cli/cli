@@ -403,16 +403,6 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 
 				if strings.Contains(gardenCell.StatusLine, "stream") {
 					player.ShoeMoistureContent = 5
-				} else {
-					if player.ShoeMoistureContent > 1 {
-						sl += "\nYour shoes squish with water from the stream."
-					} else if player.ShoeMoistureContent == 1 {
-						sl += "\nYour shoes seem to have dried out."
-					}
-
-					if player.ShoeMoistureContent > 0 {
-						player.ShoeMoistureContent--
-					}
 				}
 			} else {
 				char = gardenCell.Char
