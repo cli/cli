@@ -507,7 +507,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	}
 
 	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening https://github.com/OWNER/REPO/pull/10 in your browser.\n")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/pull/10 in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")

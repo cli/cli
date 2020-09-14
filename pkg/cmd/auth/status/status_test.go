@@ -3,7 +3,6 @@ package status
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"testing"
 
@@ -19,29 +18,10 @@ import (
 
 func Test_NewCmdStatus(t *testing.T) {
 	tests := []struct {
-		name    string
-		cli     string
-		wants   StatusOptions
-		ghtoken string
+		name  string
+		cli   string
+		wants StatusOptions
 	}{
-		{
-			name: "ghtoken set",
-			cli:  "",
-			wants: StatusOptions{
-				Token:    "abc123",
-				Hostname: "github.com",
-			},
-			ghtoken: "abc123",
-		},
-		{
-			name: "ghtoken set",
-			cli:  "--hostname joel.miller",
-			wants: StatusOptions{
-				Token:    "def456",
-				Hostname: "joel.miller",
-			},
-			ghtoken: "def456",
-		},
 		{
 			name:  "no arguments",
 			cli:   "",
@@ -58,12 +38,6 @@ func Test_NewCmdStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ghtoken := os.Getenv("GITHUB_TOKEN")
-			defer func() {
-				os.Setenv("GITHUB_TOKEN", ghtoken)
-			}()
-			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
-
 			f := &cmdutil.Factory{}
 
 			argv, err := shlex.Split(tt.cli)
@@ -86,7 +60,6 @@ func Test_NewCmdStatus(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.Token, gotOpts.Token)
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 		})
 	}
@@ -101,47 +74,6 @@ func Test_statusRun(t *testing.T) {
 		wantErr    *regexp.Regexp
 		wantErrOut *regexp.Regexp
 	}{
-		{
-			name: "token set, bad token",
-			opts: &StatusOptions{
-				Token:    "abc123",
-				Hostname: "github.com",
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", ""),
-					httpmock.StatusStringResponse(400, "no bueno"),
-				)
-			},
-			wantErr:    regexp.MustCompile(``),
-			wantErrOut: regexp.MustCompile(`authentication failed`),
-		},
-		{
-			name: "token set, missing scope",
-			opts: &StatusOptions{
-				Token:    "abc123",
-				Hostname: "github.com",
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,"))
-			},
-			wantErr:    regexp.MustCompile(``),
-			wantErrOut: regexp.MustCompile(`missing required scope 'read:org'`),
-		},
-		{
-			name: "token set, good token",
-			opts: &StatusOptions{
-				Token:    "abc123",
-				Hostname: "github.com",
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,"))
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
-			},
-			wantErrOut: regexp.MustCompile(`token valid for github.com as.*tess`),
-		},
 		{
 			name: "hostname set",
 			opts: &StatusOptions{

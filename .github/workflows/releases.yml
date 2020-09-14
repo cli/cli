@@ -27,41 +27,85 @@ jobs:
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
-      - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v1
-        if: "!contains(github.ref, '-')" # skip prereleases
-        with:
-          formula-name: gh
-          download-url: https://github.com/cli/cli.git
-        env:
-          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
       - name: Checkout documentation site
-        if: "!contains(github.ref, '-')" # skip prereleases
         uses: actions/checkout@v2
         with:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
           token: ${{secrets.SITE_GITHUB_TOKEN}}
-      - name: Publish documentation site
-        if: "!contains(github.ref, '-')" # skip prereleases
+      - name: Update site man pages
         env:
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
           GIT_AUTHOR_EMAIL: noreply@github.com
-        run: make site-publish
+        run: make site-bump
       - name: Move project cards
-        if: "!contains(github.ref, '-')" # skip prereleases
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           PENDING_COLUMN: 8189733
           DONE_COLUMN: 7110130
         run: |
-          curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
-          api() { bin/hub api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
+          api() { gh api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
+          api-write() { [[ $GITHUB_REF == *-* ]] && echo "skipping: api $*" || api "$@"; }
           cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
-          for card in $cards; do api projects/columns/cards/$card/moves --field position=top --field column_id=$DONE_COLUMN; done
+          for card in $cards; do
+            api-write projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
+          done
+      
+      - name: Install packaging dependencies
+        run: sudo apt-get install -y createrepo rpm reprepro
+      - name: Set up GPG
+        run: |
+          gpg --import --no-tty --batch --yes < script/pubkey.asc
+          echo "${{secrets.GPG_KEY}}" | base64 -d | gpg --import --no-tty --batch --yes
+          echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent RELOADAGENT /bye
+          echo "${{secrets.GPG_PASSPHRASE}}" | /usr/lib/gnupg2/gpg-preset-passphrase --preset 867DAD5051270B843EF54F6186FA10E3A1D22DC5
+      - name: Sign RPMs
+        run: |
+          cp script/rpmmacros ~/.rpmmacros
+          rpmsign --addsign dist/*.rpm
+      - name: Run createrepo
+        run: |
+          mkdir -p site/packages/rpm
+          cp dist/*.rpm site/packages/rpm/
+          createrepo site/packages/rpm
+          pushd site/packages/rpm
+          gpg --yes --detach-sign --armor repodata/repomd.xml
+          popd
+      - name: Run reprepro
+        env:
+          RELEASES: "focal stable bionic trusty precise xenial"
+        run: |
+          mkdir -p upload
+          for release in $RELEASES; do
+            for file in dist/*.deb; do
+              reprepro --confdir="+b/script" includedeb "$release" "$file"
+            done
+          done
+          cp -a dists/ pool/ upload/
+          mkdir -p site/packages
+          cp -a upload/* site/packages/
+      - name: Publish site
+        env:
+          GIT_COMMITTER_NAME: cli automation
+          GIT_AUTHOR_NAME: cli automation
+          GIT_COMMITTER_EMAIL: noreply@github.com
+          GIT_AUTHOR_EMAIL: noreply@github.com
+        working-directory: ./site
+        run: |
+          git add packages
+          git commit -m "Add rpm and deb packages for ${GITHUB_REF#refs/tags/}"
+          if [[ $GITHUB_REF == *-* ]]; then
+            git log --oneline @{upstream}..
+            git diff --name-status @{upstream}..
+          else
+            git push
+          fi
+
   msi:
     needs: goreleaser
     runs-on: windows-latest
@@ -72,8 +116,7 @@ jobs:
         id: download_exe
         shell: bash
         run: |
-          curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
-          bin/hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
+          hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
           printf "::set-output name=zip::%s\n" *.zip
           unzip -o *.zip && rm -v *.zip
         env:
@@ -106,6 +149,14 @@ jobs:
             -Executable "${{ steps.buildmsi.outputs.msi }}"
       - name: Upload MSI
         shell: bash
-        run: bin/hub release edit "${GITHUB_REF#refs/tags/}" -m "" -a "${{ steps.buildmsi.outputs.msi }}"
+        run: hub release edit "${GITHUB_REF#refs/tags/}" -m "" --draft=false -a "${{ steps.buildmsi.outputs.msi }}"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')" # skip prereleases
+        with:
+          formula-name: gh
+          download-url: https://github.com/cli/cli.git
+        env:
+          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}

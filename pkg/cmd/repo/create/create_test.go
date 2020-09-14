@@ -22,6 +22,8 @@ import (
 
 func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStdinTTY(true)
 	fac := &cmdutil.Factory{
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
@@ -109,8 +111,8 @@ func TestRepoCreate(t *testing.T) {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "https://github.com/OWNER/REPO\n", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -191,8 +193,8 @@ func TestRepoCreate_org(t *testing.T) {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "https://github.com/ORG/REPO\n", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -273,8 +275,8 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "https://github.com/ORG/REPO\n", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -363,8 +365,8 @@ func TestRepoCreate_template(t *testing.T) {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "https://github.com/OWNER/REPO\n", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")

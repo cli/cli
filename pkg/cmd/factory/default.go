@@ -27,6 +27,7 @@ func New(appVersion string) *cmdutil.Factory {
 			cachedConfig = config.NewBlankConfig()
 			configError = nil
 		}
+		cachedConfig = config.InheritEnv(cachedConfig)
 		return cachedConfig, configError
 	}
 
@@ -46,8 +47,7 @@ func New(appVersion string) *cmdutil.Factory {
 				return nil, err
 			}
 
-			// TODO: avoid setting Accept header for `api` command
-			return httpClient(io, cfg, appVersion, true), nil
+			return NewHTTPClient(io, cfg, appVersion, true), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			remotes, err := remotesFunc()

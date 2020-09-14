@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/auth/client"
@@ -24,9 +24,8 @@ type LoginOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (config.Config, error)
 
-	Hostname     string
-	Token        string
-	OnlyValidate bool
+	Hostname string
+	Token    string
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -34,6 +33,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:     f.IOStreams,
 		Config: f.Config,
 	}
+
+	var tokenStdin bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -57,33 +58,23 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# => read token from mytoken.txt and authenticate against a GitHub Enterprise Server instance
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			isTTY := opts.IO.IsStdinTTY()
-
-			// TODO support other ways of naming
-			ghToken := os.Getenv("GITHUB_TOKEN")
-
-			if !isTTY && (!cmd.Flags().Changed("with-token") && ghToken == "") {
-				return &cmdutil.FlagError{Err: errors.New("no terminal detected; please use '--with-token' or set GITHUB_TOKEN")}
-			}
-
-			wt, _ := cmd.Flags().GetBool("with-token")
-			if wt {
+			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("failed to read token from STDIN: %w", err)}
+					return fmt.Errorf("failed to read token from STDIN: %w", err)
 				}
-
 				opts.Token = strings.TrimSpace(string(token))
-			} else if ghToken != "" {
-				opts.OnlyValidate = true
-				opts.Token = ghToken
 			}
 
 			if opts.Token != "" {
 				// Assume non-interactive if a token is specified
 				if opts.Hostname == "" {
 					opts.Hostname = ghinstance.Default()
+				}
+			} else {
+				if !opts.IO.CanPrompt() {
+					return &cmdutil.FlagError{Err: errors.New("--with-token required when not running interactively")}
 				}
 			}
 
@@ -102,7 +93,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
-	cmd.Flags().Bool("with-token", false, "Read token from standard input")
+	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 
 	return cmd
 }
@@ -129,10 +120,6 @@ func loginRun(opts *LoginOptions) error {
 		err = client.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
-		}
-
-		if opts.OnlyValidate {
-			return nil
 		}
 
 		return cfg.Write()
@@ -203,6 +190,10 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
+	}
+
 	var authMode int
 	err = prompt.SurveyAskOne(&survey.Select{
 		Message: "How would you like to authenticate?",
@@ -216,7 +207,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if authMode == 0 {
-		_, err := config.AuthFlowWithConfig(cfg, hostname, "", []string{})
+		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", []string{})
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}

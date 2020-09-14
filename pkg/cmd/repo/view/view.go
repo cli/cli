@@ -3,10 +3,10 @@ package view
 import (
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strings"
 	"syscall"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
