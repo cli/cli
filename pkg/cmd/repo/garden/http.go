@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 )
 
@@ -69,7 +70,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 }
 
 func getResponse(client *http.Client, path string, data interface{}) (*http.Response, error) {
-	url := "https://api.github.com/" + path
+	url := ghinstance.RESTPrefix(ghinstance.OverridableDefault()) + path
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
