@@ -73,6 +73,8 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 		Example: heredoc.Doc(`
 			$ gh config set editor vim
 			$ gh config set editor "code --wait"
+			$ gh config set git_protocol ssh
+			$ gh config set prompt disabled
 		`),
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
