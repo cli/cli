@@ -152,7 +152,7 @@ func editRun(opts *EditOptions) error {
 		}, &choice)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("could not prompt: %w", err)
 		}
 
 		stop := false
