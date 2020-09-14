@@ -77,7 +77,7 @@ func listRun(opts *ListOptions) error {
 
 	for _, gist := range gists {
 		fileCount := 0
-		for _, _ = range gist.Files {
+		for range gist.Files {
 			fileCount++
 		}
 
