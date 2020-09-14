@@ -32,7 +32,7 @@ func listGists(client *http.Client, hostname string, limit int, visibility strin
 		if len(gists) == limit {
 			break
 		}
-		if visibility == "all" || (visibility == "private" && !gist.Public) || (visibility == "public" && gist.Public) {
+		if visibility == "all" || (visibility == "secret" && !gist.Public) || (visibility == "public" && gist.Public) {
 			gists = append(gists, gist)
 		}
 	}

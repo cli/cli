@@ -36,13 +36,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			}
 
 			pub := cmd.Flags().Changed("public")
-			priv := cmd.Flags().Changed("private")
+			secret := cmd.Flags().Changed("secret")
 
 			opts.Visibility = "all"
-			if pub && !priv {
+			if pub && !secret {
 				opts.Visibility = "public"
-			} else if priv && !pub {
-				opts.Visibility = "private"
+			} else if secret && !pub {
+				opts.Visibility = "secret"
 			}
 
 			if runF != nil {
@@ -55,7 +55,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of gists to fetch")
 	cmd.Flags().Bool("public", false, "Show only public gists")
-	cmd.Flags().Bool("private", false, "Show only private gists")
+	cmd.Flags().Bool("secret", false, "Show only secret gists")
 
 	return cmd
 }
