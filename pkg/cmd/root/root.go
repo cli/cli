@@ -90,7 +90,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
 
-	// Help Topics
+	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
 
 	// the `api` command should not inherit any extra HTTP headers

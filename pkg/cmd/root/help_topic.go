@@ -1,8 +1,6 @@
 package root
 
 import (
-	"fmt"
-
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
@@ -41,6 +39,7 @@ func NewHelpTopic(topic string) *cobra.Command {
 		Long:   topicContent[topic],
 		Hidden: true,
 		Args:   cobra.NoArgs,
+		Run:    helpTopicHelpFunc,
 	}
 
 	cmd.SetHelpFunc(helpTopicHelpFunc)
@@ -50,27 +49,10 @@ func NewHelpTopic(topic string) *cobra.Command {
 }
 
 func helpTopicHelpFunc(command *cobra.Command, args []string) {
-	if len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
-		command.Printf("unknown command %q for %q\n", args[1], command.CommandPath())
-
-		if args[1] == "help" {
-			command.Print("\nDid you mean this?\n")
-			command.Printf("\t%s\n\n", "--help")
-		} else {
-			command.Printf("\n")
-		}
-
-		helpTopicUsageFunc(command)
-		command.Printf("\n")
-		hasFailed = true
-		return
-	}
-
-	fmt.Fprint(command.OutOrStdout(), command.Long)
+	command.Print(command.Long)
 }
 
 func helpTopicUsageFunc(command *cobra.Command) error {
-	command.Printf("Usage:  gh help %s", command.Use)
-
+	command.Printf("Usage: gh help %s", command.Use)
 	return nil
 }
