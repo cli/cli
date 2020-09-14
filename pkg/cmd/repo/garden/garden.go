@@ -102,7 +102,7 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:    "garden [<repository>]",
 		Short:  "Explore a git repository as a garden",
-		Long:   "Use WASD or vi keys to move. q to quit.",
+		Long:   "Use arrow keys, WASD or vi keys to move. q to quit.",
 		Hidden: true,
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -198,12 +198,9 @@ func gardenRun(opts *GardenOptions) error {
 		_ = exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
 	}
 
-	var b []byte = make([]byte, 1)
+	var b []byte = make([]byte, 3)
 	for {
-		_, err := opts.IO.In.Read(b)
-		if err != nil {
-			return err
-		}
+		_, _ = opts.IO.In.Read(b)
 
 		oldX := player.X
 		oldY := player.Y
@@ -226,12 +223,12 @@ func gardenRun(opts *GardenOptions) error {
 			continuing = true
 		}
 
-		if !moved || continuing {
-			continue
-		}
-
 		if quitting {
 			break
+		}
+
+		if !moved || continuing {
+			continue
 		}
 
 		underPlayer := garden[player.Y][player.X]
@@ -281,34 +278,40 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprint(out, utils.Bold(sl))
 	}
 
-	fmt.Println()
-	fmt.Println(utils.Bold("You turn and walk away from the wildflower garden..."))
+	clear(opts.IO)
+	fmt.Fprint(out, "\033[?25h")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
 
 	return nil
 }
 
-// TODO fix arrow keys
-// TODO detect ctrl+c if possible
-// TODO reshow cursor and clear terminal on quit
-
 func isLeft(b []byte) bool {
-	return bytes.EqualFold(b, []byte("a")) || bytes.EqualFold(b, []byte("q")) || bytes.EqualFold(b, []byte("h"))
+	left := []byte{27, 91, 68}
+	r := rune(b[0])
+	return bytes.EqualFold(b, left) || r == 'a' || r == 'h'
 }
 
 func isRight(b []byte) bool {
-	return bytes.EqualFold(b, []byte("d")) || bytes.EqualFold(b, []byte("l"))
+	right := []byte{27, 91, 67}
+	r := rune(b[0])
+	return bytes.EqualFold(b, right) || r == 'd' || r == 'l'
 }
 
 func isDown(b []byte) bool {
-	return bytes.EqualFold(b, []byte("s")) || bytes.EqualFold(b, []byte("j"))
+	down := []byte{27, 91, 66}
+	r := rune(b[0])
+	return bytes.EqualFold(b, down) || r == 's' || r == 'j'
 }
 
 func isUp(b []byte) bool {
-	return bytes.EqualFold(b, []byte("w")) || bytes.EqualFold(b, []byte("z")) || bytes.EqualFold(b, []byte("k"))
+	up := []byte{27, 91, 65}
+	r := rune(b[0])
+	return bytes.EqualFold(b, up) || r == 'w' || r == 'k'
 }
 
 func isQuit(b []byte) bool {
-	return bytes.EqualFold(b, []byte("q"))
+	return rune(b[0]) == 'q'
 }
 
 func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
