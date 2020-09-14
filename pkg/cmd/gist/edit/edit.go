@@ -100,6 +100,10 @@ func editRun(opts *EditOptions) error {
 					Message: "Edit which file?",
 					Options: candidates,
 				}, &filename)
+
+				if err != nil {
+					return fmt.Errorf("could not prompt: %w", err)
+				}
 			}
 		}
 
