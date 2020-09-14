@@ -83,7 +83,7 @@ func editRun(opts *EditOptions) error {
 	for {
 		filename := opts.Filename
 		candidates := []string{}
-		for filename, _ := range gist.Files {
+		for filename := range gist.Files {
 			candidates = append(candidates, filename)
 		}
 
