@@ -80,7 +80,7 @@ func editRun(opts *EditOptions) error {
 
 	filesToUpdate := map[string]string{}
 
-	for true {
+	for {
 		filename := opts.Filename
 		candidates := []string{}
 		for filename, _ := range gist.Files {
