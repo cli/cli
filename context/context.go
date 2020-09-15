@@ -139,7 +139,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 	return selectedRepo, err
 }
 
-func (r *ResolvedRemotes) HeadRepo(baseRepo ghrepo.Interface) (ghrepo.Interface, error) {
+func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 	if r.network == nil {
 		err := resolveNetwork(r)
 		if err != nil {
@@ -147,28 +147,13 @@ func (r *ResolvedRemotes) HeadRepo(baseRepo ghrepo.Interface) (ghrepo.Interface,
 		}
 	}
 
-	// try to find a pushable fork among existing remotes
-	for _, repo := range r.network.Repositories {
-		if repo != nil && repo.Parent != nil && repo.ViewerCanPush() && ghrepo.IsSame(repo.Parent, baseRepo) {
-			return repo, nil
-		}
-	}
-
-	// a fork might still exist on GitHub, so let's query for it
-	var notFound *api.NotFoundError
-	if repo, err := api.RepoFindFork(r.apiClient, baseRepo); err == nil {
-		return repo, nil
-	} else if !errors.As(err, &notFound) {
-		return nil, err
-	}
-
-	// fall back to any listed repository that has push access
+	var results []*api.Repository
 	for _, repo := range r.network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
-			return repo, nil
+			results = append(results, repo)
 		}
 	}
-	return nil, errors.New("none of the repositories have push access")
+	return results, nil
 }
 
 // RemoteForRepo finds the git remote that points to a repository

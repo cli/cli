@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -17,6 +18,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -40,6 +42,7 @@ type CreateOptions struct {
 	Title      string
 	Body       string
 	BaseBranch string
+	HeadBranch string
 
 	Reviewers []string
 	Assignees []string
@@ -60,13 +63,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a pull request",
+		Long: heredoc.Doc(`
+			Create a pull request on GitHub.
+
+			When the current branch isn't fully pushed to a git remote, a prompt will ask where
+			to push the branch and offer an option to fork the base repository. Use '--head' to
+			explicitly skip any forking or pushing behavior.
+
+			A prompt will also ask for the title and the body of the pull request. Use '--title'
+			and '--body' to skip this, or use '--fill' to autofill these values from git commits.
+		`),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh pr create --reviewer monalisa,hubot
 			$ gh pr create --project "Roadmap"
-			$ gh pr create --base develop
+			$ gh pr create --base develop --head monalisa:feature
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -96,9 +109,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	fl := cmd.Flags()
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
-	fl.StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
-	fl.StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
-	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The branch into which you want your code merged")
+	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
+	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
+	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
+	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people by their `login`")
@@ -132,6 +146,8 @@ func createRun(opts *CreateOptions) error {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
+			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
+			// consider piggybacking on that result instead of performing a separate lookup
 			var err error
 			baseRepo, err = api.GitHubRepo(client, br)
 			if err != nil {
@@ -142,32 +158,106 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("could not determine base repository: %w", err)
 	}
 
-	headBranch, err := opts.Branch()
-	if err != nil {
-		return fmt.Errorf("could not determine the current branch: %w", err)
+	isPushEnabled := false
+	headBranch := opts.HeadBranch
+	headBranchLabel := opts.HeadBranch
+	if headBranch == "" {
+		headBranch, err = opts.Branch()
+		if err != nil {
+			return fmt.Errorf("could not determine the current branch: %w", err)
+		}
+		headBranchLabel = headBranch
+		isPushEnabled = true
+	} else if idx := strings.IndexRune(headBranch, ':'); idx >= 0 {
+		headBranch = headBranch[idx+1:]
+	}
+
+	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
+		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var headRepo ghrepo.Interface
 	var headRemote *context.Remote
 
-	// determine whether the head branch is already pushed to a remote
-	headBranchPushedTo := determineTrackingBranch(remotes, headBranch)
-	if headBranchPushedTo != nil {
-		for _, r := range remotes {
-			if r.Name != headBranchPushedTo.RemoteName {
-				continue
+	if isPushEnabled {
+		// determine whether the head branch is already pushed to a remote
+		if pushedTo := determineTrackingBranch(remotes, headBranch); pushedTo != nil {
+			isPushEnabled = false
+			for _, r := range remotes {
+				if r.Name != pushedTo.RemoteName {
+					continue
+				}
+				headRepo = r
+				headRemote = r
+				break
 			}
-			headRepo = r
-			headRemote = r
-			break
 		}
 	}
 
-	// otherwise, determine the head repository with info obtained from the API
-	if headRepo == nil {
-		if r, err := repoContext.HeadRepo(baseRepo); err == nil {
-			headRepo = r
+	// otherwise, ask the user for the head repository using info obtained from the API
+	if headRepo == nil && isPushEnabled && opts.IO.CanPrompt() {
+		pushableRepos, err := repoContext.HeadRepos()
+		if err != nil {
+			return err
 		}
+
+		if len(pushableRepos) == 0 {
+			pushableRepos, err = api.RepoFindForks(client, baseRepo, 3)
+			if err != nil {
+				return err
+			}
+		}
+
+		currentLogin, err := api.CurrentLoginName(client, baseRepo.RepoHost())
+		if err != nil {
+			return err
+		}
+
+		hasOwnFork := false
+		var pushOptions []string
+		for _, r := range pushableRepos {
+			pushOptions = append(pushOptions, ghrepo.FullName(r))
+			if r.RepoOwner() == currentLogin {
+				hasOwnFork = true
+			}
+		}
+
+		if !hasOwnFork {
+			pushOptions = append(pushOptions, "Create a fork of "+ghrepo.FullName(baseRepo))
+		}
+		pushOptions = append(pushOptions, "Skip pushing the branch")
+		pushOptions = append(pushOptions, "Cancel")
+
+		var selectedOption int
+		err = prompt.SurveyAskOne(&survey.Select{
+			Message: fmt.Sprintf("Where should we push the '%s' branch?", headBranch),
+			Options: pushOptions,
+		}, &selectedOption)
+		if err != nil {
+			return err
+		}
+
+		if selectedOption < len(pushableRepos) {
+			headRepo = pushableRepos[selectedOption]
+			if !ghrepo.IsSame(baseRepo, headRepo) {
+				headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+			}
+		} else if pushOptions[selectedOption] == "Skip pushing the branch" {
+			isPushEnabled = false
+		} else if pushOptions[selectedOption] == "Cancel" {
+			return cmdutil.SilentError
+		} else {
+			// "Create a fork of ..."
+			if baseRepo.IsPrivate {
+				return fmt.Errorf("cannot fork private repository %s", ghrepo.FullName(baseRepo))
+			}
+			headBranchLabel = fmt.Sprintf("%s:%s", currentLogin, headBranch)
+		}
+	}
+
+	if headRepo == nil && isPushEnabled && !opts.IO.CanPrompt() {
+		fmt.Fprintf(opts.IO.ErrOut, "aborted: you must first push the current branch to a remote, or use the --head flag")
+		return cmdutil.SilentError
 	}
 
 	baseBranch := opts.BaseBranch
@@ -176,10 +266,6 @@ func createRun(opts *CreateOptions) error {
 	}
 	if headBranch == baseBranch && headRepo != nil && ghrepo.IsSame(baseRepo, headRepo) {
 		return fmt.Errorf("must be on a branch named differently than %q", baseBranch)
-	}
-
-	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var milestoneTitles []string
@@ -211,10 +297,6 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if !opts.WebMode {
-		headBranchLabel := headBranch
-		if headRepo != nil && !ghrepo.IsSame(baseRepo, headRepo) {
-			headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
-		}
 		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
@@ -297,10 +379,7 @@ func createRun(opts *CreateOptions) error {
 	didForkRepo := false
 	// if a head repository could not be determined so far, automatically create
 	// one by forking the base repository
-	if headRepo == nil {
-		if baseRepo.IsPrivate {
-			return fmt.Errorf("cannot fork private repository '%s'", ghrepo.FullName(baseRepo))
-		}
+	if headRepo == nil && isPushEnabled {
 		headRepo, err = api.ForkRepo(client, baseRepo)
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
@@ -308,12 +387,7 @@ func createRun(opts *CreateOptions) error {
 		didForkRepo = true
 	}
 
-	headBranchLabel := headBranch
-	if !ghrepo.IsSame(baseRepo, headRepo) {
-		headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
-	}
-
-	if headRemote == nil {
+	if headRemote == nil && headRepo != nil {
 		headRemote, _ = repoContext.RemoteForRepo(headRepo)
 	}
 
@@ -324,7 +398,7 @@ func createRun(opts *CreateOptions) error {
 	//
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
-	if headRemote == nil {
+	if headRemote == nil && isPushEnabled {
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
@@ -345,7 +419,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	// automatically push the branch if it hasn't been pushed anywhere yet
-	if headBranchPushedTo == nil {
+	if isPushEnabled {
 		pushTries := 0
 		maxPushTries := 3
 		for {
