@@ -22,7 +22,7 @@ type Gist struct {
 	Description string               `json:"description"`
 	Files       map[string]*GistFile `json:"files"`
 	UpdatedAt   time.Time            `json:"updated_at"`
-	Public      bool
+	Public      bool                 `json:"public"`
 }
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
