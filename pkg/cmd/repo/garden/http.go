@@ -31,7 +31,6 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 
 	page := 1
 	paginating := true
-	fmt.Println("gathering commits; this could take a minute...")
 	for paginating {
 		if len(commits) >= maxCommits {
 			break

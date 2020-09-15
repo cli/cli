@@ -179,7 +179,10 @@ func gardenRun(opts *GardenOptions) error {
 
 	maxCommits := geo.Width * geo.Height
 
+	opts.IO.StartProgressIndicator()
+	fmt.Fprintln(out, "gathering commits; this could take a minute...")
 	commits, err := getCommits(httpClient, toView, maxCommits)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
