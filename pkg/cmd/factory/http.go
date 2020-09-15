@@ -24,7 +24,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
 			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
-			if token, err := cfg.Get(hostname, "oauth_token"); err == nil || token != "" {
+			if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
 				return fmt.Sprintf("token %s", token), nil
 			}
 			return "", nil
