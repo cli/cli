@@ -93,9 +93,6 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 			},
-			//askStubs: func(as *prompt.AskStubber) {
-			//	as.StubOne("new file content")
-			//},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
@@ -113,8 +110,73 @@ func Test_editRun(t *testing.T) {
 				},
 			},
 		},
-		// TODO multiple files, submit
-		// TODO multiple files, cancel
+		{
+			name: "multiple files, submit",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("unix.md")
+				as.StubOne("Submit")
+			},
+			gist: &shared.Gist{
+				ID:          "1234",
+				Description: "catbug",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Filename: "cicada.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+					"unix.md": {
+						Filename: "unix.md",
+						Content:  "meow",
+						Type:     "application/markdown",
+					},
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			wantParams: map[string]interface{}{
+				"description": "catbug",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"cicada.txt": map[string]interface{}{
+						"content":  "bwhiizzzbwhuiiizzzz",
+						"filename": "cicada.txt",
+						"type":     "text/plain",
+					},
+					"unix.md": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "unix.md",
+						"type":     "application/markdown",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple files, cancel",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("unix.md")
+				as.StubOne("Cancel")
+			},
+			wantErr: true,
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Filename: "cicada.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+					"unix.md": {
+						Filename: "unix.md",
+						Content:  "meow",
+						Type:     "application/markdown",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -161,21 +223,22 @@ func Test_editRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := editRun(tt.opts)
+			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
 
-			reg.Verify(t)
-
-			bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
-			reqBody := make(map[string]interface{})
-			err = json.Unmarshal(bodyBytes, &reqBody)
-			if err != nil {
-				t.Fatalf("error decoding JSON: %v", err)
+			if tt.wantParams != nil {
+				bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
+				reqBody := make(map[string]interface{})
+				err = json.Unmarshal(bodyBytes, &reqBody)
+				if err != nil {
+					t.Fatalf("error decoding JSON: %v", err)
+				}
+				assert.Equal(t, tt.wantParams, reqBody)
 			}
-			assert.Equal(t, tt.wantParams, reqBody)
 		})
 	}
 }
