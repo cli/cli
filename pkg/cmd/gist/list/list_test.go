@@ -88,14 +88,13 @@ func TestNewCmdList(t *testing.T) {
 	}
 }
 
-// TODO execution tests
-
 func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    *ListOptions
 		wantOut string
 		stubs   func(*httpmock.Registry)
+		nontty  bool
 	}{
 		{
 			name: "no gists",
@@ -116,6 +115,7 @@ func Test_listRun(t *testing.T) {
 		// TODO public filter
 		// TODO secret filter
 		// TODO limit specified
+		// TODO nontty output
 	}
 
 	for _, tt := range tests {
@@ -149,8 +149,16 @@ func Test_listRun(t *testing.T) {
 		}
 
 		io, _, stdout, _ := iostreams.Test()
+		io.SetStdoutTTY(!tt.nontty)
 		tt.opts.IO = io
 
+		if tt.opts.Limit == 0 {
+			tt.opts.Limit = 10
+		}
+
+		if tt.opts.Visibility == "" {
+			tt.opts.Visibility = "all"
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			err := listRun(tt.opts)
 			assert.NoError(t, err)

@@ -26,9 +26,6 @@ func listGists(client *http.Client, hostname string, limit int, visibility strin
 		return nil, err
 	}
 
-	// TODO in tests the api call is matching properly and encoding json properly but i'm getting no
-	// result and no parse error, wtf?
-
 	gists := []shared.Gist{}
 
 	for _, gist := range result {

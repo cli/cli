@@ -3,7 +3,6 @@ package httpmock
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -87,8 +86,6 @@ func StatusStringResponse(status int, body string) Responder {
 func JSONResponse(body interface{}) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
-		fmt.Printf("DEBUG %#v\n", "COOOOOL")
-		fmt.Printf("DEBUG %#v\n", string(b))
 		return httpResponse(200, req, bytes.NewBuffer(b)), nil
 	}
 }
