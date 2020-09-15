@@ -19,6 +19,7 @@ type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 
 	Selector string
+	Filename string
 	Raw      bool
 	Web      bool
 }
@@ -49,6 +50,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "do not try and render markdown")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "open gist in browser")
+	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "display a single file of the gist")
 
 	return cmd
 }
@@ -87,12 +89,27 @@ func viewRun(opts *ViewOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	if gist.Description != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s\n", cs.Bold(gist.Description))
+		fmt.Fprintf(opts.IO.Out, "%s\n", cs.Bold(gist.Description))
 	}
 
+	if opts.Filename != "" {
+		gistFile, ok := gist.Files[opts.Filename]
+		if !ok {
+			return fmt.Errorf("gist has no such file %q", opts.Filename)
+		}
+
+		gist.Files = map[string]*shared.GistFile{
+			opts.Filename: gistFile,
+		}
+	}
+
+	showFilenames := len(gist.Files) > 1
+
 	for filename, gistFile := range gist.Files {
-		fmt.Fprintf(opts.IO.ErrOut, "%s\n", cs.Gray(filename))
-		fmt.Fprintln(opts.IO.ErrOut)
+		if showFilenames {
+			fmt.Fprintf(opts.IO.Out, "%s\n", cs.Gray(filename))
+			fmt.Fprintln(opts.IO.Out)
+		}
 		content := gistFile.Content
 		if strings.Contains(gistFile.Type, "markdown") && !opts.Raw {
 			rendered, err := utils.RenderMarkdown(gistFile.Content)
@@ -104,6 +121,5 @@ func viewRun(opts *ViewOptions) error {
 		fmt.Fprintln(opts.IO.Out)
 	}
 
-	// TODO print gist files, possibly with rendered markdown
 	return nil
 }
