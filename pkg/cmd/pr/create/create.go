@@ -127,8 +127,18 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	baseRepo, err := repoContext.BaseRepo()
-	if err != nil {
+	var baseRepo *api.Repository
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
+		if r, ok := br.(*api.Repository); ok {
+			baseRepo = r
+		} else {
+			var err error
+			baseRepo, err = api.GitHubRepo(client, br)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
 		return fmt.Errorf("could not determine base repository: %w", err)
 	}
 
@@ -155,7 +165,7 @@ func createRun(opts *CreateOptions) error {
 
 	// otherwise, determine the head repository with info obtained from the API
 	if headRepo == nil {
-		if r, err := repoContext.HeadRepo(); err == nil {
+		if r, err := repoContext.HeadRepo(baseRepo); err == nil {
 			headRepo = r
 		}
 	}
