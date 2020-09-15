@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
@@ -93,8 +94,18 @@ func listRun(opts *ListOptions) error {
 			visColor = cs.Red
 		}
 
+		description := gist.Description
+		if description == "" {
+			for filename, _ := range gist.Files {
+				if !strings.HasPrefix(filename, "gistfile") {
+					description = filename
+					break
+				}
+			}
+		}
+
 		tp.AddField(gist.ID, nil, nil)
-		tp.AddField(gist.Description, nil, cs.Bold)
+		tp.AddField(description, nil, cs.Bold)
 		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
 		if tp.IsTTY() {

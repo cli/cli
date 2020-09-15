@@ -108,12 +108,12 @@ func Test_listRun(t *testing.T) {
 		{
 			name:    "default behavior",
 			opts:    &ListOptions{},
-			wantOut: "1234567890                        1 file    public  about 6 hours ago\n2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
+			wantOut: "1234567890  cool.txt              1 file    public  about 6 hours ago\n4567890123                        1 file    public  about 6 hours ago\n2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
 		},
 		{
 			name:    "with public filter",
 			opts:    &ListOptions{Visibility: "public"},
-			wantOut: "1234567890    1 file  public  about 6 hours ago\n",
+			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n4567890123            1 file  public  about 6 hours ago\n",
 		},
 		{
 			name:    "with secret filter",
@@ -123,12 +123,12 @@ func Test_listRun(t *testing.T) {
 		{
 			name:    "with limit",
 			opts:    &ListOptions{Limit: 1},
-			wantOut: "1234567890    1 file  public  about 6 hours ago\n",
+			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n",
 		},
 		{
 			name:    "nontty output",
 			opts:    &ListOptions{},
-			wantOut: "1234567890\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
+			wantOut: "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
 			nontty:  true,
 		},
 	}
@@ -142,9 +142,15 @@ func Test_listRun(t *testing.T) {
 						ID:          "1234567890",
 						Description: "",
 						Files: map[string]*shared.GistFile{
-							"cool.txt": {
-								Content: "lol",
-							},
+							"cool.txt": {},
+						},
+						Public: true,
+					},
+					{
+						ID:          "4567890123",
+						Description: "",
+						Files: map[string]*shared.GistFile{
+							"gistfile0.txt": {},
 						},
 						Public: true,
 					},
@@ -152,12 +158,8 @@ func Test_listRun(t *testing.T) {
 						ID:          "2345678901",
 						Description: "tea leaves thwart those who court catastrophe",
 						Files: map[string]*shared.GistFile{
-							"gistfile0.txt": {
-								Content: "lolol",
-							},
-							"gistfile1.txt": {
-								Content: "lololol",
-							},
+							"gistfile0.txt": {},
+							"gistfile1.txt": {},
 						},
 						Public: false,
 					},
