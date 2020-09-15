@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 
@@ -28,6 +27,8 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 
+	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
+
 	Selector string
 	Filename string
 }
@@ -37,6 +38,13 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Edit: func(editorCmd, filename, defaultContent string, io *iostreams.IOStreams) (string, error) {
+			return surveyext.Edit(
+				editorCmd,
+				"*."+filename,
+				defaultContent,
+				io.In, io.Out, io.ErrOut, nil)
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -115,12 +123,7 @@ func editRun(opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
-		text, err := surveyext.Edit(
-			editorCommand,
-			"*."+filename,
-			gist.Files[filename].Content,
-			// TODO: consider using iostreams here
-			os.Stdin, os.Stdout, os.Stderr, nil)
+		text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
 
 		if err != nil {
 			return err
