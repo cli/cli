@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
@@ -105,10 +106,12 @@ func viewRun(opts *ViewOptions) error {
 
 	showFilenames := len(gist.Files) > 1
 
+	outs := []string{} // to ensure consistent ordering
+
 	for filename, gistFile := range gist.Files {
+		out := ""
 		if showFilenames {
-			fmt.Fprintf(opts.IO.Out, "%s\n", cs.Gray(filename))
-			fmt.Fprintln(opts.IO.Out)
+			out += fmt.Sprintf("%s\n\n", cs.Gray(filename))
 		}
 		content := gistFile.Content
 		if strings.Contains(gistFile.Type, "markdown") && !opts.Raw {
@@ -117,8 +120,15 @@ func viewRun(opts *ViewOptions) error {
 				content = rendered
 			}
 		}
-		fmt.Fprintf(opts.IO.Out, "%s\n", content)
-		fmt.Fprintln(opts.IO.Out)
+		out += fmt.Sprintf("%s\n\n", content)
+
+		outs = append(outs, out)
+	}
+
+	sort.Strings(outs)
+
+	for _, out := range outs {
+		fmt.Fprint(opts.IO.Out, out)
 	}
 
 	return nil
