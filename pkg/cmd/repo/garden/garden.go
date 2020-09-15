@@ -177,7 +177,7 @@ func gardenRun(opts *GardenOptions) error {
 		Density: 0.3,
 	}
 
-	maxCommits := geo.Width * geo.Height
+	maxCommits := (geo.Width * geo.Height) / 2
 
 	opts.IO.StartProgressIndicator()
 	fmt.Fprintln(out, "gathering commits; this could take a minute...")
