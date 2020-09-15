@@ -3,19 +3,12 @@ package context
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 )
-
-// Context represents the interface for querying information about the current environment
-type Context interface {
-	Config() (config.Config, error)
-}
 
 // cap the number of git remotes looked up, since the user might have an
 // unusually large number of git remotes
@@ -149,27 +142,4 @@ func (r ResolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*Remote, error) {
 		}
 	}
 	return nil, errors.New("not found")
-}
-
-// New initializes a Context that reads from the filesystem
-func New() Context {
-	return &fsContext{}
-}
-
-// A Context implementation that queries the filesystem
-type fsContext struct {
-	config config.Config
-}
-
-func (c *fsContext) Config() (config.Config, error) {
-	if c.config == nil {
-		cfg, err := config.ParseDefaultConfig()
-		if errors.Is(err, os.ErrNotExist) {
-			cfg = config.NewBlankConfig()
-		} else if err != nil {
-			return nil, err
-		}
-		c.config = cfg
-	}
-	return c.config, nil
 }
