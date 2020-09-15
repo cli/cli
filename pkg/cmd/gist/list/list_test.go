@@ -22,7 +22,6 @@ func TestNewCmdList(t *testing.T) {
 	}{
 		{
 			name: "no arguments",
-			cli:  "",
 			wants: ListOptions{
 				Limit:      10,
 				Visibility: "all",
@@ -129,7 +128,7 @@ func Test_listRun(t *testing.T) {
 		{
 			name:    "nontty output",
 			opts:    &ListOptions{},
-			wantOut: "",
+			wantOut: "1234567890\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
 			nontty:  true,
 		},
 	}

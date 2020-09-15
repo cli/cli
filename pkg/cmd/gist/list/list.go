@@ -93,12 +93,16 @@ func listRun(opts *ListOptions) error {
 			visColor = cs.Red
 		}
 
-		updatedAt := utils.FuzzyAgo(opts.Since(gist.UpdatedAt))
 		tp.AddField(gist.ID, nil, nil)
 		tp.AddField(gist.Description, nil, cs.Bold)
 		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
-		tp.AddField(updatedAt, nil, utils.Gray)
+		if tp.IsTTY() {
+			updatedAt := utils.FuzzyAgo(opts.Since(gist.UpdatedAt))
+			tp.AddField(updatedAt, nil, cs.Gray)
+		} else {
+			tp.AddField(gist.UpdatedAt.String(), nil, nil)
+		}
 		tp.EndRow()
 	}
 
