@@ -106,16 +106,32 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: "",
 		},
-
 		{
 			name:    "default behavior",
 			opts:    &ListOptions{},
-			wantOut: "TODO",
+			wantOut: "1234567890                        1 file    public  about 6 hours ago\n2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
 		},
-		// TODO public filter
-		// TODO secret filter
-		// TODO limit specified
-		// TODO nontty output
+		{
+			name:    "with public filter",
+			opts:    &ListOptions{Visibility: "public"},
+			wantOut: "1234567890    1 file  public  about 6 hours ago\n",
+		},
+		{
+			name:    "with secret filter",
+			opts:    &ListOptions{Visibility: "secret"},
+			wantOut: "2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
+		},
+		{
+			name:    "with limit",
+			opts:    &ListOptions{Limit: 1},
+			wantOut: "1234567890    1 file  public  about 6 hours ago\n",
+		},
+		{
+			name:    "nontty output",
+			opts:    &ListOptions{},
+			wantOut: "",
+			nontty:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -131,8 +147,38 @@ func Test_listRun(t *testing.T) {
 								Content: "lol",
 							},
 						},
-						Public:    true,
-						UpdatedAt: time.Time{},
+						Public: true,
+					},
+					{
+						ID:          "2345678901",
+						Description: "tea leaves thwart those who court catastrophe",
+						Files: map[string]*shared.GistFile{
+							"gistfile0.txt": {
+								Content: "lolol",
+							},
+							"gistfile1.txt": {
+								Content: "lololol",
+							},
+						},
+						Public: false,
+					},
+					{
+						ID:          "3456789012",
+						Description: "short desc",
+						Files: map[string]*shared.GistFile{
+							"gistfile0.txt":  {},
+							"gistfile1.txt":  {},
+							"gistfile2.txt":  {},
+							"gistfile3.txt":  {},
+							"gistfile4.txt":  {},
+							"gistfile5.txt":  {},
+							"gistfile6.txt":  {},
+							"gistfile7.txt":  {},
+							"gistfile8.txt":  {},
+							"gistfile9.txt":  {},
+							"gistfile10.txt": {},
+						},
+						Public: false,
 					},
 				}))
 		} else {

@@ -20,6 +20,7 @@ func listGists(client *http.Client, hostname string, limit int, visibility strin
 		query.Add("per_page", "100")
 	}
 
+	// TODO switch to graphql
 	apiClient := api.NewClientFromHTTP(client)
 	err := apiClient.REST(hostname, "GET", "gists?"+query.Encode(), nil, &result)
 	if err != nil {
