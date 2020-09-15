@@ -96,7 +96,7 @@ func listRun(opts *ListOptions) error {
 
 		description := gist.Description
 		if description == "" {
-			for filename, _ := range gist.Files {
+			for filename := range gist.Files {
 				if !strings.HasPrefix(filename, "gistfile") {
 					description = filename
 					break
