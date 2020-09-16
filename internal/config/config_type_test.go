@@ -45,6 +45,8 @@ func Test_defaultConfig(t *testing.T) {
 		editor:
 		# When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled
 		prompt: enabled
+		# A pager program to send command output to. Example value: less
+		pager:
 		# Aliases allow you to create nicknames for gh commands
 		aliases:
 		    co: pr checkout

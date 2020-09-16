@@ -92,6 +92,10 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
+func (s *IOStreams) SetPager(cmd string) {
+	s.pagerCommand = cmd
+}
+
 func (s *IOStreams) StartPager() error {
 	if s.pagerCommand == "" || !s.IsStdoutTTY() {
 		return nil

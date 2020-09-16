@@ -51,10 +51,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	prompt, _ := cfg.Get("", "prompt")
-
-	if prompt == config.PromptsDisabled {
+	if prompt, _ := cfg.Get("", "prompt"); prompt == config.PromptsDisabled {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
+	}
+
+	if pager, _ := cfg.Get("", "pager"); pager != "" {
+		cmdFactory.IOStreams.SetPager(pager)
 	}
 
 	expandedArgs := []string{}
