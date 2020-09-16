@@ -91,6 +91,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
 			id
+			name
+			owner { login }
 			hasIssuesEnabled
 			description
 			viewerPermission
@@ -317,8 +319,8 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}, nil
 }
 
-// RepoFindFork finds a fork of repo affiliated with the viewer
-func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
+// RepoFindForks finds forks of the repo that are affiliated with the viewer
+func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Repository, error) {
 	result := struct {
 		Repository struct {
 			Forks struct {
@@ -330,12 +332,13 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
+		"limit": limit,
 	}
 
 	if err := client.GraphQL(repo.RepoHost(), `
-	query RepositoryFindFork($owner: String!, $repo: String!) {
+	query RepositoryFindFork($owner: String!, $repo: String!, $limit: Int!) {
 		repository(owner: $owner, name: $repo) {
-			forks(first: 1, affiliations: [OWNER, COLLABORATOR]) {
+			forks(first: $limit, affiliations: [OWNER, COLLABORATOR]) {
 				nodes {
 					id
 					name
@@ -350,14 +353,18 @@ func RepoFindFork(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		return nil, err
 	}
 
-	forks := result.Repository.Forks.Nodes
-	// we check ViewerCanPush, even though we expect it to always be true per
-	// `affiliations` condition, to guard against versions of GitHub with a
-	// faulty `affiliations` implementation
-	if len(forks) > 0 && forks[0].ViewerCanPush() {
-		return InitRepoHostname(&forks[0], repo.RepoHost()), nil
+	var results []*Repository
+	for _, r := range result.Repository.Forks.Nodes {
+		// we check ViewerCanPush, even though we expect it to always be true per
+		// `affiliations` condition, to guard against versions of GitHub with a
+		// faulty `affiliations` implementation
+		if !r.ViewerCanPush() {
+			continue
+		}
+		results = append(results, InitRepoHostname(&r, repo.RepoHost()))
 	}
-	return nil, &NotFoundError{errors.New("no fork found")}
+
+	return results, nil
 }
 
 type RepoMetadataResult struct {

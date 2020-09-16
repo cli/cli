@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 )
@@ -32,6 +34,9 @@ func makeColorFunc(color string) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
 		if isColorEnabled() {
+			if color == "black+h" && iostreams.Is256ColorSupported() {
+				return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, arg)
+			}
 			return cf(arg)
 		}
 		return arg
@@ -39,7 +44,11 @@ func makeColorFunc(color string) func(string) string {
 }
 
 func isColorEnabled() bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if iostreams.EnvColorForced() {
+		return true
+	}
+
+	if iostreams.EnvColorDisabled() {
 		return false
 	}
 

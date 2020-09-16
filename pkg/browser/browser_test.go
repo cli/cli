@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -13,6 +14,7 @@ func TestForOS(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
+		exe  string
 		want []string
 	}{
 		{
@@ -29,7 +31,17 @@ func TestForOS(t *testing.T) {
 				goos: "linux",
 				url:  "https://example.com/path?a=1&b=2",
 			},
+			exe:  "xdg-open",
 			want: []string{"xdg-open", "https://example.com/path?a=1&b=2"},
+		},
+		{
+			name: "WSL",
+			args: args{
+				goos: "linux",
+				url:  "https://example.com/path?a=1&b=2",
+			},
+			exe:  "wslview",
+			want: []string{"wslview", "https://example.com/path?a=1&b=2"},
 		},
 		{
 			name: "Windows",
@@ -41,6 +53,14 @@ func TestForOS(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		lookPath = func(file string) (string, error) {
+			if file == tt.exe {
+				return file, nil
+			} else {
+				return "", errors.New("not found")
+			}
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
 			if cmd := ForOS(tt.args.goos, tt.args.url); !reflect.DeepEqual(cmd.Args, tt.want) {
 				t.Errorf("ForOS() = %v, want %v", cmd.Args, tt.want)

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghinstance"
@@ -196,6 +197,12 @@ func apiRun(opts *ApiOptions) error {
 	headersOutputStream := opts.IO.Out
 	if opts.Silent {
 		opts.IO.Out = ioutil.Discard
+	} else {
+		err := opts.IO.StartPager()
+		if err != nil {
+			return err
+		}
+		defer opts.IO.StopPager()
 	}
 
 	host := ghinstance.OverridableDefault()
@@ -265,12 +272,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
-		if err != nil {
-			return
-		}
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
-		if err != nil {
+	}
+	if err != nil {
+		if errors.Is(err, syscall.EPIPE) {
+			err = nil
+		} else {
 			return
 		}
 	}

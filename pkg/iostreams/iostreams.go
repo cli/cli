@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -25,6 +26,7 @@ type IOStreams struct {
 	// the original (non-colorable) output stream
 	originalOut  io.Writer
 	colorEnabled bool
+	is256enabled bool
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -36,11 +38,18 @@ type IOStreams struct {
 	stderrTTYOverride bool
 	stderrIsTTY       bool
 
+	pagerCommand string
+	pagerProcess *os.Process
+
 	neverPrompt bool
 }
 
 func (s *IOStreams) ColorEnabled() bool {
 	return s.colorEnabled
+}
+
+func (s *IOStreams) ColorSupport256() bool {
+	return s.is256enabled
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -86,6 +95,60 @@ func (s *IOStreams) IsStderrTTY() bool {
 		return isTerminal(stderr)
 	}
 	return false
+}
+
+func (s *IOStreams) SetPager(cmd string) {
+	s.pagerCommand = cmd
+}
+
+func (s *IOStreams) StartPager() error {
+	if s.pagerCommand == "" || !s.IsStdoutTTY() {
+		return nil
+	}
+
+	pagerArgs, err := shlex.Split(s.pagerCommand)
+	if err != nil {
+		return err
+	}
+
+	pagerEnv := os.Environ()
+	for i := len(pagerEnv) - 1; i >= 0; i-- {
+		if strings.HasPrefix(pagerEnv[i], "PAGER=") {
+			pagerEnv = append(pagerEnv[0:i], pagerEnv[i+1:]...)
+		}
+	}
+	if _, ok := os.LookupEnv("LESS"); !ok {
+		pagerEnv = append(pagerEnv, "LESS=FRX")
+	}
+	if _, ok := os.LookupEnv("LV"); !ok {
+		pagerEnv = append(pagerEnv, "LV=-c")
+	}
+
+	pagerCmd := exec.Command(pagerArgs[0], pagerArgs[1:]...)
+	pagerCmd.Env = pagerEnv
+	pagerCmd.Stdout = s.Out
+	pagerCmd.Stderr = s.ErrOut
+	pagedOut, err := pagerCmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	s.Out = pagedOut
+	err = pagerCmd.Start()
+	if err != nil {
+		return err
+	}
+	s.pagerProcess = pagerCmd.Process
+	return nil
+}
+
+func (s *IOStreams) StopPager() {
+	if s.pagerProcess == nil {
+		return
+	}
+
+	s.Out.(io.ReadCloser).Close()
+	_, _ = s.pagerProcess.Wait()
+	s.pagerProcess = nil
 }
 
 func (s *IOStreams) CanPrompt() bool {
@@ -142,7 +205,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
 }
 
 func System() *IOStreams {
@@ -154,7 +217,9 @@ func System() *IOStreams {
 		originalOut:  os.Stdout,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
-		colorEnabled: os.Getenv("NO_COLOR") == "" && stdoutIsTTY,
+		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
+		is256enabled: Is256ColorSupported(),
+		pagerCommand: os.Getenv("PAGER"),
 	}
 
 	if stdoutIsTTY && stderrIsTTY {

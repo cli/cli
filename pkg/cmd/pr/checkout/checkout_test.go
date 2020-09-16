@@ -198,11 +198,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 		"maintainerCanModify": false
 	} } } }
 	`))
-	http.Register(httpmock.GraphQL(`query RepositoryInfo\b`), httpmock.StringResponse(`
-	{ "data": { "repository": {
-		"defaultBranchRef": {"name": "master"}
-	} } }
-	`))
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
 
 	ranCommands := [][]string{}
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {

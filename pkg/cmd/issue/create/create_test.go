@@ -191,15 +191,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true,
-			"viewerPermission": "WRITE"
-		} } }
-		`))
+	http.StubRepoInfoResponse("OWNER", "REPO", "main")
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`

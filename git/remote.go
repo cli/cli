@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"net/url"
 	"os/exec"
 	"regexp"
@@ -26,6 +27,7 @@ func NewRemote(name string, u string) *Remote {
 // Remote is a parsed git remote
 type Remote struct {
 	Name     string
+	Resolved string
 	FetchURL *url.URL
 	PushURL  *url.URL
 }
@@ -40,7 +42,30 @@ func Remotes() (RemoteSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseRemotes(list), nil
+	remotes := parseRemotes(list)
+
+	// this is affected by SetRemoteResolution
+	remoteCmd := exec.Command("git", "config", "--get-regexp", `^remote\..*\.gh-resolved$`)
+	output, _ := run.PrepareCmd(remoteCmd).Output()
+	for _, l := range outputLines(output) {
+		parts := strings.SplitN(l, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		rp := strings.SplitN(parts[0], ".", 3)
+		if len(rp) < 2 {
+			continue
+		}
+		name := rp[1]
+		for _, r := range remotes {
+			if r.Name == name {
+				r.Resolved = parts[1]
+				break
+			}
+		}
+	}
+
+	return remotes, nil
 }
 
 func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
@@ -108,4 +133,9 @@ func AddRemote(name, u string) (*Remote, error) {
 		FetchURL: urlParsed,
 		PushURL:  urlParsed,
 	}, nil
+}
+
+func SetRemoteResolution(name, resolution string) error {
+	addCmd := exec.Command("git", "config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution)
+	return run.PrepareCmd(addCmd).Run()
 }

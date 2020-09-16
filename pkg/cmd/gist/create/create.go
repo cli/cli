@@ -23,9 +23,10 @@ import (
 type CreateOptions struct {
 	IO *iostreams.IOStreams
 
-	Description string
-	Public      bool
-	Filenames   []string
+	Description      string
+	Public           bool
+	Filenames        []string
+	FilenameOverride string
 
 	HttpClient func() (*http.Client, error)
 }
@@ -84,6 +85,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
 	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
+	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
 	return cmd
 }
 
@@ -93,7 +95,7 @@ func createRun(opts *CreateOptions) error {
 		fileArgs = []string{"-"}
 	}
 
-	files, err := processFiles(opts.IO.In, fileArgs)
+	files, err := processFiles(opts.IO.In, opts.FilenameOverride, fileArgs)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
@@ -137,7 +139,7 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, error) {
+func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []string) (map[string]string, error) {
 	fs := map[string]string{}
 
 	if len(filenames) == 0 {
@@ -149,7 +151,11 @@ func processFiles(stdin io.ReadCloser, filenames []string) (map[string]string, e
 		var content []byte
 		var err error
 		if f == "-" {
-			filename = fmt.Sprintf("gistfile%d.txt", i)
+			if filenameOverride != "" {
+				filename = filenameOverride
+			} else {
+				filename = fmt.Sprintf("gistfile%d.txt", i)
+			}
 			content, err = ioutil.ReadAll(stdin)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read from stdin: %w", err)
