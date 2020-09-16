@@ -8,6 +8,62 @@ SignWith: C99B11DEB97541F0
 
 Origin: gh
 Label: gh
+Codename: oldstable
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian oldstable repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: testing
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian testing repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: unstable
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian unstable repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: buster
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian buster repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: bullseye
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian bullseye repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: stretch
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian stretch repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: jessie
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - debian jessie repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
 Codename: focal
 Architectures: i386 amd64 arm64
 Components: main
