@@ -55,3 +55,10 @@ func RESTPrefix(hostname string) string {
 	}
 	return "https://api.github.com/"
 }
+
+func GistPrefix(hostname string) string {
+	if IsEnterprise(hostname) {
+		return fmt.Sprintf("https://%s/gist/", hostname)
+	}
+	return fmt.Sprintf("https://gist.%s/", hostname)
+}
