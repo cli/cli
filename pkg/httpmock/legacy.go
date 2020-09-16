@@ -48,6 +48,22 @@ func (r *Registry) StubWithFixturePath(status int, fixturePath string) func() {
 	}
 }
 
+func (r *Registry) StubRepoInfoResponse(owner, repo, branch string) {
+	r.Register(
+		GraphQL(`query RepositoryInfo\b`),
+		StringResponse(fmt.Sprintf(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "%s",
+			"owner": {"login": "%s"},
+			"description": "",
+			"defaultBranchRef": {"name": "%s"},
+			"hasIssuesEnabled": true,
+			"viewerPermission": "WRITE"
+		} } }
+		`, repo, owner, branch)))
+}
+
 func (r *Registry) StubRepoResponse(owner, repo string) {
 	r.StubRepoResponseWithPermission(owner, repo, "WRITE")
 }
