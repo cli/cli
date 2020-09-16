@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -52,8 +53,15 @@ func TestForOS(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		lookPath = func(file string) (string, error) {
+			if file == tt.exe {
+				return file, nil
+			} else {
+				return "", errors.New("not found")
+			}
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
-			linuxExe = func() string { return tt.exe }
 			if cmd := ForOS(tt.args.goos, tt.args.url); !reflect.DeepEqual(cmd.Args, tt.want) {
 				t.Errorf("ForOS() = %v, want %v", cmd.Args, tt.want)
 			}

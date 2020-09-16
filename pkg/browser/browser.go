@@ -52,15 +52,18 @@ func FromLauncher(launcher, url string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-var linuxExe = func() string {
+func linuxExe() string {
 	exe := "xdg-open"
-	if !findExe("xdg-open") && findExe("wslview") {
-		exe = "wslview"
+
+	_, err := lookPath(exe)
+	if err != nil {
+		_, err := lookPath("wslview")
+		if err == nil {
+			exe = "wslview"
+		}
 	}
+
 	return exe
 }
 
-func findExe(command string) bool {
-	_, err := exec.LookPath(command)
-	return err == nil
-}
+var lookPath = exec.LookPath
