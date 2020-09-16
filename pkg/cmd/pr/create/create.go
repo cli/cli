@@ -75,8 +75,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
-			$ gh issue create --label "bug,help wanted"
-			$ gh issue create --label bug --label "help wanted"
 			$ gh pr create --reviewer monalisa,hubot
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
