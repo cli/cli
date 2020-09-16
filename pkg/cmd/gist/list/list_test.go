@@ -89,11 +89,12 @@ func TestNewCmdList(t *testing.T) {
 
 func Test_listRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *ListOptions
-		wantOut string
-		stubs   func(*httpmock.Registry)
-		nontty  bool
+		name      string
+		opts      *ListOptions
+		wantOut   string
+		stubs     func(*httpmock.Registry)
+		nontty    bool
+		updatedAt *time.Time
 	}{
 		{
 			name: "no gists",
@@ -126,20 +127,28 @@ func Test_listRun(t *testing.T) {
 			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n",
 		},
 		{
-			name:    "nontty output",
-			opts:    &ListOptions{},
-			wantOut: "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
-			nontty:  true,
+			name:      "nontty output",
+			opts:      &ListOptions{},
+			updatedAt: &time.Time{},
+			wantOut:   "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
+			nontty:    true,
 		},
 	}
 
 	for _, tt := range tests {
+		sixHoursAgo, _ := time.ParseDuration("-6h")
+		updatedAt := time.Now().Add(sixHoursAgo)
+		if tt.updatedAt != nil {
+			updatedAt = *tt.updatedAt
+		}
+
 		reg := &httpmock.Registry{}
 		if tt.stubs == nil {
 			reg.Register(httpmock.REST("GET", "gists"),
 				httpmock.JSONResponse([]shared.Gist{
 					{
 						ID:          "1234567890",
+						UpdatedAt:   updatedAt,
 						Description: "",
 						Files: map[string]*shared.GistFile{
 							"cool.txt": {},
@@ -148,6 +157,7 @@ func Test_listRun(t *testing.T) {
 					},
 					{
 						ID:          "4567890123",
+						UpdatedAt:   updatedAt,
 						Description: "",
 						Files: map[string]*shared.GistFile{
 							"gistfile0.txt": {},
@@ -156,6 +166,7 @@ func Test_listRun(t *testing.T) {
 					},
 					{
 						ID:          "2345678901",
+						UpdatedAt:   updatedAt,
 						Description: "tea leaves thwart those who court catastrophe",
 						Files: map[string]*shared.GistFile{
 							"gistfile0.txt": {},
@@ -165,6 +176,7 @@ func Test_listRun(t *testing.T) {
 					},
 					{
 						ID:          "3456789012",
+						UpdatedAt:   updatedAt,
 						Description: "short desc",
 						Files: map[string]*shared.GistFile{
 							"gistfile0.txt":  {},
@@ -188,11 +200,6 @@ func Test_listRun(t *testing.T) {
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
-		}
-
-		tt.opts.Since = func(t time.Time) time.Duration {
-			d, _ := time.ParseDuration("6h")
-			return d
 		}
 
 		io, _, stdout, _ := iostreams.Test()

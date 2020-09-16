@@ -17,8 +17,6 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 
-	Since func(t time.Time) time.Duration
-
 	Limit      int
 	Visibility string // all, secret, public
 }
@@ -27,9 +25,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Since: func(t time.Time) time.Duration {
-			return time.Since(t)
-		},
 	}
 
 	cmd := &cobra.Command{
@@ -109,7 +104,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
 		if tp.IsTTY() {
-			updatedAt := utils.FuzzyAgo(opts.Since(gist.UpdatedAt))
+			updatedAt := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
 			tp.AddField(updatedAt, nil, cs.Gray)
 		} else {
 			tp.AddField(gist.UpdatedAt.String(), nil, nil)
