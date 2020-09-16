@@ -104,9 +104,7 @@ func Test_RepoView_Web(t *testing.T) {
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryInfo\b`),
-			httpmock.StringResponse(`{}`))
+		reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 
 		opts := &ViewOptions{
 			Web: true,

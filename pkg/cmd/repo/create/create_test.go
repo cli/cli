@@ -322,14 +322,7 @@ func TestRepoCreate_template(t *testing.T) {
 			}
 		} } }`))
 
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`
-	{ "data": {
-		"repository": {
-			"id": "REPOID",
-			"description": "DESCRIPTION"
-	} } }`))
+	reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 
 	reg.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
