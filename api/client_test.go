@@ -76,10 +76,19 @@ func TestRESTGetDelete(t *testing.T) {
 }
 
 func TestRESTError(t *testing.T) {
-	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	fakehttp := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(fakehttp))
 
-	http.StubResponse(422, bytes.NewBufferString(`{"message": "OH NO"}`))
+	fakehttp.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			Request:    req,
+			StatusCode: 422,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "OH NO"}`)),
+			Header: map[string][]string{
+				"Content-Type": {"application/json; charset=utf-8"},
+			},
+		}, nil
+	})
 
 	var httpErr HTTPError
 	err := client.REST("github.com", "DELETE", "repos/branch", nil, nil)

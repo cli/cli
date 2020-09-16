@@ -97,6 +97,12 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	out := opts.IO.Out
 
 	fmt.Fprintln(out, "")

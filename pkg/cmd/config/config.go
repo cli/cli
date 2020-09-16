@@ -18,6 +18,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 			Current respected settings:
 			- git_protocol: "https" or "ssh". Default is "https".
 			- editor: if unset, defaults to environment variables.
+			- prompt: "enabled" or "disabled". Toggles interactive prompting.
 		`),
 	}
 
@@ -72,6 +73,8 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 		Example: heredoc.Doc(`
 			$ gh config set editor vim
 			$ gh config set editor "code --wait"
+			$ gh config set git_protocol ssh
+			$ gh config set prompt disabled
 		`),
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -3,7 +3,6 @@ package login
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"testing"
 
@@ -26,7 +25,6 @@ func Test_NewCmdLogin(t *testing.T) {
 		stdinTTY bool
 		wants    LoginOptions
 		wantsErr bool
-		ghtoken  string
 	}{
 		{
 			name:  "nontty, with-token",
@@ -49,11 +47,13 @@ func Test_NewCmdLogin(t *testing.T) {
 		},
 		{
 			name:     "nontty, hostname",
+			stdinTTY: false,
 			cli:      "--hostname claire.redfield",
 			wantsErr: true,
 		},
 		{
 			name:     "nontty",
+			stdinTTY: false,
 			cli:      "",
 			wantsErr: true,
 		},
@@ -81,8 +81,9 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			cli:      "--hostname barry.burton",
 			wants: LoginOptions{
-				Hostname: "barry.burton",
-				Token:    "",
+				Hostname:    "barry.burton",
+				Token:       "",
+				Interactive: true,
 			},
 		},
 		{
@@ -90,46 +91,43 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			cli:      "",
 			wants: LoginOptions{
-				Hostname: "",
-				Token:    "",
+				Hostname:    "",
+				Token:       "",
+				Interactive: true,
 			},
 		},
 		{
-			name:     "tty, GITHUB_TOKEN",
+			name:     "tty web",
 			stdinTTY: true,
-			cli:      "",
-			ghtoken:  "abc123",
+			cli:      "--web",
 			wants: LoginOptions{
-				Hostname:     "github.com",
-				Token:        "abc123",
-				OnlyValidate: true,
+				Hostname: "github.com",
+				Web:      true,
 			},
 		},
 		{
-			name:     "nontty, GITHUB_TOKEN",
-			stdinTTY: false,
-			cli:      "",
-			ghtoken:  "abc123",
+			name: "nontty web",
+			cli:  "--web",
 			wants: LoginOptions{
-				Hostname:     "github.com",
-				Token:        "abc123",
-				OnlyValidate: true,
+				Hostname: "github.com",
+				Web:      true,
 			},
+		},
+		{
+			name:     "web and with-token",
+			cli:      "--web --with-token",
+			wantsErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ghtoken := os.Getenv("GITHUB_TOKEN")
-			defer func() {
-				os.Setenv("GITHUB_TOKEN", ghtoken)
-			}()
-			os.Setenv("GITHUB_TOKEN", tt.ghtoken)
 			io, stdin, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: io,
 			}
 
+			io.SetStdoutTTY(true)
 			io.SetStdinTTY(tt.stdinTTY)
 			if tt.stdin != "" {
 				stdin.WriteString(tt.stdin)
@@ -160,6 +158,8 @@ func Test_NewCmdLogin(t *testing.T) {
 
 			assert.Equal(t, tt.wants.Token, gotOpts.Token)
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
+			assert.Equal(t, tt.wants.Web, gotOpts.Web)
+			assert.Equal(t, tt.wants.Interactive, gotOpts.Interactive)
 		})
 	}
 }
@@ -288,6 +288,9 @@ func Test_loginRun_Survey(t *testing.T) {
 	}{
 		{
 			name: "already authenticated",
+			opts: &LoginOptions{
+				Interactive: true,
+			},
 			cfg: func(cfg config.Config) {
 				_ = cfg.Set("github.com", "oauth_token", "ghi789")
 			},
@@ -306,7 +309,8 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "hostname set",
 			opts: &LoginOptions{
-				Hostname: "rebecca.chambers",
+				Hostname:    "rebecca.chambers",
+				Interactive: true,
 			},
 			wantHosts: "rebecca.chambers:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
 			askStubs: func(as *prompt.AskStubber) {
@@ -324,6 +328,9 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name:      "choose enterprise",
 			wantHosts: "brad.vickers:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
+			opts: &LoginOptions{
+				Interactive: true,
+			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(1)              // host type enterprise
 				as.StubOne("brad.vickers") // hostname
@@ -341,6 +348,9 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name:      "choose github.com",
 			wantHosts: "github.com:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
+			opts: &LoginOptions{
+				Interactive: true,
+			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(0)        // host type github.com
 				as.StubOne(1)        // auth mode: token
@@ -351,6 +361,9 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name:      "sets git_protocol",
 			wantHosts: "github.com:\n    oauth_token: def456\n    git_protocol: ssh\n    user: jillv\n",
+			opts: &LoginOptions{
+				Interactive: true,
+			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(0)        // host type github.com
 				as.StubOne(1)        // auth mode: token

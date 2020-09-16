@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,8 +20,8 @@ func Test_fileConfig_Set(t *testing.T) {
 	assert.NoError(t, c.Set("github.com", "user", "hubot"))
 	assert.NoError(t, c.Write())
 
-	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor: nano\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
-	assert.Equal(t, expected, mainBuf.String())
+	assert.Contains(t, mainBuf.String(), "editor: nano")
+	assert.Contains(t, mainBuf.String(), "git_protocol: https")
 	assert.Equal(t, `github.com:
     git_protocol: ssh
     user: hubot
@@ -37,7 +38,19 @@ func Test_defaultConfig(t *testing.T) {
 	cfg := NewBlankConfig()
 	assert.NoError(t, cfg.Write())
 
-	expected := "# What protocol to use when performing git operations. Supported values: ssh, https\ngit_protocol: https\n# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.\neditor:\n# Aliases allow you to create nicknames for gh commands\naliases:\n    co: pr checkout\n"
+	expected := heredoc.Doc(`
+		# What protocol to use when performing git operations. Supported values: ssh, https
+		git_protocol: https
+		# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.
+		editor:
+		# When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled
+		prompt: enabled
+		# A pager program to send command output to. Example value: less
+		pager:
+		# Aliases allow you to create nicknames for gh commands
+		aliases:
+		    co: pr checkout
+	`)
 	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, "", hostsBuf.String())
 

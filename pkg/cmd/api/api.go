@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghinstance"
@@ -117,7 +118,9 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for API requests.
+				GITHUB_TOKEN: an authentication token for github.com API requests.
+
+				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
 			`),
 		},
 		Args: cobra.ExactArgs(1),
@@ -194,6 +197,12 @@ func apiRun(opts *ApiOptions) error {
 	headersOutputStream := opts.IO.Out
 	if opts.Silent {
 		opts.IO.Out = ioutil.Discard
+	} else {
+		err := opts.IO.StartPager()
+		if err != nil {
+			return err
+		}
+		defer opts.IO.StopPager()
 	}
 
 	host := ghinstance.OverridableDefault()
@@ -263,12 +272,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
-		if err != nil {
-			return
-		}
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
-		if err != nil {
+	}
+	if err != nil {
+		if errors.Is(err, syscall.EPIPE) {
+			err = nil
+		} else {
 			return
 		}
 	}

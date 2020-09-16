@@ -1,11 +1,12 @@
 package refresh
 
 import (
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -27,7 +28,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		IO:     f.IOStreams,
 		Config: f.Config,
 		AuthFlow: func(cfg config.Config, hostname string, scopes []string) error {
-			_, err := config.AuthFlowWithConfig(cfg, hostname, "", scopes)
+			_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", scopes)
 			return err
 		},
 	}
@@ -49,6 +50,17 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			# => open a browser to ensure your authentication credentials have the correct minimum scopes
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
+
+			if !isTTY {
+				return fmt.Errorf("not attached to a terminal; in headless environments, GITHUB_TOKEN is recommended")
+			}
+
+			if opts.Hostname == "" && !opts.IO.CanPrompt() {
+				// here, we know we are attached to a TTY but prompts are disabled
+				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -64,16 +76,6 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 }
 
 func refreshRun(opts *RefreshOptions) error {
-	if os.Getenv("GITHUB_TOKEN") != "" {
-		return fmt.Errorf("GITHUB_TOKEN is present in your environment and is incompatible with this command. If you'd like to modify a personal access token, see https://github.com/settings/tokens")
-	}
-
-	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
-
-	if !isTTY {
-		return fmt.Errorf("not attached to a terminal; in headless environments, GITHUB_TOKEN is recommended")
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -110,6 +112,10 @@ func refreshRun(opts *RefreshOptions) error {
 		if !found {
 			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
 		}
+	}
+
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		return err
 	}
 
 	return opts.AuthFlow(cfg, hostname, opts.Scopes)

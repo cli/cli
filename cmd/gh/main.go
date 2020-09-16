@@ -50,6 +50,20 @@ func main() {
 
 	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
 
+	cfg, err := cmdFactory.Config()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+		os.Exit(2)
+	}
+
+	if prompt, _ := cfg.Get("", "prompt"); prompt == config.PromptsDisabled {
+		cmdFactory.IOStreams.SetNeverPrompt(true)
+	}
+
+	if pager, _ := cfg.Get("", "pager"); pager != "" {
+		cmdFactory.IOStreams.SetPager(pager)
+	}
+
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
@@ -59,12 +73,6 @@ func main() {
 	if err != nil || cmd == rootCmd {
 		originalArgs := expandedArgs
 		isShell := false
-
-		cfg, err := cmdFactory.Config()
-		if err != nil {
-			fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
-			os.Exit(2)
-		}
 
 		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
 		if err != nil {
@@ -97,23 +105,11 @@ func main() {
 		}
 	}
 
-	authCheckEnabled := cmdutil.IsAuthCheckEnabled(cmd)
-
-	// TODO support other names
-	ghtoken := os.Getenv("GITHUB_TOKEN")
-	if ghtoken != "" {
-		authCheckEnabled = false
-	}
-
+	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
+		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
+		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
 	if authCheckEnabled {
-		hasAuth := false
-
-		cfg, err := cmdFactory.Config()
-		if err == nil {
-			hasAuth = cmdutil.CheckAuth(cfg)
-		}
-
-		if !hasAuth {
+		if !cmdutil.CheckAuth(cfg) {
 			fmt.Fprintln(stderr, utils.Bold("Welcome to GitHub CLI!"))
 			fmt.Fprintln(stderr)
 			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")

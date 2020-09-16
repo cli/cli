@@ -116,10 +116,16 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	if isTerminal {
 		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.Assignee != "" || opts.Author != "" || opts.Mention != "" || opts.Milestone != ""
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
-		fmt.Fprintf(opts.IO.ErrOut, "\n%s\n\n", title)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)

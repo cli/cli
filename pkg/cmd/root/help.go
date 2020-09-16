@@ -3,9 +3,9 @@ package root
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -28,7 +28,7 @@ func rootUsageFunc(command *cobra.Command) error {
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
 		command.Println("\n\nFlags:")
-		command.Print(indent(dedent(flagUsages), "  "))
+		command.Print(text.Indent(dedent(flagUsages), "  "))
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func rootHelpFunc(command *cobra.Command, args []string) {
 		helpEntries = append(helpEntries, helpEntry{"ENVIRONMENT VARIABLES", command.Annotations["help:environment"]})
 	}
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
-Use "gh <command> <subcommand> --help" for more information about a command.
+Use 'gh <command> <subcommand> --help' for more information about a command.
 Read the manual at https://cli.github.com/manual`})
 	if _, ok := command.Annotations["help:feedback"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
@@ -150,7 +150,7 @@ Read the manual at https://cli.github.com/manual`})
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
 			fmt.Fprintln(out, utils.Bold(e.Title))
-			fmt.Fprintln(out, indent(strings.Trim(e.Body, "\r\n"), "  "))
+			fmt.Fprintln(out, text.Indent(strings.Trim(e.Body, "\r\n"), "  "))
 		} else {
 			// If there is no title print the body as is
 			fmt.Fprintln(out, e.Body)
@@ -163,15 +163,6 @@ Read the manual at https://cli.github.com/manual`})
 func rpad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds ", padding)
 	return fmt.Sprintf(template, s)
-}
-
-var lineRE = regexp.MustCompile(`(?m)^`)
-
-func indent(s, indent string) string {
-	if len(strings.TrimSpace(s)) == 0 {
-		return s
-	}
-	return lineRE.ReplaceAllLiteralString(s, indent)
 }
 
 func dedent(s string) string {

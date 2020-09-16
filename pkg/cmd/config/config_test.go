@@ -21,10 +21,15 @@ func genKey(host, key string) string {
 }
 
 func (c configStub) Get(host, key string) (string, error) {
+	val, _, err := c.GetWithSource(host, key)
+	return val, err
+}
+
+func (c configStub) GetWithSource(host, key string) (string, string, error) {
 	if v, found := c[genKey(host, key)]; found {
-		return v, nil
+		return v, "(memory)", nil
 	}
-	return "", errors.New("not found")
+	return "", "", errors.New("not found")
 }
 
 func (c configStub) Set(host, key, value string) error {
@@ -41,6 +46,10 @@ func (c configStub) Hosts() ([]string, error) {
 }
 
 func (c configStub) UnsetHost(hostname string) {
+}
+
+func (c configStub) CheckWriteable(host, key string) error {
+	return nil
 }
 
 func (c configStub) Write() error {

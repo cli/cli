@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os/exec"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -76,23 +76,15 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, `
-Showing 3 of 3 open pull requests in OWNER/REPO
+	assert.Equal(t, heredoc.Doc(`
 
-`, output.Stderr())
-
-	lines := strings.Split(output.String(), "\n")
-	res := []*regexp.Regexp{
-		regexp.MustCompile(`#32.*New feature.*feature`),
-		regexp.MustCompile(`#29.*Fixed bad bug.*hubot:bug-fix`),
-		regexp.MustCompile(`#28.*Improve documentation.*docs`),
-	}
-
-	for i, r := range res {
-		if !r.MatchString(lines[i]) {
-			t.Errorf("%s did not match %s", lines[i], r)
-		}
-	}
+		Showing 3 of 3 open pull requests in OWNER/REPO
+		
+		#32  New feature            feature
+		#29  Fixed bad bug          hubot:bug-fix
+		#28  Improve documentation  docs
+	`), output.String())
+	assert.Equal(t, ``, output.Stderr())
 }
 
 func TestPRList_nontty(t *testing.T) {
@@ -130,8 +122,8 @@ func TestPRList_filtering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), `
+	eq(t, output.Stderr(), "")
+	eq(t, output.String(), `
 No pull requests match your search in OWNER/REPO
 
 `)
@@ -150,19 +142,12 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lines := strings.Split(output.String(), "\n")
-
-	res := []*regexp.Regexp{
-		regexp.MustCompile(`#32.*New feature.*feature`),
-		regexp.MustCompile(`#29.*Fixed bad bug.*hubot:bug-fix`),
-		regexp.MustCompile(`#28.*Improve documentation.*docs`),
+	out := output.String()
+	idx := strings.Index(out, "New feature")
+	if idx < 0 {
+		t.Fatalf("text %q not found in %q", "New feature", out)
 	}
-
-	for i, r := range res {
-		if !r.MatchString(lines[i]) {
-			t.Errorf("%s did not match %s", lines[i], r)
-		}
-	}
+	assert.Equal(t, idx, strings.LastIndex(out, "New feature"))
 }
 
 func TestPRList_filteringClosed(t *testing.T) {

@@ -9,7 +9,10 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/briandowns/spinner"
+	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh/terminal"
@@ -20,7 +23,12 @@ type IOStreams struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
+	// the original (non-colorable) output stream
+	originalOut  io.Writer
 	colorEnabled bool
+
+	progressIndicatorEnabled bool
+	progressIndicator        *spinner.Spinner
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -28,6 +36,11 @@ type IOStreams struct {
 	stdoutIsTTY       bool
 	stderrTTYOverride bool
 	stderrIsTTY       bool
+
+	pagerCommand string
+	pagerProcess *os.Process
+
+	neverPrompt bool
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -79,17 +92,101 @@ func (s *IOStreams) IsStderrTTY() bool {
 	return false
 }
 
-func (s *IOStreams) TerminalWidth() int {
-	defaultWidth := 80
-	if s.stdoutTTYOverride {
-		return defaultWidth
+func (s *IOStreams) SetPager(cmd string) {
+	s.pagerCommand = cmd
+}
+
+func (s *IOStreams) StartPager() error {
+	if s.pagerCommand == "" || !s.IsStdoutTTY() {
+		return nil
 	}
 
-	if w, _, err := terminalSize(s.Out); err == nil {
+	pagerArgs, err := shlex.Split(s.pagerCommand)
+	if err != nil {
+		return err
+	}
+
+	pagerEnv := os.Environ()
+	for i := len(pagerEnv) - 1; i >= 0; i-- {
+		if strings.HasPrefix(pagerEnv[i], "PAGER=") {
+			pagerEnv = append(pagerEnv[0:i], pagerEnv[i+1:]...)
+		}
+	}
+	if _, ok := os.LookupEnv("LESS"); !ok {
+		pagerEnv = append(pagerEnv, "LESS=FRX")
+	}
+	if _, ok := os.LookupEnv("LV"); !ok {
+		pagerEnv = append(pagerEnv, "LV=-c")
+	}
+
+	pagerCmd := exec.Command(pagerArgs[0], pagerArgs[1:]...)
+	pagerCmd.Env = pagerEnv
+	pagerCmd.Stdout = s.Out
+	pagerCmd.Stderr = s.ErrOut
+	pagedOut, err := pagerCmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	s.Out = pagedOut
+	err = pagerCmd.Start()
+	if err != nil {
+		return err
+	}
+	s.pagerProcess = pagerCmd.Process
+	return nil
+}
+
+func (s *IOStreams) StopPager() {
+	if s.pagerProcess == nil {
+		return
+	}
+
+	s.Out.(io.ReadCloser).Close()
+	_, _ = s.pagerProcess.Wait()
+	s.pagerProcess = nil
+}
+
+func (s *IOStreams) CanPrompt() bool {
+	if s.neverPrompt {
+		return false
+	}
+
+	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
+func (s *IOStreams) SetNeverPrompt(v bool) {
+	s.neverPrompt = v
+}
+
+func (s *IOStreams) StartProgressIndicator() {
+	if !s.progressIndicatorEnabled {
+		return
+	}
+	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut))
+	sp.Start()
+	s.progressIndicator = sp
+}
+
+func (s *IOStreams) StopProgressIndicator() {
+	if s.progressIndicator == nil {
+		return
+	}
+	s.progressIndicator.Stop()
+	s.progressIndicator = nil
+}
+
+func (s *IOStreams) TerminalWidth() int {
+	defaultWidth := 80
+	out := s.Out
+	if s.originalOut != nil {
+		out = s.originalOut
+	}
+
+	if w, _, err := terminalSize(out); err == nil {
 		return w
 	}
 
-	if isCygwinTerminal(s.Out) {
+	if isCygwinTerminal(out) {
 		tputCmd := exec.Command("tput", "cols")
 		tputCmd.Stdin = os.Stdin
 		if out, err := tputCmd.Output(); err == nil {
@@ -102,15 +199,25 @@ func (s *IOStreams) TerminalWidth() int {
 	return defaultWidth
 }
 
+func (s *IOStreams) ColorScheme() *ColorScheme {
+	return NewColorScheme(s.ColorEnabled())
+}
+
 func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
 	io := &IOStreams{
 		In:           os.Stdin,
+		originalOut:  os.Stdout,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
+		pagerCommand: os.Getenv("PAGER"),
+	}
+
+	if stdoutIsTTY && stderrIsTTY {
+		io.progressIndicatorEnabled = true
 	}
 
 	// prevent duplicate isTerminal queries now that we know the answer

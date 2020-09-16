@@ -83,13 +83,21 @@ func viewRun(opts *ViewOptions) error {
 	openURL := issue.URL
 
 	if opts.WebMode {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", openURL)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		}
 		return utils.OpenInBrowser(openURL)
 	}
+
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts.IO.Out, issue)
 	}
-
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 

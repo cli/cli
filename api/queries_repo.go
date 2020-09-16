@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -125,6 +126,19 @@ func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
 		return "", err
 	}
 	return r.DefaultBranchRef.Name, nil
+}
+
+func CanPushToRepo(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
+	if r, ok := repo.(*Repository); ok && r.ViewerPermission != "" {
+		return r.ViewerCanPush(), nil
+	}
+
+	apiClient := NewClientFromHTTP(httpClient)
+	r, err := GitHubRepo(apiClient, repo)
+	if err != nil {
+		return false, err
+	}
+	return r.ViewerCanPush(), nil
 }
 
 // RepoParent finds out the parent repository of a fork

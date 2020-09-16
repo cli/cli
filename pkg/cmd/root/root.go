@@ -2,6 +2,7 @@ package root
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -13,9 +14,11 @@ import (
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
+	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
+	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -38,35 +41,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		`),
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
-				Open an issue using “gh issue create -R cli/cli”
+				Open an issue using 'gh issue create -R cli/cli'
 			`),
 			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for API requests. Setting this avoids being
-				prompted to authenticate and overrides any previously stored credentials.
-	
-				GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
-				that otherwise operate on a local repository.
-
-				GH_HOST: specify the GitHub hostname for commands that would otherwise assume
-				the "github.com" host when not in a context of an existing repository.
-	
-				GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
-				for authoring text.
-	
-				BROWSER: the web browser to use for opening links.
-	
-				DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-				or "oauth" to print detailed information about HTTP requests or authentication flow.
-	
-				GLAMOUR_STYLE: the style to use for rendering Markdown. See
-				https://github.com/charmbracelet/glamour#styles
-	
-				NO_COLOR: set to any value to avoid printing ANSI escape sequences for color output.
-
-				CLICOLOR: set to "0" to disable printing ANSI colors in output.
-
-				CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
-				even when the output is piped.
+				See 'gh help environment' for the list of supported environment variables.
 			`),
 		},
 	}
@@ -104,15 +82,28 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	// CHILD COMMANDS
-
+	// Child commands
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
-	cmd.AddCommand(apiCmd.NewCmdApi(f, nil))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
+
+	// Help topics
+	cmd.AddCommand(NewHelpTopic("environment"))
+
+	// the `api` command should not inherit any extra HTTP headers
+	bareHTTPCmdFactory := *f
+	bareHTTPCmdFactory.HttpClient = func() (*http.Client, error) {
+		cfg, err := bareHTTPCmdFactory.Config()
+		if err != nil {
+			return nil, err
+		}
+		return factory.NewHTTPClient(bareHTTPCmdFactory.IOStreams, cfg, version, false), nil
+	}
+
+	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
@@ -120,6 +111,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
+	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 
 	return cmd

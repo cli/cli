@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
@@ -72,12 +73,19 @@ type PullRequest struct {
 		TotalCount int
 		Nodes      []struct {
 			Commit struct {
+				Oid               string
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
-							State      string
-							Status     string
-							Conclusion string
+							Name        string
+							Context     string
+							State       string
+							Status      string
+							Conclusion  string
+							StartedAt   time.Time
+							CompletedAt time.Time
+							DetailsURL  string
+							TargetURL   string
 						}
 					}
 				}
@@ -227,7 +235,7 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 	if resp.StatusCode == 404 {
 		return nil, &NotFoundError{errors.New("pull request not found")}
 	} else if resp.StatusCode != 200 {
-		return nil, handleHTTPError(resp)
+		return nil, HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil
@@ -275,8 +283,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 									state
 								}
 								...on CheckRun {
-									status
 									conclusion
+									status
 								}
 							}
 						}
@@ -418,8 +426,32 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				author {
 				  login
 				}
-				commits {
+				commits(last: 1) {
 				  totalCount
+					nodes {
+						commit {
+              oid
+						  statusCheckRollup {
+						    contexts(last: 100) {
+						      nodes {
+						  		  ...on StatusContext {
+						  			  context
+						  				state
+											targetUrl
+						  			}
+						  			...on CheckRun {
+											name
+											status
+											conclusion
+											startedAt
+											completedAt
+											detailsUrl
+						  			}
+						  		}
+						  	}
+						  }
+            }
+          }
 				}
 				baseRefName
 				headRefName
@@ -524,8 +556,32 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					author {
 						login
 					}
-					commits {
+					commits(last: 1) {
 						totalCount
+					  nodes {
+						  commit {
+							  oid
+								statusCheckRollup {
+								  contexts(last: 100) {
+								    nodes {
+										  ...on StatusContext {
+											  context
+												state
+											  targetUrl
+											}
+											...on CheckRun {
+												name
+												status
+												conclusion
+												startedAt
+												completedAt
+												detailsUrl
+											}
+										}
+									}
+								}
+							}
+					  }
 					}
 					url
 					baseRefName
@@ -981,11 +1037,18 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 		} `graphql:"mergePullRequest(input: $input)"`
 	}
 
+	input := githubv4.MergePullRequestInput{
+		PullRequestID: pr.ID,
+		MergeMethod:   &mergeMethod,
+	}
+
+	if m == PullRequestMergeMethodSquash {
+		commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
+		input.CommitHeadline = &commitHeadline
+	}
+
 	variables := map[string]interface{}{
-		"input": githubv4.MergePullRequestInput{
-			PullRequestID: pr.ID,
-			MergeMethod:   &mergeMethod,
-		},
+		"input": input,
 	}
 
 	gql := graphQLClient(client.http, repo.RepoHost())

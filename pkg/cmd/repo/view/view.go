@@ -1,10 +1,12 @@
 package view
 
 import (
+	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strings"
+	"syscall"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -107,6 +109,12 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	stdout := opts.IO.Out
 
 	if !opts.IO.IsStdoutTTY() {
@@ -166,7 +174,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	err = tmpl.Execute(stdout, repoData)
-	if err != nil {
+	if err != nil && !errors.Is(err, syscall.EPIPE) {
 		return err
 	}
 
