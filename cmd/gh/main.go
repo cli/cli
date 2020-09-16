@@ -46,6 +46,19 @@ func main() {
 	stderr := cmdFactory.IOStreams.ErrOut
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
+	} else {
+		// override survey's poor choice of color
+		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
+			switch style {
+			case "white":
+				if cmdFactory.IOStreams.ColorSupport256() {
+					return fmt.Sprintf("\x1b[%d;5;%dm", 38, 242)
+				}
+				return ansi.ColorCode("default")
+			default:
+				return ansi.ColorCode(style)
+			}
+		}
 	}
 
 	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
