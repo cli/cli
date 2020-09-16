@@ -11,10 +11,10 @@ func TestForOS(t *testing.T) {
 		url  string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		findExe bool
-		want    []string
+		name string
+		args args
+		exe  string
+		want []string
 	}{
 		{
 			name: "macOS",
@@ -30,8 +30,8 @@ func TestForOS(t *testing.T) {
 				goos: "linux",
 				url:  "https://example.com/path?a=1&b=2",
 			},
-			findExe: false, // wslview does not exist on standard Linux
-			want:    []string{"xdg-open", "https://example.com/path?a=1&b=2"},
+			exe:  "xdg-open",
+			want: []string{"xdg-open", "https://example.com/path?a=1&b=2"},
 		},
 		{
 			name: "WSL",
@@ -39,8 +39,8 @@ func TestForOS(t *testing.T) {
 				goos: "linux",
 				url:  "https://example.com/path?a=1&b=2",
 			},
-			findExe: true, // wslview exists on WSL
-			want:    []string{"wslview", "https://example.com/path?a=1&b=2"},
+			exe:  "wslview",
+			want: []string{"wslview", "https://example.com/path?a=1&b=2"},
 		},
 		{
 			name: "Windows",
@@ -53,7 +53,7 @@ func TestForOS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			findExe = func(string) bool { return tt.findExe }
+			linuxExe = func() string { return tt.exe }
 			if cmd := ForOS(tt.args.goos, tt.args.url); !reflect.DeepEqual(cmd.Args, tt.want) {
 				t.Errorf("ForOS() = %v, want %v", cmd.Args, tt.want)
 			}
