@@ -41,32 +41,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		`),
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
-				Open an issue using “gh issue create -R cli/cli”
+				Open an issue using 'gh issue create -R cli/cli'
 			`),
 			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for github.com API requests. Setting this avoids
-				being prompted to authenticate and takes precedence over previously stored credentials.
-	
-				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
-	
-				GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
-				that otherwise operate on a local repository.
-
-				GH_HOST: specify the GitHub hostname for commands that would otherwise assume
-				the "github.com" host when not in a context of an existing repository.
-	
-				GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
-				for authoring text.
-	
-				BROWSER: the web browser to use for opening links.
-	
-				DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-				or "oauth" to print detailed information about HTTP requests or authentication flow.
-	
-				GLAMOUR_STYLE: the style to use for rendering Markdown. See
-				https://github.com/charmbracelet/glamour#styles
-	
-				NO_COLOR: avoid printing ANSI escape sequences for color output.
+				See 'gh help environment' for the list of supported environment variables.
 			`),
 		},
 	}
@@ -104,14 +82,16 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	// CHILD COMMANDS
-
+	// Child commands
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
+
+	// Help topics
+	cmd.AddCommand(NewHelpTopic("environment"))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f

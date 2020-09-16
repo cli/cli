@@ -27,7 +27,7 @@ Please avoid:
 
 Prerequisites:
 - Go 1.13+ for building the binary
-- Go 1.14+ for running the test suite
+- Go 1.15+ for running the test suite
 
 Build with: `make` or `go build -o bin/gh ./cmd/gh`
 
