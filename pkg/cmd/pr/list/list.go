@@ -133,10 +133,16 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	err = opts.IO.StartPager()
+	if err != nil {
+		return err
+	}
+	defer opts.IO.StopPager()
+
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.BaseBranch != "" || opts.Assignee != ""
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
-		fmt.Fprintf(opts.IO.ErrOut, "\n%s\n\n", title)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	table := utils.NewTablePrinter(opts.IO)

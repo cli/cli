@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os/exec"
 	"reflect"
+	"regexp"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -97,15 +99,19 @@ func TestIssueList_tty(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.Stderr(), `
-Showing 3 of 3 open issues in OWNER/REPO
+	out := output.String()
+	timeRE := regexp.MustCompile(`\d+ years`)
+	out = timeRE.ReplaceAllString(out, "X years")
 
-`)
+	assert.Equal(t, heredoc.Doc(`
 
-	test.ExpectLines(t, output.String(),
-		"number won",
-		"number too",
-		"number fore")
+		Showing 3 of 3 open issues in OWNER/REPO
+
+		#1  number won   (label)  about X years ago
+		#2  number too   (label)  about X years ago
+		#4  number fore  (label)  about X years ago
+	`), out)
+	assert.Equal(t, ``, output.Stderr())
 }
 
 func TestIssueList_tty_withFlags(t *testing.T) {
@@ -141,8 +147,8 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), `
+	eq(t, output.Stderr(), "")
+	eq(t, output.String(), `
 No issues match your search in OWNER/REPO
 
 `)

@@ -181,6 +181,15 @@ func NewBlankRoot() *yaml.Node {
 						Value: PromptsEnabled,
 					},
 					{
+						HeadComment: "A pager program to send command output to. Example value: less",
+						Kind:        yaml.ScalarNode,
+						Value:       "pager",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "",
+					},
+					{
 						HeadComment: "Aliases allow you to create nicknames for gh commands",
 						Kind:        yaml.ScalarNode,
 						Value:       "aliases",
