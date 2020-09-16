@@ -1,7 +1,9 @@
 package iostreams
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mgutz/ansi"
 )
@@ -15,6 +17,10 @@ var (
 	green   = ansi.ColorFunc("green")
 	gray    = ansi.ColorFunc("black+h")
 	bold    = ansi.ColorFunc("default+b")
+
+	gray256 = func(t string) string {
+		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
+	}
 )
 
 func EnvColorDisabled() bool {
@@ -25,12 +31,28 @@ func EnvColorForced() bool {
 	return os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0"
 }
 
-func NewColorScheme(enabled bool) *ColorScheme {
-	return &ColorScheme{enabled: enabled}
+func Is256ColorSupported() bool {
+	term := os.Getenv("TERM")
+	colorterm := os.Getenv("COLORTERM")
+
+	return strings.Contains(term, "256") ||
+		strings.Contains(term, "24bit") ||
+		strings.Contains(term, "truecolor") ||
+		strings.Contains(colorterm, "256") ||
+		strings.Contains(colorterm, "24bit") ||
+		strings.Contains(colorterm, "truecolor")
+}
+
+func NewColorScheme(enabled, is256enabled bool) *ColorScheme {
+	return &ColorScheme{
+		enabled:      enabled,
+		is256enabled: is256enabled,
+	}
 }
 
 type ColorScheme struct {
-	enabled bool
+	enabled      bool
+	is256enabled bool
 }
 
 func (c *ColorScheme) Bold(t string) string {
@@ -64,6 +86,9 @@ func (c *ColorScheme) Green(t string) string {
 func (c *ColorScheme) Gray(t string) string {
 	if !c.enabled {
 		return t
+	}
+	if c.is256enabled {
+		return gray256(t)
 	}
 	return gray(t)
 }

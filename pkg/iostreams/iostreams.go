@@ -26,6 +26,7 @@ type IOStreams struct {
 	// the original (non-colorable) output stream
 	originalOut  io.Writer
 	colorEnabled bool
+	is256enabled bool
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -45,6 +46,10 @@ type IOStreams struct {
 
 func (s *IOStreams) ColorEnabled() bool {
 	return s.colorEnabled
+}
+
+func (s *IOStreams) ColorSupport256() bool {
+	return s.is256enabled
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -200,7 +205,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
 }
 
 func System() *IOStreams {
@@ -213,6 +218,7 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
+		is256enabled: Is256ColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
 	}
 

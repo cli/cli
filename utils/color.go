@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -33,6 +34,9 @@ func makeColorFunc(color string) func(string) string {
 	cf := ansi.ColorFunc(color)
 	return func(arg string) string {
 		if isColorEnabled() {
+			if color == "black+h" && iostreams.Is256ColorSupported() {
+				return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, arg)
+			}
 			return cf(arg)
 		}
 		return arg
