@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"bufio"
 	"os"
 	"os/exec"
 	"runtime"
@@ -31,10 +30,10 @@ func ForOS(goos, url string) *exec.Cmd {
 		r := strings.NewReplacer("&", "^&")
 		args = append(args, "/c", "start", r.Replace(url))
 	default:
-		if inWsl() {
-			exe = "wslview"
-		} else {
+		if findExe("xdg-open") {
 			exe = "xdg-open"
+		} else {
+			exe = "wslview"
 		}
 		args = append(args, url)
 	}
@@ -57,20 +56,11 @@ func FromLauncher(launcher, url string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// Determine if gh is running inside of WSL2
-func inWsl() bool {
-	file, err := os.Open("/proc/sys/kernel/osrelease")
+var findExe = func(command string) bool {
+	_, err := exec.LookPath(command)
 	if err != nil {
 		return false
+	} else {
+		return true
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	scanner.Scan() // Read single line
-	if err := scanner.Err(); err != nil {
-		return false
-	}
-
-	os := scanner.Text()
-	return strings.Contains(os, "microsoft-WSL2")
 }
