@@ -30,7 +30,7 @@ func TestForOS(t *testing.T) {
 				goos: "linux",
 				url:  "https://example.com/path?a=1&b=2",
 			},
-			findExe: true,
+			findExe: false, // wslview does not exist on standard Linux
 			want:    []string{"xdg-open", "https://example.com/path?a=1&b=2"},
 		},
 		{
@@ -39,7 +39,7 @@ func TestForOS(t *testing.T) {
 				goos: "linux",
 				url:  "https://example.com/path?a=1&b=2",
 			},
-			findExe: false,
+			findExe: true, // wslview exists on WSL
 			want:    []string{"wslview", "https://example.com/path?a=1&b=2"},
 		},
 		{

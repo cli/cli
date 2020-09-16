@@ -30,10 +30,10 @@ func ForOS(goos, url string) *exec.Cmd {
 		r := strings.NewReplacer("&", "^&")
 		args = append(args, "/c", "start", r.Replace(url))
 	default:
-		if findExe("xdg-open") {
-			exe = "xdg-open"
-		} else {
+		if findExe("wslview") {
 			exe = "wslview"
+		} else {
+			exe = "xdg-open"
 		}
 		args = append(args, url)
 	}
@@ -58,9 +58,5 @@ func FromLauncher(launcher, url string) (*exec.Cmd, error) {
 
 var findExe = func(command string) bool {
 	_, err := exec.LookPath(command)
-	if err != nil {
-		return false
-	} else {
-		return true
-	}
+	return err == nil
 }
