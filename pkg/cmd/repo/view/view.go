@@ -25,6 +25,7 @@ type ViewOptions struct {
 
 	RepoArg string
 	Web     bool
+	Branch  string
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -41,7 +42,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 With no argument, the repository for the current directory is displayed.
 
-With '--web', open the repository in a web browser instead.`,
+With '--web', open the repository in a web browser instead.
+
+With '--branch', view a specific branch of the repository.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -55,6 +58,7 @@ With '--web', open the repository in a web browser instead.`,
 	}
 
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a repository in the browser")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "View a specific branch of the repository")
 
 	return cmd
 }
@@ -104,7 +108,7 @@ func viewRun(opts *ViewOptions) error {
 
 	fullName := ghrepo.FullName(toView)
 
-	readme, err := RepositoryReadme(httpClient, toView)
+	readme, err := RepositoryReadme(httpClient, toView, opts.Branch)
 	if err != nil && err != NotFoundError {
 		return err
 	}
