@@ -38,7 +38,7 @@ sudo dnf install gh
 Upgrade:
 
 ```bash
-sudo dnf install gh
+sudo dnf update gh
 ```
 
 ### openSUSE/SUSE Linux (zypper)
