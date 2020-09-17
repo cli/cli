@@ -79,7 +79,7 @@ Our team does do not directly maintain the following packages or repositories.
 Arch Linux users can install from the [community repo][arch linux repo]:
 
 ```bash
-pacman -S github-cli
+sudo pacman -S github-cli
 ```
 
 ### Android
