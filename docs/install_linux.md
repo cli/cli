@@ -9,7 +9,7 @@ our release schedule.
 
 ## Official sources
 
-### Debian, Ubuntu 20.04 Linux (apt)
+### Debian, Ubuntu LTS Linux (apt)
 
 Install:
 
