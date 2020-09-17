@@ -106,3 +106,39 @@ Components: main
 Description: The GitHub CLI - ubuntu xenial repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: groovy
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu groovy repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: eoan
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu eoan repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: disco
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu disco repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: cosmic
+Architectures: i386 amd64 arm64
+Components: main
+Description: The GitHub CLI - ubuntu cosmic repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
