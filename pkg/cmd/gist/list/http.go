@@ -1,41 +1,94 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 )
 
 func listGists(client *http.Client, hostname string, limit int, visibility string) ([]shared.Gist, error) {
-	result := []shared.Gist{}
-
-	query := url.Values{}
-	if visibility == "all" {
-		query.Add("per_page", fmt.Sprintf("%d", limit))
-	} else {
-		query.Add("per_page", "100")
+	type response struct {
+		Viewer struct {
+			Gists struct {
+				Nodes []struct {
+					Description string
+					Files       []struct {
+						Name     string
+						Language struct {
+							Name string
+						}
+						Extension string
+					}
+					IsPublic  bool
+					Name      string
+					UpdatedAt time.Time
+				}
+			}
+		}
 	}
 
-	// TODO switch to graphql
+	query := `
+	query ListGists($visibility: GistPrivacy!, $per_page: Int = 10) {
+		viewer {
+			gists(first: $per_page, privacy: $visibility) {
+				nodes {
+					name
+					files {
+						name
+						language {
+							name
+						}
+						extension
+					}
+					description
+					updatedAt
+					isPublic
+				}
+			}
+		}
+	}`
+
+	if visibility != "all" {
+		limit = 100
+	}
+	variables := map[string]interface{}{
+		"per_page":   limit,
+		"visibility": strings.ToUpper(visibility),
+	}
+
 	apiClient := api.NewClientFromHTTP(client)
-	err := apiClient.REST(hostname, "GET", "gists?"+query.Encode(), nil, &result)
+	var result response
+	err := apiClient.GraphQL(hostname, query, variables, &result)
 	if err != nil {
 		return nil, err
 	}
 
 	gists := []shared.Gist{}
+	for _, gist := range result.Viewer.Gists.Nodes {
 
-	for _, gist := range result {
-		if len(gists) == limit {
-			break
+		files := map[string]*shared.GistFile{}
+		for _, file := range gist.Files {
+			files[file.Name] = &shared.GistFile{
+				Filename: file.Name,
+				Type:     file.Extension,
+				Language: file.Language.Name,
+			}
 		}
-		if visibility == "all" || (visibility == "secret" && !gist.Public) || (visibility == "public" && gist.Public) {
-			gists = append(gists, gist)
-		}
+
+		gists = append(
+			gists,
+			shared.Gist{
+				ID:          gist.Name,
+				Description: gist.Description,
+				Files:       files,
+				UpdatedAt:   gist.UpdatedAt,
+				Public:      gist.IsPublic,
+			},
+		)
 	}
 
 	sort.SliceStable(gists, func(i, j int) bool {
