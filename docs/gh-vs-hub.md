@@ -20,7 +20,7 @@ GitHub CLI is built and maintained by a team of people who work on the tool on b
 
 We have no interest in forcing anyone to use GitHub CLI instead of `hub`. We think people should use whatever set of tools makes them happiest and most productive working with GitHub. 
 
-If you are set on using a tool that acts as a wrapper for Git itself, `hub` is likely a better choice than `gh`. `hub` currently covers a larger overall surface area of GitHub’s API v3, provides more scripting functionality, and is compatible with GitHub Enterprise (though these are all things that we intend to improve in GitHub CLI). 
+If you are set on using a tool that acts as a wrapper for Git itself, `hub` is likely a better choice than `gh`.
 
 If you want a tool that’s more opinionated and intended to help simplify your GitHub workflows from the command line, we hope you’ll use `gh`. And since `gh` is maintained by a team at GitHub, we intend to be responsive to people’s concerns and needs and improve the tool based on how people are using it over time.
 
