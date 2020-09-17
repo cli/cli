@@ -20,6 +20,9 @@ sudo apt update
 sudo apt install gh
 ```
 
+**Note**: most systems will have `apt-add-repository` already. If you get a _command not found_
+error, try running `sudo apt install software-properties-common` and trying these steps again.
+
 Upgrade:
 
 ```bash
