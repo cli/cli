@@ -9,7 +9,7 @@ our release schedule.
 
 ## Official sources
 
-### Debian, Ubuntu LTS Linux (apt)
+### Debian, Ubuntu Linux (apt)
 
 Install:
 
