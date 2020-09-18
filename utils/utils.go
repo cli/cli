@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -22,10 +21,9 @@ func OpenInBrowser(url string) error {
 	}
 	err = run.PrepareCmd(browseCmd).Run()
 	if err != nil {
-		fmt.Printf("Error opening %s in your browser.\n", url)
-		envVar := os.Getenv("BROWSER")
-		if envVar != "" {
-			fmt.Printf("$BROWSER is set to %s. Is that correct?\n", envVar)
+		browserEnv := browser.FromEnv()
+		if browserEnv != "" {
+			return fmt.Errorf("%w\nNote: check your BROWSER environment variable", err)
 		}
 	}
 	return err
