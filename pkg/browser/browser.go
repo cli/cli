@@ -13,10 +13,7 @@ import (
 func Command(url string) (*exec.Cmd, error) {
 	launcher := os.Getenv("BROWSER")
 	if launcher != "" {
-		_, err := lookPath(launcher)
-		if err == nil {
-			return FromLauncher(launcher, url)
-		}
+		return FromLauncher(launcher, url)
 	}
 	return ForOS(runtime.GOOS, url), nil
 }

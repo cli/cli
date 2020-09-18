@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -19,7 +20,15 @@ func OpenInBrowser(url string) error {
 	if err != nil {
 		return err
 	}
-	return run.PrepareCmd(browseCmd).Run()
+	err = run.PrepareCmd(browseCmd).Run()
+	if err != nil {
+		fmt.Printf("Error opening %s in your browser.\n", url)
+		envVar := os.Getenv("BROWSER")
+		if envVar != "" {
+			fmt.Printf("$BROWSER is set to %s. Is that correct?\n", envVar)
+		}
+	}
+	return err
 }
 
 func RenderMarkdown(text string) (string, error) {
