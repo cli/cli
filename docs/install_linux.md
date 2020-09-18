@@ -76,7 +76,7 @@ Install and upgrade:
 
 ## Community-supported methods
 
-Our team does do not directly maintain the following packages or repositories.
+Our team does not directly maintain the following packages or repositories.
 
 ### Arch Linux
 
