@@ -172,7 +172,7 @@ func NewBlankRoot() *yaml.Node {
 						Value: "",
 					},
 					{
-						HeadComment: "When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled",
+						HeadComment: "When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled",
 						Kind:        yaml.ScalarNode,
 						Value:       "prompt",
 					},
