@@ -2,11 +2,11 @@
 
 ## Literal text
 
-Use plain text for parts of the command that cannot be changed
+Use plain text for parts of the command that cannot be changed.
 
 _example:_
 `gh help`
-The argument help is required in this command
+The argument help is required in this command.
 
 ## Placeholder values
 
@@ -14,7 +14,7 @@ Use angled brackets to represent a value the user must replace. No other express
 
 _example:_
 `gh pr view <issue-number>`
-Replace `<issue-number>` with an issue number
+Replace `<issue-number>` with an issue number.
 
 ## Optional arguments
 
@@ -36,7 +36,7 @@ _example:_
 
 ## Repeatable arguments
 
-Ellipsis represent arguments that can appear multiple times
+Ellipsis represent arguments that can appear multiple times.
 
 _example:_
 `gh pr close <pr-number>...`
