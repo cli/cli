@@ -30,7 +30,9 @@ bin/gh: $(BUILD_FILES)
 	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
 clean:
-	rm -rf bin
+	rm -rf ./bin
+	rm -rf ./share
+.PHONY: clean
 
 test:
 	go test ./...
