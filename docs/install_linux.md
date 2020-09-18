@@ -94,6 +94,14 @@ Android users can install via Termux:
 pkg install gh
 ```
 
+### Kiss Linux
+
+Kiss Linux users can install from the [community repos](https://github.com/kisslinux/community):
+
+```bash
+kiss b github-cli && kiss i github-cli
+```
+
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
