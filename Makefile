@@ -29,6 +29,9 @@ endif
 bin/gh: $(BUILD_FILES)
 	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
+clean:
+	rm -rf bin
+
 test:
 	go test ./...
 .PHONY: test
