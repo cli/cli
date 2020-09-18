@@ -96,7 +96,7 @@ pkg install gh
 
 ### Kiss Linux
 
-Kiss Linux users can install via the [community repos](https://github.com/kisslinux/community):
+Kiss Linux users can install from the [community repos](https://github.com/kisslinux/community):
 
 ```bash
 kiss b github-cli && kiss i github-cli
