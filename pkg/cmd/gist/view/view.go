@@ -74,7 +74,7 @@ func viewRun(opts *ViewOptions) error {
 	u, err := url.Parse(opts.Selector)
 	if err == nil {
 		if strings.HasPrefix(u.Path, "/") {
-			gistID = u.Path[1:]
+			gistID = strings.Split(u.Path, "/")[2]
 		}
 	}
 
