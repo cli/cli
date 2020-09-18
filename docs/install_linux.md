@@ -7,6 +7,8 @@ the following CPU architectures: `i386`, `amd64`, `arm64`.
 Other sources for installation are community-maintained and thus might lag behind
 our release schedule.
 
+If none of our official binaries, packages, repositories, nor community sources work for you, we recommend using our `Makefile` to build `gh` from source. It's quick and easy.
+
 ## Official sources
 
 ### Debian, Ubuntu Linux (apt)
@@ -76,7 +78,7 @@ Install and upgrade:
 
 ## Community-supported methods
 
-Our team does not directly maintain the following packages or repositories.
+Our team does not directly maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them.
 
 ### Arch Linux
 
