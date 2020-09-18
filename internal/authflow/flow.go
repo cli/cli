@@ -65,7 +65,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 
-	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
+	minimumScopes := []string{"repo", "read:org", "gist", "workflow", "read:public_key"}
 	scopes := append(minimumScopes, additionalScopes...)
 
 	callbackURI := "http://127.0.0.1/callback"

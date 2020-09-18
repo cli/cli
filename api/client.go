@@ -203,9 +203,10 @@ func (c Client) HasMinimumScopes(hostname string) error {
 	}
 
 	search := map[string]bool{
-		"repo":      false,
-		"read:org":  false,
-		"admin:org": false,
+		"repo":            false,
+		"read:org":        false,
+		"admin:org":       false,
+		"read:public_key": false,
 	}
 	for _, s := range strings.Split(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
@@ -218,6 +219,10 @@ func (c Client) HasMinimumScopes(hostname string) error {
 
 	if !search["read:org"] && !search["admin:org"] {
 		missingScopes = append(missingScopes, "read:org")
+	}
+
+	if !search["read:public_key"] && !search["admin:public_key"] {
+		missingScopes = append(missingScopes, "read:public_key")
 	}
 
 	if len(missingScopes) > 0 {
