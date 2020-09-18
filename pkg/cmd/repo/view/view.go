@@ -15,8 +15,8 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
-	"github.com/spf13/cobra"
 	"github.com/enescakir/emoji"
+	"github.com/spf13/cobra"
 )
 
 type ViewOptions struct {
