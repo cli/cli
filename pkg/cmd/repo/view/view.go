@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/enescakir/emoji"
 )
 
 type ViewOptions struct {
@@ -156,8 +157,9 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
+		readmeContent = emoji.Parse(readmeContent)
 	} else {
-		readmeContent = readme.Content
+		readmeContent = emoji.Parse(readme.Content)
 	}
 
 	description := repo.Description
