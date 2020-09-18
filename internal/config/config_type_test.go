@@ -43,7 +43,7 @@ func Test_defaultConfig(t *testing.T) {
 		git_protocol: https
 		# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.
 		editor:
-		# When to interactively prompt. This is a global config that cannot be overriden by hostname. Supported values: enabled, disabled
+		# When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
 		prompt: enabled
 		# A pager program to send command output to. Example value: less
 		pager:
