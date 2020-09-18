@@ -215,7 +215,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:             repoToCreate.RepoName(),
+		Name:             opts.Name,
 		Visibility:       visibility,
 		OwnerID:          repoToCreate.RepoOwner(),
 		TeamID:           opts.Team,
