@@ -32,7 +32,7 @@ Upgrade:
 
 ```bash
 sudo apt update
-sudo apt install gh
+sudo apt upgrade gh 
 ```
 
 ### Fedora, Centos, Red Hat Linux (dnf)
