@@ -83,11 +83,12 @@ func TestNewCmdView(t *testing.T) {
 
 func Test_viewRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *ViewOptions
-		wantOut string
-		gist    *shared.Gist
-		wantErr bool
+		name       string
+		opts       *ViewOptions
+		wantOut    string
+		wantStderr string
+		gist       *shared.Gist
+		wantErr    bool
 	}{
 		{
 			name:    "no such gist",
@@ -177,6 +178,22 @@ func Test_viewRun(t *testing.T) {
 			},
 			wantOut: "some files\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n- foo\n\n",
 		},
+		{
+			name: "url",
+			opts: &ViewOptions{
+				Selector: "https://gist.github.com/octocat/1234",
+			},
+			wantErr:    true,
+			wantStderr: "HTTP 404 (https://api.github.com/gists/1234)",
+		},
+		{
+			name: "invalid url",
+			opts: &ViewOptions{
+				Selector: "https://gist.github.com/octocat",
+			},
+			wantErr:    true,
+			wantStderr: "Invalid gist URL https://gist.github.com/octocat",
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,12 +217,17 @@ func Test_viewRun(t *testing.T) {
 		io.SetStdoutTTY(true)
 		tt.opts.IO = io
 
-		tt.opts.Selector = "1234"
+		if tt.opts.Selector == "" {
+			tt.opts.Selector = "1234"
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := viewRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.wantStderr != "" {
+					assert.EqualError(t, err, tt.wantStderr)
+				}
 				return
 			}
 			assert.NoError(t, err)
