@@ -19,7 +19,6 @@ Read the [official docs][] for usage and more information.
 We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
 
 
-
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
 
