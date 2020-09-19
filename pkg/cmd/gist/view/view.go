@@ -71,10 +71,16 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(gistURL)
 	}
 
-	u, err := url.Parse(opts.Selector)
-	if err == nil {
-		if strings.HasPrefix(u.Path, "/") {
-			gistID = strings.Split(u.Path, "/")[2]
+	if strings.Contains(gistID, "/") {
+		u, err := url.Parse(opts.Selector)
+		if err == nil && strings.HasPrefix(u.Path, "/") {
+			split := strings.Split(u.Path, "/")
+
+			if len(split) > 2 && split[2] != "" {
+				gistID = strings.Split(u.Path, "/")[2]
+			} else {
+				return fmt.Errorf("Invalid gist URL %s", u)
+			}
 		}
 	}
 
