@@ -312,14 +312,14 @@ func createRun(opts *CreateOptions) error {
 func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName string) (string, string, string, error) {
 	qs := []*survey.Question{}
 
-	repoOwnerQuestion := &survey.Question{
-		Name: "repoOwner",
+	repoNameQuestion := &survey.Question{
+		Name: "repoName",
 		Prompt: &survey.Input{
 			Message: "Repository name",
 			Default: repoName,
 		},
 	}
-	qs = append(qs, repoOwnerQuestion)
+	qs = append(qs, repoNameQuestion)
 
 	if isDescEmpty {
 		repoDescriptionQuestion := &survey.Question{
@@ -344,7 +344,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	}
 
 	answers := struct {
-		RepoOwner       string
+		RepoName       string
 		RepoDescription string
 		RepoVisibility  string
 	}{}
@@ -355,7 +355,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 		return "", "", "", err
 	}
 
-	return answers.RepoOwner, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
+	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 
 }
 
