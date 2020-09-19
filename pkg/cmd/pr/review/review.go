@@ -175,7 +175,7 @@ func reviewRun(opts *ReviewOptions) error {
 	case api.ReviewComment:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", utils.Gray("-"), pr.Number)
 	case api.ReviewApprove:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", utils.Green("✓"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", utils.GreenCheck(), pr.Number)
 	case api.ReviewRequestChanges:
 		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", utils.Red("+"), pr.Number)
 	}

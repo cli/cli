@@ -114,10 +114,10 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
-	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
+	successMsg := fmt.Sprintf("%s Added alias.", utils.GreenCheck())
 	if oldExpansion, ok := aliasCfg.Get(opts.Name); ok {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
-			utils.Green("✓"),
+			utils.GreenCheck(),
 			utils.Bold(opts.Name),
 			utils.Bold(oldExpansion),
 			utils.Bold(expansion),

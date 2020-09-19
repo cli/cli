@@ -96,14 +96,14 @@ func statusRun(opts *StatusOptions) error {
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
-				addMsg("%s %s: %s", utils.Red("X"), hostname, err)
+				addMsg("%s %s: %s", utils.RedX(), hostname, err)
 				if tokenIsWriteable {
 					addMsg("- To request missing scopes, run: %s %s\n",
 						utils.Bold("gh auth refresh -h"),
 						utils.Bold(hostname))
 				}
 			} else {
-				addMsg("%s %s: authentication failed", utils.Red("X"), hostname)
+				addMsg("%s %s: authentication failed", utils.RedX(), hostname)
 				addMsg("- The %s token in %s is no longer valid.", utils.Bold(hostname), tokenSource)
 				if tokenIsWriteable {
 					addMsg("- To re-authenticate, run: %s %s",

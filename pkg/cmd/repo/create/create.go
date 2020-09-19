@@ -246,7 +246,7 @@ func createRun(opts *CreateOptions) error {
 
 		stderr := opts.IO.ErrOut
 		stdout := opts.IO.Out
-		greenCheck := utils.Green("✓")
+		greenCheck := utils.GreenCheck()
 		isTTY := opts.IO.IsStdoutTTY()
 
 		if isTTY {

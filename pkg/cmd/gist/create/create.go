@@ -129,10 +129,10 @@ func createRun(opts *CreateOptions) error {
 				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate by doing `gh config set -h github.com oauth_token ''` and running the command again.")
 			}
 		}
-		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
+		return fmt.Errorf("%s Failed to create gist: %w", utils.RedX(), err)
 	}
 
-	fmt.Fprintf(errOut, "%s %s\n", utils.Green("✓"), completionMessage)
+	fmt.Fprintf(errOut, "%s %s\n", utils.GreenCheck(), completionMessage)
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
