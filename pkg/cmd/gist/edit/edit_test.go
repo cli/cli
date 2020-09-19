@@ -177,6 +177,19 @@ func Test_editRun(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "not change",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Filename: "cicada.txt",
+						Content:  "new file content",
+						Type:     "text/plain",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
