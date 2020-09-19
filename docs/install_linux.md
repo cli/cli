@@ -24,6 +24,8 @@ sudo apt install gh
 
 **Note**: If you are behind a firewall, the connection to `keyserver.ubuntu.com` might fail. In that case, try running `sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key C99B11DEB97541F0`.
 
+**Note**: If you get _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_ error, try installing the `dirmngr` package. Run `sudo apt-get install dirmngr` and repeat the steps above.  
+
 **Note**: most systems will have `apt-add-repository` already. If you get a _command not found_
 error, try running `sudo apt install software-properties-common` and trying these steps again.
 
