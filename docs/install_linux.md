@@ -22,7 +22,7 @@ sudo apt update
 sudo apt install gh
 ```
 
-**Note**: If you are behind a firewall, the connection to `keyserver.ubuntu.com` might fail. In that case, try running `sudo apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-key C99B11DEB97541F0`.
+**Note**: If you are behind a firewall, the connection to `keyserver.ubuntu.com` might fail. In that case, try running `sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key C99B11DEB97541F0`.
 
 **Note**: most systems will have `apt-add-repository` already. If you get a _command not found_
 error, try running `sudo apt install software-properties-common` and trying these steps again.
