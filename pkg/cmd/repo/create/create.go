@@ -344,7 +344,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	}
 
 	answers := struct {
-		RepoName       string
+		RepoName        string
 		RepoDescription string
 		RepoVisibility  string
 	}{}
