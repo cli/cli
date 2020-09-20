@@ -134,6 +134,18 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		}))
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryLabelList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "labels": {
+			"nodes": [
+				{ "id": "1", "name": "bug" },
+				{ "id": "2", "name": "web" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+
+	http.Register(
 		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
