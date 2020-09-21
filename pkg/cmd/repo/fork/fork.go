@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -210,14 +211,29 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if remoteDesired {
-			remoteName := "origin"
+			remoteName := ""
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Fork remote name?",
+				Default: "origin",
+			}, &remoteName)
+			if err != nil {
+				return fmt.Errorf("failed to prompt: %w", err)
+			}
 
 			remotes, err := opts.Remotes()
 			if err != nil {
 				return err
 			}
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				renameTarget := "upstream"
+				renameTarget := ""
+				err = prompt.SurveyAskOne(&survey.Input{
+					Message: "There is already remote with same name. Source remote name?",
+					Default: "upstream",
+				}, &renameTarget)
+				if err != nil {
+					return fmt.Errorf("failed to prompt: %w", err)
+				}
+
 				renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
 				if err != nil {
 					return err
