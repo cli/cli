@@ -174,6 +174,10 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	if len(filesToUpdate) == 0 {
+		return nil
+	}
+
 	err = updateGist(client, ghinstance.OverridableDefault(), gist)
 	if err != nil {
 		return err
