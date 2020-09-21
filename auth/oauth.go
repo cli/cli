@@ -62,19 +62,20 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 	if err != nil {
 		return
 	}
-	if resp.StatusCode == 200 || strings.HasPrefix(resp.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+	if resp.StatusCode == http.StatusOK || strings.HasPrefix(resp.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
 		values, err = url.ParseQuery(string(bb))
 		if err != nil {
 			return
 		}
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 || resp.StatusCode == 422 ||
-		(resp.StatusCode == 400 && values != nil && values.Get("error") == "unauthorized_client") {
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusPaymentRequired ||
+		resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnprocessableEntity ||
+		(resp.StatusCode == http.StatusBadRequest && values != nil && values.Get("error") == "unauthorized_client") {
 		// OAuth Device Flow is not available; continue with OAuth browser flow with a
 		// local server endpoint as callback target
 		return oa.localServerFlow()
-	} else if resp.StatusCode != 200 {
+	} else if resp.StatusCode != http.StatusOK {
 		if values != nil && values.Get("error_description") != "" {
 			return "", fmt.Errorf("HTTP %d: %s (%s)", resp.StatusCode, values.Get("error_description"), initURL)
 		}
@@ -134,7 +135,7 @@ func (oa *OAuthFlow) deviceFlowPing(tokenURL, deviceCode string) (accessToken st
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("error: HTTP %d (%s)", resp.StatusCode, tokenURL)
 	}
 
@@ -235,7 +236,7 @@ func (oa *OAuthFlow) localServerFlow() (accessToken string, err error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("HTTP %d error while obtaining OAuth access token", resp.StatusCode)
 		return
 	}
