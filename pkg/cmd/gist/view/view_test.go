@@ -91,11 +91,17 @@ func Test_viewRun(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:    "no such gist",
+			name: "no such gist",
+			opts: &ViewOptions{
+				Selector: "1234",
+			},
 			wantErr: true,
 		},
 		{
 			name: "one file",
+			opts: &ViewOptions{
+				Selector: "1234",
+			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -109,6 +115,7 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "filename selected",
 			opts: &ViewOptions{
+				Selector: "1234",
 				Filename: "cicada.txt",
 			},
 			gist: &shared.Gist{
@@ -127,6 +134,9 @@ func Test_viewRun(t *testing.T) {
 		},
 		{
 			name: "multiple files, no description",
+			opts: &ViewOptions{
+				Selector: "1234",
+			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -143,6 +153,9 @@ func Test_viewRun(t *testing.T) {
 		},
 		{
 			name: "multiple files, description",
+			opts: &ViewOptions{
+				Selector: "1234",
+			},
 			gist: &shared.Gist{
 				Description: "some files",
 				Files: map[string]*shared.GistFile{
@@ -161,7 +174,8 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "raw",
 			opts: &ViewOptions{
-				Raw: true,
+				Selector: "1234",
+				Raw:      true,
 			},
 			gist: &shared.Gist{
 				Description: "some files",
@@ -216,10 +230,6 @@ func Test_viewRun(t *testing.T) {
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(true)
 		tt.opts.IO = io
-
-		if tt.opts.Selector == "" {
-			tt.opts.Selector = "1234"
-		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := viewRun(tt.opts)
