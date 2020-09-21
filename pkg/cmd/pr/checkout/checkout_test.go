@@ -448,6 +448,46 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
 }
 
+func TestPRCheckout_detachedHead(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO"
+		},
+		"isCrossRepository": true,
+		"maintainerCanModify": true
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git config branch.feature.merge":
+			return &test.OutputStub{Out: []byte("refs/heads/feature\n")}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, nil, "", `123`)
+	eq(t, err, nil)
+	eq(t, output.String(), "")
+
+	eq(t, len(ranCommands), 2)
+	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
+	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+}
+
 func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
