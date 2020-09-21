@@ -37,7 +37,7 @@ sudo apt update
 sudo apt install gh
 ```
 
-### Fedora, Centos, Red Hat Linux (dnf)
+### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
 Install:
 
