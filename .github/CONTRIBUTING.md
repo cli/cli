@@ -18,6 +18,7 @@ Please do:
 * open a pull request to fix a bug
 * open a pull request to fix documentation about a command
 * open a pull request if a member of the GitHub CLI team has given the ok after discussion in an issue
+* Display the columns of the issues in the project boards 
 
 Please avoid:
 
