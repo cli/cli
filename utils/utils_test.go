@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -33,6 +34,24 @@ func TestFuzzyAgo(t *testing.T) {
 		fuzzy := FuzzyAgo(d)
 		if fuzzy != expected {
 			t.Errorf("unexpected fuzzy duration value: %s for %s", fuzzy, duration)
+		}
+	}
+}
+
+func TestRenderMarkdown(t *testing.T) {
+	cases := map[string]string{
+		"<details>details</details>": "<details>details</details>",
+	}
+
+	for text, expected := range cases {
+		markdown, e := RenderMarkdown(text)
+		if e != nil {
+			t.Errorf("failed to render a markdown: %s", e)
+		}
+
+		markdown = strings.TrimSpace(markdown)
+		if markdown != expected {
+			t.Errorf("unexpected markdown value: %s for %s", markdown, text)
 		}
 	}
 }

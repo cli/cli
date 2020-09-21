@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"html"
 	"io"
 	"net/url"
 	"strings"
@@ -26,6 +27,8 @@ func RenderMarkdown(text string) (string, error) {
 	// Glamour rendering preserves carriage return characters in code blocks, but
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
+
+	text = html.EscapeString(text)
 
 	renderStyle := glamour.WithStandardStyle("notty")
 	// TODO: make color an input parameter
