@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
+	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
 )
 
@@ -156,8 +157,9 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
+		readmeContent = emoji.Parse(readmeContent)
 	} else {
-		readmeContent = readme.Content
+		readmeContent = emoji.Parse(readme.Content)
 	}
 
 	description := repo.Description
