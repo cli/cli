@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -71,11 +70,12 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(gistURL)
 	}
 
-	u, err := url.Parse(opts.Selector)
-	if err == nil {
-		if strings.HasPrefix(u.Path, "/") {
-			gistID = u.Path[1:]
+	if strings.Contains(gistID, "/") {
+		id, err := shared.GistIDFromURL(gistID)
+		if err != nil {
+			return err
 		}
+		gistID = id
 	}
 
 	client, err := opts.HttpClient()

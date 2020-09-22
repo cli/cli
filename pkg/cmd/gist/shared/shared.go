@@ -3,6 +3,8 @@ package shared
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -36,4 +38,21 @@ func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	}
 
 	return &gist, nil
+}
+
+func GistIDFromURL(gistURL string) (string, error) {
+	u, err := url.Parse(gistURL)
+	if err == nil && strings.HasPrefix(u.Path, "/") {
+		split := strings.Split(u.Path, "/")
+
+		if len(split) > 2 {
+			return split[2], nil
+		}
+
+		if len(split) == 2 && split[1] != "" {
+			return split[1], nil
+		}
+	}
+
+	return "", fmt.Errorf("Invalid gist URL %s", u)
 }
