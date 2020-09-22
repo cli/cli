@@ -31,9 +31,7 @@ type repoTemplateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(
-	client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string,
-) (*api.Repository, error) {
+func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
@@ -85,8 +83,7 @@ func repoCreate(
 			"input": templateInput,
 		}
 
-		err := apiClient.GraphQL(
-			hostname, `
+		err := apiClient.GraphQL(hostname, `
 		mutation CloneTemplateRepository($input: CloneTemplateRepositoryInput!) {
 			cloneTemplateRepository(input: $input) {
 				repository {
@@ -97,8 +94,7 @@ func repoCreate(
 				}
 			}
 		}
-		`, variables, &response,
-		)
+		`, variables, &response)
 		if err != nil {
 			return nil, err
 		}
@@ -116,8 +112,7 @@ func repoCreate(
 		"input": input,
 	}
 
-	err := apiClient.GraphQL(
-		hostname, `
+	err := apiClient.GraphQL(hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
@@ -128,8 +123,7 @@ func repoCreate(
 			}
 		}
 	}
-	`, variables, &response,
-	)
+	`, variables, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -147,17 +141,13 @@ func resolveOrganization(client *api.Client, hostname, orgName string) (string, 
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
-func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (
-	string, string, error,
-) {
+func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (string, string, error) {
 	var response struct {
 		NodeID       string `json:"node_id"`
 		Organization struct {
 			NodeID string `json:"node_id"`
 		}
 	}
-	err := client.REST(
-		hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response,
-	)
+	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return response.Organization.NodeID, response.NodeID, err
 }
