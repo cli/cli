@@ -31,11 +31,21 @@ type repoTemplateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
+func repoCreate(
+	client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string,
+) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
-		orgID, teamID, err := resolveOrganizationTeam(apiClient, hostname, input.OwnerID, input.TeamID)
+		if input.OwnerID == "" {
+			return nil, fmt.Errorf(
+				"specify the fully qualified repository name including the organization name. For example:\n\tgh repo create --team %s org-name/%s",
+				input.TeamID, input.Name,
+			)
+		}
+		orgID, teamID, err := resolveOrganizationTeam(
+			apiClient, hostname, input.OwnerID, input.TeamID,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +85,8 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 			"input": templateInput,
 		}
 
-		err := apiClient.GraphQL(hostname, `
+		err := apiClient.GraphQL(
+			hostname, `
 		mutation CloneTemplateRepository($input: CloneTemplateRepositoryInput!) {
 			cloneTemplateRepository(input: $input) {
 				repository {
@@ -86,7 +97,8 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 				}
 			}
 		}
-		`, variables, &response)
+		`, variables, &response,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +116,8 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 		"input": input,
 	}
 
-	err := apiClient.GraphQL(hostname, `
+	err := apiClient.GraphQL(
+		hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
 			repository {
@@ -115,7 +128,8 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 			}
 		}
 	}
-	`, variables, &response)
+	`, variables, &response,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -133,13 +147,17 @@ func resolveOrganization(client *api.Client, hostname, orgName string) (string, 
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
-func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (string, string, error) {
+func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (
+	string, string, error,
+) {
 	var response struct {
 		NodeID       string `json:"node_id"`
 		Organization struct {
 			NodeID string `json:"node_id"`
 		}
 	}
-	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	err := client.REST(
+		hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response,
+	)
 	return response.Organization.NodeID, response.NodeID, err
 }
