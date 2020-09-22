@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -69,11 +68,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 func editRun(opts *EditOptions) error {
 	gistID := opts.Selector
 
-	u, err := url.Parse(opts.Selector)
-	if err == nil {
-		if strings.HasPrefix(u.Path, "/") {
-			gistID = u.Path[1:]
+	if strings.Contains(gistID, "/") {
+		id, err := shared.GistIDFromURL(gistID)
+		if err != nil {
+			return err
 		}
+		gistID = id
 	}
 
 	client, err := opts.HttpClient()

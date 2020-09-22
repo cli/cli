@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -72,16 +71,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if strings.Contains(gistID, "/") {
-		u, err := url.Parse(opts.Selector)
-		if err == nil && strings.HasPrefix(u.Path, "/") {
-			split := strings.Split(u.Path, "/")
-
-			if len(split) > 2 && split[2] != "" {
-				gistID = strings.Split(u.Path, "/")[2]
-			} else {
-				return fmt.Errorf("Invalid gist URL %s", u)
-			}
+		id, err := shared.GistIDFromURL(gistID)
+		if err != nil {
+			return err
 		}
+		gistID = id
 	}
 
 	client, err := opts.HttpClient()
