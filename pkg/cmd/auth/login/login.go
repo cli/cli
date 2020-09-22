@@ -315,7 +315,7 @@ func hostnameValidator(v interface{}) error {
 func getAccessTokenTip(hostname string) string {
 	ghHostname := hostname
 	if ghHostname == "" {
-		ghHostname = "github.com"
+		ghHostname = ghinstance.OverridableDefault()
 	}
 	return fmt.Sprintf(`
 	Tip: you can generate a Personal Access Token here https://%s/settings/tokens
