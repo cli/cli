@@ -279,12 +279,13 @@ func Test_loginRun_nontty(t *testing.T) {
 
 func Test_loginRun_Survey(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      *LoginOptions
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
-		wantHosts string
-		cfg       func(config.Config)
+		name       string
+		opts       *LoginOptions
+		httpStubs  func(*httpmock.Registry)
+		askStubs   func(*prompt.AskStubber)
+		wantHosts  string
+		wantErrOut *regexp.Regexp
+		cfg        func(config.Config)
 	}{
 		{
 			name: "already authenticated",
@@ -304,7 +305,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(0)     // host type github.com
 				as.StubOne(false) // do not continue
 			},
-			wantHosts: "", // nothing should have been written to hosts
+			wantHosts:  "", // nothing should have been written to hosts
+			wantErrOut: regexp.MustCompile("Logging into github.com"),
 		},
 		{
 			name: "hostname set",
@@ -324,6 +326,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			},
+			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://rebecca.chambers/settings/tokens"),
 		},
 		{
 			name:      "choose enterprise",
@@ -344,6 +347,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			},
+			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://brad.vickers/settings/tokens"),
 		},
 		{
 			name:      "choose github.com",
@@ -357,6 +361,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
 			},
+			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
 		{
 			name:      "sets git_protocol",
@@ -370,6 +375,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne("def456") // auth token
 				as.StubOne("SSH")    // git_protocol
 			},
+			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
 		// TODO how to test browser auth?
 	}
@@ -378,7 +384,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		if tt.opts == nil {
 			tt.opts = &LoginOptions{}
 		}
-		io, _, _, _ := iostreams.Test()
+		io, _, _, stderr := iostreams.Test()
 
 		io.SetStdinTTY(true)
 		io.SetStderrTTY(true)
@@ -430,6 +436,11 @@ func Test_loginRun_Survey(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
+			if tt.wantErrOut == nil {
+				assert.Equal(t, "", stderr.String())
+			} else {
+				assert.True(t, tt.wantErrOut.MatchString(stderr.String()))
+			}
 			reg.Verify(t)
 		})
 	}
