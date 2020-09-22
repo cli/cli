@@ -3,6 +3,11 @@ package checkout
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -13,10 +18,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"net/http"
-	"os"
-	"os/exec"
-	"strings"
 )
 
 type CheckoutOptions struct {
@@ -70,11 +71,6 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	currentBranch, err := opts.Branch()
-	if err != nil {
-		return err
-	}
-
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
@@ -133,6 +129,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		}
 	} else {
 		// no git remote for PR head
+		currentBranch, _ := opts.Branch()
 
 		defaultBranchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
 		if err != nil {
