@@ -109,6 +109,14 @@ Kiss Linux users can install from the [community repos](https://github.com/kissl
 kiss b github-cli && kiss i github-cli
 ```
 
+### Nix/NixOS
+
+Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?show=gitAndTools.gh&query=gh&from=0&size=30&sort=relevance&channel=20.03#disabled):
+
+```bash
+nix-env -iA nixos.gitAndTools.gh
+```
+
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
