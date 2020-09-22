@@ -91,6 +91,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return &cmdutil.FlagError{Err: errors.New(`The '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
 			}
 
+			if opts.Team != "" && !strings.Contains(opts.Name, "/") {
+				return &cmdutil.FlagError{Err: fmt.Errorf(
+					"Specify the fully qualified repository name including the organization name. For example:\n\tgh repo create --team %s org-name/%s",
+					opts.Team, opts.Name,
+				)}
+			}
+
 			return createRun(opts)
 		},
 	}

@@ -35,15 +35,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
-		if input.OwnerID == "" {
-			return nil, fmt.Errorf(
-				"specify the fully qualified repository name including the organization name. For example:\n\tgh repo create --team %s org-name/%s",
-				input.TeamID, input.Name,
-			)
-		}
-		orgID, teamID, err := resolveOrganizationTeam(
-			apiClient, hostname, input.OwnerID, input.TeamID,
-		)
+		orgID, teamID, err := resolveOrganizationTeam(apiClient, hostname, input.OwnerID, input.TeamID)
 		if err != nil {
 			return nil, err
 		}
