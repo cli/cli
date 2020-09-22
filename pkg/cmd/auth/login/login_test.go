@@ -439,7 +439,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			if tt.wantErrOut == nil {
 				assert.Equal(t, "", stderr.String())
 			} else {
-				assert.True(t, tt.wantErrOut.MatchString(stderr.String()))
+				assert.Regexp(t, tt.wantErrOut, stderr.String())
 			}
 			reg.Verify(t)
 		})
