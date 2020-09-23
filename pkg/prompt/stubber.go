@@ -26,7 +26,7 @@ func InitAskStubber() (*AskStubber, func()) {
 		as.AskOnes = append(as.AskOnes, &p)
 		count := as.OneCount
 		as.OneCount += 1
-		if count > len(as.StubOnes) {
+		if count >= len(as.StubOnes) {
 			panic(fmt.Sprintf("more asks than stubs. most recent call: %v", p))
 		}
 		stubbedPrompt := as.StubOnes[count]
