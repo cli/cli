@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -99,6 +100,7 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
+	opts.IO.ResolveBgColor()
 	err = opts.IO.StartPager()
 	if err != nil {
 		return err
@@ -106,7 +108,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts.IO.Out, pr)
+		return printHumanPrPreview(opts.IO, pr)
 	}
 	return printRawPrPreview(opts.IO.Out, pr)
 }
@@ -134,7 +136,9 @@ func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(out io.Writer, pr *api.PullRequest) error {
+func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
+	out := io.Out
+
 	// Header (Title and State)
 	fmt.Fprintln(out, utils.Bold(pr.Title))
 	fmt.Fprintf(out, "%s", shared.StateTitleWithColor(*pr))
@@ -172,7 +176,7 @@ func printHumanPrPreview(out io.Writer, pr *api.PullRequest) error {
 	// Body
 	if pr.Body != "" {
 		fmt.Fprintln(out)
-		md, err := utils.RenderMarkdown(pr.Body)
+		md, err := markdown.Render(pr.Body, io.BgColor())
 		if err != nil {
 			return err
 		}

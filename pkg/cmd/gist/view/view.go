@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -115,7 +116,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 		content := gistFile.Content
 		if strings.Contains(gistFile.Type, "markdown") && !opts.Raw {
-			rendered, err := utils.RenderMarkdown(gistFile.Content)
+			rendered, err := markdown.Render(gistFile.Content, opts.IO.ResolveBgColor())
 			if err == nil {
 				content = rendered
 			}

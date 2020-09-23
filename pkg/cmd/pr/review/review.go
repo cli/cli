@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/utils"
@@ -252,7 +253,7 @@ func reviewSurvey(io *iostreams.IOStreams, editorCommand string) (*api.PullReque
 	}
 
 	if len(bodyAnswers.Body) > 0 {
-		renderedBody, err := utils.RenderMarkdown(bodyAnswers.Body)
+		renderedBody, err := markdown.Render(bodyAnswers.Body, io.ResolveBgColor())
 		if err != nil {
 			return nil, err
 		}
