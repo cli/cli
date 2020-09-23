@@ -9,10 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -285,6 +287,70 @@ func TestPRCreate_createFork(t *testing.T) {
 	assert.Equal(t, []string{"git", "remote", "add", "-f", "fork", "https://github.com/monalisa/REPO.git"}, cs.Calls[4].Args)
 	assert.Equal(t, []string{"git", "push", "--set-upstream", "fork", "HEAD:feature"}, cs.Calls[5].Args)
 
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+}
+
+func TestPRCreate_pushToNonBaseRepo(t *testing.T) {
+	remotes := context.Remotes{
+		{
+			Remote: &git.Remote{
+				Name:     "upstream",
+				Resolved: "base",
+			},
+			Repo: ghrepo.New("OWNER", "REPO"),
+		},
+		{
+			Remote: &git.Remote{
+				Name:     "origin",
+				Resolved: "base",
+			},
+			Repo: ghrepo.New("monalisa", "REPO"),
+		},
+	}
+
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, "REPOID", input["repositoryId"].(string))
+			assert.Equal(t, "master", input["baseRefName"].(string))
+			assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register("git status", 0, "")
+	cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 1, "") // determineTrackingBranch
+	cs.Register("git show-ref --verify", 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadb00f refs/remotes/upstream/feature
+		deadbeef refs/remotes/origin/feature
+	`)) // determineTrackingBranch
+	cs.Register("git .+ log", 1, "", func(args []string) {
+		assert.Equal(t, "upstream/master...feature", args[len(args)-1])
+	})
+
+	_, cleanupAsk := prompt.InitAskStubber()
+	defer cleanupAsk()
+
+	output, err := runCommand(http, remotes, "feature", true, `-t title -b body`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
