@@ -9,9 +9,14 @@ import (
 	"github.com/google/shlex"
 )
 
+// BrowserEnv simply returns the $BROWSER envionment variable
+func FromEnv() string {
+	return os.Getenv("BROWSER")
+}
+
 // Command produces an exec.Cmd respecting runtime.GOOS and $BROWSER environment variable
 func Command(url string) (*exec.Cmd, error) {
-	launcher := os.Getenv("BROWSER")
+	launcher := FromEnv()
 	if launcher != "" {
 		return FromLauncher(launcher, url)
 	}

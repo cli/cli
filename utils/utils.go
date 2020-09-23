@@ -19,7 +19,14 @@ func OpenInBrowser(url string) error {
 	if err != nil {
 		return err
 	}
-	return run.PrepareCmd(browseCmd).Run()
+	err = run.PrepareCmd(browseCmd).Run()
+	if err != nil {
+		browserEnv := browser.FromEnv()
+		if browserEnv != "" {
+			return fmt.Errorf("%w\nNote: check your BROWSER environment variable", err)
+		}
+	}
+	return err
 }
 
 func RenderMarkdown(text string) (string, error) {
