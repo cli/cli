@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	DefaultSource      = "default"
 	defaultGitProtocol = "https"
 	PromptsDisabled    = "disabled"
 	PromptsEnabled     = "enabled"
@@ -252,23 +253,23 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	}
 
 	// TODO: avoid hardcoding this
-	defaultSource := "~/.config/gh/config.yml"
+	defaultConfigFileSource := "~/.config/gh/config.yml"
 
 	value, err := c.GetStringValue(key)
 
 	var notFound *NotFoundError
 
 	if err != nil && errors.As(err, &notFound) {
-		return defaultFor(key), defaultSource, nil
+		return defaultFor(key), DefaultSource, nil
 	} else if err != nil {
-		return "", defaultSource, err
+		return "", "", err
 	}
 
 	if value == "" {
-		return defaultFor(key), defaultSource, nil
+		return defaultFor(key), defaultConfigFileSource, nil
 	}
 
-	return value, defaultSource, nil
+	return value, defaultConfigFileSource, nil
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {
@@ -494,7 +495,7 @@ func (c *fileConfig) parseHosts(hostsEntry *yaml.Node) ([]*HostConfig, error) {
 }
 
 func defaultFor(key string) string {
-	// we only have a set default for one setting right now
+	// we only have a set default for two setting right now
 	switch key {
 	case "git_protocol":
 		return defaultGitProtocol

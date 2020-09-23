@@ -73,7 +73,7 @@ func main() {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
 	}
 
-	if pager, _ := cfg.Get("", "pager"); pager != "" {
+	if pager, source, _ := cfg.GetWithSource("", "pager"); pager != "" || source != config.DefaultSource {
 		cmdFactory.IOStreams.SetPager(pager)
 	}
 

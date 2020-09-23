@@ -40,7 +40,24 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string(nil),
 				token:     "",
-				source:    "~/.config/gh/config.yml",
+				source:    "default",
+				writeable: true,
+			},
+		},
+		{
+			name: "default value from file",
+			baseConfig: heredoc.Doc(`
+			hosts:
+			  github.com:
+			    oauth_token:
+			`),
+			GITHUB_TOKEN:            "",
+			GITHUB_ENTERPRISE_TOKEN: "",
+			hostname:                "github.com",
+			wants: wants{
+				hosts:     []string{"github.com"},
+				token:     "",
+				source:    "default",
 				writeable: true,
 			},
 		},
@@ -66,7 +83,7 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string{"github.com"},
 				token:     "",
-				source:    "~/.config/gh/config.yml",
+				source:    "default",
 				writeable: true,
 			},
 		},
