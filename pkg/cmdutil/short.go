@@ -8,7 +8,7 @@ import (
 )
 
 func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) error {
-	commands = validCommandList(cmd, commands)
+	commands = filterValidChoices(cmd, commands)
 
 	if len(commands) == 0 {
 		return nil
@@ -21,7 +21,7 @@ func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) e
 		commandList = fmt.Sprintf("%s and %s", strings.Join(front, ", "), back)
 	}
 
-	short := strings.Join([]string{commandList, resource}, " ")
+	short := commandList + " " + resource
 
 	if additional := len(cmd.Commands()) - len(commands); additional >= 1 {
 		short += fmt.Sprintf(" (+%v more)", additional)
@@ -32,21 +32,21 @@ func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) e
 	return nil
 }
 
-func validCommandList(cmd *cobra.Command, commands []string) []string {
-	valid := commands[:0]
-	subCommands := []string{}
+func filterValidChoices(cmd *cobra.Command, commands []string) []string {
+	validChoices := []string{}
+	validOptions := []string{}
 
 	for _, sub := range cmd.Commands() {
-		subCommands = append(subCommands, sub.Name())
+		validOptions = append(validOptions, sub.Name())
 	}
 
 	for _, command := range commands {
-		for _, subCommand := range subCommands {
+		for _, subCommand := range validOptions {
 			if strings.EqualFold(command, subCommand) {
-				valid = append(valid, command)
+				validChoices = append(validChoices, command)
 			}
 		}
 	}
 
-	return valid
+	return validChoices
 }
