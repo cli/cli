@@ -25,10 +25,10 @@ type IOStreams struct {
 	ErrOut io.Writer
 
 	// the original (non-colorable) output stream
-	originalOut  io.Writer
-	colorEnabled bool
-	is256enabled bool
-	bgColor      string
+	originalOut   io.Writer
+	colorEnabled  bool
+	is256enabled  bool
+	terminalTheme string
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -54,30 +54,38 @@ func (s *IOStreams) ColorSupport256() bool {
 	return s.is256enabled
 }
 
-func (s *IOStreams) ResolveBgColor() string {
+func (s *IOStreams) DetectTerminalTheme() string {
 	style := os.Getenv("GLAMOUR_STYLE")
-	if (!s.ColorEnabled()) ||
-		(style != "" && style != "auto") ||
-		(s.pagerProcess != nil) {
-		s.bgColor = "none"
+	if !s.ColorEnabled() {
+		s.terminalTheme = "none"
+		return "none"
+	}
+
+	if s.pagerProcess != nil {
+		s.terminalTheme = "none"
+		return "none"
+	}
+
+	if style != "" && style != "auto" {
+		s.terminalTheme = "none"
 		return "none"
 	}
 
 	if termenv.HasDarkBackground() {
-		s.bgColor = "dark"
+		s.terminalTheme = "dark"
 		return "dark"
 	}
 
-	s.bgColor = "light"
+	s.terminalTheme = "light"
 	return "light"
 }
 
-func (s *IOStreams) BgColor() string {
-	if s.bgColor == "" {
+func (s *IOStreams) TerminalTheme() string {
+	if s.terminalTheme == "" {
 		return "none"
 	}
 
-	return s.bgColor
+	return s.terminalTheme
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {

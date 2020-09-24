@@ -115,7 +115,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	opts.IO.ResolveBgColor()
+	opts.IO.DetectTerminalTheme()
 
 	err = opts.IO.StartPager()
 	if err != nil {
@@ -156,7 +156,8 @@ func viewRun(opts *ViewOptions) error {
 		readmeContent = utils.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
-		readmeContent, err = markdown.Render(readme.Content, opts.IO.BgColor())
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		readmeContent, err = markdown.Render(readme.Content, style)
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}

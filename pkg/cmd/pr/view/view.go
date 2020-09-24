@@ -100,7 +100,8 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	opts.IO.ResolveBgColor()
+	opts.IO.DetectTerminalTheme()
+
 	err = opts.IO.StartPager()
 	if err != nil {
 		return err
@@ -176,7 +177,8 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	// Body
 	if pr.Body != "" {
 		fmt.Fprintln(out)
-		md, err := markdown.Render(pr.Body, io.BgColor())
+		style := markdown.GetStyle(io.TerminalTheme())
+		md, err := markdown.Render(pr.Body, style)
 		if err != nil {
 			return err
 		}

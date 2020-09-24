@@ -7,13 +7,13 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
-func Render(text string, bgColor string) (string, error) {
+func Render(text, style string) (string, error) {
 	// Glamour rendering preserves carriage return characters in code blocks, but
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
 	tr, err := glamour.NewTermRenderer(
-		glamour.WithStylePath(getEnvironmentStyle(bgColor)),
+		glamour.WithStylePath(style),
 		// glamour.WithBaseURL(""),  // TODO: make configurable
 		// glamour.WithWordWrap(80), // TODO: make configurable
 	)
@@ -24,14 +24,14 @@ func Render(text string, bgColor string) (string, error) {
 	return tr.Render(text)
 }
 
-func getEnvironmentStyle(bgColor string) string {
+func GetStyle(defaultStyle string) string {
 	style := os.Getenv("GLAMOUR_STYLE")
 	if style != "" && style != "auto" {
 		return style
 	}
 
-	if bgColor == "light" || bgColor == "dark" {
-		return bgColor
+	if defaultStyle == "light" || defaultStyle == "dark" {
+		return defaultStyle
 	}
 
 	return "notty"
