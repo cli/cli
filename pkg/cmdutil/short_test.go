@@ -8,11 +8,11 @@ import (
 
 func TestCreateCuratedShortDescription(t *testing.T) {
 	exampleCommands := map[string]*cobra.Command{
-		"list":   &cobra.Command{Use: "list"},
-		"view":   &cobra.Command{Use: "view"},
-		"create": &cobra.Command{Use: "create"},
-		"edit":   &cobra.Command{Use: "edit"},
-		"delete": &cobra.Command{Use: "delete"},
+		"list":   {Use: "list"},
+		"view":   {Use: "view"},
+		"create": {Use: "create"},
+		"edit":   {Use: "edit"},
+		"delete": {Use: "delete"},
 	}
 
 	tests := []struct {

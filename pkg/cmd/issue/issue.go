@@ -14,8 +14,8 @@ import (
 
 func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "issue <command>",
-		Long:  `Work with GitHub issues`,
+		Use:  "issue <command>",
+		Long: `Work with GitHub issues`,
 		Example: heredoc.Doc(`
 			$ gh issue list
 			$ gh issue create --label bug
@@ -39,7 +39,7 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdReopen.NewCmdReopen(f, nil))
 	cmd.AddCommand(cmdStatus.NewCmdStatus(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	
+
 	cmdutil.ApplyCuratedShort(cmd, "Issues", []string{"create", "view", "close"})
 
 	return cmd
