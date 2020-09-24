@@ -7,11 +7,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) error {
+func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) {
 	commands = filterValidChoices(cmd, commands)
 
 	if len(commands) == 0 {
-		return nil
+		return
 	}
 
 	commandList := commands[0]
@@ -28,8 +28,6 @@ func ApplyCuratedShort(cmd *cobra.Command, resource string, commands []string) e
 	}
 
 	cmd.Short = short
-
-	return nil
 }
 
 func filterValidChoices(cmd *cobra.Command, commands []string) []string {
