@@ -184,8 +184,9 @@ func createRun(opts *CreateOptions) error {
 			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
 				headRemote = r
+				headBranchLabel = pushedTo.BranchName
 				if !ghrepo.IsSame(baseRepo, headRepo) {
-					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), headBranch)
+					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), pushedTo.BranchName)
 				}
 			}
 		}

@@ -290,7 +290,7 @@ func TestPRCreate_createFork(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
-func TestPRCreate_pushToNonBaseRepo(t *testing.T) {
+func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 	remotes := context.Remotes{
 		{
 			Remote: &git.Remote{
@@ -351,6 +351,55 @@ func TestPRCreate_pushToNonBaseRepo(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+}
+
+func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, "REPOID", input["repositoryId"].(string))
+			assert.Equal(t, "master", input["baseRefName"].(string))
+			assert.Equal(t, "my-feat2", input["headRefName"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register("git status", 0, "")
+	cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 0, heredoc.Doc(`
+		branch.feature.remote origin
+		branch.feature.merge refs/heads/my-feat2
+	`)) // determineTrackingBranch
+	cs.Register("git show-ref --verify", 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadbeef refs/remotes/origin/my-feat2
+	`)) // determineTrackingBranch
+	cs.Register("git .+ log", 1, "", func(args []string) {
+		assert.Equal(t, "origin/master...feature", args[len(args)-1])
+	})
+
+	_, cleanupAsk := prompt.InitAskStubber()
+	defer cleanupAsk()
+
+	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "\nCreating pull request for my-feat2 into master in OWNER/REPO\n\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
