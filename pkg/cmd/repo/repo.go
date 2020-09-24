@@ -38,6 +38,8 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoCreateCmd.NewCmdCreate(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
 	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
+	
+	cmdutil.ApplyCuratedShort(cmd, "Repositories", []string{"create", "fork", "garden"})
 
 	return cmd
 }

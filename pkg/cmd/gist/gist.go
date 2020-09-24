@@ -13,7 +13,6 @@ import (
 func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gist",
-		Short: "Manage gists",
 		Long:  `Work with GitHub gists.`,
 		Annotations: map[string]string{
 			"IsCore": "true",
@@ -29,6 +28,8 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(gistListCmd.NewCmdList(f, nil))
 	cmd.AddCommand(gistViewCmd.NewCmdView(f, nil))
 	cmd.AddCommand(gistEditCmd.NewCmdEdit(f, nil))
+	
+	cmdutil.ApplyCuratedShort(cmd, "Gists", []string{"create", "view", "edit"})
 
 	return cmd
 }

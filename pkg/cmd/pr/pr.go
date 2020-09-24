@@ -21,7 +21,6 @@ import (
 func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pr <command>",
-		Short: "Manage pull requests",
 		Long:  "Work with GitHub pull requests",
 		Example: heredoc.Doc(`
 			$ gh pr checkout 353
@@ -53,6 +52,8 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdStatus.NewCmdStatus(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	cmd.AddCommand(cmdChecks.NewCmdChecks(f, nil))
+	
+	cmdutil.ApplyCuratedShort(cmd, "Pull Requests", []string{"create", "review", "merge"})
 
 	return cmd
 }

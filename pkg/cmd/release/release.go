@@ -14,7 +14,6 @@ import (
 func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "release <command>",
-		Short: "Manage GitHub releases",
 		Annotations: map[string]string{
 			"IsCore": "true",
 		},
@@ -28,6 +27,8 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))
+	
+	cmdutil.ApplyCuratedShort(cmd, "Releases", []string{"create", "view", "download"})
 
 	return cmd
 }
