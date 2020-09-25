@@ -55,7 +55,6 @@ func (s *IOStreams) ColorSupport256() bool {
 }
 
 func (s *IOStreams) DetectTerminalTheme() string {
-	style := os.Getenv("GLAMOUR_STYLE")
 	if !s.ColorEnabled() {
 		s.terminalTheme = "none"
 		return "none"
@@ -66,6 +65,7 @@ func (s *IOStreams) DetectTerminalTheme() string {
 		return "none"
 	}
 
+	style := os.Getenv("GLAMOUR_STYLE")
 	if style != "" && style != "auto" {
 		s.terminalTheme = "none"
 		return "none"

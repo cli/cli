@@ -25,7 +25,7 @@ func Render(text, style string) (string, error) {
 }
 
 func GetStyle(defaultStyle string) string {
-	style := os.Getenv("GLAMOUR_STYLE")
+	style := fromEnv()
 	if style != "" && style != "auto" {
 		return style
 	}
@@ -35,4 +35,8 @@ func GetStyle(defaultStyle string) string {
 	}
 
 	return "notty"
+}
+
+var fromEnv = func() string {
+	return os.Getenv("GLAMOUR_STYLE")
 }
