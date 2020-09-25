@@ -247,7 +247,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 			Name: "deleteBranch",
 			Prompt: &survey.Confirm{
 				Message: message,
-				Default: true,
+				Default: false,
 			},
 		}
 		qs = append(qs, deleteBranchQuestion)
