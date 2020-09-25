@@ -53,7 +53,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 			})
 		}
 		link := resp.Header["Link"]
-		if !strings.Contains(link[0], "last") {
+		if len(link) == 0 || !strings.Contains(link[0], "last") {
 			paginating = false
 		}
 		page++
