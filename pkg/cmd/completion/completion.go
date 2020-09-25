@@ -1,4 +1,4 @@
-package root
+package completion
 
 import (
 	"errors"
@@ -6,11 +6,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
+func NewCmdCompletion(f *cmdutil.Factory) *cobra.Command {
+	io := f.IOStreams
 	var shellType string
 
 	cmd := &cobra.Command{

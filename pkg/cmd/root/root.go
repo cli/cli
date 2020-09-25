@@ -13,6 +13,7 @@ import (
 	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
+	completionCmd "github.com/cli/cli/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
@@ -88,7 +89,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
-	cmd.AddCommand(NewCmdCompletion(f.IOStreams))
+	cmd.AddCommand(completionCmd.NewCmdCompletion(f))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
