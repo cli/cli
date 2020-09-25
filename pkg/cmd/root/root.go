@@ -95,13 +95,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
-	bareHTTPCmdFactory.HttpClient = func() (*http.Client, error) {
-		cfg, err := bareHTTPCmdFactory.Config()
-		if err != nil {
-			return nil, err
-		}
-		return factory.NewHTTPClient(bareHTTPCmdFactory.IOStreams, cfg, version, false), nil
-	}
+	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
 
 	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
 
@@ -115,6 +109,16 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 
 	return cmd
+}
+
+func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		cfg, err := f.Config()
+		if err != nil {
+			return nil, err
+		}
+		return factory.NewHTTPClient(f.IOStreams, cfg, version, false), nil
+	}
 }
 
 func resolvedBaseRepo(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
