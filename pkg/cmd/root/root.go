@@ -74,8 +74,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.SetUsageFunc(rootUsageFunc)
 	cmd.SetFlagErrorFunc(rootFlagErrrorFunc)
 
-	cmdutil.DisableAuthCheck(cmd)
-
 	// Child commands
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
@@ -101,6 +99,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
+
+	cmdutil.DisableAuthCheck(cmd)
 
 	return cmd
 }
