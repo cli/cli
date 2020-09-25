@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func rootUsageFunc(command *cobra.Command) error {
@@ -31,6 +33,13 @@ func rootUsageFunc(command *cobra.Command) error {
 		command.Print(text.Indent(dedent(flagUsages), "  "))
 	}
 	return nil
+}
+
+func rootFlagErrrorFunc(cmd *cobra.Command, err error) error {
+	if err == pflag.ErrHelp {
+		return err
+	}
+	return &cmdutil.FlagError{Err: err}
 }
 
 var hasFailed bool

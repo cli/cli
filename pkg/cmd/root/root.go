@@ -24,7 +24,6 @@ import (
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
@@ -73,13 +72,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
 	cmd.SetHelpFunc(rootHelpFunc)
 	cmd.SetUsageFunc(rootUsageFunc)
-
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		if err == pflag.ErrHelp {
-			return err
-		}
-		return &cmdutil.FlagError{Err: err}
-	})
+	cmd.SetFlagErrorFunc(rootFlagErrrorFunc)
 
 	cmdutil.DisableAuthCheck(cmd)
 
@@ -90,9 +83,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f))
-
-	// Help topics
-	cmd.AddCommand(NewHelpTopic("environment"))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -108,6 +98,9 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
+
+	// Help topics
+	cmd.AddCommand(NewHelpTopic("environment"))
 
 	return cmd
 }
