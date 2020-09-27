@@ -3,14 +3,14 @@ package view
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"text/template"
-	"os"
-	"io/ioutil"
-	"path/filepath"
-	"regexp"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -146,6 +146,10 @@ func viewRun(opts *ViewOptions) error {
 		topLevelDir, _ := git.ToplevelDir()
 		var files string
 		filepath.Walk(topLevelDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+
 			files = files + " " + path
 			return nil
 		})
@@ -160,7 +164,7 @@ func viewRun(opts *ViewOptions) error {
 		isRemoteReadme = false
 		readme = &RepoReadme{
 			Filename: readmePath,
-			Content: string(readmeContent),
+			Content:  string(readmeContent),
 		}
 	}
 
@@ -222,7 +226,7 @@ func viewRun(opts *ViewOptions) error {
 		description = utils.Gray("No description provided")
 	}
 
-	branchPattern := "";
+	branchPattern := ""
 	if branchName != "" {
 		branchPattern = "tree/%s"
 	}
@@ -236,13 +240,13 @@ func viewRun(opts *ViewOptions) error {
 
 	repoData := struct {
 		FullName    string
-		ReadmeFile	string
+		ReadmeFile  string
 		Description string
 		Readme      string
 		View        string
 	}{
 		FullName:    utils.Bold(fullName),
-		ReadmeFile:	 readmeFileDescription,
+		ReadmeFile:  readmeFileDescription,
 		Description: description,
 		Readme:      readmeContent,
 		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),

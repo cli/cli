@@ -229,7 +229,7 @@ func Test_ViewRun(t *testing.T) {
 			`),
 		},
 		{
-			name: "dot arg",
+			name:      "dot arg",
 			repoName: ".",
 			opts: &ViewOptions{
 				RepoArg: ".",
