@@ -1,5 +1,7 @@
 # GitHub CLI
 
+[中文][] 
+
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to the terminal next to where you are already working with `git` and your code.
 
 ![screenshot of gh pr status](https://user-images.githubusercontent.com/98482/84171218-327e7a80-aa40-11ea-8cd1-5177fc2d0e72.png)
@@ -100,3 +102,4 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
 [gh-vs-hub]: /docs/gh-vs-hub.md
 [build from source]: /docs/source.md
+[中文]: README_CN.md
