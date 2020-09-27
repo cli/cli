@@ -7,9 +7,14 @@ import (
 	"strings"
 	"syscall"
 	"text/template"
+	"os"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -37,11 +42,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view [<repository>]",
+		Use:   "view [<repository> | <.>]",
 		Short: "View a repository",
 		Long: `Display the description and the README of a GitHub repository.
 
 With no argument, the repository for the current directory is displayed.
+
+With '.', view the current repository's branch, if the branch is not remote then shows the local readme file (overrides branch flag)
 
 With '--web', open the repository in a web browser instead.
 
@@ -70,24 +77,46 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	var toView ghrepo.Interface
+	var toView, baseRepo ghrepo.Interface
 	apiClient := api.NewClientFromHTTP(httpClient)
+	branchName := opts.Branch
 	if opts.RepoArg == "" {
 		var err error
 		toView, err = opts.BaseRepo()
+
 		if err != nil {
 			return err
 		}
 	} else {
 		var err error
 		viewURL := opts.RepoArg
-		if !strings.Contains(viewURL, "/") {
+
+		if opts.RepoArg == "." {
 			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 			if err != nil {
 				return err
 			}
+
+			baseRepo, err = opts.BaseRepo()
+			if err != nil {
+				return err
+			}
+
+			branchName, err = git.CurrentBranch()
+			if err != nil {
+				return err
+			}
+
+			viewURL = currentUser + "/" + baseRepo.RepoName()
+		} else if !strings.Contains(viewURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+
 			viewURL = currentUser + "/" + viewURL
 		}
+
 		toView, err = ghrepo.FromFullName(viewURL)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
@@ -109,7 +138,32 @@ func viewRun(opts *ViewOptions) error {
 
 	fullName := ghrepo.FullName(toView)
 
-	readme, err := RepositoryReadme(httpClient, toView, opts.Branch)
+	isRemoteReadme := true
+	readme, err := RepositoryReadme(httpClient, toView, branchName)
+
+	var readmePath string
+	if readme == nil && opts.RepoArg == "." {
+		topLevelDir, _ := git.ToplevelDir()
+		var files string
+		filepath.Walk(topLevelDir, func(path string, info os.FileInfo, err error) error {
+			files = files + " " + path
+			return nil
+		})
+		re := regexp.MustCompile(regexp.QuoteMeta(topLevelDir) + `/(?i)readme\.md`)
+		readmePath = re.FindString(files)
+		readmeContent, err := ioutil.ReadFile(readmePath)
+
+		if err != nil {
+			return err
+		}
+
+		isRemoteReadme = false
+		readme = &RepoReadme{
+			Filename: readmePath,
+			Content: string(readmeContent),
+		}
+	}
+
 	if err != nil && err != NotFoundError {
 		return err
 	}
@@ -136,6 +190,7 @@ func viewRun(opts *ViewOptions) error {
 
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
+		{{.ReadmeFile}}
 		{{.Description}}
 		
 		{{.Readme}}
@@ -167,13 +222,27 @@ func viewRun(opts *ViewOptions) error {
 		description = utils.Gray("No description provided")
 	}
 
+	branchPattern := "";
+	if branchName != "" {
+		branchPattern = "tree/%s"
+	}
+
+	readmeUrl := ghrepo.GenerateRepoURL(toView, branchPattern, branchName)
+	readmeFileDescription := readmeUrl + " (remote)"
+
+	if !isRemoteReadme {
+		readmeFileDescription = readmePath + " (local)"
+	}
+
 	repoData := struct {
 		FullName    string
+		ReadmeFile	string
 		Description string
 		Readme      string
 		View        string
 	}{
 		FullName:    utils.Bold(fullName),
+		ReadmeFile:	 readmeFileDescription,
 		Description: description,
 		Readme:      readmeContent,
 		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
