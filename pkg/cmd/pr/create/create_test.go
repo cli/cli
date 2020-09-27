@@ -71,6 +71,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
+		// TODO(msfjarvis): Fix this case
 		return createRun(opts)
 	})
 	cmd.PersistentFlags().StringP("repo", "R", "", "")

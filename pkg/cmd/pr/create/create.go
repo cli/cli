@@ -78,7 +78,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --reviewer monalisa,hubot
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
-    	`),
+		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			titleProvided := cmd.Flags().Changed("title")
@@ -101,7 +101,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return createRun(opts)
+			return createRun(cmd, opts)
 		},
 	}
 
@@ -122,7 +122,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(cmd *cobra.Command, opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -277,6 +277,8 @@ func createRun(opts *CreateOptions) error {
 	}
 	defs, defaultsErr := computeDefaults(baseTrackingBranch, headBranch)
 
+	var titleProvided = cmd.Flags().Changed("title")
+	var bodyProvided = cmd.Flags().Changed("body")
 	title := opts.Title
 	body := opts.Body
 
@@ -287,11 +289,15 @@ func createRun(opts *CreateOptions) error {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
 	} else if opts.Autofill {
-		if defaultsErr != nil {
+		if defaultsErr != nil && !(titleProvided || bodyProvided) {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
-		title = defs.Title
-		body = defs.Body
+		if !titleProvided {
+			title = defs.Title
+		}
+		if !bodyProvided {
+			body = defs.Body
+		}
 	}
 
 	if !opts.WebMode {
