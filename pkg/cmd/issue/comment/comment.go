@@ -95,13 +95,13 @@ func titleBodySurvey(editorCommand string, issueState *CommentOptions, apiClient
 
 	err := prompt.SurveyAsk(qs, issueState)
 	if err != nil {
-		panic(fmt.Sprintf("could not prompt: %w", err))
+		panic(fmt.Sprintf("could not prompt: %v", err))
 	}
 
 	confirmA, err := confirmSubmission()
 
 	if err != nil {
-		panic(fmt.Sprintf("unable to confirm: %w", err))
+		panic(fmt.Sprintf("unable to confirm: %v", err))
 	}
 
 	issueState.Action = confirmA
