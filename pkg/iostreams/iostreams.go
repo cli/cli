@@ -15,6 +15,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
+	"github.com/muesli/termenv"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -24,9 +25,10 @@ type IOStreams struct {
 	ErrOut io.Writer
 
 	// the original (non-colorable) output stream
-	originalOut  io.Writer
-	colorEnabled bool
-	is256enabled bool
+	originalOut   io.Writer
+	colorEnabled  bool
+	is256enabled  bool
+	terminalTheme string
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -50,6 +52,40 @@ func (s *IOStreams) ColorEnabled() bool {
 
 func (s *IOStreams) ColorSupport256() bool {
 	return s.is256enabled
+}
+
+func (s *IOStreams) DetectTerminalTheme() string {
+	if !s.ColorEnabled() {
+		s.terminalTheme = "none"
+		return "none"
+	}
+
+	if s.pagerProcess != nil {
+		s.terminalTheme = "none"
+		return "none"
+	}
+
+	style := os.Getenv("GLAMOUR_STYLE")
+	if style != "" && style != "auto" {
+		s.terminalTheme = "none"
+		return "none"
+	}
+
+	if termenv.HasDarkBackground() {
+		s.terminalTheme = "dark"
+		return "dark"
+	}
+
+	s.terminalTheme = "light"
+	return "light"
+}
+
+func (s *IOStreams) TerminalTheme() string {
+	if s.terminalTheme == "" {
+		return "none"
+	}
+
+	return s.terminalTheme
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {

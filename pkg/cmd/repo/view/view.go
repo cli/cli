@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
 	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
@@ -114,6 +115,8 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	opts.IO.DetectTerminalTheme()
+
 	err = opts.IO.StartPager()
 	if err != nil {
 		return err
@@ -153,7 +156,8 @@ func viewRun(opts *ViewOptions) error {
 		readmeContent = utils.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
-		readmeContent, err = utils.RenderMarkdown(readme.Content)
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		readmeContent, err = markdown.Render(readme.Content, style)
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}

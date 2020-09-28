@@ -18,6 +18,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.9
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/muesli/termenv v0.7.2
 	github.com/rivo/uniseg v0.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200802174311-f27d2ca7f6d5
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f

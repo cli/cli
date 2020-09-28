@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -122,7 +123,8 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.PublishedAt)))))
 	}
 
-	renderedDescription, err := utils.RenderMarkdown(release.Body)
+	style := markdown.GetStyle(io.DetectTerminalTheme())
+	renderedDescription, err := markdown.Render(release.Body, style)
 	if err != nil {
 		return err
 	}

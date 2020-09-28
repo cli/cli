@@ -16,6 +16,7 @@ import (
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -89,6 +90,8 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
+	opts.IO.DetectTerminalTheme()
+
 	err = opts.IO.StartPager()
 	if err != nil {
 		return err
@@ -96,7 +99,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.IO.IsStdoutTTY() {
-		return printHumanIssuePreview(opts.IO.Out, issue)
+		return printHumanIssuePreview(opts.IO, issue)
 	}
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
@@ -122,7 +125,8 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
+func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
+	out := io.Out
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
 
@@ -158,7 +162,8 @@ func printHumanIssuePreview(out io.Writer, issue *api.Issue) error {
 	// Body
 	if issue.Body != "" {
 		fmt.Fprintln(out)
-		md, err := utils.RenderMarkdown(issue.Body)
+		style := markdown.GetStyle(io.TerminalTheme())
+		md, err := markdown.Render(issue.Body, style)
 		if err != nil {
 			return err
 		}
