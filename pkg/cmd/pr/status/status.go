@@ -236,6 +236,8 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(pr))
 		}
 
+		fmt.Fprintf(w, " %s", pr.URL)
+
 		fmt.Fprint(w, "\n")
 	}
 	remaining := totalCount - len(prs)
