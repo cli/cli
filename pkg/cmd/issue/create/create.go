@@ -53,6 +53,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
+			$ gh issue create --assignee @me
 			$ gh issue create --project "Roadmap"
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -84,7 +85,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
-	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`")
+	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`, use @me to self assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
@@ -132,9 +133,14 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
+	opts.Assignees, err = prShared.ReplaceAtMeLogin(opts.Assignees, apiClient, baseRepo)
+	if err != nil {
+		return err
+	}
+
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		if opts.Title != "" || opts.Body != "" {
+		if opts.Title != "" || opts.Body != "" || len(opts.Assignees) > 0 {
 			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 			if err != nil {
 				return

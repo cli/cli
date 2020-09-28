@@ -81,8 +81,12 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		return nil
 	}
 
-	err := fillMetadata(client, baseRepo, tb)
-	if err != nil {
+	var err error
+	if tb.Assignees, err = ReplaceAtMeLogin(tb.Assignees, client, baseRepo); err != nil {
+		return err
+	}
+
+	if err := fillMetadata(client, baseRepo, tb); err != nil {
 		return err
 	}
 
@@ -190,4 +194,19 @@ func quoteValueForQuery(v string) string {
 		return fmt.Sprintf("%q", v)
 	}
 	return v
+}
+
+// ReplaceAtMeLogin iterates over the list of specified login names, replacing
+// any "@me" mentions with the current user LoginName.
+func ReplaceAtMeLogin(logins []string, client *api.Client, repo ghrepo.Interface) ([]string, error) {
+	for i, u := range logins {
+		if strings.EqualFold(u, "@me") {
+			login, err := api.CurrentLoginName(client, repo.RepoHost())
+			if err != nil {
+				return logins, fmt.Errorf("@me resolve: failed obtaining user id: %w", err)
+			}
+			logins[i] = login
+		}
+	}
+	return logins, nil
 }
