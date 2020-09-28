@@ -1,6 +1,8 @@
 package create
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -121,7 +124,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	gist, err := apiCreate(httpClient, ghinstance.OverridableDefault(), opts.Description, opts.Public, files)
+	gist, err := createGist(httpClient, ghinstance.OverridableDefault(), opts.Description, opts.Public, files)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
@@ -139,8 +142,8 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []string) (map[string]string, error) {
-	fs := map[string]string{}
+func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []string) (map[string]*shared.GistFile, error) {
+	fs := map[string]*shared.GistFile{}
 
 	if len(filenames) == 0 {
 		return nil, errors.New("no files passed")
@@ -169,13 +172,15 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 			filename = path.Base(f)
 		}
 
-		fs[filename] = string(content)
+		fs[filename] = &shared.GistFile{
+			Content: string(content),
+		}
 	}
 
 	return fs, nil
 }
 
-func guessGistName(files map[string]string) string {
+func guessGistName(files map[string]*shared.GistFile) string {
 	filenames := make([]string, 0, len(files))
 	gistName := ""
 
@@ -192,4 +197,30 @@ func guessGistName(files map[string]string) string {
 	}
 
 	return gistName
+}
+
+func createGist(client *http.Client, hostname, description string, public bool, files map[string]*shared.GistFile) (*shared.Gist, error) {
+	path := "gists"
+
+	body := &shared.Gist{
+		Description: description,
+		Public:      public,
+		Files:       files,
+	}
+
+	result := shared.Gist{}
+
+	requestByte, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	requestBody := bytes.NewReader(requestByte)
+
+	apliClient := api.NewClientFromHTTP(client)
+	err = apliClient.REST(hostname, "POST", path, requestBody, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
