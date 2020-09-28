@@ -181,13 +181,13 @@ func createRun(opts *CreateOptions) error {
 		// determine whether the head branch is already pushed to a remote
 		if pushedTo := determineTrackingBranch(remotes, headBranch); pushedTo != nil {
 			isPushEnabled = false
-			for _, r := range remotes {
-				if r.Name != pushedTo.RemoteName {
-					continue
-				}
+			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
 				headRemote = r
-				break
+				headBranchLabel = pushedTo.BranchName
+				if !ghrepo.IsSame(baseRepo, headRepo) {
+					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), pushedTo.BranchName)
+				}
 			}
 		}
 	}
@@ -315,7 +315,7 @@ func createRun(opts *CreateOptions) error {
 
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, message,
-				utils.Cyan(headBranch),
+				utils.Cyan(headBranchLabel),
 				utils.Cyan(baseBranch),
 				ghrepo.FullName(baseRepo))
 			if (title == "" || body == "") && defaultsErr != nil {
