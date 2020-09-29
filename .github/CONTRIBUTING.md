@@ -12,18 +12,18 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
-* check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted
-* open an issue if things aren't working as expected
-* open an issue to propose a significant change
-* open a pull request to fix a bug
-* open a pull request to fix documentation about a command
-* open a pull request for an issue with the `help-wanted` label and leave a comment claiming it
+* Check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted.
+* Open an issue if things aren't working as expected.
+* Open an issue to propose a significant change.
+* Open a pull request to fix a bug.
+* Open a pull request to fix documentation about a command.
+* Open a pull request for an issue with the `help-wanted` label and leave a comment claiming it.
 
 Please avoid:
 
-* adding installation instructions specifically for your OS/package manager
-* opening pull requests for any issue marked `core`. these issues require additional context from
-  the core CLI team at GitHub and any external pull requests will not be accepted
+* Adding installation instructions specifically for your OS/package manager.
+* Opening pull requests for any issue marked `core`. These issues require additional context from
+  the core CLI team at GitHub and any external pull requests will not be accepted.
 
 ## Building the project
 
