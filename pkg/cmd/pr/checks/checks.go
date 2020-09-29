@@ -37,7 +37,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "checks",
+		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
