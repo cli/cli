@@ -32,6 +32,9 @@ type CreateOptions struct {
 
 	Interactive bool
 
+	TitleProvided bool
+	BodyProvided  bool
+
 	RootDirOverride string
 	RepoOverride    string
 
@@ -81,13 +84,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			titleProvided := cmd.Flags().Changed("title")
-			bodyProvided := cmd.Flags().Changed("body")
+			opts.TitleProvided = cmd.Flags().Changed("title")
+			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			opts.Interactive = !(titleProvided && bodyProvided)
+			opts.Interactive = !(opts.TitleProvided && opts.BodyProvided)
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !titleProvided && !opts.Autofill {
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
 			}
 
@@ -101,7 +104,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return createRun(cmd, opts)
+			return createRun(opts)
 		},
 	}
 
@@ -122,7 +125,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(cmd *cobra.Command, opts *CreateOptions) error {
+func createRun(opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -277,8 +280,6 @@ func createRun(cmd *cobra.Command, opts *CreateOptions) error {
 	}
 	defs, defaultsErr := computeDefaults(baseTrackingBranch, headBranch)
 
-	var titleProvided = cmd.Flags().Changed("title")
-	var bodyProvided = cmd.Flags().Changed("body")
 	title := opts.Title
 	body := opts.Body
 
@@ -289,13 +290,13 @@ func createRun(cmd *cobra.Command, opts *CreateOptions) error {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
 	} else if opts.Autofill {
-		if defaultsErr != nil && !(titleProvided || bodyProvided) {
+		if defaultsErr != nil && !(opts.TitleProvided || opts.BodyProvided) {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
-		if !titleProvided {
+		if !opts.TitleProvided {
 			title = defs.Title
 		}
-		if !bodyProvided {
+		if !opts.BodyProvided {
 			body = defs.Body
 		}
 	}
