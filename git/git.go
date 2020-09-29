@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/iostreams"
 )
 
 // ErrNotOnAnyBranch indicates that the user is in detached HEAD state
@@ -164,8 +165,10 @@ func CommitBody(sha string) (string, error) {
 // Push publishes a git ref to a remote and sets up upstream configuration
 func Push(remote string, ref string) error {
 	pushCmd := GitCommand("push", "--set-upstream", remote, ref)
+	regexp := regexp.MustCompile("^remote:.*$")
+	filterErr := iostreams.NewRegexFilterWriter(os.Stderr, regexp, "")
 	pushCmd.Stdout = os.Stdout
-	pushCmd.Stderr = os.Stderr
+	pushCmd.Stderr = filterErr
 	return run.PrepareCmd(pushCmd).Run()
 }
 
