@@ -28,7 +28,7 @@ func NewHelpTopic(topic string) *cobra.Command {
 		DEBUG: set to any value to enable verbose output to standard error. Include values "api"
 		or "oauth" to print detailed information about HTTP requests or authentication flow.
 
-		PAGER: a terminal paging program to send standard output to, e.g. "less".
+		GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output to, e.g. "less".
 
 		GLAMOUR_STYLE: the style to use for rendering Markdown. See
 		https://github.com/charmbracelet/glamour#styles

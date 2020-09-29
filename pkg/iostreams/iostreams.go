@@ -248,6 +248,13 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
+	var pagerCommand string
+	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
+		pagerCommand = ghPager
+	} else {
+		pagerCommand = os.Getenv("PAGER")
+	}
+
 	io := &IOStreams{
 		In:           os.Stdin,
 		originalOut:  os.Stdout,
@@ -255,7 +262,7 @@ func System() *IOStreams {
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
-		pagerCommand: os.Getenv("PAGER"),
+		pagerCommand: pagerCommand,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
