@@ -181,7 +181,7 @@ func NewBlankRoot() *yaml.Node {
 						Value: PromptsEnabled,
 					},
 					{
-						HeadComment: "A pager program to send command output to. Example value: less",
+						HeadComment: "A pager program to send command output to, e.g. \"less\". Set the value to \"cat\" to disable the pager.",
 						Kind:        yaml.ScalarNode,
 						Value:       "pager",
 					},

@@ -138,7 +138,7 @@ func (s *IOStreams) SetPager(cmd string) {
 }
 
 func (s *IOStreams) StartPager() error {
-	if s.pagerCommand == "" || !s.IsStdoutTTY() {
+	if s.pagerCommand == "" || s.pagerCommand == "cat" || !s.IsStdoutTTY() {
 		return nil
 	}
 
