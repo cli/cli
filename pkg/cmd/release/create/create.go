@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -19,7 +22,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
-	"github.com/cli/cli/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -157,7 +159,8 @@ func createRun(opts *CreateOptions) error {
 
 			if prevTag, err := detectPreviousTag(headRef); err == nil {
 				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-				generatedChangelog = generateChangelog(commits)
+				apiClient := api.NewClientFromHTTP(httpClient)
+				generatedChangelog = generateChangelog(commits, apiClient, baseRepo)
 			}
 		}
 
@@ -352,14 +355,21 @@ func changelogForRange(refRange string) ([]logEntry, error) {
 	return entries, nil
 }
 
-func generateChangelog(commits []logEntry) string {
+// HACK: this is my modified generateChangelog function to make changelog with a given template
+func generateChangelog(commits []logEntry, apiClient *api.Client, repo ghrepo.Interface) string {
 	var parts []string
 	for _, c := range commits {
-		// TODO: consider rendering "Merge pull request #123 from owner/branch" differently
-		parts = append(parts, fmt.Sprintf("* %s", c.Subject))
-		if c.Body != "" {
-			parts = append(parts, text.Indent(c.Body, "  "))
+		if strings.Contains(c.Subject, "Merge pull request") {
+			re := regexp.MustCompile(`.*#([0-9]*)*`)
+			subMatches := re.FindStringSubmatch(c.Subject)
+			if len(subMatches) > 1 {
+				prID := subMatches[1]
+				id, _ := strconv.Atoi(prID)
+				pr, _ := api.PullRequestByNumber(apiClient, repo, id)
+				parts = append(parts, fmt.Sprintf("- %s (#%d) @%s", pr.Title, id, pr.Author.Login))
+			}
 		}
+
 	}
-	return strings.Join(parts, "\n\n")
+	return strings.Join(parts, "\n")
 }
