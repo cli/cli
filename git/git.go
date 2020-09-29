@@ -56,9 +56,16 @@ func ShowRefs(ref ...string) ([]Ref, error) {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
+	// Available from Git 2.22 and above
+	branchCmd := GitCommand("branch", "--show-current")
+	output, err := run.PrepareCmd(branchCmd).Output()
 
-	output, err := run.PrepareCmd(refCmd).Output()
+	// Fallback to symbolic-ref
+	if err != nil {
+		refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
+		output, err = run.PrepareCmd(refCmd).Output()
+	}
+
 	if err == nil {
 		// Found the branch name
 		return firstLine(output), nil
