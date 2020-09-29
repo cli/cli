@@ -189,6 +189,14 @@ func gardenRun(opts *GardenOptions) error {
 	player := &Player{0, 0, utils.Bold("@"), geo, 0}
 
 	garden := plantGarden(commits, geo)
+	if len(garden) < geo.Height {
+		geo.Height = len(garden)
+	}
+	if geo.Height > 0 && len(garden[0]) < geo.Width {
+		geo.Width = len(garden[0])
+	} else if len(garden) == 0 {
+		geo.Width = 0
+	}
 	clear(opts.IO)
 	drawGarden(out, garden, player)
 
