@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -27,21 +28,23 @@ func Test_processFiles(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, len(files))
-	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"])
+	assert.Equal(t, "hey cool how is it going", files["gistfile0.txt"].Content)
 }
 
 func Test_guessGistName_stdin(t *testing.T) {
-	files := map[string]string{"gistfile0.txt": "sample content"}
+	files := map[string]*shared.GistFile{
+		"gistfile0.txt": {Content: "sample content"},
+	}
 
 	gistName := guessGistName(files)
 	assert.Equal(t, "", gistName)
 }
 
 func Test_guessGistName_userFiles(t *testing.T) {
-	files := map[string]string{
-		"fig.txt":       "I am a fig.",
-		"apple.txt":     "I am an apple.",
-		"gistfile0.txt": "sample content",
+	files := map[string]*shared.GistFile{
+		"fig.txt":       {Content: "I am a fig"},
+		"apple.txt":     {Content: "I am an apple"},
+		"gistfile0.txt": {Content: "sample content"},
 	}
 
 	gistName := guessGistName(files)
@@ -178,7 +181,9 @@ func Test_createRun(t *testing.T) {
 			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
-				"public": true,
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      true,
 				"files": map[string]interface{}{
 					"fixture.txt": map[string]interface{}{
 						"content": "{}",
@@ -197,6 +202,8 @@ func Test_createRun(t *testing.T) {
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
 				"files": map[string]interface{}{
 					"fixture.txt": map[string]interface{}{
 						"content": "{}",
@@ -214,6 +221,9 @@ func Test_createRun(t *testing.T) {
 			wantStderr: "- Creating gist with multiple files\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
 				"files": map[string]interface{}{
 					"fixture.txt": map[string]interface{}{
 						"content": "{}",
@@ -234,6 +244,9 @@ func Test_createRun(t *testing.T) {
 			wantStderr: "- Creating gist...\n✓ Created gist\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
 				"files": map[string]interface{}{
 					"gistfile0.txt": map[string]interface{}{
 						"content": "cool stdin content",
