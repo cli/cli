@@ -8,23 +8,12 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-// TODO I don't like this use of interface{} but we need to accept both io.Writer and io.Reader
-// interfaces.
-
-var IsTerminal = func(w interface{}) bool {
-	if f, isFile := w.(*os.File); isFile {
-		return isatty.IsTerminal(f.Fd()) || IsCygwinTerminal(f)
-	}
-
-	return false
+var IsTerminal = func(f *os.File) bool {
+	return isatty.IsTerminal(f.Fd()) || IsCygwinTerminal(f)
 }
 
-func IsCygwinTerminal(w interface{}) bool {
-	if f, isFile := w.(*os.File); isFile {
-		return isatty.IsCygwinTerminal(f.Fd())
-	}
-
-	return false
+func IsCygwinTerminal(f *os.File) bool {
+	return isatty.IsCygwinTerminal(f.Fd())
 }
 
 var TerminalSize = func(w interface{}) (int, int, error) {
