@@ -17,11 +17,13 @@ Please do:
 * open an issue to propose a significant change
 * open a pull request to fix a bug
 * open a pull request to fix documentation about a command
-* open a pull request if a member of the GitHub CLI team has given the ok after discussion in an issue
+* open a pull request for an issue with the `help-wanted` label and leave a comment claiming it
 
 Please avoid:
 
 * adding installation instructions specifically for your OS/package manager
+* opening pull requests for any issue marked `core`. these issues require additional context from
+  the core CLI team at GitHub and any external pull requests will not be accepted
 
 ## Building the project
 
