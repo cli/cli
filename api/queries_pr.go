@@ -408,6 +408,13 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
     }
 	`
 
+	if currentUsername == "@me" && ghinstance.IsEnterprise(repo.RepoHost()) {
+		currentUsername, err = CurrentLoginName(client, repo.RepoHost())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
 	reviewerQuery := fmt.Sprintf("repo:%s state:open review-requested:%s", ghrepo.FullName(repo), currentUsername)
 
