@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -266,7 +268,13 @@ func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prF
 		} `graphql:"Commit: __type(name: \"Commit\")"`
 	}
 
-	v4 := graphQLClient(httpClient, hostname)
+	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
+	cacheTTL := time.Duration(24 * time.Hour)
+	cachedClient := &http.Client{
+		Transport: CacheReponse(cacheTTL, cacheDir)(httpClient.Transport),
+	}
+
+	v4 := graphQLClient(cachedClient, hostname)
 	err = v4.Query(context.Background(), &featureDetection, nil)
 	if err != nil {
 		return
