@@ -241,6 +241,52 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 	return resp.Body, nil
 }
 
+type pullRequestFeature struct {
+	HasReviewDecision    bool
+	HasStatusCheckRollup bool
+}
+
+func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prFeatures pullRequestFeature, err error) {
+	if !ghinstance.IsEnterprise(hostname) {
+		prFeatures.HasReviewDecision = true
+		prFeatures.HasStatusCheckRollup = true
+		return
+	}
+
+	var featureDetection struct {
+		PullRequest struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+		Commit struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Commit: __type(name: \"Commit\")"`
+	}
+
+	v4 := graphQLClient(httpClient, hostname)
+	err = v4.Query(context.Background(), &featureDetection, nil)
+	if err != nil {
+		return
+	}
+
+	for _, field := range featureDetection.PullRequest.Fields {
+		switch field.Name {
+		case "reviewDecision":
+			prFeatures.HasReviewDecision = true
+		}
+	}
+	for _, field := range featureDetection.Commit.Fields {
+		switch field.Name {
+		case "statusCheckRollup":
+			prFeatures.HasStatusCheckRollup = true
+		}
+	}
+	return
+}
+
 func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
 	type edges struct {
 		TotalCount int
@@ -261,18 +307,19 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ReviewRequested edges
 	}
 
-	fragments := `
-	fragment pr on PullRequest {
-		number
-		title
-		state
-		url
-		headRefName
-		headRepositoryOwner {
-			login
-		}
-		isCrossRepository
-		isDraft
+	prFeatures, err := determinePullRequestFeatures(client.http, repo.RepoHost())
+	if err != nil {
+		return nil, err
+	}
+
+	var reviewsFragment string
+	if prFeatures.HasReviewDecision {
+		reviewsFragment = "reviewDecision"
+	}
+
+	var statusesFragment string
+	if prFeatures.HasStatusCheckRollup {
+		statusesFragment = `
 		commits(last: 1) {
 			nodes {
 				commit {
@@ -292,12 +339,28 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 				}
 			}
 		}
+		`
+	}
+
+	fragments := fmt.Sprintf(`
+	fragment pr on PullRequest {
+		number
+		title
+		state
+		url
+		headRefName
+		headRepositoryOwner {
+			login
+		}
+		isCrossRepository
+		isDraft
+		%s
 	}
 	fragment prWithReviews on PullRequest {
 		...pr
-		reviewDecision
+		%s
 	}
-	`
+	`, statusesFragment, reviewsFragment)
 
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
@@ -363,7 +426,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	}
 
 	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -404,11 +467,54 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	return &payload, nil
 }
 
+func prCommitsFragment(httpClient *http.Client, hostname string) (string, error) {
+	if prFeatures, err := determinePullRequestFeatures(httpClient, hostname); err != nil {
+		return "", err
+	} else if !prFeatures.HasStatusCheckRollup {
+		return "", nil
+	}
+
+	return `
+	commits(last: 1) {
+		totalCount
+		nodes {
+			commit {
+				oid
+				statusCheckRollup {
+					contexts(last: 100) {
+						nodes {
+							...on StatusContext {
+								context
+								state
+								targetUrl
+							}
+							...on CheckRun {
+								name
+								status
+								conclusion
+								startedAt
+								completedAt
+								detailsUrl
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	`, nil
+}
+
 func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequest PullRequest
 		}
+	}
+
+	statusesFragment, err := prCommitsFragment(client.http, repo.RepoHost())
+	if err != nil {
+		return nil, err
 	}
 
 	query := `
@@ -426,33 +532,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				author {
 				  login
 				}
-				commits(last: 1) {
-				  totalCount
-					nodes {
-						commit {
-              oid
-						  statusCheckRollup {
-						    contexts(last: 100) {
-						      nodes {
-						  		  ...on StatusContext {
-						  			  context
-						  				state
-											targetUrl
-						  			}
-						  			...on CheckRun {
-											name
-											status
-											conclusion
-											startedAt
-											completedAt
-											detailsUrl
-						  			}
-						  		}
-						  	}
-						  }
-            }
-          }
-				}
+				` + statusesFragment + `
 				baseRefName
 				headRefName
 				headRepositoryOwner {
@@ -524,7 +604,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	}
 
 	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -542,6 +622,11 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		}
 	}
 
+	statusesFragment, err := prCommitsFragment(client.http, repo.RepoHost())
+	if err != nil {
+		return nil, err
+	}
+
 	query := `
 	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!) {
 		repository(owner: $owner, name: $repo) {
@@ -556,33 +641,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					author {
 						login
 					}
-					commits(last: 1) {
-						totalCount
-					  nodes {
-						  commit {
-							  oid
-								statusCheckRollup {
-								  contexts(last: 100) {
-								    nodes {
-										  ...on StatusContext {
-											  context
-												state
-											  targetUrl
-											}
-											...on CheckRun {
-												name
-												status
-												conclusion
-												startedAt
-												completedAt
-												detailsUrl
-											}
-										}
-									}
-								}
-							}
-					  }
-					}
+					` + statusesFragment + `
 					url
 					baseRefName
 					headRefName
@@ -661,7 +720,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}
