@@ -6,11 +6,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdCompletion(f *cmdutil.Factory) *cobra.Command {
-	io := f.IOStreams
+func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 	var shellType string
 
 	cmd := &cobra.Command{

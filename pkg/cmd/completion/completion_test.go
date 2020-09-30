@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -46,10 +45,7 @@ func TestNewCmdCompletion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
-			f := &cmdutil.Factory{
-				IOStreams: io,
-			}
-			completeCmd := NewCmdCompletion(f)
+			completeCmd := NewCmdCompletion(io)
 			rootCmd := &cobra.Command{Use: "gh"}
 			rootCmd.AddCommand(completeCmd)
 
