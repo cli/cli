@@ -32,6 +32,9 @@ type CreateOptions struct {
 
 	Interactive bool
 
+	TitleProvided bool
+	BodyProvided  bool
+
 	RootDirOverride string
 	RepoOverride    string
 
@@ -78,16 +81,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --reviewer monalisa,hubot
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
-    	`),
+		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			titleProvided := cmd.Flags().Changed("title")
-			bodyProvided := cmd.Flags().Changed("body")
+			opts.TitleProvided = cmd.Flags().Changed("title")
+			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			opts.Interactive = !(titleProvided && bodyProvided)
+			opts.Interactive = !(opts.TitleProvided && opts.BodyProvided)
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !titleProvided && !opts.Autofill {
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
 			}
 
@@ -287,11 +290,15 @@ func createRun(opts *CreateOptions) error {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
 	} else if opts.Autofill {
-		if defaultsErr != nil {
+		if defaultsErr != nil && !(opts.TitleProvided || opts.BodyProvided) {
 			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 		}
-		title = defs.Title
-		body = defs.Body
+		if !opts.TitleProvided {
+			title = defs.Title
+		}
+		if !opts.BodyProvided {
+			body = defs.Body
+		}
 	}
 
 	if !opts.WebMode {
