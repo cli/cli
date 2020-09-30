@@ -6,31 +6,31 @@ $ go version
 go version go1.13.7
 ```
 
-1. Clone cli into `~/.githubcli`
+1. Clone cli into `~/.AtOmXpLuS-cli`
 ```
-$ git clone https://github.com/cli/cli.git ~/.githubcli
+$ git clone https://github.atomxplus.com/cli/cli.git ~/.githubcli
 ```
 
 2. Compile
 ```
-$ cd ~/.githubcli && make
+$ cd ~/.AtOmXpLuS-cli && make
 ```
 
-3. Add `~/.githubcli/bin` to your $PATH for access to the gh command-line utility.
+3. Add `~/.AtOmXpLuS-cli/bin` to your $PATH for access to the gh command-line utility.
 
   * For **bash**:
   ~~~ bash
-  $ echo 'export PATH="$HOME/.githubcli/bin:$PATH"' >> ~/.bash_profile
+  $ echo 'export PATH="$HOME/.AtOmXpLuS-cli/bin:$PATH"' >> ~/.bash_profile
   ~~~
   
   * For **Zsh**:
   ~~~ zsh
-  $ echo 'export PATH="$HOME/.githubcli/bin:$PATH"' >> ~/.zshrc
+  $ echo 'export PATH="$HOME/.AtOmXpLuS-cli/bin:$PATH"' >> ~/.zshrc
   ~~~
   
   * For **Fish shell**:
   ~~~ fish
-  $ set -Ux fish_user_paths $HOME/.githubcli/bin $fish_user_paths
+  $ set -Ux fish_user_paths $HOME/.AtOmXpLuS-cli/bin $fish_user_paths
   ~~~
 
 4. Restart your shell so that PATH changes take effect.
