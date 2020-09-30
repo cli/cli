@@ -44,7 +44,7 @@ We'd love to hear your feedback about `gh`. If you spot bugs or have features th
 
 ### Linux
 
-See [Linux installation docs](/docs/install_linux.md).
+See [Linux installation docs](./docs/install_linux.md).
 
 ### Windows
 
@@ -98,5 +98,5 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
-[gh-vs-hub]: /docs/gh-vs-hub.md
-[build from source]: /docs/source.md
+[gh-vs-hub]: ./docs/gh-vs-hub.md
+[build from source]: ./docs/source.md
