@@ -45,12 +45,16 @@ func Test_CurrentBranch(t *testing.T) {
 	}
 	cases := []c{
 		{
-			Stub:     "branch-name",
+			Stub:     "branch-name\n",
 			Expected: "branch-name",
 		},
 		{
-			Stub:     "refs/heads/branch-name",
+			Stub:     "refs/heads/branch-name\n",
 			Expected: "branch-name",
+		},
+		{
+			Stub:     "refs/heads/branch\u00A0with\u00A0non\u00A0breaking\u00A0space\n",
+			Expected: "branch\u00A0with\u00A0non\u00A0breaking\u00A0space",
 		},
 	}
 

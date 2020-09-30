@@ -294,9 +294,5 @@ func firstLine(output []byte) string {
 
 func getBranchShortName(output []byte) string {
 	branch := firstLine(output)
-	prefix := "refs/heads/"
-	if i := strings.Index(branch, prefix); i != -1 {
-		return branch[i+len(prefix):]
-	}
-	return branch
+	return strings.TrimPrefix(branch, "refs/heads/")
 }
