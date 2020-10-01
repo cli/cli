@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strings"
 	"syscall"
 	"text/template"
 
@@ -55,6 +56,7 @@ func renderRun(opts *RenderOptions) error {
 	}
 
 	contentString := string(content)
+	contentString = strings.Replace(contentString, "\r\n", "\n", -1)
 	filename := path.Base(filePath)
 
 	opts.IO.DetectTerminalTheme()
@@ -71,7 +73,7 @@ func renderRun(opts *RenderOptions) error {
 		fmt.Fprintf(stdout, "name:\t%s\n", filename)
 		fmt.Fprintf(stdout, "full path:\t%s\n", filePath)
 		fmt.Fprintln(stdout, "--")
-		fmt.Fprintf(stdout, contentString)
+		fmt.Fprint(stdout, contentString)
 		fmt.Fprintln(stdout)
 
 		return nil
@@ -80,7 +82,7 @@ func renderRun(opts *RenderOptions) error {
 	renderTmpl := heredoc.Doc(`
 		{{.Name}}
 		{{.FullPath}}
-		
+
 		{{.Content}}
 	`)
 
