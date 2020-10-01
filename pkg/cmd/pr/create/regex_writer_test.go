@@ -34,7 +34,7 @@ func Test_Write(t *testing.T) {
 			},
 			output: output{
 				wantsErr: false,
-				out:      "some input line that has right information\n",
+				out:      "some input line that has right information",
 				length:   42,
 			},
 		},
@@ -47,7 +47,7 @@ func Test_Write(t *testing.T) {
 			},
 			output: output{
 				wantsErr: false,
-				out:      "multiple tests\nin this\ninput tests\n",
+				out:      "multiple tests\nin this\ninput tests",
 				length:   34,
 			},
 		},
@@ -60,7 +60,7 @@ func Test_Write(t *testing.T) {
 			},
 			output: output{
 				wantsErr: false,
-				out:      "this line has no matches\n",
+				out:      "this line has no matches",
 				length:   24,
 			},
 		},
@@ -94,12 +94,12 @@ func Test_Write(t *testing.T) {
 			name: "multiple lines removed",
 			input: input{
 				in:     "begining line\nremove this whole line\nremove this one also\nnot this one",
-				regexp: regexp.MustCompile("^remove.*$"),
+				regexp: regexp.MustCompile("(?s)^remove.*$"),
 				repl:   "",
 			},
 			output: output{
 				wantsErr: false,
-				out:      "begining line\nnot this one\n",
+				out:      "begining line\nnot this one",
 				length:   70,
 			},
 		},
@@ -114,12 +114,12 @@ func Test_Write(t *testing.T) {
 					remote: 
 					output: more information
 			 `),
-				regexp: regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github\\.com/.*/pull/new/.*)$"),
+				regexp: regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$"),
 				repl:   "",
 			},
 			output: output{
 				wantsErr: false,
-				out:      "output: some information\noutput: more information\n",
+				out:      "output: some information\nremote: \nremote: \noutput: more information\n",
 				length:   192,
 			},
 		},
