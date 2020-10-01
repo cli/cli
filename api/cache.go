@@ -14,6 +14,13 @@ import (
 	"time"
 )
 
+func makeCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
+	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
+	return &http.Client{
+		Transport: CacheReponse(cacheTTL, cacheDir)(httpClient.Transport),
+	}
+}
+
 // CacheReponse produces a RoundTripper that caches HTTP responses to disk for a specified amount of time
 func CacheReponse(ttl time.Duration, dir string) ClientOption {
 	return func(tr http.RoundTripper) http.RoundTripper {
@@ -21,12 +28,14 @@ func CacheReponse(ttl time.Duration, dir string) ClientOption {
 			key, keyErr := cacheKey(req)
 			cacheFile := filepath.Join(dir, key)
 			if keyErr == nil {
+				// TODO: make thread-safe
 				if res, err := readCache(ttl, cacheFile, req); err == nil {
 					return res, nil
 				}
 			}
 			res, err := tr.RoundTrip(req)
 			if err == nil && keyErr == nil {
+				// TODO: make thread-safe
 				_ = writeCache(cacheFile, res)
 			}
 			return res, err
@@ -53,12 +62,16 @@ func cacheKey(req *http.Request) (string, error) {
 	return fmt.Sprintf("%x", digest), nil
 }
 
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
 func readCache(ttl time.Duration, cacheFile string, req *http.Request) (*http.Response, error) {
 	f, err := os.Open(cacheFile)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
 	fs, err := f.Stat()
 	if err != nil {
@@ -70,7 +83,14 @@ func readCache(ttl time.Duration, cacheFile string, req *http.Request) (*http.Re
 		return nil, errors.New("cache expired")
 	}
 
-	return http.ReadResponse(bufio.NewReader(f), req)
+	res, err := http.ReadResponse(bufio.NewReader(f), req)
+	if res != nil {
+		res.Body = &readCloser{
+			Reader: res.Body,
+			Closer: f,
+		}
+	}
+	return res, err
 }
 
 func writeCache(cacheFile string, res *http.Response) error {

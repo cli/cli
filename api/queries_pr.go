@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -268,14 +266,8 @@ func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prF
 		} `graphql:"Commit: __type(name: \"Commit\")"`
 	}
 
-	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
-	cacheTTL := time.Duration(24 * time.Hour)
-	cachedClient := &http.Client{
-		Transport: CacheReponse(cacheTTL, cacheDir)(httpClient.Transport),
-	}
-
-	v4 := graphQLClient(cachedClient, hostname)
-	err = v4.Query(context.Background(), &featureDetection, nil)
+	v4 := graphQLClient(httpClient, hostname)
+	err = v4.QueryNamed(context.Background(), "PullRequest_fields", &featureDetection, nil)
 	if err != nil {
 		return
 	}
@@ -315,7 +307,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ReviewRequested edges
 	}
 
-	prFeatures, err := determinePullRequestFeatures(client.http, repo.RepoHost())
+	cachedClient := makeCachedClient(client.http, time.Hour*24)
+	prFeatures, err := determinePullRequestFeatures(cachedClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +476,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 }
 
 func prCommitsFragment(httpClient *http.Client, hostname string) (string, error) {
-	if prFeatures, err := determinePullRequestFeatures(httpClient, hostname); err != nil {
+	cachedClient := makeCachedClient(httpClient, time.Hour*24)
+	if prFeatures, err := determinePullRequestFeatures(cachedClient, hostname); err != nil {
 		return "", err
 	} else if !prFeatures.HasStatusCheckRollup {
 		return "", nil
