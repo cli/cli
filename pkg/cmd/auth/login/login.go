@@ -52,14 +52,14 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			The minimum required scopes for the token are: "repo", "read:org".
 		`, "`"),
 		Example: heredoc.Doc(`
+			# start interactive setup
 			$ gh auth login
-			# => do an interactive setup
 
+			# authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
-			# => read token from mytoken.txt and authenticate against github.com
 
-			$ gh auth login --hostname enterprise.internal --with-token < mytoken.txt
-			# => read token from mytoken.txt and authenticate against a GitHub Enterprise Server instance
+			# authenticate with a specific GitHub Enterprise Server instance
+			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
