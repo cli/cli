@@ -431,7 +431,7 @@ func createRun(opts *CreateOptions) error {
 		pushTries := 0
 		maxPushTries := 3
 		for {
-			regexp := regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github.com/.*/pull/new/.*)$")
+			regexp := regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github\\.com/.*/pull/new/.*)$")
 			cmdErr := NewRegexWriter(os.Stderr, regexp, "")
 			cmdOut := os.Stdout
 			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch), cmdOut, cmdErr); err != nil {

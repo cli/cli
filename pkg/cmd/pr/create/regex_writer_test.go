@@ -114,7 +114,7 @@ func Test_Write(t *testing.T) {
 					remote: 
 					output: more information
 			 `),
-				regexp: regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github.com/.*/pull/new/.*)$"),
+				regexp: regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github\\.com/.*/pull/new/.*)$"),
 				repl:   "",
 			},
 			output: output{
