@@ -84,11 +84,13 @@ func readCache(ttl time.Duration, cacheFile string, req *http.Request) (*http.Re
 	}
 
 	res, err := http.ReadResponse(bufio.NewReader(f), req)
-	if res != nil {
+	if res == nil {
 		res.Body = &readCloser{
 			Reader: res.Body,
 			Closer: f,
 		}
+	} else {
+		f.Close()
 	}
 	return res, err
 }
