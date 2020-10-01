@@ -21,12 +21,12 @@ jobs:
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v1
+        uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
           args: release --release-notes=CHANGELOG.md
         env:
-          GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
