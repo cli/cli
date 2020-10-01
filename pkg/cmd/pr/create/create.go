@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -429,7 +431,10 @@ func createRun(opts *CreateOptions) error {
 		pushTries := 0
 		maxPushTries := 3
 		for {
-			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
+			regexp := regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github.com/.*/pull/new/.*)$")
+			cmdErr := NewRegexWriter(os.Stderr, regexp, "")
+			cmdOut := os.Stdout
+			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch), cmdOut, cmdErr); err != nil {
 				if didForkRepo && pushTries < maxPushTries {
 					pushTries++
 					// first wait 2 seconds after forking, then 4s, then 6s

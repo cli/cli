@@ -1,4 +1,4 @@
-package iostreams
+package create
 
 import (
 	"bufio"
@@ -7,17 +7,17 @@ import (
 	"regexp"
 )
 
-func NewRegexFilterWriter(out io.Writer, regexp *regexp.Regexp, repl string) io.Writer {
-	return &RegexFilterWriter{out: out, regexp: *regexp, repl: repl}
+func NewRegexWriter(out io.Writer, regexp *regexp.Regexp, repl string) io.Writer {
+	return &RegexWriter{out: out, regexp: *regexp, repl: repl}
 }
 
-type RegexFilterWriter struct {
+type RegexWriter struct {
 	out    io.Writer
 	regexp regexp.Regexp
 	repl   string
 }
 
-func (s RegexFilterWriter) Write(data []byte) (int, error) {
+func (s RegexWriter) Write(data []byte) (int, error) {
 	filtered := []byte{}
 	repl := []byte(s.repl)
 	scanner := bufio.NewScanner(bytes.NewReader(data))

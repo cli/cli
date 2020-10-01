@@ -1,4 +1,4 @@
-package iostreams
+package create
 
 import (
 	"bytes"
@@ -108,26 +108,26 @@ func Test_Write(t *testing.T) {
 			input: input{
 				in: heredoc.Doc(`
 					output: some information
-					remote:
-					remote: Create a pull request for 'regex' on GitHub by visiting:
+					remote: 
+					remote: Create a pull request for 'regex' on GitHub by visiting: 
 					remote:      https://github.com/owner/repo/pull/new/regex
-					remote:
+					remote: 
 					output: more information
 			 `),
-				regexp: regexp.MustCompile("^remote.*$"),
+				regexp: regexp.MustCompile("^remote: (|Create a pull request for '.*' on GitHub by visiting:.*|.*https://github.com/.*/pull/new/.*)$"),
 				repl:   "",
 			},
 			output: output{
 				wantsErr: false,
 				out:      "output: some information\noutput: more information\n",
-				length:   189,
+				length:   192,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		out := &bytes.Buffer{}
-		writer := NewRegexFilterWriter(out, tt.input.regexp, tt.input.repl)
+		writer := NewRegexWriter(out, tt.input.regexp, tt.input.repl)
 		t.Run(tt.name, func(t *testing.T) {
 			length, err := writer.Write([]byte(tt.input.in))
 
