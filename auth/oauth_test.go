@@ -42,6 +42,9 @@ func TestObtainAccessToken_deviceFlow(t *testing.T) {
 			return &http.Response{
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(responseData.Encode())),
+				Header: http.Header{
+					"Content-Type": []string{"application/x-www-form-urlencoded; charset=utf-8"},
+				},
 			}, nil
 		case "POST https://github.com/login/oauth/access_token":
 			if err := req.ParseForm(); err != nil {
@@ -117,5 +120,130 @@ func TestObtainAccessToken_deviceFlow(t *testing.T) {
 	}
 	if browseCode != "1234-ABCD" {
 		t.Errorf("expected to provide user with one-time code %q, got %q", "1234-ABCD", browseCode)
+	}
+}
+
+func Test_detectDeviceFlow(t *testing.T) {
+	type args struct {
+		statusCode int
+		values     url.Values
+	}
+	tests := []struct {
+		name       string
+		args       args
+		doFallback bool
+		wantErr    string
+	}{
+		{
+			name: "success",
+			args: args{
+				statusCode: 200,
+				values:     url.Values{},
+			},
+			doFallback: false,
+			wantErr:    "",
+		},
+		{
+			name: "wrong response type",
+			args: args{
+				statusCode: 200,
+				values:     nil,
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "401 unauthorized",
+			args: args{
+				statusCode: 401,
+				values:     nil,
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "403 forbidden",
+			args: args{
+				statusCode: 403,
+				values:     nil,
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "404 not found",
+			args: args{
+				statusCode: 404,
+				values:     nil,
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "422 unprocessable",
+			args: args{
+				statusCode: 422,
+				values:     nil,
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "400 bad request",
+			args: args{
+				statusCode: 400,
+				values:     nil,
+			},
+			doFallback: false,
+			wantErr:    "error: HTTP 400",
+		},
+		{
+			name: "400 with values",
+			args: args{
+				statusCode: 400,
+				values: url.Values{
+					"error": []string{"blah"},
+				},
+			},
+			doFallback: false,
+			wantErr:    "error: HTTP 400",
+		},
+		{
+			name: "400 with unauthorized_client",
+			args: args{
+				statusCode: 400,
+				values: url.Values{
+					"error": []string{"unauthorized_client"},
+				},
+			},
+			doFallback: true,
+			wantErr:    "",
+		},
+		{
+			name: "400 with error_description",
+			args: args{
+				statusCode: 400,
+				values: url.Values{
+					"error_description": []string{"HI"},
+				},
+			},
+			doFallback: false,
+			wantErr:    "HTTP 400: HI",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := detectDeviceFlow(tt.args.statusCode, tt.args.values)
+			if (err != nil) != (tt.wantErr != "") {
+				t.Errorf("detectDeviceFlow() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr != "" && err.Error() != tt.wantErr {
+				t.Errorf("error = %q, wantErr = %q", err, tt.wantErr)
+			}
+			if got != tt.doFallback {
+				t.Errorf("detectDeviceFlow() = %v, want %v", got, tt.doFallback)
+			}
+		})
 	}
 }
