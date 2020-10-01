@@ -69,7 +69,7 @@ func (oa *OAuthFlow) ObtainAccessToken() (accessToken string, err error) {
 		}
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusPaymentRequired ||
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
 		resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnprocessableEntity ||
 		(resp.StatusCode == http.StatusBadRequest && values != nil && values.Get("error") == "unauthorized_client") {
 		// OAuth Device Flow is not available; continue with OAuth browser flow with a
