@@ -43,13 +43,14 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
 		Short: "Authenticate with a GitHub host",
-		Long: heredoc.Doc(`Authenticate with a GitHub host.
+		Long: heredoc.Docf(`
+			Authenticate with a GitHub host.
 
-			This interactive command initializes your authentication state either by helping you log into
-			GitHub via browser-based OAuth or by accepting a Personal Access Token.
+			The default authentication mode is a web-based browser flow.
 
-			The interactivity can be avoided by specifying --with-token and passing a token on STDIN.
-		`),
+			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
+			The minimum required scopes for the token are: "repo", "read:org".
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh auth login
 			# => do an interactive setup
