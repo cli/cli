@@ -27,17 +27,18 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name          string
-	Description   string
-	Homepage      string
-	Team          string
-	Template      string
-	EnableIssues  bool
-	EnableWiki    bool
-	Public        bool
-	Private       bool
-	Internal      bool
-	ConfirmSubmit bool
+	Name           string
+	Description    string
+	Homepage       string
+	Team           string
+	Template       string
+	EnableIssues   bool
+	EnableWiki     bool
+	Public         bool
+	Private        bool
+	Internal       bool
+	ConfirmSubmit  bool
+	BypassIOPrompt bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -105,6 +106,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm the submission directly")
+	cmd.Flags().BoolVar(&opts.BypassIOPrompt, "bypass-io", false, "Bypass interactive flow for node process executors like child_process, execa etc.")
 
 	return cmd
 }
@@ -274,7 +276,7 @@ func createRun(opts *CreateOptions) error {
 			if isTTY {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
 			}
-		} else if opts.IO.CanPrompt() {
+		} else if opts.IO.CanPrompt() || opts.BypassIOPrompt {
 			doSetup := createLocalDirectory
 			if !doSetup {
 				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
