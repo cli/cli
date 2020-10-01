@@ -56,7 +56,6 @@ func renderRun(opts *RenderOptions) error {
 	}
 
 	contentString := string(content)
-	contentString = strings.Replace(contentString, "\r\n", "\n", -1)
 	filename := path.Base(filePath)
 
 	opts.IO.DetectTerminalTheme()
@@ -73,7 +72,7 @@ func renderRun(opts *RenderOptions) error {
 		fmt.Fprintf(stdout, "name:\t%s\n", filename)
 		fmt.Fprintf(stdout, "full path:\t%s\n", filePath)
 		fmt.Fprintln(stdout, "--")
-		fmt.Fprint(stdout, contentString)
+		fmt.Fprint(stdout, strings.ReplaceAll(contentString, "\r\n", "\n"))
 		fmt.Fprintln(stdout)
 
 		return nil
