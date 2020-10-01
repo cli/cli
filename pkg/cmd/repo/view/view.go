@@ -154,7 +154,7 @@ func viewRun(opts *ViewOptions) error {
 	var readmeContent string
 	if readme == nil {
 		readmeContent = utils.Gray("This repository does not have a README")
-	} else if isMarkdownFile(readme.Filename) {
+	} else if utils.IsMarkdownFile(readme.Filename) {
 		var err error
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
 		readmeContent, err = markdown.Render(readme.Content, style)
@@ -189,13 +189,4 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	return nil
-}
-
-func isMarkdownFile(filename string) bool {
-	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
-	// seem worth executing a regex for this given that assumption.
-	return strings.HasSuffix(filename, ".md") ||
-		strings.HasSuffix(filename, ".markdown") ||
-		strings.HasSuffix(filename, ".mdown") ||
-		strings.HasSuffix(filename, ".mkdown")
 }

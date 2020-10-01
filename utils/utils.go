@@ -109,3 +109,12 @@ func YellowDash() string {
 func RedX() string {
 	return Red("X")
 }
+
+func IsMarkdownFile(filename string) bool {
+	// kind of gross, but i'm assuming that 90% of the time the suffix will just be .md. it didn't
+	// seem worth executing a regex for this given that assumption.
+	return strings.HasSuffix(filename, ".md") ||
+		strings.HasSuffix(filename, ".markdown") ||
+		strings.HasSuffix(filename, ".mdown") ||
+		strings.HasSuffix(filename, ".mkdown")
+}
