@@ -189,6 +189,15 @@ func Test_detectDeviceFlow(t *testing.T) {
 			wantErr:    "",
 		},
 		{
+			name: "402 payment required",
+			args: args{
+				statusCode: 402,
+				values:     nil,
+			},
+			doFallback: false,
+			wantErr:    "error: HTTP 402",
+		},
+		{
 			name: "400 bad request",
 			args: args{
 				statusCode: 400,
