@@ -31,6 +31,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "no flags",
 			cli:  "graphql",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "graphql",
@@ -48,6 +49,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "override method",
 			cli:  "repos/octocat/Spoon-Knife -XDELETE",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "DELETE",
 				RequestMethodPassed: true,
 				RequestPath:         "repos/octocat/Spoon-Knife",
@@ -65,6 +67,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "with fields",
 			cli:  "graphql -f query=QUERY -F body=@file.txt",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "graphql",
@@ -82,6 +85,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "with headers",
 			cli:  "user -H 'accept: text/plain' -i",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "user",
@@ -99,6 +103,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "with pagination",
 			cli:  "repos/OWNER/REPO/issues --paginate",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "repos/OWNER/REPO/issues",
@@ -116,6 +121,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "with silenced output",
 			cli:  "repos/OWNER/REPO/issues --silent",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "repos/OWNER/REPO/issues",
@@ -138,6 +144,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "GraphQL pagination",
 			cli:  "-XPOST graphql --paginate",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "POST",
 				RequestMethodPassed: true,
 				RequestPath:         "graphql",
@@ -160,6 +167,7 @@ func Test_NewCmdApi(t *testing.T) {
 			name: "with request body from file",
 			cli:  "user --input myfile",
 			wants: ApiOptions{
+				Hostname:            "",
 				RequestMethod:       "GET",
 				RequestMethodPassed: false,
 				RequestPath:         "user",
@@ -178,10 +186,29 @@ func Test_NewCmdApi(t *testing.T) {
 			cli:      "",
 			wantsErr: true,
 		},
+		{
+			name: "with hostname",
+			cli:  "graphql --hostname tom.petty",
+			wants: ApiOptions{
+				Hostname:            "tom.petty",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "graphql",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewCmdApi(f, func(o *ApiOptions) error {
+				assert.Equal(t, tt.wants.Hostname, o.Hostname)
 				assert.Equal(t, tt.wants.RequestMethod, o.RequestMethod)
 				assert.Equal(t, tt.wants.RequestMethodPassed, o.RequestMethodPassed)
 				assert.Equal(t, tt.wants.RequestPath, o.RequestPath)
