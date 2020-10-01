@@ -63,15 +63,3 @@ nfpms:
       - rpm
     files:
       "./share/man/man1/gh*.1": "/usr/share/man/man1"
-
-scoop:
-  bucket:
-    owner: cli
-    name: scoop-gh
-  commit_author:
-    name: vilmibm
-    email: vilmibm@github.com
-  homepage: https://github.com/cli/cli
-  skip_upload: auto
-  description: GitHub CLI
-  license: MIT
