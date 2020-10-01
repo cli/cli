@@ -62,16 +62,12 @@ func cacheKey(req *http.Request) (string, error) {
 	return fmt.Sprintf("%x", digest), nil
 }
 
-type readCloser struct {
-	io.Reader
-	io.Closer
-}
-
 func readCache(ttl time.Duration, cacheFile string, req *http.Request) (*http.Response, error) {
 	f, err := os.Open(cacheFile)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	fs, err := f.Stat()
 	if err != nil {
@@ -83,15 +79,13 @@ func readCache(ttl time.Duration, cacheFile string, req *http.Request) (*http.Re
 		return nil, errors.New("cache expired")
 	}
 
-	res, err := http.ReadResponse(bufio.NewReader(f), req)
-	if res == nil {
-		res.Body = &readCloser{
-			Reader: res.Body,
-			Closer: f,
-		}
-	} else {
-		f.Close()
+	body := &bytes.Buffer{}
+	_, err = io.Copy(body, f)
+	if err != nil {
+		return nil, err
 	}
+
+	res, err := http.ReadResponse(bufio.NewReader(body), req)
 	return res, err
 }
 

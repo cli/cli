@@ -39,6 +39,7 @@ func Test_CacheReponse(t *testing.T) {
 		if err != nil {
 			return "", err
 		}
+		defer res.Body.Close()
 		resBody, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			err = fmt.Errorf("ReadAll: %w", err)
