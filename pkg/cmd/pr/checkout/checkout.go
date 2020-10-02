@@ -114,14 +114,15 @@ func checkoutRun(opts *CheckoutOptions) error {
 	var cmdQueue [][]string
 
 	if headRemote == nil {
-		// no git remote for PR head
 		currentBranch, _ := opts.Branch()
-
-		defaultBranchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		defaultBranch, err := api.RepoDefaultBranch(apiClient, baseRepo)
 		if err != nil {
 			return err
 		}
-		cmdQueue = append(cmdQueue, checkoutFromMissingRemoteCmds(baseURLOrName, pr, baseRepo.RepoHost(), defaultBranchName, currentBranch, protocol)...)
+
+		cmdQueue = append(cmdQueue,
+			checkoutFromMissingRemoteCmds(baseURLOrName, pr, baseRepo.RepoHost(), defaultBranch, currentBranch, protocol)...,
+		)
 	} else {
 		cmdQueue = append(cmdQueue, checkoutFromExistingRemoteCmds(headRemote, pr)...)
 	}
@@ -153,8 +154,7 @@ func checkoutFromExistingRemoteCmds(remote *context.Remote, pr *api.PullRequest)
 
 	cmds = append(cmds, []string{"git", "fetch", remote.Name, refSpec})
 
-	// local branch already exists
-	if _, err := git.ShowRefs("refs/heads/" + pr.HeadRefName); err == nil {
+	if localBranchExists(pr.HeadRefName) {
 		cmds = append(cmds, []string{"git", "checkout", pr.HeadRefName})
 		cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 	} else {
@@ -194,12 +194,22 @@ func checkoutFromMissingRemoteCmds(baseURLOrName string, pr *api.PullRequest, re
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
 
-	if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
+	if missingMergeConfigForBranch(newBranchName) {
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
 	}
 
 	return cmds
+}
+
+func missingMergeConfigForBranch(b string) bool {
+	mc, err := git.Config(fmt.Sprintf("branch.%s.merge", b))
+	return err != nil || mc == ""
+}
+
+func localBranchExists(b string) bool {
+	_, err := git.ShowRefs("refs/heads/" + b)
+	return err == nil
 }
 
 func executeCmdQueue(q [][]string) error {
