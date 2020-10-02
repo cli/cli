@@ -114,7 +114,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	var cmdQueue [][]string
 
 	if headRemote != nil {
-		cmdQueue = append(cmdQueue, fetchFromExistingRemote(headRemote, pr)...)
+		cmdQueue = append(cmdQueue, fetchFromExistingRemoteCmds(headRemote, pr)...)
 	} else {
 		// no git remote for PR head
 		currentBranch, _ := opts.Branch()
@@ -123,7 +123,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		cmdQueue = append(cmdQueue, fetchFromNewRemote(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
+		cmdQueue = append(cmdQueue, fetchFromMissingRemoteCmds(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
 	}
 
 	if opts.RecurseSubmodules {
@@ -145,7 +145,7 @@ func recurseThroughSubmodulesCmds() [][]string {
 	return cmdQueue
 }
 
-func fetchFromExistingRemote(headRemote *context.Remote, pr *api.PullRequest) [][]string {
+func fetchFromExistingRemoteCmds(headRemote *context.Remote, pr *api.PullRequest) [][]string {
 	var cmdQueue [][]string
 
 	remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
@@ -167,7 +167,7 @@ func fetchFromExistingRemote(headRemote *context.Remote, pr *api.PullRequest) []
 	return cmdQueue
 }
 
-func fetchFromNewRemote(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
+func fetchFromMissingRemoteCmds(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
 	var cmdQueue [][]string
 
 	newBranchName := pr.HeadRefName
