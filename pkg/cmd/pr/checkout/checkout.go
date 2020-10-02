@@ -121,7 +121,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		cmdQueue = append(cmdQueue, checkoutFromMissingRemoteCmds(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
+		cmdQueue = append(cmdQueue, checkoutFromMissingRemoteCmds(baseURLOrName, pr, baseRepo.RepoHost(), defaultBranchName, currentBranch, protocol)...)
 	} else {
 		cmdQueue = append(cmdQueue, checkoutFromExistingRemoteCmds(headRemote, pr)...)
 	}
@@ -166,12 +166,12 @@ func checkoutFromExistingRemoteCmds(remote *context.Remote, pr *api.PullRequest)
 	return cmds
 }
 
-func checkoutFromMissingRemoteCmds(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
+func checkoutFromMissingRemoteCmds(baseURLOrName string, pr *api.PullRequest, repoHost string, defaultBranch string, currentBranch string, protocol string) [][]string {
 	var cmds [][]string
 
 	newBranchName := pr.HeadRefName
 	// avoid naming the new branch the same as the default branch
-	if newBranchName == defaultBranchName {
+	if newBranchName == defaultBranch {
 		newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
 	}
 
@@ -189,7 +189,7 @@ func checkoutFromMissingRemoteCmds(protocol string, apiClient *api.Client, pr *a
 	remote := baseURLOrName
 	mergeRef := ref
 	if pr.MaintainerCanModify {
-		headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
+		headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, repoHost)
 		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
