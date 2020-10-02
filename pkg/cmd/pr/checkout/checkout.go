@@ -127,8 +127,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if opts.RecurseSubmodules {
-		cmdQueue = append(cmdQueue, []string{"git", "submodule", "sync", "--recursive"})
-		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
+		cmdQueue = append(cmdQueue, recurseThroughSubmodulesCmds()...)
 	}
 
 	err = executeCmdQueue(cmdQueue)
@@ -137,6 +136,13 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	return nil
+}
+
+func recurseThroughSubmodulesCmds() [][]string {
+	var cmdQueue [][]string
+	cmdQueue = append(cmdQueue, []string{"git", "submodule", "sync", "--recursive"})
+	cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
+	return cmdQueue
 }
 
 func fetchFromExistingRemote(headRemote *context.Remote, pr *api.PullRequest) [][]string {
