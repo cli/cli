@@ -170,7 +170,16 @@ func checkoutRun(opts *CheckoutOptions) error {
 		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
 	}
 
-	for _, args := range cmdQueue {
+	err = executeCmdQueue(cmdQueue)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func executeCmdQueue(q [][]string) error {
+	for _, args := range q {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -178,6 +187,5 @@ func checkoutRun(opts *CheckoutOptions) error {
 			return err
 		}
 	}
-
 	return nil
 }
