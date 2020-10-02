@@ -123,34 +123,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-
-		// avoid naming the new branch the same as the default branch
-		if newBranchName == defaultBranchName {
-			newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
-		}
-
-		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
-		if newBranchName == currentBranch {
-			// PR head matches currently checked out branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
-		} else {
-			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-		}
-
-		remote := baseURLOrName
-		mergeRef := ref
-		if pr.MaintainerCanModify {
-			headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
-			remote = ghrepo.FormatRemoteURL(headRepo, protocol)
-			mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
-		}
-		if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
-		}
+		cmdQueue = append(cmdQueue, fetchFromNewRemote(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
 	}
 
 	if opts.RecurseSubmodules {
@@ -183,6 +156,42 @@ func fetchFromExistingRemote(headRemote *context.Remote, pr *api.PullRequest) []
 		cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
 		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
 		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
+	}
+
+	return cmdQueue
+}
+
+func fetchFromNewRemote(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
+	var cmdQueue [][]string
+
+	newBranchName := pr.HeadRefName
+
+	// avoid naming the new branch the same as the default branch
+	if newBranchName == defaultBranchName {
+		newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
+	}
+
+	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
+	if newBranchName == currentBranch {
+		// PR head matches currently checked out branch
+		cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
+		cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+	} else {
+		// create a new branch
+		cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
+		cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+	}
+
+	remote := baseURLOrName
+	mergeRef := ref
+	if pr.MaintainerCanModify {
+		headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, baseRepo.RepoHost())
+		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
+		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
+	}
+	if mc, err := git.Config(fmt.Sprintf("branch.%s.merge", newBranchName)); err != nil || mc == "" {
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
 	}
 
 	return cmdQueue
