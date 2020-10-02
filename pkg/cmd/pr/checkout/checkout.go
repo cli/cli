@@ -113,9 +113,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	var cmdQueue [][]string
 
-	if headRemote != nil {
-		cmdQueue = append(cmdQueue, fetchFromExistingRemoteCmds(headRemote, pr)...)
-	} else {
+	if headRemote == nil {
 		// no git remote for PR head
 		currentBranch, _ := opts.Branch()
 
@@ -123,7 +121,9 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		cmdQueue = append(cmdQueue, fetchFromMissingRemoteCmds(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
+		cmdQueue = append(cmdQueue, checkoutFromMissingRemoteCmds(protocol, apiClient, pr, baseRepo, defaultBranchName, currentBranch, baseURLOrName)...)
+	} else {
+		cmdQueue = append(cmdQueue, checkoutFromExistingRemoteCmds(headRemote, pr)...)
 	}
 
 	if opts.RecurseSubmodules {
@@ -139,19 +139,19 @@ func checkoutRun(opts *CheckoutOptions) error {
 }
 
 func recurseThroughSubmodulesCmds() [][]string {
-	var cmds [][]string
-	cmds = append(cmds, []string{"git", "submodule", "sync", "--recursive"})
-	cmds = append(cmds, []string{"git", "submodule", "update", "--init", "--recursive"})
-	return cmds
+	return [][]string{
+		{"git", "submodule", "sync", "--recursive"},
+		{"git", "submodule", "update", "--init", "--recursive"},
+	}
 }
 
-func fetchFromExistingRemoteCmds(headRemote *context.Remote, pr *api.PullRequest) [][]string {
+func checkoutFromExistingRemoteCmds(remote *context.Remote, pr *api.PullRequest) [][]string {
 	var cmds [][]string
 
-	remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
+	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 	refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
 
-	cmds = append(cmds, []string{"git", "fetch", headRemote.Name, refSpec})
+	cmds = append(cmds, []string{"git", "fetch", remote.Name, refSpec})
 
 	// local branch already exists
 	if _, err := git.ShowRefs("refs/heads/" + pr.HeadRefName); err == nil {
@@ -159,14 +159,14 @@ func fetchFromExistingRemoteCmds(headRemote *context.Remote, pr *api.PullRequest
 		cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 	} else {
 		cmds = append(cmds, []string{"git", "checkout", "-b", pr.HeadRefName, "--no-track", remoteBranch})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", pr.HeadRefName), headRemote.Name})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", pr.HeadRefName), remote.Name})
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", pr.HeadRefName), "refs/heads/" + pr.HeadRefName})
 	}
 
 	return cmds
 }
 
-func fetchFromMissingRemoteCmds(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
+func checkoutFromMissingRemoteCmds(protocol string, apiClient *api.Client, pr *api.PullRequest, baseRepo ghrepo.Interface, defaultBranchName string, currentBranch string, baseURLOrName string) [][]string {
 	var cmds [][]string
 
 	newBranchName := pr.HeadRefName
