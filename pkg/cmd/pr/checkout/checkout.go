@@ -30,6 +30,7 @@ type CheckoutOptions struct {
 
 	SelectorArg       string
 	RecurseSubmodules bool
+	DetachHead        bool
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -66,6 +67,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	}
 
 	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all active submodules (recursively)")
+	cmd.Flags().BoolVarP(&opts.DetachHead, "detach-head", "", false, "Checkout PR with a detach head")
 
 	return cmd
 }
@@ -94,7 +96,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	protocol, _ := cfg.Get(baseRepo.RepoHost(), "git_protocol")
 
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
-	// baseRemoteSpec is a repository URL or a remote name to be used in git fetch
+	// baseURLOrName is a repository URL or a remote name to be used in git fetch
 	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
 	if baseRemote != nil {
 		baseURLOrName = baseRemote.Name
@@ -112,21 +114,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if headRemote != nil {
-		// there is an existing git remote for PR head
-		remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
-		refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
-
-		cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
-
-		// local branch already exists
-		if _, err := git.ShowRefs("refs/heads/" + newBranchName); err == nil {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
-		} else {
-			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
-			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
-		}
+		cmdQueue = append(cmdQueue, fetchFromExistingRemote(headRemote, pr)...)
 	} else {
 		// no git remote for PR head
 		currentBranch, _ := opts.Branch()
@@ -176,6 +164,28 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	return nil
+}
+
+func fetchFromExistingRemote(headRemote *context.Remote, pr *api.PullRequest) [][]string {
+	var cmdQueue [][]string
+
+	remoteBranch := fmt.Sprintf("%s/%s", headRemote.Name, pr.HeadRefName)
+	refSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/%s", pr.HeadRefName, remoteBranch)
+	newBranchName := pr.HeadRefName
+
+	cmdQueue = append(cmdQueue, []string{"git", "fetch", headRemote.Name, refSpec})
+
+	// local branch already exists
+	if _, err := git.ShowRefs("refs/heads/" + newBranchName); err == nil {
+		cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
+		cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+	} else {
+		cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
+		cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), "refs/heads/" + pr.HeadRefName})
+	}
+
+	return cmdQueue
 }
 
 func executeCmdQueue(q [][]string) error {
