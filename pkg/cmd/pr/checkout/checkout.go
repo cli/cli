@@ -107,11 +107,11 @@ func checkoutRun(opts *CheckoutOptions) error {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
-	var cmdQueue [][]string
-	newBranchName := pr.HeadRefName
-	if strings.HasPrefix(newBranchName, "-") {
-		return fmt.Errorf("invalid branch name: %q", newBranchName)
+	if strings.HasPrefix(pr.HeadRefName, "-") {
+		return fmt.Errorf("invalid branch name: %q", pr.HeadRefName)
 	}
+
+	var cmdQueue [][]string
 
 	if headRemote != nil {
 		cmdQueue = append(cmdQueue, fetchFromExistingRemote(headRemote, pr)...)
