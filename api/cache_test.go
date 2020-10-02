@@ -20,8 +20,12 @@ func Test_CacheReponse(t *testing.T) {
 		roundTrip: func(req *http.Request) (*http.Response, error) {
 			counter += 1
 			body := fmt.Sprintf("%d: %s %s", counter, req.Method, req.URL.String())
+			status := 200
+			if req.URL.Path == "/error" {
+				status = 500
+			}
 			return &http.Response{
-				StatusCode: 200,
+				StatusCode: status,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(body)),
 			}, nil
 		},
@@ -47,25 +51,39 @@ func Test_CacheReponse(t *testing.T) {
 		return string(resBody), err
 	}
 
-	res1, err := do("GET", "http://example.com/path", nil)
-	require.NoError(t, err)
-	assert.Equal(t, "1: GET http://example.com/path", res1)
-	res2, err := do("GET", "http://example.com/path", nil)
-	require.NoError(t, err)
-	assert.Equal(t, "1: GET http://example.com/path", res2)
+	var res string
+	var err error
 
-	res3, err := do("GET", "http://example.com/path2", nil)
+	res, err = do("GET", "http://example.com/path", nil)
 	require.NoError(t, err)
-	assert.Equal(t, "2: GET http://example.com/path2", res3)
+	assert.Equal(t, "1: GET http://example.com/path", res)
+	res, err = do("GET", "http://example.com/path", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "1: GET http://example.com/path", res)
 
-	res4, err := do("POST", "http://example.com/path", bytes.NewBufferString(`hello`))
+	res, err = do("GET", "http://example.com/path2", nil)
 	require.NoError(t, err)
-	assert.Equal(t, "3: POST http://example.com/path", res4)
-	res5, err := do("POST", "http://example.com/path", bytes.NewBufferString(`hello`))
-	require.NoError(t, err)
-	assert.Equal(t, "3: POST http://example.com/path", res5)
+	assert.Equal(t, "2: GET http://example.com/path2", res)
 
-	res6, err := do("POST", "http://example.com/path", bytes.NewBufferString(`hello2`))
+	res, err = do("POST", "http://example.com/path2", nil)
 	require.NoError(t, err)
-	assert.Equal(t, "4: POST http://example.com/path", res6)
+	assert.Equal(t, "3: POST http://example.com/path2", res)
+
+	res, err = do("POST", "http://example.com/graphql", bytes.NewBufferString(`hello`))
+	require.NoError(t, err)
+	assert.Equal(t, "4: POST http://example.com/graphql", res)
+	res, err = do("POST", "http://example.com/graphql", bytes.NewBufferString(`hello`))
+	require.NoError(t, err)
+	assert.Equal(t, "4: POST http://example.com/graphql", res)
+
+	res, err = do("POST", "http://example.com/graphql", bytes.NewBufferString(`hello2`))
+	require.NoError(t, err)
+	assert.Equal(t, "5: POST http://example.com/graphql", res)
+
+	res, err = do("GET", "http://example.com/error", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "6: GET http://example.com/error", res)
+	res, err = do("GET", "http://example.com/error", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "7: GET http://example.com/error", res)
 }
