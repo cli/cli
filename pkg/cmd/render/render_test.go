@@ -3,7 +3,6 @@ package render
 import (
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,28 +23,21 @@ func Test_renderRun(t *testing.T) {
 	}{
 		{
 			name:       "no file path",
-			wantStderr: "failed to read file ",
+			wantStderr: "Markdown file was expected, but got '.' instead\n",
 		},
 		{
 			name: "file not exist",
 			opts: &RenderOptions{
-				FilePath: "filepath",
+				FilePath: "filepath.md",
 			},
-			wantStderr: "failed to read file filepath",
+			wantStderr: "failed to read file 'filepath.md'",
 		},
 		{
-			name: "notty",
+			name: "no markdown file",
 			opts: &RenderOptions{
-				FilePath: fixtureFile,
+				FilePath: "fixture.file",
 			},
-			wantOut: heredoc.Doc(`
-				name:	fixture.md
-				full path:	./fixture.md
-				--
-				# Fixture file
-
-				content here
-				`),
+			wantStderr: "Markdown file was expected, but got '.file' instead\n",
 		},
 		{
 			name: "tty",
@@ -53,17 +45,7 @@ func Test_renderRun(t *testing.T) {
 				FilePath: fixtureFile,
 			},
 			stdoutTTY: true,
-			wantOut: heredoc.Doc(`
-				Name: fixture.md
-				Path: ./fixture.md
-
-
-				  # Fixture file                                                              
-                                                                                  
-				  content here                                                                
-
-
-			`),
+			wantOut:   "\n  # Fixture file                                                              \n\n",
 		},
 	}
 	for _, tt := range tests {

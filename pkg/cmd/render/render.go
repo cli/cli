@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
-	"strings"
 	"syscall"
-	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -48,15 +46,20 @@ func NewCmdRender(f *cmdutil.Factory) *cobra.Command {
 
 func renderRun(opts *RenderOptions) error {
 	filePath := opts.FilePath
-	content, err := ioutil.ReadFile(filePath)
+	filename := path.Base(filePath)
 
+	if !utils.IsMarkdownFile(filename) {
+		_, err := fmt.Fprintf(opts.IO.ErrOut, "Markdown file was expected, but got '%s' instead\n", path.Ext(filename))
+		return err
+	}
+
+	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		_, err := fmt.Fprintf(opts.IO.ErrOut, "failed to read file %s", filePath)
+		_, err := fmt.Fprintf(opts.IO.ErrOut, "failed to read file '%s'", filePath)
 		return err
 	}
 
 	contentString := string(content)
-	filename := path.Base(filePath)
 
 	opts.IO.DetectTerminalTheme()
 
@@ -66,54 +69,14 @@ func renderRun(opts *RenderOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	stdout := opts.IO.Out
-
-	if !opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(stdout, "name:\t%s\n", filename)
-		fmt.Fprintf(stdout, "full path:\t%s\n", filePath)
-		fmt.Fprintln(stdout, "--")
-		fmt.Fprint(stdout, strings.ReplaceAll(contentString, "\r\n", "\n"))
-		fmt.Fprintln(stdout)
-
-		return nil
-	}
-
-	renderTmpl := heredoc.Doc(`
-		{{.Name}}
-		{{.FullPath}}
-
-		{{.Content}}
-	`)
-
-	tmpl, err := template.New("mdfile").Parse(renderTmpl)
+	style := markdown.GetStyle(opts.IO.TerminalTheme())
+	renderContent, err := markdown.Render(contentString, style)
 	if err != nil {
-		return err
+		return fmt.Errorf("error rendering markdown: %w", err)
 	}
+	renderContent = emoji.Parse(renderContent)
 
-	var renderContent string
-	if utils.IsMarkdownFile(filename) {
-		var err error
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		renderContent, err = markdown.Render(contentString, style)
-		if err != nil {
-			return fmt.Errorf("error rendering markdown: %w", err)
-		}
-		renderContent = emoji.Parse(renderContent)
-	} else {
-		renderContent = emoji.Parse(contentString)
-	}
-
-	renderData := struct {
-		Name     string
-		FullPath string
-		Content  string
-	}{
-		Name:     utils.Bold("Name: " + filename),
-		FullPath: "Path: " + filePath,
-		Content:  renderContent,
-	}
-
-	err = tmpl.Execute(stdout, renderData)
+	_, err = opts.IO.Out.Write([]byte(renderContent))
 	if err != nil && !errors.Is(err, syscall.EPIPE) {
 		return err
 	}

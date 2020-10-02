@@ -1,3 +1,1 @@
 # Fixture file
-
-content here
