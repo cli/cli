@@ -2,6 +2,7 @@ package root
 
 import (
 	"net/http"
+	"runtime"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -25,6 +26,10 @@ import (
 )
 
 func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
+	if runtime.GOOS == "windows" {
+		cobra.MousetrapHelpText = ""
+	}
+
 	cmd := &cobra.Command{
 		Use:   "gh <command> <subcommand> [flags]",
 		Short: "GitHub CLI",
