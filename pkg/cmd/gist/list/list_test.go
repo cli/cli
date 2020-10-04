@@ -2,11 +2,11 @@ package list
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -88,115 +88,254 @@ func TestNewCmdList(t *testing.T) {
 }
 
 func Test_listRun(t *testing.T) {
+	const query = `query ListGists\b`
+	sixHoursAgo, _ := time.ParseDuration("-6h")
+	timeSixHoursAgo := time.Now().Add(sixHoursAgo).Format(time.RFC3339)
+	blankTime := time.Time{}.Format(time.RFC3339)
 	tests := []struct {
-		name      string
-		opts      *ListOptions
-		wantOut   string
-		stubs     func(*httpmock.Registry)
-		nontty    bool
-		updatedAt *time.Time
+		name    string
+		opts    *ListOptions
+		wantOut string
+		stubs   func(*httpmock.Registry)
+		nontty  bool
 	}{
 		{
 			name: "no gists",
 			opts: &ListOptions{},
 			stubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "gists"),
-					httpmock.JSONResponse([]shared.Gist{}))
-
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(`{ "data": { "viewer": {
+						"gists": { "nodes": [] }
+					} } }`))
 			},
 			wantOut: "",
 		},
 		{
-			name:    "default behavior",
-			opts:    &ListOptions{},
+			name: "default behavior",
+			opts: &ListOptions{},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{ 
+								"name": "1234567890",
+								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							},
+							{ 
+								"name": "4567890123",
+								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							},
+							{ 
+								"name": "2345678901",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "tea leaves thwart those who court catastrophe",
+								"updatedAt": "%v",
+								"isPublic": false
+							},
+							{ 
+								"name": "3456789012",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "short desc",
+								"updatedAt": "%v",
+								"isPublic": false
+							}
+						] } } } }`,
+						timeSixHoursAgo,
+						timeSixHoursAgo,
+						timeSixHoursAgo,
+						timeSixHoursAgo,
+					)),
+				)
+			},
 			wantOut: "1234567890  cool.txt              1 file    public  about 6 hours ago\n4567890123                        1 file    public  about 6 hours ago\n2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
 		},
 		{
-			name:    "with public filter",
-			opts:    &ListOptions{Visibility: "public"},
+			name: "with public filter",
+			opts: &ListOptions{Visibility: "public"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{ 
+								"name": "1234567890",
+								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							},
+							{ 
+								"name": "4567890123",
+								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							}
+						] } } } }`,
+						timeSixHoursAgo,
+						timeSixHoursAgo,
+					)),
+				)
+			},
 			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n4567890123            1 file  public  about 6 hours ago\n",
 		},
 		{
-			name:    "with secret filter",
-			opts:    &ListOptions{Visibility: "secret"},
+			name: "with secret filter",
+			opts: &ListOptions{Visibility: "secret"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{ 
+								"name": "2345678901",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "tea leaves thwart those who court catastrophe",
+								"updatedAt": "%v",
+								"isPublic": false
+							},
+							{ 
+								"name": "3456789012",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "short desc",
+								"updatedAt": "%v",
+								"isPublic": false
+							}
+						] } } } }`,
+						timeSixHoursAgo,
+						timeSixHoursAgo,
+					)),
+				)
+			},
 			wantOut: "2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
 		},
 		{
-			name:    "with limit",
-			opts:    &ListOptions{Limit: 1},
+			name: "with limit",
+			opts: &ListOptions{Limit: 1},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{ 
+								"name": "1234567890",
+								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							}
+						] } } } }`,
+						timeSixHoursAgo,
+					)),
+				)
+			},
 			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n",
 		},
 		{
-			name:      "nontty output",
-			opts:      &ListOptions{},
-			updatedAt: &time.Time{},
-			wantOut:   "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
-			nontty:    true,
+			name: "nontty output",
+			opts: &ListOptions{},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{ 
+								"name": "1234567890",
+								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							},
+							{ 
+								"name": "4567890123",
+								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"description": "",
+								"updatedAt": "%v",
+								"isPublic": true
+							},
+							{ 
+								"name": "2345678901",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "tea leaves thwart those who court catastrophe",
+								"updatedAt": "%v",
+								"isPublic": false
+							},
+							{ 
+								"name": "3456789012",
+								"files": [
+									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
+									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+								],
+								"description": "short desc",
+								"updatedAt": "%v",
+								"isPublic": false
+							}
+						] } } } }`,
+						blankTime,
+						blankTime,
+						blankTime,
+						blankTime,
+					)),
+				)
+			},
+			wantOut: "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
+			nontty:  true,
 		},
 	}
 
 	for _, tt := range tests {
-		sixHoursAgo, _ := time.ParseDuration("-6h")
-		updatedAt := time.Now().Add(sixHoursAgo)
-		if tt.updatedAt != nil {
-			updatedAt = *tt.updatedAt
-		}
-
 		reg := &httpmock.Registry{}
-		if tt.stubs == nil {
-			reg.Register(httpmock.REST("GET", "gists"),
-				httpmock.JSONResponse([]shared.Gist{
-					{
-						ID:          "1234567890",
-						UpdatedAt:   updatedAt,
-						Description: "",
-						Files: map[string]*shared.GistFile{
-							"cool.txt": {},
-						},
-						Public: true,
-					},
-					{
-						ID:          "4567890123",
-						UpdatedAt:   updatedAt,
-						Description: "",
-						Files: map[string]*shared.GistFile{
-							"gistfile0.txt": {},
-						},
-						Public: true,
-					},
-					{
-						ID:          "2345678901",
-						UpdatedAt:   updatedAt,
-						Description: "tea leaves thwart those who court catastrophe",
-						Files: map[string]*shared.GistFile{
-							"gistfile0.txt": {},
-							"gistfile1.txt": {},
-						},
-						Public: false,
-					},
-					{
-						ID:          "3456789012",
-						UpdatedAt:   updatedAt,
-						Description: "short desc",
-						Files: map[string]*shared.GistFile{
-							"gistfile0.txt":  {},
-							"gistfile1.txt":  {},
-							"gistfile2.txt":  {},
-							"gistfile3.txt":  {},
-							"gistfile4.txt":  {},
-							"gistfile5.txt":  {},
-							"gistfile6.txt":  {},
-							"gistfile7.txt":  {},
-							"gistfile8.txt":  {},
-							"gistfile9.txt":  {},
-							"gistfile10.txt": {},
-						},
-						Public: false,
-					},
-				}))
-		} else {
-			tt.stubs(reg)
-		}
+		tt.stubs(reg)
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
