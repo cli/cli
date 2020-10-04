@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
@@ -14,7 +16,13 @@ import (
 )
 
 func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
+	dirPath := ""
+	if runtime.GOOS == "windows" {
+		dirPath = filepath.Join(os.Getenv("APPDATA"), "Github CLI")
+	} else {
+		dirPath = "~/.config/gh"
+	}
+	dir, _ := homedir.Expand(dirPath)
 	return dir
 }
 
