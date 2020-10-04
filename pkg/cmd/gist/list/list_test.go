@@ -119,31 +119,31 @@ func Test_listRun(t *testing.T) {
 					httpmock.GraphQL(query),
 					httpmock.StringResponse(fmt.Sprintf(
 						`{ "data": { "viewer": { "gists": { "nodes": [
-							{ 
+							{
 								"name": "1234567890",
 								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
-							{ 
+							{
 								"name": "4567890123",
 								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
-							{ 
+							{
 								"name": "2345678901",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
 									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							},
-							{ 
+							{
 								"name": "3456789012",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
@@ -159,13 +159,10 @@ func Test_listRun(t *testing.T) {
 									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "short desc",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						timeSixHoursAgo,
-						timeSixHoursAgo,
-						timeSixHoursAgo,
 						timeSixHoursAgo,
 					)),
 				)
@@ -180,22 +177,21 @@ func Test_listRun(t *testing.T) {
 					httpmock.GraphQL(query),
 					httpmock.StringResponse(fmt.Sprintf(
 						`{ "data": { "viewer": { "gists": { "nodes": [
-							{ 
+							{
 								"name": "1234567890",
 								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
-							{ 
+							{
 								"name": "4567890123",
 								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							}
 						] } } } }`,
-						timeSixHoursAgo,
 						timeSixHoursAgo,
 					)),
 				)
@@ -210,17 +206,17 @@ func Test_listRun(t *testing.T) {
 					httpmock.GraphQL(query),
 					httpmock.StringResponse(fmt.Sprintf(
 						`{ "data": { "viewer": { "gists": { "nodes": [
-							{ 
+							{
 								"name": "2345678901",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
 									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							},
-							{ 
+							{
 								"name": "3456789012",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
@@ -236,11 +232,10 @@ func Test_listRun(t *testing.T) {
 									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "short desc",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						timeSixHoursAgo,
 						timeSixHoursAgo,
 					)),
 				)
@@ -255,7 +250,7 @@ func Test_listRun(t *testing.T) {
 					httpmock.GraphQL(query),
 					httpmock.StringResponse(fmt.Sprintf(
 						`{ "data": { "viewer": { "gists": { "nodes": [
-							{ 
+							{
 								"name": "1234567890",
 								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
@@ -277,31 +272,31 @@ func Test_listRun(t *testing.T) {
 					httpmock.GraphQL(query),
 					httpmock.StringResponse(fmt.Sprintf(
 						`{ "data": { "viewer": { "gists": { "nodes": [
-							{ 
+							{
 								"name": "1234567890",
 								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
-							{ 
+							{
 								"name": "4567890123",
 								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
 								"description": "",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
-							{ 
+							{
 								"name": "2345678901",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
 									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							},
-							{ 
+							{
 								"name": "3456789012",
 								"files": [
 									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
@@ -317,13 +312,10 @@ func Test_listRun(t *testing.T) {
 									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
 								],
 								"description": "short desc",
-								"updatedAt": "%v",
+								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						blankTime,
-						blankTime,
-						blankTime,
 						blankTime,
 					)),
 				)
