@@ -26,7 +26,7 @@ We'd love to hear your feedback about `gh`. If you spot bugs or have features th
 
 ### macOS
 
-`gh` is available via Homebrew and MacPorts.
+`gh` is available via [Homebrew][] and [MacPorts][].
 
 #### Homebrew
 
@@ -93,6 +93,8 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 
 
 [official docs]: https://cli.github.com/manual
+[Homebrew]: https://brew.sh
+[MacPorts]: https://www.macports.org
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
