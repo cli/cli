@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
@@ -14,7 +15,15 @@ import (
 )
 
 func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
+	dirPath := userHomeDir()
+
+	if runtime.GOOS == "windows" {
+		dirPath += "\\AppData\\Local\\Github Cli"
+	} else {
+		dirPath += "/.config/gh"
+	}
+
+	dir, _ := homedir.Expand(dirPath)
 	return dir
 }
 
@@ -205,4 +214,17 @@ func findRegularFile(p string) string {
 		p = newPath
 	}
 	return ""
+}
+
+func userHomeDir() string {
+	if runtime.GOOS == "windows" {
+		home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
+		if home == "" {
+			home = os.Getenv("USERPROFILE")
+		}
+
+		return home
+	}
+
+	return os.Getenv("HOME")
 }
