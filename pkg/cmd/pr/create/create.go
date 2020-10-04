@@ -399,7 +399,7 @@ func createRun(opts *CreateOptions) error {
 	// There are two cases when an existing remote for the head repo will be
 	// missing:
 	// 1. the head repo was just created by auto-forking;
-	// 2. an existing fork was discovered by quering the API.
+	// 2. an existing fork was discovered by querying the API.
 	//
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.

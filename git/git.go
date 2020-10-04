@@ -14,7 +14,7 @@ import (
 	"github.com/cli/cli/internal/run"
 )
 
-// ErrNotOnAnyBranch indicates that the users is in detached HEAD state
+// ErrNotOnAnyBranch indicates that the user is in detached HEAD state
 var ErrNotOnAnyBranch = errors.New("git: not on any branch")
 
 // Ref represents a git commit reference
