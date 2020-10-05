@@ -27,6 +27,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 	}
 
+	var flagPublic bool
+	var flagSecret bool
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your gists",
@@ -36,27 +39,23 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
 			}
 
-			pub := cmd.Flags().Changed("public")
-			secret := cmd.Flags().Changed("secret")
-
 			opts.Visibility = "all"
-			if pub && !secret {
-				opts.Visibility = "public"
-			} else if secret && !pub {
+			if flagSecret {
 				opts.Visibility = "secret"
+			} else if flagPublic {
+				opts.Visibility = "public"
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return listRun(opts)
 		},
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of gists to fetch")
-	cmd.Flags().Bool("public", false, "Show only public gists")
-	cmd.Flags().Bool("secret", false, "Show only secret gists")
+	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public gists")
+	cmd.Flags().BoolVar(&flagSecret, "secret", false, "Show only secret gists")
 
 	return cmd
 }

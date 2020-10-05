@@ -44,11 +44,19 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
+			name: "secret with explicit false value",
+			cli:  "--secret=false",
+			wants: ListOptions{
+				Limit:      10,
+				Visibility: "all",
+			},
+		},
+		{
 			name: "public and secret",
 			cli:  "--secret --public",
 			wants: ListOptions{
 				Limit:      10,
-				Visibility: "all",
+				Visibility: "secret",
 			},
 		},
 		{
