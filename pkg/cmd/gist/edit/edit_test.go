@@ -75,6 +75,7 @@ func Test_editRun(t *testing.T) {
 		askStubs   func(*prompt.AskStubber)
 		nontty     bool
 		wantErr    bool
+		wantStderr string
 		wantParams map[string]interface{}
 	}{
 		{
@@ -92,6 +93,7 @@ func Test_editRun(t *testing.T) {
 						Type:     "text/plain",
 					},
 				},
+				Owner: &shared.GistOwner{Login: "octocat"},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
@@ -131,6 +133,7 @@ func Test_editRun(t *testing.T) {
 						Type:     "application/markdown",
 					},
 				},
+				Owner: &shared.GistOwner{Login: "octocat"},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
@@ -175,6 +178,7 @@ func Test_editRun(t *testing.T) {
 						Type:     "application/markdown",
 					},
 				},
+				Owner: &shared.GistOwner{Login: "octocat"},
 			},
 		},
 		{
@@ -188,7 +192,24 @@ func Test_editRun(t *testing.T) {
 						Type:     "text/plain",
 					},
 				},
+				Owner: &shared.GistOwner{Login: "octocat"},
 			},
+		},
+		{
+			name: "another user's gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Filename: "cicada.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat2"},
+			},
+			wantErr:    true,
+			wantStderr: "You do not own this gist.",
 		},
 	}
 
@@ -200,6 +221,8 @@ func Test_editRun(t *testing.T) {
 		} else {
 			reg.Register(httpmock.REST("GET", "gists/1234"),
 				httpmock.JSONResponse(tt.gist))
+			reg.Register(httpmock.GraphQL(`query UserCurrent\b`),
+				httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
 		}
 
 		if tt.httpStubs != nil {
@@ -239,12 +262,15 @@ func Test_editRun(t *testing.T) {
 			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.wantStderr != "" {
+					assert.EqualError(t, err, tt.wantStderr)
+				}
 				return
 			}
 			assert.NoError(t, err)
 
 			if tt.wantParams != nil {
-				bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
+				bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
 				reqBody := make(map[string]interface{})
 				err = json.Unmarshal(bodyBytes, &reqBody)
 				if err != nil {

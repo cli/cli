@@ -17,6 +17,10 @@ type GistFile struct {
 	Content  string `json:"content,omitempty"`
 }
 
+type GistOwner struct {
+	Login string `json:"login,omitempty"`
+}
+
 type Gist struct {
 	ID          string               `json:"id,omitempty"`
 	Description string               `json:"description"`
@@ -24,6 +28,7 @@ type Gist struct {
 	UpdatedAt   time.Time            `json:"updated_at"`
 	Public      bool                 `json:"public"`
 	HTMLURL     string               `json:"html_url,omitempty"`
+	Owner       *GistOwner           `json:"owner,omitempty"`
 }
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
