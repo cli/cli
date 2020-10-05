@@ -1,46 +1,88 @@
 package list
 
 import (
-	"fmt"
+	"context"
 	"net/http"
-	"net/url"
-	"sort"
+	"strings"
+	"time"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
+	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 )
 
 func listGists(client *http.Client, hostname string, limit int, visibility string) ([]shared.Gist, error) {
-	result := []shared.Gist{}
-
-	query := url.Values{}
-	if visibility == "all" {
-		query.Add("per_page", fmt.Sprintf("%d", limit))
-	} else {
-		query.Add("per_page", "100")
+	type response struct {
+		Viewer struct {
+			Gists struct {
+				Nodes []struct {
+					Description string
+					Files       []struct {
+						Name string
+					}
+					IsPublic  bool
+					Name      string
+					UpdatedAt time.Time
+				}
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"gists(first: $per_page, after: $endCursor, privacy: $visibility, orderBy: {field: CREATED_AT, direction: DESC})"`
+		}
 	}
 
-	// TODO switch to graphql
-	apiClient := api.NewClientFromHTTP(client)
-	err := apiClient.REST(hostname, "GET", "gists?"+query.Encode(), nil, &result)
-	if err != nil {
-		return nil, err
+	perPage := limit
+	if perPage > 100 {
+		perPage = 100
 	}
+
+	variables := map[string]interface{}{
+		"per_page":   githubv4.Int(perPage),
+		"endCursor":  (*githubv4.String)(nil),
+		"visibility": githubv4.GistPrivacy(strings.ToUpper(visibility)),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
 
 	gists := []shared.Gist{}
+pagination:
+	for {
+		var result response
+		err := gql.QueryNamed(context.Background(), "GistList", &result, variables)
+		if err != nil {
+			return nil, err
+		}
 
-	for _, gist := range result {
-		if len(gists) == limit {
+		for _, gist := range result.Viewer.Gists.Nodes {
+			files := map[string]*shared.GistFile{}
+			for _, file := range gist.Files {
+				files[file.Name] = &shared.GistFile{
+					Filename: file.Name,
+				}
+			}
+
+			gists = append(
+				gists,
+				shared.Gist{
+					ID:          gist.Name,
+					Description: gist.Description,
+					Files:       files,
+					UpdatedAt:   gist.UpdatedAt,
+					Public:      gist.IsPublic,
+				},
+			)
+			if len(gists) == limit {
+				break pagination
+			}
+		}
+
+		if !result.Viewer.Gists.PageInfo.HasNextPage {
 			break
 		}
-		if visibility == "all" || (visibility == "secret" && !gist.Public) || (visibility == "public" && gist.Public) {
-			gists = append(gists, gist)
-		}
+		variables["endCursor"] = githubv4.String(result.Viewer.Gists.PageInfo.EndCursor)
 	}
-
-	sort.SliceStable(gists, func(i, j int) bool {
-		return gists[i].UpdatedAt.After(gists[j].UpdatedAt)
-	})
 
 	return gists, nil
 }
