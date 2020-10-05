@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -76,10 +77,7 @@ func listRun(opts *ListOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, gist := range gists {
-		fileCount := 0
-		for range gist.Files {
-			fileCount++
-		}
+		fileCount := len(gist.Files)
 
 		visibility := "public"
 		visColor := cs.Green
@@ -98,16 +96,16 @@ func listRun(opts *ListOptions) error {
 			}
 		}
 
+		gistTime := gist.UpdatedAt.Format(time.RFC3339)
+		if tp.IsTTY() {
+			gistTime = utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+		}
+
 		tp.AddField(gist.ID, nil, nil)
-		tp.AddField(description, nil, cs.Bold)
+		tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, cs.Bold)
 		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
-		if tp.IsTTY() {
-			updatedAt := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
-			tp.AddField(updatedAt, nil, cs.Gray)
-		} else {
-			tp.AddField(gist.UpdatedAt.String(), nil, nil)
-		}
+		tp.AddField(gistTime, nil, cs.Gray)
 		tp.EndRow()
 	}
 

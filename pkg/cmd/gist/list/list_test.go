@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -96,10 +97,11 @@ func TestNewCmdList(t *testing.T) {
 }
 
 func Test_listRun(t *testing.T) {
-	const query = `query ListGists\b`
-	sixHoursAgo, _ := time.ParseDuration("-6h")
-	timeSixHoursAgo := time.Now().Add(sixHoursAgo).Format(time.RFC3339)
-	blankTime := time.Time{}.Format(time.RFC3339)
+	const query = `query GistList\b`
+	sixHours, _ := time.ParseDuration("6h")
+	sixHoursAgo := time.Now().Add(-sixHours)
+	absTime, _ := time.Parse(time.RFC3339, "2020-07-30T15:24:28Z")
+
 	tests := []struct {
 		name    string
 		opts    *ListOptions
@@ -129,14 +131,14 @@ func Test_listRun(t *testing.T) {
 						`{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "1234567890",
-								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
 							{
 								"name": "4567890123",
-								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "gistfile0.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
@@ -144,8 +146,8 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "2345678901",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
 								"updatedAt": "%[1]v",
@@ -154,24 +156,24 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "3456789012",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" },
+									{ "name": "gistfile2.txt" },
+									{ "name": "gistfile3.txt" },
+									{ "name": "gistfile4.txt" },
+									{ "name": "gistfile5.txt" },
+									{ "name": "gistfile6.txt" },
+									{ "name": "gistfile7.txt" },
+									{ "name": "gistfile9.txt" },
+									{ "name": "gistfile10.txt" },
+									{ "name": "gistfile11.txt" }
 								],
 								"description": "short desc",
 								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						timeSixHoursAgo,
+						sixHoursAgo.Format(time.RFC3339),
 					)),
 				)
 			},
@@ -187,20 +189,20 @@ func Test_listRun(t *testing.T) {
 						`{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "1234567890",
-								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
 							{
 								"name": "4567890123",
-								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "gistfile0.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							}
 						] } } } }`,
-						timeSixHoursAgo,
+						sixHoursAgo.Format(time.RFC3339),
 					)),
 				)
 			},
@@ -217,8 +219,8 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "2345678901",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
 								"updatedAt": "%[1]v",
@@ -227,24 +229,24 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "3456789012",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" },
+									{ "name": "gistfile2.txt" },
+									{ "name": "gistfile3.txt" },
+									{ "name": "gistfile4.txt" },
+									{ "name": "gistfile5.txt" },
+									{ "name": "gistfile6.txt" },
+									{ "name": "gistfile7.txt" },
+									{ "name": "gistfile9.txt" },
+									{ "name": "gistfile10.txt" },
+									{ "name": "gistfile11.txt" }
 								],
 								"description": "short desc",
 								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						timeSixHoursAgo,
+						sixHoursAgo.Format(time.RFC3339),
 					)),
 				)
 			},
@@ -260,13 +262,13 @@ func Test_listRun(t *testing.T) {
 						`{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "1234567890",
-								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%v",
 								"isPublic": true
 							}
 						] } } } }`,
-						timeSixHoursAgo,
+						sixHoursAgo.Format(time.RFC3339),
 					)),
 				)
 			},
@@ -282,14 +284,14 @@ func Test_listRun(t *testing.T) {
 						`{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "1234567890",
-								"files": [{ "name": "cool.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
 							{
 								"name": "4567890123",
-								"files": [{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" }],
+								"files": [{ "name": "gistfile0.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
@@ -297,8 +299,8 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "2345678901",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" }
 								],
 								"description": "tea leaves thwart those who court catastrophe",
 								"updatedAt": "%[1]v",
@@ -307,29 +309,34 @@ func Test_listRun(t *testing.T) {
 							{
 								"name": "3456789012",
 								"files": [
-									{ "name": "gistfile0.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile1.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile2.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile3.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile4.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile5.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile6.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile7.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile9.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile10.txt", "languages": { "name": "None" }, "extension": ".txt" },
-									{ "name": "gistfile11.txt", "languages": { "name": "None" }, "extension": ".txt" }
+									{ "name": "gistfile0.txt" },
+									{ "name": "gistfile1.txt" },
+									{ "name": "gistfile2.txt" },
+									{ "name": "gistfile3.txt" },
+									{ "name": "gistfile4.txt" },
+									{ "name": "gistfile5.txt" },
+									{ "name": "gistfile6.txt" },
+									{ "name": "gistfile7.txt" },
+									{ "name": "gistfile9.txt" },
+									{ "name": "gistfile10.txt" },
+									{ "name": "gistfile11.txt" }
 								],
 								"description": "short desc",
 								"updatedAt": "%[1]v",
 								"isPublic": false
 							}
 						] } } } }`,
-						blankTime,
+						absTime.Format(time.RFC3339),
 					)),
 				)
 			},
-			wantOut: "1234567890\tcool.txt\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n4567890123\t\t1 file\tpublic\t0001-01-01 00:00:00 +0000 UTC\n2345678901\ttea leaves thwart those who court catastrophe\t2 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n3456789012\tshort desc\t11 files\tsecret\t0001-01-01 00:00:00 +0000 UTC\n",
-			nontty:  true,
+			wantOut: heredoc.Doc(`
+				1234567890	cool.txt	1 file	public	2020-07-30T15:24:28Z
+				4567890123		1 file	public	2020-07-30T15:24:28Z
+				2345678901	tea leaves thwart those who court catastrophe	2 files	secret	2020-07-30T15:24:28Z
+				3456789012	short desc	11 files	secret	2020-07-30T15:24:28Z
+			`),
+			nontty: true,
 		},
 	}
 

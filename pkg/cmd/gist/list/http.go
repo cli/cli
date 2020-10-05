@@ -1,13 +1,15 @@
 package list
 
 import (
+	"context"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
+	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 )
 
 func listGists(client *http.Client, hostname string, limit int, visibility string) ([]shared.Gist, error) {
@@ -17,83 +19,70 @@ func listGists(client *http.Client, hostname string, limit int, visibility strin
 				Nodes []struct {
 					Description string
 					Files       []struct {
-						Name     string
-						Language struct {
-							Name string
-						}
-						Extension string
+						Name string
 					}
 					IsPublic  bool
 					Name      string
 					UpdatedAt time.Time
 				}
-			}
-		}
-	}
-
-	query := `
-	query ListGists($visibility: GistPrivacy!, $per_page: Int = 10) {
-		viewer {
-			gists(first: $per_page, privacy: $visibility) {
-				nodes {
-					name
-					files {
-						name
-						language {
-							name
-						}
-						extension
-					}
-					description
-					updatedAt
-					isPublic
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
 				}
-			}
+			} `graphql:"gists(first: $per_page, after: $endCursor, privacy: $visibility, orderBy: {field: CREATED_AT, direction: DESC})"`
 		}
-	}`
-
-	if visibility != "all" {
-		limit = 100
 	}
+
+	perPage := limit
+	if perPage > 100 {
+		perPage = 100
+	}
+
 	variables := map[string]interface{}{
-		"per_page":   limit,
-		"visibility": strings.ToUpper(visibility),
+		"per_page":   githubv4.Int(perPage),
+		"endCursor":  (*githubv4.String)(nil),
+		"visibility": githubv4.GistPrivacy(strings.ToUpper(visibility)),
 	}
 
-	apiClient := api.NewClientFromHTTP(client)
-	var result response
-	err := apiClient.GraphQL(hostname, query, variables, &result)
-	if err != nil {
-		return nil, err
-	}
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
 
 	gists := []shared.Gist{}
-	for _, gist := range result.Viewer.Gists.Nodes {
+pagination:
+	for {
+		var result response
+		err := gql.QueryNamed(context.Background(), "GistList", &result, variables)
+		if err != nil {
+			return nil, err
+		}
 
-		files := map[string]*shared.GistFile{}
-		for _, file := range gist.Files {
-			files[file.Name] = &shared.GistFile{
-				Filename: file.Name,
-				Type:     file.Extension,
-				Language: file.Language.Name,
+		for _, gist := range result.Viewer.Gists.Nodes {
+			files := map[string]*shared.GistFile{}
+			for _, file := range gist.Files {
+				files[file.Name] = &shared.GistFile{
+					Filename: file.Name,
+				}
+			}
+
+			gists = append(
+				gists,
+				shared.Gist{
+					ID:          gist.Name,
+					Description: gist.Description,
+					Files:       files,
+					UpdatedAt:   gist.UpdatedAt,
+					Public:      gist.IsPublic,
+				},
+			)
+			if len(gists) == limit {
+				break pagination
 			}
 		}
 
-		gists = append(
-			gists,
-			shared.Gist{
-				ID:          gist.Name,
-				Description: gist.Description,
-				Files:       files,
-				UpdatedAt:   gist.UpdatedAt,
-				Public:      gist.IsPublic,
-			},
-		)
+		if !result.Viewer.Gists.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(result.Viewer.Gists.PageInfo.EndCursor)
 	}
-
-	sort.SliceStable(gists, func(i, j int) bool {
-		return gists[i].UpdatedAt.After(gists[j].UpdatedAt)
-	})
 
 	return gists, nil
 }
