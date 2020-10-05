@@ -38,6 +38,7 @@ type CreateOptions struct {
 	Private       bool
 	Internal      bool
 	ConfirmSubmit bool
+	BaseDir       string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -105,6 +106,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm the submission directly")
+	cmd.Flags().StringVarP(&opts.BaseDir, "base-dir", "B", "", "The base directory that will be used for repo initialization after creation.")
 
 	return cmd
 }
@@ -284,6 +286,12 @@ func createRun(opts *CreateOptions) error {
 			}
 			if doSetup {
 				path := repo.Name
+				baseDirPrefix := "./"
+
+				if opts.BaseDir != "" {
+					path = fmt.Sprintf("%s/%s", opts.BaseDir, repo.Name)
+					baseDirPrefix = ""
+				}
 
 				gitInit := git.GitCommand("init", path)
 				gitInit.Stdout = stdout
@@ -300,7 +308,7 @@ func createRun(opts *CreateOptions) error {
 					return err
 				}
 
-				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", utils.GreenCheck(), path)
+				fmt.Fprintf(stderr, "%s Initialized repository in '%s%s/'\n", utils.GreenCheck(), baseDirPrefix, path)
 			}
 		}
 
