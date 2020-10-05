@@ -178,12 +178,12 @@ func gardenRun(opts *GardenOptions) error {
 	}
 
 	maxCommits := (geo.Width * geo.Height) / 2
-	
+
 	sttyFileArg := "-F"
 	if runtime.GOOS == "darwin" {
 		sttyFileArg = "-f"
 	}
-	
+
 	oldTTYCommand := exec.Command("stty", sttyFileArg, "/dev/tty", "-g")
 	oldTTYSettings, err := oldTTYCommand.CombinedOutput()
 	if err != nil {
