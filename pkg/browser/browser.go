@@ -9,7 +9,7 @@ import (
 	"github.com/google/shlex"
 )
 
-// BrowserEnv simply returns the $BROWSER envionment variable
+// BrowserEnv simply returns the $BROWSER environment variable
 func FromEnv() string {
 	return os.Getenv("BROWSER")
 }

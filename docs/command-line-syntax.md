@@ -10,7 +10,7 @@ The argument help is required in this command.
 
 ## Placeholder values
 
-Use angled brackets to represent a value the user must replace. No other expressions can be contained within the angeled brackets.
+Use angled brackets to represent a value the user must replace. No other expressions can be contained within the angled brackets.
 
 _example:_
 `gh pr view <issue-number>`

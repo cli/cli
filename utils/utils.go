@@ -72,7 +72,7 @@ func Humanize(s string) string {
 	return strings.Map(h, s)
 }
 
-// We do this so we can stub out the spinner in tests -- it made things really flakey. this is not
+// We do this so we can stub out the spinner in tests -- it made things really flakey. This is not
 // an elegant solution.
 var StartSpinner = func(s *spinner.Spinner) {
 	s.Start()
