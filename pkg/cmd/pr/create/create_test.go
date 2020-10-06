@@ -764,6 +764,64 @@ func TestPRCreate_web(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", browserCall[len(browserCall)-1])
 }
 
+func TestPRCreate_webProject(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "projects": {
+				"nodes": [
+					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "organization": { "projects": {
+				"nodes": [
+					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
+
+	ask, cleanupAsk := prompt.InitAskStubber()
+	defer cleanupAsk()
+	ask.StubOne(0)
+
+	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+
+	assert.Equal(t, 6, len(cs.Calls))
+	assert.Equal(t, "git push --set-upstream origin HEAD:feature", strings.Join(cs.Calls[4].Args, " "))
+	browserCall := cs.Calls[5].Args
+	url := strings.ReplaceAll(browserCall[len(browserCall)-1], "^", "")
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
+}
+
 func Test_determineTrackingBranch_empty(t *testing.T) {
 	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()

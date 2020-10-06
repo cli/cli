@@ -141,6 +141,63 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 }
 
+func Test_ProjectsToPaths(t *testing.T) {
+	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER"}
+	projects := []RepoProject{
+		{"id1", "My Project", "/OWNER/REPO/projects/PROJECT_NUMBER"},
+		{"id2", "Org Project", "/orgs/ORG/projects/PROJECT_NUMBER"},
+		{"id3", "Project", "/orgs/ORG/projects/PROJECT_NUMBER_2"},
+	}
+	projectNames := []string{"My Project", "Org Project"}
+
+	projectPaths, err := ProjectsToPaths(projects, projectNames)
+	if err != nil {
+		t.Errorf("error resolving projects: %v", err)
+	}
+	if !sliceEqual(projectPaths, expectedProjectPaths) {
+		t.Errorf("expected projects %v, got %v", expectedProjectPaths, projectPaths)
+	}
+}
+
+func Test_ProjectNamesToPaths(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	repo, _ := ghrepo.FromFullName("OWNER/REPO")
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [
+				{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" },
+				{ "name": "Roadmap", "id": "ROADMAPID", "resourcePath": "/OWNER/REPO/projects/2" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "organization": { "projects": {
+				"nodes": [
+					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+
+	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2"}
+	if !sliceEqual(projectPaths, expectedProjectPaths) {
+		t.Errorf("expected projects paths %v, got %v", expectedProjectPaths, projectPaths)
+	}
+}
+
 func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
