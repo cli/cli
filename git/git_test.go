@@ -39,22 +39,40 @@ func Test_UncommittedChangeCount(t *testing.T) {
 }
 
 func Test_CurrentBranch(t *testing.T) {
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-
-	expected := "branch-name"
-
-	cs.Stub(expected)
-
-	result, err := CurrentBranch()
-	if err != nil {
-		t.Errorf("got unexpected error: %w", err)
+	type c struct {
+		Stub     string
+		Expected string
 	}
-	if len(cs.Calls) != 1 {
-		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
+	cases := []c{
+		{
+			Stub:     "branch-name\n",
+			Expected: "branch-name",
+		},
+		{
+			Stub:     "refs/heads/branch-name\n",
+			Expected: "branch-name",
+		},
+		{
+			Stub:     "refs/heads/branch\u00A0with\u00A0non\u00A0breaking\u00A0space\n",
+			Expected: "branch\u00A0with\u00A0non\u00A0breaking\u00A0space",
+		},
 	}
-	if result != expected {
-		t.Errorf("unexpected branch name: %s instead of %s", result, expected)
+
+	for _, v := range cases {
+		cs, teardown := test.InitCmdStubber()
+		cs.Stub(v.Stub)
+
+		result, err := CurrentBranch()
+		if err != nil {
+			t.Errorf("got unexpected error: %w", err)
+		}
+		if len(cs.Calls) != 1 {
+			t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
+		}
+		if result != v.Expected {
+			t.Errorf("unexpected branch name: %s instead of %s", result, v.Expected)
+		}
+		teardown()
 	}
 }
 
