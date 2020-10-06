@@ -20,6 +20,7 @@ import (
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
+	whatCmd "github.com/cli/cli/pkg/cmd/what"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -92,6 +93,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
+
+	cmd.AddCommand(whatCmd.NewCmdWhat(f, nil))
 
 	cmdutil.DisableAuthCheck(cmd)
 
