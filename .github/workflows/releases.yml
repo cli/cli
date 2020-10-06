@@ -178,6 +178,7 @@ jobs:
             git -C ./scoop-gh push
           fi
         env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
