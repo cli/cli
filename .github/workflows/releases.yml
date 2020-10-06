@@ -50,10 +50,11 @@ jobs:
         run: |
           api() { gh api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
           api-write() { [[ $GITHUB_REF == *-* ]] && echo "skipping: api $*" || api "$@"; }
-          cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
+          cards=$(api --paginate projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
           for card in $cards; do
-            api-write projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
+            api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
+          echo "moved ${#cards[@]} cards to the Done column"
       
       - name: Install packaging dependencies
         run: sudo apt-get install -y createrepo rpm reprepro
