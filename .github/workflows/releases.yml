@@ -17,7 +17,7 @@ jobs:
           go-version: 1.15
       - name: Generate changelog
         run: |
-          echo ::set-env name=GORELEASER_CURRENT_TAG::${GITHUB_REF#refs/tags/}
+          echo "GORELEASER_CURRENT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
@@ -127,8 +127,8 @@ jobs:
       - name: Prepare PATH
         shell: bash
         run: |
-          echo "::add-path::$WIX\\bin"
-          echo "::add-path::C:\\Program Files\\go-msi"
+          echo "$WIX\\bin" >> $GITHUB_PATH
+          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
       - name: Build MSI
         id: buildmsi
         shell: bash
