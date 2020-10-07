@@ -23,7 +23,7 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
-// Ref. https://developer.github.com/v4/object/issue/
+// Ref. https://docs.github.com/v4/object/issue
 type Issue struct {
 	ID        string
 	Number    int
