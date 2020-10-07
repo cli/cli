@@ -11,7 +11,7 @@ import (
 
 func Test_Write(t *testing.T) {
 	type input struct {
-		in     string
+		in     []string
 		regexp *regexp.Regexp
 		repl   string
 	}
@@ -28,7 +28,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "single line input",
 			input: input{
-				in:     "some input line that has wrong information",
+				in:     []string{"some input line that has wrong information"},
 				regexp: regexp.MustCompile("wrong"),
 				repl:   "right",
 			},
@@ -41,7 +41,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "multiple line input",
 			input: input{
-				in:     "multiple lines\nin this\ninput lines",
+				in:     []string{"multiple lines\nin this\ninput lines"},
 				regexp: regexp.MustCompile("lines"),
 				repl:   "tests",
 			},
@@ -54,7 +54,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no matches",
 			input: input{
-				in:     "this line has no matches",
+				in:     []string{"this line has no matches"},
 				regexp: regexp.MustCompile("wrong"),
 				repl:   "right",
 			},
@@ -67,7 +67,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no output",
 			input: input{
-				in:     "remove this whole line",
+				in:     []string{"remove this whole line"},
 				regexp: regexp.MustCompile("^remove.*$"),
 				repl:   "",
 			},
@@ -80,7 +80,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no input",
 			input: input{
-				in:     "",
+				in:     []string{""},
 				regexp: regexp.MustCompile("remove"),
 				repl:   "",
 			},
@@ -93,7 +93,7 @@ func Test_Write(t *testing.T) {
 		{
 			name: "multiple lines removed",
 			input: input{
-				in:     "begining line\nremove this whole line\nremove this one also\nnot this one",
+				in:     []string{"begining line\nremove this whole line\nremove this one also\nnot this one"},
 				regexp: regexp.MustCompile("(?s)^remove.*$"),
 				repl:   "",
 			},
@@ -106,14 +106,14 @@ func Test_Write(t *testing.T) {
 		{
 			name: "removes remote from git push output",
 			input: input{
-				in: heredoc.Doc(`
+				in: []string{heredoc.Doc(`
 					output: some information
 					remote: 
 					remote: Create a pull request for 'regex' on GitHub by visiting: 
 					remote:      https://github.com/owner/repo/pull/new/regex
 					remote: 
 					output: more information
-			 `),
+			 `)},
 				regexp: regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$"),
 				repl:   "",
 			},
@@ -123,19 +123,35 @@ func Test_Write(t *testing.T) {
 				length:   192,
 			},
 		},
+		{
+			name: "multiple writes",
+			input: input{
+				in:     []string{"first write\n", "second write ", "third write"},
+				regexp: regexp.MustCompile("write"),
+				repl:   "read",
+			},
+			output: output{
+				wantsErr: false,
+				out:      "first read\nsecond read third read",
+				length:   36,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		out := &bytes.Buffer{}
 		writer := NewRegexWriter(out, tt.input.regexp, tt.input.repl)
 		t.Run(tt.name, func(t *testing.T) {
-			length, err := writer.Write([]byte(tt.input.in))
-
-			if tt.output.wantsErr {
-				assert.Error(t, err)
-				return
+			length := 0
+			for _, in := range tt.input.in {
+				l, err := writer.Write([]byte(in))
+				length = length + l
+				if tt.output.wantsErr {
+					assert.Error(t, err)
+					return
+				}
+				assert.NoError(t, err)
 			}
-			assert.NoError(t, err)
 			assert.Equal(t, tt.output.out, out.String())
 			assert.Equal(t, tt.output.length, length)
 		})
