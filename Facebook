@@ -1,0 +1,80 @@
+معرف التطبيق صفحات فيس بوك 
+
+
+969281893560481
+
+‏4OVHKLDA577DT3JYQXVMAG2W 
+
+
+
+
+
+‏<key>CFBundleURLTypes</key> <array> <dict> <key>CFBundleURLSchemes</key> <array> <string>fb969281893560481</string> </array> </dict> </array> <key>FacebookAppID</key> <string>969281893560481</string> <key>FacebookDisplayName</key> <string>4OVHKLDA577DT3JYQXVMAG2W - Test1</string>
+
+
+
+
+
+
+
+
+‏<key>LSApplicationQueriesSchemes</key> <array> <string>fbapi</string> <string>fbapi20130214</string> <string>fbapi20130410</string> <string>fbapi20130702</string> <string>fbapi20131010</string> <string>fbapi20131219</string> <string>fbapi20140410</string> <string>fbapi20140116</string> <string>fbapi20150313</string> <string>fbapi20150629</string> <string>fbapi20160328</string> <string>fbauth</string> <string>fb-messenger-share-api</string> <string>fbauth2</string> <string>fbshareextension</string> </array>
+
+
+
+
+
+
+
+‏// Objective-C - (void)viewDidLoad { [super viewDidLoad]; if ([FBSDKAccessToken currentAccessToken]) { // User is logged in, do work such as go to next view controller. } }
+
+
+
+https://www.facebook.com/Liverpoolfccom-100421421834054/
+
+
+
+
+
+‏<div id="fb-root"></div>
+‏<script async defer crossorigin="anonymous" src="https://connect.facebook.net/ar_AR/sdk.js#xfbml=1&version=v8.0&appId=969281893560481&autoLogAppEvents=1" nonce="juMkWR2I"></script>
+
+
+
+
+
+
+
+
+‏<div class="fb-page" data-href="https://www.facebook.com/Liverpoolfccom-100421421834054/" data-tabs="timeline" data-width="" data-height="" data-small-header="true" data-adapt-container-width="true" data-hide-cover="false" data-show-facepile="true"><blockquote cite="https://www.facebook.com/Liverpoolfccom-100421421834054/" class="fb-xfbml-parse-ignore"><a href="https://www.facebook.com/Liverpoolfccom-100421421834054/">‏‎Liverpoolfc.com‎‏</a></blockquote></div>
+
+
+
+
+
+
+
+
+
+
+‏<script>
+‏  window.fbAsyncInit = function() {
+‏    FB.init({
+‏      appId      : '{your-app-id}',
+‏      cookie     : true,
+‏      xfbml      : true,
+‏      version    : '{api-version}'
+    });
+      
+‏    FB.AppEvents.logPageView();   
+      
+  };
+
+‏  (function(d, s, id){
+‏     var js, fjs = d.getElementsByTagName(s)[0];
+‏     if (d.getElementById(id)) {return;}
+‏     js = d.createElement(s); js.id = id;
+‏     js.src = "https://connect.facebook.net/en_US/sdk.js";
+‏     fjs.parentNode.insertBefore(js, fjs);
+‏   }(document, 'script', 'facebook-jssdk'));
+‏</script>
