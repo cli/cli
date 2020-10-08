@@ -186,7 +186,9 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 }
 
 func shouldCheckForUpdate() bool {
-	return updaterEnabled != "" && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
+	isCIEnvironment := (os.Getenv("CI") != "") || (os.Getenv("BUILD_NUMBER") != "") || (os.Getenv("RUN_ID") != "")
+	isGlobalDisabled := os.Getenv("GH_NO_UPDATE_NOTIFIER") == "disabled"
+	return updaterEnabled != "" && !isCompletionCommand() && utils.IsTerminal(os.Stderr) && !isCIEnvironment && !isGlobalDisabled
 }
 
 func isCompletionCommand() bool {
