@@ -191,7 +191,6 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-// Ref. Please see Github GraphQL PullRequestReviewState reference page
 const (
 	requestedReviewState        = "REQUESTED" // This is our own state for review request
 	approvedReviewState         = "APPROVED"
@@ -250,7 +249,6 @@ func prReviewerList(pr api.PullRequest) string {
 	return reviewerList
 }
 
-// Ref. Please see Github GraphQL PullRequestReviewState reference page
 const teamTypeName = "Team"
 
 const ghostName = "ghost"
