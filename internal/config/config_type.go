@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"gopkg.in/yaml.v3"
@@ -15,6 +16,10 @@ const (
 	PromptsDisabled    = "disabled"
 	PromptsEnabled     = "enabled"
 )
+
+var configValues = map[string][]string{
+	"git_protocol": {"ssh", "https"},
+}
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
@@ -271,7 +276,30 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	return value, defaultSource, nil
 }
 
+func validConfigValues(key string) []string {
+	return configValues[key]
+}
+
+func validateConfigEntry(key, value string) error {
+	validValues := validConfigValues(key)
+
+	if len(validValues) == 0 {
+		return nil
+	}
+
+	for _, v := range validValues {
+		if v == value {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid value. Possible values for \"%s\" are: %s", key, strings.Join(validValues, ", "))
+}
+
 func (c *fileConfig) Set(hostname, key, value string) error {
+	if err := validateConfigEntry(key, value); err != nil {
+		return err
+	}
 	if hostname == "" {
 		return c.SetStringValue(key, value)
 	} else {
