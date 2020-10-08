@@ -39,6 +39,8 @@ func NewHelpTopic(topic string) *cobra.Command {
 
 		CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
 		even when the output is piped.
+
+		GH_NO_UPDATE_NOTIFIER: set to "1" to disable checking for updates.
 	`)
 
 	cmd := &cobra.Command{
