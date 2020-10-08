@@ -23,7 +23,7 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
-// Ref. https://docs.github.com/v4/object/issue
+// Ref. Please see Github GraphQL object issue reference page
 type Issue struct {
 	ID        string
 	Number    int
