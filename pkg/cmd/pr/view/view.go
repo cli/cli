@@ -191,7 +191,6 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-// Ref. https://developer.github.com/v4/enum/pullrequestreviewstate/
 const (
 	requestedReviewState        = "REQUESTED" // This is our own state for review request
 	approvedReviewState         = "APPROVED"
@@ -250,7 +249,6 @@ func prReviewerList(pr api.PullRequest) string {
 	return reviewerList
 }
 
-// Ref. https://developer.github.com/v4/union/requestedreviewer/
 const teamTypeName = "Team"
 
 const ghostName = "ghost"
