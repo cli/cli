@@ -11,11 +11,9 @@ import (
 )
 
 const (
-	defaultGitProtocol  = "https"
-	PromptsDisabled     = "disabled"
-	PromptsEnabled      = "enabled"
-	UpdateCheckEnabled  = "enabled"
-	UpdateCheckDisabled = "disabled"
+	defaultGitProtocol = "https"
+	PromptsDisabled    = "disabled"
+	PromptsEnabled     = "enabled"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
