@@ -271,7 +271,32 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	return value, defaultSource, nil
 }
 
+func (c *fileConfig) ConfigValidator(key, value string) (bool, string) {
+	var isErr = false
+	var errMessage = ""
+	if key == "git_protocol" {
+		if value != "https" && value != "ssh" {
+			isErr = true
+			errMessage = "invalid `git_protocol`, supported values: https, ssh"
+		}
+	} else if key == "prompt" {
+		if value != "enabled" && value != "disabled" {
+			isErr = true
+			errMessage = "invalid `prompt`, supported values: enabled, disabled"
+		}
+	}
+	return isErr, errMessage
+}
+
+func (c *fileConfig) ValidateConfig(key, value string) (bool, string) {
+	return c.ConfigValidator(key, value)
+}
+
 func (c *fileConfig) Set(hostname, key, value string) error {
+	isErr, errMessage := c.ValidateConfig(key, value)
+	if isErr && errMessage != "" {
+		return fmt.Errorf(errMessage)
+	}
 	if hostname == "" {
 		return c.SetStringValue(key, value)
 	} else {
