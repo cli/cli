@@ -91,6 +91,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return &cmdutil.FlagError{Err: errors.New(`The '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
 			}
 
+			if !git.IsRepositoryInitialized() {
+				if !opts.ConfirmSubmit {
+					if resp, err := confirmInitializeGit(); !resp {
+						return fmt.Errorf("you can't create a repository without initializing git")
+					} else if err != nil {
+						return err
+					}
+				}
+
+				if err := git.Init(); err != nil {
+					return err
+				}
+			}
+
 			return createRun(opts)
 		},
 	}
@@ -412,4 +426,28 @@ func getVisibility() (string, error) {
 	}
 
 	return strings.ToUpper(answer.RepoVisibility), nil
+}
+
+func confirmInitializeGit() (bool, error) {
+	qs := []*survey.Question{}
+
+	confirmSubmitQuestion := &survey.Question{
+		Name: "confirmSubmit",
+		Prompt: &survey.Confirm{
+			Message: "This will initialize git on the current folder. Continue? ",
+			Default: true,
+		},
+	}
+	qs = append(qs, confirmSubmitQuestion)
+
+	answer := struct {
+		ConfirmSubmit bool
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answer)
+	if err != nil {
+		return false, err
+	}
+
+	return answer.ConfirmSubmit, nil
 }

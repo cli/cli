@@ -33,6 +33,24 @@ func (r TrackingRef) String() string {
 	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
 }
 
+func IsRepositoryInitialized() bool {
+	showCmd := GitCommand("status")
+	_, err := run.PrepareCmd(showCmd).Output()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func Init() error {
+	showCmd := GitCommand("init")
+	_, err := run.PrepareCmd(showCmd).Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // ShowRefs resolves fully-qualified refs to commit hashes
 func ShowRefs(ref ...string) ([]Ref, error) {
 	args := append([]string{"show-ref", "--verify", "--"}, ref...)
