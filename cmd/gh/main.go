@@ -186,9 +186,17 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 }
 
 func shouldCheckForUpdate() bool {
-	isCIEnvironment := (os.Getenv("CI") != "") || (os.Getenv("BUILD_NUMBER") != "") || (os.Getenv("RUN_ID") != "")
-	isGlobalDisabled := os.Getenv("GH_NO_UPDATE_NOTIFIER") != ""
-	return updaterEnabled != "" && !isCompletionCommand() && utils.IsTerminal(os.Stderr) && !isCIEnvironment && !isGlobalDisabled
+	if os.Getenv("GH_NO_UPDATE_NOTIFIER") != "" {
+		return false
+	}
+	return updaterEnabled != "" && !isCI() && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
+}
+
+// based on https://github.com/watson/ci-info/blob/HEAD/index.js
+func isCI() bool {
+	return os.Getenv("CI") != "" || // GitHub Actions, Travis CI, CircleCI, Cirrus CI, GitLab CI, AppVeyor, CodeShip, dsari
+		os.Getenv("BUILD_NUMBER") != "" || // Jenkins, TeamCity
+		os.Getenv("RUN_ID") != "" // TaskCluster, dsari
 }
 
 func isCompletionCommand() bool {
