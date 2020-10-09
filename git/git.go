@@ -36,10 +36,7 @@ func (r TrackingRef) String() string {
 func IsRepositoryInitialized() bool {
 	showCmd := GitCommand("status")
 	_, err := run.PrepareCmd(showCmd).Output()
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func Init() error {
