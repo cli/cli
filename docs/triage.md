@@ -28,7 +28,7 @@ just imagine a flowchart
 - do we want someone in the community to do it?
   - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
   - ensure that the thread contains all the context necessary for someone new to pick this up
-  - add `help-wanted` label
+  - add `help wanted` label
 - do we want to do it, but not in the next year?
   - comment acknowledging it, but that we don't plan on working on it this year.
   - add `future` label
