@@ -106,7 +106,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm the submission directly")
-	cmd.Flags().StringVarP(&opts.BaseDir, "base-dir", "B", "", "The base directory that will be used for repo initialization after creation.")
+	cmd.Flags().StringVarP(&opts.BaseDir, "base-dir", "B", "", "The base directory that will be used for repo initialization after creation")
 
 	return cmd
 }
