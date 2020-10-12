@@ -86,8 +86,8 @@ func Test_RepoClone(t *testing.T) {
 		},
 		{
 			name: "Non-canonical capitalization",
-			args: "git@github.com:Ower/Repo.git",
-			want: "git clone git@github.com:OWNER/REPO.git",
+			args: "Owner/Repo",
+			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 	}
 	for _, tt := range tests {
