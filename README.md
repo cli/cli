@@ -6,7 +6,7 @@
 
 ## Availability
 
-GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux. 
+GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
 
 ## Documentation
 
@@ -21,7 +21,7 @@ We'd love to hear your feedback about `gh`. If you spot bugs or have features th
 
 ### macOS
 
-`gh` is available via [Homebrew][] and [MacPorts][], and a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
