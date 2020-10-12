@@ -37,9 +37,9 @@ We'd love to hear your feedback about `gh`. If you spot bugs or have features th
 
 ### Linux
 
-`gh` is available via [Homebrew](#homebrew), and as downloadable binaries (for `i386`, `amd64` and `arm64`) from the [releases page][].
+`gh` is available via [Homebrew](#homebrew), and as downloadable binaries from the [releases page][].
 
-For distro-specific installation instructions, see the [Linux installation docs](./docs/install_linux.md).
+For more information and distro-specific instructions, see the [Linux installation docs](./docs/install_linux.md).
 
 ### Windows
 
