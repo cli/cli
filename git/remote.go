@@ -12,7 +12,6 @@ import (
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
-// RemoteSet is a slice of git remotes
 type RemoteSet []*Remote
 
 func NewRemote(name string, u string) *Remote {
@@ -24,7 +23,6 @@ func NewRemote(name string, u string) *Remote {
 	}
 }
 
-// Remote is a parsed git remote
 type Remote struct {
 	Name     string
 	Resolved string
@@ -36,7 +34,6 @@ func (r *Remote) String() string {
 	return r.Name
 }
 
-// Remotes gets the git remotes set for the current repo
 func Remotes() (RemoteSet, error) {
 	list, err := listRemotes()
 	if err != nil {

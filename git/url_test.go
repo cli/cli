@@ -1,5 +1,6 @@
 package git
 
+// some comment
 import "testing"
 
 func TestIsURL(t *testing.T) {

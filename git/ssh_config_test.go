@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// TODO: extract assertion helpers into a shared package
 func eq(t *testing.T, got interface{}, expected interface{}) {
 	t.Helper()
 	if !reflect.DeepEqual(got, expected) {
