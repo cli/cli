@@ -4,6 +4,9 @@ package git
 import "testing"
 
 // TODO: comment needed
+// more
+// sthird
+//asdf
 
 func TestIsURL(t *testing.T) {
 	tests := []struct {
