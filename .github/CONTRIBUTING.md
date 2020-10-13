@@ -15,7 +15,7 @@ Please do:
 
 Please avoid:
 
-* Opening pull requests for issues marked `needs-design`, `needs-investigation`, `needs-user-input`, or `blocked`.
+* Opening pull requests for issues marked `needs-design`, `needs-investigation`, or `blocked`.
 * Adding installation instructions specifically for your OS/package manager.
 * Opening pull requests for any issue marked `core`. These issues require additional context from
   the core CLI team at GitHub and any external pull requests will not be accepted.
