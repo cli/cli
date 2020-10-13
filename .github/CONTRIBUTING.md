@@ -11,7 +11,7 @@ Please do:
 * Open an issue to propose a significant change.
 * Open a pull request to fix a bug.
 * Open a pull request to fix documentation about a command.
-* Open a pull request for any issue with [`help wanted`][] or [`good first issue`][] labels.
+* Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
 
 Please avoid:
 
@@ -53,8 +53,8 @@ We generate manual pages from source on every release. You do not need to submit
 
 [bug issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Abug
 [feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement
-[help wanted]: https://github.com/cli/cli/labels/help%20wanted
-[good first issue]: https://github.com/cli/cli/labels/good%20first%20issue
+[hw]: https://github.com/cli/cli/labels/help%20wanted
+[gfi]: https://github.com/cli/cli/labels/good%20first%20issue
 [legal]: https://docs.github.com/en/free-pro-team@latest/github/site-policy/github-terms-of-service#6-contributions-under-repository-license
 [license]: ../LICENSE
 [code-of-conduct]: ./CODE-OF-CONDUCT.md
