@@ -16,51 +16,40 @@ triage day.
 
 # Incoming issues
 
-just imagine a flowchart
-
 - can this be closed outright?
   - e.g. spam/junk
   - close without comment
 - do we not want to do it?
   - e.g. have already discussed not wanting to do or duplicate issue
-  - comment acknowledging receipt
-  - close
+  - comment and close
 - do we want someone in the community to do it?
   - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
   - ensure that the thread contains all the context necessary for someone new to pick this up
   - add `help wanted` label
-- do we want to do it, but not in the next year?
-  - comment acknowledging it, but that we don't plan on working on it this year.
-  - add `future` label
-  - add additional labels as needed(examples include `enhancement` or `bug`)
-  - close
+  - consider adding `good first issue` label
 - do we want to do it?
-  - e.g. bugs or things we have discussed before
   - comment acknowledging it
   - label appropriately
-  - add to project TODO column if appropriate, otherwise just leave it labeled
-- is it intriguing but needs discussion?
+  - add to project TODO column if this is something that should ship soon
+- is it intriguing, but requires discussion?
   - label `needs-design` if design input is needed, ping
   - label `needs-investigation` if engineering research is required before action can be taken
-  - ping engineers if eng needed
-  - ping product if it's about future directions/roadmap/big changes
 - does it need more info from the issue author?
-  - ask the user for that
+  - ask the user for details
   - add `needs-user-input` label
-- is it a user asking for help and you have all the info you need to help?
-  - try and help
+- is it a usage/support question?
+  - offer some instructions/workaround and close
 
 # Incoming PRs
 
 just imagine a flowchart
 
 - can it be closed outright?
-  - ie spam/junk
-- do we not want to do it?
-  - ie have already discussed not wanting to do, duplicate issue
-  - comment acknowledging receipt
+  - e.g. spam/junk
   - close
-- is it intriguing but needs discussion?
+- do we not want to do it?
+  - comment and close
+- is it intriguing, but requires discussion and there is no referenced issue?
   - request an issue
   - close
 - is it something we want to include?
@@ -82,7 +71,7 @@ For each PR, ask:
 
 ## Examples
 
-We want the cli/cli repo to be a safe and encouraging open-source environment. Below are some examples
+We want our project to be a safe and encouraging open-source environment. Below are some examples
 of how to empathetically respond to or close an issue/PR:
 
 - [Closing a quality PR its scope is too large](https://github.com/cli/cli/pull/1161)
