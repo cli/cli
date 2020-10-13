@@ -11,9 +11,9 @@ import (
 
 func Test_Write(t *testing.T) {
 	type input struct {
-		in     []string
-		regexp *regexp.Regexp
-		repl   string
+		in   []string
+		re   *regexp.Regexp
+		repl string
 	}
 	type output struct {
 		wantsErr bool
@@ -28,9 +28,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "single line input",
 			input: input{
-				in:     []string{"some input line that has wrong information"},
-				regexp: regexp.MustCompile("wrong"),
-				repl:   "right",
+				in:   []string{"some input line that has wrong information"},
+				re:   regexp.MustCompile("wrong"),
+				repl: "right",
 			},
 			output: output{
 				wantsErr: false,
@@ -41,9 +41,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "multiple line input",
 			input: input{
-				in:     []string{"multiple lines\nin this\ninput lines"},
-				regexp: regexp.MustCompile("lines"),
-				repl:   "tests",
+				in:   []string{"multiple lines\nin this\ninput lines"},
+				re:   regexp.MustCompile("lines"),
+				repl: "tests",
 			},
 			output: output{
 				wantsErr: false,
@@ -54,9 +54,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no matches",
 			input: input{
-				in:     []string{"this line has no matches"},
-				regexp: regexp.MustCompile("wrong"),
-				repl:   "right",
+				in:   []string{"this line has no matches"},
+				re:   regexp.MustCompile("wrong"),
+				repl: "right",
 			},
 			output: output{
 				wantsErr: false,
@@ -67,9 +67,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no output",
 			input: input{
-				in:     []string{"remove this whole line"},
-				regexp: regexp.MustCompile("^remove.*$"),
-				repl:   "",
+				in:   []string{"remove this whole line"},
+				re:   regexp.MustCompile("^remove.*$"),
+				repl: "",
 			},
 			output: output{
 				wantsErr: false,
@@ -80,9 +80,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "no input",
 			input: input{
-				in:     []string{""},
-				regexp: regexp.MustCompile("remove"),
-				repl:   "",
+				in:   []string{""},
+				re:   regexp.MustCompile("remove"),
+				repl: "",
 			},
 			output: output{
 				wantsErr: false,
@@ -93,9 +93,9 @@ func Test_Write(t *testing.T) {
 		{
 			name: "multiple lines removed",
 			input: input{
-				in:     []string{"begining line\nremove this whole line\nremove this one also\nnot this one"},
-				regexp: regexp.MustCompile("(?s)^remove.*$"),
-				repl:   "",
+				in:   []string{"begining line\nremove this whole line\nremove this one also\nnot this one"},
+				re:   regexp.MustCompile("(?s)^remove.*$"),
+				repl: "",
 			},
 			output: output{
 				wantsErr: false,
@@ -108,27 +108,27 @@ func Test_Write(t *testing.T) {
 			input: input{
 				in: []string{heredoc.Doc(`
 					output: some information
-					remote: 
-					remote: Create a pull request for 'regex' on GitHub by visiting: 
+					remote:
+					remote: Create a pull request for 'regex' on GitHub by visiting:
 					remote:      https://github.com/owner/repo/pull/new/regex
-					remote: 
+					remote:
 					output: more information
 			 `)},
-				regexp: regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$"),
-				repl:   "",
+				re:   regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$"),
+				repl: "",
 			},
 			output: output{
 				wantsErr: false,
-				out:      "output: some information\nremote: \nremote: \noutput: more information\n",
-				length:   192,
+				out:      "output: some information\nremote:\nremote:\noutput: more information\n",
+				length:   189,
 			},
 		},
 		{
 			name: "multiple writes",
 			input: input{
-				in:     []string{"first write\n", "second write ", "third write"},
-				regexp: regexp.MustCompile("write"),
-				repl:   "read",
+				in:   []string{"first write\n", "second write ", "third write"},
+				re:   regexp.MustCompile("write"),
+				repl: "read",
 			},
 			output: output{
 				wantsErr: false,
@@ -140,7 +140,7 @@ func Test_Write(t *testing.T) {
 
 	for _, tt := range tests {
 		out := &bytes.Buffer{}
-		writer := NewRegexWriter(out, tt.input.regexp, tt.input.repl)
+		writer := NewRegexpWriter(out, tt.input.re, tt.input.repl)
 		t.Run(tt.name, func(t *testing.T) {
 			length := 0
 			for _, in := range tt.input.in {
@@ -152,6 +152,7 @@ func Test_Write(t *testing.T) {
 				}
 				assert.NoError(t, err)
 			}
+			writer.Flush()
 			assert.Equal(t, tt.output.out, out.String())
 			assert.Equal(t, tt.output.length, length)
 		})
