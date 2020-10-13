@@ -6,45 +6,40 @@
 
 ## Availability
 
-GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux. 
-
+GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
 
 ## Documentation
 
 Read the [official docs][] for usage and more information.
 
-
-
 ## We want your feedback
 
 We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
-
-
 
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
 
 ### macOS
 
-`gh` is available via [Homebrew][] and [MacPorts][].
+`gh` is available via [Homebrew][], [MacPorts][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
-|Install:|Upgrade:|
-|---|---|
-|`brew install gh`|`brew upgrade gh`|
+| Install:          | Upgrade:          |
+| ----------------- | ----------------- |
+| `brew install gh` | `brew upgrade gh` |
 
 #### MacPorts
 
-|Install:|Upgrade:|
-|---|---|
-|`sudo port install gh`|`sudo port selfupdate && sudo port upgrade gh`|
-
-
+| Install:               | Upgrade:                                       |
+| ---------------------- | ---------------------------------------------- |
+| `sudo port install gh` | `sudo port selfupdate && sudo port upgrade gh` |
 
 ### Linux
 
-See [Linux installation docs](./docs/install_linux.md).
+`gh` is available via [Homebrew](#homebrew), and as downloadable binaries from the [releases page][].
+
+For more information and distro-specific instructions, see the [Linux installation docs](./docs/install_linux.md).
 
 ### Windows
 
@@ -67,10 +62,9 @@ scoop update gh
 
 #### Chocolatey
 
-|Install:|Upgrade:|
-|---|---|
-|`choco install gh`|`choco upgrade gh`|
-
+| Install:           | Upgrade:           |
+| ------------------ | ------------------ |
+| `choco install gh` | `choco upgrade gh` |
 
 #### Signed MSI
 
