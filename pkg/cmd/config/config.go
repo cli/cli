@@ -8,19 +8,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ConfigKey struct {
+	name        string
+	description string
+}
+
+var respectedConfigKeys []ConfigKey = []ConfigKey{
+	{"git_protocol", `"https" or "ssh". Default is "https".`},
+	{"editor", `if unset, defaults to environment variables.`},
+	{"prompt", `"enabled" or "disabled". Toggles interactive prompting.`},
+	{"pager", `terminal pager program to send standard output to.`},
+}
+
 func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
+	longDoc := `
+Display or change configuration settings for gh.
+
+Current respected settings:
+`
+	for _, configKey := range respectedConfigKeys {
+		longDoc += fmt.Sprintf("- %s: %s\n", configKey.name, configKey.description)
+	}
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration for gh",
-		Long: heredoc.Doc(`
-			Display or change configuration settings for gh.
-	
-			Current respected settings:
-			- git_protocol: "https" or "ssh". Default is "https".
-			- editor: if unset, defaults to environment variables.
-			- prompt: "enabled" or "disabled". Toggles interactive prompting.
-			- pager: terminal pager program to send standard output to.
-		`),
+		Long:  heredoc.Doc(longDoc),
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
@@ -85,6 +97,18 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 			}
 
 			key, value := args[0], args[1]
+			knownKey := false
+			for _, configKey := range respectedConfigKeys {
+				if key == configKey.name {
+					knownKey = true
+					break
+				}
+			}
+			if !knownKey {
+				iostreams := f.IOStreams
+				warningIcon := iostreams.ColorScheme().WarningIcon()
+				fmt.Fprintf(iostreams.ErrOut, "%s warning: '%s' is not a known configuration key\n", warningIcon, key)
+			}
 			err = cfg.Set(hostname, key, value)
 			if err != nil {
 				return fmt.Errorf("failed to set %q to %q: %w", key, value, err)
