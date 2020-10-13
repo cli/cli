@@ -88,16 +88,23 @@ func (r Repository) ViewerCanTriage() bool {
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
+	fragment repo on Repository {
+		id
+		name
+		owner { login }
+		hasIssuesEnabled
+		description
+		viewerPermission
+		defaultBranchRef {
+			name
+		}
+	}
+
 	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
-			id
-			name
-			owner { login }
-			hasIssuesEnabled
-			description
-			viewerPermission
-			defaultBranchRef {
-				name
+			...repo
+			parent {
+				...repo
 			}
 		}
 	}`

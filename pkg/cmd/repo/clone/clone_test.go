@@ -103,13 +103,6 @@ func Test_RepoClone(t *testing.T) {
 					}
 				} } }
 				`))
-			reg.Register(
-				httpmock.GraphQL(`query RepositoryFindParent\b`),
-				httpmock.StringResponse(`
-				{ "data": { "repository": {
-					"parent": null
-				} } }
-				`))
 
 			httpClient := &http.Client{Transport: reg}
 
@@ -141,19 +134,15 @@ func Test_RepoClone_hasParent(t *testing.T) {
 					"name": "REPO",
 					"owner": {
 						"login": "OWNER"
+					},
+					"parent": {
+						"name": "ORIG",
+						"owner": {
+							"login": "hubot"
+						}
 					}
 				} } }
 				`))
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryFindParent\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"parent": {
-				"owner": {"login": "hubot"},
-				"name": "ORIG"
-			}
-		} } }
-		`))
 
 	httpClient := &http.Client{Transport: reg}
 

@@ -126,8 +126,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
-	var canonicalRepo ghrepo.Interface
-	canonicalRepo, err = api.GitHubRepo(apiClient, repo)
+	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
 	if err != nil {
 		return err
 	}
@@ -139,18 +138,12 @@ func cloneRun(opts *CloneOptions) error {
 	}
 
 	// If the repo is a fork, add the parent as an upstream
-	var parentRepo ghrepo.Interface
-	parentRepo, err = api.RepoParent(apiClient, canonicalRepo)
-	if err != nil {
-		return err
-	}
-
-	if parentRepo != nil {
-		protocol, err := cfg.Get(parentRepo.RepoHost(), "git_protocol")
+	if canonicalRepo.Parent != nil {
+		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
-		upstreamURL := ghrepo.FormatRemoteURL(parentRepo, protocol)
+		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 		if err != nil {
