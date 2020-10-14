@@ -657,7 +657,7 @@ type RepoProject struct {
 
 // RepoProjects fetches all open projects for a repository
 func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
-	var query struct {
+	type responseData struct {
 		Repository struct {
 			Projects struct {
 				Nodes    []RepoProject
@@ -679,6 +679,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 
 	var projects []RepoProject
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
 		if err != nil {
 			return nil, err
@@ -701,7 +702,7 @@ type RepoAssignee struct {
 
 // RepoAssignableUsers fetches all the assignable users for a repository
 func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
-	var query struct {
+	type responseData struct {
 		Repository struct {
 			AssignableUsers struct {
 				Nodes    []RepoAssignee
@@ -723,6 +724,7 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 
 	var users []RepoAssignee
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "RepositoryAssignableUsers", &query, variables)
 		if err != nil {
 			return nil, err
@@ -745,7 +747,7 @@ type RepoLabel struct {
 
 // RepoLabels fetches all the labels in a repository
 func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
-	var query struct {
+	type responseData struct {
 		Repository struct {
 			Labels struct {
 				Nodes    []RepoLabel
@@ -767,6 +769,7 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 
 	var labels []RepoLabel
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "RepositoryLabelList", &query, variables)
 		if err != nil {
 			return nil, err
@@ -789,7 +792,7 @@ type RepoMilestone struct {
 
 // RepoMilestones fetches all open milestones in a repository
 func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, error) {
-	var query struct {
+	type responseData struct {
 		Repository struct {
 			Milestones struct {
 				Nodes    []RepoMilestone
@@ -811,6 +814,7 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 
 	var milestones []RepoMilestone
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "RepositoryMilestoneList", &query, variables)
 		if err != nil {
 			return nil, err
