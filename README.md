@@ -4,17 +4,16 @@
 
 ![screenshot of gh pr status](https://user-images.githubusercontent.com/98482/84171218-327e7a80-aa40-11ea-8cd1-5177fc2d0e72.png)
 
-## Availability
-
 GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
 
 ## Documentation
 
-Read the [official docs][] for usage and more information.
+[See the manual][manual] for setup and usage instructions.
 
-## We want your feedback
+## Contributing
 
-We'd love to hear your feedback about `gh`. If you spot bugs or have features that you'd really like to see in `gh`, please check out the [contributing page][].
+If anything feels off, or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
+
 
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
@@ -86,13 +85,13 @@ tools bring GitHub to the terminal, `hub` behaves as a proxy to `git`, and `gh` 
 tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 
 
-[official docs]: https://cli.github.com/manual
+[manual]: https://cli.github.com/manual/
 [Homebrew]: https://brew.sh
 [MacPorts]: https://www.macports.org
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
-[contributing page]: https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md
+[contributing]: ./.github/CONTRIBUTING.md
 [gh-vs-hub]: ./docs/gh-vs-hub.md
 [build from source]: ./docs/source.md
