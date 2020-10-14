@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
@@ -73,6 +74,7 @@ func TestIssueList(t *testing.T) {
 func TestIssueList_pagination(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
+
 	http.StubResponse(200, bytes.NewBufferString(`
 	{ "data": { "repository": {
 		"hasIssuesEnabled": true,
@@ -111,42 +113,33 @@ func TestIssueList_pagination(t *testing.T) {
 		}
 	} } }
 	`))
+
 	repo := ghrepo.New("OWNER", "REPO")
-
-	want := &IssuesAndTotalCount{
-		Issues: []Issue{
-			{
-				Title: "issue1",
-				Assignees: struct {
-					Nodes      []struct{ Login string }
-					TotalCount int
-				}{[]struct{ Login string }{{"user1"}}, 1},
-				Labels: struct {
-					Nodes      []struct{ Name string }
-					TotalCount int
-				}{[]struct{ Name string }{{"bug"}}, 1},
-			},
-			{
-				Title: "issue2",
-				Assignees: struct {
-					Nodes      []struct{ Login string }
-					TotalCount int
-				}{[]struct{ Login string }{{"user2"}}, 1},
-				Labels: struct {
-					Nodes      []struct{ Name string }
-					TotalCount int
-				}{[]struct{ Name string }{{"enhancement"}}, 1},
-			},
-		},
-		TotalCount: 2,
-	}
-
-	got, err := IssueList(client, repo, "", nil, "", 0, "", "", "")
+	res, err := IssueList(client, repo, "", nil, "", 0, "", "", "")
 	if err != nil {
-		t.Errorf("IssueList() error = %v", err)
-		return
+		t.Fatalf("IssueList() error = %v", err)
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("IssueList() = %v, want %v", got, want)
+
+	assert.Equal(t, 2, res.TotalCount)
+	assert.Equal(t, 2, len(res.Issues))
+
+	getLabels := func(i Issue) []string {
+		var labels []string
+		for _, l := range i.Labels.Nodes {
+			labels = append(labels, l.Name)
+		}
+		return labels
 	}
+	getAssignees := func(i Issue) []string {
+		var logins []string
+		for _, u := range i.Assignees.Nodes {
+			logins = append(logins, u.Login)
+		}
+		return logins
+	}
+
+	assert.Equal(t, []string{"bug"}, getLabels(res.Issues[0]))
+	assert.Equal(t, []string{"user1"}, getAssignees(res.Issues[0]))
+	assert.Equal(t, []string{"enhancement"}, getLabels(res.Issues[1]))
+	assert.Equal(t, []string{"user2"}, getAssignees(res.Issues[1]))
 }
