@@ -9,7 +9,7 @@ import (
 
 // OrganizationProjects fetches all open projects for an organization
 func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
-	var query struct {
+	type responseData struct {
 		Organization struct {
 			Projects struct {
 				Nodes    []RepoProject
@@ -30,6 +30,7 @@ func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject,
 
 	var projects []RepoProject
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "OrganizationProjectList", &query, variables)
 		if err != nil {
 			return nil, err
@@ -52,7 +53,7 @@ type OrgTeam struct {
 
 // OrganizationTeams fetches all the teams in an organization
 func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error) {
-	var query struct {
+	type responseData struct {
 		Organization struct {
 			Teams struct {
 				Nodes    []OrgTeam
@@ -73,6 +74,7 @@ func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error)
 
 	var teams []OrgTeam
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "OrganizationTeamList", &query, variables)
 		if err != nil {
 			return nil, err
