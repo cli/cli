@@ -27,6 +27,7 @@ type LoginOptions struct {
 	Interactive bool
 
 	Hostname string
+	Scopes   []string
 	Token    string
 	Web      bool
 }
@@ -50,6 +51,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
 			The minimum required scopes for the token are: "repo", "read:org".
+
+			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
+			absent, this command ensures that gh has access to a minimum set of scopes.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
@@ -104,6 +108,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 
@@ -223,7 +228,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if authMode == 0 {
-		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", []string{})
+		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
