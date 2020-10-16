@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -155,7 +154,20 @@ func (err HTTPError) Error() string {
 }
 
 type MissingScopesError struct {
-	error
+	MissingScopes []string
+}
+
+func (e MissingScopesError) Error() string {
+	var missing []string
+	for _, s := range e.MissingScopes {
+		missing = append(missing, fmt.Sprintf("'%s'", s))
+	}
+	scopes := strings.Join(missing, ", ")
+
+	if len(e.MissingScopes) == 1 {
+		return "missing required scope " + scopes
+	}
+	return "missing required scopes " + scopes
 }
 
 func (c Client) HasMinimumScopes(hostname string) error {
@@ -183,31 +195,29 @@ func (c Client) HasMinimumScopes(hostname string) error {
 		return HandleHTTPError(res)
 	}
 
-	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+	scopesHeader := res.Header.Get("X-Oauth-Scopes")
 
 	search := map[string]bool{
 		"repo":      false,
 		"read:org":  false,
 		"admin:org": false,
 	}
-
-	for _, s := range hasScopes {
+	for _, s := range strings.Split(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
 	}
 
-	errorMsgs := []string{}
+	var missingScopes []string
 	if !search["repo"] {
-		errorMsgs = append(errorMsgs, "missing required scope 'repo'")
+		missingScopes = append(missingScopes, "repo")
 	}
 
 	if !search["read:org"] && !search["admin:org"] {
-		errorMsgs = append(errorMsgs, "missing required scope 'read:org'")
+		missingScopes = append(missingScopes, "read:org")
 	}
 
-	if len(errorMsgs) > 0 {
-		return &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
+	if len(missingScopes) > 0 {
+		return &MissingScopesError{MissingScopes: missingScopes}
 	}
-
 	return nil
 }
 
