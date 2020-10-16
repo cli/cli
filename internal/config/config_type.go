@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"gopkg.in/yaml.v3"
@@ -276,14 +275,17 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	return value, defaultSource, nil
 }
 
-func validConfigValues(key string) []string {
-	return configValues[key]
+type InvalidValueError struct {
+	ValidValues []string
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
 }
 
 func validateConfigEntry(key, value string) error {
-	validValues := validConfigValues(key)
-
-	if len(validValues) == 0 {
+	validValues, found := configValues[key]
+	if !found {
 		return nil
 	}
 
@@ -293,7 +295,7 @@ func validateConfigEntry(key, value string) error {
 		}
 	}
 
-	return fmt.Errorf("invalid value. Possible values for \"%s\" are: %s", key, strings.Join(validValues, ", "))
+	return &InvalidValueError{ValidValues: validValues}
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {

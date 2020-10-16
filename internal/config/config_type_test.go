@@ -28,7 +28,7 @@ func Test_fileConfig_Set(t *testing.T) {
 example.com:
     editor: vim
 `, hostsBuf.String())
-	assert.EqualError(t, c.Set("github.com", "git_protocol", "sshpps"), "invalid value. Possible values for \"git_protocol\" are: ssh, https")
+	assert.EqualError(t, c.Set("github.com", "git_protocol", "sshpps"), "invalid value")
 }
 
 func Test_defaultConfig(t *testing.T) {
@@ -72,7 +72,7 @@ func Test_defaultConfig(t *testing.T) {
 
 func Test_validateConfigEntry(t *testing.T) {
 	err := validateConfigEntry("git_protocol", "sshpps")
-	assert.EqualError(t, err, "invalid value. Possible values for \"git_protocol\" are: ssh, https")
+	assert.EqualError(t, err, "invalid value")
 
 	err = validateConfigEntry("git_protocol", "ssh")
 	assert.Nil(t, err)
