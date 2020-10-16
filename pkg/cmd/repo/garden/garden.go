@@ -7,10 +7,13 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
@@ -216,6 +219,22 @@ func gardenRun(opts *GardenOptions) error {
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "cbreak", "min", "1").Run()
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "-echo").Run()
 
+	walkAway := func() {
+		clear(opts.IO)
+		fmt.Fprint(out, "\033[?25h")
+		_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
+	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func(){
+		<-c
+		walkAway()
+		os.Exit(0)
+	}()
+
 	var b []byte = make([]byte, 3)
 	for {
 		_, _ = opts.IO.In.Read(b)
@@ -296,12 +315,7 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprint(out, utils.Bold(sl))
 	}
 
-	clear(opts.IO)
-	fmt.Fprint(out, "\033[?25h")
-	_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
-
+	walkAway()
 	return nil
 }
 
