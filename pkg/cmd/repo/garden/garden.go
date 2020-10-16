@@ -229,7 +229,7 @@ func gardenRun(opts *GardenOptions) error {
 
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func(){
+	go func() {
 		<-c
 		walkAway()
 		os.Exit(0)
