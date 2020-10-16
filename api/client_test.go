@@ -112,6 +112,11 @@ func Test_HasMinimumScopes(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:    "no scopes",
+			header:  "",
+			wantErr: "",
+		},
+		{
 			name:    "default scopes",
 			header:  "repo, read:org",
 			wantErr: "",

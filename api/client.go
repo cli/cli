@@ -196,6 +196,11 @@ func (c Client) HasMinimumScopes(hostname string) error {
 	}
 
 	scopesHeader := res.Header.Get("X-Oauth-Scopes")
+	if scopesHeader == "" {
+		// if the token reports no scopes, assume that it's an integration token and give up on
+		// detecting its capabilities
+		return nil
+	}
 
 	search := map[string]bool{
 		"repo":      false,
