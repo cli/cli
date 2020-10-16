@@ -118,6 +118,28 @@ func Test_NewCmdLogin(t *testing.T) {
 			cli:      "--web --with-token",
 			wantsErr: true,
 		},
+		{
+			name:     "tty one scope",
+			stdinTTY: true,
+			cli:      "--scopes repo:invite",
+			wants: LoginOptions{
+				Hostname:    "",
+				Scopes:      []string{"repo:invite"},
+				Token:       "",
+				Interactive: true,
+			},
+		},
+		{
+			name:     "tty scopes",
+			stdinTTY: true,
+			cli:      "--scopes repo:invite,read:public_key",
+			wants: LoginOptions{
+				Hostname:    "",
+				Scopes:      []string{"repo:invite", "read:public_key"},
+				Token:       "",
+				Interactive: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -160,6 +182,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 			assert.Equal(t, tt.wants.Web, gotOpts.Web)
 			assert.Equal(t, tt.wants.Interactive, gotOpts.Interactive)
+			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 		})
 	}
 }
