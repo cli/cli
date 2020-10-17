@@ -238,13 +238,41 @@ func mergeRun(opts *MergeOptions) error {
 }
 
 func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, repo ghrepo.Interface, apiClient *api.Client) (api.PullRequestMergeMethod, bool, error) {
-	repoMergeOpts, err := api.GetRepoPROpts(apiClient, repo)
+	var baseRepo *api.Repository
+
+	if r, ok := repo.(*api.Repository); ok {
+		baseRepo = r
+	} else {
+		var err error
+		baseRepo, err = api.GitHubRepo(apiClient, repo)
+		if err != nil {
+			return 0, false, fmt.Errorf("could not fetch merge options: %w", err)
+		}
+	}
+
+	var opts []string
+
+	if baseRepo.MergeCommitAllowed {
+		opts = append(opts, "Create a merge commit")
+	}
+
+	if baseRepo.RebaseMergeAllowed {
+		opts = append(opts, "Rebase and merge")
+	}
+
+	if baseRepo.SquashMergeAllowed {
+		opts = append(opts, "Squash and merge")
+	}
+
+	if len(opts) == 0 {
+		return 0, false, fmt.Errorf("no merge options enabled, please enable at least one for your repo")
+	}
 
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
 			Message: "What merge method would you like to use?",
-			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
+			Options: opts,
 			Default: "Create a merge commit",
 		},
 	}

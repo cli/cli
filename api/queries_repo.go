@@ -103,6 +103,9 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			defaultBranchRef {
 				name
 			}
+			mergeCommitAllowed
+			squashMergeAllowed
+			rebaseMergeAllowed
 		}
 	}`
 	variables := map[string]interface{}{
@@ -872,31 +875,4 @@ func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int) (*Repo
 	}
 
 	return query.Repository.Milestone, nil
-}
-
-func GetRepoPROpts(client *Client, repo ghrepo.Interface) (*Repository, error) {
-	query := `
-	query RepositoryInfo($owner: String!, $name: String!) {
-		repository(owner: $owner, name: $name) {
-			mergeCommitAllowed
-			squashMergeAllowed
-			rebaseMergeAllowed
-		}
-	}`
-	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"name":  repo.RepoName(),
-	}
-
-	result := struct {
-		Repository Repository
-	}{}
-
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &result.Repository, nil
 }
