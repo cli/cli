@@ -32,6 +32,10 @@ type Repository struct {
 
 	Parent *Repository
 
+	MergeCommitAllowed bool
+	SquashMergeAllowed bool
+	RebaseMergeAllowed bool
+
 	// pseudo-field that keeps track of host name of this repo
 	hostname string
 }
@@ -868,4 +872,31 @@ func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int) (*Repo
 	}
 
 	return query.Repository.Milestone, nil
+}
+
+func GetRepoPROpts(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	query := `
+	query RepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			mergeCommitAllowed
+			squashMergeAllowed
+			rebaseMergeAllowed
+		}
+	}`
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	result := struct {
+		Repository Repository
+	}{}
+
+	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &result.Repository, nil
 }

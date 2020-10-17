@@ -140,7 +140,7 @@ func mergeRun(opts *MergeOptions) error {
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 
 	if opts.InteractiveMode {
-		mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR)
+		mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR, baseRepo, apiClient)
 		if err != nil {
 			return nil
 		}
@@ -237,7 +237,9 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
+func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, repo ghrepo.Interface, apiClient *api.Client) (api.PullRequestMergeMethod, bool, error) {
+	repoMergeOpts, err := api.GetRepoPROpts(apiClient, repo)
+
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
