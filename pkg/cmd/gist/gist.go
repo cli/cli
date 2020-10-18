@@ -2,6 +2,7 @@ package gist
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	gistCloneCmd "github.com/cli/cli/pkg/cmd/gist/clone"
 	gistCreateCmd "github.com/cli/cli/pkg/cmd/gist/create"
 	gistDeleteCmd "github.com/cli/cli/pkg/cmd/gist/delete"
 	gistEditCmd "github.com/cli/cli/pkg/cmd/gist/edit"
@@ -26,6 +27,7 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
+	cmd.AddCommand(gistCloneCmd.NewCmdClone(f, nil))
 	cmd.AddCommand(gistCreateCmd.NewCmdCreate(f, nil))
 	cmd.AddCommand(gistListCmd.NewCmdList(f, nil))
 	cmd.AddCommand(gistViewCmd.NewCmdView(f, nil))
