@@ -39,7 +39,6 @@ func generateChecksumFromAssets(assets []*shared.AssetForUpload) (map[string]str
 			return make(map[string]string), err
 		}
 		checksum, err := generateChecksum(file)
-		fmt.Println(checksum)
 		checksumData[asset.Name] = checksum
 	}
 	return checksumData, nil
