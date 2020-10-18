@@ -310,9 +310,11 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		//delete temperory checksumFile after upload
-		err = deleteChecksumFile()
-		if err != nil {
-			return err
+		if createChecksum {
+			err = deleteChecksumFile()
+			if err != nil {
+				return err
+			}
 		}
 
 		if !opts.Draft {
