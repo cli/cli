@@ -49,6 +49,9 @@ type CreateOptions struct {
 
 	// maximum number of simultaneous uploads
 	Concurrency int
+
+	// generate sha256 checksum for artifacts
+	Checksum bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -116,6 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
+	cmd.Flags().BoolVarP(&opts.Checksum, "checksum", "", false, "Upload sha256 checksum along with the artifacts for verification")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or commit SHA (default: main branch)")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
@@ -263,11 +267,15 @@ func createRun(opts *CreateOptions) error {
 		"name":       opts.Name,
 		"body":       opts.Body,
 	}
+
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
 	}
 
 	hasAssets := len(opts.Assets) > 0
+
+	// Change createChecksum to false if no assets are present
+	createChecksum := opts.Checksum && hasAssets
 
 	// Avoid publishing the release until all assets have finished uploading
 	if hasAssets {
@@ -280,6 +288,15 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if hasAssets {
+
+		if createChecksum {
+			checksumAsset, err := createChecksumAssetFor(opts.Assets)
+			if err != nil {
+				return err
+			}
+			opts.Assets = append(opts.Assets, &checksumAsset)
+		}
+
 		uploadURL := newRelease.UploadURL
 		if idx := strings.IndexRune(uploadURL, '{'); idx > 0 {
 			uploadURL = uploadURL[:idx]
@@ -288,6 +305,12 @@ func createRun(opts *CreateOptions) error {
 		opts.IO.StartProgressIndicator()
 		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+
+		//delete temperory checksumFile after upload
+		err = deleteChecksumFile()
 		if err != nil {
 			return err
 		}

@@ -160,6 +160,51 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY:   true,
 			wantErr: "requires at least 1 arg(s), only received 0",
 		},
+		{
+			name:  "add checksum flag with Assets",
+			args:  fmt.Sprintf("--checksum v1.2.3 '%s' '%s#Linux build'", af1.Name(), af2.Name()),
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "v1.2.3",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Checksum:     true,
+				Assets: []*shared.AssetForUpload{
+					{
+						Name:  "windows.zip",
+						Label: "",
+					},
+					{
+						Name:  "linux.tgz",
+						Label: "Linux build",
+					},
+				},
+			},
+		},
+		{
+			name:  "add checksum flag without Assets",
+			args:  fmt.Sprintf("--checksum v1.2.3 "),
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "v1.2.3",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Checksum:     true,
+				Assets:       []*shared.AssetForUpload(nil),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -209,6 +254,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
+			assert.Equal(t, tt.want.Checksum, opts.Checksum)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
