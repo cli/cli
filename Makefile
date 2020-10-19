@@ -29,6 +29,9 @@ endif
 bin/gh: $(BUILD_FILES)
 	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
+bin/container:
+	docker build --build-arg BUILD_DATE=$(BUILD_DATE) --build-arg VERSION=$(GH_VERSION) .
+
 clean:
 	rm -rf ./bin ./share
 .PHONY: clean
