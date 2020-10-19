@@ -501,11 +501,11 @@ func computeDefaults(baseRef, headRef string) (shared.Defaults, error) {
 	} else {
 		out.Title = utils.Humanize(headRef)
 
-		body := ""
+		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			body += fmt.Sprintf("- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
 		}
-		out.Body = body
+		out.Body = body.String()
 	}
 
 	return out, nil
