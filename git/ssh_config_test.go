@@ -1,10 +1,15 @@
 package git
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/mitchellh/go-homedir"
 )
 
 // TODO: extract assertion helpers into a shared package
@@ -15,17 +20,94 @@ func eq(t *testing.T, got interface{}, expected interface{}) {
 	}
 }
 
-func Test_sshParse(t *testing.T) {
-	m := sshParse(strings.NewReader(`
-	Host foo bar
-		HostName example.com
-	`), strings.NewReader(`
-	Host bar baz
-	hostname %%%h.net%%
-	`))
+func createTempFile(t *testing.T, prefix string) *os.File {
+	t.Helper()
+
+	dir, err := homedir.Dir()
+	if err != nil {
+		t.Errorf("Could not find homedir: %s", err)
+	}
+
+	tempFile, err := ioutil.TempFile(filepath.Join(dir, ".ssh"), prefix)
+	if err != nil {
+		t.Errorf("Could create a temp file: %s", err)
+	}
+
+	t.Cleanup(func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name())
+	})
+
+	return tempFile
+}
+
+func Test_parse(t *testing.T) {
+	includedTempFile := createTempFile(t, "included")
+	includedConfigFile := `
+Host webapp
+	HostName webapp.example.com
+	`
+	fmt.Fprint(includedTempFile, includedConfigFile)
+
+	m := parse(
+		"testdata/ssh_config1.conf",
+		"testdata/ssh_config2.conf",
+		"testdata/ssh_config3.conf",
+	)
+
 	eq(t, m["foo"], "example.com")
 	eq(t, m["bar"], "%bar.net%")
 	eq(t, m["nonexistent"], "")
+}
+
+func Test_absolutePaths(t *testing.T) {
+	dir, err := homedir.Dir()
+	if err != nil {
+		t.Errorf("Could not find homedir: %s", err)
+	}
+
+	tests := map[string]struct {
+		parentFile string
+		Input      []string
+		Want       []string
+	}{
+		"absolute path": {
+			parentFile: "/etc/ssh/ssh_config",
+			Input:      []string{"/etc/ssh/config"},
+			Want:       []string{"/etc/ssh/config"},
+		},
+		"system relative path": {
+			parentFile: "/etc/ssh/config",
+			Input:      []string{"configs/*.conf"},
+			Want:       []string{"/etc/ssh/configs/*.conf"},
+		},
+		"user relative path": {
+			parentFile: filepath.Join(dir, ".ssh", "ssh_config"),
+			Input:      []string{"configs/*.conf"},
+			Want:       []string{filepath.Join(dir, ".ssh", "configs/*.conf")},
+		},
+		"shell-like ~ rerefence": {
+			parentFile: filepath.Join(dir, ".ssh", "ssh_config"),
+			Input:      []string{"~/.ssh/*.conf"},
+			Want:       []string{filepath.Join(dir, ".ssh", "*.conf")},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			paths := absolutePaths(test.parentFile, test.Input)
+
+			if len(paths) != len(test.Input) {
+				t.Errorf("Expected %d, got %d", len(test.Input), len(paths))
+			}
+
+			for i, path := range paths {
+				if path != test.Want[i] {
+					t.Errorf("Expected %q, got %q", test.Want[i], path)
+				}
+			}
+		})
+	}
 }
 
 func Test_Translator(t *testing.T) {

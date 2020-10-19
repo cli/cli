@@ -2,7 +2,6 @@ package git
 
 import (
 	"bufio"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,12 +12,10 @@ import (
 )
 
 var (
-	sshHostRE,
 	sshTokenRE *regexp.Regexp
 )
 
 func init() {
-	sshHostRE = regexp.MustCompile("(?i)^[ \t]*(host|hostname)[ \t]+(.+)$")
 	sshTokenRE = regexp.MustCompile(`%[%h]`)
 }
 
@@ -45,6 +42,88 @@ func (m SSHAliasMap) Translator() func(*url.URL) *url.URL {
 	}
 }
 
+type parser struct {
+	aliasMap SSHAliasMap
+}
+
+func (p *parser) read(fileName string) error {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	hosts := []string{"*"}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+
+		if len(fields) < 2 {
+			continue
+		}
+
+		directive, params := fields[0], fields[1:]
+		switch {
+		case strings.EqualFold(directive, "Host"):
+			hosts = params
+		case strings.EqualFold(directive, "Hostname"):
+			for _, host := range hosts {
+				for _, name := range params {
+					p.aliasMap[host] = sshExpandTokens(name, host)
+				}
+			}
+		case strings.EqualFold(directive, "Include"):
+			for _, path := range absolutePaths(fileName, params) {
+				fileNames, err := filepath.Glob(path)
+				if err != nil {
+					continue
+				}
+
+				for _, fileName := range fileNames {
+					_ = p.read(fileName)
+				}
+			}
+		}
+	}
+
+	return scanner.Err()
+}
+
+func isSystem(path string) bool {
+	return strings.HasPrefix(path, "/etc/ssh")
+}
+
+func absolutePaths(parentFile string, paths []string) []string {
+	absPaths := make([]string, len(paths))
+
+	for i, path := range paths {
+		switch {
+		case filepath.IsAbs(path):
+			absPaths[i] = path
+		case strings.HasPrefix(path, "~"):
+			absPaths[i], _ = homedir.Expand(path)
+		case isSystem(parentFile):
+			absPaths[i] = filepath.Join("/etc", "ssh", path)
+		default:
+			dir, _ := homedir.Dir()
+			absPaths[i] = filepath.Join(dir, ".ssh", path)
+		}
+	}
+
+	return absPaths
+}
+
+func parse(files ...string) SSHAliasMap {
+	p := parser{aliasMap: make(SSHAliasMap)}
+
+	for _, file := range files {
+		_ = p.read(file)
+	}
+
+	return p.aliasMap
+}
+
 // ParseSSHConfig constructs a map of SSH hostname aliases based on user and
 // system configuration files
 func ParseSSHConfig() SSHAliasMap {
@@ -57,49 +136,7 @@ func ParseSSHConfig() SSHAliasMap {
 		configFiles = append([]string{userConfig}, configFiles...)
 	}
 
-	openFiles := make([]io.Reader, 0, len(configFiles))
-	for _, file := range configFiles {
-		f, err := os.Open(file)
-		if err != nil {
-			continue
-		}
-		defer f.Close()
-		openFiles = append(openFiles, f)
-	}
-	return sshParse(openFiles...)
-}
-
-func sshParse(r ...io.Reader) SSHAliasMap {
-	config := make(SSHAliasMap)
-	for _, file := range r {
-		_ = sshParseConfig(config, file)
-	}
-	return config
-}
-
-func sshParseConfig(c SSHAliasMap, file io.Reader) error {
-	hosts := []string{"*"}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		match := sshHostRE.FindStringSubmatch(line)
-		if match == nil {
-			continue
-		}
-
-		names := strings.Fields(match[2])
-		if strings.EqualFold(match[1], "host") {
-			hosts = names
-		} else {
-			for _, host := range hosts {
-				for _, name := range names {
-					c[host] = sshExpandTokens(name, host)
-				}
-			}
-		}
-	}
-
-	return scanner.Err()
+	return parse(configFiles...)
 }
 
 func sshExpandTokens(text, host string) string {
