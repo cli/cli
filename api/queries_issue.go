@@ -251,8 +251,8 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 
 	if milestoneString != "" {
 		var milestone *RepoMilestone
-		if milestoneNumber, err := strconv.Atoi(milestoneString); err == nil {
-			milestone, err = MilestoneByNumber(client, repo, milestoneNumber)
+		if milestoneNumber, err := strconv.ParseInt(milestoneString, 10, 32); err == nil {
+			milestone, err = MilestoneByNumber(client, repo, int32(milestoneNumber))
 			if err != nil {
 				return nil, err
 			}

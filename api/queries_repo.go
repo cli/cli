@@ -844,7 +844,7 @@ func MilestoneByTitle(client *Client, repo ghrepo.Interface, title string) (*Rep
 	return nil, fmt.Errorf("no milestone found with title %q", title)
 }
 
-func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int) (*RepoMilestone, error) {
+func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int32) (*RepoMilestone, error) {
 	var query struct {
 		Repository struct {
 			Milestone *RepoMilestone `graphql:"milestone(number: $number)"`
