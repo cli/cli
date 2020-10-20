@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -380,4 +381,77 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func Test_Checksums(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	// Setup fake responses
+	fakeHTTP := &httpmock.Registry{}
+	fakeHTTP.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+		httpmock.StatusStringResponse(201, `{
+        "url": "https://api.github.com/releases/123",
+        "upload_url": "https://api.github.com/assets/upload",
+        "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+    }`))
+	// Since registered urls are only matched once we need one for each file
+	for i := 0; i < 3; i++ {
+		fakeHTTP.Register(
+			httpmock.REST("POST", "assets/upload"),
+			httpmock.StatusStringResponse(201, `{}`),
+		)
+	}
+	fakeHTTP.Register(
+		httpmock.REST("PATCH", "releases/123"),
+		httpmock.StatusStringResponse(201, `{
+        "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
+    }`))
+
+	opts := CreateOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: fakeHTTP}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("OWNER/REPO")
+		},
+		TagName:      "v1.2.3",
+		Name:         "Cool release",
+		Body:         "Fixed everything",
+		BodyProvided: true,
+		Checksums:    true,
+		Assets: []*shared.AssetForUpload{
+			{
+				Name: "code.tgz",
+				Open: func() (io.ReadCloser, error) {
+					return ioutil.NopCloser(bytes.NewBufferString("The code tarball")), nil
+				},
+			},
+			{
+				Name: "command",
+				Open: func() (io.ReadCloser, error) {
+					return ioutil.NopCloser(bytes.NewBufferString("The command binary")), nil
+				},
+			},
+		},
+		Concurrency: 1,
+	}
+	err := createRun(&opts)
+	require.NoError(t, err)
+
+	// Check checksum file name
+	q := fakeHTTP.Requests[3].URL.Query()
+	assert.Equal(t, "REPO_v1.2.3_checksums.txt", q.Get("name"))
+	// Check checksum file contents
+	sumContents, err := ioutil.ReadAll(fakeHTTP.Requests[3].Body)
+	require.NoError(t, err)
+	expected := fmt.Sprintf(
+		"%x  %s\n%x  %s\n",
+		sha256.Sum256([]byte("The code tarball")),
+		"code.tgz",
+		sha256.Sum256([]byte("The command binary")),
+		"command",
+	)
+	assert.Equal(t, expected, string(sumContents))
 }

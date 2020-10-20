@@ -2,7 +2,9 @@ package create
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -36,6 +38,7 @@ type CreateOptions struct {
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
+	Checksums    bool
 
 	Assets []*shared.AssetForUpload
 
@@ -116,6 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
+	cmd.Flags().BoolVarP(&opts.Checksums, "checksums", "", false, "Attach checksum file to release")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or commit SHA (default: main branch)")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
@@ -280,6 +284,14 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if hasAssets {
+		if opts.Checksums {
+			checksumsAsset, err := generateChecksumsAsset(baseRepo.RepoName(), opts.TagName, opts.Assets)
+			if err != nil {
+				return err
+			}
+			opts.Assets = append(opts.Assets, checksumsAsset)
+		}
+
 		uploadURL := newRelease.UploadURL
 		if idx := strings.IndexRune(uploadURL, '{'); idx > 0 {
 			uploadURL = uploadURL[:idx]
@@ -362,4 +374,33 @@ func generateChangelog(commits []logEntry) string {
 		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+func generateChecksumsAsset(repoName string, tagName string, assets []*shared.AssetForUpload) (*shared.AssetForUpload, error) {
+	buffer := bytes.NewBuffer(nil)
+
+	for _, asset := range assets {
+		hash := sha256.New()
+		f, err := asset.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		_, err = io.Copy(hash, f)
+		if err != nil {
+			return nil, err
+		}
+		buffer.WriteString(fmt.Sprintf("%x  %s\n", hash.Sum(nil), asset.Name))
+	}
+
+	checksumAsset := &shared.AssetForUpload{
+		Name:     fmt.Sprintf("%s_%s_checksums.txt", repoName, tagName),
+		Size:     int64(buffer.Len()),
+		MIMEType: "text/plain",
+		Open: func() (io.ReadCloser, error) {
+			return ioutil.NopCloser(buffer), nil
+		},
+	}
+	return checksumAsset, nil
 }
