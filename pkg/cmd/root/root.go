@@ -30,8 +30,9 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		Short: "GitHub CLI",
 		Long:  `Work seamlessly with GitHub from the command line.`,
 
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		DisableAutoGenTag: true,
+		SilenceErrors:     true,
+		SilenceUsage:      true,
 		Example: heredoc.Doc(`
 			$ gh issue create
 			$ gh repo clone cli/cli
