@@ -16,6 +16,10 @@ const (
 	PromptsEnabled     = "enabled"
 )
 
+var configValues = map[string][]string{
+	"git_protocol": {"ssh", "https"},
+}
+
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
@@ -271,7 +275,33 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	return value, defaultSource, nil
 }
 
+type InvalidValueError struct {
+	ValidValues []string
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
+}
+
+func validateConfigEntry(key, value string) error {
+	validValues, found := configValues[key]
+	if !found {
+		return nil
+	}
+
+	for _, v := range validValues {
+		if v == value {
+			return nil
+		}
+	}
+
+	return &InvalidValueError{ValidValues: validValues}
+}
+
 func (c *fileConfig) Set(hostname, key, value string) error {
+	if err := validateConfigEntry(key, value); err != nil {
+		return err
+	}
 	if hostname == "" {
 		return c.SetStringValue(key, value)
 	} else {

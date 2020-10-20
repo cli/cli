@@ -1,9 +1,12 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -87,6 +90,14 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 			key, value := args[0], args[1]
 			err = cfg.Set(hostname, key, value)
 			if err != nil {
+				var invalidValue *config.InvalidValueError
+				if errors.As(err, &invalidValue) {
+					var values []string
+					for _, v := range invalidValue.ValidValues {
+						values = append(values, fmt.Sprintf("'%s'", v))
+					}
+					return fmt.Errorf("failed to set %q to %q: valid values are %v", key, value, strings.Join(values, ", "))
+				}
 				return fmt.Errorf("failed to set %q to %q: %w", key, value, err)
 			}
 
