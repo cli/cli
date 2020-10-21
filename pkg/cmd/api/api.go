@@ -122,6 +122,8 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 				GITHUB_TOKEN: an authentication token for github.com API requests.
 
 				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
+
+				GH_HOST: make the request to a GitHub host other than github.com.
 			`),
 		},
 		Args: cobra.ExactArgs(1),
