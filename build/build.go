@@ -1,4 +1,4 @@
-package command
+package build
 
 import (
 	"runtime/debug"
@@ -7,8 +7,8 @@ import (
 // Version is dynamically set by the toolchain or overridden by the Makefile.
 var Version = "DEV"
 
-// BuildDate is dynamically set at build time in the Makefile.
-var BuildDate = "" // YYYY-MM-DD
+// Date is dynamically set at build time in the Makefile.
+var Date = "" // YYYY-MM-DD
 
 func init() {
 	if Version == "DEV" {
