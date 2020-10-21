@@ -636,6 +636,42 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
+func TestPRCreate_web_uncommon_branch_names(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("")                                         // git push
+	cs.Stub("")                                         // browser
+
+	ask, cleanupAsk := prompt.InitAskStubber()
+	defer cleanupAsk()
+	ask.StubOne(0)
+
+	output, err := runCommand(http, nil, "feature/#123", true, `--web`)
+	require.NoError(t, err)
+
+	eq(t, output.String(), "")
+	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature/#123 in your browser.\n")
+
+	eq(t, len(cs.Calls), 6)
+	eq(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature/#123")
+	browserCall := cs.Calls[5].Args
+	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature%2F%23123?expand=1")
+}
+
 func Test_determineTrackingBranch_empty(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
