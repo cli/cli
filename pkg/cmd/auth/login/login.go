@@ -88,7 +88,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if cmd.Flags().Changed("hostname") {
-				if err := utils.HostnameValidator(opts.Hostname); err != nil {
+				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}
@@ -166,7 +166,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(utils.HostnameValidator))
+			}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}

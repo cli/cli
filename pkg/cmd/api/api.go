@@ -21,7 +21,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -131,7 +130,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
 			if c.Flags().Changed("hostname") {
-				if err := utils.HostnameValidator(opts.Hostname); err != nil {
+				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}

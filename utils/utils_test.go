@@ -3,8 +3,6 @@ package utils
 import (
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFuzzyAgo(t *testing.T) {
@@ -36,50 +34,5 @@ func TestFuzzyAgo(t *testing.T) {
 		if fuzzy != expected {
 			t.Errorf("unexpected fuzzy duration value: %s for %s", fuzzy, duration)
 		}
-	}
-}
-
-func TestHostnameValidator(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		wantsErr bool
-	}{
-		{
-			name:     "valid hostname",
-			input:    "internal.instance",
-			wantsErr: false,
-		},
-		{
-			name:     "hostname with slashes",
-			input:    "//internal.instance",
-			wantsErr: true,
-		},
-		{
-			name:     "empty hostname",
-			input:    "   ",
-			wantsErr: true,
-		},
-		{
-			name:     "hostname with colon",
-			input:    "internal.instance:2205",
-			wantsErr: true,
-		},
-		{
-			name:     "non-string hostname",
-			input:    62,
-			wantsErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := HostnameValidator(tt.input)
-			if tt.wantsErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.Equal(t, nil, err)
-		})
 	}
 }

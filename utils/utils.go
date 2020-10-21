@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -27,21 +26,6 @@ func OpenInBrowser(url string) error {
 		}
 	}
 	return err
-}
-
-func HostnameValidator(v interface{}) error {
-	hostname, valid := v.(string)
-	if !valid {
-		return errors.New("hostname is not a string")
-	}
-
-	if len(strings.TrimSpace(hostname)) < 1 {
-		return errors.New("a value is required")
-	}
-	if strings.ContainsRune(hostname, '/') || strings.ContainsRune(hostname, ':') {
-		return errors.New("invalid hostname")
-	}
-	return nil
 }
 
 func Pluralize(num int, thing string) string {
