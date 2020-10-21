@@ -52,6 +52,8 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+
+	MaintainerCanModify bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -121,6 +123,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.BoolVar(&opts.MaintainerCanModify, "maintainer-edit", true, "Indicates whether maintainers can modify the pull request (default: true).")
 
 	return cmd
 }
@@ -450,6 +453,7 @@ func createRun(opts *CreateOptions) error {
 			"draft":       opts.IsDraft,
 			"baseRefName": baseBranch,
 			"headRefName": headBranchLabel,
+			"maintainerCanModify": opts.MaintainerCanModify,
 		}
 
 		err = shared.AddMetadataToIssueParams(client, baseRepo, params, &tb)
