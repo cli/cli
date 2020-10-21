@@ -448,11 +448,11 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitAction {
 		params := map[string]interface{}{
-			"title":       title,
-			"body":        body,
-			"draft":       opts.IsDraft,
-			"baseRefName": baseBranch,
-			"headRefName": headBranchLabel,
+			"title":               title,
+			"body":                body,
+			"draft":               opts.IsDraft,
+			"baseRefName":         baseBranch,
+			"headRefName":         headBranchLabel,
 			"maintainerCanModify": opts.MaintainerCanModify,
 		}
 
