@@ -18,7 +18,7 @@ const (
 
 var configValues = map[string][]string{
 	"git_protocol": {"ssh", "https"},
-	"prompt": {"enabled", "disabled"},
+	"prompt":       {"enabled", "disabled"},
 }
 
 // This interface describes interacting with some persistent configuration for gh.
