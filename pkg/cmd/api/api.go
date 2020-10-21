@@ -151,7 +151,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Hostname, "hostname", "", "The hostname of the GitHub instance for the request")
+	cmd.Flags().StringVar(&opts.Hostname, "hostname", "", "The GitHub hostname for the request (default \"github.com\")")
 	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a parameter of inferred type")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
