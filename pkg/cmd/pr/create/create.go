@@ -554,11 +554,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestones []string) (string, error) {
-	// This is to fix issues with names like "branch/#123"
-	b := url.QueryEscape(base)
-	h := url.QueryEscape(head)
-
-	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", b, h)
+	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", url.QueryEscape(base), url.QueryEscape(head))
 	url, err := shared.WithPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestones)
 	if err != nil {
 		return "", err

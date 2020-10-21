@@ -636,42 +636,6 @@ func TestPRCreate_web(t *testing.T) {
 	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
 }
 
-func TestPRCreate_web_uncommon_branch_names(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
-	cs.Stub("")                                         // browser
-
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-	ask.StubOne(0)
-
-	output, err := runCommand(http, nil, "feature/#123", true, `--web`)
-	require.NoError(t, err)
-
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature/#123 in your browser.\n")
-
-	eq(t, len(cs.Calls), 6)
-	eq(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature/#123")
-	browserCall := cs.Calls[5].Args
-	eq(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature%2F%23123?expand=1")
-}
-
 func Test_determineTrackingBranch_empty(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -765,4 +729,68 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 	}
 
 	eq(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"})
+}
+
+func Test_generateCompareURL(t *testing.T) {
+	type args struct {
+		r          ghrepo.Interface
+		base       string
+		head       string
+		title      string
+		body       string
+		assignees  []string
+		labels     []string
+		projects   []string
+		milestones []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "basic",
+			args: args{
+				r:    ghrepo.New("OWNER", "REPO"),
+				base: "main",
+				head: "feature",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
+			wantErr: false,
+		},
+		{
+			name: "with labels",
+			args: args{
+				r:      ghrepo.New("OWNER", "REPO"),
+				base:   "a",
+				head:   "b",
+				labels: []string{"one", "two three"},
+			},
+			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
+			wantErr: false,
+		},
+		{
+			name: "complex branch names",
+			args: args{
+				r:    ghrepo.New("OWNER", "REPO"),
+				base: "main/trunk",
+				head: "owner:feature",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := generateCompareURL(tt.args.r, tt.args.base, tt.args.head, tt.args.title, tt.args.body, tt.args.assignees, tt.args.labels, tt.args.projects, tt.args.milestones)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("generateCompareURL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("generateCompareURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
