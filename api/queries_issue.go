@@ -257,7 +257,7 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 				return nil, err
 			}
 		} else {
-			milestone, err = MilestoneByTitle(client, repo, milestoneString)
+			milestone, err = MilestoneByTitle(client, repo, "all", milestoneString)
 			if err != nil {
 				return nil, err
 			}

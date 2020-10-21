@@ -536,7 +536,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Milestones {
 		count++
 		go func() {
-			milestones, err := RepoMilestones(client, repo)
+			milestones, err := RepoMilestones(client, repo, "open")
 			if err != nil {
 				err = fmt.Errorf("error fetching milestones: %w", err)
 			}
@@ -797,8 +797,8 @@ type RepoMilestone struct {
 	Title string
 }
 
-// RepoMilestones fetches all open milestones in a repository
-func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, error) {
+// RepoMilestones fetches milestones in a repository
+func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]RepoMilestone, error) {
 	type responseData struct {
 		Repository struct {
 			Milestones struct {
@@ -807,13 +807,26 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"milestones(states: [OPEN], first: 100, after: $endCursor)"`
+			} `graphql:"milestones(states: $states, first: 100, after: $endCursor)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	var states []githubv4.MilestoneState
+	switch state {
+	case "open":
+		states = []githubv4.MilestoneState{"OPEN"}
+	case "closed":
+		states = []githubv4.MilestoneState{"CLOSED"}
+	case "all":
+		states = []githubv4.MilestoneState{"OPEN", "CLOSED"}
+	default:
+		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
 	variables := map[string]interface{}{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
+		"states":    states,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
@@ -837,8 +850,8 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 	return milestones, nil
 }
 
-func MilestoneByTitle(client *Client, repo ghrepo.Interface, title string) (*RepoMilestone, error) {
-	milestones, err := RepoMilestones(client, repo)
+func MilestoneByTitle(client *Client, repo ghrepo.Interface, state, title string) (*RepoMilestone, error) {
+	milestones, err := RepoMilestones(client, repo, state)
 	if err != nil {
 		return nil, err
 	}
