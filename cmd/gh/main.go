@@ -208,7 +208,7 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 		return nil, nil
 	}
 
-	client, err := command.BasicClient()
+	client, err := basicClient()
 	if err != nil {
 		return nil, err
 	}
@@ -216,4 +216,31 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	repo := updaterEnabled
 	stateFilePath := path.Join(config.ConfigDir(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
+}
+
+// BasicClient returns an API client for github.com only that borrows from but
+// does not depend on user configuration
+func basicClient() (*api.Client, error) {
+	var opts []api.ClientOption
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
+	}
+	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", command.Version)))
+
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		if c, err := config.ParseDefaultConfig(); err == nil {
+			token, _ = c.Get(ghinstance.Default(), "oauth_token")
+		}
+	}
+	if token != "" {
+		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+	}
+	return api.NewClient(opts...), nil
+}
+
+func apiVerboseLog() api.ClientOption {
+	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
+	colorize := utils.IsTerminal(os.Stderr)
+	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
 }
