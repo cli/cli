@@ -210,3 +210,10 @@ func Test_RepoClone_flagError(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 }
+
+func Test_RepoClone_noArgError(t *testing.T) {
+	_, err := runCloneCommand(nil, "")
+	if err == nil || err.Error() != "cannot clone: no repository name given" {
+		t.Errorf("unexpected error %v", err)
+	}
+}
