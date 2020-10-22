@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -62,30 +61,6 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 
 	if err := printOptions(buf, cmd, name); err != nil {
 		return err
-	}
-	if hasSeeAlso(cmd) {
-		buf.WriteString("### SEE ALSO\n\n")
-		if cmd.HasParent() {
-			parent := cmd.Parent()
-			pname := parent.CommandPath()
-			link := pname + ".md"
-			link = strings.Replace(link, " ", "_", -1)
-			buf.WriteString(fmt.Sprintf("* [%s](%s)\t - %s\n", pname, linkHandler(link), parent.Short))
-		}
-
-		children := cmd.Commands()
-		sort.Sort(byName(children))
-
-		for _, child := range children {
-			if !child.IsAvailableCommand() || child.IsAdditionalHelpTopicCommand() {
-				continue
-			}
-			cname := name + " " + child.Name()
-			link := cname + ".md"
-			link = strings.Replace(link, " ", "_", -1)
-			buf.WriteString(fmt.Sprintf("* [%s](%s)\t - %s\n", cname, linkHandler(link), child.Short))
-		}
-		buf.WriteString("\n")
 	}
 	_, err := buf.WriteTo(w)
 	return err

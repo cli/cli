@@ -22,8 +22,6 @@ func TestGenMdDoc(t *testing.T) {
 	checkStringContains(t, output, echoCmd.Example)
 	checkStringContains(t, output, "boolone")
 	checkStringContains(t, output, "rootflag")
-	checkStringContains(t, output, rootCmd.Short)
-	checkStringContains(t, output, echoSubCmd.Short)
 	checkStringOmits(t, output, deprecatedCmd.Short)
 	checkStringContains(t, output, "Options inherited from parent commands")
 }
@@ -59,8 +57,6 @@ func TestGenMdNoHiddenParents(t *testing.T) {
 	checkStringContains(t, output, echoCmd.Example)
 	checkStringContains(t, output, "boolone")
 	checkStringOmits(t, output, "rootflag")
-	checkStringContains(t, output, rootCmd.Short)
-	checkStringContains(t, output, echoSubCmd.Short)
 	checkStringOmits(t, output, deprecatedCmd.Short)
 	checkStringOmits(t, output, "Options inherited from parent commands")
 }
