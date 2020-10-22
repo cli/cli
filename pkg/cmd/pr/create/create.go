@@ -107,8 +107,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
 			}
-			if opts.MaintainerCanModify && opts.WebMode {
-				return errors.New("the --maintainer-edit flag is not supported with --web")
+			if !opts.MaintainerCanModify && opts.WebMode {
+				return errors.New("the --maintainer-edit=false flag is not supported with --web")
 			}
 
 			if runF != nil {
