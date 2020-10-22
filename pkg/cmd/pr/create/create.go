@@ -77,12 +77,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			A prompt will also ask for the title and the body of the pull request. Use '--title'
 			and '--body' to skip this, or use '--fill' to autofill these values from git commits.
+
+			By default users with write access to the base respository can add new commits to your branch.
+			If undesired, you may disable access of maintainers by using '--maintainer-edit=false' 
+			You can always change this setting later.
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
 			$ gh pr create --reviewer monalisa,hubot
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
+			$ gh pr create --maintainer-edit=false
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -101,6 +106,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
+			}
+			if opts.MaintainerCanModify && opts.WebMode {
+				return errors.New("the --maintainer-edit flag is not supported with --web")
 			}
 
 			if runF != nil {
