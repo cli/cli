@@ -38,6 +38,7 @@ func main() {
 
 	io, _, _, _ := iostreams.Test()
 	rootCmd := root.NewCmdRoot(&cmdutil.Factory{IOStreams: io}, "", "")
+	rootCmd.InitDefaultHelpCmd()
 
 	err := os.MkdirAll(*dir, 0755)
 	if err != nil {

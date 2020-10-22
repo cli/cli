@@ -82,15 +82,22 @@ func GenMarkdownTree(cmd *cobra.Command, dir string) error {
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
-			continue
+		if genMarkdown, ok := c.Annotations["markdown:generate"]; ok {
+			if genMarkdown == "false" {
+				continue
+			}
 		}
+
 		if err := GenMarkdownTreeCustom(c, dir, filePrepender, linkHandler); err != nil {
 			return err
 		}
 	}
 
 	basename := strings.Replace(cmd.CommandPath(), " ", "_", -1) + ".md"
+	if override, ok := cmd.Annotations["markdown:basename"]; ok {
+		basename = override + ".md"
+	}
+
 	filename := filepath.Join(dir, basename)
 	f, err := os.Create(filename)
 	if err != nil {
