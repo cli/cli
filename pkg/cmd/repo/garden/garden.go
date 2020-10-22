@@ -113,6 +113,9 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 			}
 			return gardenRun(&opts)
 		},
+		Annotations: map[string]string{
+			"markdown:generate": "false",
+		},
 	}
 
 	return cmd
