@@ -65,19 +65,6 @@ func TestGenMdNoHiddenParents(t *testing.T) {
 	checkStringOmits(t, output, "Options inherited from parent commands")
 }
 
-func TestGenMdNoTag(t *testing.T) {
-	rootCmd.DisableAutoGenTag = true
-	defer func() { rootCmd.DisableAutoGenTag = false }()
-
-	buf := new(bytes.Buffer)
-	if err := GenMarkdown(rootCmd, buf); err != nil {
-		t.Fatal(err)
-	}
-	output := buf.String()
-
-	checkStringOmits(t, output, "Auto generated")
-}
-
 func TestGenMdTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
 	tmpdir, err := ioutil.TempDir("", "test-gen-md-tree")
