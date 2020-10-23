@@ -465,6 +465,13 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	reg.Verify(t)
 }
 
+func Test_RepoFork_flagError(t *testing.T) {
+	_, err := runCommand(nil, nil, true, "--depth 1 OWNER/REPO")
+	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
 func stubSpinner() {
 	// not bothering with teardown since we never want spinners when doing tests
 	utils.StartSpinner = func(_ *spinner.Spinner) {
