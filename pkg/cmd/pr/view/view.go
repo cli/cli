@@ -107,7 +107,7 @@ func viewRun(opts *ViewOptions) error {
 		if connectedToTerminal {
 			url = fmt.Sprintf("\n%s\n", url)
 		}
-		fmt.Fprintf(opts.IO.Out, utils.Underline(url))
+		fmt.Fprint(opts.IO.Out, utils.Underline(url))
 		return nil
 	}
 
@@ -198,8 +198,8 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintln(out)
 
 	// Footer
-	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: "))
-	fmt.Fprintln(out, utils.Underline(fmt.Sprintf("%s\n", pr.URL)))
+	fmt.Fprint(out, utils.Gray("View this pull request on GitHub: "))
+	fmt.Fprintf(out, utils.Underline(fmt.Sprintf("%s\n", pr.URL)))
 	return nil
 }
 
