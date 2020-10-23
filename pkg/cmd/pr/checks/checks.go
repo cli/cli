@@ -76,12 +76,12 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	if len(pr.Commits.Nodes) == 0 {
-		return nil
+		return fmt.Errorf("no commit found on the pull request")
 	}
 
 	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	if len(rollup) == 0 {
-		return nil
+		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
 	passing := 0
