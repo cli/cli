@@ -316,7 +316,8 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantParams, reqBody)
 
 			if tt.name == "web arg" {
-				assert.Equal(t, cs.Calls[0].Args[1], "https://gist.github.com/aa5a315d61ae9438b18d")
+				browserCall := cs.Calls[0].Args
+				assert.Equal(t, browserCall[len(browserCall)-1], "https://gist.github.com/aa5a315d61ae9438b18d")
 			}
 
 			reg.Verify(t)
