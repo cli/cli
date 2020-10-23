@@ -59,6 +59,14 @@ func Test_NewCmdView(t *testing.T) {
 			},
 		},
 		{
+			name:  "url only mode",
+			args:  "-u",
+			isTTY: true,
+			want: ViewOptions{
+				UrlOnly: true,
+			},
+		},
+		{
 			name:    "no argument with --repo override",
 			args:    "-R owner/repo",
 			isTTY:   true,
@@ -245,7 +253,7 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
-		"Open PR wth empty body for the current branch": {
+		"Open PR with empty body for the current branch": {
 			branch:  "blueberries",
 			args:    "",
 			fixture: "./fixtures/prView_EmptyBody.json",
@@ -257,6 +265,14 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`labels:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+			},
+		},
+		"Open PR url only for the current branch": {
+			branch:  "blueberries",
+			args:    "-u",
+			fixture: "./fixtures/prView.json",
+			expectedOutputs: []string{
+				`https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
 		"Closed PR": {
@@ -550,9 +566,9 @@ func TestPRView_web_numberArg(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
-	} } } }
+		{ "data": { "repository": { "pullRequest": {
+			"url": "https://github.com/OWNER/REPO/pull/23"
+		} } } }
 	`))
 
 	var seenCmd *exec.Cmd
@@ -581,9 +597,9 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
-	} } } }
+		{ "data": { "repository": { "pullRequest": {
+			"url": "https://github.com/OWNER/REPO/pull/23"
+		} } } }
 	`))
 
 	var seenCmd *exec.Cmd
@@ -642,11 +658,11 @@ func TestPRView_web_branchArg(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "headRefName": "blueberries",
-		  "isCrossRepository": false,
-		  "url": "https://github.com/OWNER/REPO/pull/23" }
-	] } } } }
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries",
+			  "isCrossRepository": false,
+			  "url": "https://github.com/OWNER/REPO/pull/23" }
+		] } } } }
 	`))
 
 	var seenCmd *exec.Cmd
@@ -675,12 +691,12 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "headRefName": "blueberries",
-		  "isCrossRepository": true,
-		  "headRepositoryOwner": { "login": "hubot" },
-		  "url": "https://github.com/hubot/REPO/pull/23" }
-	] } } } }
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries",
+			  "isCrossRepository": true,
+			  "headRepositoryOwner": { "login": "hubot" },
+			  "url": "https://github.com/hubot/REPO/pull/23" }
+		] } } } }
 	`))
 
 	var seenCmd *exec.Cmd
@@ -702,4 +718,176 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
 	eq(t, url, "https://github.com/hubot/REPO/pull/23")
+}
+
+func TestPRView_url_only_currentBranch(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView.json"))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &test.OutputStub{}
+		default:
+			seenCmd = cmd
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, "blueberries", true, "-u")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "\nhttps://github.com/OWNER/REPO/pull/10\n")
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
+}
+
+func TestPRView_url_only_noResultsForBranch(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView_NoActiveBranch.json"))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
+			return &test.OutputStub{}
+		default:
+			seenCmd = cmd
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	_, err := runCommand(http, "blueberries", true, "-u")
+	if err == nil || err.Error() != `no open pull requests found for branch "blueberries"` {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
+}
+
+func TestPRView_url_only_numberArg(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+	{ "data": { "repository": { "pullRequest": {
+		"url": "https://github.com/OWNER/REPO/pull/23"
+	} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, "blueberries", true, "-u 23")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "\nhttps://github.com/OWNER/REPO/pull/23\n")
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
+}
+
+func TestPRView_url_only_numberArgWithHash(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequest": {
+			"url": "https://github.com/OWNER/REPO/pull/23"
+		} } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, "blueberries", true, "-u https://github.com/OWNER/REPO/pull/23/files")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "\nhttps://github.com/OWNER/REPO/pull/23\n")
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
+}
+
+func TestPRView_url_only_branchArg(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries",
+			  "isCrossRepository": false,
+			  "url": "https://github.com/OWNER/REPO/pull/23" }
+		] } } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, "hacktober", true, "-u blueberries")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "\nhttps://github.com/OWNER/REPO/pull/23\n")
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
+}
+
+func TestPRView_url_only_branchWithOwnerArg(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [
+			{ "headRefName": "blueberries",
+			  "isCrossRepository": true,
+			  "headRepositoryOwner": { "login": "ephelsa" },
+			  "url": "https://github.com/ephelsa/REPO/pull/23" }
+		] } } } }
+	`))
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, "hacktober", true, "-u ephelsa:blueberries")
+	if err != nil {
+		t.Errorf("error running command `pr view`: %v", err)
+	}
+
+	eq(t, output.String(), "\nhttps://github.com/ephelsa/REPO/pull/23\n")
+	if seenCmd != nil {
+		t.Fatalf("unexpected command: %v", seenCmd.Args)
+	}
 }
