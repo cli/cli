@@ -42,7 +42,16 @@ For more information and distro-specific instructions, see the [Linux installati
 
 ### Windows
 
-`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [winget][], [scoop][], [Chocolatey][], and as downloadable MSI.
+
+
+#### Windows Package Manager (aka winget)
+
+Install:
+
+```powershell
+winget install GitHub.cli
+```
 
 #### scoop
 
@@ -88,6 +97,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [manual]: https://cli.github.com/manual/
 [Homebrew]: https://brew.sh
 [MacPorts]: https://www.macports.org
+[winget]: https://github.com/microsoft/winget-cli
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest
