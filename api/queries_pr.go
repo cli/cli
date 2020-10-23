@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -621,7 +622,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, stateFilters []string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
@@ -637,9 +638,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	query := `
-	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!) {
+	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
+			pullRequests(headRefName: $headRefName, states: $states, first: 30) {
 				nodes {
 					id
 					number
@@ -726,6 +727,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		"owner":       repo.RepoOwner(),
 		"repo":        repo.RepoName(),
 		"headRefName": branchWithoutOwner,
+		"states":      stateFilters,
 	}
 
 	var resp response
@@ -734,7 +736,8 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		return nil, err
 	}
 
-	for _, pr := range resp.Repository.PullRequests.Nodes {
+	prs := sortPullRequestsByState(resp.Repository.PullRequests.Nodes)
+	for _, pr := range prs {
 		if pr.HeadLabel() == headBranch {
 			if baseBranch != "" {
 				if pr.BaseRefName != baseBranch {
@@ -1147,6 +1150,14 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+}
+
+// sortPullRequestsByState ensures that OPEN PRs precede non-open states (MERGED, CLOSED)
+func sortPullRequestsByState(prs []PullRequest) []PullRequest {
+	sort.SliceStable(prs, func(a, b int) bool {
+		return prs[a].State == "OPEN"
+	})
+	return prs
 }
 
 func min(a, b int) int {

@@ -43,7 +43,7 @@ func PRFromArgs(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, erro
 		}
 
 		// Last see if it is a branch name
-		pr, err = api.PullRequestForBranch(apiClient, repo, "", arg)
+		pr, err = api.PullRequestForBranch(apiClient, repo, "", arg, nil)
 		return pr, repo, err
 	}
 }
@@ -117,5 +117,5 @@ func prForCurrentBranch(apiClient *api.Client, repo ghrepo.Interface, branchFn f
 		}
 	}
 
-	return api.PullRequestForBranch(apiClient, repo, "", prHeadRef)
+	return api.PullRequestForBranch(apiClient, repo, "", prHeadRef, nil)
 }
