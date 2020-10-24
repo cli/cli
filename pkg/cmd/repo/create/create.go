@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const defaultGitProtocol = "https"
+
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -251,6 +253,7 @@ func createRun(opts *CreateOptions) error {
 
 		if isTTY {
 			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+			fmt.Fprintf(stderr, "%s The url repository %s on GitHub\n", greenCheck, ghrepo.FormatRemoteURL(repo, defaultGitProtocol))
 		} else {
 			fmt.Fprintln(stdout, repo.URL)
 		}
