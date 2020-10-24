@@ -57,7 +57,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.
 
-If '--clone' is specified, you can pass aditional 'git clone' flags by listing them after '--'.`,
+If '--clone' is specified, you can pass additional 'git clone' flags by listing them after '--'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
 			if len(args) > 0 {
