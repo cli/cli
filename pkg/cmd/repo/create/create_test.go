@@ -112,7 +112,7 @@ func TestRepoCreate(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ The url repository https://github.com/OWNER/REPO.git on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -194,7 +194,7 @@ func TestRepoCreate_org(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ The url repository https://github.com/ORG/REPO.git on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -276,7 +276,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ The url repository https://github.com/ORG/REPO.git on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -359,7 +359,7 @@ func TestRepoCreate_template(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ The url repository https://github.com/OWNER/REPO.git on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
@@ -447,7 +447,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ The url repository https://github.com/OWNER/REPO.git on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
