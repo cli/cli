@@ -232,7 +232,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, &opts.ConfirmSubmit)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, projectDirErr, &opts.ConfirmSubmit)
 		if err != nil {
 			return err
 		}
@@ -359,14 +359,23 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *bool) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, projectDirErr error, isConfirmFlagPassed *bool) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
-	if repoOwner != "" {
-		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
+	// if projectDirErr == nil it means that the current directory is an exiting git directory and an 'origin' git remote would be added, else create a new repo and dir
+	if projectDirErr == nil {
+		if repoOwner != "" {
+			promptString = fmt.Sprintf("This will add an 'origin' git remote to your existing '%s/%s' repository. Continue? ", repoOwner, repoName)
+		} else {
+			promptString = fmt.Sprintf("This will add an 'origin' git remote to your existing '%s' repository. Continue? ", repoName)
+		}
 	} else {
-		promptString = fmt.Sprintf("This will create '%s' in your current directory. Continue? ", repoName)
+		if repoOwner != "" {
+			promptString = fmt.Sprintf("This will create a new '%s/%s' repository and a local project directory for it in your current directory. Continue? ", repoOwner, repoName)
+		} else {
+			promptString = fmt.Sprintf("This will create a new '%s' repository and a local project directory for it in your current directory. Continue? ", repoName)
+		}
 	}
 
 	confirmSubmitQuestion := &survey.Question{
