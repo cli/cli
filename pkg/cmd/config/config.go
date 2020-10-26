@@ -11,31 +11,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ConfigKey struct {
-	name        string
-	description string
-}
-
-var respectedConfigKeys []ConfigKey = []ConfigKey{
-	{"git_protocol", `"https" or "ssh". Default is "https".`},
-	{"editor", `if unset, defaults to environment variables.`},
-	{"prompt", `"enabled" or "disabled". Toggles interactive prompting.`},
-	{"pager", `terminal pager program to send standard output to.`},
-}
-
 func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
-	longDoc := `
-Display or change configuration settings for gh.
-
-Current respected settings:
-`
-	for _, configKey := range respectedConfigKeys {
-		longDoc += fmt.Sprintf("- %s: %s\n", configKey.name, configKey.description)
+	longDoc := strings.Builder{}
+	longDoc.WriteString("Display or change configuration settings for gh.\n\n")
+	longDoc.WriteString("Current respected settings:\n")
+	for _, co := range config.ConfigOptions() {
+		longDoc.WriteString(fmt.Sprintf("- %s: %s", co.Key, co.Description))
+		if co.DefaultValue != "" {
+			longDoc.WriteString(fmt.Sprintf(" (default: %q)", co.DefaultValue))
+		}
+		longDoc.WriteRune('\n')
 	}
+
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration for gh",
-		Long:  heredoc.Doc(longDoc),
+		Long:  longDoc.String(),
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
@@ -101,8 +92,8 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 
 			key, value := args[0], args[1]
 			knownKey := false
-			for _, configKey := range respectedConfigKeys {
-				if key == configKey.name {
+			for _, configKey := range config.ConfigOptions() {
+				if key == configKey.Key {
 					knownKey = true
 					break
 				}
