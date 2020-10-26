@@ -28,6 +28,7 @@ func Test_fileConfig_Set(t *testing.T) {
 example.com:
     editor: vim
 `, hostsBuf.String())
+	assert.EqualError(t, c.Set("github.com", "git_protocol", "sshpps"), "invalid value")
 }
 
 func Test_defaultConfig(t *testing.T) {
@@ -67,4 +68,18 @@ func Test_defaultConfig(t *testing.T) {
 	assert.Equal(t, len(aliases.All()), 1)
 	expansion, _ := aliases.Get("co")
 	assert.Equal(t, expansion, "pr checkout")
+}
+
+func Test_validateConfigEntry(t *testing.T) {
+	err := validateConfigEntry("git_protocol", "sshpps")
+	assert.EqualError(t, err, "invalid value")
+
+	err = validateConfigEntry("git_protocol", "ssh")
+	assert.Nil(t, err)
+
+	err = validateConfigEntry("editor", "vim")
+	assert.Nil(t, err)
+
+	err = validateConfigEntry("got", "123")
+	assert.Nil(t, err)
 }

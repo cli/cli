@@ -730,3 +730,67 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 
 	eq(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"})
 }
+
+func Test_generateCompareURL(t *testing.T) {
+	type args struct {
+		r          ghrepo.Interface
+		base       string
+		head       string
+		title      string
+		body       string
+		assignees  []string
+		labels     []string
+		projects   []string
+		milestones []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "basic",
+			args: args{
+				r:    ghrepo.New("OWNER", "REPO"),
+				base: "main",
+				head: "feature",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
+			wantErr: false,
+		},
+		{
+			name: "with labels",
+			args: args{
+				r:      ghrepo.New("OWNER", "REPO"),
+				base:   "a",
+				head:   "b",
+				labels: []string{"one", "two three"},
+			},
+			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
+			wantErr: false,
+		},
+		{
+			name: "complex branch names",
+			args: args{
+				r:    ghrepo.New("OWNER", "REPO"),
+				base: "main/trunk",
+				head: "owner:feature",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := generateCompareURL(tt.args.r, tt.args.base, tt.args.head, tt.args.title, tt.args.body, tt.args.assignees, tt.args.labels, tt.args.projects, tt.args.milestones)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("generateCompareURL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("generateCompareURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
