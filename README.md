@@ -42,10 +42,10 @@ For more information and distro-specific instructions, see the [Linux installati
 
 ### Windows
 
-`gh` is available via [winget][], [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], and as downloadable MSI.
 
 
-#### Windows Package Manager (aka winget)
+#### WinGet
 
 Install:
 
