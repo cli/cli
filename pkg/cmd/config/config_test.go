@@ -117,6 +117,7 @@ func TestConfigSet(t *testing.T) {
 		config    configStub
 		args      []string
 		expectKey string
+		expectVal string
 		stdout    string
 		stderr    string
 	}{
@@ -125,6 +126,7 @@ func TestConfigSet(t *testing.T) {
 			config:    configStub{},
 			args:      []string{"editor", "vim"},
 			expectKey: "editor",
+			expectVal: "vim",
 			stdout:    "",
 			stderr:    "",
 		},
@@ -133,8 +135,18 @@ func TestConfigSet(t *testing.T) {
 			config:    configStub{},
 			args:      []string{"editor", "vim", "-h", "github.com"},
 			expectKey: "github.com:editor",
+			expectVal: "vim",
 			stdout:    "",
 			stderr:    "",
+		},
+		{
+			name:      "set key",
+			config:    configStub{},
+			args:      []string{"unknownKey", "someValue"},
+			expectKey: "unknownKey",
+			expectVal: "someValue",
+			stdout:    "",
+			stderr:    "! warning: 'unknownKey' is not a known configuration key\n",
 		},
 	}
 	for _, tt := range tests {
@@ -158,7 +170,7 @@ func TestConfigSet(t *testing.T) {
 
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
-			assert.Equal(t, "vim", tt.config[tt.expectKey])
+			assert.Equal(t, tt.expectVal, tt.config[tt.expectKey])
 			assert.Equal(t, "true", tt.config["_written"])
 		})
 	}

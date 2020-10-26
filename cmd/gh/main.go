@@ -71,7 +71,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == config.PromptsDisabled {
+	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
 	}
 

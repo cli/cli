@@ -12,18 +12,21 @@ import (
 )
 
 func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
+	longDoc := strings.Builder{}
+	longDoc.WriteString("Display or change configuration settings for gh.\n\n")
+	longDoc.WriteString("Current respected settings:\n")
+	for _, co := range config.ConfigOptions() {
+		longDoc.WriteString(fmt.Sprintf("- %s: %s", co.Key, co.Description))
+		if co.DefaultValue != "" {
+			longDoc.WriteString(fmt.Sprintf(" (default: %q)", co.DefaultValue))
+		}
+		longDoc.WriteRune('\n')
+	}
+
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration for gh",
-		Long: heredoc.Doc(`
-			Display or change configuration settings for gh.
-	
-			Current respected settings:
-			- git_protocol: "https" or "ssh". Default is "https".
-			- editor: if unset, defaults to environment variables.
-			- prompt: "enabled" or "disabled". Toggles interactive prompting.
-			- pager: terminal pager program to send standard output to.
-		`),
+		Long:  longDoc.String(),
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
@@ -77,7 +80,7 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 		Example: heredoc.Doc(`
 			$ gh config set editor vim
 			$ gh config set editor "code --wait"
-			$ gh config set git_protocol ssh
+			$ gh config set git_protocol ssh --host github.com
 			$ gh config set prompt disabled
 		`),
 		Args: cobra.ExactArgs(2),
@@ -88,6 +91,18 @@ func NewCmdConfigSet(f *cmdutil.Factory) *cobra.Command {
 			}
 
 			key, value := args[0], args[1]
+			knownKey := false
+			for _, configKey := range config.ConfigOptions() {
+				if key == configKey.Key {
+					knownKey = true
+					break
+				}
+			}
+			if !knownKey {
+				iostreams := f.IOStreams
+				warningIcon := iostreams.ColorScheme().WarningIcon()
+				fmt.Fprintf(iostreams.ErrOut, "%s warning: '%s' is not a known configuration key\n", warningIcon, key)
+			}
 			err = cfg.Set(hostname, key, value)
 			if err != nil {
 				var invalidValue *config.InvalidValueError
