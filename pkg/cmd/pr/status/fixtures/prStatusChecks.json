@@ -44,6 +44,34 @@
             "url": "https://github.com/cli/cli/pull/7",
             "headRefName": "banananana",
             "reviewDecision": "APPROVED",
+            "reviews": {
+              "nodes": [
+                {
+                  "author": {
+                    "login": "bob"
+                  },
+                  "state": "APPROVED"
+                },
+                {
+                  "author": {
+                    "login": "bob"
+                  },
+                  "state": "CHANGES_REQUESTED"
+                },
+                {
+                  "author": {
+                    "login": "bob"
+                  },
+                  "state": "APPROVED"
+                },
+                {
+                  "author": {
+                    "login": "alice"
+                  },
+                  "state": "APPROVED"
+                }
+              ]
+            },
             "commits": {
               "nodes": [
                 {
