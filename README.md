@@ -50,7 +50,7 @@ For more information and distro-specific instructions, see the [Linux installati
 Install:
 
 ```powershell
-winget install GitHub.cli
+winget install gh
 ```
 
 #### scoop
