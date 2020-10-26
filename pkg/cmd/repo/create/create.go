@@ -146,6 +146,9 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 		}, &answer)
+		if err != nil {
+			return err
+		}
 
 		if answer {
 			remoteName, remoteURL, err := interactiveAddRemote("", remotes)
