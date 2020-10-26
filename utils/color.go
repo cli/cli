@@ -12,14 +12,15 @@ import (
 
 var (
 	// Outputs ANSI color if stdout is a tty
-	Magenta = makeColorFunc("magenta")
-	Cyan    = makeColorFunc("cyan")
-	Red     = makeColorFunc("red")
-	Yellow  = makeColorFunc("yellow")
-	Blue    = makeColorFunc("blue")
-	Green   = makeColorFunc("green")
-	Gray    = makeColorFunc("black+h")
-	Bold    = makeColorFunc("default+b")
+	Magenta   = makeColorFunc("magenta")
+	Cyan      = makeColorFunc("cyan")
+	Red       = makeColorFunc("red")
+	Yellow    = makeColorFunc("yellow")
+	Blue      = makeColorFunc("blue")
+	Green     = makeColorFunc("green")
+	Gray      = makeColorFunc("black+h")
+	Bold      = makeColorFunc("default+b")
+	Underline = makeColorFunc("default+u")
 )
 
 // NewColorable returns an output stream that handles ANSI color sequences on Windows

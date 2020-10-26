@@ -42,12 +42,12 @@ func Remotes() (RemoteSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	remotes := parseRemotes(list)
+	remotes := ParseRemotes(list)
 
 	// this is affected by SetRemoteResolution
 	remoteCmd := exec.Command("git", "config", "--get-regexp", `^remote\..*\.gh-resolved$`)
 	output, _ := run.PrepareCmd(remoteCmd).Output()
-	for _, l := range outputLines(output) {
+	for _, l := range OutputLines(output) {
 		parts := strings.SplitN(l, " ", 2)
 		if len(parts) < 2 {
 			continue
@@ -68,7 +68,7 @@ func Remotes() (RemoteSet, error) {
 	return remotes, nil
 }
 
-func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
+func ParseRemotes(gitRemotes []string) (remotes RemoteSet) {
 	for _, r := range gitRemotes {
 		match := remoteRE.FindStringSubmatch(r)
 		if match == nil {

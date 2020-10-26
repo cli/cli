@@ -40,7 +40,7 @@ func ShowRefs(ref ...string) ([]Ref, error) {
 	output, err := run.PrepareCmd(showRef).Output()
 
 	var refs []Ref
-	for _, line := range outputLines(output) {
+	for _, line := range OutputLines(output) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
@@ -79,7 +79,7 @@ func CurrentBranch() (string, error) {
 func listRemotes() ([]string, error) {
 	remoteCmd := exec.Command("git", "remote", "-v")
 	output, err := run.PrepareCmd(remoteCmd).Output()
-	return outputLines(output), err
+	return OutputLines(output), err
 }
 
 func Config(name string) (string, error) {
@@ -134,7 +134,7 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 	commits := []*Commit{}
 	sha := 0
 	title := 1
-	for _, line := range outputLines(output) {
+	for _, line := range OutputLines(output) {
 		split := strings.SplitN(line, ",", 2)
 		if len(split) != 2 {
 			continue
@@ -183,7 +183,7 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	if err != nil {
 		return
 	}
-	for _, line := range outputLines(output) {
+	for _, line := range OutputLines(output) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
@@ -279,7 +279,7 @@ func ToplevelDir() (string, error) {
 
 }
 
-func outputLines(output []byte) []string {
+func OutputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	return strings.Split(lines, "\n")
 

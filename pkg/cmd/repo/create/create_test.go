@@ -95,6 +95,12 @@ func TestRepoCreate(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "addNewRemote",
+			Value: false,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
@@ -105,19 +111,37 @@ func TestRepoCreate(t *testing.T) {
 			Value: true,
 		},
 	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addOrigin",
+			Value: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteUrl",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteName",
+			Default: true,
+		},
+	})
 
 	output, err := runCommand(httpClient, "REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "Detected a project with these remotes: []\n\nCreate a new project...\n", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Initialized repository in './REPO/'\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -177,6 +201,12 @@ func TestRepoCreate_org(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "addNewRemote",
+			Value: false,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
@@ -187,19 +217,37 @@ func TestRepoCreate_org(t *testing.T) {
 			Value: true,
 		},
 	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addOrigin",
+			Value: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteUrl",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteName",
+			Default: true,
+		},
+	})
 
 	output, err := runCommand(httpClient, "ORG/REPO")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
+	assert.Equal(t, "Detected a project with these remotes: []\n\nCreate a new project...\n", output.String())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Initialized repository in './REPO/'\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	assert.Equal(t, "git remote add -f origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -259,6 +307,12 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "addNewRemote",
+			Value: false,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
@@ -269,19 +323,31 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 			Value: true,
 		},
 	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addOrigin",
+			Value: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteUrl",
+			Default: true,
+		},
+	})
 
 	output, err := runCommand(httpClient, "ORG/REPO --team monkeys")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
+	assert.Equal(t, "Detected a project with these remotes: []\n\nCreate a new project...\n", output.String())
+	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Initialized repository in './REPO/'\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	assert.Equal(t, "git remote add -f origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -342,6 +408,12 @@ func TestRepoCreate_template(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "addNewRemote",
+			Value: false,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
@@ -352,19 +424,31 @@ func TestRepoCreate_template(t *testing.T) {
 			Value: true,
 		},
 	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addOrigin",
+			Value: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "remoteUrl",
+			Default: true,
+		},
+	})
 
 	output, err := runCommand(httpClient, "REPO --template='OWNER/REPO'")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "Detected a project with these remotes: []\n\nCreate a new project...\n", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Initialized repository in './REPO/'\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -422,6 +506,12 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
+			Name:  "addNewRemote",
+			Value: false,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
 			Name:  "repoName",
 			Value: "OWNER/REPO",
 		},
@@ -440,19 +530,31 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 			Value: true,
 		},
 	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addOrigin",
+			Value: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "remoteUrl",
+			Value: "https://github.com/OWNER/REPO.git",
+		},
+	})
 
 	output, err := runCommand(httpClient, "")
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, "Detected a project with these remotes: []\n\nCreate a new project...\n", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Initialized repository in './REPO/'\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
