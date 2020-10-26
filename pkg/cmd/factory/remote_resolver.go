@@ -59,21 +59,36 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		var hostname string
 		cachedRemotes = context.Remotes{}
 		sort.Sort(resolvedRemotes)
-		for _, r := range resolvedRemotes {
-			if hostname == "" {
-				if !knownHosts[r.RepoHost()] {
+
+		if ghinstance.Default() != ghinstance.OverridableDefault() {
+			hostname = ghinstance.OverridableDefault()
+			for _, r := range resolvedRemotes {
+				if r.RepoHost() == hostname {
+					cachedRemotes = append(cachedRemotes, r)
+				}
+			}
+
+			if len(cachedRemotes) == 0 {
+				remotesError = errors.New("none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try either add a matching remote or unset the variable.")
+				return nil, remotesError
+			}
+		} else {
+			for _, r := range resolvedRemotes {
+				if hostname == "" {
+					if !knownHosts[r.RepoHost()] {
+						continue
+					}
+					hostname = r.RepoHost()
+				} else if r.RepoHost() != hostname {
 					continue
 				}
-				hostname = r.RepoHost()
-			} else if r.RepoHost() != hostname {
-				continue
+				cachedRemotes = append(cachedRemotes, r)
 			}
-			cachedRemotes = append(cachedRemotes, r)
-		}
 
-		if len(cachedRemotes) == 0 {
-			remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
-			return nil, remotesError
+			if len(cachedRemotes) == 0 {
+				remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
+				return nil, remotesError
+			}
 		}
 		return cachedRemotes, nil
 	}

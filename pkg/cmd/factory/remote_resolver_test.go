@@ -40,3 +40,5 @@ func Test_remoteResolver(t *testing.T) {
 	assert.Equal(t, "upstream", remotes[0].Name)
 	assert.Equal(t, "fork", remotes[1].Name)
 }
+
+// TODO test
