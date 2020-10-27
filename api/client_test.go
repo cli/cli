@@ -105,97 +105,66 @@ func TestRESTError(t *testing.T) {
 	}
 }
 
-func Test_CheckScopes(t *testing.T) {
+func Test_HasMinimumScopes(t *testing.T) {
 	tests := []struct {
-		name           string
-		wantScope      string
-		responseApp    string
-		responseScopes string
-		responseError  error
-		expectCallback bool
+		name    string
+		header  string
+		wantErr string
 	}{
 		{
-			name:           "missing read:org",
-			wantScope:      "read:org",
-			responseApp:    "APPID",
-			responseScopes: "repo, gist",
-			expectCallback: true,
+			name:    "no scopes",
+			header:  "",
+			wantErr: "",
 		},
 		{
-			name:           "has read:org",
-			wantScope:      "read:org",
-			responseApp:    "APPID",
-			responseScopes: "repo, read:org, gist",
-			expectCallback: false,
+			name:    "default scopes",
+			header:  "repo, read:org",
+			wantErr: "",
 		},
 		{
-			name:           "has admin:org",
-			wantScope:      "read:org",
-			responseApp:    "APPID",
-			responseScopes: "repo, admin:org, gist",
-			expectCallback: false,
+			name:    "admin:org satisfies read:org",
+			header:  "repo, admin:org",
+			wantErr: "",
 		},
 		{
-			name:           "no scopes in response",
-			wantScope:      "read:org",
-			responseApp:    "",
-			responseScopes: "",
-			expectCallback: false,
+			name:    "insufficient scope",
+			header:  "repo",
+			wantErr: "missing required scope 'read:org'",
 		},
 		{
-			name:           "errored response",
-			wantScope:      "read:org",
-			responseApp:    "",
-			responseScopes: "",
-			responseError:  errors.New("Network Failed"),
-			expectCallback: false,
+			name:    "insufficient scopes",
+			header:  "gist",
+			wantErr: "missing required scopes 'repo', 'read:org'",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := &httpmock.Registry{}
-			tr.Register(httpmock.MatchAny, func(*http.Request) (*http.Response, error) {
-				if tt.responseError != nil {
-					return nil, tt.responseError
-				}
-				if tt.responseScopes == "" {
-					return &http.Response{StatusCode: 200}, nil
-				}
+			fakehttp := &httpmock.Registry{}
+			client := NewClient(ReplaceTripper(fakehttp))
+
+			fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
+					Request:    req,
 					StatusCode: 200,
-					Header: http.Header{
-						"X-Oauth-Client-Id": []string{tt.responseApp},
-						"X-Oauth-Scopes":    []string{tt.responseScopes},
+					Body:       ioutil.NopCloser(&bytes.Buffer{}),
+					Header: map[string][]string{
+						"X-Oauth-Scopes": {tt.header},
 					},
 				}, nil
 			})
 
-			callbackInvoked := false
-			var gotAppID string
-			fn := CheckScopes(tt.wantScope, func(appID string) error {
-				callbackInvoked = true
-				gotAppID = appID
-				return nil
-			})
-
-			rt := fn(tr)
-			req, err := http.NewRequest("GET", "https://api.github.com/hello", nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			err := client.HasMinimumScopes("github.com")
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("error: %v", err)
+				}
+				return
 			}
+			if err.Error() != tt.wantErr {
+				t.Errorf("want %q, got %q", tt.wantErr, err.Error())
 
-			issuedScopesWarning = false
-			_, err = rt.RoundTrip(req)
-			if err != nil && !errors.Is(err, tt.responseError) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if tt.expectCallback != callbackInvoked {
-				t.Fatalf("expected CheckScopes callback: %v", tt.expectCallback)
-			}
-			if tt.expectCallback && gotAppID != tt.responseApp {
-				t.Errorf("unexpected app ID: %q", gotAppID)
 			}
 		})
 	}
+
 }

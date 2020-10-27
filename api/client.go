@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -99,58 +98,6 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	}
 }
 
-var issuedScopesWarning bool
-
-const (
-	httpOAuthAppID  = "X-Oauth-Client-Id"
-	httpOAuthScopes = "X-Oauth-Scopes"
-)
-
-// CheckScopes checks whether an OAuth scope is present in a response
-func CheckScopes(wantedScope string, cb func(string) error) ClientOption {
-	wantedCandidates := []string{wantedScope}
-	if strings.HasPrefix(wantedScope, "read:") {
-		wantedCandidates = append(wantedCandidates, "admin:"+strings.TrimPrefix(wantedScope, "read:"))
-	}
-
-	return func(tr http.RoundTripper) http.RoundTripper {
-		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-			res, err := tr.RoundTrip(req)
-			if err != nil || res.StatusCode > 299 || issuedScopesWarning {
-				return res, err
-			}
-
-			_, hasHeader := res.Header[httpOAuthAppID]
-			if !hasHeader {
-				return res, nil
-			}
-
-			appID := res.Header.Get(httpOAuthAppID)
-			hasScopes := strings.Split(res.Header.Get(httpOAuthScopes), ",")
-
-			hasWanted := false
-		outer:
-			for _, s := range hasScopes {
-				for _, w := range wantedCandidates {
-					if w == strings.TrimSpace(s) {
-						hasWanted = true
-						break outer
-					}
-				}
-			}
-
-			if !hasWanted {
-				if err := cb(appID); err != nil {
-					return res, err
-				}
-				issuedScopesWarning = true
-			}
-
-			return res, nil
-		}}
-	}
-}
-
 type funcTripper struct {
 	roundTrip func(*http.Request) (*http.Response, error)
 }
@@ -207,7 +154,20 @@ func (err HTTPError) Error() string {
 }
 
 type MissingScopesError struct {
-	error
+	MissingScopes []string
+}
+
+func (e MissingScopesError) Error() string {
+	var missing []string
+	for _, s := range e.MissingScopes {
+		missing = append(missing, fmt.Sprintf("'%s'", s))
+	}
+	scopes := strings.Join(missing, ", ")
+
+	if len(e.MissingScopes) == 1 {
+		return "missing required scope " + scopes
+	}
+	return "missing required scopes " + scopes
 }
 
 func (c Client) HasMinimumScopes(hostname string) error {
@@ -235,31 +195,34 @@ func (c Client) HasMinimumScopes(hostname string) error {
 		return HandleHTTPError(res)
 	}
 
-	hasScopes := strings.Split(res.Header.Get("X-Oauth-Scopes"), ",")
+	scopesHeader := res.Header.Get("X-Oauth-Scopes")
+	if scopesHeader == "" {
+		// if the token reports no scopes, assume that it's an integration token and give up on
+		// detecting its capabilities
+		return nil
+	}
 
 	search := map[string]bool{
 		"repo":      false,
 		"read:org":  false,
 		"admin:org": false,
 	}
-
-	for _, s := range hasScopes {
+	for _, s := range strings.Split(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
 	}
 
-	errorMsgs := []string{}
+	var missingScopes []string
 	if !search["repo"] {
-		errorMsgs = append(errorMsgs, "missing required scope 'repo'")
+		missingScopes = append(missingScopes, "repo")
 	}
 
 	if !search["read:org"] && !search["admin:org"] {
-		errorMsgs = append(errorMsgs, "missing required scope 'read:org'")
+		missingScopes = append(missingScopes, "read:org")
 	}
 
-	if len(errorMsgs) > 0 {
-		return &MissingScopesError{error: errors.New(strings.Join(errorMsgs, ";"))}
+	if len(missingScopes) > 0 {
+		return &MissingScopesError{MissingScopes: missingScopes}
 	}
-
 	return nil
 }
 

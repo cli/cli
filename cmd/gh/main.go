@@ -191,6 +191,9 @@ func shouldCheckForUpdate() bool {
 	if os.Getenv("GH_NO_UPDATE_NOTIFIER") != "" {
 		return false
 	}
+	if os.Getenv("CODESPACES") != "" {
+		return false
+	}
 	return updaterEnabled != "" && !isCI() && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
 }
 
