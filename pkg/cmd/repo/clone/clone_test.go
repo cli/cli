@@ -77,22 +77,30 @@ func Test_RepoClone(t *testing.T) {
 		{
 			name: "HTTPS URL",
 			args: "https://github.com/OWNER/REPO",
-			want: "git clone https://github.com/OWNER/REPO",
+			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "SSH URL",
 			args: "git@github.com:OWNER/REPO.git",
 			want: "git clone git@github.com:OWNER/REPO.git",
 		},
+		{
+			name: "Non-canonical capitalization",
+			args: "Owner/Repo",
+			want: "git clone https://github.com/OWNER/REPO.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			reg.Register(
-				httpmock.GraphQL(`query RepositoryFindParent\b`),
+				httpmock.GraphQL(`query RepositoryInfo\b`),
 				httpmock.StringResponse(`
 				{ "data": { "repository": {
-					"parent": null
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					}
 				} } }
 				`))
 
@@ -120,15 +128,21 @@ func Test_RepoClone(t *testing.T) {
 func Test_RepoClone_hasParent(t *testing.T) {
 	reg := &httpmock.Registry{}
 	reg.Register(
-		httpmock.GraphQL(`query RepositoryFindParent\b`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"parent": {
-				"owner": {"login": "hubot"},
-				"name": "ORIG"
-			}
-		} } }
-		`))
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					},
+					"parent": {
+						"name": "ORIG",
+						"owner": {
+							"login": "hubot"
+						}
+					}
+				} } }
+				`))
 
 	httpClient := &http.Client{Transport: reg}
 
@@ -155,6 +169,16 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 		{ "data": { "viewer": {
 			"login": "OWNER"
 		}}}`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					}
+				} } }
+				`))
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryFindParent\b`),
 		httpmock.StringResponse(`

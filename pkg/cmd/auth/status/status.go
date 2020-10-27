@@ -19,7 +19,8 @@ type StatusOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 
-	Hostname string
+	Hostname  string
+	ShowToken bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -48,6 +49,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
+	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
 
 	return cmd
 }
@@ -84,7 +86,7 @@ func statusRun(opts *StatusOptions) error {
 			continue
 		}
 
-		_, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
+		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
 		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
 
 		statusInfo[hostname] = []string{}
@@ -96,7 +98,7 @@ func statusRun(opts *StatusOptions) error {
 		if err != nil {
 			var missingScopes *api.MissingScopesError
 			if errors.As(err, &missingScopes) {
-				addMsg("%s %s: %s", utils.Red("X"), hostname, err)
+				addMsg("%s %s: the token in %s is %s", utils.Red("X"), hostname, tokenSource, err)
 				if tokenIsWriteable {
 					addMsg("- To request missing scopes, run: %s %s\n",
 						utils.Bold("gh auth refresh -h"),
@@ -124,6 +126,11 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					utils.GreenCheck(), hostname, utils.Bold(proto))
 			}
+			tokenDisplay := "*******************"
+			if opts.ShowToken {
+				tokenDisplay = token
+			}
+			addMsg("%s Token: %s", utils.GreenCheck(), tokenDisplay)
 		}
 		addMsg("")
 

@@ -19,8 +19,8 @@ ifndef CGO_LDFLAGS
     export CGO_LDFLAGS := $(LDFLAGS)
 endif
 
-GO_LDFLAGS := -X github.com/cli/cli/command.Version=$(GH_VERSION) $(GO_LDFLAGS)
-GO_LDFLAGS := -X github.com/cli/cli/command.BuildDate=$(BUILD_DATE) $(GO_LDFLAGS)
+GO_LDFLAGS := -X github.com/cli/cli/internal/build.Version=$(GH_VERSION) $(GO_LDFLAGS)
+GO_LDFLAGS := -X github.com/cli/cli/internal/build.Date=$(BUILD_DATE) $(GO_LDFLAGS)
 ifdef GH_OAUTH_CLIENT_SECRET
 	GO_LDFLAGS := -X github.com/cli/cli/internal/authflow.oauthClientID=$(GH_OAUTH_CLIENT_ID) $(GO_LDFLAGS)
 	GO_LDFLAGS := -X github.com/cli/cli/internal/authflow.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(GO_LDFLAGS)

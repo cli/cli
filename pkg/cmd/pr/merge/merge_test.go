@@ -2,6 +2,7 @@ package merge
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -356,6 +357,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
+
 	// We don't expect the default branch to be checked out, just that blueberries is deleted
 	cs.Stub("") // git rev-parse --verify blueberries
 	cs.Stub("") // git branch -d blueberries
@@ -568,6 +570,10 @@ func TestPRMerge_interactive(t *testing.T) {
 			Name:  "deleteBranch",
 			Value: true,
 		},
+		{
+			Name:  "isConfirmed",
+			Value: true,
+		},
 	})
 
 	output, err := runCommand(http, "blueberries", true, "")
@@ -576,4 +582,52 @@ func TestPRMerge_interactive(t *testing.T) {
 	}
 
 	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", `Deleted branch.*blueberries`)
+}
+
+func TestPRMerge_interactiveCancelled(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [{
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"},
+			"id": "THE-ID",
+			"number": 3
+		}] } } } }`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git push origin --delete blueberries
+	cs.Stub("") // git branch -d
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "mergeMethod",
+			Value: 0,
+		},
+		{
+			Name:  "deleteBranch",
+			Value: true,
+		},
+		{
+			Name:  "isConfirmed",
+			Value: false,
+		},
+	})
+
+	output, err := runCommand(http, "blueberries", true, "")
+	if !errors.Is(err, cmdutil.SilentError) {
+		t.Fatalf("got error %v", err)
+	}
+
+	assert.Equal(t, "Cancelled.\n", output.Stderr())
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -501,11 +502,11 @@ func computeDefaults(baseRef, headRef string) (shared.Defaults, error) {
 	} else {
 		out.Title = utils.Humanize(headRef)
 
-		body := ""
+		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			body += fmt.Sprintf("- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
 		}
-		out.Body = body
+		out.Body = body.String()
 	}
 
 	return out, nil
@@ -553,7 +554,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestones []string) (string, error) {
-	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", base, head)
+	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", url.QueryEscape(base), url.QueryEscape(head))
 	url, err := shared.WithPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestones)
 	if err != nil {
 		return "", err
