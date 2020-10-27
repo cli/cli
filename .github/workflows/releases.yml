@@ -17,7 +17,7 @@ jobs:
           go-version: 1.15
       - name: Generate changelog
         run: |
-          echo ::set-env name=GORELEASER_CURRENT_TAG::${GITHUB_REF#refs/tags/}
+          echo "GORELEASER_CURRENT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
@@ -50,10 +50,11 @@ jobs:
         run: |
           api() { gh api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
           api-write() { [[ $GITHUB_REF == *-* ]] && echo "skipping: api $*" || api "$@"; }
-          cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
+          cards=$(api --paginate projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
           for card in $cards; do
-            api-write projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
+            api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
+          echo "moved ${#cards[@]} cards to the Done column"
       
       - name: Install packaging dependencies
         run: sudo apt-get install -y createrepo rpm reprepro
@@ -126,8 +127,8 @@ jobs:
       - name: Prepare PATH
         shell: bash
         run: |
-          echo "::add-path::$WIX\\bin"
-          echo "::add-path::C:\\Program Files\\go-msi"
+          echo "$WIX\\bin" >> $GITHUB_PATH
+          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
       - name: Build MSI
         id: buildmsi
         shell: bash
