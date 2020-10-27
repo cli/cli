@@ -2,19 +2,37 @@
 
 As we get more issues and pull requests opened on the GitHub CLI, we've decided on a weekly rotation
 triage role. The initial expectation is that the person in the role for the week spends no more than
-1-2 hours a day on this work; we can refine that as needed. Below is a basic timeline for a typical
-triage day.
+2 hours a day on this work; we can refine that as needed.
 
-1. Note the time
-2. Open every new [issue](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue)/[pr](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse) in a tab
-3. Go through each one and look for things that should be closed outright (See the PR and Issue section below for more details.)
-4. Go through again and look for issues that are worth keeping around, update each one with labels/pings
-5. Go through again and look for PRs that solve a useful problem but lack obvious things like tests or passing builds; request changes on those
-6. Mark any remaining PRs (i.e. ones that look worth merging with a cursory glance) as `community` PRs and move to Needs Review
-7. Look for [issues](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue) and [PRs](https://github.com/cli/cli/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse+sort%3Aupdated-desc) updated in the last day and see if they need a response.
-8. Check the clock at each step and just bail out when an hour passes
+## Expectations for incoming issues
 
-# Incoming issues
+All incoming issues need either an **enhancement** or **bug** label.
+
+To be considered triaged, **enhancement** issues require at least one of the following additional labels:
+
+- **core**: work reserved for the core CLI team
+- **help wanted**: work that we would accept contributions for
+- **needs-design**: work that requires input from a UX designer before it can move forward
+- **needs-investigation**: work that requires a mystery be solved by the core team before it can move forward
+- **needs-user-input**: work that requires more information from the reporter before it can move forward
+
+To be considered triaged, **bug** issues require a severity label: one of **p1**, **p2**, or **p3**
+
+For a more detailed breakdown of **how** to triage an issue, see the _Issue triage flowchart_ below.
+
+## Expectations for community pull requests
+
+To be considered triaged, incoming pull requests should:
+
+- be checked for a corresponding **help wanted** issue
+- be checked for basic quality: are the builds passing? have tests been added?
+- be checked for redundancy: is there already a PR dealing with this?
+
+Once a pull request has been triaged, it should be moved to the **Needs Review** column of the project board.
+
+For a more detailed breakdown of **how** to triage an issue, see the _PR triage flowchart_ below.
+
+## Issue triage flowchart
 
 - can this be closed outright?
   - e.g. spam/junk
@@ -22,14 +40,14 @@ triage day.
 - do we not want to do it?
   - e.g. have already discussed not wanting to do or duplicate issue
   - comment and close
-- do we want someone in the community to do it?
+- are we ok with outside contribution for this?
   - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
   - ensure that the thread contains all the context necessary for someone new to pick this up
   - add `help wanted` label
   - consider adding `good first issue` label
 - do we want to do it?
   - comment acknowledging it
-  - label appropriately
+  - add `core` label
   - add to project TODO column if this is something that should ship soon
 - is it intriguing, but requires discussion?
   - label `needs-design` if design input is needed, ping
@@ -40,9 +58,7 @@ triage day.
 - is it a usage/support question?
   - offer some instructions/workaround and close
 
-# Incoming PRs
-
-just imagine a flowchart
+## Pull request triage flowchart
 
 - can it be closed outright?
   - e.g. spam/junk
@@ -53,10 +69,9 @@ just imagine a flowchart
   - request an issue
   - close
 - is it something we want to include?
-  - add `community` label
   - add to `needs review` column
 
-# Weekly PR audit
+## Weekly PR audit
 
 In the interest of not letting our open PR list get out of hand (20+ total PRs _or_ multiple PRs
 over a few months old), try to audit open PRs each week with the goal of getting them merged and/or
