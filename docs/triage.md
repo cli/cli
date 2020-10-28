@@ -6,7 +6,7 @@ triage role. The initial expectation is that the person in the role for the week
 
 ## Expectations for incoming issues
 
-All incoming issues need either an **enhancement** or **bug** label.
+All incoming issues need either an **enhancement**, **bug**, or **docs** label.
 
 To be considered triaged, **enhancement** issues require at least one of the following additional labels:
 
