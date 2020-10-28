@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"time"
+
+	"github.com/cli/cli/pkg/iostreams"
 )
 
-// TODO accept output writing thing
-
-func PreserveInput(ims *IssueMetadataState, defs Defaults, doPreserve *bool) func() {
+func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaults, doPreserve *bool) func() {
 	return func() {
 		if ims.Body == defs.Body && ims.Title == defs.Title {
 			return
@@ -19,11 +19,16 @@ func PreserveInput(ims *IssueMetadataState, defs Defaults, doPreserve *bool) fun
 			return
 		}
 
+		out := io.ErrOut
+
+		// this extra newline guards against appending to the end of a survey line
+		fmt.Fprintln(out)
+
 		data, err := json.Marshal(ims)
 		if err != nil {
-			fmt.Printf("failed to save input to file: %s\n", err)
-			fmt.Println("would have saved:")
-			fmt.Printf("%v\n", ims)
+			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
+			fmt.Fprintln(out, "would have saved:")
+			fmt.Fprintf(out, "%v\n", ims)
 			return
 		}
 
@@ -31,12 +36,14 @@ func PreserveInput(ims *IssueMetadataState, defs Defaults, doPreserve *bool) fun
 
 		err = ioutil.WriteFile(dumpPath, data, 0660)
 		if err != nil {
-			fmt.Printf("failed to save input to file: %s\n", err)
-			fmt.Println("would have saved:")
-			fmt.Println(string(data))
+			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
+			fmt.Fprintln(out, "would have saved:")
+			fmt.Fprintln(out, string(data))
 			return
 		}
 
-		fmt.Printf("%s operation failed.input saved to: %s\n", "TODO", dumpPath)
+		cs := io.ColorScheme()
+
+		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), dumpPath)
 	}
 }

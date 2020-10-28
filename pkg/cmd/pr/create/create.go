@@ -342,7 +342,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	doPreserveInput := false
-	defer shared.PreserveInput(&tb, defs, &doPreserveInput)()
+	defer shared.PreserveInput(opts.IO, &tb, defs, &doPreserveInput)()
 
 	if !opts.WebMode && !opts.Autofill && opts.Interactive {
 		doPreserveInput = true
