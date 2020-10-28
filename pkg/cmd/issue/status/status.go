@@ -75,33 +75,34 @@ func statusRun(opts *StatusOptions) error {
 	defer opts.IO.StopPager()
 
 	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintf(out, "Relevant issues in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	prShared.PrintHeader(out, "Issues assigned to you")
+	prShared.PrintHeader(cs, out, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
 		issueShared.PrintIssues(opts.IO, "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
 	} else {
 		message := "  There are no issues assigned to you"
-		prShared.PrintMessage(out, message)
+		prShared.PrintMessage(cs, out, message)
 	}
 	fmt.Fprintln(out)
 
-	prShared.PrintHeader(out, "Issues mentioning you")
+	prShared.PrintHeader(cs, out, "Issues mentioning you")
 	if issuePayload.Mentioned.TotalCount > 0 {
 		issueShared.PrintIssues(opts.IO, "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
 	} else {
-		prShared.PrintMessage(out, "  There are no issues mentioning you")
+		prShared.PrintMessage(cs, out, "  There are no issues mentioning you")
 	}
 	fmt.Fprintln(out)
 
-	prShared.PrintHeader(out, "Issues opened by you")
+	prShared.PrintHeader(cs, out, "Issues opened by you")
 	if issuePayload.Authored.TotalCount > 0 {
 		issueShared.PrintIssues(opts.IO, "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
 	} else {
-		prShared.PrintMessage(out, "  There are no issues opened by you")
+		prShared.PrintMessage(cs, out, "  There are no issues opened by you")
 	}
 	fmt.Fprintln(out)
 

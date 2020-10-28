@@ -122,6 +122,7 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 }
 
 func gardenRun(opts *GardenOptions) error {
+	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
 
 	if runtime.GOOS == "windows" {
@@ -201,7 +202,7 @@ func gardenRun(opts *GardenOptions) error {
 	if err != nil {
 		return err
 	}
-	player := &Player{0, 0, utils.Bold("@"), geo, 0}
+	player := &Player{0, 0, cs.Bold("@"), geo, 0}
 
 	garden := plantGarden(commits, geo)
 	if len(garden) < geo.Height {
@@ -213,7 +214,7 @@ func gardenRun(opts *GardenOptions) error {
 		geo.Width = 0
 	}
 	clear(opts.IO)
-	drawGarden(out, garden, player)
+	drawGarden(cs, out, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "cbreak", "min", "1").Run()
@@ -224,7 +225,7 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprint(out, "\033[?25h")
 		_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
+		fmt.Fprintln(out, cs.Bold("You turn and walk away from the wildflower garden..."))
 	}
 
 	c := make(chan os.Signal)
@@ -312,7 +313,7 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out)
 
-		fmt.Fprint(out, utils.Bold(sl))
+		fmt.Fprint(out, cs.Bold(sl))
 	}
 
 	walkAway()
@@ -423,7 +424,7 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 	return garden
 }
 
-func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
+func drawGarden(cs *iostreams.ColorScheme, out io.Writer, garden [][]*Cell, player *Player) {
 	fmt.Fprint(out, "\033[?25l") // hide cursor. it needs to be restored at command exit.
 	sl := ""
 	for y, gardenRow := range garden {
@@ -432,7 +433,7 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 			underPlayer := (player.X == x && player.Y == y)
 			if underPlayer {
 				sl = gardenCell.StatusLine
-				char = utils.Bold(player.Char)
+				char = cs.Bold(player.Char)
 
 				if strings.Contains(gardenCell.StatusLine, "stream") {
 					player.ShoeMoistureContent = 5
@@ -447,7 +448,7 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	}
 
 	fmt.Println()
-	fmt.Fprintln(out, utils.Bold(sl))
+	fmt.Fprintln(out, cs.Bold(sl))
 }
 
 func statusLine(garden [][]*Cell, player *Player) string {
