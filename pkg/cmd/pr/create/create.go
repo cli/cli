@@ -303,7 +303,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if !opts.WebMode {
-		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel, []string{"OPEN"})
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
