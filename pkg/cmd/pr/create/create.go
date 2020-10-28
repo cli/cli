@@ -364,7 +364,6 @@ func createRun(opts *CreateOptions) error {
 
 		err = shared.TitleBodySurvey(opts.IO, editorCommand, &tb, client, baseRepo, title, body, defs, nonLegacyTemplateFiles, legacyTemplateFile, true, baseRepo.ViewerCanTriage())
 		if err != nil {
-			// TODO want dump here
 			return fmt.Errorf("could not collect title and/or body: %w", err)
 		}
 
@@ -387,7 +386,6 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if action == shared.SubmitAction && title == "" {
-		// TODO want dump here
 		return errors.New("pull request title must not be blank")
 	}
 
@@ -397,7 +395,6 @@ func createRun(opts *CreateOptions) error {
 	if headRepo == nil && isPushEnabled {
 		headRepo, err = api.ForkRepo(client, baseRepo)
 		if err != nil {
-			// TODO want dump here
 			return fmt.Errorf("error forking repo: %w", err)
 		}
 		didForkRepo = true
@@ -417,7 +414,6 @@ func createRun(opts *CreateOptions) error {
 	if headRemote == nil && isPushEnabled {
 		cfg, err := opts.Config()
 		if err != nil {
-			// TODO want dump here
 			return err
 		}
 		cloneProtocol, _ := cfg.Get(headRepo.RepoHost(), "git_protocol")
@@ -427,7 +423,6 @@ func createRun(opts *CreateOptions) error {
 		// TODO: prevent clashes with another remote of a same name
 		gitRemote, err := git.AddRemote("fork", headRepoURL)
 		if err != nil {
-			// TODO want dump here
 			return fmt.Errorf("error adding remote: %w", err)
 		}
 		headRemote = &context.Remote{
@@ -450,7 +445,6 @@ func createRun(opts *CreateOptions) error {
 					time.Sleep(time.Duration(waitSeconds) * time.Second)
 					continue
 				}
-				// TODO want dump here
 				return err
 			}
 			break
@@ -468,7 +462,6 @@ func createRun(opts *CreateOptions) error {
 
 		err = shared.AddMetadataToIssueParams(client, baseRepo, params, &tb)
 		if err != nil {
-			// TODO want dump here
 			return err
 		}
 
@@ -477,7 +470,6 @@ func createRun(opts *CreateOptions) error {
 			fmt.Fprintln(opts.IO.Out, pr.URL)
 		}
 		if err != nil {
-			// TODO want dump here
 			if pr != nil {
 				return fmt.Errorf("pull request update failed: %w", err)
 			}
@@ -486,7 +478,6 @@ func createRun(opts *CreateOptions) error {
 	} else if action == shared.PreviewAction {
 		openURL, err := generateCompareURL(baseRepo, baseBranch, headBranchLabel, title, body, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
 		if err != nil {
-			// TODO want dump here
 			return err
 		}
 		if isTerminal {
@@ -494,7 +485,6 @@ func createRun(opts *CreateOptions) error {
 		}
 		return utils.OpenInBrowser(openURL)
 	} else {
-		// TODO want dump here
 		panic("Unreachable state")
 	}
 
