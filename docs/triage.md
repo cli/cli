@@ -84,6 +84,12 @@ For each PR, ask:
 - is this really close but author is absent? push commits to finish, request review
 - is this waiting on triage? go through the PR triage flow
 
+## Useful aliases
+
+This gist has some useful aliases for first responders:
+
+https://gist.github.com/vilmibm/ee6ed8a783e4fef5b69b2ed42d743b1a
+
 ## Examples
 
 We want our project to be a safe and encouraging open-source environment. Below are some examples
