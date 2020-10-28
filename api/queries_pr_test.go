@@ -139,22 +139,31 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 	}
 }
 
-func Test_sortPullRequestsByPrecedence(t *testing.T) {
-	prs := sortPullRequestsByState([]PullRequest{
+func Test_sortPullRequestsByState(t *testing.T) {
+	prs := []PullRequest{
 		{
-			BaseRefName: "test-PR",
+			BaseRefName: "test1",
 			State:       "MERGED",
 		},
 		{
-			BaseRefName: "test-PR",
+			BaseRefName: "test2",
 			State:       "CLOSED",
 		},
 		{
-			BaseRefName: "test-PR",
+			BaseRefName: "test3",
 			State:       "OPEN",
 		},
-	})
-	if prs[0].State != "OPEN" {
-		t.Errorf("sortPullRequestsByPrecedence() = got %s, want \"OPEN\"", prs[0].State)
+	}
+
+	sortPullRequestsByState(prs)
+
+	if prs[0].BaseRefName != "test3" {
+		t.Errorf("prs[0]: got %s, want %q", prs[0].BaseRefName, "test3")
+	}
+	if prs[1].BaseRefName != "test1" {
+		t.Errorf("prs[1]: got %s, want %q", prs[1].BaseRefName, "test1")
+	}
+	if prs[2].BaseRefName != "test2" {
+		t.Errorf("prs[2]: got %s, want %q", prs[2].BaseRefName, "test2")
 	}
 }

@@ -736,7 +736,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		return nil, err
 	}
 
-	prs := sortPullRequestsByState(resp.Repository.PullRequests.Nodes)
+	prs := resp.Repository.PullRequests.Nodes
+	sortPullRequestsByState(prs)
+
 	for _, pr := range prs {
 		if pr.HeadLabel() == headBranch {
 			if baseBranch != "" {
@@ -749,6 +751,13 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	return nil, &NotFoundError{fmt.Errorf("no pull requests found for branch %q", headBranch)}
+}
+
+// sortPullRequestsByState sorts a PullRequest slice by open-first
+func sortPullRequestsByState(prs []PullRequest) {
+	sort.SliceStable(prs, func(a, b int) bool {
+		return prs[a].State == "OPEN"
+	})
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
@@ -1150,14 +1159,6 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
-}
-
-// sortPullRequestsByState ensures that OPEN PRs precede non-open states (MERGED, CLOSED)
-func sortPullRequestsByState(prs []PullRequest) []PullRequest {
-	sort.SliceStable(prs, func(a, b int) bool {
-		return prs[a].State == "OPEN"
-	})
-	return prs
 }
 
 func min(a, b int) int {
