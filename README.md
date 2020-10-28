@@ -51,7 +51,7 @@ For more information and distro-specific instructions, see the [Linux installati
 | ------------------- | --------------------|
 | `winget install gh` | `winget install gh` |
 
-> WinGet does not have an upgrade command yet. But using the install command removes the older version of the gh and installs the latest version
+<i>WinGet does not have a specialized `upgrade` command yet, but the `install` command should work for upgrading to a newer version of GitHub CLI.</i>
 
 #### scoop
 
