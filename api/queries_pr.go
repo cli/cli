@@ -626,7 +626,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	type response struct {
 		Repository struct {
 			PullRequests struct {
-				ID    githubv4.ID
 				Nodes []PullRequest
 			}
 		}
@@ -740,12 +739,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	sortPullRequestsByState(prs)
 
 	for _, pr := range prs {
-		if pr.HeadLabel() == headBranch {
-			if baseBranch != "" {
-				if pr.BaseRefName != baseBranch {
-					continue
-				}
-			}
+		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
 			return &pr, nil
 		}
 	}
