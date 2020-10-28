@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -32,7 +34,8 @@ func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaul
 			return
 		}
 
-		dumpPath := fmt.Sprintf("/tmp/gh-dump-%x.json", time.Now().UnixNano())
+		dumpFilename := fmt.Sprintf("gh-dump-%x.json", time.Now().UnixNano())
+		dumpPath := filepath.Join(os.TempDir(), dumpFilename)
 
 		err = ioutil.WriteFile(dumpPath, data, 0660)
 		if err != nil {
