@@ -57,9 +57,5 @@ func IssueLabelList(issue api.Issue) string {
 		labelNames = append(labelNames, label.Name)
 	}
 
-	list := strings.Join(labelNames, ", ")
-	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
-		list += ", …"
-	}
-	return list
+	return strings.Join(labelNames, ", ")
 }

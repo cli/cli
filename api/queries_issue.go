@@ -78,7 +78,7 @@ const fragments = `
 		url
 		state
 		updatedAt
-		labels(first: 3) {
+		labels(first: 100) {
 			nodes {
 				name
 			}
