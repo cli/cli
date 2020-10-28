@@ -47,11 +47,11 @@ For more information and distro-specific instructions, see the [Linux installati
 
 #### WinGet
 
-Install:
+| Install:            | Upgrade:            |
+| ------------------- | --------------------|
+| `winget install gh` | `winget install gh` |
 
-```powershell
-winget install gh
-```
+> WinGet does not have an upgrade command yet. But using the install command removes the older version of the gh and installs the latest version
 
 #### scoop
 
