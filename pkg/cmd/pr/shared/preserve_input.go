@@ -1,9 +1,13 @@
 package shared
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"time"
 )
+
+// TODO accept output writing thing
 
 func PreserveInput(ims *IssueMetadataState, defs Defaults, doPreserve *bool) func() {
 	return func() {
@@ -15,9 +19,24 @@ func PreserveInput(ims *IssueMetadataState, defs Defaults, doPreserve *bool) fun
 			return
 		}
 
-		dumpPath := fmt.Sprintf(".dump-%x.json", time.Now().UnixNano())
+		data, err := json.Marshal(ims)
+		if err != nil {
+			fmt.Printf("failed to save input to file: %s\n", err)
+			fmt.Println("would have saved:")
+			fmt.Printf("%v\n", ims)
+			return
+		}
 
-		// TODO try serializing ims as JSON and dumping to a file with random name
-		fmt.Println("DUMPIN TO", dumpPath)
+		dumpPath := fmt.Sprintf("/tmp/gh-dump-%x.json", time.Now().UnixNano())
+
+		err = ioutil.WriteFile(dumpPath, data, 0660)
+		if err != nil {
+			fmt.Printf("failed to save input to file: %s\n", err)
+			fmt.Println("would have saved:")
+			fmt.Println(string(data))
+			return
+		}
+
+		fmt.Printf("%s operation failed.input saved to: %s\n", "TODO", dumpPath)
 	}
 }
