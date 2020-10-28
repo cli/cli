@@ -121,3 +121,7 @@ func (c *ColorScheme) SuccessIcon() string {
 func (c *ColorScheme) WarningIcon() string {
 	return c.Yellow("!")
 }
+
+func (c *ColorScheme) FailureIcon() string {
+	return c.Red("X")
+}
