@@ -341,22 +341,11 @@ func createRun(opts *CreateOptions) error {
 		Milestones: milestoneTitles,
 	}
 
-	performDump := false
-	defer func() {
-		if tb.Body == defs.Body || tb.Title == defs.Title {
-			return
-		}
-
-		if !performDump {
-			return
-		}
-
-		// TODO try serializing tb as JSON and dumping to a file with random name
-		fmt.Println("DUMPIN")
-	}()
+	doPreserveInput := false
+	defer shared.PreserveInput(&tb, defs, &doPreserveInput)()
 
 	if !opts.WebMode && !opts.Autofill && opts.Interactive {
-		performDump = true
+		doPreserveInput = true
 		var nonLegacyTemplateFiles []string
 		var legacyTemplateFile *string
 
@@ -384,7 +373,7 @@ func createRun(opts *CreateOptions) error {
 		if action == shared.CancelAction {
 			// TODO wouldn't want dump here...maybe? i could see there still being a desire to save state
 			// even with an explicit cancel
-			performDump = false
+			doPreserveInput = false
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
 			return nil
 		}
@@ -509,7 +498,7 @@ func createRun(opts *CreateOptions) error {
 		panic("Unreachable state")
 	}
 
-	performDump = false
+	doPreserveInput = false
 	return nil
 }
 
