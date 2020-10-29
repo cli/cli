@@ -117,6 +117,16 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 nix-env -iA nixos.gitAndTools.gh
 ```
 
+### Snaps
+
+Many Linux distro users can install using Snapd from the [Snap Store](https://snapcraft.io/gh) or the associated [repo](https://github.com/casperdcl/cli/tree/snap)
+
+```bash
+sudo snap install --edge gh && snap connect gh:ssh-keys
+```
+> `Snapd` is required and is available on a wide range of Linux distros. 
+>
+> Find out which distros have it pre-installed and how to install it in the [Snapcraft Installation Docs](https://snapcraft.io/docs/installing-snapd)
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
