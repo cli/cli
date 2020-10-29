@@ -53,6 +53,9 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+
+	JsonInput string
+	JsonFill  bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -85,13 +88,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO process JsonInput/JsonFill
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
 			opts.Interactive = !(opts.TitleProvided && opts.BodyProvided)
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill && !opts.JsonFill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
 			}
 
@@ -122,6 +126,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.StringVarP(&opts.JsonInput, "json", "j", "", "Fill in a pull request's details with JSON data")
 
 	return cmd
 }
@@ -300,6 +305,9 @@ func createRun(opts *CreateOptions) error {
 		if !opts.BodyProvided {
 			body = defs.Body
 		}
+	} else if opts.JsonFill {
+		// TODO
+		fmt.Println("HANDLE JSON FILL")
 	}
 
 	if !opts.WebMode {
@@ -315,7 +323,7 @@ func createRun(opts *CreateOptions) error {
 
 	isTerminal := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
-	if !opts.WebMode && !opts.Autofill {
+	if !opts.WebMode && !opts.Autofill && !opts.JsonFill {
 		message := "\nCreating pull request for %s into %s in %s\n\n"
 		if opts.IsDraft {
 			message = "\nCreating draft pull request for %s into %s in %s\n\n"
@@ -344,7 +352,7 @@ func createRun(opts *CreateOptions) error {
 	doPreserveInput := false
 	defer shared.PreserveInput(opts.IO, &tb, defs, &doPreserveInput)()
 
-	if !opts.WebMode && !opts.Autofill && opts.Interactive {
+	if !opts.WebMode && !opts.Autofill && !opts.JsonFill && opts.Interactive {
 		doPreserveInput = true
 		var nonLegacyTemplateFiles []string
 		var legacyTemplateFile *string
