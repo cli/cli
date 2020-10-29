@@ -24,7 +24,7 @@
 3. Move the resulting `bin/gh` executable to somewhere in your PATH
 
    ```sh
-   $ sudo mv ./bin/gh /usr/local/bin/
+   $ sudo mv ./bin/gh /usr/bin/
    ```
 
 4. Run `gh version` to check if it worked.
