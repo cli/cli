@@ -12,7 +12,86 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdClone(t *testing.T) {
+	testCases := []struct {
+		name     string
+		args     string
+		wantOpts CloneOptions
+		wantErr  string
+	}{
+		{
+			name:    "no arguments",
+			args:    "",
+			wantErr: "cannot clone: repository argument required",
+		},
+		{
+			name: "repo argument",
+			args: "OWNER/REPO",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{},
+			},
+		},
+		{
+			name: "directory argument",
+			args: "OWNER/REPO mydir",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"mydir"},
+			},
+		},
+		{
+			name: "git clone arguments",
+			args: "OWNER/REPO -- --depth 1 --recurse-submodules",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"--depth", "1", "--recurse-submodules"},
+			},
+		},
+		{
+			name:    "unknown argument",
+			args:    "OWNER/REPO --depth 1",
+			wantErr: "unknown flag: --depth\nSeparate git clone flags with '--'.",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, stdout, stderr := iostreams.Test()
+			fac := &cmdutil.Factory{IOStreams: io}
+
+			var opts *CloneOptions
+			cmd := NewCmdClone(fac, func(co *CloneOptions) error {
+				opts = co
+				return nil
+			})
+
+			argv, err := shlex.Split(tt.args)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+
+			cmd.SetIn(stdin)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
+
+			_, err = cmd.ExecuteC()
+			if err != nil {
+				assert.Equal(t, tt.wantErr, err.Error())
+				return
+			} else if tt.wantErr != "" {
+				t.Errorf("expected error %q, got nil", tt.wantErr)
+			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
+
+			assert.Equal(t, tt.wantOpts.Repository, opts.Repository)
+			assert.Equal(t, tt.wantOpts.GitArgs, opts.GitArgs)
+		})
+	}
+}
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
 	io, stdin, stdout, stderr := iostreams.Test()
@@ -202,11 +281,4 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, 1, cs.Count)
 	assert.Equal(t, "git clone https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[0].Args, " "))
-}
-
-func Test_RepoClone_flagError(t *testing.T) {
-	_, err := runCloneCommand(nil, "--depth 1 OWNER/REPO")
-	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
-		t.Errorf("unexpected error %v", err)
-	}
 }
