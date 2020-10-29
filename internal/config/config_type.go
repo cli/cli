@@ -10,14 +10,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ConfigOption struct {
+type configOption struct {
 	Key           string
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
 }
 
-var configOptions = []ConfigOption{
+var configOptions = []configOption{
 	{
 		Key:           "git_protocol",
 		Description:   "the protocol to use for git clone and push operations",
@@ -42,13 +42,45 @@ var configOptions = []ConfigOption{
 	},
 }
 
-func ConfigOptions() []ConfigOption {
+func ConfigOptions() []configOption {
 	return configOptions
 }
 
-var configValues = map[string][]string{
-	"git_protocol": {"ssh", "https"},
-	"prompt":       {"enabled", "disabled"},
+func ValidateKey(key string) error {
+	for _, configKey := range configOptions {
+		if key == configKey.Key {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid key")
+}
+
+func ValidateValue(key, value string) error {
+	var validValues []string
+
+	for _, v := range configOptions {
+		if v.Key == key {
+			validValues = v.AllowedValues
+			break
+		}
+	}
+
+	if validValues == nil {
+		return nil
+	}
+
+	for _, v := range validValues {
+		if v == value {
+			return nil
+		}
+	}
+
+	return &InvalidValueError{ValidValues: validValues}
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
 }
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -310,29 +342,7 @@ type InvalidValueError struct {
 	ValidValues []string
 }
 
-func (e InvalidValueError) Error() string {
-	return "invalid value"
-}
-
-func validateConfigEntry(key, value string) error {
-	validValues, found := configValues[key]
-	if !found {
-		return nil
-	}
-
-	for _, v := range validValues {
-		if v == value {
-			return nil
-		}
-	}
-
-	return &InvalidValueError{ValidValues: validValues}
-}
-
 func (c *fileConfig) Set(hostname, key, value string) error {
-	if err := validateConfigEntry(key, value); err != nil {
-		return err
-	}
 	if hostname == "" {
 		return c.SetStringValue(key, value)
 	} else {
