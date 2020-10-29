@@ -1,0 +1,163 @@
+2020-10-29T17:29:10.7966999Z ##[section]Starting: Request a runner to run this job
+2020-10-29T17:29:11.4384134Z Can't find any online and idle self-hosted runner in current repository that matches the required labels: 'ubuntu-latest'
+2020-10-29T17:29:11.4384219Z Can't find any online and idle self-hosted runner in current repository's account/organization that matches the required labels: 'ubuntu-latest'
+2020-10-29T17:29:11.4384719Z Found online and idle hosted runner in current repository's account/organization that matches the required labels: 'ubuntu-latest'
+2020-10-29T17:29:11.7171027Z ##[section]Finishing: Request a runner to run this job
+2020-10-29T17:29:19.4890457Z Current runner version: '2.273.5'
+2020-10-29T17:29:19.4919703Z ##[group]Operating System
+2020-10-29T17:29:19.4920506Z Ubuntu
+2020-10-29T17:29:19.4920858Z 18.04.5
+2020-10-29T17:29:19.4921242Z LTS
+2020-10-29T17:29:19.4921540Z ##[endgroup]
+2020-10-29T17:29:19.4921910Z ##[group]Virtual Environment
+2020-10-29T17:29:19.4922355Z Environment: ubuntu-18.04
+2020-10-29T17:29:19.4922741Z Version: 20201026.1
+2020-10-29T17:29:19.4923793Z Included Software: https://github.com/actions/virtual-environments/blob/ubuntu18/20201026.1/images/linux/Ubuntu1804-README.md
+2020-10-29T17:29:19.4924491Z ##[endgroup]
+2020-10-29T17:29:19.4925626Z Prepare workflow directory
+2020-10-29T17:29:19.5134370Z Prepare all required actions
+2020-10-29T17:29:19.5144635Z Getting action download info
+2020-10-29T17:29:19.9044224Z Download action repository 'actions/checkout@v2'
+2020-10-29T17:29:21.6765443Z Download action repository 'actions/setup-node@v1'
+2020-10-29T17:29:22.1219722Z Download action repository 'azure/webapps-deploy@v2'
+2020-10-29T17:29:24.7399552Z ##[group]Run actions/checkout@v2
+2020-10-29T17:29:24.7400057Z with:
+2020-10-29T17:29:24.7401349Z   repository: C28NGO37/https-opencollective.com-cassime-lingogh-pr-checkout-10509
+2020-10-29T17:29:24.7402795Z   token: ***
+2020-10-29T17:29:24.7403037Z   ssh-strict: true
+2020-10-29T17:29:24.7403359Z   persist-credentials: true
+2020-10-29T17:29:24.7403661Z   clean: true
+2020-10-29T17:29:24.7403899Z   fetch-depth: 1
+2020-10-29T17:29:24.7404130Z   lfs: false
+2020-10-29T17:29:24.7404369Z   submodules: false
+2020-10-29T17:29:24.7404579Z env:
+2020-10-29T17:29:24.7404852Z   AZURE_WEBAPP_NAME: your-app-name
+2020-10-29T17:29:24.7405177Z   AZURE_WEBAPP_PACKAGE_PATH: .
+2020-10-29T17:29:24.7405447Z   NODE_VERSION: 10.x
+2020-10-29T17:29:24.7405681Z ##[endgroup]
+2020-10-29T17:29:25.1614753Z Syncing repository: C28NGO37/https-opencollective.com-cassime-lingogh-pr-checkout-10509
+2020-10-29T17:29:25.1616494Z ##[group]Getting Git version info
+2020-10-29T17:29:25.1619067Z Working directory is '/home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509'
+2020-10-29T17:29:25.1673502Z [command]/usr/bin/git version
+2020-10-29T17:29:25.1898881Z git version 2.29.0
+2020-10-29T17:29:25.1899982Z ##[endgroup]
+2020-10-29T17:29:25.1909204Z Deleting the contents of '/home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509'
+2020-10-29T17:29:25.1911854Z ##[group]Initializing the repository
+2020-10-29T17:29:25.1916181Z [command]/usr/bin/git init /home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509
+2020-10-29T17:29:25.2009286Z Initialized empty Git repository in /home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509/.git/
+2020-10-29T17:29:25.2022217Z [command]/usr/bin/git remote add origin https://github.com/C28NGO37/https-opencollective.com-cassime-lingogh-pr-checkout-10509
+2020-10-29T17:29:25.2064450Z ##[endgroup]
+2020-10-29T17:29:25.2065223Z ##[group]Disabling automatic garbage collection
+2020-10-29T17:29:25.2073790Z [command]/usr/bin/git config --local gc.auto 0
+2020-10-29T17:29:25.2137360Z ##[endgroup]
+2020-10-29T17:29:25.2140221Z ##[group]Setting up auth
+2020-10-29T17:29:25.2141185Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2020-10-29T17:29:25.2173429Z [command]/usr/bin/git submodule foreach --recursive git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :
+2020-10-29T17:29:25.2634440Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2020-10-29T17:29:25.2691928Z [command]/usr/bin/git submodule foreach --recursive git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :
+2020-10-29T17:29:25.2960558Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2020-10-29T17:29:25.3022364Z ##[endgroup]
+2020-10-29T17:29:25.3022785Z ##[group]Fetching the repository
+2020-10-29T17:29:25.3034829Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +00c63b865f268b9c3fec85d1b70108ffd29a5d56:refs/tags/V.28.3.7
+2020-10-29T17:29:25.6358824Z remote: Enumerating objects: 7, done.        
+2020-10-29T17:29:25.6361225Z remote: Counting objects:  14% (1/7)        
+2020-10-29T17:29:25.6362754Z remote: Counting objects:  28% (2/7)        
+2020-10-29T17:29:25.6364322Z remote: Counting objects:  42% (3/7)        
+2020-10-29T17:29:25.6365762Z remote: Counting objects:  57% (4/7)        
+2020-10-29T17:29:25.6524693Z remote: Counting objects:  71% (5/7)        
+2020-10-29T17:29:25.6525349Z remote: Counting objects:  85% (6/7)        
+2020-10-29T17:29:25.6528087Z remote: Counting objects: 100% (7/7)        
+2020-10-29T17:29:25.6528950Z remote: Counting objects: 100% (7/7), done.        
+2020-10-29T17:29:25.6529511Z remote: Compressing objects:  16% (1/6)        
+2020-10-29T17:29:25.6530021Z remote: Compressing objects:  33% (2/6)        
+2020-10-29T17:29:25.6530519Z remote: Compressing objects:  50% (3/6)        
+2020-10-29T17:29:25.6531088Z remote: Compressing objects:  66% (4/6)        
+2020-10-29T17:29:25.6531565Z remote: Compressing objects:  83% (5/6)        
+2020-10-29T17:29:25.6531998Z remote: Compressing objects: 100% (6/6)        
+2020-10-29T17:29:25.6532449Z remote: Compressing objects: 100% (6/6), done.        
+2020-10-29T17:29:25.6535014Z remote: Total 7 (delta 0), reused 0 (delta 0), pack-reused 0        
+2020-10-29T17:29:25.6657995Z From https://github.com/C28NGO37/https-opencollective.com-cassime-lingogh-pr-checkout-10509
+2020-10-29T17:29:25.6659802Z  * [new ref]         00c63b865f268b9c3fec85d1b70108ffd29a5d56 -> V.28.3.7
+2020-10-29T17:29:25.6706956Z ##[endgroup]
+2020-10-29T17:29:25.6708390Z ##[group]Determining the checkout info
+2020-10-29T17:29:25.6709088Z ##[endgroup]
+2020-10-29T17:29:25.6709721Z ##[group]Checking out the ref
+2020-10-29T17:29:25.6711236Z [command]/usr/bin/git checkout --progress --force refs/tags/V.28.3.7
+2020-10-29T17:29:25.7119808Z Note: switching to 'refs/tags/V.28.3.7'.
+2020-10-29T17:29:25.7120127Z 
+2020-10-29T17:29:25.7135454Z You are in 'detached HEAD' state. You can look around, make experimental
+2020-10-29T17:29:25.7136206Z changes and commit them, and you can discard any commits you make in this
+2020-10-29T17:29:25.7136757Z state without impacting any branches by switching back to a branch.
+2020-10-29T17:29:25.7137073Z 
+2020-10-29T17:29:25.7137421Z If you want to create a new branch to retain commits you create, you may
+2020-10-29T17:29:25.7138472Z do so (now or later) by using -c with the switch command. Example:
+2020-10-29T17:29:25.7138738Z 
+2020-10-29T17:29:25.7139132Z   git switch -c <new-branch-name>
+2020-10-29T17:29:25.7139378Z 
+2020-10-29T17:29:25.7139625Z Or undo this operation with:
+2020-10-29T17:29:25.7139814Z 
+2020-10-29T17:29:25.7140120Z   git switch -
+2020-10-29T17:29:25.7140574Z 
+2020-10-29T17:29:25.7140981Z Turn off this advice by setting config variable advice.detachedHead to false
+2020-10-29T17:29:25.7141354Z 
+2020-10-29T17:29:25.7141599Z HEAD is now at 00c63b8 Create ruby.yml
+2020-10-29T17:29:25.7142217Z ##[endgroup]
+2020-10-29T17:29:25.7176978Z [command]/usr/bin/git log -1 --format='%H'
+2020-10-29T17:29:25.7207359Z '00c63b865f268b9c3fec85d1b70108ffd29a5d56'
+2020-10-29T17:29:25.7365657Z ##[group]Run actions/setup-node@v1
+2020-10-29T17:29:25.7365981Z with:
+2020-10-29T17:29:25.7366211Z   node-version: 10.x
+2020-10-29T17:29:25.7366497Z   always-auth: false
+2020-10-29T17:29:25.7366737Z env:
+2020-10-29T17:29:25.7367018Z   AZURE_WEBAPP_NAME: your-app-name
+2020-10-29T17:29:25.7367357Z   AZURE_WEBAPP_PACKAGE_PATH: .
+2020-10-29T17:29:25.7367641Z   NODE_VERSION: 10.x
+2020-10-29T17:29:25.7367894Z ##[endgroup]
+2020-10-29T17:29:25.8452428Z [command]/opt/hostedtoolcache/node/10.22.1/x64/bin/node --version
+2020-10-29T17:29:27.1763803Z v10.22.1
+2020-10-29T17:29:27.1765454Z [command]/opt/hostedtoolcache/node/10.22.1/x64/bin/npm --version
+2020-10-29T17:29:27.1766170Z 6.14.6
+2020-10-29T17:29:27.1842639Z ##[group]Run # Build and test the project, then
+2020-10-29T17:29:27.1843145Z [36;1m# Build and test the project, then[0m
+2020-10-29T17:29:27.1843482Z [36;1m# deploy to Azure Web App.[0m
+2020-10-29T17:29:27.1843764Z [36;1mnpm install[0m
+2020-10-29T17:29:27.1844041Z [36;1mnpm run build --if-present[0m
+2020-10-29T17:29:27.1844366Z [36;1mnpm run test --if-present[0m
+2020-10-29T17:29:27.1886083Z shell: /bin/bash -e {0}
+2020-10-29T17:29:27.1886330Z env:
+2020-10-29T17:29:27.1886621Z   AZURE_WEBAPP_NAME: your-app-name
+2020-10-29T17:29:27.1886964Z   AZURE_WEBAPP_PACKAGE_PATH: .
+2020-10-29T17:29:27.1887248Z   NODE_VERSION: 10.x
+2020-10-29T17:29:27.1887492Z ##[endgroup]
+2020-10-29T17:29:27.8748961Z npm WARN saveError ENOENT: no such file or directory, open '/home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509/package.json'
+2020-10-29T17:29:27.8975526Z npm notice created a lockfile as package-lock.json. You should commit this file.
+2020-10-29T17:29:27.8994058Z npm WARN enoent ENOENT: no such file or directory, open '/home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509/package.json'
+2020-10-29T17:29:27.9008400Z npm WARN https-opencollective.com-cassime-lingogh-pr-checkout-10509 No description
+2020-10-29T17:29:27.9025040Z npm WARN https-opencollective.com-cassime-lingogh-pr-checkout-10509 No repository field.
+2020-10-29T17:29:27.9041145Z npm WARN https-opencollective.com-cassime-lingogh-pr-checkout-10509 No README data
+2020-10-29T17:29:27.9057444Z npm WARN https-opencollective.com-cassime-lingogh-pr-checkout-10509 No license field.
+2020-10-29T17:29:27.9058578Z 
+2020-10-29T17:29:28.1339110Z up to date in 0.334s
+2020-10-29T17:29:28.1355879Z found 0 vulnerabilities
+2020-10-29T17:29:28.1356170Z 
+2020-10-29T17:29:28.5147515Z npm ERR! code ENOENT
+2020-10-29T17:29:28.5148710Z npm ERR! syscall open
+2020-10-29T17:29:28.5153144Z npm ERR! path /home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509/package.json
+2020-10-29T17:29:28.5155873Z npm ERR! errno -2
+2020-10-29T17:29:28.5168077Z npm ERR! enoent ENOENT: no such file or directory, open '/home/runner/work/https-opencollective.com-cassime-lingogh-pr-checkout-10509/https-opencollective.com-cassime-lingogh-pr-checkout-10509/package.json'
+2020-10-29T17:29:28.5170769Z npm ERR! enoent This is related to npm not being able to find a file.
+2020-10-29T17:29:28.5171415Z npm ERR! enoent 
+2020-10-29T17:29:28.5241023Z 
+2020-10-29T17:29:28.5243802Z npm ERR! A complete log of this run can be found in:
+2020-10-29T17:29:28.5246388Z npm ERR!     /home/runner/.npm/_logs/2020-10-29T17_29_28_517Z-debug.log
+2020-10-29T17:29:28.5285848Z ##[error]Process completed with exit code 254.
+2020-10-29T17:29:28.5363424Z Post job cleanup.
+2020-10-29T17:29:28.6459989Z [command]/usr/bin/git version
+2020-10-29T17:29:28.6517565Z git version 2.29.0
+2020-10-29T17:29:28.6560751Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2020-10-29T17:29:28.6607117Z [command]/usr/bin/git submodule foreach --recursive git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :
+2020-10-29T17:29:28.6867164Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2020-10-29T17:29:28.6897638Z http.https://github.com/.extraheader
+2020-10-29T17:29:28.6904392Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2020-10-29T17:29:28.6949704Z [command]/usr/bin/git submodule foreach --recursive git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :
+2020-10-29T17:29:28.7238976Z Cleaning up orphan processestz1ZKi1ZCRY78fYFUtd1dhavss4BK4zQPYXjcontent://media/external/downloads/733tz1ZKi1ZCRY78fYFUtd1dhavss4BK4zQPYXjgh pr checkout 9
