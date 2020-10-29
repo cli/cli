@@ -24,7 +24,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -41,7 +40,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		Use: "clone <repository> [<directory>] [-- <gitflags>...]",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("cannot clone: no repository name given")}
+				return &cmdutil.FlagError{Err: errors.New("cannot clone: repository argument required")}
 			}
 			return nil
 		},
