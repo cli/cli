@@ -10,14 +10,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type configOption struct {
+type ConfigOption struct {
 	Key           string
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
 }
 
-var configOptions = []configOption{
+var configOptions = []ConfigOption{
 	{
 		Key:           "git_protocol",
 		Description:   "the protocol to use for git clone and push operations",
@@ -42,7 +42,7 @@ var configOptions = []configOption{
 	},
 }
 
-func ConfigOptions() []configOption {
+func ConfigOptions() []ConfigOption {
 	return configOptions
 }
 
@@ -54,6 +54,14 @@ func ValidateKey(key string) error {
 	}
 
 	return fmt.Errorf("invalid key")
+}
+
+type InvalidValueError struct {
+	ValidValues []string
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
 }
 
 func ValidateValue(key, value string) error {
@@ -77,10 +85,6 @@ func ValidateValue(key, value string) error {
 	}
 
 	return &InvalidValueError{ValidValues: validValues}
-}
-
-func (e InvalidValueError) Error() string {
-	return "invalid value"
 }
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -336,10 +340,6 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	}
 
 	return value, defaultSource, nil
-}
-
-type InvalidValueError struct {
-	ValidValues []string
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {
