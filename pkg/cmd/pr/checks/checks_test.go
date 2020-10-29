@@ -63,29 +63,26 @@ func TestNewCmdChecks(t *testing.T) {
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name               string
-		fixture            string
-		stubs              func(*httpmock.Registry)
-		wantOut            string
-		nontty             bool
-		unsuccessfulChecks bool
-		wantErr            bool
+		name    string
+		fixture string
+		stubs   func(*httpmock.Registry)
+		nontty  bool
+		wantOut string
+		wantErr string
 	}{
 		{
 			name: "no commits",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestByNumber\b`),
-					httpmock.JSONResponse(
-						bytes.NewBufferString(`
-					{ "data": { "repository": {
-						"pullRequest": { "number": 123 }
-					} } }
-				`)))
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"pullRequest": { "number": 123 }
+						} } }
+					`))
 			},
-			unsuccessfulChecks: true,
-			wantErr:            true,
-			wantOut:            "no commit found on the pull request",
+			wantOut: "",
+			wantErr: "no commit found on the pull request",
 		},
 		{
 			name: "no checks",
@@ -96,49 +93,32 @@ func Test_checksRun(t *testing.T) {
 				  } } }
 				`))
 			},
-			unsuccessfulChecks: true,
-			wantErr:            true,
-			wantOut:            "no checks reported on the 'master' branch",
+			wantOut: "",
+			wantErr: "no checks reported on the 'master' branch",
 		},
 		{
-			name:               "some failing",
-			fixture:            "./fixtures/someFailing.json",
-			wantOut:            "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
-			unsuccessfulChecks: true,
+			name:    "some failing",
+			fixture: "./fixtures/someFailing.json",
+			wantOut: "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantErr: "SilentError",
 		},
 		{
-			name:               "some pending",
-			fixture:            "./fixtures/somePending.json",
-			wantOut:            "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
-			unsuccessfulChecks: true,
+			name:    "some pending",
+			fixture: "./fixtures/somePending.json",
+			wantOut: "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
 			fixture: "./fixtures/allPassing.json",
 			wantOut: "All checks were successful\n0 failing, 3 successful, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantErr: "",
 		},
 		{
-			name:               "with statuses",
-			fixture:            "./fixtures/withStatuses.json",
-			wantOut:            "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
-			unsuccessfulChecks: true,
-		},
-		{
-			name:   "no commits",
-			nontty: true,
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query PullRequestByNumber\b`),
-					httpmock.JSONResponse(
-						bytes.NewBufferString(`
-					{ "data": { "repository": {
-						"pullRequest": { "number": 123 }
-					} } }
-				`)))
-			},
-			unsuccessfulChecks: true,
-			wantErr:            true,
-			wantOut:            "no commit found on the pull request",
+			name:    "with statuses",
+			fixture: "./fixtures/withStatuses.json",
+			wantOut: "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantErr: "SilentError",
 		},
 		{
 			name:   "no checks",
@@ -150,36 +130,36 @@ func Test_checksRun(t *testing.T) {
 				  } } }
 				`))
 			},
-			unsuccessfulChecks: true,
-			wantErr:            true,
-			wantOut:            "no checks reported on the 'master' branch",
+			wantOut: "",
+			wantErr: "no checks reported on the 'master' branch",
 		},
 		{
-			name:               "some failing",
-			nontty:             true,
-			fixture:            "./fixtures/someFailing.json",
-			wantOut:            "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
-			unsuccessfulChecks: true,
+			name:    "some failing",
+			nontty:  true,
+			fixture: "./fixtures/someFailing.json",
+			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantErr: "SilentError",
 		},
 		{
-			name:               "some pending",
-			nontty:             true,
-			fixture:            "./fixtures/somePending.json",
-			wantOut:            "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
-			unsuccessfulChecks: true,
+			name:    "some pending",
+			nontty:  true,
+			fixture: "./fixtures/somePending.json",
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
 			nontty:  true,
 			fixture: "./fixtures/allPassing.json",
 			wantOut: "awesome tests\tpass\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantErr: "",
 		},
 		{
-			name:               "with statuses",
-			nontty:             true,
-			fixture:            "./fixtures/withStatuses.json",
-			wantOut:            "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
-			unsuccessfulChecks: true,
+			name:    "with statuses",
+			nontty:  true,
+			fixture: "./fixtures/withStatuses.json",
+			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantErr: "SilentError",
 		},
 	}
 
@@ -202,10 +182,7 @@ func Test_checksRun(t *testing.T) {
 			if tt.stubs != nil {
 				tt.stubs(reg)
 			} else if tt.fixture != "" {
-				reg.Register(
-					httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse(tt.fixture))
-			} else {
-				panic("need either stubs or fixture key")
+				reg.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse(tt.fixture))
 			}
 
 			opts.HttpClient = func() (*http.Client, error) {
@@ -213,15 +190,10 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			err := checksRun(opts)
-			if err != nil && tt.wantErr {
-				assert.Equal(t, tt.wantOut, err.Error())
-				return
-			}
-
-			if tt.unsuccessfulChecks {
-				assert.Equal(t, "SilentError", err.Error())
-			} else {
-				assert.NoError(t, err)
+			if err != nil {
+				assert.Equal(t, tt.wantErr, err.Error())
+			} else if tt.wantErr != "" {
+				t.Errorf("expected %q, got nil error", tt.wantErr)
 			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
