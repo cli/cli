@@ -1,5 +1,7 @@
 package protip
 
+import "strings"
+
 type Sprite struct {
 	Width   int
 	Height  int
@@ -15,93 +17,103 @@ func (s *Sprite) IncrFrame() {
 	s.frameIx = (s.frameIx + 1) % len(s.Frames)
 }
 
+func (s *Sprite) Cells() [][]rune {
+	out := [][]rune{}
+	curFrame := s.Frames[s.frameIx]
+	lines := strings.Split(curFrame, "\n")
+	for _, line := range lines {
+		out = append(out, []rune(line))
+	}
+	return out
+}
+
 func Clippy() *Sprite {
 	s := &Sprite{
 		Width:  15,
 		Height: 15,
 	}
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 O   O
-			 |   |
+        ___
+       ^   ^
+       O   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 O   O
-			 |   |
+        ___
+       ^   ^
+       O   O
+       |   |
        ||  |
-			 ||_/  -
-			 |    |
-			 |   |
-			 \___/
+       ||_/  -
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 O   O
-			 |   |
+        ___
+       ^   ^
+       O   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 o   O
-			 |   |
+        ___
+       ^   ^
+       o   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 -   O
-			 |   |
+        ___
+       ^   ^
+       -   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 o   O
-			 |   |
+        ___
+       ^   ^
+       o   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 	s.AddFrame(`
-		    ___
-			 ^   ^
-			 O   O
-			 |   |
+        ___
+       ^   ^
+       O   O
+       |   |
        ||  |
-			 ||_/  /
-			 |    |
-			 |   |
-			 \___/
+       ||_/  /
+       |    |
+       |   |
+       \___/
 
 `)
 

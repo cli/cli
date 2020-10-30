@@ -94,9 +94,11 @@ loop:
 			break loop
 		case <-time.After(time.Millisecond * 50):
 		}
-		w, h := s.Size()
+		//w, h := s.Size()
+		//w, _ := s.Size()
 		s.Clear()
-		emitStr(s, w/2-7, h/2, tcell.StyleDefault, "TODO a protip and stuff")
+		//emitStr(s, w/2-7, h/2, tcell.StyleDefault, "TODO a protip and stuff")
+		drawSprite(s, 0, 0, tcell.StyleDefault, opts.Sprite)
 		s.Show()
 	}
 
@@ -117,6 +119,18 @@ func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 		s.SetContent(x, y, c, comb, style)
 		x += w
 	}
+}
+
+func drawSprite(s tcell.Screen, x, y int, st tcell.Style, sp *Sprite) {
+	// TODO worry about animation later
+	cells := sp.Cells()
+	for y := 0; y < len(cells); y++ {
+		row := cells[y]
+		for x := 0; x < len(row); x++ {
+			s.SetContent(x, y, cells[y][x], nil, st)
+		}
+	}
+	sp.IncrFrame()
 }
 
 // Want to be able to have a sprite that occupies a rectangle and can animate internally relative to
