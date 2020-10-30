@@ -1,6 +1,7 @@
 package protip
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cli/cli/pkg/cmdutil"
@@ -14,11 +15,16 @@ type ProtipOptions struct {
 	IO *iostreams.IOStreams
 
 	Character string
+	Sprites   map[string]*Sprite
+	Sprite    *Sprite
 }
 
 func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Command {
 	opts := &ProtipOptions{
 		IO: f.IOStreams,
+		Sprites: map[string]*Sprite{
+			"clippy": Clippy(),
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -26,6 +32,9 @@ func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Co
 		Short: "get a random protip about using gh",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Character = strings.ToLower(opts.Character)
+			// TODO error handling
+			opts.Sprite = opts.Sprites[opts.Character]
 			if runF != nil {
 				return runF(opts)
 			}
@@ -108,4 +117,17 @@ func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 		s.SetContent(x, y, c, comb, style)
 		x += w
 	}
+}
+
+// Want to be able to have a sprite that occupies a rectangle and can animate internally relative to
+// its own geometry.
+
+type Sprite struct {
+	Width  int
+	Height int
+	Frames []string
+}
+
+func (s *Sprite) AddFrame(f string) {
+	s.Frames = append(s.Frames, f)
 }
