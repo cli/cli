@@ -121,13 +121,3 @@ func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 
 // Want to be able to have a sprite that occupies a rectangle and can animate internally relative to
 // its own geometry.
-
-type Sprite struct {
-	Width  int
-	Height int
-	Frames []string
-}
-
-func (s *Sprite) AddFrame(f string) {
-	s.Frames = append(s.Frames, f)
-}
