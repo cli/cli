@@ -1,6 +1,7 @@
 package protip
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -34,8 +35,12 @@ func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Co
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Character = strings.ToLower(opts.Character)
-			// TODO error handling
-			opts.Sprite = opts.Sprites[opts.Character]
+			if s, ok := opts.Sprites[opts.Character]; ok {
+				opts.Sprite = s
+			} else {
+				return fmt.Errorf("no such character: %s", opts.Character)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
