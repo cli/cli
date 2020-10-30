@@ -104,7 +104,7 @@ loop:
 			"To merge a PR, review it until",
 			"it is approved.",
 		}
-		drawProtip(s, opts.Sprite.Width+2, style, tipLines)
+		drawProtip(s, opts.Sprite.Width, 1, style, tipLines)
 		s.Show()
 	}
 
@@ -113,7 +113,7 @@ loop:
 	return nil
 }
 
-func drawProtip(s tcell.Screen, startX int, st tcell.Style, tipLines []string) {
+func drawProtip(s tcell.Screen, startX, startY int, st tcell.Style, tipLines []string) {
 	// Should look like this:
 	/*
 
@@ -147,9 +147,9 @@ func drawProtip(s tcell.Screen, startX int, st tcell.Style, tipLines []string) {
 	topBorder += "-*"
 	bottomBorder += "_*"
 
-	emitStr(s, startX, 0, st, topBorder)
+	emitStr(s, startX, startY, st, topBorder)
 
-	y := 1
+	y := startY + 1
 
 	for iy, line := range tipLines {
 		emitStr(s, startX, y+iy, st, pad(line))
