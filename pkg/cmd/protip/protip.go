@@ -50,6 +50,8 @@ func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Co
 func protipRun(opts *ProtipOptions) error {
 	tcell.SetEncodingFallback(tcell.EncodingFallbackASCII)
 
+	style := tcell.StyleDefault
+
 	s, err := tcell.NewScreen()
 	if err != nil {
 		return err
@@ -58,7 +60,7 @@ func protipRun(opts *ProtipOptions) error {
 		return err
 	}
 
-	s.SetStyle(tcell.StyleDefault.
+	s.SetStyle(style.
 		Foreground(tcell.ColorGreen).
 		Background(tcell.ColorBlack))
 	s.Clear()
@@ -92,19 +94,70 @@ loop:
 		select {
 		case <-quit:
 			break loop
-		case <-time.After(time.Millisecond * 50):
+		case <-time.After(time.Millisecond * 500):
 		}
 		//w, h := s.Size()
 		//w, _ := s.Size()
 		s.Clear()
-		//emitStr(s, w/2-7, h/2, tcell.StyleDefault, "TODO a protip and stuff")
-		drawSprite(s, 0, 0, tcell.StyleDefault, opts.Sprite)
+		drawSprite(s, 0, 0, style, opts.Sprite)
+		tipLines := []string{
+			"To merge a PR, review it until",
+			"it is approved.",
+		}
+		drawProtip(s, opts.Sprite.Width+2, style, tipLines)
 		s.Show()
 	}
 
 	s.Fini()
 
 	return nil
+}
+
+func drawProtip(s tcell.Screen, startX int, st tcell.Style, tipLines []string) {
+	// Should look like this:
+	/*
+
+	  *--------------------------------*
+	  | To merge a PR, review it until |
+	  | it is approved.                |
+	  |________________________________*
+	 /
+
+	*/
+
+	width := len(tipLines[0]) + 5
+	pad := func(s string) string {
+		out := " | " + s
+		spaces := width - len(out) - 1
+		for i := 0; i < spaces; i++ {
+			out += " "
+		}
+		out += "|"
+
+		return out
+	}
+
+	// draw top border
+	topBorder := " *"
+	bottomBorder := " |"
+	for x := 0; x < width-4; x++ {
+		topBorder += "-"
+		bottomBorder += "_"
+	}
+	topBorder += "-*"
+	bottomBorder += "_*"
+
+	emitStr(s, startX, 0, st, topBorder)
+
+	y := 1
+
+	for iy, line := range tipLines {
+		emitStr(s, startX, y+iy, st, pad(line))
+		y += iy
+	}
+
+	emitStr(s, startX, y+1, st, bottomBorder)
+	emitStr(s, startX, y+2, st, "/")
 }
 
 func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
