@@ -16,10 +16,10 @@ import (
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
+	protipCmd "github.com/cli/cli/pkg/cmd/protip"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
-	tipCmd "github.com/cli/cli/pkg/cmd/tip"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -69,7 +69,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(tipCmd.NewCmdTip(f, nil))
+	cmd.AddCommand(protipCmd.NewCmdProtip(f, nil))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
