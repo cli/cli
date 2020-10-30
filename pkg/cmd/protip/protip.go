@@ -23,7 +23,8 @@ func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Co
 	opts := &ProtipOptions{
 		IO: f.IOStreams,
 		Sprites: map[string]*Sprite{
-			"clippy": Clippy(),
+			"clippy":  Clippy(),
+			"manatee": Manatee(),
 		},
 	}
 
@@ -49,6 +50,8 @@ func NewCmdProtip(f *cmdutil.Factory, runF func(*ProtipOptions) error) *cobra.Co
 
 func protipRun(opts *ProtipOptions) error {
 	tcell.SetEncodingFallback(tcell.EncodingFallbackASCII)
+
+	tip := getProtip()
 
 	style := tcell.StyleDefault
 
@@ -96,15 +99,9 @@ loop:
 			break loop
 		case <-time.After(time.Millisecond * 500):
 		}
-		//w, h := s.Size()
-		//w, _ := s.Size()
 		s.Clear()
 		drawSprite(s, 0, 0, style, opts.Sprite)
-		tipLines := []string{
-			"To merge a PR, review it until",
-			"it is approved.",
-		}
-		drawProtip(s, opts.Sprite.Width, 1, style, tipLines)
+		drawProtip(s, opts.Sprite.Width, 1, style, tip)
 		s.Show()
 	}
 
@@ -147,20 +144,20 @@ func drawProtip(s tcell.Screen, startX, startY int, st tcell.Style, tipLines []s
 	topBorder += "-*"
 	bottomBorder += "_*"
 
-	emitStr(s, startX, startY, st, topBorder)
+	drawStr(s, startX, startY, st, topBorder)
 
 	y := startY + 1
 
 	for iy, line := range tipLines {
-		emitStr(s, startX, y+iy, st, pad(line))
+		drawStr(s, startX, y+iy, st, pad(line))
 		y += iy
 	}
 
-	emitStr(s, startX, y+1, st, bottomBorder)
-	emitStr(s, startX, y+2, st, "/")
+	drawStr(s, startX, y+1, st, bottomBorder)
+	drawStr(s, startX, y+2, st, "/")
 }
 
-func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
+func drawStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 	for _, c := range str {
 		var comb []rune
 		w := runewidth.RuneWidth(c)
@@ -175,7 +172,6 @@ func emitStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 }
 
 func drawSprite(s tcell.Screen, x, y int, st tcell.Style, sp *Sprite) {
-	// TODO worry about animation later
 	cells := sp.Cells()
 	for y := 0; y < len(cells); y++ {
 		row := cells[y]
@@ -185,6 +181,3 @@ func drawSprite(s tcell.Screen, x, y int, st tcell.Style, sp *Sprite) {
 	}
 	sp.IncrFrame()
 }
-
-// Want to be able to have a sprite that occupies a rectangle and can animate internally relative to
-// its own geometry.
