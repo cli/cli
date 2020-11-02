@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -28,9 +27,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 	}
 
-	var flagPublic bool
-	var flagSecret bool
-
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your gists",
@@ -40,23 +36,27 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
 			}
 
+			pub := cmd.Flags().Changed("public")
+			secret := cmd.Flags().Changed("secret")
+
 			opts.Visibility = "all"
-			if flagSecret {
-				opts.Visibility = "secret"
-			} else if flagPublic {
+			if pub && !secret {
 				opts.Visibility = "public"
+			} else if secret && !pub {
+				opts.Visibility = "secret"
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return listRun(opts)
 		},
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of gists to fetch")
-	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public gists")
-	cmd.Flags().BoolVar(&flagSecret, "secret", false, "Show only secret gists")
+	cmd.Flags().Bool("public", false, "Show only public gists")
+	cmd.Flags().Bool("secret", false, "Show only secret gists")
 
 	return cmd
 }
@@ -77,7 +77,10 @@ func listRun(opts *ListOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, gist := range gists {
-		fileCount := len(gist.Files)
+		fileCount := 0
+		for range gist.Files {
+			fileCount++
+		}
 
 		visibility := "public"
 		visColor := cs.Green
@@ -96,16 +99,16 @@ func listRun(opts *ListOptions) error {
 			}
 		}
 
-		gistTime := gist.UpdatedAt.Format(time.RFC3339)
-		if tp.IsTTY() {
-			gistTime = utils.FuzzyAgo(time.Since(gist.UpdatedAt))
-		}
-
 		tp.AddField(gist.ID, nil, nil)
-		tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, cs.Bold)
+		tp.AddField(description, nil, cs.Bold)
 		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
-		tp.AddField(gistTime, nil, cs.Gray)
+		if tp.IsTTY() {
+			updatedAt := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+			tp.AddField(updatedAt, nil, cs.Gray)
+		} else {
+			tp.AddField(gist.UpdatedAt.String(), nil, nil)
+		}
 		tp.EndRow()
 	}
 
