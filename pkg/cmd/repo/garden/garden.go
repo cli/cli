@@ -451,20 +451,25 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 }
 
 func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) string {
-	statusLine := garden[player.Y][player.X].StatusLine
+	width := io.TerminalWidth()
+	statusLines := []string{garden[player.Y][player.X].StatusLine}
 
 	if player.ShoeMoistureContent > 1 {
-		statusLine += "\nYour shoes squish with water from the stream."
+		statusLines = append(statusLines, "Your shoes squish with water from the stream.")
 	} else if player.ShoeMoistureContent == 1 {
-		statusLine += "\nYour shoes seem to have dried out."
+		statusLines = append(statusLines, "Your shoes seem to have dried out.")
+	} else {
+		statusLines = append(statusLines, "")
 	}
 
-	if len(statusLine) < io.TerminalWidth() {
-		paddingSize := io.TerminalWidth() - len(statusLine)
-		statusLine += strings.Repeat(" ", paddingSize)
+	for i, line := range statusLines {
+		if len(line) < width {
+			paddingSize := width - len(line)
+			statusLines[i] = line + strings.Repeat(" ", paddingSize)
+		}
 	}
 
-	return statusLine
+	return strings.Join(statusLines, "\n")
 }
 
 func shaToColorFunc(sha string) func(string) string {
