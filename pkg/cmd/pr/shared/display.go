@@ -2,7 +2,6 @@ package shared
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/cli/cli/api"
@@ -40,12 +39,12 @@ func ColorForState(state string) string {
 	}
 }
 
-func PrintHeader(cs *iostreams.ColorScheme, w io.Writer, s string) {
-	fmt.Fprintln(w, cs.Bold(s))
+func PrintHeader(io *iostreams.IOStreams, s string) {
+	fmt.Fprintln(io.Out, io.ColorScheme().Bold(s))
 }
 
-func PrintMessage(cs *iostreams.ColorScheme, w io.Writer, s string) {
-	fmt.Fprintln(w, cs.Gray(s))
+func PrintMessage(io *iostreams.IOStreams, s string) {
+	fmt.Fprintln(io.Out, io.ColorScheme().Gray(s))
 }
 
 func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {

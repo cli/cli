@@ -3,7 +3,6 @@ package status
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -109,33 +108,33 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	shared.PrintHeader(cs, out, "Current branch")
+	shared.PrintHeader(opts.IO, "Current branch")
 	currentPR := prPayload.CurrentPR
 	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
 		currentPR = nil
 	}
 	if currentPR != nil {
-		printPrs(cs, out, 1, *currentPR)
+		printPrs(opts.IO, 1, *currentPR)
 	} else if currentPRHeadRef == "" {
-		shared.PrintMessage(cs, out, "  There is no current branch")
+		shared.PrintMessage(opts.IO, "  There is no current branch")
 	} else {
-		shared.PrintMessage(cs, out, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
+		shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
 	}
 	fmt.Fprintln(out)
 
-	shared.PrintHeader(cs, out, "Created by you")
+	shared.PrintHeader(opts.IO, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(cs, out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
+		printPrs(opts.IO, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
 	} else {
-		shared.PrintMessage(cs, out, "  You have no open pull requests")
+		shared.PrintMessage(opts.IO, "  You have no open pull requests")
 	}
 	fmt.Fprintln(out)
 
-	shared.PrintHeader(cs, out, "Requesting a code review from you")
+	shared.PrintHeader(opts.IO, "Requesting a code review from you")
 	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(cs, out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
+		printPrs(opts.IO, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
 	} else {
-		shared.PrintMessage(cs, out, "  You have no pull requests to review")
+		shared.PrintMessage(opts.IO, "  You have no pull requests to review")
 	}
 	fmt.Fprintln(out)
 
@@ -179,7 +178,10 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 	return
 }
 
-func printPrs(cs *iostreams.ColorScheme, w io.Writer, totalCount int, prs ...api.PullRequest) {
+func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
+	w := io.Out
+	cs := io.ColorScheme()
+
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 

@@ -22,13 +22,13 @@ var (
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
 
-func AuthFlowWithConfig(cfg config.Config, io *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
+func AuthFlowWithConfig(cfg config.Config, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
-	stderr := io.ErrOut
-	cs := io.ColorScheme()
+	stderr := IO.ErrOut
+	cs := IO.ColorScheme()
 
-	token, userLogin, err := authFlow(hostname, stderr, cs, notice, additionalScopes)
+	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes)
 	if err != nil {
 		return "", err
 	}
@@ -49,12 +49,15 @@ func AuthFlowWithConfig(cfg config.Config, io *iostreams.IOStreams, hostname, no
 
 	fmt.Fprintf(stderr, "%s Authentication complete. %s to continue...\n",
 		cs.SuccessIcon(), cs.Bold("Press Enter"))
-	_ = waitForEnter(os.Stdin)
+	_ = waitForEnter(IO.In)
 
 	return token, nil
 }
 
-func authFlow(oauthHost string, w io.Writer, cs *iostreams.ColorScheme, notice string, additionalScopes []string) (string, string, error) {
+func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string) (string, string, error) {
+	w := IO.ErrOut
+	cs := IO.ColorScheme()
+
 	var verboseStream io.Writer
 	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
 		verboseStream = w
@@ -78,7 +81,7 @@ func authFlow(oauthHost string, w io.Writer, cs *iostreams.ColorScheme, notice s
 				fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			}
 			fmt.Fprintf(w, "- %s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
-			_ = waitForEnter(os.Stdin)
+			_ = waitForEnter(IO.In)
 
 			browseCmd, err := browser.Command(url)
 			if err != nil {
