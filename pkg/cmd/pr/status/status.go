@@ -183,14 +183,7 @@ func printPrs(cs *iostreams.ColorScheme, w io.Writer, totalCount int, prs ...api
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prStateColorFunc := cs.Green
-		if pr.IsDraft {
-			prStateColorFunc = cs.Gray
-		} else if pr.State == "MERGED" {
-			prStateColorFunc = cs.Magenta
-		} else if pr.State == "CLOSED" {
-			prStateColorFunc = cs.Red
-		}
+		prStateColorFunc := cs.ColorFromString(shared.ColorForPR(pr))
 
 		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), cs.Cyan("["+pr.HeadLabel()+"]"))
 
