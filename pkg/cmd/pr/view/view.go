@@ -3,7 +3,6 @@ package view
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -112,11 +111,13 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanPrPreview(opts.IO, pr)
 	}
 
-	cs := opts.IO.ColorScheme()
-	return printRawPrPreview(opts.IO.Out, cs, pr)
+	return printRawPrPreview(opts.IO, pr)
 }
 
-func printRawPrPreview(out io.Writer, cs *iostreams.ColorScheme, pr *api.PullRequest) error {
+func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
+	out := io.Out
+	cs := io.ColorScheme()
+
 	reviewers := prReviewerList(*pr, cs)
 	assignees := prAssigneeList(*pr)
 	labels := prLabelList(*pr)

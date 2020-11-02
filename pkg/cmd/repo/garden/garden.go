@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -214,7 +213,7 @@ func gardenRun(opts *GardenOptions) error {
 		geo.Width = 0
 	}
 	clear(opts.IO)
-	drawGarden(cs, out, garden, player)
+	drawGarden(opts.IO, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "cbreak", "min", "1").Run()
@@ -424,7 +423,10 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 	return garden
 }
 
-func drawGarden(cs *iostreams.ColorScheme, out io.Writer, garden [][]*Cell, player *Player) {
+func drawGarden(io *iostreams.IOStreams, garden [][]*Cell, player *Player) {
+	out := io.Out
+	cs := io.ColorScheme()
+
 	fmt.Fprint(out, "\033[?25l") // hide cursor. it needs to be restored at command exit.
 	sl := ""
 	for y, gardenRow := range garden {
