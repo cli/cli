@@ -303,7 +303,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 
 		// status line stuff
-		sl := statusLine(garden, player)
+		sl := statusLine(garden, player, opts.IO)
 
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for y := 0; y < player.Geo.Height-1; y++ {
@@ -450,14 +450,18 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	fmt.Fprintln(out, utils.Bold(sl))
 }
 
-func statusLine(garden [][]*Cell, player *Player) string {
-	statusLine := garden[player.Y][player.X].StatusLine + "         "
+func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) string {
+	statusLine := garden[player.Y][player.X].StatusLine
+
 	if player.ShoeMoistureContent > 1 {
 		statusLine += "\nYour shoes squish with water from the stream."
 	} else if player.ShoeMoistureContent == 1 {
 		statusLine += "\nYour shoes seem to have dried out."
-	} else {
-		statusLine += "\n                                             "
+	}
+
+	if len(statusLine) < io.TerminalWidth() {
+		paddingSize := io.TerminalWidth() - len(statusLine)
+		statusLine += strings.Repeat(" ", paddingSize)
 	}
 
 	return statusLine
