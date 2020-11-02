@@ -1,5 +1,0 @@
-{
-    "search.exclude": {
-        "vendor/**": true
-    }
-}
