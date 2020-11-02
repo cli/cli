@@ -136,7 +136,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("%s Failed to create gist: %w", cs.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s %s\n", cs.Green("✓"), completionMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIcon(), completionMessage)
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
