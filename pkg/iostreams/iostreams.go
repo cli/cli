@@ -253,6 +253,21 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
 }
 
+func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
+	var r io.ReadCloser
+	if fn == "-" {
+		r = s.In
+	} else {
+		var err error
+		r, err = os.Open(fn)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer r.Close()
+	return ioutil.ReadAll(r)
+}
+
 func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
