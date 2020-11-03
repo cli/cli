@@ -25,8 +25,6 @@ import (
 )
 
 func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
-	cobra.MousetrapHelpText = ""
-
 	cmd := &cobra.Command{
 		Use:   "gh <command> <subcommand> [flags]",
 		Short: "GitHub CLI",

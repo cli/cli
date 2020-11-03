@@ -61,6 +61,10 @@ func main() {
 		}
 	}
 
+	// Enable running gh from explorer.exe. Without this, the user is told to stop and run from a
+	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
+	cobra.MousetrapHelpText = ""
+
 	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
 
 	cfg, err := cmdFactory.Config()
