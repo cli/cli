@@ -154,6 +154,7 @@ func creditsRun(opts *CreditsOptions) error {
 	static := opts.Static || isWindows
 
 	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	if isTTY && static {
 		fmt.Fprintln(out, "THANK YOU CONTRIBUTORS!!! <3")
@@ -167,7 +168,7 @@ func creditsRun(opts *CreditsOptions) error {
 		}
 
 		if isTTY && !static {
-			logins = append(logins, getColor(x)(c.Login))
+			logins = append(logins, cs.ColorFromString(getColor(x))(c.Login))
 		} else {
 			fmt.Fprintf(out, "%s\n", c.Login)
 		}
@@ -183,14 +184,13 @@ func creditsRun(opts *CreditsOptions) error {
 
 	thankLines := strings.Split(thankYou, "\n")
 	for x, tl := range thankLines {
-		lines = append(lines, getColor(x)(tl))
+		lines = append(lines, cs.ColorFromString(getColor(x))(tl))
 	}
 	lines = append(lines, "")
 	lines = append(lines, logins...)
 	lines = append(lines, "( <3 press ctrl-c to quit <3 )")
 
 	termWidth, termHeight, err := utils.TerminalSize(out)
-	//termWidth, termHeight, err := terminal.GetSize(int(outFile.Fd()))
 	if err != nil {
 		return err
 	}
@@ -277,14 +277,14 @@ func twinkle(starLine string) string {
 	return starLine
 }
 
-func getColor(x int) func(string) string {
-	rainbow := []func(string) string{
-		utils.Magenta,
-		utils.Red,
-		utils.Yellow,
-		utils.Green,
-		utils.Cyan,
-		utils.Blue,
+func getColor(x int) string {
+	rainbow := []string{
+		"magenta",
+		"red",
+		"yellow",
+		"green",
+		"cyan",
+		"blue",
 	}
 
 	ix := x % len(rainbow)

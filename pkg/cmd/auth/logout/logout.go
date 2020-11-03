@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -151,8 +150,9 @@ func logoutRun(opts *LogoutOptions) error {
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	if isTTY {
+		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s%s\n",
-			utils.GreenCheck(), utils.Bold(hostname), usernameStr)
+			cs.SuccessIcon(), cs.Bold(hostname), usernameStr)
 	}
 
 	return nil

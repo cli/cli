@@ -128,6 +128,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -324,11 +326,11 @@ func createRun(opts *CreateOptions) error {
 
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, message,
-				utils.Cyan(headBranchLabel),
-				utils.Cyan(baseBranch),
+				cs.Cyan(headBranchLabel),
+				cs.Cyan(baseBranch),
 				ghrepo.FullName(baseRepo))
 			if (title == "" || body == "") && defaultsErr != nil {
-				fmt.Fprintf(opts.IO.ErrOut, "%s warning: could not compute title or body defaults: %s\n", utils.Yellow("!"), defaultsErr)
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: could not compute title or body defaults: %s\n", cs.Yellow("!"), defaultsErr)
 			}
 		}
 	}

@@ -125,14 +125,15 @@ func forkRun(opts *ForkOptions) error {
 
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()
 
+	cs := opts.IO.ColorScheme()
 	stderr := opts.IO.ErrOut
 	s := utils.Spinner(stderr)
 	stopSpinner := func() {}
 
 	if connectedToTerminal {
-		loading := utils.Gray("Forking ") + utils.Bold(utils.Gray(ghrepo.FullName(repoToFork))) + utils.Gray("...")
+		loading := cs.Gray("Forking ") + cs.Bold(cs.Gray(ghrepo.FullName(repoToFork))) + cs.Gray("...")
 		s.Suffix = " " + loading
-		s.FinalMSG = utils.Gray(fmt.Sprintf("- %s\n", loading))
+		s.FinalMSG = cs.Gray(fmt.Sprintf("- %s\n", loading))
 		utils.StartSpinner(s)
 		stopSpinner = func() {
 			utils.StopSpinner(s)
@@ -163,8 +164,8 @@ func forkRun(opts *ForkOptions) error {
 	if createdAgo > time.Minute {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s %s %s\n",
-				utils.Yellow("!"),
-				utils.Bold(ghrepo.FullName(forkedRepo)),
+				cs.Yellow("!"),
+				cs.Bold(ghrepo.FullName(forkedRepo)),
 				"already exists")
 		} else {
 			fmt.Fprintf(stderr, "%s already exists", ghrepo.FullName(forkedRepo))
@@ -172,7 +173,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 	} else {
 		if connectedToTerminal {
-			fmt.Fprintf(stderr, "%s Created fork %s\n", utils.GreenCheck(), utils.Bold(ghrepo.FullName(forkedRepo)))
+			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
@@ -196,7 +197,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Using existing remote %s\n", utils.GreenCheck(), utils.Bold(remote.Name))
+				fmt.Fprintf(stderr, "%s Using existing remote %s\n", cs.SuccessIcon(), cs.Bold(remote.Name))
 			}
 			return nil
 		}
@@ -223,7 +224,7 @@ func forkRun(opts *ForkOptions) error {
 					return err
 				}
 				if connectedToTerminal {
-					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", utils.GreenCheck(), utils.Bold(remoteName), utils.Bold(renameTarget))
+					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", cs.SuccessIcon(), cs.Bold(remoteName), cs.Bold(renameTarget))
 				}
 			}
 
@@ -235,7 +236,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Added remote %s\n", utils.GreenCheck(), utils.Bold(remoteName))
+				fmt.Fprintf(stderr, "%s Added remote %s\n", cs.SuccessIcon(), cs.Bold(remoteName))
 			}
 		}
 	} else {
@@ -260,7 +261,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if connectedToTerminal {
-				fmt.Fprintf(stderr, "%s Cloned fork\n", utils.GreenCheck())
+				fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
 			}
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -53,6 +52,8 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 }
 
 func reopenRun(opts *ReopenOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -65,7 +66,7 @@ func reopenRun(opts *ReopenOptions) error {
 	}
 
 	if !issue.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already open\n", utils.Yellow("!"), issue.Number, issue.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already open\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
 
@@ -74,7 +75,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", utils.Green("✔"), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", cs.SuccessIcon(), issue.Number, issue.Title)
 
 	return nil
 }

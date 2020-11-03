@@ -20,15 +20,15 @@ type RefreshOptions struct {
 
 	Hostname string
 	Scopes   []string
-	AuthFlow func(config.Config, string, []string) error
+	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(cfg config.Config, hostname string, scopes []string) error {
-			_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", scopes)
+		AuthFlow: func(cfg config.Config, io *iostreams.IOStreams, hostname string, scopes []string) error {
+			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
 			return err
 		},
 	}
@@ -118,5 +118,5 @@ func refreshRun(opts *RefreshOptions) error {
 		return err
 	}
 
-	return opts.AuthFlow(cfg, hostname, opts.Scopes)
+	return opts.AuthFlow(cfg, opts.IO, hostname, opts.Scopes)
 }
