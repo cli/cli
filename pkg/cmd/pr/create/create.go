@@ -354,6 +354,7 @@ func createRun(opts *CreateOptions) error {
 		Milestones: milestoneTitles,
 	}
 
+	// TODO experiment with named output as sigil
 	doPreserveInput := false
 	defer shared.PreserveInput(opts.IO, &tb, defs, &doPreserveInput)()
 

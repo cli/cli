@@ -14,6 +14,7 @@ import (
 func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaults, doPreserve *bool) func() {
 	return func() {
 		if ims.Body == defs.Body && ims.Title == defs.Title {
+			// TODO check for nil metadata, too
 			return
 		}
 
