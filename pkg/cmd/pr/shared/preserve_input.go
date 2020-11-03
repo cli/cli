@@ -48,5 +48,6 @@ func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaul
 		cs := io.ColorScheme()
 
 		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), dumpPath)
+		fmt.Fprintln(out, "(hint: you can restore with the --json flag)")
 	}
 }
