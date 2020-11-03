@@ -303,7 +303,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 
 		// status line stuff
-		sl := statusLine(garden, player)
+		sl := statusLine(garden, player, opts.IO)
 
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for y := 0; y < player.Geo.Height-1; y++ {
@@ -450,17 +450,26 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	fmt.Fprintln(out, utils.Bold(sl))
 }
 
-func statusLine(garden [][]*Cell, player *Player) string {
-	statusLine := garden[player.Y][player.X].StatusLine + "         "
+func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) string {
+	width := io.TerminalWidth()
+	statusLines := []string{garden[player.Y][player.X].StatusLine}
+
 	if player.ShoeMoistureContent > 1 {
-		statusLine += "\nYour shoes squish with water from the stream."
+		statusLines = append(statusLines, "Your shoes squish with water from the stream.")
 	} else if player.ShoeMoistureContent == 1 {
-		statusLine += "\nYour shoes seem to have dried out."
+		statusLines = append(statusLines, "Your shoes seem to have dried out.")
 	} else {
-		statusLine += "\n                                             "
+		statusLines = append(statusLines, "")
 	}
 
-	return statusLine
+	for i, line := range statusLines {
+		if len(line) < width {
+			paddingSize := width - len(line)
+			statusLines[i] = line + strings.Repeat(" ", paddingSize)
+		}
+	}
+
+	return strings.Join(statusLines, "\n")
 }
 
 func shaToColorFunc(sha string) func(string) string {
