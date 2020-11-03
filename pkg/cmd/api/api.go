@@ -403,7 +403,7 @@ func parseField(f string) (string, string, error) {
 
 func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	if strings.HasPrefix(v, "@") {
-		return readUserFile(v[1:], opts.IO.In)
+		return opts.IO.ReadUserFile(v[1:])
 	}
 
 	if n, err := strconv.Atoi(v); err == nil {
@@ -420,21 +420,6 @@ func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	default:
 		return fillPlaceholders(v, opts)
 	}
-}
-
-func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
-	var r io.ReadCloser
-	if fn == "-" {
-		r = stdin
-	} else {
-		var err error
-		r, err = os.Open(fn)
-		if err != nil {
-			return nil, err
-		}
-	}
-	defer r.Close()
-	return ioutil.ReadAll(r)
 }
 
 func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) {
