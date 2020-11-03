@@ -81,9 +81,9 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][];
 2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
 
-## Community-supported methods
+## Unofficial, Community-supported methods
 
-Our team does not directly maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them.
+The core GitHub CLI team does not maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them. They are linked here as a convenience and their presence does not imply continued oversight from the CLI core team. Users who choose to use them do so at their own risk.
 
 ### Arch Linux
 
