@@ -8,7 +8,6 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -84,6 +83,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 }
 
 func setRun(opts *SetOptions) error {
+	cs := opts.IO.ColorScheme()
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -96,7 +96,7 @@ func setRun(opts *SetOptions) error {
 
 	isTerminal := opts.IO.IsStdoutTTY()
 	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", utils.Bold(opts.Name), utils.Bold(opts.Expansion))
+		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(opts.Expansion))
 	}
 
 	expansion := opts.Expansion
@@ -114,13 +114,13 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
-	successMsg := fmt.Sprintf("%s Added alias.", utils.Green("✓"))
+	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
 	if oldExpansion, ok := aliasCfg.Get(opts.Name); ok {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
-			utils.Green("✓"),
-			utils.Bold(opts.Name),
-			utils.Bold(oldExpansion),
-			utils.Bold(expansion),
+			cs.SuccessIcon(),
+			cs.Bold(opts.Name),
+			cs.Bold(oldExpansion),
+			cs.Bold(expansion),
 		)
 	}
 

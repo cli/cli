@@ -1,6 +1,7 @@
 package clone
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,7 +24,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -37,8 +37,13 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "clone <repository> [<directory>] [-- <gitflags>...]",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("cannot clone: repository argument required")}
+			}
+			return nil
+		},
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(`
 			Clone a GitHub repository locally.

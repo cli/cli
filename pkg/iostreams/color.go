@@ -125,3 +125,32 @@ func (c *ColorScheme) WarningIcon() string {
 func (c *ColorScheme) FailureIcon() string {
 	return c.Red("X")
 }
+
+func (c *ColorScheme) ColorFromString(s string) func(string) string {
+	s = strings.ToLower(s)
+	var fn func(string) string
+	switch s {
+	case "bold":
+		fn = c.Bold
+	case "red":
+		fn = c.Red
+	case "yellow":
+		fn = c.Yellow
+	case "green":
+		fn = c.Green
+	case "gray":
+		fn = c.Gray
+	case "magenta":
+		fn = c.Magenta
+	case "cyan":
+		fn = c.Cyan
+	case "blue":
+		fn = c.Blue
+	default:
+		fn = func(s string) string {
+			return s
+		}
+	}
+
+	return fn
+}

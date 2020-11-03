@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -111,6 +110,8 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 }
 
 func mergeRun(opts *MergeOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -123,13 +124,13 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if pr.Mergeable == "CONFLICTING" {
-		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", utils.Red("!"), pr.Number, pr.Title)
+		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", cs.Red("!"), pr.Number, pr.Title)
 		return err
 	} else if pr.Mergeable == "UNKNOWN" {
-		err := fmt.Errorf("%s Pull request #%d (%s) can't be merged right now; try again in a few seconds", utils.Red("!"), pr.Number, pr.Title)
+		err := fmt.Errorf("%s Pull request #%d (%s) can't be merged right now; try again in a few seconds", cs.Red("!"), pr.Number, pr.Title)
 		return err
 	} else if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", utils.Red("!"), pr.Number, pr.Title)
+		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", cs.Red("!"), pr.Number, pr.Title)
 		return err
 	}
 
@@ -170,7 +171,7 @@ func mergeRun(opts *MergeOptions) error {
 	isTerminal := opts.IO.IsStdoutTTY()
 
 	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", utils.Magenta("✔"), action, pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.Magenta("✔"), action, pr.Number, pr.Title)
 	}
 
 	if deleteBranch {
@@ -198,13 +199,13 @@ func mergeRun(opts *MergeOptions) error {
 			if localBranchExists {
 				err = git.DeleteLocalBranch(pr.HeadRefName)
 				if err != nil {
-					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 					return err
 				}
 			}
 
 			if branchToSwitchTo != "" {
-				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
+				branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 			}
 		}
 
@@ -213,13 +214,13 @@ func mergeRun(opts *MergeOptions) error {
 			var httpErr api.HTTPError
 			// The ref might have already been deleted by GitHub
 			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
-				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				err = fmt.Errorf("failed to delete remote branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 				return err
 			}
 		}
 
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.Red("✔"), cs.Cyan(pr.HeadRefName), branchSwitchString)
 		}
 	}
 

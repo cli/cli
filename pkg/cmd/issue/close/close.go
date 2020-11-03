@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -53,6 +52,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 }
 
 func closeRun(opts *CloseOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -65,7 +66,7 @@ func closeRun(opts *CloseOptions) error {
 	}
 
 	if issue.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", utils.Yellow("!"), issue.Number, issue.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
 
@@ -74,7 +75,7 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", utils.Red("✔"), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", cs.Red("✔"), issue.Number, issue.Title)
 
 	return nil
 }

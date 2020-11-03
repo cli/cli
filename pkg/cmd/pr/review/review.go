@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -172,13 +171,15 @@ func reviewRun(opts *ReviewOptions) error {
 		return nil
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	switch reviewData.State {
 	case api.ReviewComment:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", utils.Gray("-"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", cs.Gray("-"), pr.Number)
 	case api.ReviewApprove:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", utils.Green("✓"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", cs.SuccessIcon(), pr.Number)
 	case api.ReviewRequestChanges:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", utils.Red("+"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", cs.Red("+"), pr.Number)
 	}
 
 	return nil

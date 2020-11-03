@@ -151,9 +151,11 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	var readmeContent string
 	if readme == nil {
-		readmeContent = utils.Gray("This repository does not have a README")
+		readmeContent = cs.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
@@ -168,7 +170,7 @@ func viewRun(opts *ViewOptions) error {
 
 	description := repo.Description
 	if description == "" {
-		description = utils.Gray("No description provided")
+		description = cs.Gray("No description provided")
 	}
 
 	repoData := struct {
@@ -177,10 +179,10 @@ func viewRun(opts *ViewOptions) error {
 		Readme      string
 		View        string
 	}{
-		FullName:    utils.Bold(fullName),
+		FullName:    cs.Bold(fullName),
 		Description: description,
 		Readme:      readmeContent,
-		View:        utils.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
+		View:        cs.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
 	}
 
 	err = tmpl.Execute(stdout, repoData)

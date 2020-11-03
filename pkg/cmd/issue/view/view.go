@@ -129,11 +129,12 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	out := io.Out
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
+	cs := io.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, utils.Bold(issue.Title))
-	fmt.Fprint(out, issueStateTitleWithColor(issue.State))
-	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+	fmt.Fprintln(out, cs.Bold(issue.Title))
+	fmt.Fprint(out, issueStateTitleWithColor(cs, issue.State))
+	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
 		" • %s opened %s • %s",
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
@@ -143,19 +144,19 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	// Metadata
 	fmt.Fprintln(out)
 	if assignees := issueAssigneeList(*issue); assignees != "" {
-		fmt.Fprint(out, utils.Bold("Assignees: "))
+		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
 	if labels := shared.IssueLabelList(*issue); labels != "" {
-		fmt.Fprint(out, utils.Bold("Labels: "))
+		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
 	if projects := issueProjectList(*issue); projects != "" {
-		fmt.Fprint(out, utils.Bold("Projects: "))
+		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
 	if issue.Milestone.Title != "" {
-		fmt.Fprint(out, utils.Bold("Milestone: "))
+		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
 
@@ -172,12 +173,12 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	fmt.Fprintln(out)
 
 	// Footer
-	fmt.Fprintf(out, utils.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
 	return nil
 }
 
-func issueStateTitleWithColor(state string) string {
-	colorFunc := prShared.ColorFuncForState(state)
+func issueStateTitleWithColor(cs *iostreams.ColorScheme, state string) string {
+	colorFunc := cs.ColorFromString(prShared.ColorForState(state))
 	return colorFunc(strings.Title(strings.ToLower(state)))
 }
 

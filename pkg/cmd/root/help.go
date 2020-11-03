@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -80,7 +80,7 @@ func isRootCmd(command *cobra.Command) bool {
 	return command != nil && !command.HasParent()
 }
 
-func rootHelpFunc(command *cobra.Command, args []string) {
+func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []string) {
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
 		nestedSuggestFunc(command, args[1])
 		hasFailed = true
@@ -158,7 +158,7 @@ Read the manual at https://cli.github.com/manual`})
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
-			fmt.Fprintln(out, utils.Bold(e.Title))
+			fmt.Fprintln(out, cs.Bold(e.Title))
 			fmt.Fprintln(out, text.Indent(strings.Trim(e.Body, "\r\n"), "  "))
 		} else {
 			// If there is no title print the body as is

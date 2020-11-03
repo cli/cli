@@ -3,7 +3,6 @@ package status
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -18,7 +17,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -104,38 +102,39 @@ func statusRun(opts *StatusOptions) error {
 	defer opts.IO.StopPager()
 
 	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	shared.PrintHeader(out, "Current branch")
+	shared.PrintHeader(opts.IO, "Current branch")
 	currentPR := prPayload.CurrentPR
 	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
 		currentPR = nil
 	}
 	if currentPR != nil {
-		printPrs(out, 1, *currentPR)
+		printPrs(opts.IO, 1, *currentPR)
 	} else if currentPRHeadRef == "" {
-		shared.PrintMessage(out, "  There is no current branch")
+		shared.PrintMessage(opts.IO, "  There is no current branch")
 	} else {
-		shared.PrintMessage(out, fmt.Sprintf("  There is no pull request associated with %s", utils.Cyan("["+currentPRHeadRef+"]")))
+		shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
 	}
 	fmt.Fprintln(out)
 
-	shared.PrintHeader(out, "Created by you")
+	shared.PrintHeader(opts.IO, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(out, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
+		printPrs(opts.IO, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
 	} else {
-		shared.PrintMessage(out, "  You have no open pull requests")
+		shared.PrintMessage(opts.IO, "  You have no open pull requests")
 	}
 	fmt.Fprintln(out)
 
-	shared.PrintHeader(out, "Requesting a code review from you")
+	shared.PrintHeader(opts.IO, "Requesting a code review from you")
 	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(out, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
+		printPrs(opts.IO, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
 	} else {
-		shared.PrintMessage(out, "  You have no pull requests to review")
+		shared.PrintMessage(opts.IO, "  You have no pull requests to review")
 	}
 	fmt.Fprintln(out)
 
@@ -179,20 +178,16 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 	return
 }
 
-func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
+func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
+	w := io.Out
+	cs := io.ColorScheme()
+
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prStateColorFunc := utils.Green
-		if pr.IsDraft {
-			prStateColorFunc = utils.Gray
-		} else if pr.State == "MERGED" {
-			prStateColorFunc = utils.Magenta
-		} else if pr.State == "CLOSED" {
-			prStateColorFunc = utils.Red
-		}
+		prStateColorFunc := cs.ColorFromString(shared.ColorForPR(pr))
 
-		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), utils.Cyan("["+pr.HeadLabel()+"]"))
+		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), cs.Cyan("["+pr.HeadLabel()+"]"))
 
 		checks := pr.ChecksStatus()
 		reviews := pr.ReviewStatus()
@@ -208,14 +203,14 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 				var summary string
 				if checks.Failing > 0 {
 					if checks.Failing == checks.Total {
-						summary = utils.Red("× All checks failing")
+						summary = cs.Red("× All checks failing")
 					} else {
-						summary = utils.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
+						summary = cs.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
 					}
 				} else if checks.Pending > 0 {
-					summary = utils.Yellow("- Checks pending")
+					summary = cs.Yellow("- Checks pending")
 				} else if checks.Passing == checks.Total {
-					summary = utils.Green("✓ Checks passing")
+					summary = cs.Green("✓ Checks passing")
 				}
 				fmt.Fprint(w, summary)
 			}
@@ -226,20 +221,20 @@ func printPrs(w io.Writer, totalCount int, prs ...api.PullRequest) {
 			}
 
 			if reviews.ChangesRequested {
-				fmt.Fprint(w, utils.Red("+ Changes requested"))
+				fmt.Fprint(w, cs.Red("+ Changes requested"))
 			} else if reviews.ReviewRequired {
-				fmt.Fprint(w, utils.Yellow("- Review required"))
+				fmt.Fprint(w, cs.Yellow("- Review required"))
 			} else if reviews.Approved {
-				fmt.Fprint(w, utils.Green("✓ Approved"))
+				fmt.Fprint(w, cs.Green("✓ Approved"))
 			}
 		} else {
-			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(pr))
+			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(cs, pr))
 		}
 
 		fmt.Fprint(w, "\n")
 	}
 	remaining := totalCount - len(prs)
 	if remaining > 0 {
-		fmt.Fprintf(w, utils.Gray("  And %d more\n"), remaining)
+		fmt.Fprintf(w, cs.Gray("  And %d more\n"), remaining)
 	}
 }

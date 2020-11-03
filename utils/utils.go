@@ -97,15 +97,3 @@ func DisplayURL(urlStr string) string {
 	}
 	return u.Hostname() + u.Path
 }
-
-func GreenCheck() string {
-	return Green("✓")
-}
-
-func YellowDash() string {
-	return Yellow("-")
-}
-
-func RedX() string {
-	return Red("X")
-}

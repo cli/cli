@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -137,6 +138,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -313,7 +316,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if !opts.WebMode {
-		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel, []string{"OPEN"})
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
@@ -333,11 +336,11 @@ func createRun(opts *CreateOptions) error {
 
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, message,
-				utils.Cyan(headBranchLabel),
-				utils.Cyan(baseBranch),
+				cs.Cyan(headBranchLabel),
+				cs.Cyan(baseBranch),
 				ghrepo.FullName(baseRepo))
 			if (title == "" || body == "") && defaultsErr != nil {
-				fmt.Fprintf(opts.IO.ErrOut, "%s warning: could not compute title or body defaults: %s\n", utils.Yellow("!"), defaultsErr)
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: could not compute title or body defaults: %s\n", cs.Yellow("!"), defaultsErr)
 			}
 		}
 	}
@@ -455,21 +458,33 @@ func createRun(opts *CreateOptions) error {
 
 	// automatically push the branch if it hasn't been pushed anywhere yet
 	if isPushEnabled {
-		pushTries := 0
-		maxPushTries := 3
-		for {
-			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
-				if didForkRepo && pushTries < maxPushTries {
-					pushTries++
-					// first wait 2 seconds after forking, then 4s, then 6s
-					waitSeconds := 2 * pushTries
-					fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
-					time.Sleep(time.Duration(waitSeconds) * time.Second)
-					continue
+		pushBranch := func() error {
+			pushTries := 0
+			maxPushTries := 3
+			for {
+				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer r.Flush()
+				cmdErr := r
+				cmdOut := opts.IO.Out
+				if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch), cmdOut, cmdErr); err != nil {
+					if didForkRepo && pushTries < maxPushTries {
+						pushTries++
+						// first wait 2 seconds after forking, then 4s, then 6s
+						waitSeconds := 2 * pushTries
+						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						time.Sleep(time.Duration(waitSeconds) * time.Second)
+						continue
+					}
+					return err
 				}
-				return err
+				break
 			}
-			break
+			return nil
+		}
+
+		err := pushBranch()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -611,3 +626,5 @@ func fillFromJSON(io *iostreams.IOStreams, jsonInput string, ims *shared.IssueMe
 
 	return nil
 }
+
+var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
