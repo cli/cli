@@ -1,6 +1,7 @@
 package clone
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,7 +24,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -37,8 +37,13 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "clone <repository> [<directory>] [-- <gitflags>...]",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return &cmdutil.FlagError{Err: errors.New("cannot clone: repository argument required")}
+			}
+			return nil
+		},
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(`
 			Clone a GitHub repository locally.
@@ -82,54 +87,68 @@ func cloneRun(opts *CloneOptions) error {
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	cloneURL := opts.Repository
-	if !strings.Contains(cloneURL, ":") {
-		if !strings.Contains(cloneURL, "/") {
+
+	respositoryIsURL := strings.Contains(opts.Repository, ":")
+	repositoryIsFullName := !respositoryIsURL && strings.Contains(opts.Repository, "/")
+
+	var repo ghrepo.Interface
+	var protocol string
+	if respositoryIsURL {
+		repoURL, err := git.ParseURL(opts.Repository)
+		if err != nil {
+			return err
+		}
+		repo, err = ghrepo.FromURL(repoURL)
+		if err != nil {
+			return err
+		}
+		if repoURL.Scheme == "git+ssh" {
+			repoURL.Scheme = "ssh"
+		}
+		protocol = repoURL.Scheme
+	} else {
+		var fullName string
+		if repositoryIsFullName {
+			fullName = opts.Repository
+		} else {
 			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
 			if err != nil {
 				return err
 			}
-			cloneURL = currentUser + "/" + cloneURL
+			fullName = currentUser + "/" + opts.Repository
 		}
-		repo, err := ghrepo.FromFullName(cloneURL)
+
+		repo, err = ghrepo.FromFullName(fullName)
 		if err != nil {
 			return err
 		}
 
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-		cloneURL = ghrepo.FormatRemoteURL(repo, protocol)
-	}
-
-	var repo ghrepo.Interface
-	var parentRepo ghrepo.Interface
-
-	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
-	// here to handle hostname aliases in SSH remotes
-	if u, err := git.ParseURL(cloneURL); err == nil {
-		repo, _ = ghrepo.FromURL(u)
-	}
-
-	if repo != nil {
-		parentRepo, err = api.RepoParent(apiClient, repo)
+		protocol, err = cfg.Get(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
 	}
 
-	cloneDir, err := git.RunClone(cloneURL, opts.GitArgs)
+	// Load the repo from the API to get the username/repo name in its
+	// canonical capitalization
+	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
+	if err != nil {
+		return err
+	}
+	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+
+	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
 	if err != nil {
 		return err
 	}
 
-	if parentRepo != nil {
-		protocol, err := cfg.Get(parentRepo.RepoHost(), "git_protocol")
+	// If the repo is a fork, add the parent as an upstream
+	if canonicalRepo.Parent != nil {
+		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
-		upstreamURL := ghrepo.FormatRemoteURL(parentRepo, protocol)
+		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 		if err != nil {

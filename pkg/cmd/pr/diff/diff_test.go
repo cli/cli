@@ -171,7 +171,7 @@ func TestPRDiff_no_current_pr(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	assert.Equal(t, `no open pull requests found for branch "feature"`, err.Error())
+	assert.Equal(t, `no pull requests found for branch "feature"`, err.Error())
 }
 
 func TestPRDiff_argument_not_found(t *testing.T) {

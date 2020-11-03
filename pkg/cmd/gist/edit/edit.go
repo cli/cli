@@ -81,9 +81,20 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	apiClient := api.NewClientFromHTTP(client)
+
 	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
 	if err != nil {
 		return err
+	}
+
+	username, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
+	if err != nil {
+		return err
+	}
+
+	if username != gist.Owner.Login {
+		return fmt.Errorf("You do not own this gist.")
 	}
 
 	filesToUpdate := map[string]string{}
@@ -178,7 +189,7 @@ func editRun(opts *EditOptions) error {
 		return nil
 	}
 
-	err = updateGist(client, ghinstance.OverridableDefault(), gist)
+	err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
 	if err != nil {
 		return err
 	}
@@ -186,7 +197,7 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func updateGist(client *http.Client, hostname string, gist *shared.Gist) error {
+func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error {
 	body := shared.Gist{
 		Description: gist.Description,
 		Files:       gist.Files,
@@ -203,7 +214,6 @@ func updateGist(client *http.Client, hostname string, gist *shared.Gist) error {
 
 	result := shared.Gist{}
 
-	apiClient := api.NewClientFromHTTP(client)
 	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
 
 	if err != nil {

@@ -14,7 +14,7 @@ import (
 	"github.com/cli/cli/internal/run"
 )
 
-// ErrNotOnAnyBranch indicates that the users is in detached HEAD state
+// ErrNotOnAnyBranch indicates that the user is in detached HEAD state
 var ErrNotOnAnyBranch = errors.New("git: not on any branch")
 
 // Ref represents a git commit reference
@@ -56,12 +56,12 @@ func ShowRefs(ref ...string) ([]Ref, error) {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	refCmd := GitCommand("symbolic-ref", "--quiet", "--short", "HEAD")
+	refCmd := GitCommand("symbolic-ref", "--quiet", "HEAD")
 
 	output, err := run.PrepareCmd(refCmd).Output()
 	if err == nil {
 		// Found the branch name
-		return firstLine(output), nil
+		return getBranchShortName(output), nil
 	}
 
 	var cmdErr *run.CmdError
@@ -290,4 +290,9 @@ func firstLine(output []byte) string {
 		return string(output)[0:i]
 	}
 	return string(output)
+}
+
+func getBranchShortName(output []byte) string {
+	branch := firstLine(output)
+	return strings.TrimPrefix(branch, "refs/heads/")
 }

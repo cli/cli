@@ -21,7 +21,7 @@ type Release struct {
 }
 
 func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]Release, error) {
-	var query struct {
+	type responseData struct {
 		Repository struct {
 			Releases struct {
 				Nodes    []Release
@@ -50,6 +50,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int) ([
 	var releases []Release
 loop:
 	for {
+		var query responseData
 		err := gql.QueryNamed(context.Background(), "RepositoryReleaseList", &query, variables)
 		if err != nil {
 			return nil, err

@@ -3,6 +3,7 @@ project_name: gh
 release:
   prerelease: auto
   draft: true # we only publish after the Windows MSI gets uploaded
+  name_template: "GitHub CLI {{.Version}}"
 
 before:
   hooks:
@@ -14,7 +15,7 @@ builds:
       binary: bin/gh
       main: ./cmd/gh
       ldflags:
-        - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
+        - -s -w -X github.com/cli/cli/internal/build.Version={{.Version}} -X github.com/cli/cli/internal/build.Date={{time "2006-01-02"}}
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
@@ -63,15 +64,3 @@ nfpms:
       - rpm
     files:
       "./share/man/man1/gh*.1": "/usr/share/man/man1"
-
-scoop:
-  bucket:
-    owner: cli
-    name: scoop-gh
-  commit_author:
-    name: vilmibm
-    email: vilmibm@github.com
-  homepage: https://github.com/cli/cli
-  skip_upload: auto
-  description: GitHub CLI
-  license: MIT

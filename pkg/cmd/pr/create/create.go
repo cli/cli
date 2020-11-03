@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -302,7 +303,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if !opts.WebMode {
-		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel)
+		existingPR, err := api.PullRequestForBranch(client, baseRepo, baseBranch, headBranchLabel, []string{"OPEN"})
 		var notFound *api.NotFoundError
 		if err != nil && !errors.As(err, &notFound) {
 			return fmt.Errorf("error checking for existing pull request: %w", err)
@@ -399,7 +400,7 @@ func createRun(opts *CreateOptions) error {
 	// There are two cases when an existing remote for the head repo will be
 	// missing:
 	// 1. the head repo was just created by auto-forking;
-	// 2. an existing fork was discovered by quering the API.
+	// 2. an existing fork was discovered by querying the API.
 	//
 	// In either case, we want to add the head repo as a new git remote so we
 	// can push to it.
@@ -501,11 +502,11 @@ func computeDefaults(baseRef, headRef string) (shared.Defaults, error) {
 	} else {
 		out.Title = utils.Humanize(headRef)
 
-		body := ""
+		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			body += fmt.Sprintf("- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
 		}
-		out.Body = body
+		out.Body = body.String()
 	}
 
 	return out, nil
@@ -553,7 +554,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 }
 
 func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assignees, labels, projects []string, milestones []string) (string, error) {
-	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", base, head)
+	u := ghrepo.GenerateRepoURL(r, "compare/%s...%s?expand=1", url.QueryEscape(base), url.QueryEscape(head))
 	url, err := shared.WithPrAndIssueQueryParams(u, title, body, assignees, labels, projects, milestones)
 	if err != nil {
 		return "", err

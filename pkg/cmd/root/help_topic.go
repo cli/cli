@@ -39,6 +39,10 @@ func NewHelpTopic(topic string) *cobra.Command {
 
 		CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
 		even when the output is piped.
+
+		GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
+		checks for new releases once every 24 hours and displays an upgrade notice on standard
+		error if a newer version was found.
 	`)
 
 	cmd := &cobra.Command{

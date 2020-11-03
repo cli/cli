@@ -17,16 +17,16 @@ jobs:
           go-version: 1.15
       - name: Generate changelog
         run: |
-          echo ::set-env name=GORELEASER_CURRENT_TAG::${GITHUB_REF#refs/tags/}
+          echo "GORELEASER_CURRENT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v1
+        uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
           args: release --release-notes=CHANGELOG.md
         env:
-          GITHUB_TOKEN: ${{secrets.UPLOAD_GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
@@ -50,10 +50,11 @@ jobs:
         run: |
           api() { gh api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
           api-write() { [[ $GITHUB_REF == *-* ]] && echo "skipping: api $*" || api "$@"; }
-          cards=$(api projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
+          cards=$(api --paginate projects/columns/$PENDING_COLUMN/cards | jq ".[].id")
           for card in $cards; do
-            api-write projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
+            api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
+          echo "moved ${#cards[@]} cards to the Done column"
       
       - name: Install packaging dependencies
         run: sudo apt-get install -y createrepo rpm reprepro
@@ -126,8 +127,8 @@ jobs:
       - name: Prepare PATH
         shell: bash
         run: |
-          echo "::add-path::$WIX\\bin"
-          echo "::add-path::C:\\Program Files\\go-msi"
+          echo "$WIX\\bin" >> $GITHUB_PATH
+          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
       - name: Build MSI
         id: buildmsi
         shell: bash
@@ -157,6 +158,29 @@ jobs:
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh
-          download-url: https://github.com/cli/cli.git
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
+      - name: Checkout scoop bucket
+        uses: actions/checkout@v2
+        with:
+          repository: cli/scoop-gh
+          path: scoop-gh
+          fetch-depth: 0
+          token: ${{secrets.UPLOAD_GITHUB_TOKEN}}
+      - name: Bump scoop bucket
+        shell: bash
+        run: |
+          hub release download "${GITHUB_REF#refs/tags/}" -i '*_checksums.txt'
+          script/scoop-gen "${GITHUB_REF#refs/tags/}" ./scoop-gh/gh.json < *_checksums.txt
+          git -C ./scoop-gh commit -m "gh ${GITHUB_REF#refs/tags/}" gh.json
+          if [[ $GITHUB_REF == *-* ]]; then
+            git -C ./scoop-gh show -m
+          else
+            git -C ./scoop-gh push
+          fi
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GIT_COMMITTER_NAME: cli automation
+          GIT_AUTHOR_NAME: cli automation
+          GIT_COMMITTER_EMAIL: noreply@github.com
+          GIT_AUTHOR_EMAIL: noreply@github.com

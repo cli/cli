@@ -27,6 +27,7 @@ import (
 type ApiOptions struct {
 	IO *iostreams.IOStreams
 
+	Hostname            string
 	RequestMethod       string
 	RequestMethodPassed bool
 	RequestPath         string
@@ -101,7 +102,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 			    }
 			  }
 			'
-			
+
 			$ gh api graphql --paginate -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -121,12 +122,20 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 				GITHUB_TOKEN: an authentication token for github.com API requests.
 
 				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
+
+				GH_HOST: make the request to a GitHub host other than github.com.
 			`),
 		},
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
+
+			if c.Flags().Changed("hostname") {
+				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
+					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
+				}
+			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
 				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported for non-GET requests`)}
@@ -142,6 +151,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		},
 	}
 
+	cmd.Flags().StringVar(&opts.Hostname, "hostname", "", "The GitHub hostname for the request (default \"github.com\")")
 	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a parameter of inferred type")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
@@ -206,6 +216,9 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	host := ghinstance.OverridableDefault()
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	}
 
 	hasNextPage := true
 	for hasNextPage {

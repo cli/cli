@@ -27,6 +27,7 @@ type LoginOptions struct {
 	Interactive bool
 
 	Hostname string
+	Scopes   []string
 	Token    string
 	Web      bool
 }
@@ -43,22 +44,26 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
 		Short: "Authenticate with a GitHub host",
-		Long: heredoc.Doc(`Authenticate with a GitHub host.
+		Long: heredoc.Docf(`
+			Authenticate with a GitHub host.
 
-			This interactive command initializes your authentication state either by helping you log into
-			GitHub via browser-based OAuth or by accepting a Personal Access Token.
+			The default authentication mode is a web-based browser flow.
 
-			The interactivity can be avoided by specifying --with-token and passing a token on STDIN.
-		`),
+			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
+			The minimum required scopes for the token are: "repo", "read:org".
+
+			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
+			absent, this command ensures that gh has access to a minimum set of scopes.
+		`, "`"),
 		Example: heredoc.Doc(`
+			# start interactive setup
 			$ gh auth login
-			# => do an interactive setup
 
+			# authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
-			# => read token from mytoken.txt and authenticate against github.com
 
-			$ gh auth login --hostname enterprise.internal --with-token < mytoken.txt
-			# => read token from mytoken.txt and authenticate against a GitHub Enterprise Server instance
+			# authenticate with a specific GitHub Enterprise Server instance
+			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
@@ -83,7 +88,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if cmd.Flags().Changed("hostname") {
-				if err := hostnameValidator(opts.Hostname); err != nil {
+				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}
@@ -103,6 +108,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 
@@ -160,7 +166,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(hostnameValidator))
+			}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
@@ -222,7 +228,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if authMode == 0 {
-		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", []string{})
+		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -298,17 +304,6 @@ func loginRun(opts *LoginOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
 
-	return nil
-}
-
-func hostnameValidator(v interface{}) error {
-	val := v.(string)
-	if len(strings.TrimSpace(val)) < 1 {
-		return errors.New("a value is required")
-	}
-	if strings.ContainsRune(val, '/') || strings.ContainsRune(val, ':') {
-		return errors.New("invalid hostname")
-	}
 	return nil
 }
 

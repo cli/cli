@@ -7,10 +7,13 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
@@ -179,6 +182,18 @@ func gardenRun(opts *GardenOptions) error {
 
 	maxCommits := (geo.Width * geo.Height) / 2
 
+	sttyFileArg := "-F"
+	if runtime.GOOS == "darwin" {
+		sttyFileArg = "-f"
+	}
+
+	oldTTYCommand := exec.Command("stty", sttyFileArg, "/dev/tty", "-g")
+	oldTTYSettings, err := oldTTYCommand.CombinedOutput()
+	if err != nil {
+		fmt.Fprintln(out, "getting TTY setings failed:", string(oldTTYSettings))
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
 	fmt.Fprintln(out, "gathering commits; this could take a minute...")
 	commits, err := getCommits(httpClient, toView, maxCommits)
@@ -201,13 +216,24 @@ func gardenRun(opts *GardenOptions) error {
 	drawGarden(out, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
-	if runtime.GOOS == "darwin" {
-		_ = exec.Command("stty", "-f", "/dev/tty", "cbreak", "min", "1").Run()
-		_ = exec.Command("stty", "-f", "/dev/tty", "-echo").Run()
-	} else {
-		_ = exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-		_ = exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "cbreak", "min", "1").Run()
+	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "-echo").Run()
+
+	walkAway := func() {
+		clear(opts.IO)
+		fmt.Fprint(out, "\033[?25h")
+		_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
 	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		walkAway()
+		os.Exit(0)
+	}()
 
 	var b []byte = make([]byte, 3)
 	for {
@@ -277,7 +303,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 
 		// status line stuff
-		sl := statusLine(garden, player)
+		sl := statusLine(garden, player, opts.IO)
 
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for y := 0; y < player.Geo.Height-1; y++ {
@@ -289,11 +315,7 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprint(out, utils.Bold(sl))
 	}
 
-	clear(opts.IO)
-	fmt.Fprint(out, "\033[?25h")
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
-
+	walkAway()
 	return nil
 }
 
@@ -428,17 +450,26 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	fmt.Fprintln(out, utils.Bold(sl))
 }
 
-func statusLine(garden [][]*Cell, player *Player) string {
-	statusLine := garden[player.Y][player.X].StatusLine + "         "
+func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) string {
+	width := io.TerminalWidth()
+	statusLines := []string{garden[player.Y][player.X].StatusLine}
+
 	if player.ShoeMoistureContent > 1 {
-		statusLine += "\nYour shoes squish with water from the stream."
+		statusLines = append(statusLines, "Your shoes squish with water from the stream.")
 	} else if player.ShoeMoistureContent == 1 {
-		statusLine += "\nYour shoes seem to have dried out."
+		statusLines = append(statusLines, "Your shoes seem to have dried out.")
 	} else {
-		statusLine += "\n                                             "
+		statusLines = append(statusLines, "")
 	}
 
-	return statusLine
+	for i, line := range statusLines {
+		if len(line) < width {
+			paddingSize := width - len(line)
+			statusLines[i] = line + strings.Repeat(" ", paddingSize)
+		}
+	}
+
+	return strings.Join(statusLines, "\n")
 }
 
 func shaToColorFunc(sha string) func(string) string {

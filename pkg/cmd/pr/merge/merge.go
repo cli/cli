@@ -107,7 +107,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
-
 	return cmd
 }
 
@@ -141,7 +140,11 @@ func mergeRun(opts *MergeOptions) error {
 	if opts.InteractiveMode {
 		mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR)
 		if err != nil {
-			return nil
+			if errors.Is(err, cancelError) {
+				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+				return cmdutil.SilentError
+			}
+			return err
 		}
 	}
 
@@ -223,6 +226,8 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
+var cancelError = errors.New("cancelError")
+
 func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
@@ -253,14 +258,26 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 		qs = append(qs, deleteBranchQuestion)
 	}
 
+	qs = append(qs, &survey.Question{
+		Name: "isConfirmed",
+		Prompt: &survey.Confirm{
+			Message: "Submit?",
+			Default: false,
+		},
+	})
+
 	answers := struct {
 		MergeMethod  int
 		DeleteBranch bool
+		IsConfirmed  bool
 	}{}
 
 	err := prompt.SurveyAsk(qs, &answers)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not prompt: %w", err)
+	}
+	if !answers.IsConfirmed {
+		return 0, false, cancelError
 	}
 
 	var mergeMethod api.PullRequestMergeMethod

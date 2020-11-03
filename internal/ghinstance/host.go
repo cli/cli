@@ -1,6 +1,7 @@
 package ghinstance
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -40,6 +41,21 @@ func NormalizeHostname(h string) string {
 		return defaultHostname
 	}
 	return hostname
+}
+
+func HostnameValidator(v interface{}) error {
+	hostname, valid := v.(string)
+	if !valid {
+		return errors.New("hostname is not a string")
+	}
+
+	if len(strings.TrimSpace(hostname)) < 1 {
+		return errors.New("a value is required")
+	}
+	if strings.ContainsRune(hostname, '/') || strings.ContainsRune(hostname, ':') {
+		return errors.New("invalid hostname")
+	}
+	return nil
 }
 
 func GraphQLEndpoint(hostname string) string {
