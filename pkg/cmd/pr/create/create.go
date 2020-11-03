@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -426,21 +427,33 @@ func createRun(opts *CreateOptions) error {
 
 	// automatically push the branch if it hasn't been pushed anywhere yet
 	if isPushEnabled {
-		pushTries := 0
-		maxPushTries := 3
-		for {
-			if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch)); err != nil {
-				if didForkRepo && pushTries < maxPushTries {
-					pushTries++
-					// first wait 2 seconds after forking, then 4s, then 6s
-					waitSeconds := 2 * pushTries
-					fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
-					time.Sleep(time.Duration(waitSeconds) * time.Second)
-					continue
+		pushBranch := func() error {
+			pushTries := 0
+			maxPushTries := 3
+			for {
+				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer r.Flush()
+				cmdErr := r
+				cmdOut := opts.IO.Out
+				if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", headBranch), cmdOut, cmdErr); err != nil {
+					if didForkRepo && pushTries < maxPushTries {
+						pushTries++
+						// first wait 2 seconds after forking, then 4s, then 6s
+						waitSeconds := 2 * pushTries
+						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						time.Sleep(time.Duration(waitSeconds) * time.Second)
+						continue
+					}
+					return err
 				}
-				return err
+				break
 			}
-			break
+			return nil
+		}
+
+		err := pushBranch()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -561,3 +574,5 @@ func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assi
 	}
 	return url, nil
 }
+
+var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
