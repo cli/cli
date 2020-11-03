@@ -1,6 +1,7 @@
 package create
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -88,7 +89,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO process JsonInput/JsonFill
+			opts.JsonFill = cmd.Flags().Changed("json")
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
@@ -97,6 +98,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill && !opts.JsonFill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
+			}
+
+			if opts.JsonFill && opts.Autofill {
+				return &cmdutil.FlagError{Err: errors.New("only specify one of --json or --fill")}
 			}
 
 			if opts.IsDraft && opts.WebMode {
@@ -305,9 +310,6 @@ func createRun(opts *CreateOptions) error {
 		if !opts.BodyProvided {
 			body = defs.Body
 		}
-	} else if opts.JsonFill {
-		// TODO
-		fmt.Println("HANDLE JSON FILL")
 	}
 
 	if !opts.WebMode {
@@ -391,6 +393,18 @@ func createRun(opts *CreateOptions) error {
 		if body == "" {
 			body = tb.Body
 		}
+	}
+
+	// TODO investigate using tb.{Title,Body} throughout instead of title/body vars
+
+	if opts.JsonFill {
+		// TODO share with issue
+		err = fillFromJSON(opts.IO, opts.JsonInput, &tb)
+		if err != nil {
+			return fmt.Errorf("failed to populate pull request from JSON: %w", err)
+		}
+		title = tb.Title
+		body = tb.Body
 	}
 
 	if action == shared.SubmitAction && title == "" {
@@ -576,4 +590,24 @@ func generateCompareURL(r ghrepo.Interface, base, head, title, body string, assi
 		return "", err
 	}
 	return url, nil
+}
+
+func fillFromJSON(io *iostreams.IOStreams, jsonInput string, ims *shared.IssueMetadataState) error {
+	var data []byte
+	var err error
+	if strings.HasPrefix(jsonInput, "@") {
+		data, err = io.ReadUserFile(jsonInput[1:])
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %w", jsonInput[1:], err)
+		}
+	} else {
+		data = []byte(jsonInput)
+	}
+
+	err = json.Unmarshal(data, ims)
+	if err != nil {
+		return fmt.Errorf("JSON parsing failure: %w", err)
+	}
+
+	return nil
 }
