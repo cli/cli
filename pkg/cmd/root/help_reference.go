@@ -4,42 +4,33 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
-func ReferenceHelpTopic(command *cobra.Command) *cobra.Command {
-	reftext := fmt.Sprintf("%s reference\n\n", utils.Bold("gh"))
+func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string {
+	cs := io.ColorScheme()
+	return func() string {
+		reftext := fmt.Sprintf("%s reference\n\n", cs.Bold("gh"))
 
-	for _, c := range command.Commands() {
-		reftext += cmdRef(c, 0)
+		for _, c := range cmd.Commands() {
+			reftext += cmdRef(cs, c, 0)
+		}
+		return reftext
 	}
-
-	ref := &cobra.Command{
-		Use:    "reference",
-		Long:   reftext,
-		Hidden: true,
-		Args:   cobra.NoArgs,
-		Run:    helpTopicHelpFunc,
-	}
-
-	ref.SetHelpFunc(helpTopicHelpFunc)
-	ref.SetUsageFunc(helpTopicUsageFunc)
-
-	return ref
 }
 
-func cmdRef(cmd *cobra.Command, lvl int) string {
+func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 	ref := ""
 
 	if cmd.Hidden {
 		return ref
 	}
 
-	cmdColor := utils.Bold
+	cmdColor := cs.Bold
 	if lvl > 0 {
-		cmdColor = utils.Cyan
+		cmdColor = cs.Cyan
 	}
 
 	// Name + Description
@@ -56,7 +47,7 @@ func cmdRef(cmd *cobra.Command, lvl int) string {
 	// Subcommands
 	subcommands := cmd.Commands()
 	for _, c := range subcommands {
-		ref += cmdRef(c, lvl+1)
+		ref += cmdRef(cs, c, lvl+1)
 	}
 
 	if len(subcommands) == 0 {

@@ -92,7 +92,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
-	cmd.AddCommand(ReferenceHelpTopic(cmd))
+	cmd.AddCommand(NewHelpTopicFn("reference", "Full reference for gh",
+		referenceHelpFn(cmd, f.IOStreams)))
 
 	cmdutil.DisableAuthCheck(cmd)
 
