@@ -82,10 +82,9 @@ func GenMarkdownTree(cmd *cobra.Command, dir string) error {
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {
-		if genMarkdown, ok := c.Annotations["markdown:generate"]; ok {
-			if genMarkdown == "false" {
-				continue
-			}
+		_, forceGeneration := c.Annotations["markdown:generate"]
+		if c.Hidden && !forceGeneration {
+			continue
 		}
 
 		if err := GenMarkdownTreeCustom(c, dir, filePrepender, linkHandler); err != nil {

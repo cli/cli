@@ -56,6 +56,7 @@ func NewHelpTopic(topic string) *cobra.Command {
 		Args:   cobra.NoArgs,
 		Run:    helpTopicHelpFunc,
 		Annotations: map[string]string{
+			"markdown:generate": "true",
 			"markdown:basename": "gh_help_" + topic,
 		},
 	}

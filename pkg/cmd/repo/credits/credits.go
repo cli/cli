@@ -45,10 +45,10 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 		Example: heredoc.Doc(`
 			# see a credits animation for this project
 			$ gh credits
-			
+
 			# display a non-animated thank you
 			$ gh credits -s
-			
+
 			# just print the contributors, one per line
 			$ gh credits | cat
 		`),
@@ -61,9 +61,6 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 			return creditsRun(opts)
 		},
 		Hidden: true,
-		Annotations: map[string]string{
-			"markdown:generate": "false",
-		},
 	}
 
 	cmd.Flags().BoolVarP(&opts.Static, "static", "s", false, "Print a static version of the credits")
@@ -107,9 +104,6 @@ func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *co
 			return creditsRun(opts)
 		},
 		Hidden: true,
-		Annotations: map[string]string{
-			"markdown:generate": "false",
-		},
 	}
 
 	cmd.Flags().BoolVarP(&opts.Static, "static", "s", false, "Print a static version of the credits")

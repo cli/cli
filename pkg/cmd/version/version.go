@@ -16,9 +16,6 @@ func NewCmdVersion(f *cmdutil.Factory, version, buildDate string) *cobra.Command
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Fprint(f.IOStreams.Out, Format(version, buildDate))
 		},
-		Annotations: map[string]string{
-			"markdown:generate": "false",
-		},
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
