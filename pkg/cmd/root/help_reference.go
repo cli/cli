@@ -10,14 +10,15 @@ import (
 )
 
 func ReferenceHelpTopic(command *cobra.Command) *cobra.Command {
-	command.Printf("%s reference\n\n", utils.Bold("gh"))
+	reftext := fmt.Sprintf("%s reference\n\n", utils.Bold("gh"))
 
 	for _, c := range command.Commands() {
-		command.Print(cmdRef(c, 0))
+		reftext += cmdRef(c, 0)
 	}
 
 	ref := &cobra.Command{
 		Use:    "reference",
+		Long:   reftext,
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		Run:    helpTopicHelpFunc,
