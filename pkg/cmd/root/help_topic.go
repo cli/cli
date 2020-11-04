@@ -7,7 +7,7 @@ import (
 
 var HelpTopics = map[string]map[string]string{
 	"environment": {
-		"short": "Environmental variables that can be used with gh",
+		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
 			GITHUB_TOKEN: an authentication token for github.com API requests. Setting this avoids
 			being prompted to authenticate and takes precedence over previously stored credentials.

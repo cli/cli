@@ -93,8 +93,8 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 	}
 
 	basename := strings.Replace(cmd.CommandPath(), " ", "_", -1) + ".md"
-	if override, ok := cmd.Annotations["markdown:basename"]; ok {
-		basename = override + ".md"
+	if basenameOverride, found := cmd.Annotations["markdown:basename"]; found {
+		basename = basenameOverride + ".md"
 	}
 
 	filename := filepath.Join(dir, basename)
