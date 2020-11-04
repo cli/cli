@@ -2,7 +2,6 @@ package create
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -77,13 +76,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return nil
-			}
-
-			return &cmdutil.FlagError{Err: errors.New("could not create: no tag name provided")}
-		},
+		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
