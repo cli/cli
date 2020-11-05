@@ -164,7 +164,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	if issue.Body != "" {
 		fmt.Fprintln(out)
 		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(issue.Body, style)
+		md, err := markdown.Render(issue.Body, style, "")
 		if err != nil {
 			return err
 		}

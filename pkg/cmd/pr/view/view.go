@@ -183,7 +183,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	if pr.Body != "" {
 		fmt.Fprintln(out)
 		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(pr.Body, style)
+		md, err := markdown.Render(pr.Body, style, "")
 		if err != nil {
 			return err
 		}
