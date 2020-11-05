@@ -21,9 +21,9 @@ type RepoReadme struct {
 func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string) (*RepoReadme, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	var response struct {
-		Name     string
-		Content  string
-		Html_url string
+		Name    string
+		Content string
+		HTMLURL string `json:"html_url"`
 	}
 
 	err := apiClient.REST(repo.RepoHost(), "GET", getReadmePath(repo, branch), nil, &response)
@@ -43,7 +43,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 	return &RepoReadme{
 		Filename: response.Name,
 		Content:  string(decoded),
-		BaseURL:  response.Html_url,
+		BaseURL:  response.HTMLURL,
 	}, nil
 }
 
