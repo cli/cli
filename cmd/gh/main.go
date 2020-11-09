@@ -64,9 +64,11 @@ func main() {
 		}
 	}
 
-	// Enable running gh from explorer.exe. Without this, the user is told to stop and run from a
+	// Enable running gh from Windows File Explorer's address bar. Without this, the user is told to stop and run from a
 	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
-	cobra.MousetrapHelpText = ""
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		cobra.MousetrapHelpText = ""
+	}
 
 	rootCmd := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
 
