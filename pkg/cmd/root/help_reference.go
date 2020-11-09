@@ -5,19 +5,25 @@ import (
 	"strings"
 
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
+	"github.com/cli/cli/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
 func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string {
 	cs := io.ColorScheme()
 	return func() string {
-		reftext := fmt.Sprintf("%s reference\n\n", cs.Bold("gh"))
+		reftext := "# gh reference\n\n"
 
 		for _, c := range cmd.Commands() {
 			reftext += cmdRef(cs, c, 0)
 		}
-		return reftext
+
+		md, err := markdown.Render(reftext, "auto")
+		if err != nil {
+			return reftext
+		}
+
+		return md
 	}
 }
 
@@ -28,17 +34,34 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 		return ref
 	}
 
-	cmdColor := cs.Bold
+	cmdPrefix := "##"
 	if lvl > 0 {
-		cmdColor = cs.Cyan
+		cmdPrefix = "###"
 	}
 
 	// Name + Description
-	ref += fmt.Sprintf("%s%s  %s\n", strings.Repeat("  ", lvl), cmdColor(cmd.Use), cmd.Short)
+	escaped := strings.ReplaceAll(cmd.Use, "<", "〈")
+	escaped = strings.ReplaceAll(escaped, ">", "〉")
+	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
+
+	ref += cmd.Short + "\n\n"
 
 	// Flags
-	ref += text.Indent(dedent(cmd.Flags().FlagUsages()), strings.Repeat("  ", lvl+1))
-	ref += text.Indent(dedent(cmd.PersistentFlags().FlagUsages()), strings.Repeat("  ", lvl+1))
+
+	// TODO glamour doesn't respect linebreaks (double space or backslash at end) at all, so there is
+	// no way to have the damn flags print without a whole newline in between.
+	for _, fu := range strings.Split(cmd.Flags().FlagUsages(), "\n") {
+		if fu == "" {
+			continue
+		}
+		ref += fu + "\n\n"
+	}
+	for _, fu := range strings.Split(cmd.PersistentFlags().FlagUsages(), "\n") {
+		if fu == "" {
+			continue
+		}
+		ref += fu + "\n\n"
+	}
 
 	if cmd.HasPersistentFlags() || cmd.HasFlags() || cmd.HasAvailableSubCommands() {
 		ref += "\n"
