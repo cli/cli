@@ -136,17 +136,15 @@ func main() {
 
 	cs := cmdFactory.IOStreams.ColorScheme()
 
-	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
-		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
-		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
-	if authCheckEnabled {
-		if !cmdutil.CheckAuth(cfg) {
-			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-			fmt.Fprintln(stderr)
-			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-			fmt.Fprintln(stderr, "You can also set the GITHUB_TOKEN environment variable, if preferred.")
-			os.Exit(4)
-		}
+	// _, _, tokenPresent := config.AuthTokenFromEnv(ghinstance.OverridableDefault())
+	// authCheckEnabled := !tokenPresent && cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
+	authCheckEnabled := cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
+	if authCheckEnabled && !cmdutil.CheckAuth(cfg) {
+		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+		fmt.Fprintln(stderr, "You can also set the one of the oauth token environment variables, if preferred.")
+		os.Exit(4)
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -248,8 +246,8 @@ func basicClient(currentVersion string) (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
 
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
+	token, _, ok := config.AuthTokenFromEnv(ghinstance.Default())
+	if !ok {
 		if c, err := config.ParseDefaultConfig(); err == nil {
 			token, _ = c.Get(ghinstance.Default(), "oauth_token")
 		}

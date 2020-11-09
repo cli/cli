@@ -9,10 +9,12 @@ var HelpTopics = map[string]map[string]string{
 	"environment": {
 		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
-			GITHUB_TOKEN: an authentication token for github.com API requests. Setting this avoids
-			being prompted to authenticate and takes precedence over previously stored credentials.
+			GH_TOKEN, GITHUB_TOKEN (in order of procedence): an authentication token for github.com
+			API requests. Setting this avoids being prompted to authenticate and takes precedence over
+			previously stored credentials.
 
-			GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
+			GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication
+			token for API requests to GitHub Enterprise.
 
 			GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
 			that otherwise operate on a local repository.
