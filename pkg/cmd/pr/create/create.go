@@ -127,7 +127,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *CreateOptions) (err error) {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -153,7 +153,6 @@ func createRun(opts *CreateOptions) error {
 		} else {
 			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
 			// consider piggybacking on that result instead of performing a separate lookup
-			var err error
 			baseRepo, err = api.GitHubRepo(client, br)
 			if err != nil {
 				return err
