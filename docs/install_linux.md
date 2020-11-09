@@ -117,6 +117,6 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 nix-env -iA nixos.gitAndTools.gh
 ```
 
-
+https://curl.se/libcurl/c/allfuncs.html
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
