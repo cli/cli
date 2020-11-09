@@ -137,7 +137,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *CreateOptions) (err error) {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -163,7 +163,6 @@ func createRun(opts *CreateOptions) error {
 		} else {
 			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
 			// consider piggybacking on that result instead of performing a separate lookup
-			var err error
 			baseRepo, err = api.GitHubRepo(client, br)
 			if err != nil {
 				return err
@@ -354,12 +353,7 @@ func createRun(opts *CreateOptions) error {
 		Milestones: milestoneTitles,
 	}
 
-	// TODO experiment with named output as sigil
-	doPreserveInput := false
-	defer shared.PreserveInput(opts.IO, &tb, defs, &doPreserveInput)()
-
 	if !opts.WebMode && !opts.Autofill && !opts.JsonFill && opts.Interactive {
-		doPreserveInput = true
 		var nonLegacyTemplateFiles []string
 		var legacyTemplateFile *string
 
@@ -384,9 +378,6 @@ func createRun(opts *CreateOptions) error {
 		action = tb.Action
 
 		if action == shared.CancelAction {
-			// TODO wouldn't want dump here...maybe? i could see there still being a desire to save state
-			// even with an explicit cancel
-			doPreserveInput = false
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
 			return nil
 		}
@@ -397,6 +388,11 @@ func createRun(opts *CreateOptions) error {
 		if body == "" {
 			body = tb.Body
 		}
+
+		// TODO ideally i only want to invoke this once from outside of tb survey; the problem is that
+		// the template is ingested and used in tbs() which makes dirty detection difficult. I'd love to
+		// refactor tbs() which does way too much to make this outer operation possible.
+		defer shared.PreserveInput(io, &shared.IssueMetadataState{}, tb, &err)()
 	}
 
 	// TODO investigate using tb.{Title,Body} throughout instead of title/body vars
@@ -526,7 +522,6 @@ func createRun(opts *CreateOptions) error {
 		panic("Unreachable state")
 	}
 
-	doPreserveInput = false
 	return nil
 }
 

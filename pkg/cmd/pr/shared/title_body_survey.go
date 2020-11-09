@@ -150,7 +150,7 @@ func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath *string,
 }
 
 // FIXME: this command has too many parameters and responsibilities
-func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *IssueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs Defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) error {
+func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *IssueMetadataState, apiClient *api.Client, repo ghrepo.Interface, providedTitle, providedBody string, defs Defaults, nonLegacyTemplatePaths []string, legacyTemplatePath *string, allowReviewers, allowMetadata bool) (err error) {
 	issueState.Title = defs.Title
 	templateContents := ""
 
@@ -200,6 +200,9 @@ func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *
 		},
 	}
 
+	preInput := *issueState
+	defer PreserveInput(io, &preInput, issueState, &err)()
+
 	var qs []*survey.Question
 	if providedTitle == "" {
 		qs = append(qs, titleQuestion)
@@ -208,7 +211,7 @@ func TitleBodySurvey(io *iostreams.IOStreams, editorCommand string, issueState *
 		qs = append(qs, bodyQuestion)
 	}
 
-	err := prompt.SurveyAsk(qs, issueState)
+	err = prompt.SurveyAsk(qs, issueState)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}

@@ -6,19 +6,19 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/cli/cli/pkg/iostreams"
 )
 
-func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaults, doPreserve *bool) func() {
+func PreserveInputIfChanged(io *iostreams.IOStreams, pre *IssueMetadataState, post *IssueMetadataState, creationErr *error) func() {
 	return func() {
-		if ims.Body == defs.Body && ims.Title == defs.Title {
-			// TODO check for nil metadata, too
+		if reflect.DeepEqual(pre, post) {
 			return
 		}
 
-		if !*doPreserve {
+		if creationErr == nil {
 			return
 		}
 
@@ -27,11 +27,11 @@ func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaul
 		// this extra newline guards against appending to the end of a survey line
 		fmt.Fprintln(out)
 
-		data, err := json.Marshal(ims)
+		data, err := json.Marshal(post)
 		if err != nil {
 			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
 			fmt.Fprintln(out, "would have saved:")
-			fmt.Fprintf(out, "%v\n", ims)
+			fmt.Fprintf(out, "%v\n", post)
 			return
 		}
 
@@ -47,6 +47,8 @@ func PreserveInput(io *iostreams.IOStreams, ims *IssueMetadataState, defs Defaul
 		}
 
 		cs := io.ColorScheme()
+		// TODO more explicit directions using file name
+		// TODO shorter filename for dump file
 
 		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), dumpPath)
 		fmt.Fprintln(out, "(hint: you can restore with the --json flag)")
