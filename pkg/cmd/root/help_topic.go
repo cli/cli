@@ -9,7 +9,7 @@ var HelpTopics = map[string]map[string]string{
 	"environment": {
 		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
-			GH_TOKEN, GITHUB_TOKEN (in order of procedence): an authentication token for github.com
+			GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for github.com
 			API requests. Setting this avoids being prompted to authenticate and takes precedence over
 			previously stored credentials.
 

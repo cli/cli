@@ -45,8 +45,8 @@ func (c *envConfig) Get(hostname, key string) (string, error) {
 
 func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) {
 	if hostname != "" && key == "oauth_token" {
-		if value, name, found := AuthTokenFromEnv(hostname); found {
-			return value, name, nil
+		if token, env, found := AuthTokenFromEnv(hostname); found {
+			return token, env, nil
 		}
 	}
 
@@ -55,8 +55,8 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
-		if _, name, found := AuthTokenFromEnv(hostname); found {
-			return fmt.Errorf("read-only token in %s cannot be modified", name)
+		if _, env, found := AuthTokenFromEnv(hostname); found {
+			return fmt.Errorf("read-only token in %s cannot be modified", env)
 		}
 	}
 

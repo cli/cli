@@ -119,9 +119,9 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
-				GH_TOKEN, GITHUB_TOKEN (in order of procedence): an authentication token for github.com API requests.
+				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for github.com API requests.
 
-				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of procedence): an authentication token for API requests to GitHub Enterprise.
+				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication token for API requests to GitHub Enterprise.
 
 				GH_HOST: make the request to a GitHub host other than github.com.
 			`),
