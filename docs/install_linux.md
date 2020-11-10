@@ -101,6 +101,23 @@ Android users can install via Termux:
 pkg install gh
 ```
 
+### Gentoo
+
+Gentoo Linux users can install from the [main portage tree](https://packages.gentoo.org/packages/dev-util/github-cli):
+
+``` bash
+emerge -av github-cli
+```
+
+Upgrading can be done by updating the portage tree and then requesting an upgrade:
+
+``` bash
+emerge --sync
+emerge -u github-cli
+```
+
+Note when doing a system upgrade via `emerge -auND @world` it will also upgrade `github-cli` if it's installed and a new version is present.
+
 ### Kiss Linux
 
 Kiss Linux users can install from the [community repos](https://github.com/kisslinux/community):
