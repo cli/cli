@@ -7,12 +7,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -101,14 +99,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	var nonLegacyTemplateFiles []string
-	if opts.RootDirOverride != "" {
-		nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(opts.RootDirOverride, "ISSUE_TEMPLATE")
-	} else if opts.RepoOverride == "" {
-		if rootDir, err := git.ToplevelDir(); err == nil {
-			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
-		}
-	}
+	templateFiles, legacyTemplate := prShared.FindTemplates(opts.RootDirOverride, "ISSUE_TEMPLATE")
 
 	isTerminal := opts.IO.IsStdoutTTY()
 
@@ -117,14 +108,24 @@ func createRun(opts *CreateOptions) error {
 		milestones = []string{opts.Milestone}
 	}
 
+	tb := prShared.IssueMetadataState{
+		Type:       prShared.IssueMetadata,
+		Assignees:  opts.Assignees,
+		Labels:     opts.Labels,
+		Projects:   opts.Projects,
+		Milestones: milestones,
+		Title:      opts.Title,
+		Body:       opts.Body,
+	}
+
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if opts.Title != "" || opts.Body != "" {
-			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, opts.Title, opts.Body, opts.Assignees, opts.Labels, opts.Projects, milestones)
+			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 			if err != nil {
 				return err
 			}
-		} else if len(nonLegacyTemplateFiles) > 1 {
+		} else if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
 		if isTerminal {
@@ -146,59 +147,65 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	action := prShared.SubmitAction
-	tb := prShared.IssueMetadataState{
-		Type:       prShared.IssueMetadata,
-		Assignees:  opts.Assignees,
-		Labels:     opts.Labels,
-		Projects:   opts.Projects,
-		Milestones: milestones,
-	}
-
-	title := opts.Title
-	body := opts.Body
 
 	if opts.Interactive {
-		var legacyTemplateFile *string
-		if opts.RepoOverride == "" {
-			if rootDir, err := git.ToplevelDir(); err == nil {
-				// TODO: figure out how to stub this in tests
-				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
-			}
-		}
-
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
 
-		err = prShared.TitleBodySurvey(opts.IO, editorCommand, &tb, apiClient, baseRepo, title, body, prShared.Defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
+		err = prShared.TitleSurvey(&tb)
 		if err != nil {
-			return fmt.Errorf("could not collect title and/or body: %w", err)
+			return err
 		}
 
-		action = tb.Action
+		templateContent := ""
 
-		if tb.Action == prShared.CancelAction {
+		templateContent, err = prShared.TemplateSurvey(templateFiles, legacyTemplate, tb)
+		if err != nil {
+			return err
+		}
+
+		err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+		if err != nil {
+			return err
+		}
+
+		if tb.Body == "" {
+			tb.Body = templateContent
+		}
+
+		action, err := prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())
+		if err != nil {
+			return fmt.Errorf("unable to confirm: %w", err)
+		}
+
+		if action == prShared.MetadataAction {
+			err = prShared.MetadataSurvey(opts.IO, apiClient, baseRepo, &tb)
+			if err != nil {
+				return err
+			}
+
+			action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), false)
+			if err != nil {
+				return err
+			}
+		}
+
+		if action == prShared.CancelAction {
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
 
 			return nil
 		}
-
-		if title == "" {
-			title = tb.Title
-		}
-		if body == "" {
-			body = tb.Body
-		}
 	} else {
-		if title == "" {
+		if tb.Title == "" {
 			return fmt.Errorf("title can't be blank")
 		}
 	}
 
 	if action == prShared.PreviewAction {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, title, body, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
+		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 		if err != nil {
 			return err
 		}
@@ -208,8 +215,8 @@ func createRun(opts *CreateOptions) error {
 		return utils.OpenInBrowser(openURL)
 	} else if action == prShared.SubmitAction {
 		params := map[string]interface{}{
-			"title": title,
-			"body":  body,
+			"title": tb.Title,
+			"body":  tb.Body,
 		}
 
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)

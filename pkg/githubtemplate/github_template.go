@@ -54,6 +54,7 @@ mainLoop:
 
 // FindLegacy returns the file path of the default(legacy) template
 func FindLegacy(rootDir string, name string) *string {
+	// TODO why does this return a pointer to string??
 	namePattern := regexp.MustCompile(fmt.Sprintf(`(?i)^%s(\.|$)`, strings.ReplaceAll(name, "_", "[_-]")))
 
 	// https://help.github.com/en/github/building-a-strong-community/creating-a-pull-request-template-for-your-repository
