@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/cli/safeexec"
 	shellquote "github.com/kballard/go-shellquote"
 )
 
@@ -55,7 +56,12 @@ func Edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Wri
 	}
 	args = append(args, f.Name())
 
-	cmd := exec.Command(args[0], args[1:]...)
+	editorExe, err := safeexec.LookPath(args[0])
+	if err != nil {
+		return "", err
+	}
+
+	cmd := exec.Command(editorExe, args[1:]...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

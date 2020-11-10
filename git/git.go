@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/safeexec"
 )
 
 // ErrNotOnAnyBranch indicates that the user is in detached HEAD state
@@ -37,7 +38,10 @@ func (r TrackingRef) String() string {
 // ShowRefs resolves fully-qualified refs to commit hashes
 func ShowRefs(ref ...string) ([]Ref, error) {
 	args := append([]string{"show-ref", "--verify", "--"}, ref...)
-	showRef := exec.Command("git", args...)
+	showRef, err := GitCommand(args...)
+	if err != nil {
+		return nil, err
+	}
 	output, err := run.PrepareCmd(showRef).Output()
 
 	var refs []Ref
@@ -57,7 +61,10 @@ func ShowRefs(ref ...string) ([]Ref, error) {
 
 // CurrentBranch reads the checked-out branch for the git repository
 func CurrentBranch() (string, error) {
-	refCmd := GitCommand("symbolic-ref", "--quiet", "HEAD")
+	refCmd, err := GitCommand("symbolic-ref", "--quiet", "HEAD")
+	if err != nil {
+		return "", err
+	}
 
 	output, err := run.PrepareCmd(refCmd).Output()
 	if err == nil {
@@ -78,13 +85,19 @@ func CurrentBranch() (string, error) {
 }
 
 func listRemotes() ([]string, error) {
-	remoteCmd := exec.Command("git", "remote", "-v")
+	remoteCmd, err := GitCommand("remote", "-v")
+	if err != nil {
+		return nil, err
+	}
 	output, err := run.PrepareCmd(remoteCmd).Output()
 	return outputLines(output), err
 }
 
 func Config(name string) (string, error) {
-	configCmd := exec.Command("git", "config", name)
+	configCmd, err := GitCommand("config", name)
+	if err != nil {
+		return "", err
+	}
 	output, err := run.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return "", fmt.Errorf("unknown config key: %s", name)
@@ -94,12 +107,19 @@ func Config(name string) (string, error) {
 
 }
 
-var GitCommand = func(args ...string) *exec.Cmd {
-	return exec.Command("git", args...)
+var GitCommand = func(args ...string) (*exec.Cmd, error) {
+	gitExe, err := safeexec.LookPath("git")
+	if err != nil {
+		return nil, err
+	}
+	return exec.Command(gitExe, args...), nil
 }
 
 func UncommittedChangeCount() (int, error) {
-	statusCmd := GitCommand("status", "--porcelain")
+	statusCmd, err := GitCommand("status", "--porcelain")
+	if err != nil {
+		return 0, err
+	}
 	output, err := run.PrepareCmd(statusCmd).Output()
 	if err != nil {
 		return 0, err
@@ -123,10 +143,13 @@ type Commit struct {
 }
 
 func Commits(baseRef, headRef string) ([]*Commit, error) {
-	logCmd := GitCommand(
+	logCmd, err := GitCommand(
 		"-c", "log.ShowSignature=false",
 		"log", "--pretty=format:%H,%s",
 		"--cherry", fmt.Sprintf("%s...%s", baseRef, headRef))
+	if err != nil {
+		return nil, err
+	}
 	output, err := run.PrepareCmd(logCmd).Output()
 	if err != nil {
 		return []*Commit{}, err
@@ -154,7 +177,10 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 }
 
 func CommitBody(sha string) (string, error) {
-	showCmd := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
+	showCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
+	if err != nil {
+		return "", err
+	}
 	output, err := run.PrepareCmd(showCmd).Output()
 	if err != nil {
 		return "", err
@@ -164,7 +190,10 @@ func CommitBody(sha string) (string, error) {
 
 // Push publishes a git ref to a remote and sets up upstream configuration
 func Push(remote string, ref string, cmdOut, cmdErr io.Writer) error {
-	pushCmd := GitCommand("push", "--set-upstream", remote, ref)
+	pushCmd, err := GitCommand("push", "--set-upstream", remote, ref)
+	if err != nil {
+		return err
+	}
 	pushCmd.Stdout = cmdOut
 	pushCmd.Stderr = cmdErr
 	return run.PrepareCmd(pushCmd).Run()
@@ -179,7 +208,10 @@ type BranchConfig struct {
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config
 func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
-	configCmd := GitCommand("config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix))
+	configCmd, err := GitCommand("config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix))
+	if err != nil {
+		return
+	}
 	output, err := run.PrepareCmd(configCmd).Output()
 	if err != nil {
 		return
@@ -209,21 +241,28 @@ func ReadBranchConfig(branch string) (cfg BranchConfig) {
 }
 
 func DeleteLocalBranch(branch string) error {
-	branchCmd := GitCommand("branch", "-D", branch)
-	err := run.PrepareCmd(branchCmd).Run()
-	return err
+	branchCmd, err := GitCommand("branch", "-D", branch)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(branchCmd).Run()
 }
 
 func HasLocalBranch(branch string) bool {
-	configCmd := GitCommand("rev-parse", "--verify", "refs/heads/"+branch)
-	_, err := run.PrepareCmd(configCmd).Output()
+	configCmd, err := GitCommand("rev-parse", "--verify", "refs/heads/"+branch)
+	if err != nil {
+		return false
+	}
+	_, err = run.PrepareCmd(configCmd).Output()
 	return err == nil
 }
 
 func CheckoutBranch(branch string) error {
-	configCmd := GitCommand("checkout", branch)
-	err := run.PrepareCmd(configCmd).Run()
-	return err
+	configCmd, err := GitCommand("checkout", branch)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(configCmd).Run()
 }
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
@@ -252,7 +291,10 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
 
-	cloneCmd := GitCommand(cloneArgs...)
+	cloneCmd, err := GitCommand(cloneArgs...)
+	if err != nil {
+		return "", err
+	}
 	cloneCmd.Stdin = os.Stdin
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
@@ -262,7 +304,10 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 }
 
 func AddUpstreamRemote(upstreamURL, cloneDir string) error {
-	cloneCmd := GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
+	cloneCmd, err := GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
+	if err != nil {
+		return err
+	}
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	return run.PrepareCmd(cloneCmd).Run()
@@ -274,7 +319,10 @@ func isFilesystemPath(p string) bool {
 
 // ToplevelDir returns the top-level directory path of the current repository
 func ToplevelDir() (string, error) {
-	showCmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	showCmd, err := GitCommand("rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
 	output, err := run.PrepareCmd(showCmd).Output()
 	return firstLine(output), err
 

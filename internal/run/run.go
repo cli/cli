@@ -23,7 +23,13 @@ var PrepareCmd = func(cmd *exec.Cmd) Runnable {
 // SetPrepareCmd overrides PrepareCmd and returns a func to revert it back
 func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
 	origPrepare := PrepareCmd
-	PrepareCmd = fn
+	PrepareCmd = func(cmd *exec.Cmd) Runnable {
+		// normalize git executable name for consistency in tests
+		if baseName := filepath.Base(cmd.Args[0]); baseName == "git" || baseName == "git.exe" {
+			cmd.Args[0] = baseName
+		}
+		return fn(cmd)
+	}
 	return func() {
 		PrepareCmd = origPrepare
 	}

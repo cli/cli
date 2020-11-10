@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
@@ -160,7 +161,11 @@ func (s *IOStreams) StartPager() error {
 		pagerEnv = append(pagerEnv, "LV=-c")
 	}
 
-	pagerCmd := exec.Command(pagerArgs[0], pagerArgs[1:]...)
+	pagerExe, err := safeexec.LookPath(pagerArgs[0])
+	if err != nil {
+		return err
+	}
+	pagerCmd := exec.Command(pagerExe, pagerArgs[1:]...)
 	pagerCmd.Env = pagerEnv
 	pagerCmd.Stdout = s.Out
 	pagerCmd.Stderr = s.ErrOut
@@ -228,7 +233,11 @@ func (s *IOStreams) TerminalWidth() int {
 	}
 
 	if isCygwinTerminal(out) {
-		tputCmd := exec.Command("tput", "cols")
+		tputExe, err := safeexec.LookPath("tput")
+		if err != nil {
+			return defaultWidth
+		}
+		tputCmd := exec.Command(tputExe, "cols")
 		tputCmd.Stdin = os.Stdin
 		if out, err := tputCmd.Output(); err == nil {
 			if w, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {

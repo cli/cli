@@ -44,6 +44,8 @@ github.com/briandowns/spinner v1.11.1/go.mod h1:QOuQk7x+EaDASo80FEXwlwiA+j/PPIcX
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684 h1:YMyvXRstOQc7n6eneHfudVMbARSCmZ7EZGjtTkkeB3A=
 github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684/go.mod h1:UA27Kwj3QHialP74iU6C+Gpc8Y7IOAKupeKMLLBURWM=
+github.com/cli/safeexec v1.0.0 h1:0VngyaIyqACHdcMNWfo6+KdUYnqEr2Sg+bSP1pdF+dI=
+github.com/cli/safeexec v1.0.0/go.mod h1:Z/D4tTN8Vs5gXYHDCbaM1S/anmEDnJb1iW0+EJ5zx3Q=
 github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e h1:aq/1jlmtZoS6nlSp3yLOTZQ50G+dzHdeRNENgE/iBew=
 github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e/go.mod h1:it23pLwxmz6OyM6I5O0ATIXQS1S190Nas26L5Kahp4U=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=

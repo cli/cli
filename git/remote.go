@@ -3,7 +3,6 @@ package git
 import (
 	"fmt"
 	"net/url"
-	"os/exec"
 	"regexp"
 	"strings"
 
@@ -45,7 +44,10 @@ func Remotes() (RemoteSet, error) {
 	remotes := parseRemotes(list)
 
 	// this is affected by SetRemoteResolution
-	remoteCmd := exec.Command("git", "config", "--get-regexp", `^remote\..*\.gh-resolved$`)
+	remoteCmd, err := GitCommand("config", "--get-regexp", `^remote\..*\.gh-resolved$`)
+	if err != nil {
+		return nil, err
+	}
 	output, _ := run.PrepareCmd(remoteCmd).Output()
 	for _, l := range outputLines(output) {
 		parts := strings.SplitN(l, " ", 2)
@@ -107,8 +109,11 @@ func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 
 // AddRemote adds a new git remote and auto-fetches objects from it
 func AddRemote(name, u string) (*Remote, error) {
-	addCmd := exec.Command("git", "remote", "add", "-f", name, u)
-	err := run.PrepareCmd(addCmd).Run()
+	addCmd, err := GitCommand("remote", "add", "-f", name, u)
+	if err != nil {
+		return nil, err
+	}
+	err = run.PrepareCmd(addCmd).Run()
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +141,9 @@ func AddRemote(name, u string) (*Remote, error) {
 }
 
 func SetRemoteResolution(name, resolution string) error {
-	addCmd := exec.Command("git", "config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution)
+	addCmd, err := GitCommand("config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution)
+	if err != nil {
+		return err
+	}
 	return run.PrepareCmd(addCmd).Run()
 }
