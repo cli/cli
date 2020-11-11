@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/henvic/httpretty v0.0.6
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/mattn/go-colorable v0.1.7
+	github.com/mattn/go-colorable v0.1.8
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mattn/go-runewidth v0.0.9
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
