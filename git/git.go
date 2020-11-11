@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/cli/cli/internal/run"
@@ -110,7 +111,11 @@ func Config(name string) (string, error) {
 var GitCommand = func(args ...string) (*exec.Cmd, error) {
 	gitExe, err := safeexec.LookPath("git")
 	if err != nil {
-		return nil, err
+		programName := "git"
+		if runtime.GOOS == "windows" {
+			programName = "Git for Windows"
+		}
+		return nil, fmt.Errorf("unable to find git executable in PATH; please install %s before retrying", programName)
 	}
 	return exec.Command(gitExe, args...), nil
 }
