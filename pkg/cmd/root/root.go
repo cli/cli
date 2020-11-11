@@ -20,6 +20,7 @@ import (
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
+	zenCmd "github.com/cli/cli/pkg/cmd/zen"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -89,6 +90,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
+	cmd.AddCommand(zenCmd.NewCmdZen(&repoResolvingCmdFactory))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
