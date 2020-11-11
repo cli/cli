@@ -8,4 +8,8 @@ func Test_truncateLabels(t *testing.T) {
 	if got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
+
+	if truncateLabels(10, "") != "" {
+		t.Error("blank value error")
+	}
 }

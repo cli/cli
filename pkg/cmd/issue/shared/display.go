@@ -49,6 +49,9 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 }
 
 func truncateLabels(w int, t string) string {
+	if len(t) < 2 {
+		return t
+	}
 	truncated := text.Truncate(w-2, t[1:len(t)-1])
 	return fmt.Sprintf("(%s)", truncated)
 }
