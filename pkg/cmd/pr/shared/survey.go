@@ -392,13 +392,5 @@ func FindTemplates(dir, path string) ([]string, string) {
 	templateFiles := githubtemplate.FindNonLegacy(dir, path)
 	legacyTemplate := githubtemplate.FindLegacy(dir, path)
 
-	// TODO stop using string pointer
-
-	lt := ""
-
-	if legacyTemplate != nil {
-		lt = *legacyTemplate
-	}
-
-	return templateFiles, lt
+	return templateFiles, legacyTemplate
 }
