@@ -159,25 +159,23 @@ func createRun(opts *CreateOptions) (err error) {
 		return err
 	}
 
-	defs, defaultsErr := computeDefaults(*ctx)
-	if defaultsErr != nil && (opts.Autofill || opts.WebMode || !opts.Interactive) {
-		return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
-	}
-
 	var milestoneTitles []string
 	if opts.Milestone != "" {
 		milestoneTitles = []string{opts.Milestone}
 	}
 
 	state := shared.IssueMetadataState{
-		Title:      defs.Title,
-		Body:       defs.Body,
 		Type:       shared.PRMetadata,
 		Reviewers:  opts.Reviewers,
 		Assignees:  opts.Assignees,
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestoneTitles,
+	}
+
+	defaultsErr := computeDefaults(*ctx, &state)
+	if defaultsErr != nil && (opts.Autofill || opts.WebMode || !opts.Interactive) {
+		return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
 	}
 
 	if opts.TitleProvided {
@@ -297,34 +295,33 @@ func createRun(opts *CreateOptions) (err error) {
 	return errors.New("expected to cancel, preview, or submit")
 }
 
-func computeDefaults(createCtx CreateContext) (shared.Defaults, error) {
-	baseRef := createCtx.BaseTrackingBranch
-	headRef := createCtx.HeadBranch
-	out := shared.Defaults{}
+func computeDefaults(ctx CreateContext, state *shared.IssueMetadataState) error {
+	baseRef := ctx.BaseTrackingBranch
+	headRef := ctx.HeadBranch
 
 	commits, err := git.Commits(baseRef, headRef)
 	if err != nil {
-		return out, err
+		return err
 	}
 
 	if len(commits) == 1 {
-		out.Title = commits[0].Title
+		state.Title = commits[0].Title
 		body, err := git.CommitBody(commits[0].Sha)
 		if err != nil {
-			return out, err
+			return err
 		}
-		out.Body = body
+		state.Body = body
 	} else {
-		out.Title = utils.Humanize(headRef)
+		state.Title = utils.Humanize(headRef)
 
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
 			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
 		}
-		out.Body = body.String()
+		state.Body = body.String()
 	}
 
-	return out, nil
+	return nil
 }
 
 func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {

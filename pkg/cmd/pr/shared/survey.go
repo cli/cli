@@ -15,11 +15,6 @@ import (
 	"github.com/cli/cli/utils"
 )
 
-type Defaults struct {
-	Title string
-	Body  string
-}
-
 type Action int
 type metadataStateType int
 
