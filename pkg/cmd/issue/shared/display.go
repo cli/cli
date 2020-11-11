@@ -33,7 +33,7 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 			table.AddField(issue.State, nil, nil)
 		}
 		table.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, nil, cs.Gray)
+		table.AddField(labels, truncateLabels, cs.Gray)
 		if table.IsTTY() {
 			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
 		} else {
@@ -48,6 +48,14 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 	}
 }
 
+func truncateLabels(w int, t string) string {
+	if len(t) < 2 {
+		return t
+	}
+	truncated := text.Truncate(w-2, t[1:len(t)-1])
+	return fmt.Sprintf("(%s)", truncated)
+}
+
 func IssueLabelList(issue api.Issue) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
@@ -58,9 +66,5 @@ func IssueLabelList(issue api.Issue) string {
 		labelNames = append(labelNames, label.Name)
 	}
 
-	list := strings.Join(labelNames, ", ")
-	if issue.Labels.TotalCount > len(issue.Labels.Nodes) {
-		list += ", …"
-	}
-	return list
+	return strings.Join(labelNames, ", ")
 }
