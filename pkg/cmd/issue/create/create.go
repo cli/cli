@@ -154,25 +154,29 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		err = prShared.TitleSurvey(&tb)
-		if err != nil {
-			return err
-		}
-
-		templateContent := ""
-
-		templateContent, err = prShared.TemplateSurvey(templateFiles, legacyTemplate, tb)
-		if err != nil {
-			return err
-		}
-
-		err = prShared.BodySurvey(&tb, templateContent, editorCommand)
-		if err != nil {
-			return err
+		if tb.Title == "" {
+			err = prShared.TitleSurvey(&tb)
+			if err != nil {
+				return err
+			}
 		}
 
 		if tb.Body == "" {
-			tb.Body = templateContent
+			templateContent := ""
+
+			templateContent, err = prShared.TemplateSurvey(templateFiles, legacyTemplate, tb)
+			if err != nil {
+				return err
+			}
+
+			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			if err != nil {
+				return err
+			}
+
+			if tb.Body == "" {
+				tb.Body = templateContent
+			}
 		}
 
 		action, err := prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())

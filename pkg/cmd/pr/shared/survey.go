@@ -180,14 +180,10 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		},
 	}
 
-	body := ""
-
-	err := prompt.SurveyAskOne(p, &body)
+	err := prompt.SurveyAskOne(p, state)
 	if err != nil {
 		return err
 	}
-
-	state.Body = body
 
 	return nil
 }
@@ -198,14 +194,10 @@ func TitleSurvey(state *IssueMetadataState) error {
 		Default: state.Title,
 	}
 
-	title := ""
-
-	err := prompt.SurveyAskOne(p, &title)
+	err := prompt.SurveyAskOne(p, state)
 	if err != nil {
 		return err
 	}
-
-	state.Title = title
 
 	return nil
 }

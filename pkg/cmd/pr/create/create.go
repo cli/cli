@@ -32,8 +32,6 @@ type CreateOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
-	Interactive bool
-
 	TitleProvided bool
 	BodyProvided  bool
 
@@ -60,7 +58,7 @@ type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
 	RepoContext        *context.ResolvedRemotes
-	BaseRepo           *api.Repository
+	BaseRepo           ghrepo.Interface
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
@@ -68,6 +66,7 @@ type CreateContext struct {
 	HeadBranchLabel    string
 	HeadRemote         *context.Remote
 	IsPushEnabled      bool
+	Client             *api.Client
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -104,16 +103,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			opts.Interactive = !(opts.TitleProvided && opts.BodyProvided)
-
-			// TODO check on edge cases around title/body provision
-
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
-			}
-
-			if !opts.IO.CanPrompt() {
-				opts.Interactive = false
 			}
 
 			if opts.IsDraft && opts.WebMode {
@@ -148,16 +139,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) (err error) {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	client := api.NewClientFromHTTP(httpClient)
-
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
 		return err
 	}
+
+	client := ctx.Client
 
 	var milestoneTitles []string
 	if opts.Milestone != "" {
@@ -173,9 +160,24 @@ func createRun(opts *CreateOptions) (err error) {
 		Milestones: milestoneTitles,
 	}
 
-	defaultsErr := computeDefaults(*ctx, &state)
-	if defaultsErr != nil && (opts.Autofill || opts.WebMode || !opts.Interactive) {
-		return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
+	var defaultsErr error
+	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
+		defaultsErr = computeDefaults(*ctx, &state)
+		if defaultsErr != nil {
+			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
+		}
+	}
+
+	if opts.WebMode {
+		if !opts.Autofill {
+			state.Title = opts.Title
+			state.Body = opts.Body
+		}
+		err := handlePush(*opts, *ctx)
+		if err != nil {
+			return err
+		}
+		return previewPR(*opts, *ctx, state)
 	}
 
 	if opts.TitleProvided {
@@ -184,18 +186,6 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if opts.BodyProvided {
 		state.Body = opts.Body
-	}
-
-	if opts.WebMode {
-		err := handlePush(*opts, *ctx)
-		if err != nil {
-			return err
-		}
-		return previewPR(*opts, *ctx, state)
-	}
-
-	if opts.Autofill || !opts.Interactive {
-		return submitPR(*opts, *ctx, state)
 	}
 
 	existingPR, err := api.PullRequestForBranch(
@@ -216,13 +206,23 @@ func createRun(opts *CreateOptions) (err error) {
 
 	cs := opts.IO.ColorScheme()
 
-	fmt.Fprintf(opts.IO.ErrOut, message,
-		cs.Cyan(ctx.HeadBranchLabel),
-		cs.Cyan(ctx.BaseBranch),
-		ghrepo.FullName(ctx.BaseRepo))
-	if (state.Title == "" || state.Body == "") && defaultsErr != nil {
-		fmt.Fprintf(opts.IO.ErrOut,
-			"%s warning: could not compute title or body defaults: %s\n", cs.Yellow("!"), defaultsErr)
+	if opts.IO.CanPrompt() {
+		fmt.Fprintf(opts.IO.ErrOut, message,
+			cs.Cyan(ctx.HeadBranchLabel),
+			cs.Cyan(ctx.BaseBranch),
+			ghrepo.FullName(ctx.BaseRepo))
+		if (state.Title == "" || state.Body == "") && defaultsErr != nil {
+			fmt.Fprintf(opts.IO.ErrOut,
+				"%s warning: could not compute title or body defaults: %s\n", cs.Yellow("!"), defaultsErr)
+		}
+	}
+
+	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
+		err = handlePush(*opts, *ctx)
+		if err != nil {
+			return err
+		}
+		return submitPR(*opts, *ctx, state)
 	}
 
 	if !opts.TitleProvided {
@@ -256,7 +256,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
+	allowMetadata := ctx.BaseRepo.(*api.Repository).ViewerCanTriage()
 	action, err := shared.ConfirmSubmission(!state.HasMetadata(), allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
@@ -523,35 +523,32 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		HeadRemote:         headRemote,
 		IsPushEnabled:      isPushEnabled,
 		RepoContext:        repoContext,
+		Client:             client,
 	}, nil
 
 }
 
-func submitPR(opts CreateOptions, createCtx CreateContext, state shared.IssueMetadataState) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return nil
-	}
-	client := api.NewClientFromHTTP(httpClient)
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
+	client := ctx.Client
 
 	params := map[string]interface{}{
 		"title":       state.Title,
 		"body":        state.Body,
 		"draft":       opts.IsDraft,
-		"baseRefName": createCtx.BaseBranch,
-		"headRefName": createCtx.HeadBranchLabel,
+		"baseRefName": ctx.BaseBranch,
+		"headRefName": ctx.HeadBranchLabel,
 	}
 
 	if params["title"] == "" {
 		return errors.New("pull request title must not be blank")
 	}
 
-	err = shared.AddMetadataToIssueParams(client, createCtx.BaseRepo, params, &state)
+	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state)
 	if err != nil {
 		return err
 	}
 
-	pr, err := api.CreatePullRequest(client, createCtx.BaseRepo, params)
+	pr, err := api.CreatePullRequest(client, ctx.BaseRepo.(*api.Repository), params)
 	if pr != nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
@@ -564,8 +561,8 @@ func submitPR(opts CreateOptions, createCtx CreateContext, state shared.IssueMet
 	return nil
 }
 
-func previewPR(opts CreateOptions, createCtx CreateContext, state shared.IssueMetadataState) error {
-	openURL, err := generateCompareURL(createCtx, state)
+func previewPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
+	openURL, err := generateCompareURL(ctx, state)
 	if err != nil {
 		return err
 	}
@@ -581,13 +578,9 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	didForkRepo := false
 	headRepo := ctx.HeadRepo
 	headRemote := ctx.HeadRemote
+	client := ctx.Client
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	client := api.NewClientFromHTTP(httpClient)
-
+	var err error
 	// if a head repository could not be determined so far, automatically create
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
@@ -664,11 +657,11 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	return nil
 }
 
-func generateCompareURL(createCtx CreateContext, state shared.IssueMetadataState) (string, error) {
+func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (string, error) {
 	u := ghrepo.GenerateRepoURL(
-		createCtx.BaseRepo,
+		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
-		url.QueryEscape(createCtx.BaseBranch), url.QueryEscape(createCtx.HeadBranch))
+		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranch))
 	url, err := shared.WithPrAndIssueQueryParams(u, state)
 	if err != nil {
 		return "", err
