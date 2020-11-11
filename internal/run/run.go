@@ -27,7 +27,7 @@ func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
 	PrepareCmd = func(cmd *exec.Cmd) Runnable {
 		// normalize git executable name for consistency in tests
 		if baseName := filepath.Base(cmd.Args[0]); baseName == "git" || baseName == "git.exe" {
-			cmd.Args[0] = baseName
+			cmd.Args[0] = "git"
 		}
 		return fn(cmd)
 	}
