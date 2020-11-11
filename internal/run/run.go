@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -42,7 +43,9 @@ type cmdWithStderr struct {
 
 func (c cmdWithStderr) Output() ([]byte, error) {
 	if os.Getenv("DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+		// print commands, but omit the full path to an executable
+		debugArgs := append([]string{filepath.Base(c.Cmd.Args[0])}, c.Cmd.Args[1:]...)
+		fmt.Fprintf(os.Stderr, "%v\n", debugArgs)
 	}
 	if c.Cmd.Stderr != nil {
 		return c.Cmd.Output()
