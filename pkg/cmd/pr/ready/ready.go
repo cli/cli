@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -63,6 +62,8 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 }
 
 func readyRun(opts *ReadyOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -75,10 +76,10 @@ func readyRun(opts *ReadyOptions) error {
 	}
 
 	if pr.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", utils.Red("!"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", cs.Red("!"), pr.Number)
 		return cmdutil.SilentError
 	} else if !pr.IsDraft {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", utils.Yellow("!"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.Yellow("!"), pr.Number)
 		return nil
 	}
 
@@ -87,7 +88,7 @@ func readyRun(opts *ReadyOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", utils.Green("✔"), pr.Number)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIcon(), pr.Number)
 
 	return nil
 }

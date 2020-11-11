@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -61,6 +60,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 }
 
 func closeRun(opts *CloseOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -73,10 +74,10 @@ func closeRun(opts *CloseOptions) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be closed because it was already merged", utils.Red("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be closed because it was already merged", cs.Red("!"), pr.Number, pr.Title)
 		return cmdutil.SilentError
 	} else if pr.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already closed\n", utils.Yellow("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already closed\n", cs.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}
 
@@ -85,7 +86,7 @@ func closeRun(opts *CloseOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", utils.Red("✔"), pr.Number, pr.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", cs.Red("✔"), pr.Number, pr.Title)
 
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 
@@ -114,24 +115,24 @@ func closeRun(opts *CloseOptions) error {
 			if localBranchExists {
 				err = git.DeleteLocalBranch(pr.HeadRefName)
 				if err != nil {
-					err = fmt.Errorf("failed to delete local branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+					err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 					return err
 				}
 			}
 
 			if branchToSwitchTo != "" {
-				branchSwitchString = fmt.Sprintf(" and switched to branch %s", utils.Cyan(branchToSwitchTo))
+				branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 			}
 		}
 
 		if !crossRepoPR {
 			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 			if err != nil {
-				err = fmt.Errorf("failed to delete remote branch %s: %w", utils.Cyan(pr.HeadRefName), err)
+				err = fmt.Errorf("failed to delete remote branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 				return err
 			}
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", utils.Red("✔"), utils.Cyan(pr.HeadRefName), branchSwitchString)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.Red("✔"), cs.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil

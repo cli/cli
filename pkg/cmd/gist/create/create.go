@@ -19,7 +19,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -116,8 +115,10 @@ func createRun(opts *CreateOptions) error {
 		completionMessage = fmt.Sprintf("Created gist %s", gistName)
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	errOut := opts.IO.ErrOut
-	fmt.Fprintf(errOut, "%s %s\n", utils.Gray("-"), processMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -132,10 +133,10 @@ func createRun(opts *CreateOptions) error {
 				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate by doing `gh config set -h github.com oauth_token ''` and running the command again.")
 			}
 		}
-		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
+		return fmt.Errorf("%s Failed to create gist: %w", cs.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s %s\n", utils.Green("✓"), completionMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIcon(), completionMessage)
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 

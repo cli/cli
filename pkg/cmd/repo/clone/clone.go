@@ -23,7 +23,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -38,7 +37,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		DisableFlagsInUseLine: true,
 
 		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(`
 			Clone a GitHub repository locally.

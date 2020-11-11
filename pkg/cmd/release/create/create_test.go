@@ -158,7 +158,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:    "no arguments",
 			args:    "",
 			isTTY:   true,
-			wantErr: "requires at least 1 arg(s), only received 0",
+			wantErr: "could not create: no tag name provided",
 		},
 	}
 	for _, tt := range tests {

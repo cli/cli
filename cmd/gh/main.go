@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
+	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +62,12 @@ func main() {
 				return ansi.ColorCode(style)
 			}
 		}
+	}
+
+	// Enable running gh from Windows File Explorer's address bar. Without this, the user is told to stop and run from a
+	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		cobra.MousetrapHelpText = ""
 	}
 
 	rootCmd := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
@@ -120,12 +127,14 @@ func main() {
 		}
 	}
 
+	cs := cmdFactory.IOStreams.ColorScheme()
+
 	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
 		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
 		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
 	if authCheckEnabled {
 		if !cmdutil.CheckAuth(cfg) {
-			fmt.Fprintln(stderr, utils.Bold("Welcome to GitHub CLI!"))
+			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
 			fmt.Fprintln(stderr)
 			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
 			fmt.Fprintln(stderr, "You can also set the GITHUB_TOKEN environment variable, if preferred.")
@@ -247,5 +256,5 @@ func basicClient(currentVersion string) (*api.Client, error) {
 func apiVerboseLog() api.ClientOption {
 	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
 	colorize := utils.IsTerminal(os.Stderr)
-	return api.VerboseLog(utils.NewColorable(os.Stderr), logTraffic, colorize)
+	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
 }

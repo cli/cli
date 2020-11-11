@@ -2,48 +2,49 @@ package shared
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 )
 
-func StateTitleWithColor(pr api.PullRequest) string {
-	prStateColorFunc := ColorFuncForPR(pr)
+func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
+	prStateColorFunc := cs.ColorFromString(ColorForPR(pr))
+
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
 	}
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func ColorFuncForPR(pr api.PullRequest) func(string) string {
+func ColorForPR(pr api.PullRequest) string {
 	if pr.State == "OPEN" && pr.IsDraft {
-		return utils.Gray
+		return "gray"
 	}
-	return ColorFuncForState(pr.State)
+	return ColorForState(pr.State)
 }
 
-// ColorFuncForState returns a color function for a PR/Issue state
-func ColorFuncForState(state string) func(string) string {
+// ColorForState returns a color constant for a PR/Issue state
+func ColorForState(state string) string {
 	switch state {
 	case "OPEN":
-		return utils.Green
+		return "green"
 	case "CLOSED":
-		return utils.Red
+		return "red"
 	case "MERGED":
-		return utils.Magenta
+		return "magenta"
 	default:
-		return nil
+		return ""
 	}
 }
 
-func PrintHeader(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Bold(s))
+func PrintHeader(io *iostreams.IOStreams, s string) {
+	fmt.Fprintln(io.Out, io.ColorScheme().Bold(s))
 }
 
-func PrintMessage(w io.Writer, s string) {
-	fmt.Fprintln(w, utils.Gray(s))
+func PrintMessage(io *iostreams.IOStreams, s string) {
+	fmt.Fprintln(io.Out, io.ColorScheme().Gray(s))
 }
 
 func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {

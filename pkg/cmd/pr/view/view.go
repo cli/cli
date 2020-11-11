@@ -3,7 +3,6 @@ package view
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -111,11 +110,15 @@ func viewRun(opts *ViewOptions) error {
 	if connectedToTerminal {
 		return printHumanPrPreview(opts.IO, pr)
 	}
-	return printRawPrPreview(opts.IO.Out, pr)
+
+	return printRawPrPreview(opts.IO, pr)
 }
 
-func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
-	reviewers := prReviewerList(*pr)
+func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
+	out := io.Out
+	cs := io.ColorScheme()
+
+	reviewers := prReviewerList(*pr, cs)
 	assignees := prAssigneeList(*pr)
 	labels := prLabelList(*pr)
 	projects := prProjectList(*pr)
@@ -140,10 +143,12 @@ func printRawPrPreview(out io.Writer, pr *api.PullRequest) error {
 func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	out := io.Out
 
+	cs := io.ColorScheme()
+
 	// Header (Title and State)
-	fmt.Fprintln(out, utils.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", shared.StateTitleWithColor(*pr))
-	fmt.Fprintln(out, utils.Gray(fmt.Sprintf(
+	fmt.Fprintln(out, cs.Bold(pr.Title))
+	fmt.Fprintf(out, "%s", shared.StateTitleWithColor(cs, *pr))
+	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
 		" • %s wants to merge %s into %s from %s",
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
@@ -153,24 +158,24 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintln(out)
 
 	// Metadata
-	if reviewers := prReviewerList(*pr); reviewers != "" {
-		fmt.Fprint(out, utils.Bold("Reviewers: "))
+	if reviewers := prReviewerList(*pr, cs); reviewers != "" {
+		fmt.Fprint(out, cs.Bold("Reviewers: "))
 		fmt.Fprintln(out, reviewers)
 	}
 	if assignees := prAssigneeList(*pr); assignees != "" {
-		fmt.Fprint(out, utils.Bold("Assignees: "))
+		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
 	if labels := prLabelList(*pr); labels != "" {
-		fmt.Fprint(out, utils.Bold("Labels: "))
+		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
 	if projects := prProjectList(*pr); projects != "" {
-		fmt.Fprint(out, utils.Bold("Projects: "))
+		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
 	if pr.Milestone.Title != "" {
-		fmt.Fprint(out, utils.Bold("Milestone: "))
+		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
 	}
 
@@ -178,7 +183,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	if pr.Body != "" {
 		fmt.Fprintln(out)
 		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(pr.Body, style)
+		md, err := markdown.Render(pr.Body, style, "")
 		if err != nil {
 			return err
 		}
@@ -187,7 +192,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintln(out)
 
 	// Footer
-	fmt.Fprintf(out, utils.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 	return nil
 }
 
@@ -205,43 +210,39 @@ type reviewerState struct {
 	State string
 }
 
-// colorFuncForReviewerState returns a color function for a reviewer state
-func colorFuncForReviewerState(state string) func(string) string {
-	switch state {
-	case requestedReviewState:
-		return utils.Yellow
-	case approvedReviewState:
-		return utils.Green
-	case changesRequestedReviewState:
-		return utils.Red
-	case commentedReviewState:
-		return func(str string) string { return str } // Do nothing
-	default:
-		return nil
-	}
-}
-
 // formattedReviewerState formats a reviewerState with state color
-func formattedReviewerState(reviewer *reviewerState) string {
+func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) string {
 	state := reviewer.State
 	if state == dismissedReviewState {
 		// Show "DISMISSED" review as "COMMENTED", since "dimissed" only makes
 		// sense when displayed in an events timeline but not in the final tally.
 		state = commentedReviewState
 	}
-	stateColorFunc := colorFuncForReviewerState(state)
-	return fmt.Sprintf("%s (%s)", reviewer.Name, stateColorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
+
+	var colorFunc func(string) string
+	switch state {
+	case requestedReviewState:
+		colorFunc = cs.Yellow
+	case approvedReviewState:
+		colorFunc = cs.Green
+	case changesRequestedReviewState:
+		colorFunc = cs.Red
+	default:
+		colorFunc = func(str string) string { return str } // Do nothing
+	}
+
+	return fmt.Sprintf("%s (%s)", reviewer.Name, colorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
 }
 
 // prReviewerList generates a reviewer list with their last state
-func prReviewerList(pr api.PullRequest) string {
+func prReviewerList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	reviewerStates := parseReviewers(pr)
 	reviewers := make([]string, 0, len(reviewerStates))
 
 	sortReviewerStates(reviewerStates)
 
 	for _, reviewer := range reviewerStates {
-		reviewers = append(reviewers, formattedReviewerState(reviewer))
+		reviewers = append(reviewers, formattedReviewerState(cs, reviewer))
 	}
 
 	reviewerList := strings.Join(reviewers, ", ")

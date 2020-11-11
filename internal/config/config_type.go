@@ -46,9 +46,45 @@ func ConfigOptions() []ConfigOption {
 	return configOptions
 }
 
-var configValues = map[string][]string{
-	"git_protocol": {"ssh", "https"},
-	"prompt":       {"enabled", "disabled"},
+func ValidateKey(key string) error {
+	for _, configKey := range configOptions {
+		if key == configKey.Key {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid key")
+}
+
+type InvalidValueError struct {
+	ValidValues []string
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
+}
+
+func ValidateValue(key, value string) error {
+	var validValues []string
+
+	for _, v := range configOptions {
+		if v.Key == key {
+			validValues = v.AllowedValues
+			break
+		}
+	}
+
+	if validValues == nil {
+		return nil
+	}
+
+	for _, v := range validValues {
+		if v == value {
+			return nil
+		}
+	}
+
+	return &InvalidValueError{ValidValues: validValues}
 }
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -306,33 +342,7 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	return value, defaultSource, nil
 }
 
-type InvalidValueError struct {
-	ValidValues []string
-}
-
-func (e InvalidValueError) Error() string {
-	return "invalid value"
-}
-
-func validateConfigEntry(key, value string) error {
-	validValues, found := configValues[key]
-	if !found {
-		return nil
-	}
-
-	for _, v := range validValues {
-		if v == value {
-			return nil
-		}
-	}
-
-	return &InvalidValueError{ValidValues: validValues}
-}
-
 func (c *fileConfig) Set(hostname, key, value string) error {
-	if err := validateConfigEntry(key, value); err != nil {
-		return err
-	}
 	if hostname == "" {
 		return c.SetStringValue(key, value)
 	} else {

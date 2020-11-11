@@ -1,7 +1,6 @@
 package checkout
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -44,12 +43,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd := &cobra.Command{
 		Use:   "checkout {<number> | <url> | <branch>}",
 		Short: "Check out a pull request in git",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required")}
-			}
-			return nil
-		},
+		Args:  cmdutil.MinimumArgs(1, "argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

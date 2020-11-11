@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -228,7 +227,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if authMode == 0 {
-		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", opts.Scopes)
+		_, err := authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
@@ -258,6 +257,8 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	gitProtocol := "https"
 	if opts.Interactive {
 		err = prompt.SurveyAskOne(&survey.Select{
@@ -279,7 +280,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
 	apiClient, err := client.ClientFromCfg(hostname, cfg)
@@ -302,7 +303,7 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
+	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
 
 	return nil
 }

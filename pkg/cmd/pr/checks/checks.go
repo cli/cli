@@ -76,12 +76,12 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	if len(pr.Commits.Nodes) == 0 {
-		return nil
+		return fmt.Errorf("no commit found on the pull request")
 	}
 
 	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	if len(rollup) == 0 {
-		return nil
+		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
 	passing := 0
@@ -97,13 +97,15 @@ func checksRun(opts *ChecksOptions) error {
 		markColor func(string) string
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	outputs := []output{}
 
 	for _, c := range pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 		mark := "✓"
 		bucket := "pass"
 		state := c.State
-		markColor := utils.Green
+		markColor := cs.Green
 		if state == "" {
 			if c.Status == "COMPLETED" {
 				state = c.Conclusion
@@ -116,12 +118,12 @@ func checksRun(opts *ChecksOptions) error {
 			passing++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			mark = "X"
-			markColor = utils.Red
+			markColor = cs.Red
 			failing++
 			bucket = "fail"
 		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
 			mark = "-"
-			markColor = utils.Yellow
+			markColor = cs.Yellow
 			pending++
 			bucket = "pending"
 		default:
@@ -206,7 +208,7 @@ func checksRun(opts *ChecksOptions) error {
 			"%d failing, %d successful, and %d pending checks",
 			failing, passing, pending)
 
-		summary = fmt.Sprintf("%s\n%s", utils.Bold(summary), tallies)
+		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
 	}
 
 	if opts.IO.IsStdoutTTY() {
