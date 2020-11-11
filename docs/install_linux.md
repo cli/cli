@@ -116,8 +116,6 @@ emerge --sync
 emerge -u github-cli
 ```
 
-Note when doing a system upgrade via `emerge -auND @world` it will also upgrade `github-cli` if it's installed and a new version is present.
-
 ### Kiss Linux
 
 Kiss Linux users can install from the [community repos](https://github.com/kisslinux/community):
