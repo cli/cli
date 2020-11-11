@@ -3,6 +3,7 @@ package run
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,9 +44,7 @@ type cmdWithStderr struct {
 
 func (c cmdWithStderr) Output() ([]byte, error) {
 	if os.Getenv("DEBUG") != "" {
-		// print commands, but omit the full path to an executable
-		debugArgs := append([]string{filepath.Base(c.Cmd.Args[0])}, c.Cmd.Args[1:]...)
-		fmt.Fprintf(os.Stderr, "%v\n", debugArgs)
+		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
 		return c.Cmd.Output()
@@ -61,7 +60,7 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 
 func (c cmdWithStderr) Run() error {
 	if os.Getenv("DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
 		return c.Cmd.Run()
@@ -88,4 +87,13 @@ func (e CmdError) Error() string {
 		msg += "\n"
 	}
 	return fmt.Sprintf("%s%s: %s", msg, e.Args[0], e.Err)
+}
+
+func printArgs(w io.Writer, args []string) error {
+	if len(args) > 0 {
+		// print commands, but omit the full path to an executable
+		args = append([]string{filepath.Base(args[0])}, args[1:]...)
+	}
+	_, err := fmt.Fprintf(w, "%v\n", args)
+	return err
 }
