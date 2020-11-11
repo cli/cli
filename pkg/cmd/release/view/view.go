@@ -124,7 +124,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	}
 
 	style := markdown.GetStyle(io.DetectTerminalTheme())
-	renderedDescription, err := markdown.Render(release.Body, style)
+	renderedDescription, err := markdown.Render(release.Body, style, "")
 	if err != nil {
 		return err
 	}
