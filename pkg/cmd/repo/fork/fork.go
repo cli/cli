@@ -218,7 +218,10 @@ func forkRun(opts *ForkOptions) error {
 			}
 			if _, err := remotes.FindByName(remoteName); err == nil {
 				renameTarget := "upstream"
-				renameCmd := git.GitCommand("remote", "rename", remoteName, renameTarget)
+				renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+				if err != nil {
+					return err
+				}
 				err = run.PrepareCmd(renameCmd).Run()
 				if err != nil {
 					return err

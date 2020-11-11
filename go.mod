@@ -7,6 +7,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.11.1
 	github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684
+	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/enescakir/emoji v1.0.0
 	github.com/google/go-cmp v0.5.2

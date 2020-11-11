@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 )
 
@@ -31,7 +32,7 @@ func ForOS(goos, url string) *exec.Cmd {
 	case "darwin":
 		args = append(args, url)
 	case "windows":
-		exe = "cmd"
+		exe, _ = lookPath("cmd")
 		r := strings.NewReplacer("&", "^&")
 		args = append(args, "/c", "start", r.Replace(url))
 	default:
@@ -51,8 +52,13 @@ func FromLauncher(launcher, url string) (*exec.Cmd, error) {
 		return nil, err
 	}
 
+	exe, err := lookPath(args[0])
+	if err != nil {
+		return nil, err
+	}
+
 	args = append(args, url)
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(exe, args[1:]...)
 	cmd.Stderr = os.Stderr
 	return cmd, nil
 }
@@ -71,4 +77,4 @@ func linuxExe() string {
 	return exe
 }
 
-var lookPath = exec.LookPath
+var lookPath = safeexec.LookPath

@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 )
 
@@ -80,7 +80,7 @@ func ExpandAlias(cfg config.Config, args []string, findShFunc func() (string, er
 }
 
 func findSh() (string, error) {
-	shPath, err := exec.LookPath("sh")
+	shPath, err := safeexec.LookPath("sh")
 	if err == nil {
 		return shPath, nil
 	}
@@ -88,7 +88,7 @@ func findSh() (string, error) {
 	if runtime.GOOS == "windows" {
 		winNotFoundErr := errors.New("unable to locate sh to execute the shell alias with. The sh.exe interpreter is typically distributed with Git for Windows.")
 		// We can try and find a sh executable in a Git for Windows install
-		gitPath, err := exec.LookPath("git")
+		gitPath, err := safeexec.LookPath("git")
 		if err != nil {
 			return "", winNotFoundErr
 		}

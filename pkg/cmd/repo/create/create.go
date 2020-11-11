@@ -284,14 +284,20 @@ func createRun(opts *CreateOptions) error {
 			if doSetup {
 				path := repo.Name
 
-				gitInit := git.GitCommand("init", path)
+				gitInit, err := git.GitCommand("init", path)
+				if err != nil {
+					return err
+				}
 				gitInit.Stdout = stdout
 				gitInit.Stderr = stderr
 				err = run.PrepareCmd(gitInit).Run()
 				if err != nil {
 					return err
 				}
-				gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				if err != nil {
+					return err
+				}
 				gitRemoteAdd.Stdout = stdout
 				gitRemoteAdd.Stderr = stderr
 				err = run.PrepareCmd(gitRemoteAdd).Run()

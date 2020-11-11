@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
+	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
@@ -107,7 +108,13 @@ func main() {
 		}
 
 		if isShell {
-			externalCmd := exec.Command(expandedArgs[0], expandedArgs[1:]...)
+			exe, err := safeexec.LookPath(expandedArgs[0])
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to run external command: %s", err)
+				os.Exit(3)
+			}
+
+			externalCmd := exec.Command(exe, expandedArgs[1:]...)
 			externalCmd.Stderr = os.Stderr
 			externalCmd.Stdout = os.Stdout
 			externalCmd.Stdin = os.Stdin
