@@ -44,7 +44,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
-			
+
 			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -82,12 +82,12 @@ func cloneRun(opts *CloneOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	respositoryIsURL := strings.Contains(opts.Repository, ":")
-	repositoryIsFullName := !respositoryIsURL && strings.Contains(opts.Repository, "/")
+	repositoryIsURL := strings.Contains(opts.Repository, ":")
+	repositoryIsFullName := !repositoryIsURL && strings.Contains(opts.Repository, "/")
 
 	var repo ghrepo.Interface
 	var protocol string
-	if respositoryIsURL {
+	if repositoryIsURL {
 		repoURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
 			return err
