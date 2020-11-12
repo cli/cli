@@ -146,26 +146,9 @@ func createRun(opts *CreateOptions) (err error) {
 
 	client := ctx.Client
 
-	var milestoneTitles []string
-	if opts.Milestone != "" {
-		milestoneTitles = []string{opts.Milestone}
-	}
-
-	state := shared.IssueMetadataState{
-		Type:       shared.PRMetadata,
-		Reviewers:  opts.Reviewers,
-		Assignees:  opts.Assignees,
-		Labels:     opts.Labels,
-		Projects:   opts.Projects,
-		Milestones: milestoneTitles,
-	}
-
-	var defaultsErr error
-	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
-		defaultsErr = computeDefaults(*ctx, &state)
-		if defaultsErr != nil {
-			return fmt.Errorf("could not compute title or body defaults: %w", defaultsErr)
-		}
+	state, err := NewIssueState(*ctx, *opts)
+	if err != nil {
+		return err
 	}
 
 	if opts.WebMode {
@@ -177,7 +160,7 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return err
 		}
-		return previewPR(*opts, *ctx, state)
+		return previewPR(*opts, *ctx, *state)
 	}
 
 	if opts.TitleProvided {
@@ -211,10 +194,6 @@ func createRun(opts *CreateOptions) (err error) {
 			cs.Cyan(ctx.HeadBranchLabel),
 			cs.Cyan(ctx.BaseBranch),
 			ghrepo.FullName(ctx.BaseRepo))
-		if (state.Title == "" || state.Body == "") && defaultsErr != nil {
-			fmt.Fprintf(opts.IO.ErrOut,
-				"%s warning: could not compute title or body defaults: %s\n", cs.Yellow("!"), defaultsErr)
-		}
 	}
 
 	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
@@ -222,11 +201,11 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return err
 		}
-		return submitPR(*opts, *ctx, state)
+		return submitPR(*opts, *ctx, *state)
 	}
 
 	if !opts.TitleProvided {
-		err = shared.TitleSurvey(&state)
+		err = shared.TitleSurvey(state)
 		if err != nil {
 			return err
 		}
@@ -241,12 +220,12 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
 
-		templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, state)
+		templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
 		if err != nil {
 			return err
 		}
 
-		err = shared.BodySurvey(&state, templateContent, editorCommand)
+		err = shared.BodySurvey(state, templateContent, editorCommand)
 		if err != nil {
 			return err
 		}
@@ -263,7 +242,7 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == shared.MetadataAction {
-		err = shared.MetadataSurvey(opts.IO, client, ctx.BaseRepo, &state)
+		err = shared.MetadataSurvey(opts.IO, client, ctx.BaseRepo, state)
 		if err != nil {
 			return err
 		}
@@ -285,17 +264,17 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == shared.PreviewAction {
-		return previewPR(*opts, *ctx, state)
+		return previewPR(*opts, *ctx, *state)
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, state)
+		return submitPR(*opts, *ctx, *state)
 	}
 
 	return errors.New("expected to cancel, preview, or submit")
 }
 
-func computeDefaults(ctx CreateContext, state *shared.IssueMetadataState) error {
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 
@@ -363,6 +342,31 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 	}
 
 	return nil
+}
+
+func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadataState, error) {
+	var milestoneTitles []string
+	if opts.Milestone != "" {
+		milestoneTitles = []string{opts.Milestone}
+	}
+
+	state := &shared.IssueMetadataState{
+		Type:       shared.PRMetadata,
+		Reviewers:  opts.Reviewers,
+		Assignees:  opts.Assignees,
+		Labels:     opts.Labels,
+		Projects:   opts.Projects,
+		Milestones: milestoneTitles,
+	}
+
+	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state)
+		if err != nil {
+			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
+		}
+	}
+
+	return state, nil
 }
 
 func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
