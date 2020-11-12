@@ -30,8 +30,8 @@ func (c *envConfig) Hosts() ([]string, error) {
 			hasDefault = true
 		}
 	}
-	_, _, found := AuthTokenFromEnv(ghinstance.Default())
-	if (err != nil || !hasDefault) && found {
+	token, _ := AuthTokenFromEnv(ghinstance.Default())
+	if (err != nil || !hasDefault) && token != "" {
 		hosts = append([]string{ghinstance.Default()}, hosts...)
 		return hosts, nil
 	}
@@ -45,7 +45,7 @@ func (c *envConfig) Get(hostname, key string) (string, error) {
 
 func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) {
 	if hostname != "" && key == "oauth_token" {
-		if token, env, found := AuthTokenFromEnv(hostname); found {
+		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return token, env, nil
 		}
 	}
@@ -55,7 +55,7 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
-		if _, env, found := AuthTokenFromEnv(hostname); found {
+		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return fmt.Errorf("read-only token in %s cannot be modified", env)
 		}
 	}
@@ -63,20 +63,18 @@ func (c *envConfig) CheckWriteable(hostname, key string) error {
 	return c.Config.CheckWriteable(hostname, key)
 }
 
-func AuthTokenFromEnv(hostname string) (string, string, bool) {
+func AuthTokenFromEnv(hostname string) (string, string) {
 	if ghinstance.IsEnterprise(hostname) {
-		if token, found := os.LookupEnv(GH_ENTERPRISE_TOKEN); found {
-			return token, GH_ENTERPRISE_TOKEN, found
+		if token := os.Getenv(GH_ENTERPRISE_TOKEN); token != "" {
+			return token, GH_ENTERPRISE_TOKEN
 		}
 
-		token, found := os.LookupEnv(GITHUB_ENTERPRISE_TOKEN)
-		return token, GITHUB_ENTERPRISE_TOKEN, found
+		return os.Getenv(GITHUB_ENTERPRISE_TOKEN), GITHUB_ENTERPRISE_TOKEN
 	}
 
-	if token, found := os.LookupEnv(GH_TOKEN); found {
-		return token, GH_TOKEN, found
+	if token := os.Getenv(GH_TOKEN); token != "" {
+		return token, GH_TOKEN
 	}
 
-	token, found := os.LookupEnv(GITHUB_TOKEN)
-	return token, GITHUB_TOKEN, found
+	return os.Getenv(GITHUB_TOKEN), GITHUB_TOKEN
 }

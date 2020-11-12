@@ -243,8 +243,8 @@ func basicClient(currentVersion string) (*api.Client, error) {
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
 
-	token, _, found := config.AuthTokenFromEnv(ghinstance.Default())
-	if !found {
+	token, _ := config.AuthTokenFromEnv(ghinstance.Default())
+	if token == "" {
 		if c, err := config.ParseDefaultConfig(); err == nil {
 			token, _ = c.Get(ghinstance.Default(), "oauth_token")
 		}

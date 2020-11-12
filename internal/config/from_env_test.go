@@ -260,29 +260,10 @@ func TestInheritEnv(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.GITHUB_TOKEN != "" {
-				os.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
-			} else {
-				os.Unsetenv("GITHUB_TOKEN")
-			}
-
-			if tt.GITHUB_ENTERPRISE_TOKEN != "" {
-				os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
-			} else {
-				os.Unsetenv("GITHUB_ENTERPRISE_TOKEN")
-			}
-
-			if tt.GH_TOKEN != "" {
-				os.Setenv("GH_TOKEN", tt.GH_TOKEN)
-			} else {
-				os.Unsetenv("GH_TOKEN")
-			}
-
-			if tt.GH_ENTERPRISE_TOKEN != "" {
-				os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
-			} else {
-				os.Unsetenv("GH_ENTERPRISE_TOKEN")
-			}
+			os.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
+			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
+			os.Setenv("GH_TOKEN", tt.GH_TOKEN)
+			os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
 
 			baseCfg := NewFromString(tt.baseConfig)
 			cfg := InheritEnv(baseCfg)
