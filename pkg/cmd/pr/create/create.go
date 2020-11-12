@@ -183,7 +183,7 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	message := "\nCreating pull request for %s into %s in %s\n\n"
-	if opts.IsDraft {
+	if state.Draft {
 		message = "\nCreating draft pull request for %s into %s in %s\n\n"
 	}
 
@@ -357,6 +357,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestoneTitles,
+		Draft:      opts.IsDraft,
 	}
 
 	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
@@ -538,7 +539,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	params := map[string]interface{}{
 		"title":       state.Title,
 		"body":        state.Body,
-		"draft":       opts.IsDraft,
+		"draft":       state.Draft,
 		"baseRefName": ctx.BaseBranch,
 		"headRefName": ctx.HeadBranchLabel,
 	}

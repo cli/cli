@@ -26,6 +26,8 @@ const (
 type IssueMetadataState struct {
 	Type metadataStateType
 
+	Draft bool
+
 	Body  string
 	Title string
 
