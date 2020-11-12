@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 	"text/template"
+	"bytes"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -16,8 +17,9 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
-	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
+	"github.com/yuin/goldmark"
+    "github.com/yuin/goldmark-emoji"
 )
 
 type ViewOptions struct {
@@ -154,6 +156,12 @@ func viewRun(opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	var readmeContent string
+	var buf bytes.Buffer
+	parser := goldmark.New(
+		goldmark.WithExtensions(
+			emoji.Emoji,
+		),
+	)
 	if readme == nil {
 		readmeContent = cs.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
@@ -163,9 +171,17 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
-		readmeContent = emoji.Parse(readmeContent)
+
+		if err := parser.Convert([]byte(readmeContent), &buf); err != nil {
+			panic(err)
+		}
+
+		readmeContent = buf.String()
 	} else {
-		readmeContent = emoji.Parse(readme.Content)
+		if err := parser.Convert([]byte(readme.Content), &buf); err != nil {
+			panic(err)
+		}
+		readmeContent = buf.String()
 	}
 
 	description := repo.Description
