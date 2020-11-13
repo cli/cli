@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -270,12 +271,11 @@ func TestPRCreate_createFork(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git remote add
-	cs.Stub("")                                         // git push
+	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("") // git status
+	cs.Stub("") // git remote add
+	cs.Stub("") // git push
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -284,8 +284,8 @@ func TestPRCreate_createFork(t *testing.T) {
 	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"git", "remote", "add", "-f", "fork", "https://github.com/monalisa/REPO.git"}, cs.Calls[4].Args)
-	assert.Equal(t, []string{"git", "push", "--set-upstream", "fork", "HEAD:feature"}, cs.Calls[5].Args)
+	assert.Equal(t, []string{"git", "remote", "add", "-f", "fork", "https://github.com/monalisa/REPO.git"}, cs.Calls[3].Args)
+	assert.Equal(t, []string{"git", "push", "--set-upstream", "fork", "HEAD:feature"}, cs.Calls[4].Args)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
@@ -340,9 +340,6 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 		deadb00f refs/remotes/upstream/feature
 		deadbeef refs/remotes/origin/feature
 	`)) // determineTrackingBranch
-	cs.Register("git .+ log", 1, "", func(args []string) {
-		assert.Equal(t, "upstream/master...feature", args[len(args)-1])
-	})
 
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -389,9 +386,6 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 		deadbeef HEAD
 		deadbeef refs/remotes/origin/my-feat2
 	`)) // determineTrackingBranch
-	cs.Register("git .+ log", 1, "", func(args []string) {
-		assert.Equal(t, "origin/master...feature", args[len(args)-1])
-	})
 
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -438,19 +432,14 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 			Name:  "index",
 			Value: 0,
 		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "body",
-			Default: true,
-		},
-	})
+	}) // template
+	as.StubOneDefault() // body
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
 			Value: 0,
 		},
-	})
+	}) // confirm
 
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
 	require.NoError(t, err)
@@ -586,12 +575,11 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
+	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
+	cs.Stub("") // git status
 
-	_, err := runCommand(http, nil, "feature", true, `-H feature`)
+	_, err := runCommand(http, nil, "feature", true, `-ttitle -bbody -H feature`)
 	if err == nil {
 		t.Fatal("error expected, got nil")
 	}
@@ -732,50 +720,42 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_generateCompareURL(t *testing.T) {
-	type args struct {
-		r          ghrepo.Interface
-		base       string
-		head       string
-		title      string
-		body       string
-		assignees  []string
-		labels     []string
-		projects   []string
-		milestones []string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		ctx     CreateContext
+		state   prShared.IssueMetadataState
 		want    string
 		wantErr bool
 	}{
 		{
 			name: "basic",
-			args: args{
-				r:    ghrepo.New("OWNER", "REPO"),
-				base: "main",
-				head: "feature",
+			ctx: CreateContext{
+				BaseRepo:   ghrepo.New("OWNER", "REPO"),
+				BaseBranch: "main",
+				HeadBranch: "feature",
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
 			wantErr: false,
 		},
 		{
 			name: "with labels",
-			args: args{
-				r:      ghrepo.New("OWNER", "REPO"),
-				base:   "a",
-				head:   "b",
-				labels: []string{"one", "two three"},
+			ctx: CreateContext{
+				BaseRepo:   ghrepo.New("OWNER", "REPO"),
+				BaseBranch: "a",
+				HeadBranch: "b",
+			},
+			state: prShared.IssueMetadataState{
+				Labels: []string{"one", "two three"},
 			},
 			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
 			wantErr: false,
 		},
 		{
 			name: "complex branch names",
-			args: args{
-				r:    ghrepo.New("OWNER", "REPO"),
-				base: "main/trunk",
-				head: "owner:feature",
+			ctx: CreateContext{
+				BaseRepo:   ghrepo.New("OWNER", "REPO"),
+				BaseBranch: "main/trunk",
+				HeadBranch: "owner:feature",
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
 			wantErr: false,
@@ -783,7 +763,7 @@ func Test_generateCompareURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := generateCompareURL(tt.args.r, tt.args.base, tt.args.head, tt.args.title, tt.args.body, tt.args.assignees, tt.args.labels, tt.args.projects, tt.args.milestones)
+			got, err := generateCompareURL(tt.ctx, tt.state)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("generateCompareURL() error = %v, wantErr %v", err, tt.wantErr)
 				return

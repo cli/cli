@@ -53,7 +53,7 @@ mainLoop:
 }
 
 // FindLegacy returns the file path of the default(legacy) template
-func FindLegacy(rootDir string, name string) *string {
+func FindLegacy(rootDir string, name string) string {
 	namePattern := regexp.MustCompile(fmt.Sprintf(`(?i)^%s(\.|$)`, strings.ReplaceAll(name, "_", "[_-]")))
 
 	// https://help.github.com/en/github/building-a-strong-community/creating-a-pull-request-template-for-your-repository
@@ -71,12 +71,11 @@ func FindLegacy(rootDir string, name string) *string {
 		// detect a single template file
 		for _, file := range files {
 			if namePattern.MatchString(file.Name()) && !file.IsDir() {
-				result := path.Join(dir, file.Name())
-				return &result
+				return path.Join(dir, file.Name())
 			}
 		}
 	}
-	return nil
+	return ""
 }
 
 // ExtractName returns the name of the template from YAML front-matter

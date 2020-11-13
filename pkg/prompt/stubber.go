@@ -45,7 +45,7 @@ func InitAskStubber() (*AskStubber, func()) {
 		count := as.Count
 		as.Count += 1
 		if count >= len(as.Stubs) {
-			panic(fmt.Sprintf("more asks than stubs. most recent call: %v", qs))
+			panic(fmt.Sprintf("more asks than stubs. most recent call: %#v", qs))
 		}
 
 		// actually set response

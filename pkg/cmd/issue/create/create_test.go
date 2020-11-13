@@ -144,18 +144,17 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
+
+	// tmeplate
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "index",
 			Value: 1,
 		},
 	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "body",
-			Default: true,
-		},
-	})
+	// body
+	as.StubOneDefault()
+	// confirm
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",

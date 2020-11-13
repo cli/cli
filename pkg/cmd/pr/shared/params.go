@@ -9,29 +9,29 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func WithPrAndIssueQueryParams(baseURL, title, body string, assignees, labels, projects []string, milestones []string) (string, error) {
+func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
 	}
 	q := u.Query()
-	if title != "" {
-		q.Set("title", title)
+	if state.Title != "" {
+		q.Set("title", state.Title)
 	}
-	if body != "" {
-		q.Set("body", body)
+	if state.Body != "" {
+		q.Set("body", state.Body)
 	}
-	if len(assignees) > 0 {
-		q.Set("assignees", strings.Join(assignees, ","))
+	if len(state.Assignees) > 0 {
+		q.Set("assignees", strings.Join(state.Assignees, ","))
 	}
-	if len(labels) > 0 {
-		q.Set("labels", strings.Join(labels, ","))
+	if len(state.Labels) > 0 {
+		q.Set("labels", strings.Join(state.Labels, ","))
 	}
-	if len(projects) > 0 {
-		q.Set("projects", strings.Join(projects, ","))
+	if len(state.Projects) > 0 {
+		q.Set("projects", strings.Join(state.Projects, ","))
 	}
-	if len(milestones) > 0 {
-		q.Set("milestone", milestones[0])
+	if len(state.Milestones) > 0 {
+		q.Set("milestone", state.Milestones[0])
 	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
