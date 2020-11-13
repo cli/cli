@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"syscall"
 	"text/template"
@@ -100,7 +101,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	openURL := ghrepo.GenerateRepoURL(toView, "")
+	openURL := generateBranchURL(toView, opts.Branch)
 	if opts.Web {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
@@ -200,4 +201,11 @@ func isMarkdownFile(filename string) bool {
 		strings.HasSuffix(filename, ".markdown") ||
 		strings.HasSuffix(filename, ".mdown") ||
 		strings.HasSuffix(filename, ".mkdown")
+}
+func generateBranchURL(r ghrepo.Interface, branch string) string {
+	if branch == "" {
+		return ghrepo.GenerateRepoURL(r, "")
+	}
+
+	return ghrepo.GenerateRepoURL(r, "tree/%s", url.QueryEscape(branch))
 }
