@@ -202,6 +202,7 @@ func isMarkdownFile(filename string) bool {
 		strings.HasSuffix(filename, ".mdown") ||
 		strings.HasSuffix(filename, ".mkdown")
 }
+
 func generateBranchURL(r ghrepo.Interface, branch string) string {
 	if branch == "" {
 		return ghrepo.GenerateRepoURL(r, "")
