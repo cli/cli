@@ -11,7 +11,7 @@ import (
 
 func NewCmdAlias(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "alias",
+		Use:   "alias <command>",
 		Short: "Create command shortcuts",
 		Long: heredoc.Doc(`
 			Aliases can be used to make shortcuts for gh commands or to compose multiple commands.

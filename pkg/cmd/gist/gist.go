@@ -12,7 +12,7 @@ import (
 
 func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "gist",
+		Use:   "gist <command>",
 		Short: "Manage gists",
 		Long:  `Work with GitHub gists.`,
 		Annotations: map[string]string{
