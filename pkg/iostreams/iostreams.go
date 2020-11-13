@@ -45,6 +45,8 @@ type IOStreams struct {
 	pagerProcess *os.Process
 
 	neverPrompt bool
+
+	WriteOverride []byte
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -266,6 +268,14 @@ func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
 	}
 	defer r.Close()
 	return ioutil.ReadAll(r)
+}
+
+func (s *IOStreams) WriteFile(fn string, data []byte) error {
+	if s.WriteOverride != nil {
+		s.WriteOverride = data
+		return nil
+	}
+	return ioutil.WriteFile(fn, data, 0660)
 }
 
 func System() *IOStreams {

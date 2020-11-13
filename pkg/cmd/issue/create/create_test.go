@@ -126,6 +126,46 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
+func TestIssueCreate_JSON(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`))
+
+	output, err := runCommand(http, true, `-j'{"title":"cool", "body":"issue"}'`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	eq(t, reqBody.Variables.Input.Title, "cool")
+	eq(t, reqBody.Variables.Input.Body, "issue")
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
 func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)

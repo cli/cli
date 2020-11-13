@@ -136,6 +136,54 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	assert.Equal(t, "", output.String())
 }
 
+func TestPRCreate_json(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+	`))
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+	`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+
+	output, err := runCommand(http, nil, "feature", false, `-j'{"title":"cool", "body":"pr"}' -H feature`)
+	require.NoError(t, err)
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
+	reqBody := struct {
+		Variables struct {
+			Input struct {
+				RepositoryID string
+				Title        string
+				Body         string
+				BaseRefName  string
+				HeadRefName  string
+			}
+		}
+	}{}
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+
+	assert.Equal(t, "REPOID", reqBody.Variables.Input.RepositoryID)
+	assert.Equal(t, "cool", reqBody.Variables.Input.Title)
+	assert.Equal(t, "pr", reqBody.Variables.Input.Body)
+	assert.Equal(t, "master", reqBody.Variables.Input.BaseRefName)
+	assert.Equal(t, "feature", reqBody.Variables.Input.HeadRefName)
+
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+}
+
 func TestPRCreate_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

@@ -38,8 +38,10 @@ type CreateOptions struct {
 	RootDirOverride string
 	RepoOverride    string
 
-	Autofill bool
-	WebMode  bool
+	Autofill  bool
+	WebMode   bool
+	JSONFill  bool
+	JSONInput string
 
 	IsDraft    bool
 	Title      string
@@ -99,11 +101,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.JSONFill = cmd.Flags().Changed("json")
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
+			if !opts.IO.CanPrompt() && !opts.JSONFill && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
 			}
 
@@ -112,6 +115,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
+			}
+
+			if opts.JSONFill && opts.WebMode {
+				return errors.New("--web and --json are mutually exclusive")
 			}
 
 			if runF != nil {
@@ -134,6 +141,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.StringVarP(&opts.JSONInput, "json", "j", "", "Use JSON to populate and submit PR")
 
 	return cmd
 }
@@ -141,14 +149,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 func createRun(opts *CreateOptions) (err error) {
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
-		return err
+		return
 	}
 
 	client := ctx.Client
 
 	state, err := NewIssueState(*ctx, *opts)
 	if err != nil {
-		return err
+		return
 	}
 
 	if opts.WebMode {
@@ -156,9 +164,9 @@ func createRun(opts *CreateOptions) (err error) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
-		err := handlePush(*opts, *ctx)
+		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return err
+			return
 		}
 		return previewPR(*opts, *ctx, *state)
 	}
@@ -199,22 +207,38 @@ func createRun(opts *CreateOptions) (err error) {
 	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return err
+			return
 		}
+		return submitPR(*opts, *ctx, *state)
+	}
+
+	if opts.JSONFill {
+		err = shared.FillFromJSON(opts.IO, opts.JSONInput, state)
+		if err != nil {
+			return fmt.Errorf("could not use JSON input: %w", err)
+		}
+
+		err = handlePush(*opts, *ctx)
+		if err != nil {
+			return
+		}
+
 		return submitPR(*opts, *ctx, *state)
 	}
 
 	if !opts.TitleProvided {
 		err = shared.TitleSurvey(state)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 	if err != nil {
-		return err
+		return
 	}
+
+	defer shared.PreserveInput(opts.IO, state, &err)()
 
 	templateContent := ""
 	if !opts.BodyProvided {
@@ -222,12 +246,12 @@ func createRun(opts *CreateOptions) (err error) {
 
 		templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
 		if err != nil {
-			return err
+			return
 		}
 
 		err = shared.BodySurvey(state, templateContent, editorCommand)
 		if err != nil {
-			return err
+			return
 		}
 
 		if state.Body == "" {
@@ -244,12 +268,12 @@ func createRun(opts *CreateOptions) (err error) {
 	if action == shared.MetadataAction {
 		err = shared.MetadataSurvey(opts.IO, client, ctx.BaseRepo, state)
 		if err != nil {
-			return err
+			return
 		}
 
 		action, err = shared.ConfirmSubmission(!state.HasMetadata(), false)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
@@ -260,7 +284,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	err = handlePush(*opts, *ctx)
 	if err != nil {
-		return err
+		return
 	}
 
 	if action == shared.PreviewAction {
@@ -271,7 +295,8 @@ func createRun(opts *CreateOptions) (err error) {
 		return submitPR(*opts, *ctx, *state)
 	}
 
-	return errors.New("expected to cancel, preview, or submit")
+	err = errors.New("expected to cancel, preview, or submit")
+	return
 }
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
