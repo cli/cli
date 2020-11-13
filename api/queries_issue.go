@@ -33,12 +33,8 @@ type Issue struct {
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Comments  struct {
-		TotalCount int
-	}
-	Author struct {
-		Login string
-	}
+	Comments  IssueComments
+	Author    Author
 	Assignees struct {
 		Nodes []struct {
 			Login string
@@ -65,10 +61,29 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
+	ReactionGroups ReactionGroups
 }
 
 type IssuesDisabledError struct {
 	error
+}
+
+type IssueComments struct {
+	Nodes      []IssueComment
+	TotalCount int
+}
+
+type IssueComment struct {
+	Author              Author
+	AuthorAssociation   string
+	Body                string
+	CreatedAt           time.Time
+	IncludesCreatedEdit bool
+	ReactionGroups      ReactionGroups
+}
+
+type Author struct {
+	Login string
 }
 
 const fragments = `
@@ -320,7 +335,7 @@ loop:
 	return &res, nil
 }
 
-func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
+func IssueByNumber(client *Client, repo ghrepo.Interface, number, comments int) (*Issue, error) {
 	type response struct {
 		Repository struct {
 			Issue            Issue
@@ -329,7 +344,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	query := `
-	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
+	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!, $comments: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
@@ -341,7 +356,22 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				author {
 					login
 				}
-				comments {
+				comments(last: $comments) {
+					nodes {
+						author {
+							login
+						}
+						authorAssociation
+						body
+						createdAt
+						includesCreatedEdit
+						reactionGroups {
+							content
+							users {
+								totalCount
+							}
+						}
+					}
 					totalCount
 				}
 				number
@@ -370,8 +400,14 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					}
 					totalCount
 				}
-				milestone{
+				milestone {
 					title
+				}
+				reactionGroups {
+					content
+					users {
+						totalCount
+					}
 				}
 			}
 		}
@@ -381,6 +417,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 		"owner":        repo.RepoOwner(),
 		"repo":         repo.RepoName(),
 		"issue_number": number,
+		"comments":     comments,
 	}
 
 	var resp response
