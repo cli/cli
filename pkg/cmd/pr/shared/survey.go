@@ -170,19 +170,25 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		state.Body += templateContent
 	}
 
-	p := &surveyext.GhEditor{
-		BlankAllowed:  true,
-		EditorCommand: editorCommand,
-		Editor: &survey.Editor{
-			Message:       "Body",
-			FileName:      "*.md",
-			Default:       state.Body,
-			HideDefault:   true,
-			AppendDefault: true,
+	// TODO should just be an AskOne but ran into problems with the stubber
+	qs := []*survey.Question{
+		{
+			Name: "Body",
+			Prompt: &surveyext.GhEditor{
+				BlankAllowed:  true,
+				EditorCommand: editorCommand,
+				Editor: &survey.Editor{
+					Message:       "Body",
+					FileName:      "*.md",
+					Default:       state.Body,
+					HideDefault:   true,
+					AppendDefault: true,
+				},
+			},
 		},
 	}
 
-	err := prompt.SurveyAskOne(p, state)
+	err := prompt.SurveyAsk(qs, state)
 	if err != nil {
 		return err
 	}
@@ -191,12 +197,18 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 }
 
 func TitleSurvey(state *IssueMetadataState) error {
-	p := &survey.Input{
-		Message: "Title",
-		Default: state.Title,
+	// TODO should just be an AskOne but ran into problems with the stubber
+	qs := []*survey.Question{
+		{
+			Name: "Title",
+			Prompt: &survey.Input{
+				Message: "Title",
+				Default: state.Title,
+			},
+		},
 	}
 
-	err := prompt.SurveyAskOne(p, state)
+	err := prompt.SurveyAsk(qs, state)
 	if err != nil {
 		return err
 	}

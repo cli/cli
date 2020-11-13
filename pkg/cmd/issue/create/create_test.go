@@ -153,7 +153,12 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		},
 	})
 	// body
-	as.StubOneDefault()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	}) // body
 	// confirm
 	as.Stub([]*prompt.QuestionStub{
 		{

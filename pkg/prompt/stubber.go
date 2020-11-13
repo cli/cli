@@ -31,6 +31,7 @@ func InitAskStubber() (*AskStubber, func()) {
 		}
 		stubbedPrompt := as.StubOnes[count]
 		if stubbedPrompt.Default {
+			// TODO this is failing for basic AskOne invocations with a string result.
 			defaultValue := reflect.ValueOf(p).Elem().FieldByName("Default")
 			_ = core.WriteAnswer(response, "", defaultValue)
 		} else {

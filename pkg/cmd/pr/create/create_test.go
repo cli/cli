@@ -433,7 +433,12 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 			Value: 0,
 		},
 	}) // template
-	as.StubOneDefault() // body
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	}) // body
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
