@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -14,8 +15,7 @@ import (
 func Test_dumpPath(t *testing.T) {
 	// mostly pointless test
 	var random int64 = 1234567890
-	tempDir := os.TempDir()
-	assert.Equal(t, dumpPath(random), tempDir+"/gh602d2.json")
+	assert.Equal(t, dumpPath(random), filepath.Join(os.TempDir(), "gh602d2.json"))
 }
 
 func Test_PreserveInput(t *testing.T) {
