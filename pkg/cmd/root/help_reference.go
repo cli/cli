@@ -18,7 +18,8 @@ func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string 
 			reftext += cmdRef(cs, c, 0)
 		}
 
-		md, err := markdown.RenderWrap(reftext, "auto", io.TerminalWidth())
+		style := markdown.GetStyle(io.DetectTerminalTheme())
+		md, err := markdown.RenderWrap(reftext, style, io.TerminalWidth())
 		if err != nil {
 			return reftext
 		}
