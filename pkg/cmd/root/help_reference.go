@@ -47,8 +47,7 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 	escaped := strings.ReplaceAll(cmd.Use, "<", "⟨")
 	escaped = strings.ReplaceAll(escaped, ">", "⟩")
 	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
-
-	ref += cmd.Short + "\n\n"
+	ref += fmt.Sprintf("**%s**\n\n", cmd.Short)
 
 	// Flags
 
@@ -69,21 +68,12 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 			}
 			ref += fu + "\n\n"
 		}
-
-		ref += "\n"
-	} else if cmd.HasAvailableSubCommands() {
-		ref += "\n"
-
 	}
 
 	// Subcommands
 	subcommands := cmd.Commands()
 	for _, c := range subcommands {
 		ref += cmdRef(cs, c, lvl+1)
-	}
-
-	if len(subcommands) == 0 {
-		ref += "\n"
 	}
 
 	return ref
