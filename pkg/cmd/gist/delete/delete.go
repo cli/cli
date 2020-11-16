@@ -13,11 +13,10 @@ import (
 )
 
 type DeleteOptions struct {
-	IO *iostreams.IOStreams
+	IO         *iostreams.IOStreams
+	HttpClient func() (*http.Client, error)
 
-	Description string
-	Selector    string
-	HttpClient  func() (*http.Client, error)
+	Selector string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
