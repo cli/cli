@@ -292,10 +292,9 @@ func Test_createRun(t *testing.T) {
 		tt.opts.IO = io
 
 		cs, cmdTeardown := test.InitCmdStubber()
+		defer cmdTeardown()
 
-		if tt.name == "web arg" {
-			defer cmdTeardown()
-
+		if tt.opts.WebMode {
 			cs.Stub("")
 		}
 
@@ -315,7 +314,7 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantParams, reqBody)
 
-			if tt.name == "web arg" {
+			if tt.opts.WebMode {
 				browserCall := cs.Calls[0].Args
 				assert.Equal(t, browserCall[len(browserCall)-1], "https://gist.github.com/aa5a315d61ae9438b18d")
 			}
