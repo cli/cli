@@ -41,8 +41,11 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 	}
 
 	// Name + Description
-	escaped := strings.ReplaceAll(cmd.Use, "<", "&lt;")
-	escaped = strings.ReplaceAll(escaped, ">", "&gt;")
+	// TODO it would be nice to just escape the </> with &gt/&lt but while that helps with the output
+	// of `gh help reference` those escaped brackets are then erroneously re-interpreted when
+	// generating the manual site.
+	escaped := strings.ReplaceAll(cmd.Use, "<", "⟨")
+	escaped = strings.ReplaceAll(escaped, ">", "⟩")
 	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
 
 	ref += cmd.Short + "\n\n"
