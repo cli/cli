@@ -49,22 +49,27 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 	// Flags
 
 	// TODO glamour doesn't respect linebreaks (double space or backslash at end) at all, so there is
-	// no way to have the damn flags print without a whole newline in between.
-	for _, fu := range strings.Split(cmd.Flags().FlagUsages(), "\n") {
-		if fu == "" {
-			continue
+	// no way to have the damn flags print without a whole newline in between.  I tried generating my
+	// own usage (to eexperiment with other ways of rendering in markdown) but there isn't enough
+	// exposed in pflag to produce the same quality of output as their FlagUsages method.
+	if cmd.HasPersistentFlags() || cmd.HasFlags() {
+		for _, fu := range strings.Split(cmd.Flags().FlagUsages(), "\n") {
+			if fu == "" {
+				continue
+			}
+			ref += fu + "\n\n"
 		}
-		ref += fu + "\n\n"
-	}
-	for _, fu := range strings.Split(cmd.PersistentFlags().FlagUsages(), "\n") {
-		if fu == "" {
-			continue
+		for _, fu := range strings.Split(cmd.PersistentFlags().FlagUsages(), "\n") {
+			if fu == "" {
+				continue
+			}
+			ref += fu + "\n\n"
 		}
-		ref += fu + "\n\n"
-	}
 
-	if cmd.HasPersistentFlags() || cmd.HasFlags() || cmd.HasAvailableSubCommands() {
 		ref += "\n"
+	} else if cmd.HasAvailableSubCommands() {
+		ref += "\n"
+
 	}
 
 	// Subcommands
