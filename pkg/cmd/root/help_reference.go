@@ -40,8 +40,8 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 	}
 
 	// Name + Description
-	escaped := strings.ReplaceAll(cmd.Use, "<", "〈")
-	escaped = strings.ReplaceAll(escaped, ">", "〉")
+	escaped := strings.ReplaceAll(cmd.Use, "<", "&lt;")
+	escaped = strings.ReplaceAll(escaped, ">", "&gt;")
 	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
 
 	ref += cmd.Short + "\n\n"
