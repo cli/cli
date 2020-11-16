@@ -30,6 +30,8 @@ type CreateOptions struct {
 	Filenames        []string
 	FilenameOverride string
 
+	WebMode bool
+
 	HttpClient func() (*http.Client, error)
 }
 
@@ -86,6 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
 	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
 	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
 	return cmd
@@ -137,6 +140,12 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIcon(), completionMessage)
+
+	if opts.WebMode {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
+
+		return utils.OpenInBrowser(gist.HTMLURL)
+	}
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
