@@ -60,13 +60,13 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			# approve the pull request of the current branch
 			$ gh pr review --approve
-			
+
 			# leave a review comment for the current branch
 			$ gh pr review --comment -b "interesting"
-			
+
 			# add a review for a specific pull request
 			$ gh pr review 123
-			
+
 			# request changes on a specific pull request
 			$ gh pr review 123 -r -b "needs more ASCII art"
 		`),
@@ -255,7 +255,7 @@ func reviewSurvey(io *iostreams.IOStreams, editorCommand string) (*api.PullReque
 
 	if len(bodyAnswers.Body) > 0 {
 		style := markdown.GetStyle(io.DetectTerminalTheme())
-		renderedBody, err := markdown.Render(bodyAnswers.Body, style, "")
+		renderedBody, err := markdown.Render(bodyAnswers.Body, style)
 		if err != nil {
 			return nil, err
 		}

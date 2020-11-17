@@ -43,7 +43,7 @@ func Test_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Render(tt.input.text, tt.input.style, "")
+			_, err := Render(tt.input.text, tt.input.style)
 			if tt.output.wantsErr {
 				assert.Error(t, err)
 				return
