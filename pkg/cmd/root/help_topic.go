@@ -47,7 +47,7 @@ var HelpTopics = map[string]map[string]string{
 	},
 }
 
-func NewHelpTopicFn(topic, short string, fn func() string) *cobra.Command {
+func NewDynamicHelpTopic(topic, short string, fn func() string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    topic,
 		Short:  short,
@@ -67,7 +67,7 @@ func NewHelpTopicFn(topic, short string, fn func() string) *cobra.Command {
 	return cmd
 }
 
-func NewHelpTopic(topic string) *cobra.Command {
+func NewStaticHelpTopic(topic string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    topic,
 		Short:  HelpTopics[topic]["short"],
