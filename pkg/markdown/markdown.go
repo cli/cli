@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
+	"github.com/cli/cli/internal/glamour"
 )
 
 func Render(text, style string, baseURL string) (string, error) {
