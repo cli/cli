@@ -9,6 +9,7 @@ import (
 
 	"github.com/muesli/termenv"
 	"github.com/yuin/goldmark"
+	emoji "github.com/yuin/goldmark-emoji"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
@@ -63,6 +64,7 @@ func NewTermRenderer(options ...TermRendererOption) (*TermRenderer, error) {
 			goldmark.WithExtensions(
 				extension.GFM,
 				extension.DefinitionList,
+				emoji.Emoji,
 			),
 			goldmark.WithParserOptions(
 				parser.WithAutoHeadingID(),
