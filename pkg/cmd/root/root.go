@@ -91,12 +91,15 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 
 	// Help topics
-	cmd.AddCommand(NewStaticHelpTopic("environment"))
-	cmd.AddCommand(NewDynamicHelpTopic("reference", "Full reference for gh",
-		referenceHelpFn(cmd, f.IOStreams)))
+	cmd.AddCommand(NewHelpTopic("environment"))
+	referenceCmd := NewHelpTopic("reference")
+	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
+	cmd.AddCommand(referenceCmd)
 
 	cmdutil.DisableAuthCheck(cmd)
 
+	// this needs to appear last:
+	referenceCmd.Long = referenceLong(cmd)
 	return cmd
 }
 

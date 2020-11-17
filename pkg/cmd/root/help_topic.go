@@ -45,36 +45,17 @@ var HelpTopics = map[string]map[string]string{
 			error if a newer version was found.
 		`),
 	},
+	"reference": {
+		"short": "A comprehensive reference of all gh commands",
+	},
 }
 
-func NewDynamicHelpTopic(topic, short string, fn func() string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:    topic,
-		Short:  short,
-		Long:   fn(),
-		Hidden: true,
-		Args:   cobra.NoArgs,
-		Run:    helpTopicHelpFunc,
-		Annotations: map[string]string{
-			"markdown:generate": "true",
-			"markdown:basename": "gh_help_" + topic,
-		},
-	}
-
-	cmd.SetHelpFunc(helpTopicHelpFunc)
-	cmd.SetUsageFunc(helpTopicUsageFunc)
-
-	return cmd
-}
-
-func NewStaticHelpTopic(topic string) *cobra.Command {
+func NewHelpTopic(topic string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    topic,
 		Short:  HelpTopics[topic]["short"],
 		Long:   HelpTopics[topic]["long"],
 		Hidden: true,
-		Args:   cobra.NoArgs,
-		Run:    helpTopicHelpFunc,
 		Annotations: map[string]string{
 			"markdown:generate": "true",
 			"markdown:basename": "gh_help_" + topic,

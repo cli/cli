@@ -1,7 +1,9 @@
 package root
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -9,74 +11,59 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string {
-	cs := io.ColorScheme()
-	return func() string {
-		reftext := "# gh reference\n\n"
-
-		for _, c := range cmd.Commands() {
-			reftext += cmdRef(cs, c, "")
+func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
+	return func(cmd *cobra.Command, args []string) {
+		wrapWidth := 0
+		style := "notty"
+		if io.IsStdoutTTY() {
+			wrapWidth = io.TerminalWidth()
+			style = markdown.GetStyle(io.DetectTerminalTheme())
 		}
 
-		style := markdown.GetStyle(io.DetectTerminalTheme())
-		md, err := markdown.RenderWrap(reftext, style, io.TerminalWidth())
+		md, err := markdown.RenderWrap(cmd.Long, style, wrapWidth)
 		if err != nil {
-			return reftext
+			fmt.Fprintln(io.ErrOut, err)
+			return
 		}
 
-		return md
+		if !io.IsStdoutTTY() {
+			fmt.Fprint(io.Out, dedent(md))
+			return
+		}
+
+		_ = io.StartPager()
+		defer io.StopPager()
+		fmt.Fprint(io.Out, md)
 	}
 }
 
-func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, parent string) string {
-	ref := ""
-
-	if cmd.Hidden {
-		return ref
+func referenceLong(cmd *cobra.Command) string {
+	buf := bytes.NewBufferString("# gh reference\n\n")
+	for _, c := range cmd.Commands() {
+		if c.Hidden {
+			continue
+		}
+		cmdRef(buf, c, 2)
 	}
+	return buf.String()
+}
 
-	cmdPrefix := "## gh"
-	if parent != "" {
-		cmdPrefix = fmt.Sprintf("### gh %s", parent)
-	}
-
+func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
 	// Name + Description
-	// TODO it would be nice to just escape the </> with &gt/&lt but while that helps with the output
-	// of `gh help reference` those escaped brackets are then erroneously re-interpreted when
-	// generating the manual site.
-	escaped := strings.ReplaceAll(cmd.Use, "<", "⟨")
-	escaped = strings.ReplaceAll(escaped, ">", "⟩")
-	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
-	ref += fmt.Sprintf("**%s**\n\n", cmd.Short)
+	fmt.Fprintf(w, "%s `%s`\n\n", strings.Repeat("#", depth), cmd.UseLine())
+	fmt.Fprintf(w, "%s\n\n", cmd.Short)
 
 	// Flags
-
-	// TODO glamour doesn't respect linebreaks (double space or backslash at end) at all, so there is
-	// no way to have the damn flags print without a whole newline in between.  I tried generating my
-	// own usage (to eexperiment with other ways of rendering in markdown) but there isn't enough
-	// exposed in pflag to produce the same quality of output as their FlagUsages method.
-	if cmd.HasPersistentFlags() || cmd.HasFlags() {
-		for _, fu := range strings.Split(cmd.Flags().FlagUsages(), "\n") {
-			if fu == "" {
-				continue
-			}
-			ref += fu + "\n\n"
-		}
-		for _, fu := range strings.Split(cmd.PersistentFlags().FlagUsages(), "\n") {
-			if fu == "" {
-				continue
-			}
-			ref += fu + "\n\n"
-		}
+	// TODO: fold in InheritedFlags/PersistentFlags, but omit `--help` due to repetitiveness
+	if flagUsages := cmd.Flags().FlagUsages(); flagUsages != "" {
+		fmt.Fprintf(w, "```\n%s````\n\n", dedent(flagUsages))
 	}
-
-	cmdName := strings.Split(cmd.Use, " ")[0]
 
 	// Subcommands
-	subcommands := cmd.Commands()
-	for _, c := range subcommands {
-		ref += cmdRef(cs, c, cmdName)
+	for _, c := range cmd.Commands() {
+		if c.Hidden {
+			continue
+		}
+		cmdRef(w, c, depth+1)
 	}
-
-	return ref
 }

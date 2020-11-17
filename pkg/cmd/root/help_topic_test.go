@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewStaticHelpTopic(t *testing.T) {
+func TestNewHelpTopic(t *testing.T) {
 	tests := []struct {
 		name     string
 		topic    string
@@ -34,7 +34,7 @@ func TestNewStaticHelpTopic(t *testing.T) {
 			topic:    "environment",
 			args:     []string{"invalid"},
 			flags:    []string{},
-			wantsErr: true,
+			wantsErr: false,
 		},
 		{
 			name:     "more than zero flags",
@@ -48,7 +48,7 @@ func TestNewStaticHelpTopic(t *testing.T) {
 			topic:    "environment",
 			args:     []string{"help"},
 			flags:    []string{},
-			wantsErr: true,
+			wantsErr: false,
 		},
 		{
 			name:     "help flag",
@@ -63,7 +63,7 @@ func TestNewStaticHelpTopic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, stdout, stderr := iostreams.Test()
 
-			cmd := NewStaticHelpTopic(tt.topic)
+			cmd := NewHelpTopic(tt.topic)
 			cmd.SetArgs(append(tt.args, tt.flags...))
 			cmd.SetOut(stdout)
 			cmd.SetErr(stderr)
@@ -74,68 +74,6 @@ func TestNewStaticHelpTopic(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestNewDyanmicHelpTopic(t *testing.T) {
-	tests := []struct {
-		name     string
-		args     []string
-		flags    []string
-		wantLong string
-		wantsErr bool
-	}{
-		{
-			name:     "more than zero args",
-			args:     []string{"invalid"},
-			flags:    []string{},
-			wantLong: "cool",
-			wantsErr: true,
-		},
-		{
-			name:     "more than zero flags",
-			args:     []string{},
-			flags:    []string{"--invalid"},
-			wantLong: "cool",
-			wantsErr: true,
-		},
-		{
-			name:     "help arg",
-			args:     []string{"help"},
-			flags:    []string{},
-			wantLong: "cool",
-			wantsErr: true,
-		},
-		{
-			name:     "help flag",
-			args:     []string{},
-			flags:    []string{"--help"},
-			wantLong: "cool",
-			wantsErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, _, stdout, stderr := iostreams.Test()
-
-			cmd := NewDynamicHelpTopic("topic", "rad", func() string {
-				return "cool"
-			})
-			cmd.SetArgs(append(tt.args, tt.flags...))
-			cmd.SetOut(stdout)
-			cmd.SetErr(stderr)
-
-			_, err := cmd.ExecuteC()
-			if tt.wantsErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-
-			assert.Equal(t, tt.wantLong, cmd.Long)
-			assert.Equal(t, "rad", cmd.Short)
 		})
 	}
 }
