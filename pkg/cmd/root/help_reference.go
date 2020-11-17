@@ -15,7 +15,7 @@ func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string 
 		reftext := "# gh reference\n\n"
 
 		for _, c := range cmd.Commands() {
-			reftext += cmdRef(cs, c, 0)
+			reftext += cmdRef(cs, c, "")
 		}
 
 		style := markdown.GetStyle(io.DetectTerminalTheme())
@@ -28,16 +28,16 @@ func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string 
 	}
 }
 
-func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
+func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, parent string) string {
 	ref := ""
 
 	if cmd.Hidden {
 		return ref
 	}
 
-	cmdPrefix := "##"
-	if lvl > 0 {
-		cmdPrefix = "###"
+	cmdPrefix := "## gh"
+	if parent != "" {
+		cmdPrefix = fmt.Sprintf("### gh %s", parent)
 	}
 
 	// Name + Description
@@ -70,10 +70,12 @@ func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
 		}
 	}
 
+	cmdName := strings.Split(cmd.Use, " ")[0]
+
 	// Subcommands
 	subcommands := cmd.Commands()
 	for _, c := range subcommands {
-		ref += cmdRef(cs, c, lvl+1)
+		ref += cmdRef(cs, c, cmdName)
 	}
 
 	return ref
