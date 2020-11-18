@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/mitchellh/go-homedir"
 )
 
 var (
@@ -52,7 +50,7 @@ func ParseSSHConfig() SSHAliasMap {
 		"/etc/ssh_config",
 		"/etc/ssh/ssh_config",
 	}
-	if homedir, err := homedir.Dir(); err == nil {
+	if homedir, err := os.UserHomeDir(); err == nil {
 		userConfig := filepath.Join(homedir, ".ssh", "config")
 		configFiles = append([]string{userConfig}, configFiles...)
 	}

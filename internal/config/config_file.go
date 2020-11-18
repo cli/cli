@@ -7,15 +7,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"syscall"
 
-	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
 func ConfigDir() string {
-	dir, _ := homedir.Expand("~/.config/gh")
-	return dir
+	homedir, _ := os.UserHomeDir()
+	return filepath.Join(homedir, ".config", "gh")
 }
 
 func ConfigFile() string {
