@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -17,7 +18,7 @@ type remoteResolver struct {
 	urlTranslator func(*url.URL) *url.URL
 }
 
-func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
+func (rr *remoteResolver) Resolver(hostOverride string) func() (context.Remotes, error) {
 	var cachedRemotes context.Remotes
 	var remotesError error
 
@@ -60,10 +61,9 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		cachedRemotes = context.Remotes{}
 		sort.Sort(resolvedRemotes)
 
-		if ghinstance.Default() != ghinstance.OverridableDefault() {
-			hostname = ghinstance.OverridableDefault()
+		if hostOverride != "" {
 			for _, r := range resolvedRemotes {
-				if r.RepoHost() == hostname {
+				if strings.EqualFold(r.RepoHost(), hostOverride) {
 					cachedRemotes = append(cachedRemotes, r)
 				}
 			}
@@ -72,23 +72,25 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 				remotesError = errors.New("none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try either add a matching remote or unset the variable.")
 				return nil, remotesError
 			}
-		} else {
-			for _, r := range resolvedRemotes {
-				if hostname == "" {
-					if !knownHosts[r.RepoHost()] {
-						continue
-					}
-					hostname = r.RepoHost()
-				} else if r.RepoHost() != hostname {
+
+			return cachedRemotes, nil
+		}
+
+		for _, r := range resolvedRemotes {
+			if hostname == "" {
+				if !knownHosts[r.RepoHost()] {
 					continue
 				}
-				cachedRemotes = append(cachedRemotes, r)
+				hostname = r.RepoHost()
+			} else if r.RepoHost() != hostname {
+				continue
 			}
+			cachedRemotes = append(cachedRemotes, r)
+		}
 
-			if len(cachedRemotes) == 0 {
-				remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
-				return nil, remotesError
-			}
+		if len(cachedRemotes) == 0 {
+			remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
+			return nil, remotesError
 		}
 		return cachedRemotes, nil
 	}
