@@ -484,7 +484,7 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 
 	remotes := []*context.Remote{
 		{
-			Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{
+			Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
 				Scheme: "ssh",
 			}},
 			Repo: ghrepo.New("OWNER", "REPO"),

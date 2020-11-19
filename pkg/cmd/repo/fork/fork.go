@@ -197,8 +197,16 @@ func forkRun(opts *ForkOptions) error {
 		}
 
 		if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
-			if remote.FetchURL.Scheme == "https" || remote.FetchURL.Scheme == "ssh" {
-				protocol = remote.FetchURL.Scheme
+
+			scheme := ""
+			if remote.FetchURL != nil {
+				scheme = remote.FetchURL.Scheme
+			}
+			if remote.PushURL != nil {
+				scheme = remote.PushURL.Scheme
+			}
+			if scheme != "" {
+				protocol = scheme
 			}
 		}
 
