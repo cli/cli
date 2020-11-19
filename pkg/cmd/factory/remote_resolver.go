@@ -69,7 +69,7 @@ func (rr *remoteResolver) Resolver(hostOverride string) func() (context.Remotes,
 			}
 
 			if len(cachedRemotes) == 0 {
-				remotesError = errors.New("none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try either add a matching remote or unset the variable.")
+				remotesError = errors.New("none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try adding a matching remote or unsetting the variable.")
 				return nil, remotesError
 			}
 
