@@ -342,6 +342,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)        // auth mode: token
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
+				as.StubOne(false)    // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
@@ -363,6 +364,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)              // auth mode: token
 				as.StubOne("def456")       // auth token
 				as.StubOne("HTTPS")        // git_protocol
+				as.StubOne(false)          // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
@@ -383,6 +385,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)        // auth mode: token
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
+				as.StubOne(false)    // cache credentials
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
