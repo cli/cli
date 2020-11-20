@@ -3,6 +3,7 @@ package shared
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,12 +12,6 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/stretchr/testify/assert"
 )
-
-func Test_dumpPath(t *testing.T) {
-	// mostly pointless test
-	var random int64 = 1234567890
-	assert.Equal(t, dumpPath(random), filepath.Join(os.TempDir(), "gh602d2.json"))
-}
 
 func Test_PreserveInput(t *testing.T) {
 	tests := []struct {
@@ -50,8 +45,8 @@ func Test_PreserveInput(t *testing.T) {
 				Labels:    []string{"sandwich"},
 			},
 			wantErrLines: []string{
-				`X operation failed. input saved to:.*\.json`,
-				`resubmit with: gh issue create -j@.*\.json`,
+				`X operation failed. input saved to:.*testfile.*`,
+				`resubmit with: gh issue create -j@.*testfile.*`,
 			},
 			err:              true,
 			wantPreservation: true,
@@ -63,8 +58,8 @@ func Test_PreserveInput(t *testing.T) {
 				Labels:    []string{"sandwich"},
 			},
 			wantErrLines: []string{
-				`X operation failed. input saved to:.*\.json`,
-				`resubmit with: gh issue create -j@.*\.json`,
+				`X operation failed. input saved to:.*testfile.*`,
+				`resubmit with: gh issue create -j@.*testfile.*`,
 			},
 			err:              true,
 			wantPreservation: true,
@@ -77,8 +72,8 @@ func Test_PreserveInput(t *testing.T) {
 				Type:  PRMetadata,
 			},
 			wantErrLines: []string{
-				`X operation failed. input saved to:.*\.json`,
-				`resubmit with: gh pr create -j@.*\.json`,
+				`X operation failed. input saved to:.*testfile.*`,
+				`resubmit with: gh pr create -j@.*testfile.*`,
 			},
 			err:              true,
 			wantPreservation: true,
@@ -90,8 +85,15 @@ func Test_PreserveInput(t *testing.T) {
 			if tt.state == nil {
 				tt.state = &IssueMetadataState{}
 			}
+
 			io, _, _, errOut := iostreams.Test()
-			io.WriteOverride = []byte{}
+
+			tfPath, tf, tferr := tmpfile()
+			assert.NoError(t, tferr)
+			defer os.Remove(tfPath)
+
+			io.TempFileOverride = tf
+
 			var err error
 			if tt.err {
 				err = errors.New("error during creation")
@@ -99,16 +101,31 @@ func Test_PreserveInput(t *testing.T) {
 
 			PreserveInput(io, tt.state, &err)()
 
+			tf.Seek(0, 0)
+
+			data, err := ioutil.ReadAll(tf)
+			assert.NoError(t, err)
+
 			if tt.wantPreservation {
 				test.ExpectLines(t, errOut.String(), tt.wantErrLines...)
 				preserved := &IssueMetadataState{}
-				assert.NoError(t, json.Unmarshal(io.WriteOverride, preserved))
+				assert.NoError(t, json.Unmarshal(data, preserved))
 				preserved.dirty = tt.state.dirty
 				assert.Equal(t, preserved, tt.state)
 			} else {
 				assert.Equal(t, errOut.String(), "")
-				assert.Equal(t, string(io.WriteOverride), "")
+				assert.Equal(t, string(data), "")
 			}
 		})
 	}
+}
+
+func tmpfile() (string, *os.File, error) {
+	dir := os.TempDir()
+	tmpfile, err := ioutil.TempFile(dir, "testfile*")
+	if err != nil {
+		return "", nil, err
+	}
+
+	return filepath.Join(dir, tmpfile.Name()), tmpfile, nil
 }

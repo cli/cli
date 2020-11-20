@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -40,9 +39,17 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			return
 		}
 
-		dp := dumpPath(time.Now().UnixNano())
+		tmpfile, err := io.TempFile(os.TempDir(), "gh*.json")
+		if err != nil {
+			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
+			fmt.Fprintln(out, "would have saved:")
+			fmt.Fprintf(out, "%v\n", state)
+			return
+		}
 
-		err = io.WriteFile(dp, data)
+		tmpfilePath := filepath.Join(os.TempDir(), tmpfile.Name())
+
+		_, err = tmpfile.Write(data)
 		if err != nil {
 			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
 			fmt.Fprintln(out, "would have saved:")
@@ -57,8 +64,8 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			issueType = "issue"
 		}
 
-		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), dp)
-		fmt.Fprintf(out, "resubmit with: gh %s create -j@%s\n", issueType, dp)
+		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), tmpfilePath)
+		fmt.Fprintf(out, "resubmit with: gh %s create -j@%s\n", issueType, tmpfilePath)
 
 		// some whitespace before the actual error
 		fmt.Fprintln(out)

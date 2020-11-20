@@ -46,7 +46,7 @@ type IOStreams struct {
 
 	neverPrompt bool
 
-	WriteOverride []byte
+	TempFileOverride *os.File
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -270,12 +270,12 @@ func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
 	return ioutil.ReadAll(r)
 }
 
-func (s *IOStreams) WriteFile(fn string, data []byte) error {
-	if s.WriteOverride != nil {
-		s.WriteOverride = data
-		return nil
+func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
+	if s.TempFileOverride != nil {
+		fmt.Printf("DBG %#v\n", s.TempFileOverride)
+		return s.TempFileOverride, nil
 	}
-	return ioutil.WriteFile(fn, data, 0660)
+	return ioutil.TempFile(dir, pattern)
 }
 
 func System() *IOStreams {
