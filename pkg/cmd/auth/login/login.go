@@ -1,6 +1,7 @@
 package login
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -9,9 +10,11 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/auth/client"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -259,7 +262,7 @@ func loginRun(opts *LoginOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	gitProtocol := "https"
+	var gitProtocol string
 	if opts.Interactive {
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: "Choose default git protocol",
@@ -301,6 +304,37 @@ func loginRun(opts *LoginOptions) error {
 	err = cfg.Write()
 	if err != nil {
 		return err
+	}
+
+	if opts.Interactive && gitProtocol == "https" {
+		var primeCredentials bool
+		err = prompt.SurveyAskOne(&survey.Confirm{
+			Message: "Set up git for passwordless push/pull operations?",
+			Default: true,
+		}, &primeCredentials)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+		if primeCredentials {
+			gitCredential, err := git.GitCommand("credential", "approve")
+			if err != nil {
+				return err
+			}
+			credentialStdin := &bytes.Buffer{}
+			gitCredential.Stdin = credentialStdin
+
+			password, _ := cfg.Get(hostname, "oauth_token")
+			fmt.Fprint(credentialStdin, "protocol=https\n")
+			fmt.Fprintf(credentialStdin, "host=%s\n", hostname)
+			fmt.Fprintf(credentialStdin, "username=%s\n", username)
+			fmt.Fprintf(credentialStdin, "password=%s\n", password)
+			fmt.Fprint(credentialStdin, "\n")
+
+			err = run.PrepareCmd(gitCredential).Run()
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
