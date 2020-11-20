@@ -3,8 +3,10 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -126,7 +129,7 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
-func TestIssueCreate_JSON(t *testing.T) {
+func TestIssueCreate_recover(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
@@ -136,32 +139,72 @@ func TestIssueCreate_JSON(t *testing.T) {
 			"hasIssuesEnabled": true
 		} } }
 	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			}
+		} }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
-	`))
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["title"], "recovered title")
+			eq(t, inputs["body"], "recovered body")
+			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+		}))
 
-	output, err := runCommand(http, true, `-j'{"title":"cool", "body":"issue"}'`)
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Title",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	assert.NoError(t, err)
+
+	state := prShared.IssueMetadataState{
+		Title:  "recovered title",
+		Body:   "recovered body",
+		Labels: []string{"bug", "TODO"},
+	}
+
+	data, err := json.Marshal(state)
+	assert.NoError(t, err)
+
+	_, err = tmpfile.Write(data)
+	assert.NoError(t, err)
+
+	args := fmt.Sprintf("-e '%s'", tmpfile.Name())
+
+	output, err := runCommandWithRootDirOverridden(http, true, args, "")
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "cool")
-	eq(t, reqBody.Variables.Input.Body, "issue")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }

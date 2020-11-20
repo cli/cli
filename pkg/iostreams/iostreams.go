@@ -272,7 +272,6 @@ func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
 
 func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
 	if s.TempFileOverride != nil {
-		fmt.Printf("DBG %#v\n", s.TempFileOverride)
 		return s.TempFileOverride, nil
 	}
 	return ioutil.TempFile(dir, pattern)

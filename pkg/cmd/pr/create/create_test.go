@@ -3,8 +3,10 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -136,20 +138,45 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	assert.Equal(t, "", output.String())
 }
 
-func TestPRCreate_json(t *testing.T) {
+func TestPRCreate_recover(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubResponse(200, bytes.NewBufferString(`
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
 		{ "data": { "repository": { "pullRequests": { "nodes" : [
 		] } } } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "jillValentine", "id": "JILLID" },
+			"repository": {},
+			"organization": {}
+		} }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "requestReviews": {
+			"clientMutationId": ""
+		} } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["userIds"], []interface{}{"JILLID"})
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
-	`))
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, "recovered title", input["title"].(string))
+			assert.Equal(t, "recovered body", input["body"].(string))
+		}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -157,31 +184,48 @@ func TestPRCreate_json(t *testing.T) {
 	cs.Stub("")                                         // git status
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 
-	output, err := runCommand(http, nil, "feature", false, `-j'{"title":"cool", "body":"pr"}' -H feature`)
-	require.NoError(t, err)
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Title",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-				BaseRefName  string
-				HeadRefName  string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
+	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	assert.NoError(t, err)
 
-	assert.Equal(t, "REPOID", reqBody.Variables.Input.RepositoryID)
-	assert.Equal(t, "cool", reqBody.Variables.Input.Title)
-	assert.Equal(t, "pr", reqBody.Variables.Input.Body)
-	assert.Equal(t, "master", reqBody.Variables.Input.BaseRefName)
-	assert.Equal(t, "feature", reqBody.Variables.Input.HeadRefName)
+	state := prShared.IssueMetadataState{
+		Title:     "recovered title",
+		Body:      "recovered body",
+		Reviewers: []string{"jillValentine"},
+	}
 
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+	data, err := json.Marshal(state)
+	assert.NoError(t, err)
+
+	_, err = tmpfile.Write(data)
+	assert.NoError(t, err)
+
+	args := fmt.Sprintf("-e '%s' -Hfeature", tmpfile.Name())
+
+	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, args, "")
+	assert.NoError(t, err)
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 
 func TestPRCreate_nontty(t *testing.T) {

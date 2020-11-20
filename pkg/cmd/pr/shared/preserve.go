@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -40,8 +39,6 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			return
 		}
 
-		tmpfilePath := filepath.Join(os.TempDir(), tmpfile.Name())
-
 		_, err = tmpfile.Write(data)
 		if err != nil {
 			fmt.Fprintf(out, "failed to save input to file: %s\n", err)
@@ -57,8 +54,7 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			issueType = "issue"
 		}
 
-		fmt.Fprintf(out, "%s operation failed. input saved to: %s\n", cs.FailureIcon(), tmpfilePath)
-		fmt.Fprintf(out, "resubmit with: gh %s create -j@%s\n", issueType, tmpfilePath)
+		fmt.Fprintf(out, "%s operation failed. recover with: gh %s create -e%s\n", cs.FailureIcon(), issueType, tmpfile.Name())
 
 		// some whitespace before the actual error
 		fmt.Fprintln(out)

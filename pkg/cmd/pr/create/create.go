@@ -38,10 +38,9 @@ type CreateOptions struct {
 	RootDirOverride string
 	RepoOverride    string
 
-	Autofill  bool
-	WebMode   bool
-	JSONFill  bool
-	JSONInput string
+	Autofill    bool
+	WebMode     bool
+	RecoverFile string
 
 	IsDraft    bool
 	Title      string
@@ -101,12 +100,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.JSONFill = cmd.Flags().Changed("json")
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			if !opts.IO.CanPrompt() && !opts.JSONFill && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
+			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
+				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
+			}
+
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
 			}
 
@@ -115,10 +117,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
-			}
-
-			if opts.JSONFill && opts.WebMode {
-				return errors.New("--web and --json are mutually exclusive")
 			}
 
 			if runF != nil {
@@ -141,7 +139,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
-	fl.StringVarP(&opts.JSONInput, "json", "j", "", "Use JSON to populate and submit PR")
+	fl.StringVarP(&opts.RecoverFile, "recover", "e", "", "Recover input from a failed run of create")
 
 	return cmd
 }
@@ -212,18 +210,11 @@ func createRun(opts *CreateOptions) (err error) {
 		return submitPR(*opts, *ctx, *state)
 	}
 
-	if opts.JSONFill {
-		err = shared.FillFromJSON(opts.IO, opts.JSONInput, state)
+	if opts.RecoverFile != "" {
+		err = shared.FillFromJSON(opts.IO, opts.RecoverFile, state)
 		if err != nil {
-			return fmt.Errorf("could not use JSON input: %w", err)
+			return fmt.Errorf("failed to recover input: %w", err)
 		}
-
-		err = handlePush(*opts, *ctx)
-		if err != nil {
-			return
-		}
-
-		return submitPR(*opts, *ctx, *state)
 	}
 
 	if !opts.TitleProvided {
@@ -242,11 +233,13 @@ func createRun(opts *CreateOptions) (err error) {
 
 	templateContent := ""
 	if !opts.BodyProvided {
-		templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
+		if opts.RecoverFile == "" {
+			templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
 
-		templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
-		if err != nil {
-			return
+			templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
+			if err != nil {
+				return
+			}
 		}
 
 		err = shared.BodySurvey(state, templateContent, editorCommand)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -18,7 +17,7 @@ func Test_PreserveInput(t *testing.T) {
 		name             string
 		state            *IssueMetadataState
 		err              bool
-		wantErrLines     []string
+		wantErrLine      string
 		wantPreservation bool
 	}{
 		{
@@ -44,10 +43,7 @@ func Test_PreserveInput(t *testing.T) {
 				Reviewers: []string{"barry", "chris"},
 				Labels:    []string{"sandwich"},
 			},
-			wantErrLines: []string{
-				`X operation failed. input saved to:.*testfile.*`,
-				`resubmit with: gh issue create -j@.*testfile.*`,
-			},
+			wantErrLine:      `X operation failed. recover with: gh issue create -e.*testfile.*`,
 			err:              true,
 			wantPreservation: true,
 		},
@@ -57,10 +53,7 @@ func Test_PreserveInput(t *testing.T) {
 				Reviewers: []string{"barry", "chris"},
 				Labels:    []string{"sandwich"},
 			},
-			wantErrLines: []string{
-				`X operation failed. input saved to:.*testfile.*`,
-				`resubmit with: gh issue create -j@.*testfile.*`,
-			},
+			wantErrLine:      `X operation failed. recover with: gh issue create -e.*testfile.*`,
 			err:              true,
 			wantPreservation: true,
 		},
@@ -71,10 +64,7 @@ func Test_PreserveInput(t *testing.T) {
 				Title: "a pull request",
 				Type:  PRMetadata,
 			},
-			wantErrLines: []string{
-				`X operation failed. input saved to:.*testfile.*`,
-				`resubmit with: gh pr create -j@.*testfile.*`,
-			},
+			wantErrLine:      `X operation failed. recover with: gh pr create -e.*testfile.*`,
 			err:              true,
 			wantPreservation: true,
 		},
@@ -88,9 +78,9 @@ func Test_PreserveInput(t *testing.T) {
 
 			io, _, _, errOut := iostreams.Test()
 
-			tfPath, tf, tferr := tmpfile()
+			tf, tferr := tmpfile()
 			assert.NoError(t, tferr)
-			defer os.Remove(tfPath)
+			defer os.Remove(tf.Name())
 
 			io.TempFileOverride = tf
 
@@ -108,7 +98,7 @@ func Test_PreserveInput(t *testing.T) {
 			assert.NoError(t, err)
 
 			if tt.wantPreservation {
-				test.ExpectLines(t, errOut.String(), tt.wantErrLines...)
+				test.ExpectLines(t, errOut.String(), tt.wantErrLine)
 				preserved := &IssueMetadataState{}
 				assert.NoError(t, json.Unmarshal(data, preserved))
 				preserved.dirty = tt.state.dirty
@@ -121,12 +111,12 @@ func Test_PreserveInput(t *testing.T) {
 	}
 }
 
-func tmpfile() (string, *os.File, error) {
+func tmpfile() (*os.File, error) {
 	dir := os.TempDir()
 	tmpfile, err := ioutil.TempFile(dir, "testfile*")
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	return filepath.Join(dir, tmpfile.Name()), tmpfile, nil
+	return tmpfile, nil
 }

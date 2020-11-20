@@ -3,7 +3,6 @@ package shared
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/iostreams"
@@ -52,16 +51,12 @@ func (tb *IssueMetadataState) HasMetadata() bool {
 		len(tb.Milestones) > 0
 }
 
-func FillFromJSON(io *iostreams.IOStreams, JSONInput string, state *IssueMetadataState) error {
+func FillFromJSON(io *iostreams.IOStreams, recoverFile string, state *IssueMetadataState) error {
 	var data []byte
 	var err error
-	if strings.HasPrefix(JSONInput, "@") {
-		data, err = io.ReadUserFile(JSONInput[1:])
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", JSONInput[1:], err)
-		}
-	} else {
-		data = []byte(JSONInput)
+	data, err = io.ReadUserFile(recoverFile)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", recoverFile, err)
 	}
 
 	err = json.Unmarshal(data, state)
