@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -143,6 +144,26 @@ func Test_parseConfigFile(t *testing.T) {
 			}
 			assert.Equal(t, yaml.MappingNode, yamlRoot.Content[0].Kind)
 			assert.Equal(t, 0, len(yamlRoot.Content[0].Content))
+		})
+	}
+}
+
+func Test_configPath(t *testing.T) {
+	tests := []struct {
+		envVar string
+		want   string
+	}{
+		{"/tmp/gh", "/tmp/gh"},
+		{"", "~/.config/gh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("envVar: %q", tt.envVar), func(t *testing.T) {
+			if tt.envVar != "" {
+				os.Setenv(GH_CONFIG_DIR, tt.envVar)
+				defer os.Unsetenv(GH_CONFIG_DIR)
+			}
+			eq(t, configPath(), tt.want)
 		})
 	}
 }

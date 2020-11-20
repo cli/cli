@@ -14,6 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	GH_CONFIG_DIR = "GH_CONFIG_DIR"
+)
+
 func ConfigDir() string {
 	homeDir, _ := homeDirAutoMigrate()
 	return homeDir
@@ -262,4 +266,11 @@ func findRegularFile(p string) string {
 		p = newPath
 	}
 	return ""
+}
+
+func configPath() string {
+	if v := os.Getenv(GH_CONFIG_DIR); v != "" {
+		return v
+	}
+	return "~/.config/gh"
 }
