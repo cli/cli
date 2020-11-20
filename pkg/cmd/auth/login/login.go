@@ -229,11 +229,13 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
+	userValidated := false
 	if authMode == 0 {
 		_, err := authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		userValidated = true
 	} else {
 		fmt.Fprintln(opts.IO.ErrOut)
 		fmt.Fprintln(opts.IO.ErrOut, heredoc.Doc(getAccessTokenTip(hostname)))
@@ -286,19 +288,24 @@ func loginRun(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	apiClient, err := client.ClientFromCfg(hostname, cfg)
-	if err != nil {
-		return err
-	}
+	var username string
+	if userValidated {
+		username, _ = cfg.Get(hostname, "user")
+	} else {
+		apiClient, err := client.ClientFromCfg(hostname, cfg)
+		if err != nil {
+			return err
+		}
 
-	username, err := api.CurrentLoginName(apiClient, hostname)
-	if err != nil {
-		return fmt.Errorf("error using api: %w", err)
-	}
+		username, err = api.CurrentLoginName(apiClient, hostname)
+		if err != nil {
+			return fmt.Errorf("error using api: %w", err)
+		}
 
-	err = cfg.Set(hostname, "user", username)
-	if err != nil {
-		return err
+		err = cfg.Set(hostname, "user", username)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = cfg.Write()
