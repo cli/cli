@@ -9,13 +9,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 )
 
-func dumpPath(random int64) string {
-	r := fmt.Sprintf("%x", random)
-	r = r[len(r)-5:]
-	dumpFilename := fmt.Sprintf("gh%s.json", r)
-	return filepath.Join(os.TempDir(), dumpFilename)
-}
-
 func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr *error) func() {
 	return func() {
 		if !state.IsDirty() {

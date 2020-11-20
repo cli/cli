@@ -101,7 +101,8 @@ func Test_PreserveInput(t *testing.T) {
 
 			PreserveInput(io, tt.state, &err)()
 
-			tf.Seek(0, 0)
+			_, err = tf.Seek(0, 0)
+			assert.NoError(t, err)
 
 			data, err := ioutil.ReadAll(tf)
 			assert.NoError(t, err)
