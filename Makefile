@@ -26,6 +26,7 @@ ifdef GH_OAUTH_CLIENT_SECRET
 	GO_LDFLAGS := -X github.com/cli/cli/internal/authflow.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(GO_LDFLAGS)
 endif
 
+install-bins += bin/gh
 bin/gh: $(BUILD_FILES)
 	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
@@ -62,3 +63,20 @@ endif
 .PHONY: manpages
 manpages:
 	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/
+
+DESTDIR :=
+prefix  := /usr/local
+bindir  := ${prefix}/bin
+
+.PHONY: install install-strip uninstall
+INSTALL_STRIP_FLAG =
+install-strip:
+	@${MAKE} INSTALL_STRIP_FLAG=-s install
+
+install: ${install-bins}
+	install -d ${DESTDIR}${bindir}
+	install -m555 ${INSTALL_STRIP_FLAG} ${install-bins} ${DESTDIR}${bindir}/
+
+remove-bins := ${install-bins:bin/%=${DESTDIR}${bindir}/%}
+uninstall:
+	rm -f ${remove-bins}
