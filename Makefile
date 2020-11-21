@@ -9,15 +9,12 @@ else
     BUILD_DATE ?= $(shell date "$(DATE_FMT)")
 endif
 
-ifndef CGO_CPPFLAGS
-    export CGO_CPPFLAGS := $(CPPFLAGS)
-endif
-ifndef CGO_CFLAGS
-    export CGO_CFLAGS := $(CFLAGS)
-endif
-ifndef CGO_LDFLAGS
-    export CGO_LDFLAGS := $(LDFLAGS)
-endif
+CGO_CPPFLAGS ?= ${CPPFLAGS}
+export CGO_CPPFLAGS
+CGO_CFLAGS ?= ${CFLAGS}
+export CGO_CFLAGS
+CGO_LDFLAGS ?= ${LDFLAGS}
+export CGO_LDFLAGS
 
 GO_LDFLAGS := -X github.com/cli/cli/internal/build.Version=$(GH_VERSION) $(GO_LDFLAGS)
 GO_LDFLAGS := -X github.com/cli/cli/internal/build.Date=$(BUILD_DATE) $(GO_LDFLAGS)
