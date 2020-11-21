@@ -24,7 +24,7 @@ ifdef GH_OAUTH_CLIENT_SECRET
 endif
 
 bin/gh: $(BUILD_FILES)
-	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
+	go build -trimpath -ldflags "${GO_LDFLAGS}" -o "$@" ./cmd/gh
 
 clean:
 	rm -rf ./bin ./share
