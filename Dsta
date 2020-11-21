@@ -1,0 +1,1025 @@
+<html><head><meta charset="UTF-8">
+<title>Device Data</title>
+
+<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto'>
+<style>
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    td, th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+    }
+    th {
+        background-color: #dddddd;
+    }
+    html,body,h1,h2,h3,h4,h5,h6 {
+      font-family: "Roboto", sans-serif
+    }
+    body {
+      margin:auto;
+      padding:0.01em 16px
+    }
+    .title{
+      color:#757575!important;
+      font-size:30px!important;
+      padding-top:16px!important;
+      padding-bottom:8px!important;
+    }
+    .category-title {
+      font-size:24px!important;
+      opacity:0.75;
+    }
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      display:table;
+    }
+    td, th {
+      border: 1px solid #dddddd;
+      text-align: left;
+      padding: 8px;
+    }
+    th {
+      background-color: #dddddd;
+    }
+  </style></head><body>
+
+<div class="title">
+<img src="https://www.gstatic.com/images/icons/material/system/1x/phone_android_grey600_24dp.png" alt="Icon">
+ANDROID DEVICE CONFIGURATION SERVICE DATA
+</div>
+
+<h3 class="category-title">Device and Account Identifiers</h3>
+Android ID: 4302491494185745010<br/>
+MEID(s): 35537010046382<br/>
+IMEI(s): 355370100463825<br/>
+ESN(s): <br/>
+Serial Number(s): a20p:R58M72Z4HAH<br/>
+MAC Addresses: <br/>
+<br/>
+<hr>
+
+<h3 class="category-title">Device Attributes</h3>
+Locale: en-US<br/>
+Timezone: America/Chicago<br/>
+IP address from Last Data Connection: 67.52.0.70<br/>
+<br/>
+Hardware: exynos7904<br/>
+Model: SM-A205U<br/>
+Brand: samsung<br/>
+Manufacturer: samsung<br/>
+Device: a20p<br/>
+Product: a20psq<br/>
+Radio Firmware Version: A205USQS6BTH2<br/>
+Bootloader Firmware Version: A205USQS6BTH2<br/>
+<br/>
+Device Type: Phone<br/>
+Touch Screen Type: Finger<br/>
+Keyboard Type: No Keys<br/>
+Hard Keyboard: false<br/>
+Navigation Type: No Navigation<br/>
+Five Way Navigation: false<br/>
+Screen Layout: Normal<br/>
+Dynamic Screen Layout: Undefined<br/>
+Screen Density: 280 DPI<br/>
+Screen Height: 1560 pixels<br/>
+Screen Width: 720 pixels<br/>
+Smallest Screen Width: 411 pixels<br/>
+<br/>
+System Shared Libraries: EpdgManager, SemAudioThumbnail, allshare, android.ext.services, android.ext.shared, android.hidl.base-V1.0-java, android.hidl.manager-V1.0-java, android.test.base, android.test.mock, android.test.runner, com.android.future.usb.accessory, com.android.location.provider, com.android.media.remotedisplay, com.android.mediadrm.signer, com.android.nfc_extras, com.google.android.gms, com.google.android.maps, com.gsma.services.nfc, com.publicnfc, com.samsung.android.knox.analytics.sdk, com.samsung.android.knox.knoxsdk, com.samsung.android.knox.securetimer.sdk, com.samsung.android.nfc.mpos, com.samsung.android.nfc.rfcontrol, com.samsung.android.nfc.t4t, com.samsung.bbc, com.samsung.device, com.sec.android.mdm, com.sec.esecomm, com.sec.smartcard.auth, com.sprint.internal.id.LauncherFacade, com.verizon.embms, com.verizon.net, com.verizon.os, com.verizon.phone, com.verizon.provider, com.vzw.apnlib, imsmanager, javax.obex, libvtmanagerjar, org.apache.http.legacy, org.nablabs.libFmRadioImpl.FmRadio, org.simalliance.openmobileapi, rcsopenapi, saiv, samsungkeystoreutils, scamera_sdk_util, sec_feature, sec_platform_library, secimaging, semcamera, semcamera2, semextendedformat, semsdrvideoconverter, sercsapi, sfeffect, stayrotation, svemanager, vsimmanager<br/>
+Supported Native Platforms / CPU Types: arm64-v8a, armeabi-v7a, armeabi<br/>
+Supported Locales: af, am, ar, as, az, be, bg, bn, bs, ca, cs, da, de, de-DE, el, en, en-GB, en-US, es, es-US, et, eu, fa, fi, fil, fr, fr-CA, fr-FR, gl, gu, hi, hr, hu, hy, in, is, it, it-IT, iw, ja, ja-JP, ka, kk, km, kn, ko, ko-KR, ky, lo, lt, lv, mk, ml, mn, mr, ms, my, nb, ne, nl, or, pa, pl, pt, pt-BR, pt-PT, ro, ru, si, sk, sl, sq, sr, sr-Latn, sv, sw, ta, te, th, tr, uk, ur, uz, vi, vi-VN, zh-CN, zh-HK, zh-TW, zu<br/>
+Supported OpenGL Extensions: GL_ANDROID_extension_pack_es31a, GL_ARM_mali_program_binary, GL_ARM_mali_shader_binary, GL_ARM_rgba8, GL_ARM_shader_framebuffer_fetch, GL_ARM_shader_framebuffer_fetch_depth_stencil, GL_EXT_EGL_image_array, GL_EXT_YUV_target, GL_EXT_blend_minmax, GL_EXT_buffer_storage, GL_EXT_color_buffer_float, GL_EXT_color_buffer_half_float, GL_EXT_copy_image, GL_EXT_debug_marker, GL_EXT_discard_framebuffer, GL_EXT_disjoint_timer_query, GL_EXT_draw_buffers_indexed, GL_EXT_draw_elements_base_vertex, GL_EXT_external_buffer, GL_EXT_geometry_shader, GL_EXT_gpu_shader5, GL_EXT_multisampled_render_to_texture, GL_EXT_multisampled_render_to_texture2, GL_EXT_occlusion_query_boolean, GL_EXT_primitive_bounding_box, GL_EXT_protected_textures, GL_EXT_read_format_bgra, GL_EXT_robustness, GL_EXT_sRGB, GL_EXT_sRGB_write_control, GL_EXT_shader_io_blocks, GL_EXT_shader_non_constant_global_initializers, GL_EXT_shader_pixel_local_storage, GL_EXT_shadow_samplers, GL_EXT_tessellation_shader, GL_EXT_texture_border_clamp, GL_EXT_texture_buffer, GL_EXT_texture_cube_map_array, GL_EXT_texture_format_BGRA8888, GL_EXT_texture_rg, GL_EXT_texture_sRGB_R8, GL_EXT_texture_sRGB_RG8, GL_EXT_texture_sRGB_decode, GL_EXT_texture_storage, GL_EXT_texture_type_2_10_10_10_REV, GL_KHR_blend_equation_advanced, GL_KHR_blend_equation_advanced_coherent, GL_KHR_debug, GL_KHR_robust_buffer_access_behavior, GL_KHR_robustness, GL_KHR_texture_compression_astc_hdr, GL_KHR_texture_compression_astc_ldr, GL_KHR_texture_compression_astc_sliced_3d, GL_OES_EGL_image, GL_OES_EGL_image_external, GL_OES_EGL_image_external_essl3, GL_OES_EGL_sync, GL_OES_blend_equation_separate, GL_OES_blend_func_separate, GL_OES_blend_subtract, GL_OES_byte_coordinates, GL_OES_compressed_ETC1_RGB8_texture, GL_OES_compressed_paletted_texture, GL_OES_copy_image, GL_OES_depth24, GL_OES_depth_texture, GL_OES_depth_texture_cube_map, GL_OES_draw_buffers_indexed, GL_OES_draw_elements_base_vertex, GL_OES_draw_texture, GL_OES_element_index_uint, GL_OES_extended_matrix_palette, GL_OES_fbo_render_mipmap, GL_OES_fixed_point, GL_OES_framebuffer_object, GL_OES_geometry_shader, GL_OES_get_program_binary, GL_OES_gpu_shader5, GL_OES_mapbuffer, GL_OES_matrix_get, GL_OES_matrix_palette, GL_OES_packed_depth_stencil, GL_OES_point_size_array, GL_OES_point_sprite, GL_OES_primitive_bounding_box, GL_OES_query_matrix, GL_OES_read_format, GL_OES_required_internalformat, GL_OES_rgb8_rgba8, GL_OES_sample_shading, GL_OES_sample_variables, GL_OES_shader_image_atomic, GL_OES_shader_io_blocks, GL_OES_shader_multisample_interpolation, GL_OES_single_precision, GL_OES_standard_derivatives, GL_OES_stencil8, GL_OES_stencil_wrap, GL_OES_surfaceless_context, GL_OES_tessellation_shader, GL_OES_texture_3D, GL_OES_texture_border_clamp, GL_OES_texture_buffer, GL_OES_texture_compression_astc, GL_OES_texture_cube_map, GL_OES_texture_cube_map_array, GL_OES_texture_mirrored_repeat, GL_OES_texture_npot, GL_OES_texture_stencil8, GL_OES_texture_storage_multisample_2d_array, GL_OES_vertex_array_object, GL_OES_vertex_half_float, GL_OVR_multiview, GL_OVR_multiview2, GL_OVR_multiview_multisampled_render_to_texture<br/>
+Number Of Available Processors: 8<br/>
+Secure Screenlock Available: true<br/>
+Total Memory: 2840977408 Bytes<br/>
+Low Ram Device: false<br/>
+Maximum APK Download Size: 50 MB<br/>
+OEM Play Auto Installs Configuration Key: <br/>
+OTA Installed Build: true<br/>
+System Available Features: 
+<table border="1"><tr>
+    <th>Feature</th>
+    <th>Version</th>
+</tr><tr>
+    <td>android.hardware.audio.output</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.bluetooth</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.bluetooth_le</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.camera</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.camera.any</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.camera.autofocus</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.camera.flash</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.camera.front</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.faketouch</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.fingerprint</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.location</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.location.gps</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.location.network</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.microphone</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.nfc</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.nfc.any</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.nfc.hce</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.nfc.hcef</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.opengles.aep</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.ram.normal</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.screen.landscape</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.screen.portrait</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.sensor.accelerometer</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.sensor.compass</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.sensor.gyroscope</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.sensor.proximity</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.telephony</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.telephony.cdma</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.telephony.gsm</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.touchscreen</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.touchscreen.multitouch</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.touchscreen.multitouch.distinct</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.touchscreen.multitouch.jazzhand</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.usb.accessory</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.usb.host</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.vulkan.compute</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.vulkan.level</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.vulkan.version</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.wifi</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.wifi.direct</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.activities_on_secondary_displays</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.app_widgets</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.autofill</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.backup</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.cant_save_state</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.companion_device_setup</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.connectionservice</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.cts</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.device_admin</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.file_based_encryption</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.freeform_window_management</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.home_screen</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.input_methods</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.live_wallpaper</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.managed_users</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.midi</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.picture_in_picture</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.print</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.securely_removes_users</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.sip</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.sip.voip</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.verified_boot</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.voice_recognizers</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.webview</td>
+    <td></td>
+</tr><tr>
+    <td>com.google.android.feature.TURBO_PRELOAD</td>
+    <td></td>
+</tr><tr>
+    <td>com.nxp.mifare</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2402</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2403</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2501</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2502</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2601</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2701</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2801</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.authfw</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.bio.face</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.knox.knoxsdk</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.dof</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.effect</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.gif</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.haze</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.hdr</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.sdk.camera.processor.lls</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.clockpack_v06</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.device_category_phone</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.device_category_phone_low_end</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.galaxyfinder_v7</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.ipsgeofence</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.samsung_experience_mobile</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.samsungpositioning</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.android.mdm</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.android.secimaging</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.android.secimaging.faceAR</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.android.smartface.smart_stay</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.cover</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.cover.flip</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.findo</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.fingerprint_manager_service</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.motionrecognition_service</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.nsflp</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.overlaymagnifier</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.saccessorymanager</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.slocation</td>
+    <td></td>
+</tr><tr>
+    <td>com.sec.feature.usb_authentication</td>
+    <td></td>
+</tr><tr>
+    <td>com.verizon.feature.appsdownload</td>
+    <td></td>
+</tr><tr>
+    <td>com.verizon.hardware.telephony.ehrpd</td>
+    <td></td>
+</tr><tr>
+    <td>com.verizon.hardware.telephony.lte</td>
+    <td></td>
+</tr><tr>
+    <td>com.verizon.hardware.telephony.srlte</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.samsungpositioning.snlp</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.telephony.ims</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.ipsec_tunnels</td>
+    <td></td>
+</tr><tr>
+    <td>android.software.secure_lock_screen</td>
+    <td></td>
+</tr><tr>
+    <td>android.sofware.nfc.beam</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2802</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2803</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.android.api.version.2901</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.SAMSUNG_EXPERIENCE</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.clockpack_v07</td>
+    <td></td>
+</tr><tr>
+    <td>com.samsung.feature.mirrorlink_fw</td>
+    <td></td>
+</tr><tr>
+    <td>android.hardware.vulkan.level</td>
+    <td>1</td>
+</tr><tr>
+    <td>android.hardware.vulkan.version</td>
+    <td>4198400</td>
+</tr><tr>
+    <td>com.samsung.feature.ipsgeofence</td>
+    <td>1</td>
+</tr><tr>
+    <td>com.samsung.feature.mirrorlink_fw</td>
+    <td>8</td>
+</tr><tr>
+    <td>com.sec.feature.nsflp</td>
+    <td>500</td>
+</tr><tr>
+    <td>com.sec.feature.slocation</td>
+    <td>3</td>
+</tr>
+</table><br/>
+<hr>
+
+<h3 class="category-title">System Software and Security Versions</h3>
+OS Build Fingerprint: samsung/a20psq/a20p:10/QP1A.190711.020/A205USQS6BTH2:user/release-keys<br/>
+OS Build Timestamp: Aug 21, 2020, 7:51:55 AM UTC<br/>
+Android SDK Version: 29<br/>
+Google Services Framework / Google Play Services Version: 204217037<br/>
+Security Patch Level: 2020-09-01<br/>
+OTA Certificates: pQCiqOznWXJsMOtUFQOoAlW1zig=, Pcsad29a5jlLVFIZ9U5JX6bj0ao=<br/>
+<hr>
+
+<h3 class="category-title">Network Connectivity &amp; Performance</h3>
+Current SIM Operator(MCC+MNC): 311490<br/>
+Current Cell Operator(MCC+MNC): 311490<br/>
+Data Network Type: WIFI<br/>
+Last SIM Operator(MCC+MNC): 311490<br/>
+Last Cell Operator(MCC+MNC): 311490<br/>
+SIM Subscription Data: 
+<table border="1"><tr>
+    <th>SIM Operator (MCC+MNC)</th>
+    <th>Carrier Name</th>
+    <th>Roaming State</th>
+    <th>Default Roles</th>
+    <th>Truncated IMSI</th>
+    <th>Group ID Level1</th>
+</tr><tr>
+    <td>311490</td>
+    <td>Virgin Mobile</td>
+    <td>Data Roaming Enabled</td>
+    <td>Voice, Data, SMS</td>
+    <td>312530205700000</td>
+    <td>000003FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF</td>
+</tr>
+</table><br/>
+Registration Time: Sep 19, 2019, 2:03:54 PM UTC<br/>
+First Data Connection Time: Sep 19, 2019, 2:03:54 PM UTC<br/>
+<br/>
+Time of Last Data Connection: Nov 19, 2020, 5:35:40 PM UTC<br/>
+Reason for Last Data Connection: Internal Trigger<br/>
+Last Data Connection Attempt Count: 1<br/>
+App Package Triggering Last Data Connection: unspecified<br/>
+App Class Triggering Last Data Connection: <br/>
+App Used Force Option For Triggering Last Data Connection: <br/>
+<h3>Recent Successful Android Device Configuration Service Connections: </h3>
+<table border="1"><tr>
+    <th>Connection Time</th>
+    <th>Build Fingerprint</th>
+    <th>Product</th>
+    <th>Brand</th>
+    <th>Radio Firmware Version</th>
+    <th>Bootloader Firmware Version</th>
+    <th>Google Play Services Version</th>
+</tr><tr>
+    <td>Jul 8, 2020, 9:16:51 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Jul 9, 2020, 4:13:51 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Jul 15, 2020, 9:19:21 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Jul 16, 2020, 2:46:08 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Jul 21, 2020, 4:33:12 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>202414028</td>
+</tr><tr>
+    <td>Jul 22, 2020, 9:11:48 AM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>202414037</td>
+</tr><tr>
+    <td>Jul 23, 2020, 12:48:48 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Jul 30, 2020, 11:13:48 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 1, 2020, 3:31:05 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>202614037</td>
+</tr><tr>
+    <td>Aug 5, 2020, 3:23:00 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 6, 2020, 9:53:33 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 6, 2020, 12:02:12 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 6, 2020, 2:07:38 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 10, 2020, 10:25:16 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 13, 2020, 8:11:16 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 16, 2020, 4:03:18 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>203019037</td>
+</tr><tr>
+    <td>Aug 18, 2020, 1:43:24 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 20, 2020, 6:19:05 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 21, 2020, 8:10:42 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 21, 2020, 9:31:46 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 27, 2020, 5:38:24 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 27, 2020, 6:39:52 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Aug 28, 2020, 1:00:50 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 3, 2020, 2:59:38 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 10, 2020, 1:25:06 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 15, 2020, 2:59:52 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>203315037</td>
+</tr><tr>
+    <td>Sep 17, 2020, 12:27:16 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 17, 2020, 2:07:33 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 23, 2020, 9:03:23 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 23, 2020, 10:11:20 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 27, 2020, 1:44:28 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Sep 29, 2020, 9:06:40 AM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQU5BTF3:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQU5BTF3</td>
+    <td>A205USQU5BTF3</td>
+    <td>203615037</td>
+</tr><tr>
+    <td>Sep 30, 2020, 8:26:41 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 1, 2020, 2:07:47 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 2, 2020, 4:29:08 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQS6BTH2:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQS6BTH2</td>
+    <td>A205USQS6BTH2</td>
+    <td>203615037</td>
+</tr><tr>
+    <td>Oct 7, 2020, 6:57:55 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 8, 2020, 2:08:27 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 10, 2020, 7:52:04 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 14, 2020, 5:19:20 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 14, 2020, 6:35:43 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 15, 2020, 3:55:25 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 16, 2020, 6:30:01 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 16, 2020, 6:31:03 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 16, 2020, 2:18:42 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 16, 2020, 2:19:55 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 20, 2020, 9:07:20 AM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQS6BTH2:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQS6BTH2</td>
+    <td>A205USQS6BTH2</td>
+    <td>203915037</td>
+</tr><tr>
+    <td>Oct 21, 2020, 3:33:27 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 24, 2020, 5:03:08 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Oct 28, 2020, 1:57:02 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 2, 2020, 12:35:56 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 4, 2020, 12:31:23 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 7, 2020, 1:20:44 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 8, 2020, 5:33:16 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 9, 2020, 12:22:42 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 11, 2020, 12:04:40 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 11, 2020, 3:57:54 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQS6BTH2:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQS6BTH2</td>
+    <td>A205USQS6BTH2</td>
+    <td>204215037</td>
+</tr><tr>
+    <td>Nov 14, 2020, 4:45:55 PM UTC</td>
+    <td>samsung/a20psq/a20p:10/QP1A.190711.020/A205USQS6BTH2:user/release-keys</td>
+    <td>exynos7904</td>
+    <td>samsung</td>
+    <td>A205USQS6BTH2</td>
+    <td>A205USQS6BTH2</td>
+    <td>204217037</td>
+</tr><tr>
+    <td>Nov 16, 2020, 12:34:43 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 18, 2020, 9:10:44 AM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr><tr>
+    <td>Nov 19, 2020, 5:35:40 PM UTC</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr>
+</table><br/>
+<h3>Recent Failed Android Device Configuration Service Connections: </h3>
+<table border="1"><tr>
+    <th>Connection Time</th>
+    <th>HTTP Response Code</th>
+</tr>
+</table><br/>
+<hr>
+</body></html>
