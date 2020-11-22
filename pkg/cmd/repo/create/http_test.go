@@ -17,7 +17,7 @@ func Test_RepoCreate(t *testing.T) {
 	reg.StubResponse(200, bytes.NewBufferString(`{}`))
 
 	input := repoCreateInput{
-		Description: "roasted chesnuts",
+		Description: "roasted chestnuts",
 		HomepageURL: "http://example.com",
 	}
 
@@ -39,8 +39,8 @@ func Test_RepoCreate(t *testing.T) {
 
 	bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
 	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if description := reqBody.Variables.Input["description"].(string); description != "roasted chesnuts" {
-		t.Errorf("expected description to be %q, got %q", "roasted chesnuts", description)
+	if description := reqBody.Variables.Input["description"].(string); description != "roasted chestnuts" {
+		t.Errorf("expected description to be %q, got %q", "roasted chestnuts", description)
 	}
 	if homepage := reqBody.Variables.Input["homepageUrl"].(string); homepage != "http://example.com" {
 		t.Errorf("expected homepageUrl to be %q, got %q", "http://example.com", homepage)
