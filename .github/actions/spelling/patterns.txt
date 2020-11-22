@@ -1,0 +1,17 @@
+# GitHub SHAs
+(?:\[[0-9a-f]+\]\(https:/|)/github\.com/[^/]+/[^/]+/[^/]+/[0-9a-f]+\b
+# githubusercontent
+/[a-z-]+\.githubusercontent\.com/[-a-zA-Z0-9?&=_\/.]*
+# gist github
+/gist\.github\.com/[^/]+/[0-9a-f]+
+# URL escaped characters
+\%[0-9A-F]{2}
+# sha-1
+"[0-9a-f]{40}"
+# hex digits including css/html color classes:
+(?:[\\0][xX]|\\u|[uU]\+|#|\%23)[0-9a-fA-FgGrR]{2,}[uU]?[lL]{0,2}\b
+# uuid:
+[{"'][0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}['"}]
+"content": "[a-zA-Z=;,/0-9+-]+"
+"id": "[a-zA-Z=;,/0-9+-]+"
+v\d+

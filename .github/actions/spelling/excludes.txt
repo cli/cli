@@ -1,0 +1,6 @@
+^\.github/
+^test/fixtures/
+\.asc$
+\.exe$
+ignore$
+^go\.(?:sum|mod)$
