@@ -59,7 +59,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
 	cmd.SetHelpFunc(helpHelper)
 	cmd.SetUsageFunc(rootUsageFunc)
-	cmd.SetFlagErrorFunc(rootFlagErrrorFunc)
+	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
 	formattedVersion := versionCmd.Format(version, buildDate)
 	cmd.SetVersionTemplate(formattedVersion)
