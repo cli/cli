@@ -319,7 +319,7 @@ func TestPRReview(t *testing.T) {
 		{`--request-changes -b"bad"`, "REQUEST_CHANGES", "bad"},
 		{`--approve`, "APPROVE", ""},
 		{`--approve -b"hot damn"`, "APPROVE", "hot damn"},
-		{`--comment --body "i donno"`, "COMMENT", "i donno"},
+		{`--comment --body "i dunno"`, "COMMENT", "i dunno"},
 	}
 
 	for _, kase := range cases {
