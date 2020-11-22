@@ -90,7 +90,7 @@ example.com:
 	val, err = config.Get("github.com", "git_protocol")
 	eq(t, err, nil)
 	eq(t, val, "ssh")
-	val, err = config.Get("nonexist.io", "git_protocol")
+	val, err = config.Get("nonexistent.io", "git_protocol")
 	eq(t, err, nil)
 	eq(t, val, "ssh")
 }

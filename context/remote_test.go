@@ -28,11 +28,11 @@ func Test_Remotes_FindByName(t *testing.T) {
 	eq(t, err, nil)
 	eq(t, r.Name, "upstream")
 
-	r, err = list.FindByName("nonexist", "*")
+	r, err = list.FindByName("nonexistent", "*")
 	eq(t, err, nil)
 	eq(t, r.Name, "mona")
 
-	_, err = list.FindByName("nonexist")
+	_, err = list.FindByName("nonexistent")
 	eq(t, err, errors.New(`no GitHub remotes found`))
 }
 
