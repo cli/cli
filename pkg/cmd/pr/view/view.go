@@ -214,7 +214,7 @@ type reviewerState struct {
 func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) string {
 	state := reviewer.State
 	if state == dismissedReviewState {
-		// Show "DISMISSED" review as "COMMENTED", since "dimissed" only makes
+		// Show "DISMISSED" review as "COMMENTED", since "dismissed" only makes
 		// sense when displayed in an events timeline but not in the final tally.
 		state = commentedReviewState
 	}
