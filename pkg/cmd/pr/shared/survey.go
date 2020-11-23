@@ -16,38 +16,6 @@ import (
 )
 
 type Action int
-type metadataStateType int
-
-const (
-	IssueMetadata metadataStateType = iota
-	PRMetadata
-)
-
-type IssueMetadataState struct {
-	Type metadataStateType
-
-	Draft bool
-
-	Body  string
-	Title string
-
-	Metadata   []string
-	Reviewers  []string
-	Assignees  []string
-	Labels     []string
-	Projects   []string
-	Milestones []string
-
-	MetadataResult *api.RepoMetadataResult
-}
-
-func (tb *IssueMetadataState) HasMetadata() bool {
-	return len(tb.Reviewers) > 0 ||
-		len(tb.Assignees) > 0 ||
-		len(tb.Labels) > 0 ||
-		len(tb.Projects) > 0 ||
-		len(tb.Milestones) > 0
-}
 
 const (
 	SubmitAction Action = iota
@@ -170,6 +138,8 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		state.Body += templateContent
 	}
 
+	preBody := state.Body
+
 	// TODO should just be an AskOne but ran into problems with the stubber
 	qs := []*survey.Question{
 		{
@@ -193,10 +163,16 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		return err
 	}
 
+	if state.Body != "" && preBody != state.Body {
+		state.MarkDirty()
+	}
+
 	return nil
 }
 
 func TitleSurvey(state *IssueMetadataState) error {
+	preTitle := state.Title
+
 	// TODO should just be an AskOne but ran into problems with the stubber
 	qs := []*survey.Question{
 		{
@@ -211,6 +187,10 @@ func TitleSurvey(state *IssueMetadataState) error {
 	err := prompt.SurveyAsk(qs, state)
 	if err != nil {
 		return err
+	}
+
+	if preTitle != state.Title {
+		state.MarkDirty()
 	}
 
 	return nil

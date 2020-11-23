@@ -122,6 +122,10 @@ func (c *ColorScheme) WarningIcon() string {
 	return c.Yellow("!")
 }
 
+func (c *ColorScheme) FailureIcon() string {
+	return c.Red("X")
+}
+
 func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	s = strings.ToLower(s)
 	var fn func(string) string

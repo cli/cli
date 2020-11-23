@@ -3,8 +3,10 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -134,6 +136,96 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	assert.Equal(t, "--title or --fill required when not running interactively", err.Error())
 
 	assert.Equal(t, "", output.String())
+}
+
+func TestPRCreate_recover(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes" : [
+		] } } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "jillValentine", "id": "JILLID" },
+			"repository": {},
+			"organization": {}
+		} }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "requestReviews": {
+			"clientMutationId": ""
+		} } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["userIds"], []interface{}{"JILLID"})
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, "recovered title", input["title"].(string))
+			assert.Equal(t, "recovered body", input["body"].(string))
+		}))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("")                                         // git status
+	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Title",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	assert.NoError(t, err)
+
+	state := prShared.IssueMetadataState{
+		Title:     "recovered title",
+		Body:      "recovered body",
+		Reviewers: []string{"jillValentine"},
+	}
+
+	data, err := json.Marshal(state)
+	assert.NoError(t, err)
+
+	_, err = tmpfile.Write(data)
+	assert.NoError(t, err)
+
+	args := fmt.Sprintf("--recover '%s' -Hfeature", tmpfile.Name())
+
+	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, args, "")
+	assert.NoError(t, err)
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
 }
 
 func TestPRCreate_nontty(t *testing.T) {
