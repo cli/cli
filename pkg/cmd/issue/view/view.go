@@ -128,7 +128,7 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintln(out, "--")
 
 	if len(issue.Comments.Nodes) > 0 {
-		fmt.Fprintf(out, rawIssueComments(issue.Comments))
+		fmt.Fprint(out, rawIssueComments(issue.Comments))
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 func rawIssueComments(comments api.IssueComments) string {
 	var b strings.Builder
 	for _, comment := range comments.Nodes {
-		fmt.Fprintf(&b, rawIssueComment(comment))
+		fmt.Fprint(&b, rawIssueComment(comment))
 	}
 	return b.String()
 }
@@ -160,13 +160,13 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(issue.Title))
-	fmt.Fprintln(out, fmt.Sprintf(
-		"%s • %s opened %s • %s",
+	fmt.Fprintf(out,
+		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue.State),
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
-	))
+	)
 
 	// Reactions
 	if reactions := issue.ReactionGroups.String(); reactions != "" {
@@ -211,7 +211,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, comments)
+		fmt.Fprint(out, comments)
 	}
 
 	// Footer
@@ -227,7 +227,7 @@ func issueComments(io *iostreams.IOStreams, comments api.IssueComments) (string,
 	hiddenCount := comments.TotalCount - retrievedCount
 
 	if hiddenCount > 0 {
-		fmt.Fprintf(&b, cs.Gray(fmt.Sprintf("———————— Hiding %v comments ————————", hiddenCount)))
+		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Hiding %v comments ————————", hiddenCount)))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
 
@@ -237,14 +237,14 @@ func issueComments(io *iostreams.IOStreams, comments api.IssueComments) (string,
 		if err != nil {
 			return "", err
 		}
-		fmt.Fprintf(&b, cmt)
+		fmt.Fprint(&b, cmt)
 		if last {
 			fmt.Fprintln(&b)
 		}
 	}
 
 	if hiddenCount > 0 {
-		fmt.Fprintf(&b, cs.Gray("Use --comments to view the full conversation"))
+		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
 		fmt.Fprintln(&b)
 	}
 
@@ -256,17 +256,17 @@ func issueComment(io *iostreams.IOStreams, comment api.IssueComment, newest bool
 	cs := io.ColorScheme()
 
 	// Header
-	fmt.Fprintf(&b, cs.Bold(comment.Author.Login))
+	fmt.Fprint(&b, cs.Bold(comment.Author.Login))
 	if comment.AuthorAssociation != "NONE" {
-		fmt.Fprintf(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
+		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
 	}
-	fmt.Fprintf(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
+	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
 	if comment.IncludesCreatedEdit {
-		fmt.Fprintf(&b, cs.Bold(" • edited"))
+		fmt.Fprint(&b, cs.Bold(" • edited"))
 	}
 	if newest {
-		fmt.Fprintf(&b, cs.Bold(" • "))
-		fmt.Fprintf(&b, cs.CyanBold("Newest comment"))
+		fmt.Fprint(&b, cs.Bold(" • "))
+		fmt.Fprint(&b, cs.CyanBold("Newest comment"))
 	}
 	fmt.Fprintln(&b)
 

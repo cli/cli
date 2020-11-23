@@ -17,19 +17,19 @@ func Test_String(t *testing.T) {
 		},
 		"non-empty reaction groups": {
 			rgs: []ReactionGroup{
-				ReactionGroup{
+				{
 					Content: "LAUGH",
 					Users:   ReactionGroupUsers{TotalCount: 0},
 				},
-				ReactionGroup{
+				{
 					Content: "HOORAY",
 					Users:   ReactionGroupUsers{TotalCount: 1},
 				},
-				ReactionGroup{
+				{
 					Content: "CONFUSED",
 					Users:   ReactionGroupUsers{TotalCount: 0},
 				},
-				ReactionGroup{
+				{
 					Content: "HEART",
 					Users:   ReactionGroupUsers{TotalCount: 2},
 				},
@@ -38,7 +38,7 @@ func Test_String(t *testing.T) {
 		},
 		"reaction groups with unmapped emoji": {
 			rgs: []ReactionGroup{
-				ReactionGroup{
+				{
 					Content: "UNKNOWN",
 					Users:   ReactionGroupUsers{TotalCount: 1},
 				},
