@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"gopkg.in/yaml.v3"
@@ -378,7 +379,7 @@ func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 	}
 
 	for _, hc := range hosts {
-		if hc.Host == hostname {
+		if strings.EqualFold(hc.Host, hostname) {
 			return hc, nil
 		}
 	}
