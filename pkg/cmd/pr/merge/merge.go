@@ -54,9 +54,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		Short: "Merge a pull request",
 		Long: heredoc.Doc(`
 			Merge a pull request on GitHub.
-
-			By default, the head branch of the pull request will get deleted on both remote and local repositories.
-			To retain the branch, use '--delete-branch=false'.
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,7 +99,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", true, "Delete the local and remote branch after merge")
+	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
