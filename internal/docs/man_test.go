@@ -106,7 +106,7 @@ func TestGenManSeeAlso(t *testing.T) {
 	}
 }
 
-func TestManPrintFlagsHidesShortDeperecated(t *testing.T) {
+func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	c := &cobra.Command{}
 	c.Flags().StringP("foo", "f", "default", "Foo flag")
 	_ = c.Flags().MarkShorthandDeprecated("foo", "don't use it no more")
