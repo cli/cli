@@ -54,7 +54,7 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			issueType = "issue"
 		}
 
-		fmt.Fprintf(out, "%s operation failed. recover with: gh %s create -e%s\n", cs.FailureIcon(), issueType, tmpfile.Name())
+		fmt.Fprintf(out, "%s operation failed. To restore: gh %s create --recover %s\n", cs.FailureIcon(), issueType, tmpfile.Name())
 
 		// some whitespace before the actual error
 		fmt.Fprintln(out)

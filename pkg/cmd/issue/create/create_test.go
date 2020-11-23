@@ -199,7 +199,7 @@ func TestIssueCreate_recover(t *testing.T) {
 	_, err = tmpfile.Write(data)
 	assert.NoError(t, err)
 
-	args := fmt.Sprintf("-e '%s'", tmpfile.Name())
+	args := fmt.Sprintf("--recover '%s'", tmpfile.Name())
 
 	output, err := runCommandWithRootDirOverridden(http, true, args, "")
 	if err != nil {

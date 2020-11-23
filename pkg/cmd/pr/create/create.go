@@ -139,7 +139,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
-	fl.StringVarP(&opts.RecoverFile, "recover", "e", "", "Recover input from a failed run of create")
+	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
 }

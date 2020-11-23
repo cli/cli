@@ -220,7 +220,7 @@ func TestPRCreate_recover(t *testing.T) {
 	_, err = tmpfile.Write(data)
 	assert.NoError(t, err)
 
-	args := fmt.Sprintf("-e '%s' -Hfeature", tmpfile.Name())
+	args := fmt.Sprintf("--recover '%s' -Hfeature", tmpfile.Name())
 
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, args, "")
 	assert.NoError(t, err)
