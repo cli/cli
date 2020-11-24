@@ -27,9 +27,10 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	SelectorArg string
-	WebMode     bool
-	Comments    int
+	SelectorArg      string
+	WebMode          bool
+	Comments         int
+	CommentsProvided bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -54,6 +55,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			opts.CommentsProvided = cmd.Flags().Changed("comments")
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -66,7 +69,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
-	cmd.Flags().IntVarP(&opts.Comments, "comments", "c", 1, "View issue comments")
+	cmd.Flags().IntVarP(&opts.Comments, "comments", "c", 1, "View issue comments sorted by most recent")
 	cmd.Flags().Lookup("comments").NoOptDefVal = "30"
 
 	return cmd
@@ -104,6 +107,11 @@ func viewRun(opts *ViewOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts.IO, issue)
 	}
+
+	if opts.CommentsProvided {
+		return printRawIssueComments(opts.IO.Out, issue)
+	}
+
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
@@ -122,30 +130,25 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
 	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
-
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
-	fmt.Fprintln(out, "--")
-
-	if len(issue.Comments.Nodes) > 0 {
-		fmt.Fprint(out, rawIssueComments(issue.Comments))
-	}
-
 	return nil
 }
 
-func rawIssueComments(comments api.IssueComments) string {
+func printRawIssueComments(out io.Writer, issue *api.Issue) error {
 	var b strings.Builder
-	for _, comment := range comments.Nodes {
+	for _, comment := range issue.Comments.Nodes {
 		fmt.Fprint(&b, rawIssueComment(comment))
 	}
-	return b.String()
+	fmt.Fprint(out, b.String())
+	return nil
 }
 
 func rawIssueComment(comment api.IssueComment) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
 	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
+	fmt.Fprintf(&b, "edited:\t%t\n", comment.IncludesCreatedEdit)
 	fmt.Fprintln(&b, "--")
 	fmt.Fprintln(&b, comment.Body)
 	fmt.Fprintln(&b, "--")

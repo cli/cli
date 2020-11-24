@@ -85,7 +85,7 @@
               "authorAssociation": "NONE",
               "body": "Comment 1",
               "createdAt": "2020-01-01T12:00:00Z",
-              "includesCreatedEdit": false,
+              "includesCreatedEdit": true,
               "reactionGroups": [
                 {
                   "content": "CONFUSED",
