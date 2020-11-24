@@ -10,6 +10,7 @@ require (
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/enescakir/emoji v1.0.0
+	github.com/gdamore/tcell/v2 v2.0.1-0.20201017141208-acf90d56d591
 	github.com/google/go-cmp v0.5.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.1
@@ -21,7 +22,8 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/termenv v0.7.4
-	github.com/rivo/uniseg v0.1.0
+	github.com/rivo/tview v0.0.0-20201118063654-f007e9ad3893
+	github.com/rivo/uniseg v0.2.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
 	github.com/spf13/cobra v1.1.1
