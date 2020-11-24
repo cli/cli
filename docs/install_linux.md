@@ -101,6 +101,8 @@ Android users can install via Termux:
 pkg install gh
 ```
 
+> Note : Termux supports Android versions greater than 7.0 (see [here](https://wiki.termux.com/wiki/Main_Page)). For versions below 7.0, you will have to build it from source.
+
 ### Gentoo
 
 Gentoo Linux users can install from the [main portage tree](https://packages.gentoo.org/packages/dev-util/github-cli):
