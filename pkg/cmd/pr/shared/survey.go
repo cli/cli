@@ -345,17 +345,22 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 			fmt.Fprintln(io.ErrOut, "warning: no milestones in the repository")
 		}
 	}
-	values := metadataValues{}
-	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
-	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
-	}
-	state.Reviewers = values.Reviewers
-	state.Assignees = values.Assignees
-	state.Labels = values.Labels
-	state.Projects = values.Projects
-	if values.Milestone != "" && values.Milestone != noMilestone {
-		state.Milestones = []string{values.Milestone}
+
+	if len(mqs) > 0 {
+		values := metadataValues{}
+		err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+		state.Reviewers = values.Reviewers
+		state.Assignees = values.Assignees
+		state.Labels = values.Labels
+		state.Projects = values.Projects
+		if values.Milestone != "" && values.Milestone != noMilestone {
+			state.Milestones = []string{values.Milestone}
+		}
+	} else {
+		state.MetadataResult = nil
 	}
 
 	return nil
