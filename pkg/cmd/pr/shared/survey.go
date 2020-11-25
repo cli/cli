@@ -347,11 +347,21 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 	}
 
 	if len(mqs) > 0 {
-		values := metadataValues{}
+		values := metadataValues{
+			Reviewers: state.Reviewers,
+			Assignees: state.Assignees,
+			Labels:    state.Labels,
+			Projects:  state.Projects,
+		}
+		if len(state.Milestones) > 0 {
+			values.Milestone = state.Milestones[0]
+		}
+
 		err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
 		state.Reviewers = values.Reviewers
 		state.Assignees = values.Assignees
 		state.Labels = values.Labels
@@ -359,9 +369,9 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 		if values.Milestone != "" && values.Milestone != noMilestone {
 			state.Milestones = []string{values.Milestone}
 		}
-	} else {
-		state.MetadataResult = nil
 	}
+
+	state.MetadataResult = nil
 
 	return nil
 }
