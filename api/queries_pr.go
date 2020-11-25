@@ -639,7 +639,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	query := `
 	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: $states, first: 30) {
+			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
 				nodes {
 					id
 					number
