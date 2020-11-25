@@ -1,14 +1,15 @@
 package project
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/gdamore/tcell/v2"
+	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +48,23 @@ func NewCmdProject(f *cmdutil.Factory, runF func(*ProjectOptions) error) *cobra.
 	return cmd
 }
 
+type Card struct {
+	Note string
+	ID   int
+}
+
+type Column struct {
+	Name  string
+	ID    int
+	Cards []*Card
+}
+
+type Project struct {
+	Name    string
+	ID      int
+	Columns []*Column
+}
+
 func projectRun(opts *ProjectOptions) error {
 	// TODO interactively ask which project they want since these IDs are not easy to get
 	projectID := 3514315
@@ -67,66 +85,71 @@ func projectRun(opts *ProjectOptions) error {
 		return err
 	}
 
-	fmt.Printf("DBG %#v\n", project)
+	style := tcell.StyleDefault
 
-	for _, c := range project.Columns {
-		fmt.Printf("DBG %s: %d cards\n", c.Name, len(c.Cards))
+	s, err := tcell.NewScreen()
+	if err != nil {
+		return err
 	}
+	if err = s.Init(); err != nil {
+		return err
+	}
+
+	s.SetStyle(style)
+
+	// some kind of controller struct to track modal state?
+
+	quit := make(chan struct{})
+	go func() {
+		for {
+			ev := s.PollEvent()
+			switch ev := ev.(type) {
+			case *tcell.EventKey:
+				switch ev.Rune() {
+				case 'q':
+					close(quit)
+					return
+				}
+				switch ev.Key() {
+				case tcell.KeyEscape:
+					close(quit)
+					return
+				case tcell.KeyCtrlL:
+					s.Sync()
+				}
+			case *tcell.EventResize:
+				s.Sync()
+			}
+		}
+	}()
+
+loop:
+	for {
+		select {
+		case <-quit:
+			break loop
+		case <-time.After(time.Millisecond * 500):
+		}
+		s.Clear()
+		drawStr(s, 0, 0, style, project.Name)
+		s.Show()
+	}
+
+	s.Fini()
 
 	return nil
 }
 
-type Card struct {
-	Note string
-	ID   int
-}
-
-type Column struct {
-	Name  string
-	ID    int
-	Cards []*Card
-}
-
-type Project struct {
-	Name    string
-	ID      int
-	Columns []*Column
-}
-
-func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID int) (*Project, error) {
-	data, err := client.GetProject(baseRepo, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	project := &Project{}
-
-	err = json.Unmarshal(data, project)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err = client.GetProjectColumns(baseRepo, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(data, &project.Columns)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, column := range project.Columns {
-		data, err := client.GetProjectCards(baseRepo, column.ID)
-		if err != nil {
-			return nil, err
+func drawStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
+	for _, c := range str {
+		var comb []rune
+		w := runewidth.RuneWidth(c)
+		if w == 0 {
+			comb = []rune{c}
+			c = ' '
+			w = 1
 		}
-
-		err = json.Unmarshal(data, &column.Cards)
-		if err != nil {
-			return nil, err
-		}
+		s.SetContent(x, y, c, comb, style)
+		x += w
 	}
-
-	return project, nil
 }
