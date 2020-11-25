@@ -49,7 +49,7 @@ func NewCmdProject(f *cmdutil.Factory, runF func(*ProjectOptions) error) *cobra.
 
 func projectRun(opts *ProjectOptions) error {
 	// TODO interactively ask which project they want since these IDs are not easy to get
-	projectID := "3514315"
+	projectID := 3514315
 
 	c, err := opts.HttpClient()
 	if err != nil {
@@ -69,14 +69,31 @@ func projectRun(opts *ProjectOptions) error {
 
 	fmt.Printf("DBG %#v\n", project)
 
+	for _, c := range project.Columns {
+		fmt.Printf("DBG %s: %d cards\n", c.Name, len(c.Cards))
+	}
+
 	return nil
 }
 
-type Project struct {
-	Name string
+type Card struct {
+	Note string
+	ID   int
 }
 
-func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID string) (*Project, error) {
+type Column struct {
+	Name  string
+	ID    int
+	Cards []*Card
+}
+
+type Project struct {
+	Name    string
+	ID      int
+	Columns []*Column
+}
+
+func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID int) (*Project, error) {
 	data, err := client.GetProject(baseRepo, projectID)
 	if err != nil {
 		return nil, err
@@ -87,6 +104,28 @@ func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID string)
 	err = json.Unmarshal(data, project)
 	if err != nil {
 		return nil, err
+	}
+
+	data, err = client.GetProjectColumns(baseRepo, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(data, &project.Columns)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, column := range project.Columns {
+		data, err := client.GetProjectCards(baseRepo, column.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		err = json.Unmarshal(data, &column.Cards)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return project, nil

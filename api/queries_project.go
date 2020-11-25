@@ -10,16 +10,12 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func (c Client) GetProject(baseRepo ghrepo.Interface, projectID string) ([]byte, error) {
-	url := fmt.Sprintf("%sprojects/%s",
-		ghinstance.RESTPrefix(baseRepo.RepoHost()), projectID)
-
+func (c Client) projectREST(url string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO api() { gh api -H 'accept: application/vnd.github.inertia-preview+json' "$@"; }
 	req.Header.Set("Accept", "application/vnd.github.inertia-preview+json; charset=utf-8")
 
 	resp, err := c.http.Do(req)
@@ -39,4 +35,25 @@ func (c Client) GetProject(baseRepo ghrepo.Interface, projectID string) ([]byte,
 	}
 
 	return data, nil
+}
+
+func (c Client) GetProject(baseRepo ghrepo.Interface, projectID int) ([]byte, error) {
+	url := fmt.Sprintf("%sprojects/%d", ghinstance.RESTPrefix(baseRepo.RepoHost()), projectID)
+
+	return c.projectREST(url)
+}
+
+func (c Client) GetProjectColumns(baseRepo ghrepo.Interface, projectID int) ([]byte, error) {
+	url := fmt.Sprintf("%sprojects/%d/columns",
+		ghinstance.RESTPrefix(baseRepo.RepoHost()), projectID)
+
+	return c.projectREST(url)
+
+}
+
+func (c Client) GetProjectCards(baseRepo ghrepo.Interface, columnID int) ([]byte, error) {
+	url := fmt.Sprintf("%sprojects/columns/%d/cards",
+		ghinstance.RESTPrefix(baseRepo.RepoHost()), columnID)
+
+	return c.projectREST(url)
 }
