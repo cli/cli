@@ -132,6 +132,9 @@ func projectRun(opts *ProjectOptions) error {
 	cardHeight := 5
 	cardsToShow := 7
 
+	selectedColumn := 0
+	selectedCard := 0
+
 loop:
 	for {
 		select {
@@ -153,7 +156,11 @@ loop:
 				if ic == cardsToShow {
 					break
 				}
-				drawRect(s, style, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight)
+				cardStyle := style
+				if selectedColumn == ix && selectedCard == ic {
+					cardStyle = style.Foreground(tcell.ColorGreen)
+				}
+				drawRect(s, cardStyle, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight)
 				cardNote := card.Note
 				if len(card.Note) > cardWidth-2 {
 					cardNote = cardNote[0 : cardWidth-2]
