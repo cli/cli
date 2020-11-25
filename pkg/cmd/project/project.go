@@ -98,7 +98,17 @@ func projectRun(opts *ProjectOptions) error {
 
 	s.SetStyle(style)
 
-	// some kind of controller struct to track modal state?
+	// TODO some kind of controller struct to track modal state?
+	colWidth := 30
+	colHeight := 40
+	colsToShow := 7
+
+	cardWidth := colWidth - 2
+	cardHeight := 5
+	cardsToShow := 7
+
+	selectedColumn := 0
+	selectedCard := 0
 
 	quit := make(chan struct{})
 	go func() {
@@ -110,6 +120,22 @@ func projectRun(opts *ProjectOptions) error {
 				case 'q':
 					close(quit)
 					return
+				case 'w':
+					if selectedCard > 0 {
+						selectedCard--
+					}
+				case 's':
+					if selectedCard < cardsToShow {
+						selectedCard++
+					}
+				case 'a':
+					if selectedColumn > 0 {
+						selectedColumn--
+					}
+				case 'd':
+					if selectedColumn < colsToShow {
+						selectedColumn++
+					}
 				}
 				switch ev.Key() {
 				case tcell.KeyEscape:
@@ -123,17 +149,6 @@ func projectRun(opts *ProjectOptions) error {
 			}
 		}
 	}()
-
-	colWidth := 30
-	colHeight := 40
-	colsToShow := 7
-
-	cardWidth := colWidth - 2
-	cardHeight := 5
-	cardsToShow := 7
-
-	selectedColumn := 0
-	selectedCard := 0
 
 loop:
 	for {
