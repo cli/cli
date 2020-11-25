@@ -55,17 +55,9 @@ For more information and distro-specific instructions, see the [Linux installati
 
 #### scoop
 
-Install:
-
-```powershell
-scoop install gh
-```
-
-Upgrade:
-
-```powershell
-scoop update gh
-```
+| Install:           | Upgrade:           |
+| ------------------ | ------------------ |
+| `scoop install gh` | `scoop update gh`  |
 
 #### Chocolatey
 
