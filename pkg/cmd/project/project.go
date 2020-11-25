@@ -49,8 +49,9 @@ func NewCmdProject(f *cmdutil.Factory, runF func(*ProjectOptions) error) *cobra.
 }
 
 type Card struct {
-	Note string
-	ID   int
+	Note       string
+	ID         int
+	ContentURL string `json:"content_url"`
 }
 
 type Column struct {
@@ -157,7 +158,7 @@ loop:
 				if len(card.Note) > cardWidth-2 {
 					cardNote = cardNote[0 : cardWidth-2]
 				} else if cardNote == "" {
-					cardNote = "TODO ISSUE"
+					cardNote = `¯\_(ツ)_/¯`
 				}
 				drawStr(s, colX+2, (ic*cardHeight)+colY+3, style, cardNote)
 			}

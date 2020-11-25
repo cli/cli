@@ -57,3 +57,7 @@ func (c Client) GetProjectCards(baseRepo ghrepo.Interface, columnID int) ([]byte
 
 	return c.projectREST(url)
 }
+
+func (c Client) GetProjectCardContent(contentURL string) ([]byte, error) {
+	return c.projectREST(contentURL)
+}

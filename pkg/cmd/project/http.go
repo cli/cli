@@ -30,6 +30,10 @@ func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID int) (*
 		return nil, err
 	}
 
+	titled := struct {
+		Title string
+	}{}
+
 	for _, column := range project.Columns {
 		data, err := client.GetProjectCards(baseRepo, column.ID)
 		if err != nil {
@@ -39,6 +43,22 @@ func getProject(client *api.Client, baseRepo ghrepo.Interface, projectID int) (*
 		err = json.Unmarshal(data, &column.Cards)
 		if err != nil {
 			return nil, err
+		}
+
+		for _, card := range column.Cards {
+			// hydrate with any linked content
+			if card.Note == "" {
+				data, err := client.GetProjectCardContent(card.ContentURL)
+				if err != nil {
+					return nil, err
+				}
+
+				err = json.Unmarshal(data, &titled)
+				if err != nil {
+					return nil, err
+				}
+				card.Note = titled.Title
+			}
 		}
 	}
 
