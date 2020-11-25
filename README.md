@@ -58,7 +58,6 @@ For more information and distro-specific instructions, see the [Linux installati
 Install:
 
 ```powershell
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
 scoop install gh
 ```
 
