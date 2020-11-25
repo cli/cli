@@ -123,6 +123,14 @@ func projectRun(opts *ProjectOptions) error {
 		}
 	}()
 
+	colWidth := 30
+	colHeight := 40
+	colsToShow := 7
+
+	cardWidth := colWidth - 2
+	cardHeight := 5
+	cardsToShow := 7
+
 loop:
 	for {
 		select {
@@ -132,6 +140,28 @@ loop:
 		}
 		s.Clear()
 		drawStr(s, 0, 0, style, project.Name)
+		for ix, col := range project.Columns {
+			if ix == colsToShow {
+				break
+			}
+			colX := colWidth * ix
+			colY := 1
+			drawRect(s, style, colX, colY, colWidth, colHeight)
+			drawStr(s, colX+1, colY+1, style, col.Name)
+			for ic, card := range col.Cards {
+				if ic == cardsToShow {
+					break
+				}
+				drawRect(s, style, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight)
+				cardNote := card.Note
+				if len(card.Note) > cardWidth-2 {
+					cardNote = cardNote[0 : cardWidth-2]
+				} else if cardNote == "" {
+					cardNote = "TODO ISSUE"
+				}
+				drawStr(s, colX+2, (ic*cardHeight)+colY+3, style, cardNote)
+			}
+		}
 		s.Show()
 	}
 
@@ -152,4 +182,44 @@ func drawStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 		s.SetContent(x, y, c, comb, style)
 		x += w
 	}
+}
+
+func drawRect(s tcell.Screen, style tcell.Style, x, y, w, h int) {
+	// TODO could consolidate these now that I have the correct unicode characters
+	topLeftCorner := '┌'
+	botLeftCorner := '└'
+	topRightCorner := '┐'
+	botRightCorner := '┘'
+	leftLine := '│'
+	rightLine := '│'
+	topLine := '─'
+	botLine := '─'
+
+	for ix := x; ix < x+w; ix++ {
+		for iy := y; iy < y+h; iy++ {
+			var c rune
+			if ix == x && iy == y {
+				c = topLeftCorner
+			} else if ix == x && iy == y+h-1 {
+				c = botLeftCorner
+			} else if ix == x {
+				c = leftLine
+			} else if ix == x+w-1 && iy == y {
+				c = topRightCorner
+			} else if ix == x+w-1 && iy == y+h-1 {
+				c = botRightCorner
+			} else if ix == x+w-1 {
+				c = rightLine
+			} else if iy == y {
+				c = topLine
+			} else if iy == y+h-1 {
+				c = botLine
+			} else {
+				continue
+			}
+
+			s.SetContent(ix, iy, c, nil, style)
+		}
+	}
+
 }
