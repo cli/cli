@@ -2,6 +2,7 @@ package project
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -48,10 +49,16 @@ func NewCmdProject(f *cmdutil.Factory, runF func(*ProjectOptions) error) *cobra.
 	return cmd
 }
 
+type Content struct {
+	Title string
+	Body  string
+}
+
 type Card struct {
 	Note       string
 	ID         int
 	ContentURL string `json:"content_url"`
+	Content    *Content
 }
 
 type Column struct {
@@ -185,7 +192,10 @@ loop:
 				}
 				drawRect(s, cardStyle, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight, bold)
 				cardNote := card.Note
-				if len(card.Note) > cardWidth-2 {
+				if cardNote == "" {
+					cardNote = card.Content.Title
+				}
+				if len(cardNote) > cardWidth-2 {
 					cardNote = cardNote[0 : cardWidth-2]
 				} else if cardNote == "" {
 					cardNote = `¯\_(ツ)_/¯`
@@ -200,7 +210,29 @@ loop:
 		infoWidth := colWidth * 2
 		infoHeight := colHeight
 		drawRect(s, style, infoX, infoY, infoWidth, infoHeight, true)
-		drawStr(s, infoX+1, infoY+1, style, cardInfo.Note)
+		if cardInfo.Content != nil {
+			title := cardInfo.Content.Title
+			if len(title) > infoWidth-2 {
+				title = title[0 : infoWidth-2]
+			}
+			drawStr(s, infoX+1, infoY+1, style, title)
+
+			// TODO markdown rendering did _not_ output correctly; lots of escaped ANSI
+
+			bodyLines := strings.Split(cardInfo.Content.Body, "\n")
+			for i, line := range bodyLines {
+				if infoY+2+i > infoHeight-2 {
+					break
+				}
+				outLine := line
+				if len(outLine) > infoWidth-2 {
+					outLine = outLine[0 : infoWidth-2]
+				}
+				drawStr(s, infoX+1, infoY+2+i, style, outLine)
+			}
+		} else {
+			drawStr(s, infoX+1, infoY+1, style, cardInfo.Note)
+		}
 
 		s.Show()
 	}
