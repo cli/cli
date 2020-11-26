@@ -125,7 +125,7 @@ func projectRun(opts *ProjectOptions) error {
 						selectedCard--
 					}
 				case 's':
-					if selectedCard < cardsToShow-1 {
+					if selectedCard < cardsToShow {
 						selectedCard++
 					}
 				case 'a':
@@ -133,7 +133,7 @@ func projectRun(opts *ProjectOptions) error {
 						selectedColumn--
 					}
 				case 'd':
-					if selectedColumn < colsToShow-1 {
+					if selectedColumn < colsToShow {
 						selectedColumn++
 					}
 				}
@@ -149,6 +149,8 @@ func projectRun(opts *ProjectOptions) error {
 			}
 		}
 	}()
+
+	var cardInfo *Card
 
 loop:
 	for {
@@ -167,6 +169,9 @@ loop:
 			colY := 1
 			drawRect(s, style, colX, colY, colWidth, colHeight, false)
 			drawStr(s, colX+1, colY+1, style, col.Name)
+			if selectedColumn == ix && selectedCard >= len(col.Cards) {
+				selectedCard = len(col.Cards) - 1
+			}
 			for ic, card := range col.Cards {
 				if ic == cardsToShow {
 					break
@@ -176,6 +181,7 @@ loop:
 				if selectedColumn == ix && selectedCard == ic {
 					cardStyle = style.Foreground(tcell.ColorGreen)
 					bold = true
+					cardInfo = card
 				}
 				drawRect(s, cardStyle, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight, bold)
 				cardNote := card.Note
@@ -187,6 +193,15 @@ loop:
 				drawStr(s, colX+2, (ic*cardHeight)+colY+3, style, cardNote)
 			}
 		}
+
+		// Info box
+		infoX := colWidth * colsToShow
+		infoY := 1
+		infoWidth := colWidth * 2
+		infoHeight := colHeight
+		drawRect(s, style, infoX, infoY, infoWidth, infoHeight, true)
+		drawStr(s, infoX+1, infoY+1, style, cardInfo.Note)
+
 		s.Show()
 	}
 
