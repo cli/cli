@@ -101,7 +101,7 @@ func projectRun(opts *ProjectOptions) error {
 	// TODO some kind of controller struct to track modal state?
 	colWidth := 30
 	colHeight := 40
-	colsToShow := 7
+	colsToShow := 3
 
 	cardWidth := colWidth - 2
 	cardHeight := 5
@@ -125,7 +125,7 @@ func projectRun(opts *ProjectOptions) error {
 						selectedCard--
 					}
 				case 's':
-					if selectedCard < cardsToShow {
+					if selectedCard < cardsToShow-1 {
 						selectedCard++
 					}
 				case 'a':
@@ -133,7 +133,7 @@ func projectRun(opts *ProjectOptions) error {
 						selectedColumn--
 					}
 				case 'd':
-					if selectedColumn < colsToShow {
+					if selectedColumn < colsToShow-1 {
 						selectedColumn++
 					}
 				}
@@ -155,7 +155,7 @@ loop:
 		select {
 		case <-quit:
 			break loop
-		case <-time.After(time.Millisecond * 500):
+		case <-time.After(time.Millisecond * 100):
 		}
 		s.Clear()
 		drawStr(s, 0, 0, style, project.Name)
@@ -165,17 +165,19 @@ loop:
 			}
 			colX := colWidth * ix
 			colY := 1
-			drawRect(s, style, colX, colY, colWidth, colHeight)
+			drawRect(s, style, colX, colY, colWidth, colHeight, false)
 			drawStr(s, colX+1, colY+1, style, col.Name)
 			for ic, card := range col.Cards {
 				if ic == cardsToShow {
 					break
 				}
 				cardStyle := style
+				bold := false
 				if selectedColumn == ix && selectedCard == ic {
 					cardStyle = style.Foreground(tcell.ColorGreen)
+					bold = true
 				}
-				drawRect(s, cardStyle, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight)
+				drawRect(s, cardStyle, colX+1, (ic*cardHeight)+colY+2, cardWidth, cardHeight, bold)
 				cardNote := card.Note
 				if len(card.Note) > cardWidth-2 {
 					cardNote = cardNote[0 : cardWidth-2]
@@ -207,16 +209,23 @@ func drawStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
 	}
 }
 
-func drawRect(s tcell.Screen, style tcell.Style, x, y, w, h int) {
+func drawRect(s tcell.Screen, style tcell.Style, x, y, w, h int, bold bool) {
 	// TODO could consolidate these now that I have the correct unicode characters
 	topLeftCorner := '┌'
 	botLeftCorner := '└'
 	topRightCorner := '┐'
 	botRightCorner := '┘'
-	leftLine := '│'
-	rightLine := '│'
-	topLine := '─'
-	botLine := '─'
+	vertiLine := '│'
+	horizLine := '─'
+
+	if bold {
+		topLeftCorner = '┏'
+		botLeftCorner = '┗'
+		topRightCorner = '┓'
+		botRightCorner = '┛'
+		vertiLine = '┃'
+		horizLine = '━'
+	}
 
 	for ix := x; ix < x+w; ix++ {
 		for iy := y; iy < y+h; iy++ {
@@ -226,17 +235,17 @@ func drawRect(s tcell.Screen, style tcell.Style, x, y, w, h int) {
 			} else if ix == x && iy == y+h-1 {
 				c = botLeftCorner
 			} else if ix == x {
-				c = leftLine
+				c = vertiLine
 			} else if ix == x+w-1 && iy == y {
 				c = topRightCorner
 			} else if ix == x+w-1 && iy == y+h-1 {
 				c = botRightCorner
 			} else if ix == x+w-1 {
-				c = rightLine
+				c = vertiLine
 			} else if iy == y {
-				c = topLine
+				c = horizLine
 			} else if iy == y+h-1 {
-				c = botLine
+				c = horizLine
 			} else {
 				continue
 			}
