@@ -38,7 +38,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			isTTY: true,
 			want: MergeOptions{
 				SelectorArg:       "123",
-				DeleteBranch:      true,
+				DeleteBranch:      false,
 				DeleteLocalBranch: true,
 				MergeMethod:       api.PullRequestMergeMethodMerge,
 				InteractiveMode:   true,
@@ -192,9 +192,6 @@ func TestPrMerge(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -238,9 +235,6 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -281,9 +275,6 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -385,9 +376,6 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -431,9 +419,6 @@ func TestPrMerge_rebase(t *testing.T) {
 			assert.Equal(t, "REBASE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -476,9 +461,6 @@ func TestPrMerge_squash(t *testing.T) {
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 			assert.Equal(t, "The title of the PR (#3)", input["commitHeadline"].(string))
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -493,7 +475,7 @@ func TestPrMerge_squash(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "Squashed and merged pull request #3", `Deleted branch.*blueberries`)
+	test.ExpectLines(t, output.Stderr(), "Squashed and merged pull request #3")
 }
 
 func TestPrMerge_alreadyMerged(t *testing.T) {
@@ -581,7 +563,7 @@ func TestPRMerge_interactive(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", `Deleted branch.*blueberries`)
+	test.ExpectLines(t, output.Stderr(), "Merged pull request #3")
 }
 
 func TestPRMerge_interactiveCancelled(t *testing.T) {
