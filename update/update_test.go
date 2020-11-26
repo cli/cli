@@ -52,6 +52,9 @@ func TestCheckForUpdate(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.Name, func(t *testing.T) {
+			stateFilePath := tempFilePath()
+			defer os.Remove(stateFilePath)
+
 			http := &httpmock.Registry{}
 			client := api.NewClient(api.ReplaceTripper(http))
 			http.StubResponse(200, bytes.NewBufferString(fmt.Sprintf(`{
@@ -59,7 +62,7 @@ func TestCheckForUpdate(t *testing.T) {
 				"html_url": "%s"
 			}`, s.LatestVersion, s.LatestURL)))
 
-			rel, err := CheckForUpdate(client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
+			rel, err := CheckForUpdate(client, stateFilePath, "OWNER/REPO", s.CurrentVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,10 +96,18 @@ func TestCheckForUpdate(t *testing.T) {
 }
 
 func tempFilePath() string {
-	file, err := ioutil.TempFile("", "")
+	content := []byte(
+		`checked_for_update_at: 2020-11-22T09:53:32.609610344-03:00
+latest_release:
+    version: v1.1.0
+    url: https://github.com/cli/cli/releases/tag/v1.1.0`)
+	file, err := ioutil.TempFile("", "state*.yml")
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Remove(file.Name())
+
+	if _, err := file.Write(content); err != nil {
+		log.Fatal(err)
+	}
 	return file.Name()
 }

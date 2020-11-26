@@ -24,22 +24,26 @@ type StateEntry struct {
 
 // CheckForUpdate checks whether this software has had a newer release on GitHub
 func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
-	latestRelease, err := getLatestReleaseInfo(client, stateFilePath, repo, currentVersion)
+	releaseInfo, err := getLatestReleaseInfo(client, stateFilePath, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	if versionGreaterThan(latestRelease.Version, currentVersion) {
-		return latestRelease, nil
+	if releaseInfo == nil {
+		return nil, nil
+	}
+
+	if versionGreaterThan(releaseInfo.LatestRelease.Version, currentVersion) {
+		return &releaseInfo.LatestRelease, nil
 	}
 
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+func getLatestReleaseInfo(client *api.Client, stateFilePath, repo string) (*StateEntry, error) {
 	stateEntry, err := getStateEntry(stateFilePath)
 	if err == nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
-		return &stateEntry.LatestRelease, nil
+		return nil, nil
 	}
 
 	var latestRelease ReleaseInfo
@@ -53,7 +57,12 @@ func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersio
 		return nil, err
 	}
 
-	return &latestRelease, nil
+	stateEntry, err = getStateEntry(stateFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return stateEntry, nil
 }
 
 func getStateEntry(stateFilePath string) (*StateEntry, error) {
