@@ -27,6 +27,7 @@ type Repository struct {
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
+	HasWikiEnabled   bool
 	ViewerPermission string
 	DefaultBranchRef BranchRef
 
@@ -94,6 +95,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		owner { login }
 		hasIssuesEnabled
 		description
+		hasWikiEnabled
 		viewerPermission
 		defaultBranchRef {
 			name

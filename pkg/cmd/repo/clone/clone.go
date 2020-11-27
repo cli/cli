@@ -87,6 +87,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	var repo ghrepo.Interface
 	var protocol string
+
 	if repositoryIsURL {
 		repoURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
@@ -122,7 +123,12 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 	}
-
+	// Check if the repo name has .wiki extension
+	wantsWiki := false
+	if strings.HasSuffix(repo.RepoName(), ".wiki") {
+		repo = ghrepo.NewWithHost(repo.RepoOwner(), strings.TrimSuffix(repo.RepoName(), ".wiki"), repo.RepoHost())
+		wantsWiki = true
+	}
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
@@ -130,6 +136,14 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+
+	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
+	if wantsWiki {
+		if !canonicalRepo.HasWikiEnabled {
+			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
+		}
+		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
+	}
 
 	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
 	if err != nil {
