@@ -140,7 +140,6 @@ func main() {
 		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-		fmt.Fprintln(stderr, "You can also set the one of the auth token environment variables, if preferred.")
 		os.Exit(4)
 	}
 
