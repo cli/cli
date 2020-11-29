@@ -369,9 +369,9 @@ func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *b
 
 	promptString := ""
 	if repoOwner != "" {
-		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
+		promptString = fmt.Sprintf("This will create '%s/%s' and add it as remote for your current directory. Continue? ", repoOwner, repoName)
 	} else {
-		promptString = fmt.Sprintf("This will create '%s' in your current directory. Continue? ", repoName)
+		promptString = fmt.Sprintf("This will create '%s' and add it as remote for your current directory. Continue? ", repoName)
 	}
 
 	confirmSubmitQuestion := &survey.Question{
