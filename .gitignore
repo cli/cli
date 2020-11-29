@@ -6,6 +6,7 @@
 /site
 .github/**/node_modules
 /CHANGELOG.md
+/manpages.list
 
 # VS Code
 .vscode
