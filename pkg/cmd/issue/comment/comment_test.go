@@ -2,116 +2,148 @@ package comment
 
 import (
 	"bytes"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"reflect"
-	"regexp"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
 
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
-func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
-
-	factory := &cmdutil.Factory{
-		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
+func TestNewCmdComment(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		output   CommentOptions
+		wantsErr bool
+	}{
+		{
+			name:     "no arguments",
+			input:    "",
+			output:   CommentOptions{},
+			wantsErr: true,
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+		{
+			name:  "issue number",
+			input: "1",
+			output: CommentOptions{
+				SelectorArg: "1",
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+			},
+			wantsErr: false,
 		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
+		{
+			name:  "issue url",
+			input: "https://github.com/OWNER/REPO/issues/12",
+			output: CommentOptions{
+				SelectorArg: "https://github.com/OWNER/REPO/issues/12",
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "body flag",
+			input: "1 --body test",
+			output: CommentOptions{
+				SelectorArg: "1",
+				Interactive: false,
+				InputType:   inline,
+				Body:        "test",
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "editor flag",
+			input: "1 --editor",
+			output: CommentOptions{
+				SelectorArg: "1",
+				Interactive: false,
+				InputType:   editor,
+				Body:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "web flag",
+			input: "1 --web",
+			output: CommentOptions{
+				SelectorArg: "1",
+				Interactive: false,
+				InputType:   web,
+				Body:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "editor and web flags",
+			input:    "1 --editor --web",
+			output:   CommentOptions{},
+			wantsErr: true,
+		},
+		{
+			name:     "editor and body flags",
+			input:    "1 --editor --body test",
+			output:   CommentOptions{},
+			wantsErr: true,
+		},
+		{
+			name:     "web and body flags",
+			input:    "1 --web --body test",
+			output:   CommentOptions{},
+			wantsErr: true,
+		},
+		{
+			name:     "editor, web, and body flags",
+			input:    "1 --editor --web --body test",
+			output:   CommentOptions{},
+			wantsErr: true,
 		},
 	}
 
-	cmd := NewCmdComment(factory, func(opts *CommentOptions) error {
-		return commentRun(opts)
-	})
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SetArgs(argv)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
 
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
-	}, err
-}
-
-func TestCommentCreate(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issue": { "number": 96, "title": "The title of the issue"}
-	} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`{"mutationId": "THE-ID"}`))
-
-	output, err := runCommand(http, true, `13 -b "cash rules everything around me"`)
-	if err != nil {
-		t.Errorf("error running command `issue comment`: %v", err)
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				Body string
+			f := &cmdutil.Factory{
+				IOStreams: io,
 			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
 
-	r := regexp.MustCompile(`Make a comment for The title of the issue`)
+			var gotOpts *CommentOptions
+			cmd := NewCmdComment(f, func(opts *CommentOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.Flags().BoolP("help", "x", false, "")
 
-	if !r.MatchString(output.Stderr()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
+			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
+			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
+			assert.Equal(t, tt.output.Body, gotOpts.Body)
+		})
 	}
 }
 
-func TestIssue_Disabled(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": false
-	} } }
-	`))
-
-	_, err := runCommand(http, true, "13")
-	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
-		t.Fatalf("got error: %v", err)
-	}
+func Test_commentRun(t *testing.T) {
 }
