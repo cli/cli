@@ -1,6 +1,7 @@
 package comment
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,44 +15,69 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
 type CommentOptions struct {
-	HttpClient  func() (*http.Client, error)
-	Config      func() (config.Config, error)
-	IO          *iostreams.IOStreams
-	BaseRepo    func() (ghrepo.Interface, error)
-	Body        string
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Edit       func(string) (string, error)
+
 	SelectorArg string
 	Interactive bool
-	Action      Action
+	InputType   int
+	Body        string
 }
+
+const (
+	inline = iota
+	editor
+	web
+)
 
 func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.Command {
 	opts := &CommentOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Edit: func(editorCommand string) (string, error) {
+			return surveyext.Edit(editorCommand, "*.md", "", f.IOStreams.In, f.IOStreams.Out, f.IOStreams.ErrOut, nil)
+		},
 	}
+
+	var webMode bool
+	var editorMode bool
 
 	cmd := &cobra.Command{
 		Use:   "comment {<number> | <url>}",
-		Short: "Create comments for the issue",
+		Short: "Create a new issue comment",
 		Example: heredoc.Doc(`
-			$ gh issue comment --body "I found a bug. Nothing works"
+			$ gh issue comment 22 --body "I found a bug. Nothing works"
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+			opts.SelectorArg = args[0]
+			opts.Interactive = !(opts.Body != "" || webMode || editorMode)
 
-			bodyProvided := cmd.Flags().Changed("body")
+			if !opts.IO.CanPrompt() && opts.Interactive {
+				return &cmdutil.FlagError{Err: errors.New("--body, --editor, or --web required when not running interactively")}
+			}
 
-			opts.Interactive = !(bodyProvided)
-
-			if len(args) > 0 {
-				opts.SelectorArg = args[0]
+			if !opts.Interactive {
+				if opts.Body != "" && !webMode && !editorMode {
+					opts.InputType = inline
+				} else if opts.Body == "" && webMode && !editorMode {
+					opts.InputType = web
+				} else if opts.Body == "" && !webMode && editorMode {
+					opts.InputType = editor
+				} else {
+					return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of --body, --editor, or --web")}
+				}
 			}
 
 			if runF != nil {
@@ -60,88 +86,11 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 			return commentRun(opts)
 		},
 	}
-
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body.")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	cmd.Flags().BoolVarP(&editorMode, "editor", "e", false, "Add body using editor")
+	cmd.Flags().BoolVarP(&webMode, "web", "w", false, "Add body in browser")
 
 	return cmd
-}
-
-type Action int
-
-const (
-	SubmitAction Action = iota
-	CancelAction
-)
-
-func titleBodySurvey(editorCommand string, issueState *CommentOptions, apiClient *api.Client, repo ghrepo.Interface, providedBody string) error {
-	bodyQuestion := &survey.Question{
-		Name: "body",
-		Prompt: &surveyext.GhEditor{
-			BlankAllowed:  false,
-			EditorCommand: editorCommand,
-			Editor: &survey.Editor{
-				Message:  "Body",
-				FileName: "*.md",
-				Default:  issueState.Body,
-			},
-		},
-	}
-
-	var qs []*survey.Question
-
-	if providedBody == "" {
-		qs = append(qs, bodyQuestion)
-	}
-
-	err := prompt.SurveyAsk(qs, issueState)
-	if err != nil {
-		panic(fmt.Sprintf("could not prompt: %v", err))
-	}
-
-	confirmA, err := confirmSubmission()
-
-	if err != nil {
-		panic(fmt.Sprintf("unable to confirm: %v", err))
-	}
-
-	issueState.Action = confirmA
-	return nil
-}
-
-func confirmSubmission() (Action, error) {
-	const (
-		submitLabel = "Submit"
-		cancelLabel = "Cancel"
-	)
-
-	options := []string{submitLabel, cancelLabel}
-
-	confirmAnswers := struct {
-		Confirmation int
-	}{}
-	confirmQs := []*survey.Question{
-		{
-			Name: "confirmation",
-			Prompt: &survey.Select{
-				Message: "What's next?",
-				Options: options,
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
-	if err != nil {
-		return -1, fmt.Errorf("could not prompt: %w", err)
-	}
-
-	switch options[confirmAnswers.Confirmation] {
-	case submitLabel:
-		return SubmitAction, nil
-	case cancelLabel:
-		return CancelAction, nil
-	default:
-		return -1, fmt.Errorf("invalid index: %d", confirmAnswers.Confirmation)
-	}
 }
 
 func commentRun(opts *CommentOptions) error {
@@ -152,51 +101,115 @@ func commentRun(opts *CommentOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
-
 	if err != nil {
 		return err
 	}
 
-	isTerminal := opts.IO.IsStdoutTTY()
-
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "\nMake a comment for %s in %s\n\n", issue.Title, ghrepo.FullName(baseRepo))
+	if opts.Interactive {
+		inputType, err := inputTypeSurvey()
+		if err != nil {
+			return err
+		}
+		opts.InputType = inputType
 	}
 
-	action := SubmitAction
-	body := opts.Body
-
-	if opts.Interactive {
+	switch opts.InputType {
+	case web:
+		openURL := issue.URL + "#issuecomment-new"
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		}
+		return utils.OpenInBrowser(openURL)
+	case inline:
+		if opts.Body != "" {
+			break
+		}
+		body, err := inlineSurvey()
+		if err != nil {
+			return err
+		}
+		opts.Body = body
+	case editor:
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-
-		err = titleBodySurvey(editorCommand, opts, apiClient, baseRepo, body)
-
+		var body string
+		if opts.Interactive {
+			body, err = editorSurvey(editorCommand)
+		} else {
+			body, err = opts.Edit(editorCommand)
+		}
 		if err != nil {
 			return err
 		}
-
-		action = opts.Action
+		opts.Body = body
 	}
 
-	if action == CancelAction {
-		return nil
-	} else if action == SubmitAction {
-		params := map[string]interface{}{
-			"subjectId": issue.ID,
-			"body":      opts.Body,
-		}
-
-		err = api.CommentCreate(apiClient, baseRepo.RepoHost(), params)
+	if opts.Interactive {
+		cont, err := confirmSubmitSurvey()
 		if err != nil {
 			return err
 		}
-
-		fmt.Fprintln(opts.IO.Out, issue.URL)
-
-		return nil
+		if !cont {
+			return fmt.Errorf("Discarding...")
+		}
 	}
-	return fmt.Errorf("unexpected action state: %v", action)
+
+	params := map[string]string{
+		"subjectId": issue.ID,
+		"body":      opts.Body,
+	}
+
+	url, err := api.CommentCreate(apiClient, baseRepo.RepoHost(), params)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(opts.IO.Out, url)
+
+	return nil
+}
+
+func inputTypeSurvey() (int, error) {
+	var inputType int
+	inputTypeQuestion := &survey.Select{
+		Message: "Where do you want to draft your comment?",
+		Options: []string{"In line", "Editor", "Web"},
+	}
+	err := prompt.SurveyAskOne(inputTypeQuestion, &inputType)
+	return inputType, err
+}
+
+func inlineSurvey() (string, error) {
+	var body string
+	bodyQuestion := &survey.Input{
+		Message: "Body",
+	}
+	err := prompt.SurveyAskOne(bodyQuestion, &body)
+	return body, err
+}
+
+func editorSurvey(editorCommand string) (string, error) {
+	var body string
+	bodyQuestion := &surveyext.GhEditor{
+		BlankAllowed:  false,
+		EditorCommand: editorCommand,
+		Editor: &survey.Editor{
+			Message:  "Body",
+			FileName: "*.md",
+		},
+	}
+	err := prompt.SurveyAskOne(bodyQuestion, &body)
+	return body, err
+}
+
+func confirmSubmitSurvey() (bool, error) {
+	var confirm bool
+	submit := &survey.Confirm{
+		Message: "Submit?",
+		Default: true,
+	}
+	err := prompt.SurveyAskOne(submit, &confirm)
+	return confirm, err
 }
