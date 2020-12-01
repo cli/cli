@@ -26,7 +26,6 @@ ifdef GH_OAUTH_CLIENT_SECRET
 	GO_LDFLAGS := -X github.com/cli/cli/internal/authflow.oauthClientSecret=$(GH_OAUTH_CLIENT_SECRET) $(GO_LDFLAGS)
 endif
 
-install-bins += bin/gh
 bin/gh: $(BUILD_FILES)
 	@go build -trimpath -ldflags "$(GO_LDFLAGS)" -o "$@" ./cmd/gh
 
@@ -59,30 +58,22 @@ endif
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 .PHONY: site-bump
 
-
 .PHONY: manpages
-manpages: manpages.list
-manpages.list:
+manpages:
 	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/
-	find share/man -type f > $@
 
 DESTDIR :=
 prefix  := /usr/local
 bindir  := ${prefix}/bin
 mandir  := ${prefix}/share/man
 
-.PHONY: install install-strip uninstall
-INSTALL_STRIP_FLAG =
-install-strip:
-	@${MAKE} INSTALL_STRIP_FLAG=-s install
-
-install: ${install-bins} manpages.list
+.PHONY: install
+install: bin/gh manpages
 	install -d ${DESTDIR}${bindir}
-	install -m555 ${INSTALL_STRIP_FLAG} ${install-bins} ${DESTDIR}${bindir}/
+	install -m755 bin/gh ${DESTDIR}${bindir}/
 	install -d ${DESTDIR}${mandir}/man1
-	install -m444 $(shell cat manpages.list) ${DESTDIR}${mandir}/man1/
+	install -m644 ./share/man/man1/* ${DESTDIR}${mandir}/man1/
 
-remove-bins := ${install-bins:bin/%=${DESTDIR}${bindir}/%}
-uninstall: manpages.list
-	rm -f ${remove-bins}
-	rm -f $(patsubst share/man/%,${DESTDIR}${mandir}/%,$(shell cat manpages.list))
+.PHONY: uninstall
+uninstall:
+	rm -f ${DESTDIR}${bindir}/gh ${DESTDIR}${mandir}/man1/gh.1 ${DESTDIR}${mandir}/man1/gh-*.1
