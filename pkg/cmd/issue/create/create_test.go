@@ -327,7 +327,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
+	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 }
 
