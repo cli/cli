@@ -684,7 +684,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 	u := ghrepo.GenerateRepoURL(
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
-		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranch))
+		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranchLabel))
 	url, err := shared.WithPrAndIssueQueryParams(u, state)
 	if err != nil {
 		return "", err
