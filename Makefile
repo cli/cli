@@ -58,7 +58,22 @@ endif
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
 .PHONY: site-bump
 
-
 .PHONY: manpages
 manpages:
 	go run ./cmd/gen-docs --man-page --doc-path ./share/man/man1/
+
+DESTDIR :=
+prefix  := /usr/local
+bindir  := ${prefix}/bin
+mandir  := ${prefix}/share/man
+
+.PHONY: install
+install: bin/gh manpages
+	install -d ${DESTDIR}${bindir}
+	install -m755 bin/gh ${DESTDIR}${bindir}/
+	install -d ${DESTDIR}${mandir}/man1
+	install -m644 ./share/man/man1/* ${DESTDIR}${mandir}/man1/
+
+.PHONY: uninstall
+uninstall:
+	rm -f ${DESTDIR}${bindir}/gh ${DESTDIR}${mandir}/man1/gh.1 ${DESTDIR}${mandir}/man1/gh-*.1
