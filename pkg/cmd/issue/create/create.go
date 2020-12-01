@@ -199,7 +199,6 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		var action prShared.Action
 		action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
