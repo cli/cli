@@ -15,16 +15,18 @@
    $ cd gh-cli
    ```
 
-2. Build the project
-
-   ```
-   $ make
-   ```
-
-3. Move the resulting `bin/gh` executable to somewhere in your PATH
+2. Build and install
 
    ```sh
-   $ sudo mv ./bin/gh /usr/local/bin/
+   # installs to '/usr/local' by default; sudo may be required
+   $ make install
    ```
 
-4. Run `gh version` to check if it worked.
+   To install to a different location:
+   ```sh
+   $ make install prefix=/path/to/gh
+   ```
+
+   Make sure that the `${prefix}/bin` directory is in your PATH.
+
+3. Run `gh version` to check if it worked.
