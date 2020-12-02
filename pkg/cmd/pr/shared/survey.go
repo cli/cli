@@ -263,13 +263,6 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 		milestones = append(milestones, m.Title)
 	}
 
-	type metadataValues struct {
-		Reviewers []string
-		Assignees []string
-		Labels    []string
-		Projects  []string
-		Milestone string
-	}
 	var mqs []*survey.Question
 	if isChosen("Reviewers") {
 		if len(users) > 0 || len(teams) > 0 {
@@ -346,32 +339,38 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 		}
 	}
 
-	if len(mqs) > 0 {
-		values := metadataValues{
-			Reviewers: state.Reviewers,
-			Assignees: state.Assignees,
-			Labels:    state.Labels,
-			Projects:  state.Projects,
-		}
-		if len(state.Milestones) > 0 {
-			values.Milestone = state.Milestones[0]
-		}
+	values := struct {
+		Reviewers []string
+		Assignees []string
+		Labels    []string
+		Projects  []string
+		Milestone string
+	}{}
 
-		err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		state.Reviewers = values.Reviewers
-		state.Assignees = values.Assignees
-		state.Labels = values.Labels
-		state.Projects = values.Projects
-		if values.Milestone != "" && values.Milestone != noMilestone {
-			state.Milestones = []string{values.Milestone}
-		}
+	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+	if err != nil {
+		return fmt.Errorf("could not prompt: %w", err)
 	}
 
-	state.MetadataResult = nil
+	if isChosen("Reviewers") {
+		state.Reviewers = values.Reviewers
+	}
+	if isChosen("Assignees") {
+		state.Assignees = values.Assignees
+	}
+	if isChosen("Labels") {
+		state.Labels = values.Labels
+	}
+	if isChosen("Projects") {
+		state.Projects = values.Projects
+	}
+	if isChosen("Milestone") {
+		if values.Milestone != "" && values.Milestone != noMilestone {
+			state.Milestones = []string{values.Milestone}
+		} else {
+			state.Milestones = []string{}
+		}
+	}
 
 	return nil
 }
