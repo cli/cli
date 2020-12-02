@@ -464,6 +464,28 @@ func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 	return "", errors.New("not found")
 }
 
+func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {
+	if len(m2.AssignableUsers) > 0 || len(m.AssignableUsers) == 0 {
+		m.AssignableUsers = m2.AssignableUsers
+	}
+
+	if len(m2.Teams) > 0 || len(m.Teams) == 0 {
+		m.Teams = m2.Teams
+	}
+
+	if len(m2.Labels) > 0 || len(m.Labels) == 0 {
+		m.Labels = m2.Labels
+	}
+
+	if len(m2.Projects) > 0 || len(m.Projects) == 0 {
+		m.Projects = m2.Projects
+	}
+
+	if len(m2.Milestones) > 0 || len(m.Milestones) == 0 {
+		m.Milestones = m2.Milestones
+	}
+}
+
 type RepoMetadataInput struct {
 	Assignees  bool
 	Reviewers  bool
