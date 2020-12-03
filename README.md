@@ -49,9 +49,8 @@ For more information and distro-specific instructions, see the [Linux installati
 
 | Install:            | Upgrade:            |
 | ------------------- | --------------------|
-| `winget install gh` | `winget install gh` |
+| `winget install gh` | `winget upgrade gh` |
 
-<i>WinGet does not have a specialized `upgrade` command yet, but the `install` command should work for upgrading to a newer version of GitHub CLI.</i>
 
 #### scoop
 
