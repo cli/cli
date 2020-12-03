@@ -259,7 +259,13 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == shared.MetadataAction {
-		err = shared.MetadataSurvey(opts.IO, client, ctx.BaseRepo, state)
+		fetcher := &shared.MetadataFetcher{
+			IO:        opts.IO,
+			APIClient: client,
+			Repo:      ctx.BaseRepo,
+			State:     state,
+		}
+		err = shared.MetadataSurvey(opts.IO, ctx.BaseRepo, fetcher, state)
 		if err != nil {
 			return
 		}
