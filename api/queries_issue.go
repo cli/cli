@@ -23,6 +23,13 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
+type IssueTemplate struct {
+	About string
+	Body  string
+	Name  string
+	Title string
+}
+
 type Issue struct {
 	ID        string
 	Number    int
@@ -486,6 +493,31 @@ func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
 	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
 
 	return err
+}
+
+func IssueTemplates(client *Client, repo *Repository) ([]IssueTemplate, error) {
+	var query struct {
+		Repository struct {
+			IssueTemplates []IssueTemplate
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	gql := graphQLClient(client.http, repo.RepoHost())
+
+	err := gql.QueryNamed(context.Background(), "RepositoryIssueTemplates", &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	if query.Repository.IssueTemplates == nil {
+		return nil, fmt.Errorf("no issue templates found ")
+	}
+
+	return query.Repository.IssueTemplates, nil
 }
 
 // milestoneNodeIdToDatabaseId extracts the REST Database ID from the GraphQL Node ID
