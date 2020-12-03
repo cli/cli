@@ -386,7 +386,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 
 	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
 		err := initDefaultTitleBody(ctx, state)
-		if err != nil {
+		if err != nil && opts.Autofill {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
