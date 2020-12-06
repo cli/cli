@@ -1,3 +1,0 @@
-linters:
-  enable:
-    gofmt
