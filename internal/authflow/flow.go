@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/auth"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/browser"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/oauth"
 )
 
 var (
@@ -58,28 +57,33 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
-	var verboseStream io.Writer
-	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
-		verboseStream = w
-	}
+	httpClient := http.DefaultClient
+	// TODO: print HTTP logs in debug mode
+	// if strings.Contains(os.Getenv("DEBUG"), "oauth") {
+	// 	httpClient = ...
+	// }
 
 	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
 	scopes := append(minimumScopes, additionalScopes...)
 
-	flow := &auth.OAuthFlow{
+	callbackURI := "http://127.0.0.1/callback"
+	if ghinstance.IsEnterprise(oauthHost) {
+		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
+		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
+		callbackURI = "http://localhost/"
+	}
+
+	flow := &oauth.Flow{
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
+		CallbackURI:  callbackURI,
 		Scopes:       scopes,
-		WriteSuccessHTML: func(w io.Writer) {
-			fmt.Fprintln(w, oauthSuccessPage)
+		DisplayCode: func(code, verificationURL string) error {
+			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
+			return nil
 		},
-		VerboseStream: verboseStream,
-		HTTPClient:    http.DefaultClient,
-		OpenInBrowser: func(url, code string) error {
-			if code != "" {
-				fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
-			}
+		BrowseURL: func(url string) error {
 			fmt.Fprintf(w, "- %s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
@@ -87,29 +91,34 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			if err != nil {
 				return err
 			}
-			err = browseCmd.Run()
-			if err != nil {
+			if err := browseCmd.Run(); err != nil {
 				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
 			}
 			return nil
 		},
+		WriteSuccessHTML: func(w io.Writer) {
+			fmt.Fprintln(w, oauthSuccessPage)
+		},
+		HTTPClient: httpClient,
+		Stdin:      IO.In,
+		Stdout:     w,
 	}
 
 	fmt.Fprintln(w, notice)
 
-	token, err := flow.ObtainAccessToken()
+	token, err := flow.DetectFlow()
 	if err != nil {
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(oauthHost, token)
+	userLogin, err := getViewer(oauthHost, token.Token)
 	if err != nil {
 		return "", "", err
 	}
 
-	return token, userLogin, nil
+	return token.Token, userLogin, nil
 }
 
 func getViewer(hostname, token string) (string, error) {
