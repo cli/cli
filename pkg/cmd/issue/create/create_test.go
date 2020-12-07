@@ -3,16 +3,20 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -126,6 +130,86 @@ func TestIssueCreate(t *testing.T) {
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
+func TestIssueCreate_recover(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
+			}
+		} }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			eq(t, inputs["title"], "recovered title")
+			eq(t, inputs["body"], "recovered body")
+			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+		}))
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Title",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	assert.NoError(t, err)
+
+	state := prShared.IssueMetadataState{
+		Title:  "recovered title",
+		Body:   "recovered body",
+		Labels: []string{"bug", "TODO"},
+	}
+
+	data, err := json.Marshal(state)
+	assert.NoError(t, err)
+
+	_, err = tmpfile.Write(data)
+	assert.NoError(t, err)
+
+	args := fmt.Sprintf("--recover '%s'", tmpfile.Name())
+
+	output, err := runCommandWithRootDirOverridden(http, true, args, "")
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
 func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
@@ -145,7 +229,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
-	// tmeplate
+	// template
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "index",
@@ -189,6 +273,62 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_continueInBrowser(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	// title
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "Title",
+			Value: "hello",
+		},
+	})
+	// confirm
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, true, `-b body`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		
+		Creating issue in OWNER/REPO
+		
+		Opening github.com/OWNER/REPO/issues/new in your browser.
+	`), output.Stderr())
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {

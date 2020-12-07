@@ -95,7 +95,7 @@ sudo pacman -S github-cli
 
 ### Android
 
-Android users can install via Termux:
+Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page):
 
 ```bash
 pkg install gh

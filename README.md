@@ -55,18 +55,9 @@ For more information and distro-specific instructions, see the [Linux installati
 
 #### scoop
 
-Install:
-
-```powershell
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
-scoop install gh
-```
-
-Upgrade:
-
-```powershell
-scoop update gh
-```
+| Install:           | Upgrade:           |
+| ------------------ | ------------------ |
+| `scoop install gh` | `scoop update gh`  |
 
 #### Chocolatey
 

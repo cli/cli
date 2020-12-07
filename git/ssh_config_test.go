@@ -25,7 +25,7 @@ func Test_sshParse(t *testing.T) {
 	`))
 	eq(t, m["foo"], "example.com")
 	eq(t, m["bar"], "%bar.net%")
-	eq(t, m["nonexist"], "")
+	eq(t, m["nonexistent"], "")
 }
 
 func Test_Translator(t *testing.T) {

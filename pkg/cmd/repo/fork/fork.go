@@ -195,6 +195,21 @@ func forkRun(opts *ForkOptions) error {
 		if err != nil {
 			return err
 		}
+
+		if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
+
+			scheme := ""
+			if remote.FetchURL != nil {
+				scheme = remote.FetchURL.Scheme
+			}
+			if remote.PushURL != nil {
+				scheme = remote.PushURL.Scheme
+			}
+			if scheme != "" {
+				protocol = scheme
+			}
+		}
+
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Using existing remote %s\n", cs.SuccessIcon(), cs.Bold(remote.Name))

@@ -45,6 +45,8 @@ type IOStreams struct {
 	pagerProcess *os.Process
 
 	neverPrompt bool
+
+	TempFileOverride *os.File
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -251,6 +253,28 @@ func (s *IOStreams) TerminalWidth() int {
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
 	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
+}
+
+func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
+	var r io.ReadCloser
+	if fn == "-" {
+		r = s.In
+	} else {
+		var err error
+		r, err = os.Open(fn)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer r.Close()
+	return ioutil.ReadAll(r)
+}
+
+func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
+	if s.TempFileOverride != nil {
+		return s.TempFileOverride, nil
+	}
+	return ioutil.TempFile(dir, pattern)
 }
 
 func System() *IOStreams {
