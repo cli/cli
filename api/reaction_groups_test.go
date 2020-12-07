@@ -8,48 +8,93 @@ import (
 
 func Test_String(t *testing.T) {
 	tests := map[string]struct {
-		rgs    ReactionGroups
-		output string
+		rg    ReactionGroup
+		emoji string
+		count int
 	}{
-		"empty reaction groups": {
-			rgs:    []ReactionGroup{},
-			output: `^$`,
+		"empty reaction group": {
+			rg:    ReactionGroup{},
+			emoji: "",
+			count: 0,
 		},
-		"non-empty reaction groups": {
-			rgs: []ReactionGroup{
-				{
-					Content: "LAUGH",
-					Users:   ReactionGroupUsers{TotalCount: 0},
-				},
-				{
-					Content: "HOORAY",
-					Users:   ReactionGroupUsers{TotalCount: 1},
-				},
-				{
-					Content: "CONFUSED",
-					Users:   ReactionGroupUsers{TotalCount: 0},
-				},
-				{
-					Content: "HEART",
-					Users:   ReactionGroupUsers{TotalCount: 2},
-				},
+		"unknown reaction group": {
+			rg: ReactionGroup{
+				Content: "UNKNOWN",
+				Users:   ReactionGroupUsers{TotalCount: 1},
 			},
-			output: `^1 \x{1f389} • 2 \x{2764}\x{fe0f}$`,
+			emoji: "",
+			count: 1,
 		},
-		"reaction groups with unmapped emoji": {
-			rgs: []ReactionGroup{
-				{
-					Content: "UNKNOWN",
-					Users:   ReactionGroupUsers{TotalCount: 1},
-				},
+		"thumbs up reaction group": {
+			rg: ReactionGroup{
+				Content: "THUMBS_UP",
+				Users:   ReactionGroupUsers{TotalCount: 2},
 			},
-			output: `^$`,
+			emoji: "\U0001f44d",
+			count: 2,
+		},
+		"thumbs down reaction group": {
+			rg: ReactionGroup{
+				Content: "THUMBS_DOWN",
+				Users:   ReactionGroupUsers{TotalCount: 3},
+			},
+			emoji: "\U0001f44e",
+			count: 3,
+		},
+		"laugh reaction group": {
+			rg: ReactionGroup{
+				Content: "LAUGH",
+				Users:   ReactionGroupUsers{TotalCount: 4},
+			},
+			emoji: "\U0001f604",
+			count: 4,
+		},
+		"hooray reaction group": {
+			rg: ReactionGroup{
+				Content: "HOORAY",
+				Users:   ReactionGroupUsers{TotalCount: 5},
+			},
+			emoji: "\U0001f389",
+			count: 5,
+		},
+		"confused reaction group": {
+			rg: ReactionGroup{
+				Content: "CONFUSED",
+				Users:   ReactionGroupUsers{TotalCount: 6},
+			},
+			emoji: "\U0001f615",
+			count: 6,
+		},
+		"heart reaction group": {
+			rg: ReactionGroup{
+				Content: "HEART",
+				Users:   ReactionGroupUsers{TotalCount: 7},
+			},
+			emoji: "\u2764\ufe0f",
+			count: 7,
+		},
+		"rocket reaction group": {
+			rg: ReactionGroup{
+				Content: "ROCKET",
+				Users:   ReactionGroupUsers{TotalCount: 8},
+			},
+			emoji: "\U0001f680",
+			count: 8,
+		},
+		"eyes reaction group": {
+			rg: ReactionGroup{
+				Content: "EYES",
+				Users:   ReactionGroupUsers{TotalCount: 9},
+			},
+			emoji: "\U0001f440",
+			count: 9,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Regexp(t, tt.output, tt.rgs.String())
+			assert.Equal(t, tt.emoji, tt.rg.Emoji())
+			assert.Equal(t, tt.count, tt.rg.Count())
 		})
 	}
 }

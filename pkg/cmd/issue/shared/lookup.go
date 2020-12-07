@@ -11,7 +11,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 )
 
-func IssueWithCommentsFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, comments int) (*api.Issue, ghrepo.Interface, error) {
+func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if baseRepo == nil {
@@ -30,12 +30,8 @@ func IssueWithCommentsFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.I
 		}
 	}
 
-	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, comments)
+	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber)
 	return issue, baseRepo, err
-}
-
-func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
-	return IssueWithCommentsFromArg(apiClient, baseRepoFn, arg, 0)
 }
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)
@@ -60,6 +56,6 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
-func issueFromNumber(apiClient *api.Client, repo ghrepo.Interface, issueNumber, comments int) (*api.Issue, error) {
-	return api.IssueByNumber(apiClient, repo, issueNumber, comments)
+func issueFromNumber(apiClient *api.Client, repo ghrepo.Interface, issueNumber int) (*api.Issue, error) {
+	return api.IssueByNumber(apiClient, repo, issueNumber)
 }

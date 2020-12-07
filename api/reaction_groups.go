@@ -1,10 +1,5 @@
 package api
 
-import (
-	"fmt"
-	"strings"
-)
-
 type ReactionGroups []ReactionGroup
 
 type ReactionGroup struct {
@@ -16,28 +11,12 @@ type ReactionGroupUsers struct {
 	TotalCount int
 }
 
-func (rg ReactionGroup) String() string {
-	c := rg.Users.TotalCount
-	if c == 0 {
-		return ""
-	}
-	e := reactionEmoji[rg.Content]
-	if e == "" {
-		return ""
-	}
-	return fmt.Sprintf("%v %s", c, e)
+func (rg ReactionGroup) Count() int {
+	return rg.Users.TotalCount
 }
 
-func (rgs ReactionGroups) String() string {
-	var rs []string
-
-	for _, rg := range rgs {
-		if r := rg.String(); r != "" {
-			rs = append(rs, r)
-		}
-	}
-
-	return strings.Join(rs, " • ")
+func (rg ReactionGroup) Emoji() string {
+	return reactionEmoji[rg.Content]
 }
 
 var reactionEmoji = map[string]string{

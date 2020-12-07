@@ -2,11 +2,13 @@ package view
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
 	"testing"
 
+	"github.com/briandowns/spinner"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -14,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
+	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -337,26 +340,31 @@ func TestIssueView_web_urlArg(t *testing.T) {
 func TestIssueView_tty_Comments(t *testing.T) {
 	tests := map[string]struct {
 		cli             string
-		fixture         string
+		fixtures        map[string]string
 		expectedOutputs []string
 		wantsErr        bool
 	}{
 		"without comments flag": {
-			cli:     "123",
-			fixture: "./fixtures/issueView_previewSingleComment.json",
+			cli: "123",
+			fixtures: map[string]string{
+				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
+			},
 			expectedOutputs: []string{
 				`some title`,
 				`some body`,
-				`———————— Hiding 4 comments ————————`,
+				`———————— Not showing 4 comments ————————`,
 				`marseilles \(collaborator\) • Jan  1, 2020 • Newest comment`,
 				`Comment 5`,
 				`Use --comments to view the full conversation`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
-		"with default comments flag": {
-			cli:     "123 --comments",
-			fixture: "./fixtures/issueView_previewFullComments.json",
+		"with comments flag": {
+			cli: "123 --comments",
+			fixtures: map[string]string{
+				"IssueByNumber":    "./fixtures/issueView_previewSingleComment.json",
+				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
+			},
 			expectedOutputs: []string{
 				`some title`,
 				`some body`,
@@ -374,35 +382,19 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
-		"with specified comments flag": {
-			cli:     "123 --comments=3",
-			fixture: "./fixtures/issueView_previewThreeComments.json",
-			expectedOutputs: []string{
-				`some title`,
-				`some body`,
-				`———————— Hiding 2 comments ————————`,
-				`elvisp \(member\) • Jan  1, 2020`,
-				`Comment 3`,
-				`loislane \(owner\) • Jan  1, 2020`,
-				`Comment 4`,
-				`marseilles \(collaborator\) • Jan  1, 2020 • Newest comment`,
-				`Comment 5`,
-				`Use --comments to view the full conversation`,
-				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
-			},
-		},
-		"with incorrect comments flag": {
+		"with invalid comments flag": {
 			cli:      "123 --comments 3",
-			fixture:  "",
 			wantsErr: true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			stubSpinner()
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
-			if tc.fixture != "" {
-				http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
+			for name, file := range tc.fixtures {
+				name := fmt.Sprintf(`query %s\b`, name)
+				http.Register(httpmock.GraphQL(name), httpmock.FileResponse(file))
 			}
 			output, err := runCommand(http, true, tc.cli)
 			if tc.wantsErr {
@@ -419,13 +411,15 @@ func TestIssueView_tty_Comments(t *testing.T) {
 func TestIssueView_nontty_Comments(t *testing.T) {
 	tests := map[string]struct {
 		cli             string
-		fixture         string
+		fixtures        map[string]string
 		expectedOutputs []string
 		wantsErr        bool
 	}{
 		"without comments flag": {
-			cli:     "123",
-			fixture: "./fixtures/issueView_previewSingleComment.json",
+			cli: "123",
+			fixtures: map[string]string{
+				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
+			},
 			expectedOutputs: []string{
 				`title:\tsome title`,
 				`state:\tOPEN`,
@@ -434,9 +428,12 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`some body`,
 			},
 		},
-		"with default comments flag": {
-			cli:     "123 --comments",
-			fixture: "./fixtures/issueView_previewFullComments.json",
+		"with comments flag": {
+			cli: "123 --comments",
+			fixtures: map[string]string{
+				"IssueByNumber":    "./fixtures/issueView_previewSingleComment.json",
+				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
+			},
 			expectedOutputs: []string{
 				`author:\tmonalisa`,
 				`association:\t`,
@@ -460,27 +457,8 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`Comment 5`,
 			},
 		},
-		"with specified comments flag": {
-			cli:     "123 --comments=3",
-			fixture: "./fixtures/issueView_previewThreeComments.json",
-			expectedOutputs: []string{
-				`author:\telvisp`,
-				`association:\tmember`,
-				`edited:\tfalse`,
-				`Comment 3`,
-				`author:\tloislane`,
-				`association:\towner`,
-				`edited:\tfalse`,
-				`Comment 4`,
-				`author:\tmarseilles`,
-				`association:\tcollaborator`,
-				`edited:\tfalse`,
-				`Comment 5`,
-			},
-		},
-		"with incorrect comments flag": {
+		"with invalid comments flag": {
 			cli:      "123 --comments 3",
-			fixture:  "",
 			wantsErr: true,
 		},
 	}
@@ -488,8 +466,9 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
-			if tc.fixture != "" {
-				http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
+			for name, file := range tc.fixtures {
+				name := fmt.Sprintf(`query %s\b`, name)
+				http.Register(httpmock.GraphQL(name), httpmock.FileResponse(file))
 			}
 			output, err := runCommand(http, false, tc.cli)
 			if tc.wantsErr {
@@ -501,4 +480,9 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
+}
+
+func stubSpinner() {
+	utils.StartSpinner = func(_ *spinner.Spinner) {}
+	utils.StopSpinner = func(_ *spinner.Spinner) {}
 }

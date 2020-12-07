@@ -33,7 +33,7 @@ type Issue struct {
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Comments  IssueComments
+	Comments  Comments
 	Author    Author
 	Assignees struct {
 		Nodes []struct {
@@ -66,20 +66,6 @@ type Issue struct {
 
 type IssuesDisabledError struct {
 	error
-}
-
-type IssueComments struct {
-	Nodes      []IssueComment
-	TotalCount int
-}
-
-type IssueComment struct {
-	Author              Author
-	AuthorAssociation   string
-	Body                string
-	CreatedAt           time.Time
-	IncludesCreatedEdit bool
-	ReactionGroups      ReactionGroups
 }
 
 type Author struct {
@@ -335,7 +321,7 @@ loop:
 	return &res, nil
 }
 
-func IssueByNumber(client *Client, repo ghrepo.Interface, number, comments int) (*Issue, error) {
+func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
 	type response struct {
 		Repository struct {
 			Issue            Issue
@@ -344,7 +330,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number, comments int) 
 	}
 
 	query := `
-	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!, $comments: Int!) {
+	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
@@ -356,7 +342,7 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number, comments int) 
 				author {
 					login
 				}
-				comments(last: $comments) {
+				comments(last: 1) {
 					nodes {
 						author {
 							login
@@ -417,7 +403,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number, comments int) 
 		"owner":        repo.RepoOwner(),
 		"repo":         repo.RepoName(),
 		"issue_number": number,
-		"comments":     comments,
 	}
 
 	var resp response

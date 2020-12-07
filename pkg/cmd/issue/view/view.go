@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/briandowns/spinner"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
@@ -27,10 +28,9 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	SelectorArg      string
-	WebMode          bool
-	Comments         int
-	CommentsProvided bool
+	SelectorArg string
+	WebMode     bool
+	Comments    bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -55,8 +55,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.CommentsProvided = cmd.Flags().Changed("comments")
-
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -69,8 +67,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
-	cmd.Flags().IntVarP(&opts.Comments, "comments", "c", 1, "View issue comments sorted by most recent")
-	cmd.Flags().Lookup("comments").NoOptDefVal = "30"
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
 
 	return cmd
 }
@@ -82,18 +79,35 @@ func viewRun(opts *ViewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, _, err := issueShared.IssueWithCommentsFromArg(apiClient, opts.BaseRepo, opts.SelectorArg, opts.Comments)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
 
-	openURL := issue.URL
-
 	if opts.WebMode {
+		openURL := issue.URL
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
+	}
+
+	if opts.Comments {
+		var s *spinner.Spinner
+		if opts.IO.IsStdoutTTY() {
+			s = utils.Spinner(opts.IO.ErrOut)
+			utils.StartSpinner(s)
+		}
+
+		comments, err := api.CommentsForIssue(apiClient, repo, issue)
+		if err != nil {
+			return err
+		}
+		issue.Comments = *comments
+
+		if opts.IO.IsStdoutTTY() {
+			utils.StopSpinner(s)
+		}
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -108,7 +122,7 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanIssuePreview(opts.IO, issue)
 	}
 
-	if opts.CommentsProvided {
+	if opts.Comments {
 		return printRawIssueComments(opts.IO.Out, issue)
 	}
 
@@ -144,7 +158,7 @@ func printRawIssueComments(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-func rawIssueComment(comment api.IssueComment) string {
+func rawIssueComment(comment api.Comment) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
 	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
@@ -172,7 +186,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	)
 
 	// Reactions
-	if reactions := issue.ReactionGroups.String(); reactions != "" {
+	if reactions := reactionGroupList(issue.ReactionGroups); reactions != "" {
 		fmt.Fprint(out, reactions)
 		fmt.Fprintln(out)
 	}
@@ -210,7 +224,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 
 	// Comments
 	if issue.Comments.TotalCount > 0 {
-		comments, err := issueComments(io, issue.Comments)
+		comments, err := issueCommentList(io, issue.Comments)
 		if err != nil {
 			return err
 		}
@@ -223,20 +237,20 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	return nil
 }
 
-func issueComments(io *iostreams.IOStreams, comments api.IssueComments) (string, error) {
+func issueCommentList(io *iostreams.IOStreams, comments api.Comments) (string, error) {
 	var b strings.Builder
 	cs := io.ColorScheme()
 	retrievedCount := len(comments.Nodes)
 	hiddenCount := comments.TotalCount - retrievedCount
 
 	if hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Hiding %v comments ————————", hiddenCount)))
+		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
 
 	for i, comment := range comments.Nodes {
 		last := i+1 == retrievedCount
-		cmt, err := issueComment(io, comment, last)
+		cmt, err := formatIssueComment(io, comment, last)
 		if err != nil {
 			return "", err
 		}
@@ -254,7 +268,7 @@ func issueComments(io *iostreams.IOStreams, comments api.IssueComments) (string,
 	return b.String(), nil
 }
 
-func issueComment(io *iostreams.IOStreams, comment api.IssueComment, newest bool) (string, error) {
+func formatIssueComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (string, error) {
 	var b strings.Builder
 	cs := io.ColorScheme()
 
@@ -274,7 +288,7 @@ func issueComment(io *iostreams.IOStreams, comment api.IssueComment, newest bool
 	fmt.Fprintln(&b)
 
 	// Reactions
-	if reactions := comment.ReactionGroups.String(); reactions != "" {
+	if reactions := reactionGroupList(comment.ReactionGroups); reactions != "" {
 		fmt.Fprint(&b, reactions)
 		fmt.Fprintln(&b)
 	}
@@ -333,4 +347,28 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func reactionGroupList(rgs api.ReactionGroups) string {
+	var rs []string
+
+	for _, rg := range rgs {
+		if r := formatReactionGroup(rg); r != "" {
+			rs = append(rs, r)
+		}
+	}
+
+	return strings.Join(rs, " • ")
+}
+
+func formatReactionGroup(rg api.ReactionGroup) string {
+	c := rg.Count()
+	if c == 0 {
+		return ""
+	}
+	e := rg.Emoji()
+	if e == "" {
+		return ""
+	}
+	return fmt.Sprintf("%v %s", c, e)
 }
