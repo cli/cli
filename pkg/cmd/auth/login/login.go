@@ -16,7 +16,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -138,7 +138,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(opts.Hostname, cfg)
+		err = shared.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -182,9 +182,9 @@ func loginRun(opts *LoginOptions) error {
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
 
 	if existingToken != "" && opts.Interactive {
-		err := client.ValidateHostCfg(hostname, cfg)
+		err := shared.ValidateHostCfg(hostname, cfg)
 		if err == nil {
-			apiClient, err := client.ClientFromCfg(hostname, cfg)
+			apiClient, err := shared.ClientFromCfg(hostname, cfg)
 			if err != nil {
 				return err
 			}
@@ -258,7 +258,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(hostname, cfg)
+		err = shared.ValidateHostCfg(hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -294,7 +294,7 @@ func loginRun(opts *LoginOptions) error {
 	if userValidated {
 		username, _ = cfg.Get(hostname, "user")
 	} else {
-		apiClient, err := client.ClientFromCfg(hostname, cfg)
+		apiClient, err := shared.ClientFromCfg(hostname, cfg)
 		if err != nil {
 			return err
 		}
