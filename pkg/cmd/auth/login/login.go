@@ -1,26 +1,21 @@
 package login
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
@@ -316,63 +311,9 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Interactive && gitProtocol == "https" {
-		helper, _ := gitCredentialHelper(hostname)
-		if !isOurCredentialHelper(helper) {
-			var primeCredentials bool
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Set up git for passwordless push/pull operations?",
-				Default: true,
-			}, &primeCredentials)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-
-			if primeCredentials {
-				if helper == "" {
-					configureCmd, err := git.GitCommand("config", "--global", gitCredentialHelperKey(hostname), "!gh auth git-credential")
-					if err != nil {
-						return err
-					}
-
-					err = run.PrepareCmd(configureCmd).Run()
-					if err != nil {
-						return err
-					}
-				} else {
-					rejectCmd, err := git.GitCommand("credential", "reject")
-					if err != nil {
-						return err
-					}
-
-					rejectCmd.Stdin = bytes.NewBufferString(fmt.Sprintf(heredoc.Doc(`
-						protocol=https
-						host=%s
-					`), hostname))
-
-					err = run.PrepareCmd(rejectCmd).Run()
-					if err != nil {
-						return err
-					}
-
-					approveCmd, err := git.GitCommand("credential", "approve")
-					if err != nil {
-						return err
-					}
-
-					password, _ := cfg.Get(hostname, "oauth_token")
-					approveCmd.Stdin = bytes.NewBufferString(fmt.Sprintf(heredoc.Doc(`
-						protocol=https
-						host=%s
-						username=%s
-						password=%s
-					`), hostname, username, password))
-
-					err = run.PrepareCmd(approveCmd).Run()
-					if err != nil {
-						return err
-					}
-				}
-			}
+		err := shared.GitCredentialSetup(cfg, hostname, username)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -389,30 +330,4 @@ func getAccessTokenTip(hostname string) string {
 	return fmt.Sprintf(`
 	Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 	The minimum required scopes are 'repo' and 'read:org'.`, ghHostname)
-}
-
-func gitCredentialHelperKey(hostname string) string {
-	return fmt.Sprintf("credential.https://%s.helper", hostname)
-}
-
-func gitCredentialHelper(hostname string) (helper string, err error) {
-	helper, err = git.Config(gitCredentialHelperKey(hostname))
-	if helper != "" {
-		return
-	}
-	helper, err = git.Config("credential.helper")
-	return
-}
-
-func isOurCredentialHelper(cmd string) bool {
-	if !strings.HasPrefix(cmd, "!") {
-		return false
-	}
-
-	args, err := shlex.Split(cmd[1:])
-	if err != nil || len(args) == 0 {
-		return false
-	}
-
-	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
 }
