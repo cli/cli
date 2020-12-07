@@ -6,23 +6,28 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
+type config interface {
+	Get(string, string) (string, error)
+}
+
 type CredentialOptions struct {
 	IO     *iostreams.IOStreams
-	Config func() (config.Config, error)
+	Config func() (config, error)
 
 	Operation string
 }
 
 func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *cobra.Command {
 	opts := &CredentialOptions{
-		IO:     f.IOStreams,
-		Config: f.Config,
+		IO: f.IOStreams,
+		Config: func() (config, error) {
+			return f.Config()
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -36,7 +41,6 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return helperRun(opts)
 		},
 	}
@@ -66,22 +70,23 @@ func helperRun(opts *CredentialOptions) error {
 		if len(parts) < 2 {
 			continue
 		}
-		wants[parts[0]] = parts[1]
+		key, value := parts[0], parts[1]
+		if key == "url" {
+			u, err := url.Parse(value)
+			if err != nil {
+				return err
+			}
+			wants["protocol"] = u.Scheme
+			wants["host"] = u.Host
+			wants["path"] = u.Path
+			wants["username"] = u.User.Username()
+			wants["password"], _ = u.User.Password()
+		} else {
+			wants[key] = value
+		}
 	}
 	if err := s.Err(); err != nil {
 		return err
-	}
-
-	if uv := wants["url"]; uv != "" {
-		u, err := url.Parse(uv)
-		if err != nil {
-			return err
-		}
-		wants["protocol"] = u.Scheme
-		wants["host"] = u.Host
-		wants["path"] = u.Path
-		wants["username"] = u.User.Username()
-		wants["password"], _ = u.User.Password()
 	}
 
 	if wants["protocol"] != "https" {
