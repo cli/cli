@@ -25,6 +25,8 @@ builds:
     id: linux
     goos: [linux]
     goarch: [386, amd64, arm64]
+    env:
+      - CGO_ENABLED=0
 
   - <<: *build_defaults
     id: windows
