@@ -5,8 +5,8 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 
-	cmdCreate "github.com/cli/cli/pkg/cmd/secret/create"
 	cmdList "github.com/cli/cli/pkg/cmd/secret/list"
+	cmdSet "github.com/cli/cli/pkg/cmd/secret/set"
 )
 
 func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
@@ -15,14 +15,15 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage GitHub secrets",
 		Long: heredoc.Doc(`
 			Secrets can be set at the repository or organization level for use in GitHub Actions.
-			Run "gh help secret add" to learn how to get started.
+			Run "gh help secret set" to learn how to get started.
 `),
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
+	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
+	// TODO add delete
 
 	return cmd
 }

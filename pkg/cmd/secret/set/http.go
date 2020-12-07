@@ -1,4 +1,4 @@
-package create
+package set
 
 import (
 	"bytes"
@@ -64,7 +64,7 @@ func putSecret(client *api.Client, host, path string, payload SecretPayload) err
 	return client.REST(host, "PUT", path, requestBody, nil)
 }
 
-func putOrgSecret(client *api.Client, pk *PubKey, host string, opts CreateOptions, eValue string) error {
+func putOrgSecret(client *api.Client, pk *PubKey, host string, opts SetOptions, eValue string) error {
 	secretName := opts.SecretName
 	orgName := opts.OrgName
 	visibility := opts.Visibility

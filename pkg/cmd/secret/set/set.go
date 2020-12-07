@@ -1,4 +1,4 @@
-package create
+package set
 
 import (
 	"encoding/base64"
@@ -20,7 +20,7 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
-type CreateOptions struct {
+type SetOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -34,23 +34,23 @@ type CreateOptions struct {
 	RepositoryNames []string
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
-	opts := &CreateOptions{
+func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
+	opts := &SetOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create <secret name>",
-		Short: "Create secrets",
-		Long:  "Locally encrypt a new secret and send it to GitHub for storage.",
+		Use:   "set <secret name>",
+		Short: "Create or update secrets",
+		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
-			$ cat SECRET.txt | gh secret create NEW_SECRET
-			$ gh secret create NEW_SECRET -b"some literal value"
-			$ gh secret create NEW_SECRET -b"@file.json"
-			$ gh secret create ORG_SECRET --org
-			$ gh secret create ORG_SECRET --org=anotherOrg --visibility=selected -r="repo1,repo2,repo3"
-			$ gh secret create ORG_SECRET --org=anotherOrg --visibility="all"
+			$ cat SECRET.txt | gh secret set NEW_SECRET
+			$ gh secret set NEW_SECRET -b"some literal value"
+			$ gh secret set NEW_SECRET -b"@file.json"
+			$ gh secret set ORG_SECRET --org
+			$ gh secret set ORG_SECRET --org=anotherOrg --visibility=selected -r="repo1,repo2,repo3"
+			$ gh secret set ORG_SECRET --org=anotherOrg --visibility="all"
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -93,7 +93,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return createRun(opts)
+			return setRun(opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.OrgName, "org", "", "List secrets for an organization")
@@ -105,7 +105,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func setRun(opts *SetOptions) error {
 	body, err := getBody(opts)
 	if err != nil {
 		return fmt.Errorf("did not understand secret body: %w", err)
@@ -154,13 +154,13 @@ func createRun(opts *CreateOptions) error {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
+		return fmt.Errorf("failed to set secret: %w", err)
 	}
 
 	return nil
 }
 
-func getBody(opts *CreateOptions) (body []byte, err error) {
+func getBody(opts *SetOptions) (body []byte, err error) {
 	if opts.Body == "-" {
 		body, err = ioutil.ReadAll(opts.IO.In)
 		if err != nil {

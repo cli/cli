@@ -1,4 +1,4 @@
-package create
+package set
 
 import (
 	"bytes"
@@ -18,11 +18,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdCreate(t *testing.T) {
+func TestNewCmdSet(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
-		wants    CreateOptions
+		wants    SetOptions
 		stdinTTY bool
 		wantsErr bool
 	}{
@@ -60,7 +60,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name: "explicit org with selected repo",
 			cli:  "--org=coolOrg -vselected -rcoolRepo cool_secret",
-			wants: CreateOptions{
+			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.VisSelected,
 				RepositoryNames: []string{"coolRepo"},
@@ -71,7 +71,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name: "explicit org with selected repos",
 			cli:  `--org=coolOrg -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
-			wants: CreateOptions{
+			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.VisSelected,
 				RepositoryNames: []string{"coolRepo", "goodRepo", "radRepo"},
@@ -82,7 +82,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name: "repo",
 			cli:  `cool_secret -b"a secret"`,
-			wants: CreateOptions{
+			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.VisPrivate,
 				Body:       "a secret",
@@ -92,7 +92,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name: "implicit org",
 			cli:  `cool_secret --org -b"@cool.json"`,
-			wants: CreateOptions{
+			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.VisPrivate,
 				Body:       "@cool.json",
@@ -102,7 +102,7 @@ func TestNewCmdCreate(t *testing.T) {
 		{
 			name: "vis all",
 			cli:  `cool_secret --org -b"@cool.json" -vall`,
-			wants: CreateOptions{
+			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.VisAll,
 				Body:       "@cool.json",
@@ -123,8 +123,8 @@ func TestNewCmdCreate(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 
-			var gotOpts *CreateOptions
-			cmd := NewCmdCreate(f, func(opts *CreateOptions) error {
+			var gotOpts *SetOptions
+			cmd := NewCmdSet(f, func(opts *SetOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -149,7 +149,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_createRun_repo(t *testing.T) {
+func Test_setRun_repo(t *testing.T) {
 	reg := &httpmock.Registry{}
 
 	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
@@ -163,7 +163,7 @@ func Test_createRun_repo(t *testing.T) {
 
 	io, _, _, _ := iostreams.Test()
 
-	opts := &CreateOptions{
+	opts := &SetOptions{
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
@@ -175,7 +175,7 @@ func Test_createRun_repo(t *testing.T) {
 		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
 	}
 
-	err := createRun(opts)
+	err := setRun(opts)
 	assert.NoError(t, err)
 
 	reg.Verify(t)
@@ -189,30 +189,30 @@ func Test_createRun_repo(t *testing.T) {
 	assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
 }
 
-func Test_createRun_org(t *testing.T) {
+func Test_setRun_org(t *testing.T) {
 	tests := []struct {
 		name             string
-		opts             *CreateOptions
+		opts             *SetOptions
 		wantVisibility   string
 		wantRepositories []int
 	}{
 		{
 			name: "explicit org name",
-			opts: &CreateOptions{
+			opts: &SetOptions{
 				OrgName:    "UmbrellaCorporation",
 				Visibility: shared.VisAll,
 			},
 		},
 		{
 			name: "implicit org name",
-			opts: &CreateOptions{
+			opts: &SetOptions{
 				OrgName:    "@owner",
 				Visibility: shared.VisPrivate,
 			},
 		},
 		{
 			name: "selected visibility",
-			opts: &CreateOptions{
+			opts: &SetOptions{
 				OrgName:         "UmbrellaCorporation",
 				Visibility:      shared.VisSelected,
 				RepositoryNames: []string{"birkin", "wesker"},
@@ -257,7 +257,7 @@ func Test_createRun_org(t *testing.T) {
 			// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
 			tt.opts.RandomOverride = bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})
 
-			err := createRun(tt.opts)
+			err := setRun(tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -319,7 +319,7 @@ func Test_getBody(t *testing.T) {
 				tt.bodyArg = fmt.Sprintf("@%s", tmpfile.Name())
 			}
 
-			body, err := getBody(&CreateOptions{
+			body, err := getBody(&SetOptions{
 				Body: tt.bodyArg,
 				IO:   io,
 			})
@@ -332,3 +332,5 @@ func Test_getBody(t *testing.T) {
 	}
 
 }
+
+// TODO test updating org secret's repo lists
