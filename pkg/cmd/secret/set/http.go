@@ -136,3 +136,12 @@ func mapRepoNameToID(client *api.Client, host, orgName string, repositoryNames [
 
 	return result, nil
 }
+
+type Repository struct {
+	Name       string
+	DatabaseID int `json:"databaseId"`
+}
+
+func getOrgRepos(client *api.Client, orgName string) ([]Repository, error) {
+	return nil, nil
+}

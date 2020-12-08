@@ -32,6 +32,8 @@ type SetOptions struct {
 	Body            string
 	Visibility      string
 	RepositoryNames []string
+
+	Wizard bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -53,6 +55,11 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			$ gh secret set ORG_SECRET --org=anotherOrg --visibility="all"
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
+			if !cmd.Flags().Changed("visibility") && !cmd.Flags().Changed("org") && !cmd.Flags().Changed("body") {
+				opts.Wizard = true
+				return nil
+			}
+
 			if len(args) != 1 {
 				return &cmdutil.FlagError{Err: errors.New("must pass single secret name")}
 			}
@@ -65,28 +72,30 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.SecretName = args[0]
+			if !opts.Wizard {
+				opts.SecretName = args[0]
 
-			if cmd.Flags().Changed("visibility") {
-				if opts.OrgName == "" {
-					return &cmdutil.FlagError{Err: errors.New(
-						"--visibility not supported for repository secrets; did you mean to pass --org?")}
+				if cmd.Flags().Changed("visibility") {
+					if opts.OrgName == "" {
+						return &cmdutil.FlagError{Err: errors.New(
+							"--visibility not supported for repository secrets; did you mean to pass --org?")}
+					}
+
+					if opts.Visibility != shared.VisAll && opts.Visibility != shared.VisPrivate && opts.Visibility != shared.VisSelected {
+						return &cmdutil.FlagError{Err: errors.New(
+							"--visibility must be one of `all`, `private`, or `selected`")}
+					}
 				}
 
-				if opts.Visibility != shared.VisAll && opts.Visibility != shared.VisPrivate && opts.Visibility != shared.VisSelected {
+				if cmd.Flags().Changed("repos") && opts.Visibility != shared.VisSelected {
 					return &cmdutil.FlagError{Err: errors.New(
-						"--visibility must be one of `all`, `private`, or `selected`")}
+						"--repos only supported when --visibility='selected'")}
 				}
-			}
 
-			if cmd.Flags().Changed("repos") && opts.Visibility != shared.VisSelected {
-				return &cmdutil.FlagError{Err: errors.New(
-					"--repos only supported when --visibility='selected'")}
-			}
-
-			if opts.Visibility == shared.VisSelected && len(opts.RepositoryNames) == 0 {
-				return &cmdutil.FlagError{Err: errors.New(
-					"--repos flag required when --visibility='selected'")}
+				if opts.Visibility == shared.VisSelected && len(opts.RepositoryNames) == 0 {
+					return &cmdutil.FlagError{Err: errors.New(
+						"--repos flag required when --visibility='selected'")}
+				}
 			}
 
 			if runF != nil {
@@ -106,16 +115,20 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 }
 
 func setRun(opts *SetOptions) error {
-	body, err := getBody(opts)
-	if err != nil {
-		return fmt.Errorf("did not understand secret body: %w", err)
-	}
-
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
 	}
 	client := api.NewClientFromHTTP(c)
+
+	if opts.Wizard {
+		return setWizard(client, opts)
+	}
+
+	body, err := getBody(opts)
+	if err != nil {
+		return fmt.Errorf("did not understand secret body: %w", err)
+	}
 
 	var baseRepo ghrepo.Interface
 	if opts.OrgName == "" || opts.OrgName == "@owner" {
@@ -156,6 +169,53 @@ func setRun(opts *SetOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to set secret: %w", err)
 	}
+
+	return nil
+}
+
+// TODO validate secret name: only letters and _
+
+func setWizard(client *api.Client, opts *SetOptions) error {
+	var err error
+
+	secretType, err := promptSecretType()
+	if err != nil {
+		return fmt.Errorf("failed to get secret type: %w", err)
+	}
+
+	var visibility string
+	var repositoryNames []string
+	if secretType == orgType {
+		// TODO collect org name
+
+		visibility, err = promptVisibility()
+		if err != nil {
+			return fmt.Errorf("failed to get visibility: %w", err)
+		}
+
+		if visibility == shared.VisSelected {
+			repositoryNames, err = promptRepositoryNames(client)
+			if err != nil {
+				return fmt.Errorf("failed to get repository names: %w", err)
+			}
+		}
+	}
+
+	secretName, err := promptSecretName()
+	if err != nil {
+		return fmt.Errorf("failed to get secret name: %w", err)
+	}
+
+	secretBody, err := promptSecretBody()
+	if err != nil {
+		return fmt.Errorf("failed to get secret body", err)
+	}
+
+	fmt.Printf("DBG %#v\n", visibility)
+	fmt.Printf("DBG %#v\n", repositoryNames)
+	fmt.Printf("DBG %#v\n", secretType)
+	fmt.Printf("DBG %#v\n", secretName)
+	fmt.Printf("DBG %#v\n", secretBody)
 
 	return nil
 }
