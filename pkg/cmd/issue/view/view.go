@@ -152,13 +152,13 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 func printRawIssueComments(out io.Writer, issue *api.Issue) error {
 	var b strings.Builder
 	for _, comment := range issue.Comments.Nodes {
-		fmt.Fprint(&b, rawIssueComment(comment))
+		fmt.Fprint(&b, formatRawIssueComment(comment))
 	}
 	fmt.Fprint(out, b.String())
 	return nil
 }
 
-func rawIssueComment(comment api.Comment) string {
+func formatRawIssueComment(comment api.Comment) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
 	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
