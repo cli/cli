@@ -14,19 +14,19 @@ import (
 func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
-	if baseRepo == nil {
-		var err error
-		baseRepo, err = baseRepoFn()
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
-		}
-	}
-
 	if issueNumber == 0 {
 		var err error
 		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	if baseRepo == nil {
+		var err error
+		baseRepo, err = baseRepoFn()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 		}
 	}
 
