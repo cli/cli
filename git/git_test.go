@@ -3,10 +3,12 @@ package git
 import (
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_UncommittedChangeCount(t *testing.T) {
@@ -170,5 +172,45 @@ func TestParseExtraCloneArgs(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestAddUpstreamRemote(t *testing.T) {
+	tests := []struct {
+		name        string
+		upstreamURL string
+		cloneDir    string
+		branches    []string
+		want        string
+	}{
+		{
+			name:        "fetch all",
+			upstreamURL: "URL",
+			cloneDir:    "DIRECTORY",
+			branches:    []string{},
+			want:        "git -C DIRECTORY remote add -f upstream URL",
+		},
+		{
+			name:        "fetch specific branches only",
+			upstreamURL: "URL",
+			cloneDir:    "DIRECTORY",
+			branches:    []string{"master", "dev"},
+			want:        "git -C DIRECTORY remote add -t master -t dev -f upstream URL",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, restore := test.InitCmdStubber()
+			defer restore()
+
+			cs.Stub("") // git remote add -f
+
+			err := AddUpstreamRemote(tt.upstreamURL, tt.cloneDir, tt.branches)
+			if err != nil {
+				t.Fatalf("error running command `git remote add -f`: %v", err)
+			}
+
+			assert.Equal(t, 1, cs.Count)
+			assert.Equal(t, tt.want, strings.Join(cs.Calls[0].Args, " "))
+		})
+	}
 }

@@ -218,6 +218,9 @@ func Test_RepoClone_hasParent(t *testing.T) {
 						"name": "ORIG",
 						"owner": {
 							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "master"
 						}
 					}
 				} } }
@@ -237,7 +240,7 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, cs.Count)
-	assert.Equal(t, "git -C REPO remote add -f upstream https://github.com/hubot/ORIG.git", strings.Join(cs.Calls[1].Args, " "))
+	assert.Equal(t, "git -C REPO remote add -t master -f upstream https://github.com/hubot/ORIG.git", strings.Join(cs.Calls[1].Args, " "))
 }
 
 func Test_RepoClone_withoutUsername(t *testing.T) {
