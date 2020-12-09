@@ -3,14 +3,11 @@ package view
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
@@ -105,21 +102,13 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.Comments {
-		var s *spinner.Spinner
-		if connectedToTerminal {
-			s = utils.Spinner(opts.IO.ErrOut)
-			utils.StartSpinner(s)
-		}
-
+		opts.IO.StartProgressIndicator()
 		comments, err := api.CommentsForPullRequest(apiClient, repo, pr)
+		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
 		pr.Comments = *comments
-
-		if connectedToTerminal {
-			utils.StopSpinner(s)
-		}
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -135,7 +124,8 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.Comments {
-		return printRawPrComments(opts.IO.Out, pr)
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments))
+		return nil
 	}
 
 	return printRawPrPreview(opts.IO, pr)
@@ -167,26 +157,6 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printRawPrComments(out io.Writer, pr *api.PullRequest) error {
-	var b strings.Builder
-	for _, comment := range pr.Comments.Nodes {
-		fmt.Fprint(&b, formatRawPrComment(comment))
-	}
-	fmt.Fprint(out, b.String())
-	return nil
-}
-
-func formatRawPrComment(comment api.Comment) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
-	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
-	fmt.Fprintf(&b, "edited:\t%t\n", comment.IncludesCreatedEdit)
-	fmt.Fprintln(&b, "--")
-	fmt.Fprintln(&b, comment.Body)
-	fmt.Fprintln(&b, "--")
-	return b.String()
-}
-
 func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	out := io.Out
 	cs := io.ColorScheme()
@@ -203,7 +173,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	)
 
 	// Reactions
-	if reactions := reactionGroupList(pr.ReactionGroups); reactions != "" {
+	if reactions := shared.ReactionGroupList(pr.ReactionGroups); reactions != "" {
 		fmt.Fprint(out, reactions)
 		fmt.Fprintln(out)
 	}
@@ -245,7 +215,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 	// Comments
 	if pr.Comments.TotalCount > 0 {
-		comments, err := prCommentList(io, pr.Comments)
+		comments, err := shared.CommentList(io, pr.Comments)
 		if err != nil {
 			return err
 		}
@@ -256,75 +226,6 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s"), pr.URL)
 
 	return nil
-}
-
-func prCommentList(io *iostreams.IOStreams, comments api.Comments) (string, error) {
-	var b strings.Builder
-	cs := io.ColorScheme()
-	retrievedCount := len(comments.Nodes)
-	hiddenCount := comments.TotalCount - retrievedCount
-
-	if hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
-		fmt.Fprintf(&b, "\n\n\n")
-	}
-
-	for i, comment := range comments.Nodes {
-		last := i+1 == retrievedCount
-		cmt, err := formatPrComment(io, comment, last)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprint(&b, cmt)
-		if last {
-			fmt.Fprintln(&b)
-		}
-	}
-
-	if hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
-		fmt.Fprintln(&b)
-	}
-
-	return b.String(), nil
-}
-
-func formatPrComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (string, error) {
-	var b strings.Builder
-	cs := io.ColorScheme()
-
-	// Header
-	fmt.Fprint(&b, cs.Bold(comment.Author.Login))
-	if comment.AuthorAssociation != "NONE" {
-		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
-	}
-	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
-	if comment.IncludesCreatedEdit {
-		fmt.Fprint(&b, cs.Bold(" • edited"))
-	}
-	if newest {
-		fmt.Fprint(&b, cs.Bold(" • "))
-		fmt.Fprint(&b, cs.CyanBold("Newest comment"))
-	}
-	fmt.Fprintln(&b)
-
-	// Reactions
-	if reactions := reactionGroupList(comment.ReactionGroups); reactions != "" {
-		fmt.Fprint(&b, reactions)
-		fmt.Fprintln(&b)
-	}
-
-	// Body
-	if comment.Body != "" {
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(comment.Body, style, "")
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprint(&b, md)
-	}
-
-	return b.String(), nil
 }
 
 const (
@@ -503,28 +404,4 @@ func prStateWithDraft(pr *api.PullRequest) string {
 	}
 
 	return pr.State
-}
-
-func reactionGroupList(rgs api.ReactionGroups) string {
-	var rs []string
-
-	for _, rg := range rgs {
-		if r := formatReactionGroup(rg); r != "" {
-			rs = append(rs, r)
-		}
-	}
-
-	return strings.Join(rs, " • ")
-}
-
-func formatReactionGroup(rg api.ReactionGroup) string {
-	c := rg.Count()
-	if c == 0 {
-		return ""
-	}
-	e := rg.Emoji()
-	if e == "" {
-		return ""
-	}
-	return fmt.Sprintf("%v %s", c, e)
 }
