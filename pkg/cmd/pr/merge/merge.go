@@ -123,9 +123,6 @@ func mergeRun(opts *MergeOptions) error {
 	if pr.Mergeable == "CONFLICTING" {
 		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", cs.Red("!"), pr.Number, pr.Title)
 		return err
-	} else if pr.Mergeable == "UNKNOWN" {
-		err := fmt.Errorf("%s Pull request #%d (%s) can't be merged right now; try again in a few seconds", cs.Red("!"), pr.Number, pr.Title)
-		return err
 	} else if pr.State == "MERGED" {
 		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", cs.Red("!"), pr.Number, pr.Title)
 		return err
