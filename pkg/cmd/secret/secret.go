@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cmdList "github.com/cli/cli/pkg/cmd/secret/list"
+	cmdRemove "github.com/cli/cli/pkg/cmd/secret/remove"
 	cmdSet "github.com/cli/cli/pkg/cmd/secret/set"
 )
 
@@ -22,8 +23,9 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	// TODO add success messages to these:
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
-	// TODO add delete
+	cmd.AddCommand(cmdRemove.NewCmdRemove(f, nil))
 
 	return cmd
 }

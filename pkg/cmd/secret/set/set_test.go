@@ -172,17 +172,15 @@ func Test_setRun_repo(t *testing.T) {
 
 	reg.Register(httpmock.REST("PUT", "repos/owner/repo/actions/secrets/cool_secret"), httpmock.StatusStringResponse(201, `{}`))
 
-	mockClient := func() (*http.Client, error) {
-		return &http.Client{Transport: reg}, nil
-	}
-
 	io, _, _, _ := iostreams.Test()
 
 	opts := &SetOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		HttpClient: mockClient,
 		IO:         io,
 		SecretName: "cool_secret",
 		Body:       "a secret",
@@ -240,9 +238,10 @@ func Test_setRun_org(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
+			impliedOrgName := "NeoUmbrella"
 			orgName := tt.opts.OrgName
 			if orgName == "@owner" {
-				orgName = "NeoUmbrella"
+				orgName = impliedOrgName
 			}
 
 			reg.Register(httpmock.REST("GET",
@@ -261,7 +260,7 @@ func Test_setRun_org(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName("NeoUmbrella/repo")
+				return ghrepo.FromFullName(fmt.Sprintf("%s/repo", impliedOrgName))
 			}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
