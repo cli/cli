@@ -84,12 +84,12 @@ func putOrgSecret(client *api.Client, pk *PubKey, host, eValue string, orgRepos 
 	return putSecret(client, host, path, payload)
 }
 
-func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string) error {
+func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, eValue string, opts SetOptions) error {
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 	}
-	path := fmt.Sprintf("repos/%s/actions/secrets/%s", ghrepo.FullName(repo), secretName)
+	path := fmt.Sprintf("repos/%s/actions/secrets/%s", ghrepo.FullName(repo), opts.SecretName)
 	return putSecret(client, repo.RepoHost(), path, payload)
 }
 

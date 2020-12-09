@@ -31,12 +31,16 @@ func promptSecretName() (secretName string, err error) {
 	return
 }
 
-func promptSecretBody() (secretBody string, err error) {
-	err = prompt.SurveyAskOne(&survey.Multiline{
+func promptSecretBody() ([]byte, error) {
+	var sb string
+	err := prompt.SurveyAskOne(&survey.Multiline{
 		Message: "Paste your secret:",
-	}, &secretBody)
+	}, &sb)
+	if err != nil {
+		return nil, err
+	}
 
-	return
+	return []byte(sb), nil
 }
 
 func promptVisibility() (visibility string, err error) {

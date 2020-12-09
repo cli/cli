@@ -165,7 +165,7 @@ func setRun(opts *SetOptions) error {
 
 		err = putOrgSecret(client, pk, host, encoded, orgRepos, *opts)
 	} else {
-		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
+		err = putRepoSecret(client, pk, baseRepo, encoded, *opts)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to set secret: %w", err)
@@ -226,9 +226,28 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 		return fmt.Errorf("failed to get secret body", err)
 	}
 
-	fmt.Printf("DBG %#v\n", orgRepos)
-	fmt.Printf("DBG %#v\n", secretName)
-	fmt.Printf("DBG %#v\n", secretBody)
+	opts.OrgName = orgName
+	opts.SecretName = secretName
+	opts.Visibility = visibility
+
+	pk, err := getPubKey(client, baseRepo, hostname, *opts)
+	if err != nil {
+		return fmt.Errorf("failed to fetch public key: %w", err)
+	}
+
+	encoded, err := encrypt(secretBody, *pk, *opts)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt body: %w", err)
+	}
+
+	if orgName != "" {
+		err = putOrgSecret(client, pk, hostname, encoded, orgRepos, *opts)
+	} else {
+		err = putRepoSecret(client, pk, baseRepo, encoded, *opts)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to set secret: %w", err)
+	}
 
 	return nil
 }
