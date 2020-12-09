@@ -89,3 +89,47 @@ func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error)
 
 	return teams, nil
 }
+
+type OrgRepo struct {
+	Name       string
+	DatabaseID int `json:"databaseId"`
+}
+
+func OrganizationRepos(client *Client, hostname, orgName string) ([]OrgRepo, error) {
+	// TODO debug how to make use of login variable
+	type responseData struct {
+		Organization struct {
+			Repositories struct {
+				Nodes    []OrgRepo
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			}
+		}
+	}
+
+	variables := map[string]interface{}{
+		"login":     orgName,
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	gql := graphQLClient(client.http, hostname)
+
+	var repositories []OrgRepo
+	for {
+		var query responseData
+		err := gql.QueryNamed(context.Background(), "OrganizationRepositories", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		repositories = append(repositories, query.Organization.Repositories.Nodes...)
+		if !query.Organization.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Organization.Repositories.PageInfo.EndCursor)
+	}
+
+	return repositories, nil
+}

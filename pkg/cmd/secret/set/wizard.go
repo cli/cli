@@ -1,6 +1,8 @@
 package set
 
 import (
+	"fmt"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
@@ -64,18 +66,37 @@ func promptVisibility() (visibility string, err error) {
 	return
 }
 
-func promptRepositoryNames(client *api.Client) ([]string, error) {
-	// TODO get all repositories for organization
-	repositoryNames := []string{"TODO"}
+func promptRepositories(client *api.Client, host, orgName string) ([]api.OrgRepo, error) {
+	orgRepos, err := api.OrganizationRepos(client, host, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine organization's repositories: %w", err)
+	}
 
-	var selected []string
+	options := []string{}
+	for _, or := range orgRepos {
+		options = append(options, or.Name)
 
-	err := prompt.SurveyAskOne(&survey.MultiSelect{
+	}
+
+	var selectedNames []string
+
+	err = prompt.SurveyAskOne(&survey.MultiSelect{
 		Message: "Which repositories should be able to use this secret?",
-		Options: repositoryNames,
-	}, &selected)
+		Options: options,
+	}, &selectedNames)
 	if err != nil {
 		return nil, err
+	}
+
+	selected := []api.OrgRepo{}
+
+	for _, name := range selectedNames {
+		for _, or := range orgRepos {
+			if name == or.Name {
+				selected = append(selected, or)
+				break
+			}
+		}
 	}
 
 	return selected, nil

@@ -141,7 +141,3 @@ type Repository struct {
 	Name       string
 	DatabaseID int `json:"databaseId"`
 }
-
-func getOrgRepos(client *api.Client, orgName string) ([]Repository, error) {
-	return nil, nil
-}

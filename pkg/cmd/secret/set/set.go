@@ -184,7 +184,7 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 	}
 
 	var visibility string
-	var repositoryNames []string
+	var orgRepos []api.OrgRepo
 	if secretType == orgType {
 		// TODO collect org name
 
@@ -194,7 +194,8 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 		}
 
 		if visibility == shared.VisSelected {
-			repositoryNames, err = promptRepositoryNames(client)
+			// TODO host/orgname
+			orgRepos, err = promptRepositories(client, "github.com", "lolhiiiii")
 			if err != nil {
 				return fmt.Errorf("failed to get repository names: %w", err)
 			}
@@ -212,7 +213,7 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 	}
 
 	fmt.Printf("DBG %#v\n", visibility)
-	fmt.Printf("DBG %#v\n", repositoryNames)
+	fmt.Printf("DBG %#v\n", orgRepos)
 	fmt.Printf("DBG %#v\n", secretType)
 	fmt.Printf("DBG %#v\n", secretName)
 	fmt.Printf("DBG %#v\n", secretBody)
