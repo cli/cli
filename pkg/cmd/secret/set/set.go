@@ -175,6 +175,7 @@ func setRun(opts *SetOptions) error {
 }
 
 // TODO validate secret name: only letters and _
+// TODO notice update case for orgs, pre-check org visibility list
 
 func setWizard(client *api.Client, opts *SetOptions) error {
 	var err error
