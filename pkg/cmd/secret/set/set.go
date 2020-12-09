@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -66,6 +67,11 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			opts.BaseRepo = f.BaseRepo
 
 			opts.SecretName = args[0]
+
+			err := validSecretName(opts.SecretName)
+			if err != nil {
+				return err
+			}
 
 			if cmd.Flags().Changed("visibility") {
 				if opts.OrgName == "" {
@@ -155,6 +161,28 @@ func setRun(opts *SetOptions) error {
 	}
 	if err != nil {
 		return fmt.Errorf("failed to set secret: %w", err)
+	}
+
+	return nil
+}
+
+func validSecretName(name string) error {
+	if name == "" {
+		return errors.New("secret name cannot be blank")
+	}
+
+	if strings.HasPrefix(name, "GITHUB_") {
+		return errors.New("secret name cannot begin with GITHUB_")
+	}
+
+	leadingNumber := regexp.MustCompile(`^[0-9]`)
+	if leadingNumber.MatchString(name) {
+		return errors.New("secret name cannot start with a number")
+	}
+
+	validChars := regexp.MustCompile(`^([0-9]|[a-z]|[A-Z]|_)+$`)
+	if !validChars.MatchString(name) {
+		return errors.New("secret name can only contain letters, numbers, and _")
 	}
 
 	return nil
