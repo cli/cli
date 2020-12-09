@@ -101,3 +101,12 @@ func promptRepositories(client *api.Client, host, orgName string) ([]api.OrgRepo
 
 	return selected, nil
 }
+
+func promptOrgName(defaultOrgName string) (orgName string, err error) {
+	err = prompt.SurveyAskOne(&survey.Input{
+		Message: "Organization name:",
+		Default: defaultOrgName,
+	}, &orgName)
+
+	return
+}

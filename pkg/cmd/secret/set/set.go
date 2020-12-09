@@ -144,25 +144,26 @@ func setRun(opts *SetOptions) error {
 		host = baseRepo.RepoHost()
 	}
 
-	var pk *PubKey
-	if opts.OrgName != "" {
-		pk, err = getOrgPublicKey(client, host, opts.OrgName)
-	} else {
-		pk, err = getRepoPubKey(client, baseRepo)
-	}
+	pk, err := getPubKey(client, baseRepo, host, *opts)
 	if err != nil {
 		return fmt.Errorf("failed to fetch public key: %w", err)
 	}
 
-	eBody, err := box.SealAnonymous(nil, body, &pk.Raw, opts.RandomOverride)
+	encoded, err := encrypt(body, *pk, *opts)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt body: %w", err)
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(eBody)
-
 	if opts.OrgName != "" {
-		err = putOrgSecret(client, pk, host, *opts, encoded)
+		var orgRepos []api.OrgRepo
+		if opts.Visibility == shared.VisSelected {
+			orgRepos, err = mapRepoNamesToID(client, host, opts.OrgName, opts.RepositoryNames)
+			if err != nil {
+				return fmt.Errorf("failed to get IDs for repo names: %w", err)
+			}
+		}
+
+		err = putOrgSecret(client, pk, host, encoded, orgRepos, *opts)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
@@ -178,6 +179,11 @@ func setRun(opts *SetOptions) error {
 func setWizard(client *api.Client, opts *SetOptions) error {
 	var err error
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return fmt.Errorf("could not determine base repo: %w", err)
+	}
+
 	secretType, err := promptSecretType()
 	if err != nil {
 		return fmt.Errorf("failed to get secret type: %w", err)
@@ -185,8 +191,17 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 
 	var visibility string
 	var orgRepos []api.OrgRepo
+	var orgName string
+	hostname := ghinstance.OverridableDefault()
 	if secretType == orgType {
-		// TODO collect org name
+		orgName, err = promptOrgName(baseRepo.RepoOwner())
+		if err != nil {
+			return fmt.Errorf("failed to get organization name: %w", err)
+		}
+
+		if orgName == baseRepo.RepoOwner() {
+			hostname = baseRepo.RepoHost()
+		}
 
 		visibility, err = promptVisibility()
 		if err != nil {
@@ -194,8 +209,7 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 		}
 
 		if visibility == shared.VisSelected {
-			// TODO host/orgname
-			orgRepos, err = promptRepositories(client, "github.com", "lolhiiiii")
+			orgRepos, err = promptRepositories(client, hostname, orgName)
 			if err != nil {
 				return fmt.Errorf("failed to get repository names: %w", err)
 			}
@@ -212,9 +226,7 @@ func setWizard(client *api.Client, opts *SetOptions) error {
 		return fmt.Errorf("failed to get secret body", err)
 	}
 
-	fmt.Printf("DBG %#v\n", visibility)
 	fmt.Printf("DBG %#v\n", orgRepos)
-	fmt.Printf("DBG %#v\n", secretType)
 	fmt.Printf("DBG %#v\n", secretName)
 	fmt.Printf("DBG %#v\n", secretBody)
 
@@ -241,4 +253,28 @@ func getBody(opts *SetOptions) (body []byte, err error) {
 	}
 
 	return []byte(opts.Body), nil
+}
+
+func getPubKey(client *api.Client, baseRepo ghrepo.Interface, host string, opts SetOptions) (pk *PubKey, err error) {
+	if opts.OrgName != "" {
+		pk, err = getOrgPublicKey(client, host, opts.OrgName)
+	} else {
+		pk, err = getRepoPubKey(client, baseRepo)
+	}
+
+	return
+}
+
+func encrypt(body []byte, pk PubKey, opts SetOptions) (string, error) {
+	eBody, err := box.SealAnonymous(nil, body, &pk.Raw, opts.RandomOverride)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(eBody), nil
+}
+
+func setSecret(client *api.Client, pk PubKey, host, encoded string, baseRepo ghrepo.Interface, opts SetOptions) error {
+	// TODO
+	return nil
 }
