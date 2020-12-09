@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
@@ -93,21 +92,13 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.Comments {
-		var s *spinner.Spinner
-		if opts.IO.IsStdoutTTY() {
-			s = utils.Spinner(opts.IO.ErrOut)
-			utils.StartSpinner(s)
-		}
-
+		opts.IO.StartProgressIndicator()
 		comments, err := api.CommentsForIssue(apiClient, repo, issue)
+		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
 		issue.Comments = *comments
-
-		if opts.IO.IsStdoutTTY() {
-			utils.StopSpinner(s)
-		}
 	}
 
 	opts.IO.DetectTerminalTheme()
