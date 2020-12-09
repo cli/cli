@@ -96,7 +96,6 @@ type OrgRepo struct {
 }
 
 func OrganizationRepos(client *Client, hostname, orgName string) ([]OrgRepo, error) {
-	// TODO debug how to make use of login variable
 	type responseData struct {
 		Organization struct {
 			Repositories struct {
@@ -105,12 +104,12 @@ func OrganizationRepos(client *Client, hostname, orgName string) ([]OrgRepo, err
 					HasNextPage bool
 					EndCursor   string
 				}
-			}
-		}
+			} `graphql:"repositories(first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
+		} `graphql:"organization(login: $login)"`
 	}
 
 	variables := map[string]interface{}{
-		"login":     orgName,
+		"login":     (githubv4.String)(orgName),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
