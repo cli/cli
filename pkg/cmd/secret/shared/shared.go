@@ -1,7 +1,9 @@
 package shared
 
+type Visibility string
+
 const (
-	VisAll      = "all"
-	VisPrivate  = "private"
-	VisSelected = "selected"
+	All      = "all"
+	Private  = "private"
+	Selected = "selected"
 )

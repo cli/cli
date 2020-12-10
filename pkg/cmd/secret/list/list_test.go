@@ -149,17 +149,17 @@ func Test_listRun(t *testing.T) {
 					{
 						Name:       "SECRET_ONE",
 						UpdatedAt:  t0,
-						Visibility: shared.VisAll,
+						Visibility: shared.All,
 					},
 					{
 						Name:       "SECRET_TWO",
 						UpdatedAt:  t1,
-						Visibility: shared.VisPrivate,
+						Visibility: shared.Private,
 					},
 					{
 						Name:             "SECRET_THREE",
 						UpdatedAt:        t2,
-						Visibility:       shared.VisSelected,
+						Visibility:       shared.Selected,
 						SelectedReposURL: fmt.Sprintf("https://api.github.com/orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName),
 					},
 				}

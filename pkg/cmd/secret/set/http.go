@@ -74,7 +74,7 @@ func putOrgSecret(client *api.Client, pk *PubKey, opts SetOptions, eValue string
 
 	var repositoryIDs []int
 	var err error
-	if orgName != "" && visibility == shared.VisSelected {
+	if orgName != "" && visibility == shared.Selected {
 		repositoryIDs, err = mapRepoNameToID(client, host, orgName, opts.RepositoryNames)
 		if err != nil {
 			return fmt.Errorf("failed to look up IDs for repositories %v: %w", opts.RepositoryNames, err)

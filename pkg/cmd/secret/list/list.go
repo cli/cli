@@ -93,7 +93,7 @@ func listRun(opts *ListOptions) error {
 			if opts.IO.IsStdoutTTY() {
 				tp.AddField(fmtVisibility(*secret), nil, nil)
 			} else {
-				tp.AddField(strings.ToUpper(secret.Visibility), nil, nil)
+				tp.AddField(strings.ToUpper(string(secret.Visibility)), nil, nil)
 			}
 		}
 		tp.EndRow()
@@ -110,18 +110,18 @@ func listRun(opts *ListOptions) error {
 type Secret struct {
 	Name             string
 	UpdatedAt        time.Time `json:"updated_at"`
-	Visibility       string
+	Visibility       shared.Visibility
 	SelectedReposURL string `json:"selected_repositories_url"`
 	NumSelectedRepos int
 }
 
 func fmtVisibility(s Secret) string {
 	switch s.Visibility {
-	case shared.VisAll:
+	case shared.All:
 		return "Visible to all repositories"
-	case shared.VisPrivate:
+	case shared.Private:
 		return "Visible to private repositories"
-	case shared.VisSelected:
+	case shared.Selected:
 		if s.NumSelectedRepos == 1 {
 			return "Visible to 1 selected repository"
 		} else {

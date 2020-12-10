@@ -62,7 +62,7 @@ func TestNewCmdSet(t *testing.T) {
 			cli:  "-ocoolOrg -vselected -rcoolRepo cool_secret",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
-				Visibility:      shared.VisSelected,
+				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
 				Body:            "-",
 				OrgName:         "coolOrg",
@@ -73,7 +73,7 @@ func TestNewCmdSet(t *testing.T) {
 			cli:  `--org=coolOrg -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
-				Visibility:      shared.VisSelected,
+				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo", "goodRepo", "radRepo"},
 				Body:            "-",
 				OrgName:         "coolOrg",
@@ -84,7 +84,7 @@ func TestNewCmdSet(t *testing.T) {
 			cli:  `cool_secret -b"a secret"`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
-				Visibility: shared.VisPrivate,
+				Visibility: shared.Private,
 				Body:       "a secret",
 				OrgName:    "",
 			},
@@ -94,7 +94,7 @@ func TestNewCmdSet(t *testing.T) {
 			cli:  `cool_secret --org coolOrg -b"@cool.json" -vall`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
-				Visibility: shared.VisAll,
+				Visibility: shared.All,
 				Body:       "@cool.json",
 				OrgName:    "coolOrg",
 			},
@@ -196,21 +196,21 @@ func Test_setRun_org(t *testing.T) {
 	tests := []struct {
 		name             string
 		opts             *SetOptions
-		wantVisibility   string
+		wantVisibility   shared.Visibility
 		wantRepositories []int
 	}{
 		{
 			name: "all vis",
 			opts: &SetOptions{
 				OrgName:    "UmbrellaCorporation",
-				Visibility: shared.VisAll,
+				Visibility: shared.All,
 			},
 		},
 		{
 			name: "selected visibility",
 			opts: &SetOptions{
 				OrgName:         "UmbrellaCorporation",
-				Visibility:      shared.VisSelected,
+				Visibility:      shared.Selected,
 				RepositoryNames: []string{"birkin", "wesker"},
 			},
 			wantRepositories: []int{1, 2},
