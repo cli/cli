@@ -67,10 +67,10 @@ func removeRun(opts *RemoveOptions) error {
 	}
 
 	var path string
-	if opts.OrgName == "" {
+	if orgName == "" {
 		path = fmt.Sprintf("repos/%s/actions/secrets/%s", ghrepo.FullName(baseRepo), opts.SecretName)
 	} else {
-		path = fmt.Sprintf("orgs/%s/actions/secrets/%s", opts.OrgName, opts.SecretName)
+		path = fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, opts.SecretName)
 	}
 
 	host := ghinstance.OverridableDefault()
@@ -81,7 +81,13 @@ func removeRun(opts *RemoveOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Removed secret %s\n", cs.SuccessIcon(), opts.SecretName)
+		if orgName == "" {
+			fmt.Fprintf(opts.IO.Out,
+				"%s Removed secret %s from %s\n", cs.SuccessIcon(), opts.SecretName, ghrepo.FullName(baseRepo))
+		} else {
+			fmt.Fprintf(opts.IO.Out,
+				"%s Removed secret %s from %s\n", cs.SuccessIcon(), opts.SecretName, orgName)
+		}
 	}
 
 	return nil

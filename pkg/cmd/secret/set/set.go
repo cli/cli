@@ -132,8 +132,8 @@ func setRun(opts *SetOptions) error {
 	}
 
 	var pk *PubKey
-	if opts.OrgName != "" {
-		pk, err = getOrgPublicKey(client, opts.OrgName)
+	if orgName != "" {
+		pk, err = getOrgPublicKey(client, orgName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -148,7 +148,7 @@ func setRun(opts *SetOptions) error {
 
 	encoded := base64.StdEncoding.EncodeToString(eBody)
 
-	if opts.OrgName != "" {
+	if orgName != "" {
 		err = putOrgSecret(client, pk, *opts, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
@@ -159,7 +159,12 @@ func setRun(opts *SetOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Set secret %s\n", cs.SuccessIcon(), opts.SecretName)
+
+		if orgName == "" {
+			fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIcon(), opts.SecretName, ghrepo.FullName(baseRepo))
+		} else {
+			fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIcon(), opts.SecretName, orgName)
+		}
 	}
 
 	return nil
