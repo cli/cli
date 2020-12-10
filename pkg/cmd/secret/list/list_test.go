@@ -31,15 +31,8 @@ func Test_NewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name: "implicit org",
-			cli:  "--org",
-			wants: ListOptions{
-				OrgName: "@owner",
-			},
-		},
-		{
-			name: "explicit org",
-			cli:  "--org=UmbrellaCorporation",
+			name: "org",
+			cli:  "-oUmbrellaCorporation",
 			wants: ListOptions{
 				OrgName: "UmbrellaCorporation",
 			},
@@ -105,7 +98,7 @@ func Test_listRun(t *testing.T) {
 			},
 		},
 		{
-			name: "explicit org tty",
+			name: "org tty",
 			tty:  true,
 			opts: &ListOptions{
 				OrgName: "UmbrellaCorporation",
@@ -117,7 +110,7 @@ func Test_listRun(t *testing.T) {
 			},
 		},
 		{
-			name: "explicit org not tty",
+			name: "org not tty",
 			tty:  false,
 			opts: &ListOptions{
 				OrgName: "UmbrellaCorporation",
@@ -126,30 +119,6 @@ func Test_listRun(t *testing.T) {
 				"SECRET_ONE\t1988-10-11\tALL",
 				"SECRET_TWO\t2020-12-04\tPRIVATE",
 				"SECRET_THREE\t1975-11-30\tSELECTED",
-			},
-		},
-		{
-			name: "implicit org not tty",
-			tty:  false,
-			opts: &ListOptions{
-				OrgName: "@owner",
-			},
-			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\tALL",
-				"SECRET_TWO\t2020-12-04\tPRIVATE",
-				"SECRET_THREE\t1975-11-30\tSELECTED",
-			},
-		},
-		{
-			name: "implicit org not tty",
-			tty:  true,
-			opts: &ListOptions{
-				OrgName: "@owner",
-			},
-			wantOut: []string{
-				"SECRET_ONE.*Updated 1988-10-11.*Visible to all repositories",
-				"SECRET_TWO.*Updated 2020-12-04.*Visible to private repositories",
-				"SECRET_THREE.*Updated 1975-11-30.*Visible to selected repositories",
 			},
 		},
 	}
@@ -195,11 +164,7 @@ func Test_listRun(t *testing.T) {
 						Visibility: shared.VisSelected,
 					},
 				}
-				if tt.opts.OrgName == "@owner" {
-					path = "orgs/owner/actions/secrets"
-				} else {
-					path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
-				}
+				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))

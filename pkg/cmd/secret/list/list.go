@@ -47,8 +47,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.OrgName, "org", "", "List secrets for an organization")
-	cmd.Flags().Lookup("org").NoOptDefVal = "@owner"
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 
 	return cmd
 }
@@ -60,26 +59,21 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	orgName := opts.OrgName
+
 	var baseRepo ghrepo.Interface
-	if opts.OrgName == "" || opts.OrgName == "@owner" {
+	if orgName == "" {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
 		}
 	}
 
-	orgName := opts.OrgName
-	host := ghinstance.OverridableDefault()
-	if orgName == "@owner" {
-		orgName = baseRepo.RepoOwner()
-		host = baseRepo.RepoHost()
-	}
-
 	var secrets []Secret
-	if orgName != "" {
-		secrets, err = getOrgSecrets(client, host, orgName)
-	} else {
+	if orgName == "" {
 		secrets, err = getRepoSecrets(client, baseRepo)
+	} else {
+		secrets, err = getOrgSecrets(client, orgName)
 	}
 
 	if err != nil {
@@ -131,7 +125,8 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client *api.Client, host, orgName string) ([]Secret, error) {
+func getOrgSecrets(client *api.Client, orgName string) ([]Secret, error) {
+	host := ghinstance.OverridableDefault()
 	return getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
 }
 
