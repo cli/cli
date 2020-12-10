@@ -13,7 +13,6 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.15
-
       - name: Check out code
         uses: actions/checkout@v2
 
@@ -29,14 +28,8 @@ jobs:
   build-minimum:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Set up Go 1.13
         uses: actions/setup-go@v2
         with:
-          go-version: 1.13
+ 
 
-      - name: Check out code
-        uses: actions/checkout@v2
 
-      - name: Build
-        run: go build -v ./cmd/gh
