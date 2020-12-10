@@ -82,16 +82,20 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					return &cmdutil.FlagError{Err: errors.New(
 						"--visibility must be one of `all`, `private`, or `selected`")}
 				}
-			}
 
-			if cmd.Flags().Changed("repos") && opts.Visibility != shared.Selected {
-				return &cmdutil.FlagError{Err: errors.New(
-					"--repos only supported when --visibility='selected'")}
-			}
+				if opts.Visibility != shared.Selected && cmd.Flags().Changed("repos") {
+					return &cmdutil.FlagError{Err: errors.New(
+						"--repos only supported when --visibility='selected'")}
+				}
 
-			if opts.Visibility == shared.Selected && len(opts.RepositoryNames) == 0 {
-				return &cmdutil.FlagError{Err: errors.New(
-					"--repos flag required when --visibility='selected'")}
+				if opts.Visibility == shared.Selected && !cmd.Flags().Changed("repos") {
+					return &cmdutil.FlagError{Err: errors.New(
+						"--repos flag required when --visibility='selected'")}
+				}
+			} else {
+				if cmd.Flags().Changed("repos") {
+					opts.Visibility = shared.Selected
+				}
 			}
 
 			if runF != nil {

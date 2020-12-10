@@ -37,6 +37,11 @@ func TestNewCmdSet(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "repos with wrong vis",
+			cli:      "cool_secret --org coolOrg -v'private' -rcoolRepo",
+			wantsErr: true,
+		},
+		{
 			name:     "no name",
 			cli:      "",
 			wantsErr: true,
@@ -56,6 +61,17 @@ func TestNewCmdSet(t *testing.T) {
 			name:     "visibility without org",
 			cli:      "cool_secret -vall",
 			wantsErr: true,
+		},
+		{
+			name: "repos without vis",
+			cli:  "cool_secret --org coolOrg -rcoolRepo",
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"coolRepo"},
+				Body:            "-",
+				OrgName:         "coolOrg",
+			},
 		},
 		{
 			name: "org with selected repo",
