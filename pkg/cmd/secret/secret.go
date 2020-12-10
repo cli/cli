@@ -23,7 +23,6 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	// TODO add success messages to these:
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
 	cmd.AddCommand(cmdRemove.NewCmdRemove(f, nil))
 

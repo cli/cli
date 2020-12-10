@@ -89,5 +89,10 @@ func removeRun(opts *RemoveOptions) error {
 		return fmt.Errorf("failed to delete secret %s: %w", opts.SecretName, err)
 	}
 
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Removed secret %s\n", cs.SuccessIcon(), opts.SecretName)
+	}
+
 	return nil
 }

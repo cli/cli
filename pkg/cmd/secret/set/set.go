@@ -163,6 +163,11 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("failed to set secret: %w", err)
 	}
 
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Set secret %s\n", cs.SuccessIcon(), opts.SecretName)
+	}
+
 	return nil
 }
 
