@@ -26,16 +26,15 @@ func TestNewCmdRemove(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name: "implicit org",
-			cli:  "cool --org",
+			name: "repo",
+			cli:  "cool",
 			wants: RemoveOptions{
 				SecretName: "cool",
-				OrgName:    "@owner",
 			},
 		},
 		{
-			name: "explicit org",
-			cli:  "cool --org=anOrg",
+			name: "org",
+			cli:  "cool --org anOrg",
 			wants: RemoveOptions{
 				SecretName: "cool",
 				OrgName:    "anOrg",
@@ -109,13 +108,11 @@ func Test_removeRun_org(t *testing.T) {
 		opts *RemoveOptions
 	}{
 		{
-			name: "implicit org",
-			opts: &RemoveOptions{
-				OrgName: "@owner",
-			},
+			name: "repo",
+			opts: &RemoveOptions{},
 		},
 		{
-			name: "explicit org",
+			name: "org",
 			opts: &RemoveOptions{
 				OrgName: "UmbrellaCorporation",
 			},
@@ -126,21 +123,22 @@ func Test_removeRun_org(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
-			impliedOrgName := "NeoUmbrella"
-
 			orgName := tt.opts.OrgName
-			if orgName == "@owner" {
-				orgName = impliedOrgName
-			}
 
-			reg.Register(
-				httpmock.REST("DELETE", fmt.Sprintf("orgs/%s/actions/secrets/tVirus", orgName)),
-				httpmock.StatusStringResponse(204, "No Content"))
+			if orgName == "" {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/owner/repo/actions/secrets/tVirus"),
+					httpmock.StatusStringResponse(204, "No Content"))
+			} else {
+				reg.Register(
+					httpmock.REST("DELETE", fmt.Sprintf("orgs/%s/actions/secrets/tVirus", orgName)),
+					httpmock.StatusStringResponse(204, "No Content"))
+			}
 
 			io, _, _, _ := iostreams.Test()
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName(fmt.Sprintf("%s/repo", impliedOrgName))
+				return ghrepo.FromFullName("owner/repo")
 			}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
@@ -31,12 +30,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "remove <secret name>",
 		Short: "Remove an organization or repository secret",
-		Example: heredoc.Doc(`
-			$ gh secret remove REPO_SECRET
-			$ gh secret remove --org ORG_SECRET
-			$ gh secret remove --org="anotherOrg" ORG_SECRET
-		`),
-		Args: cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -50,8 +44,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 			return removeRun(opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.OrgName, "org", "", "List secrets for an organization")
-	cmd.Flags().Lookup("org").NoOptDefVal = "@owner"
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 
 	return cmd
 }
@@ -63,18 +56,14 @@ func removeRun(opts *RemoveOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	orgName := opts.OrgName
+
 	var baseRepo ghrepo.Interface
-	if opts.OrgName == "" || opts.OrgName == "@owner" {
+	if orgName == "" {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
 		}
-	}
-
-	host := ghinstance.OverridableDefault()
-	if opts.OrgName == "@owner" {
-		opts.OrgName = baseRepo.RepoOwner()
-		host = baseRepo.RepoHost()
 	}
 
 	var path string
@@ -84,6 +73,7 @@ func removeRun(opts *RemoveOptions) error {
 		path = fmt.Sprintf("orgs/%s/actions/secrets/%s", opts.OrgName, opts.SecretName)
 	}
 
+	host := ghinstance.OverridableDefault()
 	err = client.REST(host, "DELETE", path, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret %s: %w", opts.SecretName, err)
