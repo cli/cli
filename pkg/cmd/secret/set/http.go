@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 )
@@ -45,7 +46,8 @@ func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
 	return &pk, nil
 }
 
-func getOrgPublicKey(client *api.Client, host, orgName string) (*PubKey, error) {
+func getOrgPublicKey(client *api.Client, orgName string) (*PubKey, error) {
+	host := ghinstance.OverridableDefault()
 	return getPubKey(client, host, fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName))
 }
 
@@ -64,10 +66,11 @@ func putSecret(client *api.Client, host, path string, payload SecretPayload) err
 	return client.REST(host, "PUT", path, requestBody, nil)
 }
 
-func putOrgSecret(client *api.Client, pk *PubKey, host string, opts SetOptions, eValue string) error {
+func putOrgSecret(client *api.Client, pk *PubKey, opts SetOptions, eValue string) error {
 	secretName := opts.SecretName
 	orgName := opts.OrgName
 	visibility := opts.Visibility
+	host := ghinstance.OverridableDefault()
 
 	var repositoryIDs []int
 	var err error

@@ -12,7 +12,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -102,8 +101,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			return setRun(opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.OrgName, "org", "", "List secrets for an organization")
-	cmd.Flags().Lookup("org").NoOptDefVal = "@owner"
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "-", "Provide either a literal string or a file path; prepend file paths with an @. Reads from STDIN if not provided.")
@@ -123,23 +121,19 @@ func setRun(opts *SetOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	orgName := opts.OrgName
+
 	var baseRepo ghrepo.Interface
-	if opts.OrgName == "" || opts.OrgName == "@owner" {
+	if orgName == "" {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
 		}
 	}
 
-	host := ghinstance.OverridableDefault()
-	if opts.OrgName == "@owner" {
-		opts.OrgName = baseRepo.RepoOwner()
-		host = baseRepo.RepoHost()
-	}
-
 	var pk *PubKey
 	if opts.OrgName != "" {
-		pk, err = getOrgPublicKey(client, host, opts.OrgName)
+		pk, err = getOrgPublicKey(client, opts.OrgName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -155,7 +149,7 @@ func setRun(opts *SetOptions) error {
 	encoded := base64.StdEncoding.EncodeToString(eBody)
 
 	if opts.OrgName != "" {
-		err = putOrgSecret(client, pk, host, *opts, encoded)
+		err = putOrgSecret(client, pk, *opts, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}

@@ -28,12 +28,12 @@ func TestNewCmdSet(t *testing.T) {
 	}{
 		{
 			name:     "invalid visibility",
-			cli:      "cool_secret --org -v'mistyVeil'",
+			cli:      "cool_secret --org coolOrg -v'mistyVeil'",
 			wantsErr: true,
 		},
 		{
 			name:     "invalid visibility",
-			cli:      "cool_secret --org -v'selected'",
+			cli:      "cool_secret --org coolOrg -v'selected'",
 			wantsErr: true,
 		},
 		{
@@ -58,8 +58,8 @@ func TestNewCmdSet(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name: "explicit org with selected repo",
-			cli:  "--org=coolOrg -vselected -rcoolRepo cool_secret",
+			name: "org with selected repo",
+			cli:  "-ocoolOrg -vselected -rcoolRepo cool_secret",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.VisSelected,
@@ -69,7 +69,7 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "explicit org with selected repos",
+			name: "org with selected repos",
 			cli:  `--org=coolOrg -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
@@ -90,23 +90,13 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "implicit org",
-			cli:  `cool_secret --org -b"@cool.json"`,
-			wants: SetOptions{
-				SecretName: "cool_secret",
-				Visibility: shared.VisPrivate,
-				Body:       "@cool.json",
-				OrgName:    "@owner",
-			},
-		},
-		{
 			name: "vis all",
-			cli:  `cool_secret --org -b"@cool.json" -vall`,
+			cli:  `cool_secret --org coolOrg -b"@cool.json" -vall`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.VisAll,
 				Body:       "@cool.json",
-				OrgName:    "@owner",
+				OrgName:    "coolOrg",
 			},
 		},
 		{
@@ -210,17 +200,10 @@ func Test_setRun_org(t *testing.T) {
 		wantRepositories []int
 	}{
 		{
-			name: "explicit org name",
+			name: "all vis",
 			opts: &SetOptions{
 				OrgName:    "UmbrellaCorporation",
 				Visibility: shared.VisAll,
-			},
-		},
-		{
-			name: "implicit org name",
-			opts: &SetOptions{
-				OrgName:    "@owner",
-				Visibility: shared.VisPrivate,
 			},
 		},
 		{
@@ -238,11 +221,7 @@ func Test_setRun_org(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
-			impliedOrgName := "NeoUmbrella"
 			orgName := tt.opts.OrgName
-			if orgName == "@owner" {
-				orgName = impliedOrgName
-			}
 
 			reg.Register(httpmock.REST("GET",
 				fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName)),
@@ -260,7 +239,7 @@ func Test_setRun_org(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName(fmt.Sprintf("%s/repo", impliedOrgName))
+				return ghrepo.FromFullName("owner/repo")
 			}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
