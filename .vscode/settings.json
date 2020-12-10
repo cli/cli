@@ -1,5 +1,7 @@
 {
     "search.exclude": {
         "vendor/**": true
-    }
+    },
+    "editor.quickSuggestions": false,
+    "sde.buildOnSave": true
 }
