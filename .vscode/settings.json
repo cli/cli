@@ -3,5 +3,121 @@
         "vendor/**": true
     },
     "editor.quickSuggestions": false,
-    "sde.buildOnSave": true
+    "sde.buildOnSave": false,
+    "swiftlint.configSearchPaths": [
+        ".swiftlint.yml"
+    ],
+    "swiftlint.forceExcludePaths": [
+        "tmp",
+        "build",
+        ".build",
+        "Pods",
+        "Carthage"
+    ],
+    "swiftlint.onlyEnableOnSwiftPMProjects": false,
+    "swiftlint.path": "/usr/local/bin/swiftlint",
+    "swiftlint.toolchainPath": "",
+    "swiftformat.configSearchPaths": [
+        ".swiftformat"
+    ],
+    "swiftformat.enable": true,
+    "swiftformat.onlyEnableOnSwiftPMProjects": false,
+    "swiftformat.path": "/usr/local/bin/swiftformat",
+    "sde.enable": true,
+    "sde.enableTracing.client": false,
+    "sde.languageServerMode": "sourcekit-lsp",
+    "sde.swiftBuildingParams": [
+        "build"
+    ],
+    "sourcekit-lsp.serverPath": "",
+    "sourcekit-lsp.toolchainPath": "",
+    "swift.diagnosis.max_num_problems": 100,
+    "swift.languageServerPath": "/usr/local/bin/langserver-swift",
+    "swift.path.shell": "/bin/sh",
+    "swift.path.sourcekiteDockerMode": true,
+    "swift.path.swift_driver_bin": "/usr/bin/swift",
+    "apple-swift-format.configSearchPaths": [
+        ".swift-format"
+    ],
+    "apple-swift-format.enable": false,
+    "apple-swift-format.path": "/usr/local/bin/swift-format",
+    "files.autoSave": "off",
+    "editor.fontSize": 14,
+    "editor.fontFamily": "Consolas, 'Courier New', monospace",
+    "editor.tabSize": 4,
+    "editor.renderWhitespace": "selection",
+    "editor.cursorStyle": "underline",
+    "editor.multiCursorModifier": "alt",
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "on",
+    "files.associations": {},
+    "swift-coverage.coverageFilePattern": "**/.build/*/debug/codecov/*.json",
+    "swift-coverage.coveredGutterIcon.dark": null,
+    "swift-coverage.coveredGutterIcon.light": null,
+    "swift-coverage.coveredTextBackground.dark": "rgba(48, 209, 88, 0.25)",
+    "swift-coverage.coveredTextBackground.light": "rgba(52, 199, 89, 0.25)",
+    "swift-coverage.highlightsCoveredText": false,
+    "swift-coverage.highlightsCoveredGutter": true,
+    "swift-coverage.highlightsMixedGutter": false,
+    "swift-coverage.highlightsNotCoveredGutter": true,
+    "swift-coverage.mixedGutterIcon.light": null,
+    "swift-coverage.notCoveredGutterIcon.dark": null,
+    "swift-coverage.notCoveredGutterIcon.light": null,
+    "swift-coverage.notCoveredTextBackground.dark": "rgba(255, 69, 58, 0.25)",
+    "swift-coverage.notCoveredTextBackground.light": "rgba(255, 59, 48, 0.25)",
+    "extensions.closeExtensionDetailsOnViewChange": false,
+    "extensions.confirmedUriHandlerExtensionIds": [],
+    "output.smartScroll.enabled": true,
+    "terminal.explorerKind": "external",
+    "problems.autoReveal": true,
+    "problems.showCurrentInStatus": true,
+    "remote.downloadExtensionsLocally": true,
+    "github.gitAuthentication": true,
+    "runTerminalCommand.commands": [
+        {
+            "command": "ng g c ",
+            "name": "Generate Component"
+        },
+        {
+            "command": "tsc {resource}",
+            "auto": true
+        },
+        {
+            "command": "dotnet run",
+            "auto": true,
+            "group": ".NET Core"
+        },
+        {
+            "command": "dotnet add page -n ",
+            "group": ".NET Core"
+        },
+        {
+            "command": "dotnet watch run",
+            "auto": true,
+            "preserve": true,
+            "group": ".NET Core"
+        },
+        {
+            "command": "dotnet add package {clipboard}",
+            "auto": true,
+            "group": ".NET Core"
+        }
+    ],
+    "cmdStatus.command": "echo \"hello\"",
+    "cmdStatus.interval": "10",
+    "makefile-creator.makefile_cxx": "g++",
+    "makefile-creator.makefile_cxxflags": "-Wall -Werror -Wextra -pedantic -std=c++17 -g",
+    "makefile-creator.makefile_ldflags": "",
+    "makefile-creator.makefile_use_asan": true,
+    "search-node-modules.orderPriority": [
+        "index.js",
+        "README.md",
+        "package.json"
+    ],
+    "search-node-modules.path": "node_modules",
+    "search-node-modules.useLastFolder": false,
+    "cmake.cmakePath": "cmake",
+    "make-runner.env": {},
+    "window.autoDetectColorScheme": false,
+    "window.closeWhenEmpty": false
 }
