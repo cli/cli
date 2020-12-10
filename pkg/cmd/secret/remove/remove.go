@@ -28,7 +28,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "remove <secret name>",
+		Use:   "remove <secret-name>",
 		Short: "Remove an organization or repository secret",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

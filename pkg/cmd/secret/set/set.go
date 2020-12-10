@@ -41,7 +41,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	}
 
 	cmd := &cobra.Command{
-		Use:   "set <secret name>",
+		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
 		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
