@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -69,7 +70,7 @@ func listRun(opts *ListOptions) error {
 		}
 	}
 
-	var secrets []Secret
+	var secrets []*Secret
 	if orgName == "" {
 		secrets, err = getRepoSecrets(client, baseRepo)
 	} else {
@@ -90,7 +91,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(updatedAt, nil, nil)
 		if secret.Visibility != "" {
 			if opts.IO.IsStdoutTTY() {
-				tp.AddField(fmtVisibility(secret), nil, nil)
+				tp.AddField(fmtVisibility(*secret), nil, nil)
 			} else {
 				tp.AddField(strings.ToUpper(secret.Visibility), nil, nil)
 			}
@@ -107,9 +108,11 @@ func listRun(opts *ListOptions) error {
 }
 
 type Secret struct {
-	Name       string
-	UpdatedAt  time.Time `json:"updated_at"`
-	Visibility string
+	Name             string
+	UpdatedAt        time.Time `json:"updated_at"`
+	Visibility       string
+	SelectedReposURL string `json:"selected_repositories_url"`
+	NumSelectedRepos int
 }
 
 func fmtVisibility(s Secret) string {
@@ -119,27 +122,56 @@ func fmtVisibility(s Secret) string {
 	case shared.VisPrivate:
 		return "Visible to private repositories"
 	case shared.VisSelected:
-		// TODO print how many? print which ones?
-		return "Visible to selected repositories"
+		if s.NumSelectedRepos == 1 {
+			return "Visible to 1 selected repository"
+		} else {
+			return fmt.Sprintf("Visible to %d selected repositories", s.NumSelectedRepos)
+		}
 	}
 	return ""
 }
 
-func getOrgSecrets(client *api.Client, orgName string) ([]Secret, error) {
+func getOrgSecrets(client *api.Client, orgName string) ([]*Secret, error) {
 	host := ghinstance.OverridableDefault()
-	return getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
+	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
+	if err != nil {
+		return nil, err
+	}
+
+	type responseData struct {
+		TotalCount int `json:"total_count"`
+	}
+
+	for _, secret := range secrets {
+		if secret.SelectedReposURL == "" {
+			continue
+		}
+		u, err := url.Parse(secret.SelectedReposURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
+		}
+
+		var result responseData
+		err = client.REST(u.Host, "GET", u.Path[1:], nil, &result)
+		if err != nil {
+			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
+		}
+		secret.NumSelectedRepos = result.TotalCount
+	}
+
+	return secrets, nil
 }
 
-func getRepoSecrets(client *api.Client, repo ghrepo.Interface) ([]Secret, error) {
+func getRepoSecrets(client *api.Client, repo ghrepo.Interface) ([]*Secret, error) {
 	return getSecrets(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/secrets",
 		ghrepo.FullName(repo)))
 }
 
 type secretsPayload struct {
-	Secrets []Secret
+	Secrets []*Secret
 }
 
-func getSecrets(client *api.Client, host, path string) ([]Secret, error) {
+func getSecrets(client *api.Client, host, path string) ([]*Secret, error) {
 	result := secretsPayload{}
 
 	err := client.REST(host, "GET", path, nil, &result)

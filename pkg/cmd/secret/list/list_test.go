@@ -68,8 +68,6 @@ func Test_NewCmdList(t *testing.T) {
 	}
 }
 
-// TODO run tests
-
 func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -106,7 +104,7 @@ func Test_listRun(t *testing.T) {
 			wantOut: []string{
 				"SECRET_ONE.*Updated 1988-10-11.*Visible to all repositories",
 				"SECRET_TWO.*Updated 2020-12-04.*Visible to private repositories",
-				"SECRET_THREE.*Updated 1975-11-30.*Visible to selected repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 2 selected repositories",
 			},
 		},
 		{
@@ -132,7 +130,7 @@ func Test_listRun(t *testing.T) {
 			t2, _ := time.Parse("2006-01-02", "1975-11-30")
 			path := "repos/owner/repo/actions/secrets"
 			payload := secretsPayload{}
-			payload.Secrets = []Secret{
+			payload.Secrets = []*Secret{
 				{
 					Name:      "SECRET_ONE",
 					UpdatedAt: t0,
@@ -147,7 +145,7 @@ func Test_listRun(t *testing.T) {
 				},
 			}
 			if tt.opts.OrgName != "" {
-				payload.Secrets = []Secret{
+				payload.Secrets = []*Secret{
 					{
 						Name:       "SECRET_ONE",
 						UpdatedAt:  t0,
@@ -159,12 +157,19 @@ func Test_listRun(t *testing.T) {
 						Visibility: shared.VisPrivate,
 					},
 					{
-						Name:       "SECRET_THREE",
-						UpdatedAt:  t2,
-						Visibility: shared.VisSelected,
+						Name:             "SECRET_THREE",
+						UpdatedAt:        t2,
+						Visibility:       shared.VisSelected,
+						SelectedReposURL: fmt.Sprintf("https://api.github.com/orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName),
 					},
 				}
 				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
+
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+					httpmock.JSONResponse(struct {
+						TotalCount int `json:"total_count"`
+					}{2}))
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
