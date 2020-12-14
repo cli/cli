@@ -24,7 +24,7 @@ builds:
   - <<: *build_defaults
     id: linux
     goos: [linux]
-    goarch: [386, amd64, arm64]
+    goarch: [386, arm, amd64, arm64]
 
   - <<: *build_defaults
     id: windows
