@@ -39,4 +39,6 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Build
+        env:
+          CGO_ENABLED: '0'
         run: go build -v ./cmd/gh
