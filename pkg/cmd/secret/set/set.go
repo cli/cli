@@ -45,12 +45,11 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Create or update secrets",
 		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
-			$ cat SECRET.txt | gh secret set NEW_SECRET
-			$ gh secret set NEW_SECRET -b"some literal value"
-			$ gh secret set NEW_SECRET -b"@file.json"
-			$ gh secret set ORG_SECRET --org
-			$ gh secret set ORG_SECRET --org=anotherOrg --visibility=selected -r="repo1,repo2,repo3"
-			$ gh secret set ORG_SECRET --org=anotherOrg --visibility="all"
+			$ gh secret set FROM_FLAG  -b"some literal value"
+			$ gh secret set FROM_ENV  -b"${ENV_VALUE}"
+			$ gh secret set FROM_FILE < file.json
+			$ gh secret set ORG_SECRET -bval --org=anOrg --visibility=all
+			$ gh secret set ORG_SECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -108,7 +107,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "-", "Provide either a literal string or a file path; prepend file paths with an @. Reads from STDIN if not provided.")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
 
 	return cmd
 }
@@ -196,23 +195,14 @@ func validSecretName(name string) error {
 	return nil
 }
 
-func getBody(opts *SetOptions) (body []byte, err error) {
-	if opts.Body == "-" {
-		body, err = ioutil.ReadAll(opts.IO.In)
+func getBody(opts *SetOptions) ([]byte, error) {
+	if opts.Body == "" {
+		body, err := ioutil.ReadAll(opts.IO.In)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read from STDIN: %w", err)
 		}
 
-		return
-	}
-
-	if strings.HasPrefix(opts.Body, "@") {
-		body, err = opts.IO.ReadUserFile(opts.Body[1:])
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s: %w", opts.Body[1:], err)
-		}
-
-		return
+		return body, nil
 	}
 
 	return []byte(opts.Body), nil

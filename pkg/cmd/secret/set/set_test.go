@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -64,34 +63,34 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "repos without vis",
-			cli:  "cool_secret --org coolOrg -rcoolRepo",
+			cli:  "cool_secret -bs --org coolOrg -rcoolRepo",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
-				Body:            "-",
+				Body:            "s",
 				OrgName:         "coolOrg",
 			},
 		},
 		{
 			name: "org with selected repo",
-			cli:  "-ocoolOrg -vselected -rcoolRepo cool_secret",
+			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_secret",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
-				Body:            "-",
+				Body:            "s",
 				OrgName:         "coolOrg",
 			},
 		},
 		{
 			name: "org with selected repos",
-			cli:  `--org=coolOrg -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
+			cli:  `--org=coolOrg -bs -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo", "goodRepo", "radRepo"},
-				Body:            "-",
+				Body:            "s",
 				OrgName:         "coolOrg",
 			},
 		},
@@ -107,11 +106,11 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "vis all",
-			cli:  `cool_secret --org coolOrg -b"@cool.json" -vall`,
+			cli:  `cool_secret --org coolOrg -b"cool" -vall`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.All,
-				Body:       "@cool.json",
+				Body:       "cool",
 				OrgName:    "coolOrg",
 			},
 		},
@@ -286,11 +285,10 @@ func Test_setRun_org(t *testing.T) {
 
 func Test_getBody(t *testing.T) {
 	tests := []struct {
-		name     string
-		bodyArg  string
-		want     string
-		stdin    string
-		fromFile bool
+		name    string
+		bodyArg string
+		want    string
+		stdin   string
 	}{
 		{
 			name:    "literal value",
@@ -298,15 +296,9 @@ func Test_getBody(t *testing.T) {
 			want:    "a secret",
 		},
 		{
-			name:    "from stdin",
-			bodyArg: "-",
-			want:    "a secret",
-			stdin:   "a secret",
-		},
-		{
-			name:     "from file",
-			fromFile: true,
-			want:     "a secret from a file",
+			name:  "from stdin",
+			want:  "a secret",
+			stdin: "a secret",
 		},
 	}
 
@@ -319,15 +311,6 @@ func Test_getBody(t *testing.T) {
 			_, err := stdin.WriteString(tt.stdin)
 			assert.NoError(t, err)
 
-			if tt.fromFile {
-				dir := os.TempDir()
-				tmpfile, err := ioutil.TempFile(dir, "testfile*")
-				assert.NoError(t, err)
-				_, err = tmpfile.WriteString(tt.want)
-				assert.NoError(t, err)
-				tt.bodyArg = fmt.Sprintf("@%s", tmpfile.Name())
-			}
-
 			body, err := getBody(&SetOptions{
 				Body: tt.bodyArg,
 				IO:   io,
@@ -335,11 +318,6 @@ func Test_getBody(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, string(body), tt.want)
-
 		})
-
 	}
-
 }
-
-// TODO test updating org secret's repo lists
