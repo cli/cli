@@ -29,6 +29,7 @@ type ViewOptions struct {
 
 	SelectorArg string
 	WebMode     bool
+	Comments    bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -65,6 +66,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
 
 	return cmd
 }
@@ -76,18 +78,27 @@ func viewRun(opts *ViewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, _, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
 
-	openURL := issue.URL
-
 	if opts.WebMode {
+		openURL := issue.URL
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
+	}
+
+	if opts.Comments {
+		opts.IO.StartProgressIndicator()
+		comments, err := api.CommentsForIssue(apiClient, repo, issue)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		issue.Comments = *comments
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -101,6 +112,11 @@ func viewRun(opts *ViewOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts.IO, issue)
 	}
+
+	if opts.Comments {
+		return printRawIssueComments(opts.IO.Out, issue)
+	}
+
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
@@ -119,10 +135,29 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
 	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
-
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
+}
+
+func printRawIssueComments(out io.Writer, issue *api.Issue) error {
+	var b strings.Builder
+	for _, comment := range issue.Comments.Nodes {
+		fmt.Fprint(&b, rawIssueComment(comment))
+	}
+	fmt.Fprint(out, b.String())
+	return nil
+}
+
+func rawIssueComment(comment api.Comment) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
+	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
+	fmt.Fprintf(&b, "edited:\t%t\n", comment.IncludesCreatedEdit)
+	fmt.Fprintln(&b, "--")
+	fmt.Fprintln(&b, comment.Body)
+	fmt.Fprintln(&b, "--")
+	return b.String()
 }
 
 func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
@@ -133,16 +168,21 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(issue.Title))
-	fmt.Fprint(out, issueStateTitleWithColor(cs, issue.State))
-	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
-		" • %s opened %s • %s",
+	fmt.Fprintf(out,
+		"%s • %s opened %s • %s\n",
+		issueStateTitleWithColor(cs, issue.State),
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
-	)))
+	)
+
+	// Reactions
+	if reactions := reactionGroupList(issue.ReactionGroups); reactions != "" {
+		fmt.Fprint(out, reactions)
+		fmt.Fprintln(out)
+	}
 
 	// Metadata
-	fmt.Fprintln(out)
 	if assignees := issueAssigneeList(*issue); assignees != "" {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
@@ -161,20 +201,100 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	}
 
 	// Body
-	if issue.Body != "" {
-		fmt.Fprintln(out)
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(issue.Body, style, "")
+	fmt.Fprintln(out)
+	if issue.Body == "" {
+		issue.Body = "_No description provided_"
+	}
+	style := markdown.GetStyle(io.TerminalTheme())
+	md, err := markdown.Render(issue.Body, style, "")
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(out, md)
+	fmt.Fprintln(out)
+
+	// Comments
+	if issue.Comments.TotalCount > 0 {
+		comments, err := issueCommentList(io, issue.Comments)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(out, md)
+		fmt.Fprint(out, comments)
 	}
-	fmt.Fprintln(out)
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s"), issue.URL)
+
 	return nil
+}
+
+func issueCommentList(io *iostreams.IOStreams, comments api.Comments) (string, error) {
+	var b strings.Builder
+	cs := io.ColorScheme()
+	retrievedCount := len(comments.Nodes)
+	hiddenCount := comments.TotalCount - retrievedCount
+
+	if hiddenCount > 0 {
+		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
+		fmt.Fprintf(&b, "\n\n\n")
+	}
+
+	for i, comment := range comments.Nodes {
+		last := i+1 == retrievedCount
+		cmt, err := formatIssueComment(io, comment, last)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprint(&b, cmt)
+		if last {
+			fmt.Fprintln(&b)
+		}
+	}
+
+	if hiddenCount > 0 {
+		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
+		fmt.Fprintln(&b)
+	}
+
+	return b.String(), nil
+}
+
+func formatIssueComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (string, error) {
+	var b strings.Builder
+	cs := io.ColorScheme()
+
+	// Header
+	fmt.Fprint(&b, cs.Bold(comment.Author.Login))
+	if comment.AuthorAssociation != "NONE" {
+		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
+	}
+	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
+	if comment.IncludesCreatedEdit {
+		fmt.Fprint(&b, cs.Bold(" • edited"))
+	}
+	if newest {
+		fmt.Fprint(&b, cs.Bold(" • "))
+		fmt.Fprint(&b, cs.CyanBold("Newest comment"))
+	}
+	fmt.Fprintln(&b)
+
+	// Reactions
+	if reactions := reactionGroupList(comment.ReactionGroups); reactions != "" {
+		fmt.Fprint(&b, reactions)
+		fmt.Fprintln(&b)
+	}
+
+	// Body
+	if comment.Body != "" {
+		style := markdown.GetStyle(io.TerminalTheme())
+		md, err := markdown.Render(comment.Body, style, "")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprint(&b, md)
+	}
+
+	return b.String(), nil
 }
 
 func issueStateTitleWithColor(cs *iostreams.ColorScheme, state string) string {
@@ -218,4 +338,28 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func reactionGroupList(rgs api.ReactionGroups) string {
+	var rs []string
+
+	for _, rg := range rgs {
+		if r := formatReactionGroup(rg); r != "" {
+			rs = append(rs, r)
+		}
+	}
+
+	return strings.Join(rs, " • ")
+}
+
+func formatReactionGroup(rg api.ReactionGroup) string {
+	c := rg.Count()
+	if c == 0 {
+		return ""
+	}
+	e := rg.Emoji()
+	if e == "" {
+		return ""
+	}
+	return fmt.Sprintf("%v %s", c, e)
 }
