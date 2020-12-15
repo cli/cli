@@ -27,6 +27,7 @@ type ListOptions struct {
 	BaseBranch   string
 	Labels       []string
 	Assignee     string
+	Author       string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -66,6 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
+	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 
 	return cmd
 }
@@ -90,6 +92,7 @@ func listRun(opts *ListOptions) error {
 			Assignee:   opts.Assignee,
 			Labels:     opts.Labels,
 			BaseBranch: opts.BaseBranch,
+			Author:     opts.Author,
 		})
 		if err != nil {
 			return err
@@ -106,7 +109,7 @@ func listRun(opts *ListOptions) error {
 	case "open":
 		graphqlState = []string{"OPEN"}
 	case "closed":
-		graphqlState = []string{"CLOSED", "MERGED"}
+		graphqlState = []string{"CLOSED"}
 	case "merged":
 		graphqlState = []string{"MERGED"}
 	case "all":
@@ -126,6 +129,9 @@ func listRun(opts *ListOptions) error {
 	}
 	if opts.Assignee != "" {
 		params["assignee"] = opts.Assignee
+	}
+	if opts.Author != "" {
+		params["author"] = opts.Author
 	}
 
 	listResult, err := api.PullRequestList(apiClient, baseRepo, params, opts.LimitResults)

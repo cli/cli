@@ -157,7 +157,7 @@ func TestPRList_filteringClosed(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, []interface{}{"CLOSED", "MERGED"}, params["state"].([]interface{}))
+			assert.Equal(t, []interface{}{"CLOSED"}, params["state"].([]interface{}))
 		}))
 
 	_, err := runCommand(http, true, `-s closed`)
@@ -173,10 +173,26 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`, params["q"].(string))
+			assert.Equal(t, `repo:OWNER/REPO is:pr sort:created-desc assignee:hubot is:merged label:"needs tests" base:"develop"`, params["q"].(string))
 		}))
 
 	_, err := runCommand(http, true, `-s merged -l "needs tests" -a hubot -B develop`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPRList_filteringAuthor(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList\b`),
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, `repo:OWNER/REPO is:pr sort:created-desc author:hubot is:merged label:"needs tests" base:"develop"`, params["q"].(string))
+		}))
+
+	_, err := runCommand(http, true, `-s merged -l "needs tests" -A hubot -B develop`)
 	if err != nil {
 		t.Fatal(err)
 	}

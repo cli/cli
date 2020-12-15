@@ -968,7 +968,7 @@ func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]inte
 	}
 	`
 
-	// If assignee wasn't specified, use `Repository.pullRequest` for ability to
+	// If assignee or author wasn't specified, use `Repository.pullRequest` for ability to
 	// query by multiple labels
 	query := fragment + `
     query PullRequestList(
@@ -1009,9 +1009,12 @@ func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]inte
 	variables := map[string]interface{}{}
 	res := PullRequestAndTotalCount{}
 
-	// If assignee was specified, use the `search` API rather than
+	// If assignee or author was specified, use the `search` API rather than
 	// `Repository.pullRequests`, but this mode doesn't support multiple labels
-	if assignee, ok := vars["assignee"].(string); ok {
+	assignee, requiresAssignee := vars["assignee"].(string)
+	author, requiresAuthor := vars["author"].(string)
+
+	if requiresAssignee || requiresAuthor {
 		query = fragment + `
 		query PullRequestList(
 			$q: String!,
@@ -1033,12 +1036,17 @@ func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]inte
 		}`
 		search := []string{
 			fmt.Sprintf("repo:%s/%s", repo.RepoOwner(), repo.RepoName()),
-			fmt.Sprintf("assignee:%s", assignee),
 			"is:pr",
 			"sort:created-desc",
 		}
-		if states, ok := vars["state"].([]string); ok && len(states) == 1 {
-			switch states[0] {
+		if requiresAssignee {
+			search = append(search, fmt.Sprintf("assignee:%s", assignee))
+		}
+		if requiresAuthor {
+			search = append(search, fmt.Sprintf("author:%s", author))
+		}
+		for _, state := range vars["state"].([]string) {
+			switch strings.ToUpper(state) {
 			case "OPEN":
 				search = append(search, "state:open")
 			case "CLOSED":
