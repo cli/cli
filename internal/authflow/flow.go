@@ -63,7 +63,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		verboseStream = w
 	}
 
-	minimumScopes := []string{"repo", "read:org", "gist"}
+	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
 	scopes := append(minimumScopes, additionalScopes...)
 
 	flow := &auth.OAuthFlow{

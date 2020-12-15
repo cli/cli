@@ -1,4 +1,4 @@
-package client
+package shared
 
 import (
 	"fmt"

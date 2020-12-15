@@ -8,7 +8,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -217,11 +217,11 @@ func Test_statusRun(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
-			origClientFromCfg := client.ClientFromCfg
+			origClientFromCfg := shared.ClientFromCfg
 			defer func() {
-				client.ClientFromCfg = origClientFromCfg
+				shared.ClientFromCfg = origClientFromCfg
 			}()
-			client.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
 				httpClient := &http.Client{Transport: reg}
 				return api.NewClientFromHTTP(httpClient), nil
 			}
