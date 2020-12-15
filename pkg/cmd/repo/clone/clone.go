@@ -123,12 +123,13 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 	}
-	// Check if the repo name has .wiki extension
-	wantsWiki := false
-	if strings.HasSuffix(repo.RepoName(), ".wiki") {
-		repo = ghrepo.NewWithHost(repo.RepoOwner(), strings.TrimSuffix(repo.RepoName(), ".wiki"), repo.RepoHost())
-		wantsWiki = true
+
+	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
+	if wantsWiki {
+		repoName := strings.TrimSuffix(repo.RepoName(), ".wiki")
+		repo = ghrepo.NewWithHost(repo.RepoOwner(), repoName, repo.RepoHost())
 	}
+
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)

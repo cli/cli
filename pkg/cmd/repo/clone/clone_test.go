@@ -56,22 +56,6 @@ func TestNewCmdClone(t *testing.T) {
 			args:    "OWNER/REPO --depth 1",
 			wantErr: "unknown flag: --depth\nSeparate git clone flags with '--'.",
 		},
-		{
-			name: "wiki with HTTPS URL",
-			args: "https://github.com/OWNER/REPO.wiki.git",
-			wantOpts: CloneOptions{
-				Repository: "https://github.com/OWNER/REPO.wiki.git",
-				GitArgs:    []string{},
-			},
-		},
-		{
-			name: "wiki with Full Name URL",
-			args: "OWNER/REPO.wiki",
-			wantOpts: CloneOptions{
-				Repository: "OWNER/REPO.wiki",
-				GitArgs:    []string{},
-			},
-		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -184,6 +168,16 @@ func Test_RepoClone(t *testing.T) {
 			args: "Owner/Repo",
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
+		{
+			name: "clone wiki",
+			args: "Owner/Repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "wiki URL",
+			args: "https://github.com/owner/repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,7 +189,8 @@ func Test_RepoClone(t *testing.T) {
 					"name": "REPO",
 					"owner": {
 						"login": "OWNER"
-					}
+					},
+					"hasWikiEnabled": true
 				} } }
 				`))
 
@@ -297,28 +292,4 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, 1, cs.Count)
 	assert.Equal(t, "git clone https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[0].Args, " "))
-}
-
-func Test_RepoClone_wiki(t *testing.T) {
-	reg := &httpmock.Registry{}
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"name": "REPO",
-			"owner": {
-				"login": "OWNER"
-			}
-		} } }
-		`))
-
-	httpClient := &http.Client{Transport: reg}
-
-	_, err := runCloneCommand(httpClient, "Owner/repo.wiki")
-	if err != nil {
-		assert.Equal(t, "The 'OWNER/REPO' repository does not have a wiki", err.Error())
-	} else {
-		t.Fatalf("error running command `repo clone`: %v", err)
-	}
-	reg.Verify(t)
 }
