@@ -114,7 +114,8 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.Comments {
-		return printRawIssueComments(opts.IO.Out, issue)
+		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments))
+		return nil
 	}
 
 	return printRawIssuePreview(opts.IO.Out, issue)
@@ -140,26 +141,6 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-func printRawIssueComments(out io.Writer, issue *api.Issue) error {
-	var b strings.Builder
-	for _, comment := range issue.Comments.Nodes {
-		fmt.Fprint(&b, rawIssueComment(comment))
-	}
-	fmt.Fprint(out, b.String())
-	return nil
-}
-
-func rawIssueComment(comment api.Comment) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
-	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
-	fmt.Fprintf(&b, "edited:\t%t\n", comment.IncludesCreatedEdit)
-	fmt.Fprintln(&b, "--")
-	fmt.Fprintln(&b, comment.Body)
-	fmt.Fprintln(&b, "--")
-	return b.String()
-}
-
 func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	out := io.Out
 	now := time.Now()
@@ -177,7 +158,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	)
 
 	// Reactions
-	if reactions := reactionGroupList(issue.ReactionGroups); reactions != "" {
+	if reactions := prShared.ReactionGroupList(issue.ReactionGroups); reactions != "" {
 		fmt.Fprint(out, reactions)
 		fmt.Fprintln(out)
 	}
@@ -215,7 +196,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 
 	// Comments
 	if issue.Comments.TotalCount > 0 {
-		comments, err := issueCommentList(io, issue.Comments)
+		comments, err := prShared.CommentList(io, issue.Comments)
 		if err != nil {
 			return err
 		}
@@ -226,75 +207,6 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s"), issue.URL)
 
 	return nil
-}
-
-func issueCommentList(io *iostreams.IOStreams, comments api.Comments) (string, error) {
-	var b strings.Builder
-	cs := io.ColorScheme()
-	retrievedCount := len(comments.Nodes)
-	hiddenCount := comments.TotalCount - retrievedCount
-
-	if hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
-		fmt.Fprintf(&b, "\n\n\n")
-	}
-
-	for i, comment := range comments.Nodes {
-		last := i+1 == retrievedCount
-		cmt, err := formatIssueComment(io, comment, last)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprint(&b, cmt)
-		if last {
-			fmt.Fprintln(&b)
-		}
-	}
-
-	if hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
-		fmt.Fprintln(&b)
-	}
-
-	return b.String(), nil
-}
-
-func formatIssueComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (string, error) {
-	var b strings.Builder
-	cs := io.ColorScheme()
-
-	// Header
-	fmt.Fprint(&b, cs.Bold(comment.Author.Login))
-	if comment.AuthorAssociation != "NONE" {
-		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
-	}
-	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
-	if comment.IncludesCreatedEdit {
-		fmt.Fprint(&b, cs.Bold(" • edited"))
-	}
-	if newest {
-		fmt.Fprint(&b, cs.Bold(" • "))
-		fmt.Fprint(&b, cs.CyanBold("Newest comment"))
-	}
-	fmt.Fprintln(&b)
-
-	// Reactions
-	if reactions := reactionGroupList(comment.ReactionGroups); reactions != "" {
-		fmt.Fprint(&b, reactions)
-		fmt.Fprintln(&b)
-	}
-
-	// Body
-	if comment.Body != "" {
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(comment.Body, style, "")
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprint(&b, md)
-	}
-
-	return b.String(), nil
 }
 
 func issueStateTitleWithColor(cs *iostreams.ColorScheme, state string) string {
@@ -338,28 +250,4 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
-}
-
-func reactionGroupList(rgs api.ReactionGroups) string {
-	var rs []string
-
-	for _, rg := range rgs {
-		if r := formatReactionGroup(rg); r != "" {
-			rs = append(rs, r)
-		}
-	}
-
-	return strings.Join(rs, " • ")
-}
-
-func formatReactionGroup(rg api.ReactionGroup) string {
-	c := rg.Count()
-	if c == 0 {
-		return ""
-	}
-	e := rg.Emoji()
-	if e == "" {
-		return ""
-	}
-	return fmt.Sprintf("%v %s", c, e)
 }

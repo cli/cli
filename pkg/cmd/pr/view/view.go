@@ -30,6 +30,7 @@ type ViewOptions struct {
 
 	SelectorArg string
 	BrowserMode bool
+	Comments    bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -73,6 +74,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
 
 	return cmd
 }
@@ -84,19 +86,29 @@ func viewRun(opts *ViewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	pr, _, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
 
-	openURL := pr.URL
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY()
 
 	if opts.BrowserMode {
+		openURL := pr.URL
 		if connectedToTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
+	}
+
+	if opts.Comments {
+		opts.IO.StartProgressIndicator()
+		comments, err := api.CommentsForPullRequest(apiClient, repo, pr)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		pr.Comments = *comments
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -109,6 +121,11 @@ func viewRun(opts *ViewOptions) error {
 
 	if connectedToTerminal {
 		return printHumanPrPreview(opts.IO, pr)
+	}
+
+	if opts.Comments {
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments))
+		return nil
 	}
 
 	return printRawPrPreview(opts.IO, pr)
@@ -142,20 +159,24 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	out := io.Out
-
 	cs := io.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", shared.StateTitleWithColor(cs, *pr))
-	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
-		" • %s wants to merge %s into %s from %s",
+	fmt.Fprintf(out,
+		"%s • %s wants to merge %s into %s from %s\n",
+		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
-	)))
-	fmt.Fprintln(out)
+	)
+
+	// Reactions
+	if reactions := shared.ReactionGroupList(pr.ReactionGroups); reactions != "" {
+		fmt.Fprint(out, reactions)
+		fmt.Fprintln(out)
+	}
 
 	// Metadata
 	if reviewers := prReviewerList(*pr, cs); reviewers != "" {
@@ -180,19 +201,30 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	}
 
 	// Body
-	if pr.Body != "" {
-		fmt.Fprintln(out)
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(pr.Body, style, "")
+	fmt.Fprintln(out)
+	if pr.Body == "" {
+		pr.Body = "_No description provided_"
+	}
+	style := markdown.GetStyle(io.TerminalTheme())
+	md, err := markdown.Render(pr.Body, style, "")
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(out, md)
+	fmt.Fprintln(out)
+
+	// Comments
+	if pr.Comments.TotalCount > 0 {
+		comments, err := shared.CommentList(io, pr.Comments)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(out, md)
+		fmt.Fprint(out, comments)
 	}
-	fmt.Fprintln(out)
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s"), pr.URL)
+
 	return nil
 }
 
