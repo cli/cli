@@ -145,6 +145,12 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 ```bash
 nix-env -iA nixos.gitAndTools.gh
 ```
+### openSUSE
+openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+```bash
+sudo zypper in gh
+```
+This package is not available on the current release of openSUSE Leap
 
 ### Snaps
 
