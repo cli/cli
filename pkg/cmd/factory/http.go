@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -26,6 +27,12 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
 			if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
 				return fmt.Sprintf("token %s", token), nil
+			}
+			return "", nil
+		}),
+		api.AddHeaderFunc("Time-Zone", func(req *http.Request) (string, error) {
+			if req.Method == "POST" && time.Local.String() != "Local" {
+				return time.Local.String(), nil
 			}
 			return "", nil
 		}),
