@@ -146,6 +146,13 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 nix-env -iA nixos.gitAndTools.gh
 ```
 
+### openSUSE Tumbleweed
+
+openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+```bash
+sudo zypper in gh
+```
+
 ### Snaps
 
 Many Linux distro users can install using Snapd from the [Snap Store](https://snapcraft.io/gh) or the associated [repo](https://github.com/casperdcl/cli/tree/snap)
