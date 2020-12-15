@@ -1,6 +1,17 @@
 package git
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+// TODO: extract assertion helpers into a shared package
+func eq(t *testing.T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
 
 func Test_parseRemotes(t *testing.T) {
 	remoteList := []string{
