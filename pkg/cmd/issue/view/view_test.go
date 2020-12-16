@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/briandowns/spinner"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"

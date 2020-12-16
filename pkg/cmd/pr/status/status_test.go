@@ -10,9 +10,9 @@ import (
 
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"

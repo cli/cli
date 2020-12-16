@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"

@@ -11,10 +11,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"

@@ -9,12 +9,12 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"

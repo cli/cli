@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/iostreams"
 )
 

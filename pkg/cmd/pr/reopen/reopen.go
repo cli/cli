@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 )

@@ -5,8 +5,8 @@ import (
 	"sort"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
