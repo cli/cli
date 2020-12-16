@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/iostreams"
 )

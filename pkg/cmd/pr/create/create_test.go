@@ -14,7 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"

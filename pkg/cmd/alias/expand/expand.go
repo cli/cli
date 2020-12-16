@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 )

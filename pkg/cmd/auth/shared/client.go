@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/config"
 )
 
 func ValidateHostCfg(hostname string, cfg config.Config) error {

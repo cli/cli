@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/config"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
