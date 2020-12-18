@@ -1,0 +1,19 @@
+name: PR Automation
+on:
+  pull_request:
+    types: [ready_for_review]
+
+
+jobs:
+  needs-review-column:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add to board
+        env:
+          NEEDS_REVIEW_COLUMN: 7110128
+          CONTENT_URL: github.event.pull_request.html_url
+        # TODO use a dynamic list
+        if: github.event.pull_request.user.login == 'vilmibm' || github.event.pull_request.user.login == 'mislav' || github.event.pull_request.user.login == 'samcoe' || github.event.pull_request.user.login == 'ampinsk' || github.event.pull_request.user.login == 'billygriffin'
+        run: |
+          gh api -H 'accept: application/vnd.github.inertia-preview+json' -XPOST /projects/columns/$NEEDS_REVIEW_COLUMN/cards --field 'content_url=$CONTENT_URL'
