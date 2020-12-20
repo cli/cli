@@ -37,8 +37,8 @@ func Test_remoteResolver(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(remotes))
 
-	assert.Equal(t, "upstream", remotes[0].Name)
-	assert.Equal(t, "fork", remotes[1].Name)
+	assert.Equal(t, "fork", remotes[0].Name)
+	assert.Equal(t, "upstream", remotes[1].Name)
 }
 
 func Test_remoteResolverOverride(t *testing.T) {

@@ -51,7 +51,7 @@ func remoteNameSortScore(name string) int {
 func (r Remotes) Len() int      { return len(r) }
 func (r Remotes) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
 func (r Remotes) Less(i, j int) bool {
-	return remoteNameSortScore(r[i].Name) > remoteNameSortScore(r[j].Name)
+	return remoteNameSortScore(r[i].Name) < remoteNameSortScore(r[j].Name)
 }
 
 // Remote represents a git remote mapped to a GitHub repository
