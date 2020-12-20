@@ -56,7 +56,7 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
-			return fmt.Errorf("read-only token in %s cannot be modified", env)
+			return fmt.Errorf("The '%s' environment variable is not empty, please clear it to save authentication data", env)
 		}
 	}
 
