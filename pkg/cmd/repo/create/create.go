@@ -273,22 +273,26 @@ func createRun(opts *CreateOptions) error {
 			if isTTY {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 			}
-		} else if opts.IO.CanPrompt() {
-			doSetup := createLocalDirectory
-			if !doSetup {
-				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
-				if err != nil {
-					return err
+		} else {
+			if opts.IO.CanPrompt() {
+				if !createLocalDirectory {
+					err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &createLocalDirectory)
+					if err != nil {
+						return err
+					}
 				}
 			}
-			if doSetup {
+			if createLocalDirectory {
 				path := repo.Name
 
 				gitInit, err := git.GitCommand("init", path)
 				if err != nil {
 					return err
 				}
-				gitInit.Stdout = stdout
+				isTTY := opts.IO.IsStdoutTTY()
+				if isTTY {
+					gitInit.Stdout = stdout
+				}
 				gitInit.Stderr = stderr
 				err = run.PrepareCmd(gitInit).Run()
 				if err != nil {
@@ -304,8 +308,9 @@ func createRun(opts *CreateOptions) error {
 				if err != nil {
 					return err
 				}
-
-				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", cs.SuccessIcon(), path)
+				if isTTY {
+					fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", cs.SuccessIcon(), path)
+				}
 			}
 		}
 
