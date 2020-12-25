@@ -10,9 +10,17 @@ import (
 	"github.com/google/shlex"
 )
 
-// BrowserEnv simply returns the $BROWSER environment variable
+// BrowserEnv returns the escaped $BROWSER environment variable
 func FromEnv() string {
-	return os.Getenv("BROWSER")
+	return strings.ReplaceAll(
+		strings.ReplaceAll(
+			os.Getenv("BROWSER"),
+			"\\",
+			"\\\\",
+		),
+		" ",
+		"\\ ",
+	)
 }
 
 // Command produces an exec.Cmd respecting runtime.GOOS and $BROWSER environment variable
