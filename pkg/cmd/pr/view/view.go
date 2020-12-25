@@ -223,7 +223,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s"), pr.URL)
+	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
 
 	return nil
 }
