@@ -204,7 +204,7 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s"), issue.URL)
+	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
 
 	return nil
 }
