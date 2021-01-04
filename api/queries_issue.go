@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 )
 
 type IssuesPayload struct {
@@ -124,37 +125,30 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 }
 
 func CommentCreate(client *Client, repoHost string, params map[string]string) (string, error) {
-	query := `
-	mutation CommentCreate($input: AddCommentInput!) {
-		addComment(input: $input) {
-			commentEdge {
-				node {
-					url
-				}
-			}
-		}
-	}`
-
-	variables := map[string]interface{}{
-		"input": params,
-	}
-
-	result := struct {
+	var mutation struct {
 		AddComment struct {
 			CommentEdge struct {
 				Node struct {
 					URL string
 				}
 			}
-		}
-	}{}
+		} `graphql:"addComment(input: $input)"`
+	}
 
-	err := client.GraphQL(repoHost, query, variables, &result)
+	variables := map[string]interface{}{
+		"input": githubv4.AddCommentInput{
+			Body:      githubv4.String(params["body"]),
+			SubjectID: graphql.ID(params["subjectId"]),
+		},
+	}
+
+	gql := graphQLClient(client.http, repoHost)
+	err := gql.MutateNamed(context.Background(), "CommentCreate", &mutation, variables)
 	if err != nil {
 		return "", err
 	}
 
-	return result.AddComment.CommentEdge.Node.URL, nil
+	return mutation.AddComment.CommentEdge.Node.URL, nil
 }
 
 func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) (*IssuesPayload, error) {

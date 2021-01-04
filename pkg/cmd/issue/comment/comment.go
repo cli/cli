@@ -33,9 +33,9 @@ type CommentOptions struct {
 }
 
 const (
-	inline = iota
-	editor
+	editor = iota
 	web
+	inline
 )
 
 func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.Command {
@@ -55,29 +55,39 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 		Use:   "comment {<number> | <url>}",
 		Short: "Create a new issue comment",
 		Example: heredoc.Doc(`
-			$ gh issue comment 22 --body "I found a bug. Nothing works"
+			$ gh issue comment 22 --body "I was able to reproduce this issue, lets fix it."
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 			opts.SelectorArg = args[0]
-			opts.Interactive = !(opts.Body != "" || webMode || editorMode)
 
-			if !opts.IO.CanPrompt() && opts.Interactive {
-				return &cmdutil.FlagError{Err: errors.New("--body, --editor, or --web required when not running interactively")}
+			inputFlags := 0
+			if cmd.Flags().Changed("body") {
+				opts.InputType = inline
+				inputFlags++
+			}
+			if webMode {
+				opts.InputType = web
+				inputFlags++
+			}
+			if editorMode {
+				opts.InputType = editor
+				inputFlags++
 			}
 
-			if !opts.Interactive {
-				if opts.Body != "" && !webMode && !editorMode {
-					opts.InputType = inline
-				} else if opts.Body == "" && webMode && !editorMode {
-					opts.InputType = web
-				} else if opts.Body == "" && !webMode && editorMode {
-					opts.InputType = editor
-				} else {
-					return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of --body, --editor, or --web")}
+			if inputFlags == 0 {
+				if !opts.IO.CanPrompt() {
+					return &cmdutil.FlagError{Err: errors.New("--body or --web required when not running interactively")}
 				}
+				opts.Interactive = true
+			} else if inputFlags == 1 {
+				if !opts.IO.CanPrompt() && opts.InputType == editor {
+					return &cmdutil.FlagError{Err: errors.New("--body or --web required when not running interactively")}
+				}
+			} else if inputFlags > 1 {
+				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of --body, --editor, or --web")}
 			}
 
 			if runF != nil {
@@ -120,30 +130,22 @@ func commentRun(opts *CommentOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
-	case inline:
-		if opts.Body != "" {
-			break
-		}
-		body, err := inlineSurvey()
-		if err != nil {
-			return err
-		}
-		opts.Body = body
 	case editor:
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-		var body string
-		if opts.Interactive {
-			body, err = editorSurvey(editorCommand)
-		} else {
-			body, err = opts.Edit(editorCommand)
-		}
+		body, err := opts.Edit(editorCommand)
 		if err != nil {
 			return err
 		}
 		opts.Body = body
+		if opts.Interactive {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprint(opts.IO.Out, cs.GreenBold("?"))
+			fmt.Fprint(opts.IO.Out, cs.Bold(" Body "))
+			fmt.Fprint(opts.IO.Out, cs.Cyan("<Received>\n"))
+		}
 	}
 
 	if opts.Interactive {
@@ -160,14 +162,11 @@ func commentRun(opts *CommentOptions) error {
 		"subjectId": issue.ID,
 		"body":      opts.Body,
 	}
-
 	url, err := api.CommentCreate(apiClient, baseRepo.RepoHost(), params)
 	if err != nil {
 		return err
 	}
-
-	fmt.Fprint(opts.IO.Out, url)
-
+	fmt.Fprintln(opts.IO.Out, url)
 	return nil
 }
 
@@ -175,33 +174,10 @@ func inputTypeSurvey() (int, error) {
 	var inputType int
 	inputTypeQuestion := &survey.Select{
 		Message: "Where do you want to draft your comment?",
-		Options: []string{"In line", "Editor", "Web"},
+		Options: []string{"Editor", "Web"},
 	}
 	err := prompt.SurveyAskOne(inputTypeQuestion, &inputType)
 	return inputType, err
-}
-
-func inlineSurvey() (string, error) {
-	var body string
-	bodyQuestion := &survey.Input{
-		Message: "Body",
-	}
-	err := prompt.SurveyAskOne(bodyQuestion, &body)
-	return body, err
-}
-
-func editorSurvey(editorCommand string) (string, error) {
-	var body string
-	bodyQuestion := &surveyext.GhEditor{
-		BlankAllowed:  false,
-		EditorCommand: editorCommand,
-		Editor: &survey.Editor{
-			Message:  "Body",
-			FileName: "*.md",
-		},
-	}
-	err := prompt.SurveyAskOne(bodyQuestion, &body)
-	return body, err
 }
 
 func confirmSubmitSurvey() (bool, error) {

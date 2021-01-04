@@ -182,19 +182,9 @@ func Test_commentRun(t *testing.T) {
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
+				Edit:        func(string) (string, error) { return "comment body", nil },
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456",
-		},
-		{
-			name:          "interactive inline",
-			testInputType: inline,
-			input: &CommentOptions{
-				SelectorArg: "123",
-				Interactive: true,
-				InputType:   0,
-				Body:        "",
-			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456",
+			stdout: "? Body <Received>\nhttps://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
 			name:          "non-interactive web",
@@ -217,7 +207,7 @@ func Test_commentRun(t *testing.T) {
 				Body:        "",
 				Edit:        func(string) (string, error) { return "comment body", nil },
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456",
+			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
 			name:          "non-interactive inline",
@@ -228,7 +218,7 @@ func Test_commentRun(t *testing.T) {
 				InputType:   inline,
 				Body:        "comment body",
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456",
+			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 	}
 	for _, tt := range tests {
@@ -260,9 +250,7 @@ func Test_commentRun(t *testing.T) {
 			defer teardown()
 			// Input type select
 			as.StubOne(tt.testInputType)
-			if tt.testInputType != web {
-				// Comment body
-				as.StubOne("comment body")
+			if tt.testInputType == editor {
 				// Confirm submit
 				as.StubOne(true)
 			}
