@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -58,10 +60,10 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	cs := IO.ColorScheme()
 
 	httpClient := http.DefaultClient
-	// TODO: print HTTP logs in debug mode
-	// if strings.Contains(os.Getenv("DEBUG"), "oauth") {
-	// 	httpClient = ...
-	// }
+	if envDebug := os.Getenv("DEBUG"); envDebug != "" {
+		logTraffic := strings.Contains(envDebug, "api") || strings.Contains(envDebug, "oauth")
+		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
+	}
 
 	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
 	scopes := append(minimumScopes, additionalScopes...)
