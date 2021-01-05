@@ -3,17 +3,12 @@ package comment
 import (
 	"bytes"
 	"net/http"
-	"os/exec"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -155,68 +150,88 @@ func TestNewCmdComment(t *testing.T) {
 
 func Test_commentRun(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         *CommentOptions
-		testInputType int
-		stdout        string
-		stderr        string
-		wantsErr      bool
-		errMsg        string
+		name      string
+		input     *CommentOptions
+		httpStubs func(*testing.T, *httpmock.Registry)
+		stdout    string
+		stderr    string
 	}{
 		{
-			name:          "interactive web",
-			testInputType: web,
+			name: "interactive web",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
+
+				InputTypeSurvey: func() (int, error) { return web, nil },
+				OpenInBrowser:   func(string) error { return nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueFromNumber(t, reg)
 			},
 			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name:          "interactive editor",
-			testInputType: editor,
+			name: "interactive editor",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
-				Edit:        func(string) (string, error) { return "comment body", nil },
+
+				EditSurvey:          func() (string, error) { return "comment body", nil },
+				InputTypeSurvey:     func() (int, error) { return editor, nil },
+				ConfirmSubmitSurvey: func() (bool, error) { return true, nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueFromNumber(t, reg)
+				mockCommentCreate(t, reg)
 			},
 			stdout: "? Body <Received>\nhttps://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name:          "non-interactive web",
-			testInputType: web,
+			name: "non-interactive web",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
 				InputType:   web,
 				Body:        "",
+
+				OpenInBrowser: func(string) error { return nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueFromNumber(t, reg)
 			},
 			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name:          "non-interactive editor",
-			testInputType: editor,
+			name: "non-interactive editor",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
 				InputType:   editor,
 				Body:        "",
-				Edit:        func(string) (string, error) { return "comment body", nil },
+
+				EditSurvey: func() (string, error) { return "comment body", nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueFromNumber(t, reg)
+				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name:          "non-interactive inline",
-			testInputType: inline,
+			name: "non-interactive inline",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
 				InputType:   inline,
 				Body:        "comment body",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueFromNumber(t, reg)
+				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
@@ -227,49 +242,20 @@ func Test_commentRun(t *testing.T) {
 		io.SetStdinTTY(true)
 		io.SetStderrTTY(true)
 
-		client := &httpmock.Registry{}
-		defer client.Verify(t)
-		mockIssueFromNumber(client)
-		if tt.testInputType != web {
-			mockCommentCreate(t, client)
-		}
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		tt.httpStubs(t, reg)
 
 		tt.input.IO = io
 		tt.input.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: client}, nil
-		}
-		tt.input.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			return &http.Client{Transport: reg}, nil
 		}
 		tt.input.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		}
 
-		if tt.input.Interactive {
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
-			// Input type select
-			as.StubOne(tt.testInputType)
-			if tt.testInputType == editor {
-				// Confirm submit
-				as.StubOne(true)
-			}
-		}
-
-		if tt.testInputType == web {
-			// Stub browser open
-			restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-				return &test.OutputStub{}
-			})
-			defer restoreCmd()
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
 			err := commentRun(tt.input)
-			if tt.wantsErr {
-				assert.EqualError(t, err, tt.errMsg)
-				return
-			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
@@ -277,7 +263,7 @@ func Test_commentRun(t *testing.T) {
 	}
 }
 
-func mockIssueFromNumber(reg *httpmock.Registry) {
+func mockIssueFromNumber(_ *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`

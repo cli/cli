@@ -13,18 +13,19 @@ import (
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
 type CommentOptions struct {
-	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Edit       func(string) (string, error)
+	HttpClient          func() (*http.Client, error)
+	IO                  *iostreams.IOStreams
+	BaseRepo            func() (ghrepo.Interface, error)
+	EditSurvey          func() (string, error)
+	InputTypeSurvey     func() (int, error)
+	ConfirmSubmitSurvey func() (bool, error)
+	OpenInBrowser       func(string) error
 
 	SelectorArg string
 	Interactive bool
@@ -40,12 +41,12 @@ const (
 
 func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.Command {
 	opts := &CommentOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Edit: func(editorCommand string) (string, error) {
-			return surveyext.Edit(editorCommand, "*.md", "", f.IOStreams.In, f.IOStreams.Out, f.IOStreams.ErrOut, nil)
-		},
+		IO:                  f.IOStreams,
+		HttpClient:          f.HttpClient,
+		EditSurvey:          editSurvey(f.Config, f.IOStreams),
+		InputTypeSurvey:     inputTypeSurvey,
+		ConfirmSubmitSurvey: confirmSubmitSurvey,
+		OpenInBrowser:       utils.OpenInBrowser,
 	}
 
 	var webMode bool
@@ -96,6 +97,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 			return commentRun(opts)
 		},
 	}
+
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().BoolVarP(&editorMode, "editor", "e", false, "Add body using editor")
 	cmd.Flags().BoolVarP(&webMode, "web", "w", false, "Add body in browser")
@@ -116,7 +118,7 @@ func commentRun(opts *CommentOptions) error {
 	}
 
 	if opts.Interactive {
-		inputType, err := inputTypeSurvey()
+		inputType, err := opts.InputTypeSurvey()
 		if err != nil {
 			return err
 		}
@@ -129,13 +131,9 @@ func commentRun(opts *CommentOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.OpenInBrowser(openURL)
 	case editor:
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return err
-		}
-		body, err := opts.Edit(editorCommand)
+		body, err := opts.EditSurvey()
 		if err != nil {
 			return err
 		}
@@ -149,7 +147,7 @@ func commentRun(opts *CommentOptions) error {
 	}
 
 	if opts.Interactive {
-		cont, err := confirmSubmitSurvey()
+		cont, err := opts.ConfirmSubmitSurvey()
 		if err != nil {
 			return err
 		}
@@ -170,22 +168,32 @@ func commentRun(opts *CommentOptions) error {
 	return nil
 }
 
-func inputTypeSurvey() (int, error) {
+var inputTypeSurvey = func() (int, error) {
 	var inputType int
 	inputTypeQuestion := &survey.Select{
 		Message: "Where do you want to draft your comment?",
 		Options: []string{"Editor", "Web"},
 	}
-	err := prompt.SurveyAskOne(inputTypeQuestion, &inputType)
+	err := survey.AskOne(inputTypeQuestion, &inputType)
 	return inputType, err
 }
 
-func confirmSubmitSurvey() (bool, error) {
+var confirmSubmitSurvey = func() (bool, error) {
 	var confirm bool
 	submit := &survey.Confirm{
 		Message: "Submit?",
 		Default: true,
 	}
-	err := prompt.SurveyAskOne(submit, &confirm)
+	err := survey.AskOne(submit, &confirm)
 	return confirm, err
+}
+
+var editSurvey = func(cf func() (config.Config, error), io *iostreams.IOStreams) func() (string, error) {
+	return func() (string, error) {
+		editorCommand, err := cmdutil.DetermineEditor(cf)
+		if err != nil {
+			return "", err
+		}
+		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut, nil)
+	}
 }
