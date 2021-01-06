@@ -17,16 +17,23 @@
 
 2. Build and install
 
+   #### Unix-like systems
    ```sh
    # installs to '/usr/local' by default; sudo may be required
    $ make install
-   ```
-
-   To install to a different location:
-   ```sh
+   
+   # install to a different location
    $ make install prefix=/path/to/gh
    ```
 
-   Make sure that the `${prefix}/bin` directory is in your PATH.
+   #### Windows 
+   ```sh
+   # build the binary
+   > go build -o gh.exe ./cmd/gh
+   ```
+   There is no install step available on Windows.
 
 3. Run `gh version` to check if it worked.
+
+   #### Windows
+   Run `.\gh version` to check if it worked.
