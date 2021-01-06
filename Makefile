@@ -1,5 +1,4 @@
-BUILD_FILES = $(shell go list -f '{{range .GoFiles}}{{$$.Dir}}/{{.}}\
-{{end}}' ./...)
+BUILD_FILES = go.mod go.sum $(shell go list -f '{{range .GoFiles}}{{. | printf "%s/%s\n" $$.Dir}}{{end}}' ./...)
 
 GH_VERSION ?= $(shell git describe --tags 2>/dev/null || git rev-parse --short HEAD)
 DATE_FMT = +%Y-%m-%d
