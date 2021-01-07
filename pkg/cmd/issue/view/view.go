@@ -46,9 +46,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Display the title, body, and other information about an issue.
 
 			With '--web', open the issue in a web browser instead.
-    	`),
-		Example: heredoc.Doc(`
-    	`),
+    `),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -110,11 +108,11 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.IO.IsStdoutTTY() {
-		return printHumanIssuePreview(opts.IO, issue)
+		return printHumanIssuePreview(opts, issue)
 	}
 
 	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments))
+		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
 		return nil
 	}
 
@@ -141,11 +139,11 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
-	out := io.Out
+func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
+	out := opts.IO.Out
 	now := time.Now()
 	ago := now.Sub(issue.CreatedAt)
-	cs := io.ColorScheme()
+	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(issue.Title))
@@ -182,21 +180,23 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 	}
 
 	// Body
-	fmt.Fprintln(out)
+	var md string
+	var err error
 	if issue.Body == "" {
-		issue.Body = "_No description provided_"
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(issue.Body, style, "")
+		if err != nil {
+			return err
+		}
 	}
-	style := markdown.GetStyle(io.TerminalTheme())
-	md, err := markdown.Render(issue.Body, style, "")
-	if err != nil {
-		return err
-	}
-	fmt.Fprint(out, md)
-	fmt.Fprintln(out)
+	fmt.Fprintf(out, "\n%s\n", md)
 
 	// Comments
 	if issue.Comments.TotalCount > 0 {
-		comments, err := prShared.CommentList(io, issue.Comments)
+		preview := !opts.Comments
+		comments, err := prShared.CommentList(opts.IO, issue.Comments, api.PullRequestReviews{}, preview)
 		if err != nil {
 			return err
 		}
