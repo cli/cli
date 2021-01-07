@@ -120,11 +120,11 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts.IO, pr)
+		return printHumanPrPreview(opts, pr)
 	}
 
 	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments))
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.Reviews))
 		return nil
 	}
 
@@ -157,9 +157,9 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
-	out := io.Out
-	cs := io.ColorScheme()
+func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
@@ -205,7 +205,7 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	if pr.Body == "" {
 		pr.Body = "_No description provided_"
 	}
-	style := markdown.GetStyle(io.TerminalTheme())
+	style := markdown.GetStyle(opts.IO.TerminalTheme())
 	md, err := markdown.Render(pr.Body, style, "")
 	if err != nil {
 		return err
@@ -213,9 +213,10 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprint(out, md)
 	fmt.Fprintln(out)
 
-	// Comments
-	if pr.Comments.TotalCount > 0 {
-		comments, err := shared.CommentList(io, pr.Comments)
+	// Reviews and Comments
+	if pr.Comments.TotalCount > 0 || pr.Reviews.TotalCount > 0 {
+		preview := !opts.Comments
+		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.Reviews, preview)
 		if err != nil {
 			return err
 		}

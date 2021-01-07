@@ -99,3 +99,51 @@ func CommentsForPullRequest(client *Client, repo ghrepo.Interface, pr *PullReque
 
 	return &Comments{Nodes: comments, TotalCount: len(comments)}, nil
 }
+
+func commentsFragment() string {
+	return `comments(last: 1) {
+						nodes {
+							author {
+								login
+							}
+							authorAssociation
+							body
+							createdAt
+							includesCreatedEdit
+							` + reactionGroupsFragment() + `
+						}
+						totalCount
+					}`
+}
+
+func (c Comment) AuthorLogin() string {
+	return c.Author.Login
+}
+
+func (c Comment) Association() string {
+	return c.AuthorAssociation
+}
+
+func (c Comment) Content() string {
+	return c.Body
+}
+
+func (c Comment) Created() time.Time {
+	return c.CreatedAt
+}
+
+func (c Comment) IsEdited() bool {
+	return c.IncludesCreatedEdit
+}
+
+func (c Comment) Reactions() ReactionGroups {
+	return c.ReactionGroups
+}
+
+func (c Comment) Status() string {
+	return ""
+}
+
+func (c Comment) Link() string {
+	return ""
+}
