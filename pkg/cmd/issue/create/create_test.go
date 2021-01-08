@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -25,13 +24,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
@@ -123,11 +115,11 @@ func TestIssueCreate(t *testing.T) {
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+	test.Eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	test.Eq(t, reqBody.Variables.Input.Title, "hello")
+	test.Eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	test.Eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
 func TestIssueCreate_recover(t *testing.T) {
@@ -158,9 +150,9 @@ func TestIssueCreate_recover(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			eq(t, inputs["title"], "recovered title")
-			eq(t, inputs["body"], "recovered body")
-			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+			test.Eq(t, inputs["title"], "recovered title")
+			test.Eq(t, inputs["body"], "recovered body")
+			test.Eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
 		}))
 
 	as, teardown := prompt.InitAskStubber()
@@ -207,7 +199,7 @@ func TestIssueCreate_recover(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	test.Eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
 func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
@@ -268,11 +260,11 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
+	test.Eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
+	test.Eq(t, reqBody.Variables.Input.Title, "hello")
+	test.Eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	test.Eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
 func TestIssueCreate_continueInBrowser(t *testing.T) {
@@ -387,12 +379,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			eq(t, inputs["title"], "TITLE")
-			eq(t, inputs["body"], "BODY")
-			eq(t, inputs["assigneeIds"], []interface{}{"MONAID"})
-			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
-			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
-			eq(t, inputs["milestoneId"], "BIGONEID")
+			test.Eq(t, inputs["title"], "TITLE")
+			test.Eq(t, inputs["body"], "BODY")
+			test.Eq(t, inputs["assigneeIds"], []interface{}{"MONAID"})
+			test.Eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+			test.Eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
+			test.Eq(t, inputs["milestoneId"], "BIGONEID")
 			if v, ok := inputs["userIds"]; ok {
 				t.Errorf("did not expect userIds: %v", v)
 			}
@@ -406,7 +398,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	test.Eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
@@ -446,9 +438,9 @@ func TestIssueCreate_web(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	test.Eq(t, url, "https://github.com/OWNER/REPO/issues/new")
+	test.Eq(t, output.String(), "")
+	test.Eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
@@ -471,7 +463,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	test.Eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
+	test.Eq(t, output.String(), "")
+	test.Eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
 }

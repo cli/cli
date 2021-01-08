@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"testing"
 
@@ -21,13 +20,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -79,7 +71,7 @@ func TestIssueList_nontty(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
+	test.Eq(t, output.Stderr(), "")
 	test.ExpectLines(t, output.String(),
 		`1[\t]+number won[\t]+label[\t]+\d+`,
 		`2[\t]+number too[\t]+label[\t]+\d+`,
@@ -147,8 +139,8 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	eq(t, output.Stderr(), "")
-	eq(t, output.String(), `
+	test.Eq(t, output.Stderr(), "")
+	test.Eq(t, output.String(), `
 No issues match your search in OWNER/REPO
 
 `)
@@ -189,8 +181,8 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 
 	_, assigneeDeclared := reqBody.Variables["assignee"]
 	_, labelsDeclared := reqBody.Variables["labels"]
-	eq(t, assigneeDeclared, false)
-	eq(t, labelsDeclared, false)
+	test.Eq(t, assigneeDeclared, false)
+	test.Eq(t, labelsDeclared, false)
 }
 
 func TestIssueList_disabledIssues(t *testing.T) {
@@ -227,14 +219,14 @@ func TestIssueList_web(t *testing.T) {
 
 	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1"
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues in your browser.\n")
+	test.Eq(t, output.String(), "")
+	test.Eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues in your browser.\n")
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, expectedURL)
+	test.Eq(t, url, expectedURL)
 }
 
 func TestIssueList_milestoneNotFound(t *testing.T) {

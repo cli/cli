@@ -5,18 +5,11 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/test"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
@@ -34,13 +27,13 @@ func TestGraphQL(t *testing.T) {
 
 	http.StubResponse(200, bytes.NewBufferString(`{"data":{"viewer":{"login":"hubot"}}}`))
 	err := client.GraphQL("github.com", "QUERY", vars, &response)
-	eq(t, err, nil)
-	eq(t, response.Viewer.Login, "hubot")
+	test.Eq(t, err, nil)
+	test.Eq(t, response.Viewer.Login, "hubot")
 
 	req := http.Requests[0]
 	reqBody, _ := ioutil.ReadAll(req.Body)
-	eq(t, string(reqBody), `{"query":"QUERY","variables":{"name":"Mona"}}`)
-	eq(t, req.Header.Get("Authorization"), "token OTOKEN")
+	test.Eq(t, string(reqBody), `{"query":"QUERY","variables":{"name":"Mona"}}`)
+	test.Eq(t, req.Header.Get("Authorization"), "token OTOKEN")
 }
 
 func TestGraphQLError(t *testing.T) {
@@ -72,7 +65,7 @@ func TestRESTGetDelete(t *testing.T) {
 
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("github.com", "DELETE", "applications/CLIENTID/grant", r, nil)
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 }
 
 func TestRESTError(t *testing.T) {

@@ -3,19 +3,12 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/cli/cli/test"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func Test_parseConfig(t *testing.T) {
 	defer StubConfig(`---
@@ -25,13 +18,13 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	test.Eq(t, err, nil)
+	test.Eq(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	test.Eq(t, err, nil)
+	test.Eq(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_multipleHosts(t *testing.T) {
@@ -45,13 +38,13 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	test.Eq(t, err, nil)
+	test.Eq(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	test.Eq(t, err, nil)
+	test.Eq(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_hostsFile(t *testing.T) {
@@ -61,13 +54,13 @@ github.com:
   oauth_token: OTOKEN
 `)()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	test.Eq(t, err, nil)
+	test.Eq(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	test.Eq(t, err, nil)
+	test.Eq(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_hostFallback(t *testing.T) {
@@ -83,16 +76,16 @@ example.com:
     git_protocol: https
 `)()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 	val, err := config.Get("example.com", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "https")
+	test.Eq(t, err, nil)
+	test.Eq(t, val, "https")
 	val, err = config.Get("github.com", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "ssh")
+	test.Eq(t, err, nil)
+	test.Eq(t, val, "ssh")
 	val, err = config.Get("nonexistent.io", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "ssh")
+	test.Eq(t, err, nil)
+	test.Eq(t, val, "ssh")
 }
 
 func Test_ParseConfig_migrateConfig(t *testing.T) {

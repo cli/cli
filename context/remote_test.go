@@ -3,19 +3,12 @@ package context
 import (
 	"errors"
 	"net/url"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/test"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
@@ -25,15 +18,15 @@ func Test_Remotes_FindByName(t *testing.T) {
 	}
 
 	r, err := list.FindByName("upstream", "origin")
-	eq(t, err, nil)
-	eq(t, r.Name, "upstream")
+	test.Eq(t, err, nil)
+	test.Eq(t, r.Name, "upstream")
 
 	r, err = list.FindByName("nonexistent", "*")
-	eq(t, err, nil)
-	eq(t, r.Name, "mona")
+	test.Eq(t, err, nil)
+	test.Eq(t, r.Name, "mona")
 
 	_, err = list.FindByName("nonexistent")
-	eq(t, err, errors.New(`no GitHub remotes found`))
+	test.Eq(t, err, errors.New(`no GitHub remotes found`))
 }
 
 func Test_translateRemotes(t *testing.T) {

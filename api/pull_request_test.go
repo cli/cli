@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/cli/cli/test"
 )
 
 func TestPullRequest_ChecksStatus(t *testing.T) {
@@ -31,11 +33,11 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 	} }] } }
 	`
 	err := json.Unmarshal([]byte(payload), &pr)
-	eq(t, err, nil)
+	test.Eq(t, err, nil)
 
 	checks := pr.ChecksStatus()
-	eq(t, checks.Total, 8)
-	eq(t, checks.Pending, 3)
-	eq(t, checks.Failing, 3)
-	eq(t, checks.Passing, 2)
+	test.Eq(t, checks.Total, 8)
+	test.Eq(t, checks.Pending, 3)
+	test.Eq(t, checks.Failing, 3)
+	test.Eq(t, checks.Passing, 2)
 }

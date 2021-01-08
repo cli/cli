@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"reflect"
 	"regexp"
 
 	"github.com/cli/cli/internal/run"
@@ -88,6 +89,13 @@ func createStubbedPrepareCmd(cs *CmdStubber) func(*exec.Cmd) run.Runnable {
 type T interface {
 	Helper()
 	Errorf(string, ...interface{})
+}
+
+func Eq(t T, got interface{}, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
 }
 
 func ExpectLines(t T, output string, lines ...string) {
