@@ -827,9 +827,9 @@ func Test_generateCompareURL(t *testing.T) {
 		{
 			name: "basic",
 			ctx: CreateContext{
-				BaseRepo:   ghrepo.New("OWNER", "REPO"),
-				BaseBranch: "main",
-				HeadBranch: "feature",
+				BaseRepo:        ghrepo.New("OWNER", "REPO"),
+				BaseBranch:      "main",
+				HeadBranchLabel: "feature",
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
 			wantErr: false,
@@ -837,9 +837,9 @@ func Test_generateCompareURL(t *testing.T) {
 		{
 			name: "with labels",
 			ctx: CreateContext{
-				BaseRepo:   ghrepo.New("OWNER", "REPO"),
-				BaseBranch: "a",
-				HeadBranch: "b",
+				BaseRepo:        ghrepo.New("OWNER", "REPO"),
+				BaseBranch:      "a",
+				HeadBranchLabel: "b",
 			},
 			state: prShared.IssueMetadataState{
 				Labels: []string{"one", "two three"},
@@ -850,9 +850,9 @@ func Test_generateCompareURL(t *testing.T) {
 		{
 			name: "complex branch names",
 			ctx: CreateContext{
-				BaseRepo:   ghrepo.New("OWNER", "REPO"),
-				BaseBranch: "main/trunk",
-				HeadBranch: "owner:feature",
+				BaseRepo:        ghrepo.New("OWNER", "REPO"),
+				BaseBranch:      "main/trunk",
+				HeadBranchLabel: "owner:feature",
 			},
 			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
 			wantErr: false,

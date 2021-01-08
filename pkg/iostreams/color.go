@@ -9,14 +9,15 @@ import (
 )
 
 var (
-	magenta = ansi.ColorFunc("magenta")
-	cyan    = ansi.ColorFunc("cyan")
-	red     = ansi.ColorFunc("red")
-	yellow  = ansi.ColorFunc("yellow")
-	blue    = ansi.ColorFunc("blue")
-	green   = ansi.ColorFunc("green")
-	gray    = ansi.ColorFunc("black+h")
-	bold    = ansi.ColorFunc("default+b")
+	magenta  = ansi.ColorFunc("magenta")
+	cyan     = ansi.ColorFunc("cyan")
+	red      = ansi.ColorFunc("red")
+	yellow   = ansi.ColorFunc("yellow")
+	blue     = ansi.ColorFunc("blue")
+	green    = ansi.ColorFunc("green")
+	gray     = ansi.ColorFunc("black+h")
+	bold     = ansi.ColorFunc("default+b")
+	cyanBold = ansi.ColorFunc("cyan+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -105,6 +106,13 @@ func (c *ColorScheme) Cyan(t string) string {
 		return t
 	}
 	return cyan(t)
+}
+
+func (c *ColorScheme) CyanBold(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return cyanBold(t)
 }
 
 func (c *ColorScheme) Blue(t string) string {

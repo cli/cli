@@ -199,7 +199,6 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		var action prShared.Action
 		action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
@@ -207,7 +206,13 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 
 		if action == prShared.MetadataAction {
-			err = prShared.MetadataSurvey(opts.IO, apiClient, baseRepo, &tb)
+			fetcher := &prShared.MetadataFetcher{
+				IO:        opts.IO,
+				APIClient: apiClient,
+				Repo:      baseRepo,
+				State:     &tb,
+			}
+			err = prShared.MetadataSurvey(opts.IO, baseRepo, fetcher, &tb)
 			if err != nil {
 				return
 			}

@@ -227,8 +227,8 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 	}
 	requestBody := bytes.NewReader(requestByte)
 
-	apliClient := api.NewClientFromHTTP(client)
-	err = apliClient.REST(hostname, "POST", path, requestBody, &result)
+	apiClient := api.NewClientFromHTTP(client)
+	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
 	if err != nil {
 		return nil, err
 	}

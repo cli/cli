@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -272,6 +273,62 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+}
+
+func TestIssueCreate_continueInBrowser(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubResponse(200, bytes.NewBufferString(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"hasIssuesEnabled": true
+		} } }
+	`))
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	// title
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "Title",
+			Value: "hello",
+		},
+	})
+	// confirm
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, true, `-b body`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		
+		Creating issue in OWNER/REPO
+		
+		Opening github.com/OWNER/REPO/issues/new in your browser.
+	`), output.Stderr())
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -133,7 +133,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(opts.Hostname, cfg)
+		err = shared.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -177,9 +177,9 @@ func loginRun(opts *LoginOptions) error {
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
 
 	if existingToken != "" && opts.Interactive {
-		err := client.ValidateHostCfg(hostname, cfg)
+		err := shared.ValidateHostCfg(hostname, cfg)
 		if err == nil {
-			apiClient, err := client.ClientFromCfg(hostname, cfg)
+			apiClient, err := shared.ClientFromCfg(hostname, cfg)
 			if err != nil {
 				return err
 			}
@@ -226,11 +226,13 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
+	userValidated := false
 	if authMode == 0 {
 		_, err := authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		userValidated = true
 	} else {
 		fmt.Fprintln(opts.IO.ErrOut)
 		fmt.Fprintln(opts.IO.ErrOut, heredoc.Doc(getAccessTokenTip(hostname)))
@@ -251,7 +253,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(hostname, cfg)
+		err = shared.ValidateHostCfg(hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -259,7 +261,7 @@ func loginRun(opts *LoginOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	gitProtocol := "https"
+	var gitProtocol string
 	if opts.Interactive {
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: "Choose default git protocol",
@@ -283,24 +285,36 @@ func loginRun(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	apiClient, err := client.ClientFromCfg(hostname, cfg)
-	if err != nil {
-		return err
-	}
+	var username string
+	if userValidated {
+		username, _ = cfg.Get(hostname, "user")
+	} else {
+		apiClient, err := shared.ClientFromCfg(hostname, cfg)
+		if err != nil {
+			return err
+		}
 
-	username, err := api.CurrentLoginName(apiClient, hostname)
-	if err != nil {
-		return fmt.Errorf("error using api: %w", err)
-	}
+		username, err = api.CurrentLoginName(apiClient, hostname)
+		if err != nil {
+			return fmt.Errorf("error using api: %w", err)
+		}
 
-	err = cfg.Set(hostname, "user", username)
-	if err != nil {
-		return err
+		err = cfg.Set(hostname, "user", username)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = cfg.Write()
 	if err != nil {
 		return err
+	}
+
+	if opts.Interactive && gitProtocol == "https" {
+		err := shared.GitCredentialSetup(cfg, hostname, username)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))

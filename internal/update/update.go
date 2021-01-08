@@ -24,31 +24,31 @@ type StateEntry struct {
 
 // CheckForUpdate checks whether this software has had a newer release on GitHub
 func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
-	latestRelease, err := getLatestReleaseInfo(client, stateFilePath, repo, currentVersion)
+	stateEntry, _ := getStateEntry(stateFilePath)
+	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
+		return nil, nil
+	}
+
+	releaseInfo, err := getLatestReleaseInfo(client, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	if versionGreaterThan(latestRelease.Version, currentVersion) {
-		return latestRelease, nil
+	err = setStateEntry(stateFilePath, time.Now(), *releaseInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	if versionGreaterThan(releaseInfo.Version, currentVersion) {
+		return releaseInfo, nil
 	}
 
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
-	stateEntry, err := getStateEntry(stateFilePath)
-	if err == nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
-		return &stateEntry.LatestRelease, nil
-	}
-
+func getLatestReleaseInfo(client *api.Client, repo string) (*ReleaseInfo, error) {
 	var latestRelease ReleaseInfo
-	err = client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
-	if err != nil {
-		return nil, err
-	}
-
-	err = setStateEntry(stateFilePath, time.Now(), latestRelease)
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
 	if err != nil {
 		return nil, err
 	}

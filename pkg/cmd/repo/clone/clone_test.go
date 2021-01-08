@@ -168,6 +168,16 @@ func Test_RepoClone(t *testing.T) {
 			args: "Owner/Repo",
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
+		{
+			name: "clone wiki",
+			args: "Owner/Repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "wiki URL",
+			args: "https://github.com/owner/repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -179,7 +189,8 @@ func Test_RepoClone(t *testing.T) {
 					"name": "REPO",
 					"owner": {
 						"login": "OWNER"
-					}
+					},
+					"hasWikiEnabled": true
 				} } }
 				`))
 

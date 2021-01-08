@@ -137,6 +137,8 @@ type PullRequest struct {
 	Milestone struct {
 		Title string
 	}
+	Comments       Comments
+	ReactionGroups ReactionGroups
 }
 
 type NotFoundError struct {
@@ -603,6 +605,30 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
+				comments(last: 1) {
+					nodes {
+						author {
+							login
+						}
+						authorAssociation
+						body
+						createdAt
+						includesCreatedEdit
+						reactionGroups {
+							content
+							users {
+								totalCount
+							}
+						}
+					}
+					totalCount
+				}
+				reactionGroups {
+					content
+					users {
+						totalCount
+					}
+				}
 			}
 		}
 	}`
@@ -639,7 +665,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	query := `
 	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: $states, first: 30) {
+			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
 				nodes {
 					id
 					number
@@ -711,6 +737,30 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					}
 					milestone{
 						title
+					}
+					comments(last: 1) {
+						nodes {
+							author {
+								login
+							}
+							authorAssociation
+							body
+							createdAt
+							includesCreatedEdit
+							reactionGroups {
+								content
+								users {
+									totalCount
+								}
+							}
+						}
+						totalCount
+					}
+					reactionGroups {
+						content
+						users {
+							totalCount
+						}
 					}
 				}
 			}

@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
-	"github.com/cli/cli/utils"
 )
 
 type Action int
@@ -196,7 +195,26 @@ func TitleSurvey(state *IssueMetadataState) error {
 	return nil
 }
 
-func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo.Interface, state *IssueMetadataState) error {
+type MetadataFetcher struct {
+	IO        *iostreams.IOStreams
+	APIClient *api.Client
+	Repo      ghrepo.Interface
+	State     *IssueMetadataState
+}
+
+func (mf *MetadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.RepoMetadataResult, error) {
+	mf.IO.StartProgressIndicator()
+	metadataResult, err := api.RepoMetadata(mf.APIClient, mf.Repo, input)
+	mf.IO.StopProgressIndicator()
+	mf.State.MetadataResult = metadataResult
+	return metadataResult, err
+}
+
+type RepoMetadataFetcher interface {
+	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
+}
+
+func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -234,42 +252,32 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 		Projects:   isChosen("Projects"),
 		Milestones: isChosen("Milestone"),
 	}
-	s := utils.Spinner(io.ErrOut)
-	utils.StartSpinner(s)
-	state.MetadataResult, err = api.RepoMetadata(client, baseRepo, metadataInput)
-	utils.StopSpinner(s)
+	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
 	if err != nil {
 		return fmt.Errorf("error fetching metadata options: %w", err)
 	}
 
 	var users []string
-	for _, u := range state.MetadataResult.AssignableUsers {
+	for _, u := range metadataResult.AssignableUsers {
 		users = append(users, u.Login)
 	}
 	var teams []string
-	for _, t := range state.MetadataResult.Teams {
+	for _, t := range metadataResult.Teams {
 		teams = append(teams, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), t.Slug))
 	}
 	var labels []string
-	for _, l := range state.MetadataResult.Labels {
+	for _, l := range metadataResult.Labels {
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, l := range state.MetadataResult.Projects {
+	for _, l := range metadataResult.Projects {
 		projects = append(projects, l.Name)
 	}
 	milestones := []string{noMilestone}
-	for _, m := range state.MetadataResult.Milestones {
+	for _, m := range metadataResult.Milestones {
 		milestones = append(milestones, m.Title)
 	}
 
-	type metadataValues struct {
-		Reviewers []string
-		Assignees []string
-		Labels    []string
-		Projects  []string
-		Milestone string
-	}
 	var mqs []*survey.Question
 	if isChosen("Reviewers") {
 		if len(users) > 0 || len(teams) > 0 {
@@ -345,17 +353,38 @@ func MetadataSurvey(io *iostreams.IOStreams, client *api.Client, baseRepo ghrepo
 			fmt.Fprintln(io.ErrOut, "warning: no milestones in the repository")
 		}
 	}
-	values := metadataValues{}
+
+	values := struct {
+		Reviewers []string
+		Assignees []string
+		Labels    []string
+		Projects  []string
+		Milestone string
+	}{}
+
 	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
-	state.Reviewers = values.Reviewers
-	state.Assignees = values.Assignees
-	state.Labels = values.Labels
-	state.Projects = values.Projects
-	if values.Milestone != "" && values.Milestone != noMilestone {
-		state.Milestones = []string{values.Milestone}
+
+	if isChosen("Reviewers") {
+		state.Reviewers = values.Reviewers
+	}
+	if isChosen("Assignees") {
+		state.Assignees = values.Assignees
+	}
+	if isChosen("Labels") {
+		state.Labels = values.Labels
+	}
+	if isChosen("Projects") {
+		state.Projects = values.Projects
+	}
+	if isChosen("Milestone") {
+		if values.Milestone != "" && values.Milestone != noMilestone {
+			state.Milestones = []string{values.Milestone}
+		} else {
+			state.Milestones = []string{}
+		}
 	}
 
 	return nil

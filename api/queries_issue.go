@@ -33,12 +33,8 @@ type Issue struct {
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Comments  struct {
-		TotalCount int
-	}
-	Author struct {
-		Login string
-	}
+	Comments  Comments
+	Author    Author
 	Assignees struct {
 		Nodes []struct {
 			Login string
@@ -65,10 +61,15 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
+	ReactionGroups ReactionGroups
 }
 
 type IssuesDisabledError struct {
 	error
+}
+
+type Author struct {
+	Login string
 }
 
 const fragments = `
@@ -341,7 +342,22 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				author {
 					login
 				}
-				comments {
+				comments(last: 1) {
+					nodes {
+						author {
+							login
+						}
+						authorAssociation
+						body
+						createdAt
+						includesCreatedEdit
+						reactionGroups {
+							content
+							users {
+								totalCount
+							}
+						}
+					}
 					totalCount
 				}
 				number
@@ -370,8 +386,14 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					}
 					totalCount
 				}
-				milestone{
+				milestone {
 					title
+				}
+				reactionGroups {
+					content
+					users {
+						totalCount
+					}
 				}
 			}
 		}

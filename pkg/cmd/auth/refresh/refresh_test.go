@@ -37,9 +37,11 @@ func Test_NewCmdRefresh(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "nontty hostname",
-			cli:      "-h aline.cedrac",
-			wantsErr: true,
+			name: "nontty hostname",
+			cli:  "-h aline.cedrac",
+			wants: RefreshOptions{
+				Hostname: "aline.cedrac",
+			},
 		},
 		{
 			name: "tty hostname",

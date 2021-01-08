@@ -7,7 +7,7 @@
         "body": "**bold story**",
         "title": "ix of coins",
         "state": "OPEN",
-        "created_at": "2011-01-26T19:01:12Z",
+        "createdAt": "2011-01-26T19:01:12Z",
         "author": {
           "login": "marseilles"
         },
@@ -20,7 +20,7 @@
               "login": "monaco"
             }
           ],
-          "totalcount": 2
+          "totalCount": 2
         },
         "labels": {
           "nodes": [
@@ -40,7 +40,7 @@
               "name": "five"
             }
           ],
-          "totalcount": 5
+          "totalCount": 5
         },
         "projectcards": {
           "nodes": [
@@ -77,13 +77,63 @@
               }
             }
           ],
-          "totalcount": 3
+          "totalCount": 3
         },
         "milestone": {
           "title": "uluru"
         },
+        "reactionGroups": [
+          {
+            "content": "CONFUSED",
+            "users": {
+              "totalCount": 8
+            }
+          },
+          {
+            "content": "EYES",
+            "users": {
+              "totalCount": 7
+            }
+          },
+          {
+            "content": "HEART",
+            "users": {
+              "totalCount": 6
+            }
+          },
+          {
+            "content": "HOORAY",
+            "users": {
+              "totalCount": 5
+            }
+          },
+          {
+            "content": "LAUGH",
+            "users": {
+              "totalCount": 4
+            }
+          },
+          {
+            "content": "ROCKET",
+            "users": {
+              "totalCount": 3
+            }
+          },
+          {
+            "content": "THUMBS_DOWN",
+            "users": {
+              "totalCount": 2
+            }
+          },
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
         "comments": {
-          "totalcount": 9
+          "totalCount": 9
         },
         "url": "https://github.com/OWNER/REPO/issues/123"
       }
