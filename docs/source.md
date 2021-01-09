@@ -19,7 +19,7 @@
 
    #### Unix-like systems
    ```sh
-   # installs to '/usr/local' by default; sudo may be required
+   # installs to '/usr/local' by default; sudo may be required, if you don't have sudo privilages, consider installing to a diffrent location and then adding the location to your PATH.
    $ make install
    
    # install to a different location
@@ -31,7 +31,7 @@
    # build the binary
    > go build -o gh.exe ./cmd/gh
    ```
-   There is no install step available on Windows.
+   There is no install step available on Windows. You need to add the Github CLI to your PATH if you want it to be more accessible.
 
 3. Run `gh version` to check if it worked.
 
