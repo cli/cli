@@ -54,7 +54,7 @@ func TestNewCmdComment(t *testing.T) {
 			output: CommentOptions{
 				SelectorArg: "1",
 				Interactive: false,
-				InputType:   inline,
+				InputType:   inputTypeInline,
 				Body:        "test",
 			},
 			wantsErr: false,
@@ -65,7 +65,7 @@ func TestNewCmdComment(t *testing.T) {
 			output: CommentOptions{
 				SelectorArg: "1",
 				Interactive: false,
-				InputType:   editor,
+				InputType:   inputTypeEditor,
 				Body:        "",
 			},
 			wantsErr: false,
@@ -76,7 +76,7 @@ func TestNewCmdComment(t *testing.T) {
 			output: CommentOptions{
 				SelectorArg: "1",
 				Interactive: false,
-				InputType:   web,
+				InputType:   inputTypeWeb,
 				Body:        "",
 			},
 			wantsErr: false,
@@ -164,7 +164,7 @@ func Test_commentRun(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 
-				InputTypeSurvey: func() (int, error) { return web, nil },
+				InputTypeSurvey: func() (inputType, error) { return inputTypeWeb, nil },
 				OpenInBrowser:   func(string) error { return nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -181,21 +181,21 @@ func Test_commentRun(t *testing.T) {
 				Body:        "",
 
 				EditSurvey:          func() (string, error) { return "comment body", nil },
-				InputTypeSurvey:     func() (int, error) { return editor, nil },
+				InputTypeSurvey:     func() (inputType, error) { return inputTypeEditor, nil },
 				ConfirmSubmitSurvey: func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
-			stdout: "? Body <Received>\nhttps://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
+			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
 			name: "non-interactive web",
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
-				InputType:   web,
+				InputType:   inputTypeWeb,
 				Body:        "",
 
 				OpenInBrowser: func(string) error { return nil },
@@ -210,7 +210,7 @@ func Test_commentRun(t *testing.T) {
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
-				InputType:   editor,
+				InputType:   inputTypeEditor,
 				Body:        "",
 
 				EditSurvey: func() (string, error) { return "comment body", nil },
@@ -226,7 +226,7 @@ func Test_commentRun(t *testing.T) {
 			input: &CommentOptions{
 				SelectorArg: "123",
 				Interactive: false,
-				InputType:   inline,
+				InputType:   inputTypeInline,
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {

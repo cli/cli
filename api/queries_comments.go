@@ -101,7 +101,12 @@ func CommentsForPullRequest(client *Client, repo ghrepo.Interface, pr *PullReque
 	return &Comments{Nodes: comments, TotalCount: len(comments)}, nil
 }
 
-func CommentCreate(client *Client, repoHost string, params map[string]string) (string, error) {
+type CommentCreateInput struct {
+	Body      string
+	SubjectId string
+}
+
+func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (string, error) {
 	var mutation struct {
 		AddComment struct {
 			CommentEdge struct {
@@ -114,8 +119,8 @@ func CommentCreate(client *Client, repoHost string, params map[string]string) (s
 
 	variables := map[string]interface{}{
 		"input": githubv4.AddCommentInput{
-			Body:      githubv4.String(params["body"]),
-			SubjectID: graphql.ID(params["subjectId"]),
+			Body:      githubv4.String(params.Body),
+			SubjectID: graphql.ID(params.SubjectId),
 		},
 	}
 

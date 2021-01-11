@@ -23,20 +23,22 @@ type CommentOptions struct {
 	IO                  *iostreams.IOStreams
 	BaseRepo            func() (ghrepo.Interface, error)
 	EditSurvey          func() (string, error)
-	InputTypeSurvey     func() (int, error)
+	InputTypeSurvey     func() (inputType, error)
 	ConfirmSubmitSurvey func() (bool, error)
 	OpenInBrowser       func(string) error
 
 	SelectorArg string
 	Interactive bool
-	InputType   int
+	InputType   inputType
 	Body        string
 }
 
+type inputType int
+
 const (
-	editor = iota
-	web
-	inline
+	inputTypeEditor inputType = iota
+	inputTypeInline
+	inputTypeWeb
 )
 
 func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.Command {
@@ -66,15 +68,15 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 
 			inputFlags := 0
 			if cmd.Flags().Changed("body") {
-				opts.InputType = inline
+				opts.InputType = inputTypeInline
 				inputFlags++
 			}
 			if webMode {
-				opts.InputType = web
+				opts.InputType = inputTypeWeb
 				inputFlags++
 			}
 			if editorMode {
-				opts.InputType = editor
+				opts.InputType = inputTypeEditor
 				inputFlags++
 			}
 
@@ -84,7 +86,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 				}
 				opts.Interactive = true
 			} else if inputFlags == 1 {
-				if !opts.IO.CanPrompt() && opts.InputType == editor {
+				if !opts.IO.CanPrompt() && opts.InputType == inputTypeEditor {
 					return &cmdutil.FlagError{Err: errors.New("--body or --web required when not running interactively")}
 				}
 			} else if inputFlags > 1 {
@@ -126,24 +128,18 @@ func commentRun(opts *CommentOptions) error {
 	}
 
 	switch opts.InputType {
-	case web:
+	case inputTypeWeb:
 		openURL := issue.URL + "#issuecomment-new"
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.OpenInBrowser(openURL)
-	case editor:
+	case inputTypeEditor:
 		body, err := opts.EditSurvey()
 		if err != nil {
 			return err
 		}
 		opts.Body = body
-		if opts.Interactive {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.Out, cs.GreenBold("?"))
-			fmt.Fprint(opts.IO.Out, cs.Bold(" Body "))
-			fmt.Fprint(opts.IO.Out, cs.Cyan("<Received>\n"))
-		}
 	}
 
 	if opts.Interactive {
@@ -156,10 +152,7 @@ func commentRun(opts *CommentOptions) error {
 		}
 	}
 
-	params := map[string]string{
-		"subjectId": issue.ID,
-		"body":      opts.Body,
-	}
+	params := api.CommentCreateInput{Body: opts.Body, SubjectId: issue.ID}
 	url, err := api.CommentCreate(apiClient, baseRepo.RepoHost(), params)
 	if err != nil {
 		return err
@@ -168,14 +161,22 @@ func commentRun(opts *CommentOptions) error {
 	return nil
 }
 
-var inputTypeSurvey = func() (int, error) {
-	var inputType int
+var inputTypeSurvey = func() (inputType, error) {
+	var result int
 	inputTypeQuestion := &survey.Select{
 		Message: "Where do you want to draft your comment?",
 		Options: []string{"Editor", "Web"},
 	}
-	err := survey.AskOne(inputTypeQuestion, &inputType)
-	return inputType, err
+	err := survey.AskOne(inputTypeQuestion, &result)
+	if err != nil {
+		return 0, err
+	}
+
+	if result == 0 {
+		return inputTypeEditor, nil
+	} else {
+		return inputTypeWeb, nil
+	}
 }
 
 var confirmSubmitSurvey = func() (bool, error) {
