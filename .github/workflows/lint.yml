@@ -29,7 +29,7 @@ jobs:
           go mod verify
           go mod download
 
-          LINT_VERSION=1.29.0
+          LINT_VERSION=1.34.1
           curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
             tar xz --strip-components 1 --wildcards \*/golangci-lint
           mkdir -p bin && mv golangci-lint bin/
@@ -50,10 +50,6 @@ jobs:
           assert-nothing-changed go fmt ./...
           assert-nothing-changed go mod tidy
 
-          while read -r file linter msg; do
-            IFS=: read -ra f <<<"$file"
-            printf '::error file=%s,line=%s,col=%s::%s\n' "${f[0]}" "${f[1]}" "${f[2]}" "[$linter] $msg"
-            STATUS=1
-          done < <(bin/golangci-lint run --out-format tab)
+          bin/golangci-lint run --out-format github-actions || STATUS=$?
 
           exit $STATUS
