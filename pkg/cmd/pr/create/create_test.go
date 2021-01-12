@@ -233,15 +233,26 @@ func TestPRCreate_nontty(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequests": { "nodes" : [
+			] } } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "createPullRequest": { "pullRequest": {
+				"URL": "https://github.com/OWNER/REPO/pull/12"
+			} } } }`,
+			func(input map[string]interface{}) {
+				assert.Equal(t, "REPOID", input["repositoryId"])
+				assert.Equal(t, "my title", input["title"])
+				assert.Equal(t, "my body", input["body"])
+				assert.Equal(t, "master", input["baseRefName"])
+				assert.Equal(t, "feature", input["headRefName"])
+			}),
+	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -251,26 +262,6 @@ func TestPRCreate_nontty(t *testing.T) {
 
 	output, err := runCommand(http, nil, "feature", false, `-t "my title" -b "my body" -H feature`)
 	require.NoError(t, err)
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[2].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-				BaseRefName  string
-				HeadRefName  string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	assert.Equal(t, "REPOID", reqBody.Variables.Input.RepositoryID)
-	assert.Equal(t, "my title", reqBody.Variables.Input.Title)
-	assert.Equal(t, "my body", reqBody.Variables.Input.Body)
-	assert.Equal(t, "master", reqBody.Variables.Input.BaseRefName)
-	assert.Equal(t, "feature", reqBody.Variables.Input.HeadRefName)
 
 	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
@@ -661,13 +652,15 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [
-			{ "url": "https://github.com/OWNER/REPO/pull/123",
-			  "headRefName": "feature",
-				"baseRefName": "master" }
-		] } } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequests": { "nodes": [
+				{ "url": "https://github.com/OWNER/REPO/pull/123",
+				  "headRefName": "feature",
+					"baseRefName": "master" }
+			] } } } }`),
+	)
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()

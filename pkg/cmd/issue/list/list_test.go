@@ -169,12 +169,14 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {	"repository": {
-		"hasIssuesEnabled": true,
-		"issues": { "nodes": [] }
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": {	"repository": {
+				"hasIssuesEnabled": true,
+				"issues": { "nodes": [] }
+			} } }`),
+	)
 
 	_, err := runCommand(http, true, "")
 	if err != nil {
@@ -197,11 +199,13 @@ func TestIssueList_disabledIssues(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": {	"repository": {
-		"hasIssuesEnabled": false
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": {	"repository": {
+				"hasIssuesEnabled": false
+			} } }`),
+	)
 
 	_, err := runCommand(http, true, "")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {

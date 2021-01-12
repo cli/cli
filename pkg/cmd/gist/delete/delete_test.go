@@ -2,6 +2,9 @@ package delete
 
 import (
 	"bytes"
+	"net/http"
+	"testing"
+
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -9,8 +12,6 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func TestNewCmdDelete(t *testing.T) {
@@ -98,7 +99,7 @@ func Test_deleteRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("DELETE", "gists/1234"),
-					httpmock.StatusStringResponse(200, "{}"))
+					httpmock.StringResponse("{}"))
 			},
 			wantErr: false,
 		},

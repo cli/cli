@@ -63,12 +63,15 @@ func TestIssueView_web(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -96,12 +99,15 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -265,11 +271,14 @@ func TestIssueView_web_notFound(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "errors": [
-		{ "message": "Could not resolve to an Issue with the number of 9999." }
-	] }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "errors": [
+				{ "message": "Could not resolve to an Issue with the number of 9999." }
+			] }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -292,12 +301,15 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": false
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": false
+			} } }
+		`),
+	)
 
 	_, err := runCommand(http, true, `6666`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
@@ -309,12 +321,15 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {

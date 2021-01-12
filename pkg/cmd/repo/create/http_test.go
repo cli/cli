@@ -1,20 +1,25 @@
 package create
 
 import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"testing"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_RepoCreate(t *testing.T) {
 	reg := &httpmock.Registry{}
 	httpClient := api.NewHTTPClient(api.ReplaceTripper(reg))
 
-	reg.StubResponse(200, bytes.NewBufferString(`{}`))
+	reg.Register(
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
+		httpmock.GraphQLMutation(`{}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["description"], "roasted chestnuts")
+				assert.Equal(t, inputs["homepageUrl"], "http://example.com")
+			}),
+	)
 
 	input := repoCreateInput{
 		Description: "roasted chestnuts",
@@ -28,21 +33,5 @@ func Test_RepoCreate(t *testing.T) {
 
 	if len(reg.Requests) != 1 {
 		t.Fatalf("expected 1 HTTP request, seen %d", len(reg.Requests))
-	}
-
-	var reqBody struct {
-		Query     string
-		Variables struct {
-			Input map[string]interface{}
-		}
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if description := reqBody.Variables.Input["description"].(string); description != "roasted chestnuts" {
-		t.Errorf("expected description to be %q, got %q", "roasted chestnuts", description)
-	}
-	if homepage := reqBody.Variables.Input["homepageUrl"].(string); homepage != "http://example.com" {
-		t.Errorf("expected homepageUrl to be %q, got %q", "http://example.com", homepage)
 	}
 }
