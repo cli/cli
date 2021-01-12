@@ -2,18 +2,11 @@ package httpmock
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 )
 
 // TODO: clean up methods in this file when there are no more callers
-
-func (r *Registry) StubResponse(status int, body io.Reader) {
-	r.Register(MatchAny, func(req *http.Request) (*http.Response, error) {
-		return httpResponse(status, req, body), nil
-	})
-}
 
 func (r *Registry) StubWithFixturePath(status int, fixturePath string) func() {
 	fixtureFile, err := os.Open(fixturePath)

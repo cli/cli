@@ -1,7 +1,6 @@
 package update
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -54,10 +53,14 @@ func TestCheckForUpdate(t *testing.T) {
 		t.Run(s.Name, func(t *testing.T) {
 			http := &httpmock.Registry{}
 			client := api.NewClient(api.ReplaceTripper(http))
-			http.StubResponse(200, bytes.NewBufferString(fmt.Sprintf(`{
-				"tag_name": "%s",
-				"html_url": "%s"
-			}`, s.LatestVersion, s.LatestURL)))
+
+			http.Register(
+				httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"),
+				httpmock.StringResponse(fmt.Sprintf(`{
+					"tag_name": "%s",
+					"html_url": "%s"
+				}`, s.LatestVersion, s.LatestURL)),
+			)
 
 			rel, err := CheckForUpdate(client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
 			if err != nil {

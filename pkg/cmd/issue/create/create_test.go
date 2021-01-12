@@ -94,38 +94,31 @@ func TestIssueCreate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "createIssue": { "issue": {
-			"URL": "https://github.com/OWNER/REPO/issues/12"
-		} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+				{ "data": { "createIssue": { "issue": {
+					"URL": "https://github.com/OWNER/REPO/issues/12"
+				} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["repositoryId"], "REPOID")
+				assert.Equal(t, inputs["title"], "hello")
+				assert.Equal(t, inputs["body"], "cash rules everything around me")
+			}),
+	)
 
 	output, err := runCommand(http, true, `-t hello -b "cash rules everything around me"`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
 
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
@@ -134,12 +127,13 @@ func TestIssueCreate_recover(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -214,17 +208,26 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "createIssue": { "issue": {
-			"URL": "https://github.com/OWNER/REPO/issues/12"
-		} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "createIssue": { "issue": {
+				"URL": "https://github.com/OWNER/REPO/issues/12"
+			} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["repositoryId"], "REPOID")
+				assert.Equal(t, inputs["title"], "hello")
+				assert.Equal(t, inputs["body"], "I have a suggestion for an enhancement")
+			}),
+	)
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -256,22 +259,6 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
-
 	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
 }
 
@@ -279,12 +266,14 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -413,12 +402,14 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": false
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": false
+			} } }`),
+	)
 
 	_, err := runCommand(http, true, `-t heres -b johnny`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {

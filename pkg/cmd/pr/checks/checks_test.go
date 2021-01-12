@@ -88,11 +88,13 @@ func Test_checksRun(t *testing.T) {
 		{
 			name: "no checks",
 			stubs: func(reg *httpmock.Registry) {
-				reg.StubResponse(200, bytes.NewBufferString(`
-				  { "data": { "repository": {
-				  	"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-				  } } }
-				`))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
+						} } }
+					`))
 			},
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
@@ -125,10 +127,12 @@ func Test_checksRun(t *testing.T) {
 			name:   "no checks",
 			nontty: true,
 			stubs: func(reg *httpmock.Registry) {
-				reg.StubResponse(200, bytes.NewBufferString(`
-				  { "data": { "repository": {
-						"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-				  } } }
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
+						} } }
 				`))
 			},
 			wantOut: "",

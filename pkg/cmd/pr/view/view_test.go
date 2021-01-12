@@ -553,11 +553,13 @@ func TestPRView_web_numberArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequest": {
+				"url": "https://github.com/OWNER/REPO/pull/23"
+			} } } }`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -584,11 +586,13 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequest": {
-		"url": "https://github.com/OWNER/REPO/pull/23"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequest": {
+				"url": "https://github.com/OWNER/REPO/pull/23"
+			} } } }`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -614,11 +618,14 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 func TestPRView_web_urlArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequest": {
-			"url": "https://github.com/OWNER/REPO/pull/23"
-		} } } }
-	`))
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequest": {
+				"url": "https://github.com/OWNER/REPO/pull/23"
+			} } } }`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -645,13 +652,15 @@ func TestPRView_web_branchArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "headRefName": "blueberries",
-		  "isCrossRepository": false,
-		  "url": "https://github.com/OWNER/REPO/pull/23" }
-	] } } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequests": { "nodes": [
+				{ "headRefName": "blueberries",
+				  "isCrossRepository": false,
+				  "url": "https://github.com/OWNER/REPO/pull/23" }
+			] } } } }`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -678,14 +687,16 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "headRefName": "blueberries",
-		  "isCrossRepository": true,
-		  "headRepositoryOwner": { "login": "hubot" },
-		  "url": "https://github.com/hubot/REPO/pull/23" }
-	] } } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequests": { "nodes": [
+				{ "headRefName": "blueberries",
+				  "isCrossRepository": true,
+				  "headRepositoryOwner": { "login": "hubot" },
+				  "url": "https://github.com/hubot/REPO/pull/23" }
+			] } } } }`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
