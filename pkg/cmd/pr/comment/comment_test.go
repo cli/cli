@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -22,13 +23,17 @@ func TestNewCmdComment(t *testing.T) {
 		wantsErr bool
 	}{
 		{
-			name:     "no arguments",
-			input:    "",
-			output:   shared.CommentableOptions{},
-			wantsErr: true,
+			name:  "no arguments",
+			input: "",
+			output: shared.CommentableOptions{
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+			},
+			wantsErr: false,
 		},
 		{
-			name:  "issue number",
+			name:  "pr number",
 			input: "1",
 			output: shared.CommentableOptions{
 				Interactive: true,
@@ -38,8 +43,18 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "issue url",
-			input: "https://github.com/OWNER/REPO/issues/12",
+			name:  "pr url",
+			input: "https://github.com/OWNER/REPO/pull/12",
+			output: shared.CommentableOptions{
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "pr branch",
+			input: "branch-name",
 			output: shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -162,10 +177,10 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueFromNumber(t, reg)
+				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
 		{
 			name: "non-interactive web",
@@ -177,9 +192,9 @@ func Test_commentRun(t *testing.T) {
 				OpenInBrowser: func(string) error { return nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueFromNumber(t, reg)
+				mockPullRequestFromNumber(t, reg)
 			},
-			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
+			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
 			name: "non-interactive editor",
@@ -191,10 +206,10 @@ func Test_commentRun(t *testing.T) {
 				EditSurvey: func() (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueFromNumber(t, reg)
+				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
 		{
 			name: "non-interactive inline",
@@ -204,10 +219,10 @@ func Test_commentRun(t *testing.T) {
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueFromNumber(t, reg)
+				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
 	}
 	for _, tt := range tests {
@@ -222,10 +237,12 @@ func Test_commentRun(t *testing.T) {
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+		branch := func() (string, error) { return "", nil }
+		remotes := func() (context.Remotes, error) { return nil, nil }
 
 		tt.input.IO = io
 		tt.input.HttpClient = httpClient
-		tt.input.RetrieveCommentable = retrieveIssue(tt.input.HttpClient, baseRepo, "123")
+		tt.input.RetrieveCommentable = retrievePR(httpClient, baseRepo, branch, remotes, "123")
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
@@ -236,13 +253,13 @@ func Test_commentRun(t *testing.T) {
 	}
 }
 
-func mockIssueFromNumber(_ *testing.T, reg *httpmock.Registry) {
+func mockPullRequestFromNumber(_ *testing.T, reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+			{ "data": { "repository": { "pullRequest": {
 				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issues/123"
+				"url": "https://github.com/OWNER/REPO/pull/123"
 			} } } }`),
 	)
 }
@@ -252,7 +269,7 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation CommentCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "addComment": { "commentEdge": { "node": {
-			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
+			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-456"
 		} } } } }`,
 			func(inputs map[string]interface{}) {
 				assert.Equal(t, "comment body", inputs["body"])
