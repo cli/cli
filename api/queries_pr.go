@@ -200,6 +200,16 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
+func (pr *PullRequest) PublishedReviews() PullRequestReviews {
+	published := []PullRequestReview{}
+	for _, prr := range pr.Reviews.Nodes {
+		if prr.State != "PENDING" {
+			published = append(published, prr)
+		}
+	}
+	return PullRequestReviews{Nodes: published, TotalCount: len(published)}
+}
+
 func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%srepos/%s/pulls/%d",
 		ghinstance.RESTPrefix(baseRepo.RepoHost()), ghrepo.FullName(baseRepo), prNumber)

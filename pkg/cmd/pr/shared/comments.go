@@ -154,6 +154,7 @@ const (
 	approvedStatus         = "APPROVED"
 	changesRequestedStatus = "CHANGES_REQUESTED"
 	commentedStatus        = "COMMENTED"
+	dismissedStatus        = "DISMISSED"
 )
 
 func formatCommentStatus(cs *iostreams.ColorScheme, status string) string {
@@ -162,7 +163,7 @@ func formatCommentStatus(cs *iostreams.ColorScheme, status string) string {
 		return fmt.Sprintf(" %s", cs.Green(strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " ")))
 	case changesRequestedStatus:
 		return fmt.Sprintf(" %s", cs.Red(strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " ")))
-	case commentedStatus:
+	case commentedStatus, dismissedStatus:
 		return fmt.Sprintf(" %s", strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " "))
 	}
 
@@ -170,7 +171,10 @@ func formatCommentStatus(cs *iostreams.ColorScheme, status string) string {
 }
 
 func formatRawCommentStatus(status string) string {
-	if status == approvedStatus || status == changesRequestedStatus || status == commentedStatus {
+	if status == approvedStatus ||
+		status == changesRequestedStatus ||
+		status == commentedStatus ||
+		status == dismissedStatus {
 		return strings.ReplaceAll(strings.ToLower(status), "_", " ")
 	}
 

@@ -216,7 +216,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Reviews and Comments
 	if pr.Comments.TotalCount > 0 || pr.Reviews.TotalCount > 0 {
 		preview := !opts.Comments
-		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.Reviews, preview)
+		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.PublishedReviews(), preview)
 		if err != nil {
 			return err
 		}
