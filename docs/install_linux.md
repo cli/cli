@@ -165,5 +165,5 @@ sudo snap install --edge gh && snap connect gh:ssh-keys
 >
 > **Note:** `snap connect gh:ssh-keys` is needed for all authentication and SSH needs.
 
-[releases page]: https://github.com/cli/cli/releases/latest
+[releases page]: https://github.com/cli/cli/releases/latest-test
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
