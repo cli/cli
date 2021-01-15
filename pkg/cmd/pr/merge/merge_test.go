@@ -485,7 +485,17 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
-			"pullRequest": { "number": 4, "title": "The title of the PR", "state": "MERGED"}
+			"pullRequest": {
+				"number": 4,
+				"title": "The title of the PR",
+				"state": "MERGED",
+				"baseRefName": "master",
+				"headRefName": "blueberries",
+				"headRepositoryOwner": {
+					"login": "OWNER"
+				},
+				"isCrossRepository": false
+			}
 		} } }`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -496,16 +506,16 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Stub("") // git checkout master
 	cs.Stub("") // git branch -d
 
-	output, err := runCommand(http, "master", true, "pr merge 4")
-	if err == nil {
-		t.Fatalf("expected an error running command `pr merge`: %v", err)
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+	as.StubOne(true)
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #4 \(The title of the PR\) was already merged`)
-
-	if !r.MatchString(err.Error()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-	}
+	test.ExpectLines(t, output.Stderr(), "✔ Deleted branch blueberries and switched to branch master")
 }
 
 func TestPRMerge_interactive(t *testing.T) {

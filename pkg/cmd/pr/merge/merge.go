@@ -123,49 +123,58 @@ func mergeRun(opts *MergeOptions) error {
 	if pr.Mergeable == "CONFLICTING" {
 		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", cs.Red("!"), pr.Number, pr.Title)
 		return err
-	} else if pr.State == "MERGED" {
-		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", cs.Red("!"), pr.Number, pr.Title)
-		return err
 	}
 
-	mergeMethod := opts.MergeMethod
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+	isTerminal := opts.IO.IsStdoutTTY()
+	isPRAlreadyMerged := pr.State == "MERGED"
 
-	if opts.InteractiveMode {
-		mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR)
-		if err != nil {
-			if errors.Is(err, cancelError) {
-				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-				return cmdutil.SilentError
+	if !isPRAlreadyMerged {
+		mergeMethod := opts.MergeMethod
+
+		if opts.InteractiveMode {
+			mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR)
+			if err != nil {
+				if errors.Is(err, cancelError) {
+					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+					return cmdutil.SilentError
+				}
+				return err
 			}
+		}
+
+		var action string
+		if mergeMethod == api.PullRequestMergeMethodRebase {
+			action = "Rebased and merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
+		} else if mergeMethod == api.PullRequestMergeMethodSquash {
+			action = "Squashed and merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
+		} else if mergeMethod == api.PullRequestMergeMethodMerge {
+			action = "Merged"
+			err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+		} else {
+			err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
 			return err
 		}
-	}
 
-	var action string
-	if mergeMethod == api.PullRequestMergeMethodRebase {
-		action = "Rebased and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodRebase)
-	} else if mergeMethod == api.PullRequestMergeMethodSquash {
-		action = "Squashed and merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodSquash)
-	} else if mergeMethod == api.PullRequestMergeMethodMerge {
-		action = "Merged"
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, api.PullRequestMergeMethodMerge)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+
+		if isTerminal {
+			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.Magenta("✔"), action, pr.Number, pr.Title)
+		}
 	} else {
-		err = fmt.Errorf("unknown merge method (%d) used", mergeMethod)
-		return err
-	}
+		err := prompt.SurveyAskOne(&survey.Confirm{
+			Message: fmt.Sprintf("Pull request #%d (%s) was already merged. Would you like to delete this local branch and switch to the default branch?", pr.Number, pr.Title),
+			Default: false,
+		}, &deleteBranch)
 
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
-
-	isTerminal := opts.IO.IsStdoutTTY()
-
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.Magenta("✔"), action, pr.Number, pr.Title)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
 	}
 
 	if deleteBranch {
@@ -203,7 +212,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		if !crossRepoPR {
+		if !isPRAlreadyMerged && !crossRepoPR {
 			err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 			var httpErr api.HTTPError
 			// The ref might have already been deleted by GitHub
