@@ -140,7 +140,7 @@ func mergeRun(opts *MergeOptions) error {
 		mergeMethod := opts.MergeMethod
 
 		if opts.InteractiveMode {
-			mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR)
+			mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteBranch, opts.DeleteLocalBranch, crossRepoPR)
 			if err != nil {
 				if errors.Is(err, cancelError) {
 					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
@@ -238,7 +238,7 @@ func mergeRun(opts *MergeOptions) error {
 
 var cancelError = errors.New("cancelError")
 
-func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
+func prInteractiveMerge(deleteBranch bool, deleteLocalBranch bool, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
 	mergeMethodQuestion := &survey.Question{
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
@@ -250,7 +250,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 
 	qs := []*survey.Question{mergeMethodQuestion}
 
-	if !crossRepoPR {
+	if !crossRepoPR && !deleteBranch {
 		var message string
 		if deleteLocalBranch {
 			message = "Delete the branch locally and on GitHub?"
@@ -300,6 +300,9 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool) (api.PullReque
 		mergeMethod = api.PullRequestMergeMethodSquash
 	}
 
-	deleteBranch := answers.DeleteBranch
+	if !deleteBranch {
+		deleteBranch = answers.DeleteBranch
+	}
+
 	return mergeMethod, deleteBranch, nil
 }

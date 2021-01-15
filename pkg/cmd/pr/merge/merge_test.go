@@ -606,6 +606,60 @@ func TestPRMerge_interactive(t *testing.T) {
 	test.ExpectLines(t, output.Stderr(), "Merged pull request #3")
 }
 
+func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [{
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"},
+			"id": "THE-ID",
+			"number": 3
+		}] } } } }`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git push origin --delete blueberries
+	cs.Stub("") // git branch -d
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "mergeMethod",
+			Value: 0,
+		},
+		{
+			Name:  "isConfirmed",
+			Value: true,
+		},
+	})
+
+	output, err := runCommand(http, "blueberries", true, "-d")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", "Deleted branch blueberries and switched to branch master")
+}
+
 func TestPRMerge_interactiveCancelled(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
