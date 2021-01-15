@@ -125,10 +125,16 @@ func mergeRun(opts *MergeOptions) error {
 		return err
 	}
 
+	isPRAlreadyMerged := pr.State == "MERGED"
+
+	if isPRAlreadyMerged && !opts.InteractiveMode && !opts.DeleteBranch {
+		err := fmt.Errorf("%s Pull request #%d (%s) was already merged", cs.Red("!"), pr.Number, pr.Title)
+		return err
+	}
+
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 	isTerminal := opts.IO.IsStdoutTTY()
-	isPRAlreadyMerged := pr.State == "MERGED"
 
 	if !isPRAlreadyMerged {
 		mergeMethod := opts.MergeMethod
@@ -166,9 +172,9 @@ func mergeRun(opts *MergeOptions) error {
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.Magenta("✔"), action, pr.Number, pr.Title)
 		}
-	} else {
+	} else if !opts.DeleteBranch {
 		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Pull request #%d (%s) was already merged. Would you like to delete this local branch and switch to the default branch?", pr.Number, pr.Title),
+			Message: fmt.Sprintf("Pull request #%d (%s) was already merged. Delete the branch locally and switch to default branch?", pr.Number, pr.Title),
 			Default: false,
 		}, &deleteBranch)
 

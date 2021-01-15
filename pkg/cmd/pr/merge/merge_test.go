@@ -518,6 +518,36 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	test.ExpectLines(t, output.Stderr(), "✔ Deleted branch blueberries and switched to branch master")
 }
 
+func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"pullRequest": { "number": 4, "title": "The title of the PR", "state": "MERGED"}
+		} } }`))
+
+	cs, cmdTeardown := test.InitCmdStubber()
+	defer cmdTeardown()
+
+	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
+	cs.Stub("") // git symbolic-ref --quiet --short HEAD
+	cs.Stub("") // git checkout master
+	cs.Stub("") // git branch -d
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	if err == nil {
+		t.Fatalf("expected an error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Pull request #4 \(The title of the PR\) was already merged`)
+
+	if !r.MatchString(err.Error()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestPRMerge_interactive(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
