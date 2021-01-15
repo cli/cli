@@ -180,15 +180,18 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	}
 
 	// Body
-	fmt.Fprintln(out)
+	var md string
+	var err error
 	if issue.Body == "" {
-		issue.Body = "_No description provided_"
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(issue.Body, style, "")
+		if err != nil {
+			return err
+		}
 	}
-	style := markdown.GetStyle(opts.IO.TerminalTheme())
-	md, err := markdown.Render(issue.Body, style, "")
-	if err != nil {
-		return err
-	}
+	fmt.Fprintln(out)
 	fmt.Fprint(out, md)
 	fmt.Fprintln(out)
 

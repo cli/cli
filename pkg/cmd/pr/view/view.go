@@ -86,7 +86,9 @@ func viewRun(opts *ViewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
+	opts.IO.StartProgressIndicator()
 	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
@@ -100,6 +102,14 @@ func viewRun(opts *ViewOptions) error {
 		}
 		return utils.OpenInBrowser(openURL)
 	}
+
+	opts.IO.StartProgressIndicator()
+	reviews, err := api.ReviewsForPullRequest(apiClient, repo, pr)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+	pr.Reviews = *reviews
 
 	if opts.Comments {
 		opts.IO.StartProgressIndicator()
@@ -201,22 +211,25 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	}
 
 	// Body
-	fmt.Fprintln(out)
+	var md string
+	var err error
 	if pr.Body == "" {
-		pr.Body = "_No description provided_"
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(pr.Body, style, "")
+		if err != nil {
+			return err
+		}
 	}
-	style := markdown.GetStyle(opts.IO.TerminalTheme())
-	md, err := markdown.Render(pr.Body, style, "")
-	if err != nil {
-		return err
-	}
+	fmt.Fprintln(out)
 	fmt.Fprint(out, md)
 	fmt.Fprintln(out)
 
 	// Reviews and Comments
 	if pr.Comments.TotalCount > 0 || pr.Reviews.TotalCount > 0 {
 		preview := !opts.Comments
-		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.PublishedReviews(), preview)
+		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.DisplayableReviews(), preview)
 		if err != nil {
 			return err
 		}

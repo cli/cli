@@ -21,28 +21,6 @@
             ],
             "totalcount": 1
         },
-        "reviews": {
-          "nodes": [
-            {
-              "author": {
-                "login": "3"
-              },
-              "state": "COMMENTED"
-            },
-            {
-              "author": {
-                "login": "2"
-              },
-              "state": "APPROVED"
-            },
-            {
-              "author": {
-                "login": "1"
-              },
-              "state": "CHANGES_REQUESTED"
-            }
-          ]
-        },
         "assignees": {
           "nodes": [
             {

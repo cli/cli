@@ -86,11 +86,11 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 
 	// Header
 	fmt.Fprint(&b, cs.Bold(comment.AuthorLogin()))
-	if comment.Association() != "NONE" {
-		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.Title(strings.ToLower(comment.Association())))))
-	}
 	if comment.Status() != "" {
 		fmt.Fprint(&b, formatCommentStatus(cs, comment.Status()))
+	}
+	if comment.Association() != "NONE" {
+		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.Title(strings.ToLower(comment.Association())))))
 	}
 	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created()))))
 	if comment.IsEdited() {
@@ -109,14 +109,16 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	}
 
 	// Body
-	content := comment.Content()
-	if content == "" {
-		content = "_No body provided_"
-	}
-	style := markdown.GetStyle(io.TerminalTheme())
-	md, err := markdown.Render(content, style, "")
-	if err != nil {
-		return "", err
+	var md string
+	var err error
+	if comment.Content() == "" {
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
+	} else {
+		style := markdown.GetStyle(io.TerminalTheme())
+		md, err = markdown.Render(comment.Content(), style, "")
+		if err != nil {
+			return "", err
+		}
 	}
 	fmt.Fprint(&b, md)
 
@@ -160,11 +162,11 @@ const (
 func formatCommentStatus(cs *iostreams.ColorScheme, status string) string {
 	switch status {
 	case approvedStatus:
-		return fmt.Sprintf(" %s", cs.Green(strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " ")))
+		return fmt.Sprintf(" %s", cs.Green("approved"))
 	case changesRequestedStatus:
-		return fmt.Sprintf(" %s", cs.Red(strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " ")))
+		return fmt.Sprintf(" %s", cs.Red("requested changes"))
 	case commentedStatus, dismissedStatus:
-		return fmt.Sprintf(" %s", strings.ReplaceAll(strings.Title(strings.ToLower(status)), "_", " "))
+		return fmt.Sprintf(" %s", strings.ToLower(status))
 	}
 
 	return ""

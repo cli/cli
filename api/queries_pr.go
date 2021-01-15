@@ -200,10 +200,12 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 	return
 }
 
-func (pr *PullRequest) PublishedReviews() PullRequestReviews {
+func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 	published := []PullRequestReview{}
 	for _, prr := range pr.Reviews.Nodes {
-		if prr.State != "PENDING" {
+		//Dont display pending reviews
+		//Dont display commenting reviews without top level comment body
+		if prr.State != "PENDING" && !(prr.State == "COMMENTED" && prr.Body == "") {
 			published = append(published, prr)
 		}
 	}
@@ -587,7 +589,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					title
 				}
 				` + commentsFragment() + `
-				` + pullRequestReviewsFragment() + `
 				` + reactionGroupsFragment() + `
 			}
 		}
@@ -690,7 +691,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 						title
 					}
 					` + commentsFragment() + `
-					` + pullRequestReviewsFragment() + `
 					` + reactionGroupsFragment() + `
 				}
 			}
