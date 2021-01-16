@@ -1,17 +1,10 @@
 package git
 
 import (
-	"reflect"
 	"testing"
-)
 
-// TODO: extract assertion helpers into a shared package
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
+	"github.com/stretchr/testify/assert"
+)
 
 func Test_parseRemotes(t *testing.T) {
 	remoteList := []string{
@@ -23,20 +16,20 @@ func Test_parseRemotes(t *testing.T) {
 		"zardoz\thttps://example.com/zed.git (push)",
 	}
 	r := parseRemotes(remoteList)
-	eq(t, len(r), 4)
+	assert.Equal(t, len(r), 4)
 
-	eq(t, r[0].Name, "mona")
-	eq(t, r[0].FetchURL.String(), "ssh://git@github.com/monalisa/myfork.git")
+	assert.Equal(t, r[0].Name, "mona")
+	assert.Equal(t, r[0].FetchURL.String(), "ssh://git@github.com/monalisa/myfork.git")
 	if r[0].PushURL != nil {
 		t.Errorf("expected no PushURL, got %q", r[0].PushURL)
 	}
-	eq(t, r[1].Name, "origin")
-	eq(t, r[1].FetchURL.Path, "/monalisa/octo-cat.git")
-	eq(t, r[1].PushURL.Path, "/monalisa/octo-cat-push.git")
+	assert.Equal(t, r[1].Name, "origin")
+	assert.Equal(t, r[1].FetchURL.Path, "/monalisa/octo-cat.git")
+	assert.Equal(t, r[1].PushURL.Path, "/monalisa/octo-cat-push.git")
 
-	eq(t, r[2].Name, "upstream")
-	eq(t, r[2].FetchURL.Host, "example.com")
-	eq(t, r[2].PushURL.Host, "github.com")
+	assert.Equal(t, r[2].Name, "upstream")
+	assert.Equal(t, r[2].FetchURL.Host, "example.com")
+	assert.Equal(t, r[2].PushURL.Host, "github.com")
 
-	eq(t, r[3].Name, "zardoz")
+	assert.Equal(t, r[3].Name, "zardoz")
 }

@@ -3,19 +3,11 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func Test_parseConfig(t *testing.T) {
 	defer StubConfig(`---
@@ -25,13 +17,13 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	assert.Equal(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_multipleHosts(t *testing.T) {
@@ -45,13 +37,13 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	assert.Equal(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_hostsFile(t *testing.T) {
@@ -61,13 +53,13 @@ github.com:
   oauth_token: OTOKEN
 `)()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	assert.Equal(t, err, nil)
 	user, err := config.Get("github.com", "user")
-	eq(t, err, nil)
-	eq(t, user, "monalisa")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, user, "monalisa")
 	token, err := config.Get("github.com", "oauth_token")
-	eq(t, err, nil)
-	eq(t, token, "OTOKEN")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, token, "OTOKEN")
 }
 
 func Test_parseConfig_hostFallback(t *testing.T) {
@@ -83,16 +75,16 @@ example.com:
     git_protocol: https
 `)()
 	config, err := ParseConfig("config.yml")
-	eq(t, err, nil)
+	assert.Equal(t, err, nil)
 	val, err := config.Get("example.com", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "https")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, val, "https")
 	val, err = config.Get("github.com", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "ssh")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, val, "ssh")
 	val, err = config.Get("nonexistent.io", "git_protocol")
-	eq(t, err, nil)
-	eq(t, val, "ssh")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, val, "ssh")
 }
 
 func Test_ParseConfig_migrateConfig(t *testing.T) {

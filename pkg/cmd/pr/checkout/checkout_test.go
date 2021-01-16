@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -24,13 +23,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 type errorStub struct {
 	message string
@@ -137,10 +129,10 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	if !assert.Equal(t, 4, len(ranCommands)) {
 		return
 	}
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
 
 func TestPRCheckout_urlArg(t *testing.T) {
@@ -174,11 +166,11 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `https://github.com/OWNER/REPO/pull/123/files`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
+	assert.Equal(t, len(ranCommands), 4)
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track origin/feature")
 }
 
 func TestPRCheckout_urlArg_differentBase(t *testing.T) {
@@ -213,8 +205,8 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `https://github.com/OTHER/POE/pull/123/files`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
 	reqBody := struct {
@@ -225,12 +217,12 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	}{}
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 
-	eq(t, reqBody.Variables.Owner, "OTHER")
-	eq(t, reqBody.Variables.Repo, "POE")
+	assert.Equal(t, reqBody.Variables.Owner, "OTHER")
+	assert.Equal(t, reqBody.Variables.Repo, "POE")
 
-	eq(t, len(ranCommands), 5)
-	eq(t, strings.Join(ranCommands[1], " "), "git fetch https://github.com/OTHER/POE.git refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.remote https://github.com/OTHER/POE.git")
+	assert.Equal(t, len(ranCommands), 5)
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git fetch https://github.com/OTHER/POE.git refs/pull/123/head:feature")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git config branch.feature.remote https://github.com/OTHER/POE.git")
 }
 
 func TestPRCheckout_branchArg(t *testing.T) {
@@ -265,11 +257,11 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `hubot:feature`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 5)
-	eq(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:feature")
+	assert.Equal(t, len(ranCommands), 5)
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git fetch origin refs/pull/123/head:feature")
 }
 
 func TestPRCheckout_existingBranch(t *testing.T) {
@@ -304,13 +296,13 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 3)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
+	assert.Equal(t, len(ranCommands), 3)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
 }
 
 func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
@@ -356,14 +348,14 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, remotes, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch robot-fork +refs/heads/feature:refs/remotes/robot-fork/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track robot-fork/feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote robot-fork")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	assert.Equal(t, len(ranCommands), 4)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch robot-fork +refs/heads/feature:refs/remotes/robot-fork/feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout -b feature --no-track robot-fork/feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote robot-fork")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
 
 func TestPRCheckout_differentRepo(t *testing.T) {
@@ -398,14 +390,14 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/pull/123/head")
+	assert.Equal(t, len(ranCommands), 4)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote origin")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/pull/123/head")
 }
 
 func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
@@ -440,12 +432,12 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 2)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, len(ranCommands), 2)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
 }
 
 func TestPRCheckout_detachedHead(t *testing.T) {
@@ -480,12 +472,12 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 2)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, len(ranCommands), 2)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
 }
 
 func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
@@ -520,12 +512,12 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "feature", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 2)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head")
-	eq(t, strings.Join(ranCommands[1], " "), "git merge --ff-only FETCH_HEAD")
+	assert.Equal(t, len(ranCommands), 2)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git merge --ff-only FETCH_HEAD")
 }
 
 func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
@@ -592,14 +584,14 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 4)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
-	eq(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
+	assert.Equal(t, len(ranCommands), 4)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin refs/pull/123/head:feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git config branch.feature.remote https://github.com/hubot/REPO.git")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git config branch.feature.merge refs/heads/feature")
 }
 
 func TestPRCheckout_recurseSubmodules(t *testing.T) {
@@ -633,13 +625,13 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123 --recurse-submodules`)
-	eq(t, err, nil)
-	eq(t, output.String(), "")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, output.String(), "")
 
-	eq(t, len(ranCommands), 5)
-	eq(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[1], " "), "git checkout feature")
-	eq(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
-	eq(t, strings.Join(ranCommands[3], " "), "git submodule sync --recursive")
-	eq(t, strings.Join(ranCommands[4], " "), "git submodule update --init --recursive")
+	assert.Equal(t, len(ranCommands), 5)
+	assert.Equal(t, strings.Join(ranCommands[0], " "), "git fetch origin +refs/heads/feature:refs/remotes/origin/feature")
+	assert.Equal(t, strings.Join(ranCommands[1], " "), "git checkout feature")
+	assert.Equal(t, strings.Join(ranCommands[2], " "), "git merge --ff-only refs/remotes/origin/feature")
+	assert.Equal(t, strings.Join(ranCommands[3], " "), "git submodule sync --recursive")
+	assert.Equal(t, strings.Join(ranCommands[4], " "), "git submodule update --init --recursive")
 }
