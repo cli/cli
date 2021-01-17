@@ -143,7 +143,7 @@ func statusRun(opts *StatusOptions) error {
 
 	if !isHostnameFound {
 		fmt.Fprintf(stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold(fmt.Sprintf("gh auth login -h %s", opts.Hostname)))
+			"Hostname %q not found among authenticated GitHub hosts\n", opts.Hostname)
 		return cmdutil.SilentError
 	}
 
