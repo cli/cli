@@ -529,7 +529,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "✔ Deleted branch blueberries and switched to branch master")
+	test.ExpectLines(t, output.Stderr(), "✓ Deleted branch blueberries and switched to branch master")
 }
 
 func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
