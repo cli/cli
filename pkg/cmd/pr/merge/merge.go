@@ -124,8 +124,8 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if pr.Mergeable == "CONFLICTING" {
-		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", cs.Red("!"), pr.Number, pr.Title)
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has conflicts and isn't mergeable\n", cs.Red("!"), pr.Number, pr.Title)
+		return cmdutil.SilentError
 	}
 
 	deleteBranch := opts.DeleteBranch
@@ -162,7 +162,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.Magenta("✔"), action, pr.Number, pr.Title)
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
@@ -170,15 +170,17 @@ func mergeRun(opts *MergeOptions) error {
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+	} else if crossRepoPR {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch {
+	if !deleteBranch || crossRepoPR {
 		return nil
 	}
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch && !crossRepoPR {
+	if opts.CanDeleteLocalBranch {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -210,7 +212,7 @@ func mergeRun(opts *MergeOptions) error {
 		}
 	}
 
-	if !isPRAlreadyMerged && !crossRepoPR {
+	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
 		// The ref might have already been deleted by GitHub
