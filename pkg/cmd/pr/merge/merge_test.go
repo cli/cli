@@ -208,14 +208,8 @@ func TestPrMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	if err != nil {
@@ -251,14 +245,8 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
 	if err != nil {
@@ -291,15 +279,13 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
-
-	assert.Equal(t, 0, len(cs.Calls))
 
 	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
@@ -326,14 +312,13 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git rev-parse --verify blueberries`
-	cs.Stub("") // git branch -d
-	cs.Stub("") // git push origin --delete blueberries
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -361,13 +346,11 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	// We don't expect the default branch to be checked out, just that blueberries is deleted
-	cs.Stub("") // git rev-parse --verify blueberries
-	cs.Stub("") // git branch -d blueberries
-	cs.Stub("") // git push origin --delete blueberries
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, "master", true, `pr merge --merge --delete-branch blueberries`)
 	if err != nil {
@@ -392,14 +375,10 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")                                                                                  // git branch -d
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -435,13 +414,8 @@ func TestPrMerge_rebase(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git branch -d
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
 	if err != nil {
@@ -477,13 +451,8 @@ func TestPrMerge_squash(t *testing.T) {
 			assert.Equal(t, "The title of the PR (#3)", input["commitHeadline"].(string))
 		}))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git branch -d
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
 	if err != nil {
@@ -577,14 +546,13 @@ func TestPRMerge_interactive(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git push origin --delete blueberries
-	cs.Stub("") // git branch -d
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -635,14 +603,13 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git push origin --delete blueberries
-	cs.Stub("") // git branch -d
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -679,14 +646,10 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 			"number": 3
 		}] } } } }`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git push origin --delete blueberries
-	cs.Stub("") // git branch -d
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
