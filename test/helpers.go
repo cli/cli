@@ -91,6 +91,7 @@ type T interface {
 	Errorf(string, ...interface{})
 }
 
+// Deprecated: prefer exact matches for command output
 func ExpectLines(t T, output string, lines ...string) {
 	t.Helper()
 	var r *regexp.Regexp
