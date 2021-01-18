@@ -74,6 +74,7 @@ func TestIssueView_web(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -110,6 +111,7 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -281,6 +283,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -332,6 +335,7 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}

@@ -117,6 +117,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -162,6 +163,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -201,6 +203,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -253,6 +256,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -292,6 +296,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -344,6 +349,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":
@@ -386,6 +392,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
@@ -428,6 +435,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
@@ -468,6 +476,7 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
@@ -508,6 +517,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
@@ -547,6 +557,7 @@ func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 	} } } }
 	`))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		t.Errorf("unexpected external invocation: %v", cmd.Args)
 		return &test.OutputStub{}
@@ -580,6 +591,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git config branch.feature.merge":
@@ -621,6 +633,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	`))
 
 	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case "git show-ref --verify -- refs/heads/feature":

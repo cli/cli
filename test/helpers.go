@@ -49,6 +49,7 @@ type CmdStubber struct {
 	Calls []*exec.Cmd
 }
 
+// Deprecated: use run.Stub
 func InitCmdStubber() (*CmdStubber, func()) {
 	cs := CmdStubber{}
 	teardown := run.SetPrepareCmd(createStubbedPrepareCmd(&cs))

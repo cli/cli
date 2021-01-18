@@ -105,6 +105,7 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -178,6 +179,7 @@ func TestPRCreate_recover(t *testing.T) {
 			assert.Equal(t, "recovered body", input["body"].(string))
 		}))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -254,6 +256,7 @@ func TestPRCreate_nontty(t *testing.T) {
 			}),
 	)
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -296,6 +299,7 @@ func TestPRCreate(t *testing.T) {
 			assert.Equal(t, "feature", input["headRefName"].(string))
 		}))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -351,6 +355,7 @@ func TestPRCreate_createFork(t *testing.T) {
 			assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
 		}))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -502,6 +507,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 			assert.Equal(t, "- commit 1\n- commit 0\n\nFixes a bug and Closes an issue", input["body"].(string))
 		}))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -635,6 +641,7 @@ func TestPRCreate_metadata(t *testing.T) {
 			eq(t, inputs["union"], true)
 		}))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -662,6 +669,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 			] } } } }`),
 	)
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -688,6 +696,7 @@ func TestPRCreate_web(t *testing.T) {
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
 
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -715,6 +724,7 @@ func TestPRCreate_web(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -730,6 +740,7 @@ func Test_determineTrackingBranch_empty(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_noMatch(t *testing.T) {
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -755,6 +766,7 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_hasMatch(t *testing.T) {
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
@@ -786,6 +798,7 @@ deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
 
