@@ -67,22 +67,21 @@ func CurrentBranch() (string, error) {
 		return "", err
 	}
 
+	stderr := bytes.Buffer{}
+	refCmd.Stderr = &stderr
+
 	output, err := run.PrepareCmd(refCmd).Output()
 	if err == nil {
 		// Found the branch name
 		return getBranchShortName(output), nil
 	}
 
-	var cmdErr *run.CmdError
-	if errors.As(err, &cmdErr) {
-		if cmdErr.Stderr.Len() == 0 {
-			// Detached head
-			return "", ErrNotOnAnyBranch
-		}
+	if stderr.Len() == 0 {
+		// Detached head
+		return "", ErrNotOnAnyBranch
 	}
 
-	// Unknown error
-	return "", err
+	return "", fmt.Errorf("%sgit: %s", stderr.String(), err)
 }
 
 func listRemotes() ([]string, error) {
