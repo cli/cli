@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -252,10 +252,9 @@ func TestChecksRun_web(t *testing.T) {
 
 			opts.IO = io
 
-			cs, teardown := test.InitCmdStubber()
-			defer teardown()
-
-			cs.Stub("") // browser open
+			cs, teardown := run.Stub()
+			defer teardown(t)
+			cs.Register(`https://github\.com/OWNER/REPO/pull/123/checks$`, 0, "")
 
 			err := checksRun(opts)
 			assert.NoError(t, err)
