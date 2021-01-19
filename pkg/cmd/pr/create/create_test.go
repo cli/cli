@@ -121,11 +121,7 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	defer http.Verify(t)
 
 	output, err := runCommand(http, nil, "feature", false, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	assert.Equal(t, "--title or --fill required when not running interactively", err.Error())
+	assert.EqualError(t, err, "--title or --fill required when not running interactively")
 
 	assert.Equal(t, "", output.String())
 }
@@ -634,7 +630,7 @@ func TestPRCreate_metadata(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 
 	output, err := runCommand(http, nil, "feature", true, `-t TITLE -b BODY -H feature -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }

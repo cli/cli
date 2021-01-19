@@ -78,7 +78,7 @@ func Test_statusRun(t *testing.T) {
 		opts       *StatusOptions
 		httpStubs  func(*httpmock.Registry)
 		cfg        func(config.Config)
-		wantErr    *regexp.Regexp
+		wantErr    string
 		wantErrOut *regexp.Regexp
 	}{
 		{
@@ -113,7 +113,7 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`joel.miller: missing required.*Logged in to github.com as.*tess`),
-			wantErr:    regexp.MustCompile(``),
+			wantErr:    "SilentError",
 		},
 		{
 			name: "bad token",
@@ -130,7 +130,7 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`joel.miller: authentication failed.*Logged in to github.com as.*tess`),
-			wantErr:    regexp.MustCompile(``),
+			wantErr:    "SilentError",
 		},
 		{
 			name: "all good",
@@ -236,14 +236,11 @@ func Test_statusRun(t *testing.T) {
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := statusRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if tt.wantErrOut == nil {

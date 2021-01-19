@@ -77,11 +77,11 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else if tt.wantErr != "" {
-				t.Errorf("expected error %q, got nil", tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())

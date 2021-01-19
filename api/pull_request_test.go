@@ -33,7 +33,7 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 	} }] } }
 	`
 	err := json.Unmarshal([]byte(payload), &pr)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 
 	checks := pr.ChecksStatus()
 	assert.Equal(t, 8, checks.Total)

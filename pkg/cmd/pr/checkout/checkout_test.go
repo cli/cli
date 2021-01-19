@@ -166,7 +166,7 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `https://github.com/OWNER/REPO/pull/123/files`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 4, len(ranCommands))
@@ -205,7 +205,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `https://github.com/OTHER/POE/pull/123/files`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
@@ -257,7 +257,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `hubot:feature`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 5, len(ranCommands))
@@ -296,7 +296,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 3, len(ranCommands))
@@ -348,7 +348,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, remotes, "master", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 4, len(ranCommands))
@@ -390,7 +390,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 4, len(ranCommands))
@@ -432,7 +432,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 2, len(ranCommands))
@@ -472,7 +472,7 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 2, len(ranCommands))
@@ -512,7 +512,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "feature", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 2, len(ranCommands))
@@ -546,9 +546,7 @@ func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	if assert.Errorf(t, err, "expected command to fail") {
-		assert.Equal(t, `invalid branch name: "-foo"`, err.Error())
-	}
+	assert.EqualError(t, err, `invalid branch name: "-foo"`)
 	assert.Equal(t, "", output.Stderr())
 }
 
@@ -584,7 +582,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 4, len(ranCommands))
@@ -625,7 +623,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	defer restoreCmd()
 
 	output, err := runCommand(http, nil, "master", `123 --recurse-submodules`)
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 
 	assert.Equal(t, 5, len(ranCommands))

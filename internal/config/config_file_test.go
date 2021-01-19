@@ -17,12 +17,12 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "monalisa", user)
 	token, err := config.Get("github.com", "oauth_token")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "OTOKEN", token)
 }
 
@@ -37,12 +37,12 @@ hosts:
     oauth_token: OTOKEN
 `, "")()
 	config, err := ParseConfig("config.yml")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "monalisa", user)
 	token, err := config.Get("github.com", "oauth_token")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "OTOKEN", token)
 }
 
@@ -53,12 +53,12 @@ github.com:
   oauth_token: OTOKEN
 `)()
 	config, err := ParseConfig("config.yml")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "monalisa", user)
 	token, err := config.Get("github.com", "oauth_token")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "OTOKEN", token)
 }
 
@@ -75,15 +75,15 @@ example.com:
     git_protocol: https
 `)()
 	config, err := ParseConfig("config.yml")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	val, err := config.Get("example.com", "git_protocol")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "https", val)
 	val, err = config.Get("github.com", "git_protocol")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "ssh", val)
 	val, err = config.Get("nonexistent.io", "git_protocol")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "ssh", val)
 }
 
@@ -100,7 +100,7 @@ github.com:
 	defer StubBackupConfig()()
 
 	_, err := ParseConfig("config.yml")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	expectedHosts := `github.com:
     user: keiyuri

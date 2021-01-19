@@ -1,7 +1,6 @@
 package context
 
 import (
-	"errors"
 	"net/url"
 	"testing"
 
@@ -18,15 +17,15 @@ func Test_Remotes_FindByName(t *testing.T) {
 	}
 
 	r, err := list.FindByName("upstream", "origin")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "upstream", r.Name)
 
 	r, err = list.FindByName("nonexistent", "*")
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "mona", r.Name)
 
 	_, err = list.FindByName("nonexistent")
-	assert.Equal(t, errors.New(`no GitHub remotes found`), err)
+	assert.Error(t, err, "no GitHub remotes found")
 }
 
 func Test_translateRemotes(t *testing.T) {

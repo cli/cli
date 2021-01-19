@@ -2,7 +2,6 @@ package refresh
 
 import (
 	"bytes"
-	"regexp"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -134,14 +133,14 @@ func Test_refreshRun(t *testing.T) {
 		opts         *RefreshOptions
 		askStubs     func(*prompt.AskStubber)
 		cfgHosts     []string
-		wantErr      *regexp.Regexp
+		wantErr      string
 		nontty       bool
 		wantAuthArgs authArgs
 	}{
 		{
 			name:    "no hosts configured",
 			opts:    &RefreshOptions{},
-			wantErr: regexp.MustCompile(`not logged in to any hosts`),
+			wantErr: `not logged in to any hosts`,
 		},
 		{
 			name: "hostname given but dne",
@@ -152,7 +151,7 @@ func Test_refreshRun(t *testing.T) {
 			opts: &RefreshOptions{
 				Hostname: "obed.morton",
 			},
-			wantErr: regexp.MustCompile(`not logged in to obed.morton`),
+			wantErr: `not logged in to obed.morton`,
 		},
 		{
 			name: "hostname provided and is configured",
@@ -250,14 +249,12 @@ func Test_refreshRun(t *testing.T) {
 			}
 
 			err := refreshRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
+			if tt.wantErr != "" {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), tt.wantErr)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, aa.hostname, tt.wantAuthArgs.hostname)

@@ -55,15 +55,15 @@ func Test_defaultConfig(t *testing.T) {
 	assert.Equal(t, "", hostsBuf.String())
 
 	proto, err := cfg.Get("", "git_protocol")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "https", proto)
 
 	editor, err := cfg.Get("", "editor")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", editor)
 
 	aliases, err := cfg.Aliases()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, len(aliases.All()), 1)
 	expansion, _ := aliases.Get("co")
 	assert.Equal(t, expansion, "pr checkout")
@@ -74,13 +74,13 @@ func Test_ValidateValue(t *testing.T) {
 	assert.EqualError(t, err, "invalid value")
 
 	err = ValidateValue("git_protocol", "ssh")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = ValidateValue("editor", "vim")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = ValidateValue("got", "123")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func Test_ValidateKey(t *testing.T) {

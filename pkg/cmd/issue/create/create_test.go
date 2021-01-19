@@ -75,11 +75,7 @@ func TestIssueCreate_nontty_error(t *testing.T) {
 	defer http.Verify(t)
 
 	_, err := runCommand(http, false, `-t hello`)
-	if err == nil {
-		t.Fatal("expected error running command `issue create`")
-	}
-
-	assert.Equal(t, "must provide --title and --body when not running interactively", err.Error())
+	assert.EqualError(t, err, "must provide --title and --body when not running interactively")
 }
 
 func TestIssueCreate(t *testing.T) {

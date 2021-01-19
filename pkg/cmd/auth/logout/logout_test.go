@@ -98,7 +98,7 @@ func Test_logoutRun_tty(t *testing.T) {
 		cfgHosts   []string
 		wantHosts  string
 		wantErrOut *regexp.Regexp
-		wantErr    *regexp.Regexp
+		wantErr    string
 	}{
 		{
 			name:      "no arguments, multiple hosts",
@@ -123,7 +123,7 @@ func Test_logoutRun_tty(t *testing.T) {
 		{
 			name:    "no arguments, no hosts",
 			opts:    &LogoutOptions{},
-			wantErr: regexp.MustCompile(`not logged in to any hosts`),
+			wantErr: `not logged in to any hosts`,
 		},
 		{
 			name: "hostname",
@@ -176,14 +176,11 @@ func Test_logoutRun_tty(t *testing.T) {
 			}
 
 			err := logoutRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if tt.wantErrOut == nil {
@@ -204,7 +201,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 		opts      *LogoutOptions
 		cfgHosts  []string
 		wantHosts string
-		wantErr   *regexp.Regexp
+		wantErr   string
 		ghtoken   string
 	}{
 		{
@@ -227,7 +224,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			opts: &LogoutOptions{
 				Hostname: "harry.mason",
 			},
-			wantErr: regexp.MustCompile(`not logged in to any hosts`),
+			wantErr: `not logged in to any hosts`,
 		},
 	}
 
@@ -258,16 +255,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := logoutRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					if !tt.wantErr.MatchString(err.Error()) {
-						t.Errorf("got error: %v", err)
-					}
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stderr.String())
