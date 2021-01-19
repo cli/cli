@@ -71,7 +71,7 @@ func TestIssueList_nontty(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	assert.Equal(t, output.Stderr(), "")
+	assert.Equal(t, "", output.Stderr())
 	test.ExpectLines(t, output.String(),
 		`1[\t]+number won[\t]+label[\t]+\d+`,
 		`2[\t]+number too[\t]+label[\t]+\d+`,
@@ -139,11 +139,11 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	assert.Equal(t, output.Stderr(), "")
-	assert.Equal(t, output.String(), `
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, `
 No issues match your search in OWNER/REPO
 
-`)
+`, output.String())
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -183,8 +183,8 @@ func TestIssueList_nullAssigneeLabels(t *testing.T) {
 
 	_, assigneeDeclared := reqBody.Variables["assignee"]
 	_, labelsDeclared := reqBody.Variables["labels"]
-	assert.Equal(t, assigneeDeclared, false)
-	assert.Equal(t, labelsDeclared, false)
+	assert.Equal(t, false, assigneeDeclared)
+	assert.Equal(t, false, labelsDeclared)
 }
 
 func TestIssueList_disabledIssues(t *testing.T) {
@@ -223,14 +223,14 @@ func TestIssueList_web(t *testing.T) {
 
 	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1"
 
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, url, expectedURL)
+	assert.Equal(t, expectedURL, url)
 }
 
 func TestIssueList_milestoneNotFound(t *testing.T) {

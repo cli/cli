@@ -115,11 +115,11 @@ func TestPRList_filtering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, output.Stderr(), "")
-	assert.Equal(t, output.String(), `
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, `
 No pull requests match your search in OWNER/REPO
 
-`)
+`, output.String())
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
@@ -213,8 +213,8 @@ func TestPRList_web(t *testing.T) {
 
 	expectedURL := "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk"
 
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "Opening github.com/OWNER/REPO/pulls in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")

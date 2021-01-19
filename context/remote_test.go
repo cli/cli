@@ -18,15 +18,15 @@ func Test_Remotes_FindByName(t *testing.T) {
 	}
 
 	r, err := list.FindByName("upstream", "origin")
-	assert.Equal(t, err, nil)
-	assert.Equal(t, r.Name, "upstream")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "upstream", r.Name)
 
 	r, err = list.FindByName("nonexistent", "*")
-	assert.Equal(t, err, nil)
-	assert.Equal(t, r.Name, "mona")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "mona", r.Name)
 
 	_, err = list.FindByName("nonexistent")
-	assert.Equal(t, err, errors.New(`no GitHub remotes found`))
+	assert.Equal(t, errors.New(`no GitHub remotes found`), err)
 }
 
 func Test_translateRemotes(t *testing.T) {

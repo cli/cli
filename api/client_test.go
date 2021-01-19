@@ -31,13 +31,13 @@ func TestGraphQL(t *testing.T) {
 	)
 
 	err := client.GraphQL("github.com", "QUERY", vars, &response)
-	assert.Equal(t, err, nil)
-	assert.Equal(t, response.Viewer.Login, "hubot")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "hubot", response.Viewer.Login)
 
 	req := http.Requests[0]
 	reqBody, _ := ioutil.ReadAll(req.Body)
-	assert.Equal(t, string(reqBody), `{"query":"QUERY","variables":{"name":"Mona"}}`)
-	assert.Equal(t, req.Header.Get("Authorization"), "token OTOKEN")
+	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
+	assert.Equal(t, "token OTOKEN", req.Header.Get("Authorization"))
 }
 
 func TestGraphQLError(t *testing.T) {
@@ -77,7 +77,7 @@ func TestRESTGetDelete(t *testing.T) {
 
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("github.com", "DELETE", "applications/CLIENTID/grant", r, nil)
-	assert.Equal(t, err, nil)
+	assert.Equal(t, nil, err)
 }
 
 func TestRESTError(t *testing.T) {

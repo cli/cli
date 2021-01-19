@@ -112,7 +112,7 @@ func TestIssueCreate(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_recover(t *testing.T) {
@@ -144,9 +144,9 @@ func TestIssueCreate_recover(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["title"], "recovered title")
-			assert.Equal(t, inputs["body"], "recovered body")
-			assert.Equal(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
+			assert.Equal(t, "recovered title", inputs["title"])
+			assert.Equal(t, "recovered body", inputs["body"])
+			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
 	as, teardown := prompt.InitAskStubber()
@@ -193,7 +193,7 @@ func TestIssueCreate_recover(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
@@ -251,7 +251,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_continueInBrowser(t *testing.T) {
@@ -368,12 +368,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["title"], "TITLE")
-			assert.Equal(t, inputs["body"], "BODY")
-			assert.Equal(t, inputs["assigneeIds"], []interface{}{"MONAID"})
-			assert.Equal(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
-			assert.Equal(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
-			assert.Equal(t, inputs["milestoneId"], "BIGONEID")
+			assert.Equal(t, "TITLE", inputs["title"])
+			assert.Equal(t, "BODY", inputs["body"])
+			assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 			if v, ok := inputs["userIds"]; ok {
 				t.Errorf("did not expect userIds: %v", v)
 			}
@@ -387,7 +387,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
@@ -429,9 +429,9 @@ func TestIssueCreate_web(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, url, "https://github.com/OWNER/REPO/issues/new")
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new", url)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
@@ -454,7 +454,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	assert.Equal(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }

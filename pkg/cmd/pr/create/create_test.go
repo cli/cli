@@ -107,12 +107,12 @@ func TestPRCreate_nontty_web(t *testing.T) {
 	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
 	require.NoError(t, err)
 
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, len(cs.Calls), 3)
+	assert.Equal(t, 3, len(cs.Calls))
 	browserCall := cs.Calls[2].Args
-	assert.Equal(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", browserCall[len(browserCall)-1])
 
 }
 
@@ -157,7 +157,7 @@ func TestPRCreate_recover(t *testing.T) {
 			"clientMutationId": ""
 		} } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["userIds"], []interface{}{"JILLID"})
+			assert.Equal(t, []interface{}{"JILLID"}, inputs["userIds"])
 		}))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
@@ -217,7 +217,7 @@ func TestPRCreate_recover(t *testing.T) {
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, args, "")
 	assert.NoError(t, err)
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
 func TestPRCreate_nontty(t *testing.T) {
@@ -524,7 +524,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
 	require.NoError(t, err)
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
 func TestPRCreate_metadata(t *testing.T) {
@@ -592,8 +592,8 @@ func TestPRCreate_metadata(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["title"], "TITLE")
-			assert.Equal(t, inputs["body"], "BODY")
+			assert.Equal(t, "TITLE", inputs["title"])
+			assert.Equal(t, "BODY", inputs["body"])
 			if v, ok := inputs["assigneeIds"]; ok {
 				t.Errorf("did not expect assigneeIds: %v", v)
 			}
@@ -608,11 +608,11 @@ func TestPRCreate_metadata(t *testing.T) {
 			"clientMutationId": ""
 		} } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["pullRequestId"], "NEWPULLID")
-			assert.Equal(t, inputs["assigneeIds"], []interface{}{"MONAID"})
-			assert.Equal(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
-			assert.Equal(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
-			assert.Equal(t, inputs["milestoneId"], "BIGONEID")
+			assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+			assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 		}))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
@@ -621,10 +621,10 @@ func TestPRCreate_metadata(t *testing.T) {
 			"clientMutationId": ""
 		} } }
 	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, inputs["pullRequestId"], "NEWPULLID")
-			assert.Equal(t, inputs["userIds"], []interface{}{"HUBOTID", "MONAID"})
-			assert.Equal(t, inputs["teamIds"], []interface{}{"COREID", "ROBOTID"})
-			assert.Equal(t, inputs["union"], true)
+			assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+			assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
+			assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+			assert.Equal(t, true, inputs["union"])
 		}))
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -634,9 +634,9 @@ func TestPRCreate_metadata(t *testing.T) {
 	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
 
 	output, err := runCommand(http, nil, "feature", true, `-t TITLE -b BODY -H feature -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
-	assert.Equal(t, err, nil)
+	assert.Equal(t, nil, err)
 
-	assert.Equal(t, output.String(), "https://github.com/OWNER/REPO/pull/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
 func TestPRCreate_alreadyExists(t *testing.T) {
@@ -697,13 +697,13 @@ func TestPRCreate_web(t *testing.T) {
 	output, err := runCommand(http, nil, "feature", true, `--web`)
 	require.NoError(t, err)
 
-	assert.Equal(t, output.String(), "")
-	assert.Equal(t, output.Stderr(), "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 
-	assert.Equal(t, len(cs.Calls), 6)
-	assert.Equal(t, strings.Join(cs.Calls[4].Args, " "), "git push --set-upstream origin HEAD:feature")
+	assert.Equal(t, 6, len(cs.Calls))
+	assert.Equal(t, "git push --set-upstream origin HEAD:feature", strings.Join(cs.Calls[4].Args, " "))
 	browserCall := cs.Calls[5].Args
-	assert.Equal(t, browserCall[len(browserCall)-1], "https://github.com/OWNER/REPO/compare/master...feature?expand=1")
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", browserCall[len(browserCall)-1])
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -771,10 +771,10 @@ deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
 		t.Fatal("expected result, got nil")
 	}
 
-	assert.Equal(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/feature", "refs/remotes/upstream/feature"})
+	assert.Equal(t, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/feature", "refs/remotes/upstream/feature"}, cs.Calls[1].Args)
 
-	assert.Equal(t, ref.RemoteName, "upstream")
-	assert.Equal(t, ref.BranchName, "feature")
+	assert.Equal(t, "upstream", ref.RemoteName)
+	assert.Equal(t, "feature", ref.BranchName)
 }
 
 func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
@@ -798,7 +798,7 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 		t.Errorf("expected nil result, got %v", ref)
 	}
 
-	assert.Equal(t, cs.Calls[1].Args, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"})
+	assert.Equal(t, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"}, cs.Calls[1].Args)
 }
 
 func Test_generateCompareURL(t *testing.T) {
