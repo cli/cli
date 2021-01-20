@@ -54,7 +54,7 @@ type CreateOptions struct {
 	Projects  []string
 	Milestone string
 
-	MaintainerCantModify bool
+	MaintainerCanModify bool
 }
 
 type CreateContext struct {
@@ -109,6 +109,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
+			opts.MaintainerCanModify = !noMaintainerEdit
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
 				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
@@ -124,7 +126,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
 			}
-			if opts.MaintainerCantModify && opts.WebMode {
+			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
 				return errors.New("the --no-maintainer-edit flag is not supported with --web")
 			}
 
@@ -148,7 +150,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
-	fl.BoolVar(&opts.MaintainerCantModify, "no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
+	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
@@ -576,7 +578,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		"draft":               state.Draft,
 		"baseRefName":         ctx.BaseBranch,
 		"headRefName":         ctx.HeadBranchLabel,
-		"maintainerCanModify": !opts.MaintainerCantModify,
+		"maintainerCanModify": opts.MaintainerCanModify,
 	}
 
 	if params["title"] == "" {
