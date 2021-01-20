@@ -12,16 +12,18 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/command"
+	"github.com/cli/cli/internal/build"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/internal/update"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
 	"github.com/cli/cli/pkg/cmd/factory"
 	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
+	"github.com/cli/safeexec"
+	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -29,10 +31,12 @@ import (
 var updaterEnabled = ""
 
 func main() {
-	currentVersion := command.Version
+	buildDate := build.Date
+	buildVersion := build.Version
+
 	updateMessageChan := make(chan *update.ReleaseInfo)
 	go func() {
-		rel, _ := checkForUpdate(currentVersion)
+		rel, _ := checkForUpdate(buildVersion)
 		updateMessageChan <- rel
 	}()
 
@@ -42,7 +46,7 @@ func main() {
 		ghinstance.OverrideDefault(hostFromEnv)
 	}
 
-	cmdFactory := factory.New(command.Version)
+	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
@@ -61,7 +65,13 @@ func main() {
 		}
 	}
 
-	rootCmd := root.NewCmdRoot(cmdFactory, command.Version, command.BuildDate)
+	// Enable running gh from Windows File Explorer's address bar. Without this, the user is told to stop and run from a
+	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		cobra.MousetrapHelpText = ""
+	}
+
+	rootCmd := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
 
 	cfg, err := cmdFactory.Config()
 	if err != nil {
@@ -69,7 +79,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == config.PromptsDisabled {
+	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
 	}
 
@@ -98,7 +108,13 @@ func main() {
 		}
 
 		if isShell {
-			externalCmd := exec.Command(expandedArgs[0], expandedArgs[1:]...)
+			exe, err := safeexec.LookPath(expandedArgs[0])
+			if err != nil {
+				fmt.Fprintf(stderr, "failed to run external command: %s", err)
+				os.Exit(3)
+			}
+
+			externalCmd := exec.Command(exe, expandedArgs[1:]...)
 			externalCmd.Stderr = os.Stderr
 			externalCmd.Stdout = os.Stdout
 			externalCmd.Stdin = os.Stdin
@@ -118,17 +134,13 @@ func main() {
 		}
 	}
 
-	authCheckEnabled := os.Getenv("GITHUB_TOKEN") == "" &&
-		os.Getenv("GITHUB_ENTERPRISE_TOKEN") == "" &&
-		cmd != nil && cmdutil.IsAuthCheckEnabled(cmd)
-	if authCheckEnabled {
-		if !cmdutil.CheckAuth(cfg) {
-			fmt.Fprintln(stderr, utils.Bold("Welcome to GitHub CLI!"))
-			fmt.Fprintln(stderr)
-			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-			fmt.Fprintln(stderr, "You can also set the GITHUB_TOKEN environment variable, if preferred.")
-			os.Exit(4)
-		}
+	cs := cmdFactory.IOStreams.ColorScheme()
+
+	if cmd != nil && cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
+		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+		os.Exit(4)
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -151,7 +163,7 @@ func main() {
 	if newRelease != nil {
 		msg := fmt.Sprintf("%s %s → %s\n%s",
 			ansi.Color("A new release of gh is available:", "yellow"),
-			ansi.Color(currentVersion, "cyan"),
+			ansi.Color(buildVersion, "cyan"),
 			ansi.Color(newRelease.Version, "cyan"),
 			ansi.Color(newRelease.URL, "yellow"))
 
@@ -189,6 +201,9 @@ func shouldCheckForUpdate() bool {
 	if os.Getenv("GH_NO_UPDATE_NOTIFIER") != "" {
 		return false
 	}
+	if os.Getenv("CODESPACES") != "" {
+		return false
+	}
 	return updaterEnabled != "" && !isCI() && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
 }
 
@@ -208,7 +223,7 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 		return nil, nil
 	}
 
-	client, err := command.BasicClient()
+	client, err := basicClient(currentVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -216,4 +231,31 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	repo := updaterEnabled
 	stateFilePath := path.Join(config.ConfigDir(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
+}
+
+// BasicClient returns an API client for github.com only that borrows from but
+// does not depend on user configuration
+func basicClient(currentVersion string) (*api.Client, error) {
+	var opts []api.ClientOption
+	if verbose := os.Getenv("DEBUG"); verbose != "" {
+		opts = append(opts, apiVerboseLog())
+	}
+	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
+
+	token, _ := config.AuthTokenFromEnv(ghinstance.Default())
+	if token == "" {
+		if c, err := config.ParseDefaultConfig(); err == nil {
+			token, _ = c.Get(ghinstance.Default(), "oauth_token")
+		}
+	}
+	if token != "" {
+		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+	}
+	return api.NewClient(opts...), nil
+}
+
+func apiVerboseLog() api.ClientOption {
+	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
+	colorize := utils.IsTerminal(os.Stderr)
+	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
 }

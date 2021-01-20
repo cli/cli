@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -53,6 +52,8 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 }
 
 func reopenRun(opts *ReopenOptions) error {
+	cs := opts.IO.ColorScheme()
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -65,12 +66,12 @@ func reopenRun(opts *ReopenOptions) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be reopened because it was already merged", utils.Red("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be reopened because it was already merged", cs.Red("!"), pr.Number, pr.Title)
 		return cmdutil.SilentError
 	}
 
 	if !pr.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", utils.Yellow("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", cs.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}
 
@@ -79,7 +80,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened pull request #%d (%s)\n", utils.Green("✔"), pr.Number, pr.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened pull request #%d (%s)\n", cs.SuccessIcon(), pr.Number, pr.Title)
 
 	return nil
 }

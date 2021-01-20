@@ -23,7 +23,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -38,14 +37,14 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		DisableFlagsInUseLine: true,
 
 		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(`
 			Clone a GitHub repository locally.
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
-			
+
 			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -82,54 +81,83 @@ func cloneRun(opts *CloneOptions) error {
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	cloneURL := opts.Repository
-	if !strings.Contains(cloneURL, ":") {
-		if !strings.Contains(cloneURL, "/") {
+
+	repositoryIsURL := strings.Contains(opts.Repository, ":")
+	repositoryIsFullName := !repositoryIsURL && strings.Contains(opts.Repository, "/")
+
+	var repo ghrepo.Interface
+	var protocol string
+
+	if repositoryIsURL {
+		repoURL, err := git.ParseURL(opts.Repository)
+		if err != nil {
+			return err
+		}
+		repo, err = ghrepo.FromURL(repoURL)
+		if err != nil {
+			return err
+		}
+		if repoURL.Scheme == "git+ssh" {
+			repoURL.Scheme = "ssh"
+		}
+		protocol = repoURL.Scheme
+	} else {
+		var fullName string
+		if repositoryIsFullName {
+			fullName = opts.Repository
+		} else {
 			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
 			if err != nil {
 				return err
 			}
-			cloneURL = currentUser + "/" + cloneURL
+			fullName = currentUser + "/" + opts.Repository
 		}
-		repo, err := ghrepo.FromFullName(cloneURL)
+
+		repo, err = ghrepo.FromFullName(fullName)
 		if err != nil {
 			return err
 		}
 
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-		cloneURL = ghrepo.FormatRemoteURL(repo, protocol)
-	}
-
-	var repo ghrepo.Interface
-	var parentRepo ghrepo.Interface
-
-	// TODO: consider caching and reusing `git.ParseSSHConfig().Translator()`
-	// here to handle hostname aliases in SSH remotes
-	if u, err := git.ParseURL(cloneURL); err == nil {
-		repo, _ = ghrepo.FromURL(u)
-	}
-
-	if repo != nil {
-		parentRepo, err = api.RepoParent(apiClient, repo)
+		protocol, err = cfg.Get(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
 	}
 
-	cloneDir, err := git.RunClone(cloneURL, opts.GitArgs)
+	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
+	if wantsWiki {
+		repoName := strings.TrimSuffix(repo.RepoName(), ".wiki")
+		repo = ghrepo.NewWithHost(repo.RepoOwner(), repoName, repo.RepoHost())
+	}
+
+	// Load the repo from the API to get the username/repo name in its
+	// canonical capitalization
+	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
+	if err != nil {
+		return err
+	}
+	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+
+	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
+	if wantsWiki {
+		if !canonicalRepo.HasWikiEnabled {
+			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
+		}
+		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
+	}
+
+	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
 	if err != nil {
 		return err
 	}
 
-	if parentRepo != nil {
-		protocol, err := cfg.Get(parentRepo.RepoHost(), "git_protocol")
+	// If the repo is a fork, add the parent as an upstream
+	if canonicalRepo.Parent != nil {
+		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
-		upstreamURL := ghrepo.FormatRemoteURL(parentRepo, protocol)
+		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		err = git.AddUpstreamRemote(upstreamURL, cloneDir)
 		if err != nil {

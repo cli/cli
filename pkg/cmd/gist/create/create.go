@@ -31,6 +31,8 @@ type CreateOptions struct {
 	Filenames        []string
 	FilenameOverride string
 
+	WebMode bool
+
 	HttpClient func() (*http.Client, error)
 }
 
@@ -87,6 +89,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
 	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
 	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
 	return cmd
@@ -116,8 +119,10 @@ func createRun(opts *CreateOptions) error {
 		completionMessage = fmt.Sprintf("Created gist %s", gistName)
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	errOut := opts.IO.ErrOut
-	fmt.Fprintf(errOut, "%s %s\n", utils.Gray("-"), processMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -132,10 +137,16 @@ func createRun(opts *CreateOptions) error {
 				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate by doing `gh config set -h github.com oauth_token ''` and running the command again.")
 			}
 		}
-		return fmt.Errorf("%s Failed to create gist: %w", utils.Red("X"), err)
+		return fmt.Errorf("%s Failed to create gist: %w", cs.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s %s\n", utils.Green("✓"), completionMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIcon(), completionMessage)
+
+	if opts.WebMode {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
+
+		return utils.OpenInBrowser(gist.HTMLURL)
+	}
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
@@ -216,8 +227,8 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 	}
 	requestBody := bytes.NewReader(requestByte)
 
-	apliClient := api.NewClientFromHTTP(client)
-	err = apliClient.REST(hostname, "POST", path, requestBody, &result)
+	apiClient := api.NewClientFromHTTP(client)
+	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
 	if err != nil {
 		return nil, err
 	}

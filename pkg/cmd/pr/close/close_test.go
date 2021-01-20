@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -61,13 +62,20 @@ func TestPrClose(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"pullRequest": { "number": 96, "title": "The title of the PR" }
-		} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "id": "THE-ID", "number": 96, "title": "The title of the PR" }
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
 
 	output, err := runCommand(http, true, "96")
 	if err != nil {
@@ -85,11 +93,13 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"pullRequest": { "number": 101, "title": "The title of the PR", "closed": true }
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "number": 101, "title": "The title of the PR", "closed": true }
+			} } }`),
+	)
 
 	output, err := runCommand(http, true, "101")
 	if err != nil {
@@ -106,12 +116,21 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 func TestPrClose_deleteBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"pullRequest": { "number": 96, "title": "The title of the PR", "headRefName":"blueberries", "headRepositoryOwner": {"login": "OWNER"}}
-		} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "id": "THE-ID", "number": 96, "title": "The title of the PR", "headRefName":"blueberries", "headRepositoryOwner": {"login": "OWNER"}}
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))

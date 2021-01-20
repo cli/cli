@@ -59,6 +59,22 @@ func FuzzyAgo(ago time.Duration) string {
 	return fmtDuration(int(ago.Hours()/24/365), "year")
 }
 
+func FuzzyAgoAbbr(now time.Time, createdAt time.Time) string {
+	ago := now.Sub(createdAt)
+
+	if ago < time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Minutes()), "m")
+	}
+	if ago < 24*time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Hours()), "h")
+	}
+	if ago < 30*24*time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Hours())/24, "d")
+	}
+
+	return createdAt.Format("Jan _2, 2006")
+}
+
 func Humanize(s string) string {
 	// Replaces - and _ with spaces.
 	replace := "_-"
@@ -96,16 +112,4 @@ func DisplayURL(urlStr string) string {
 		return urlStr
 	}
 	return u.Hostname() + u.Path
-}
-
-func GreenCheck() string {
-	return Green("✓")
-}
-
-func YellowDash() string {
-	return Yellow("-")
-}
-
-func RedX() string {
-	return Red("X")
 }

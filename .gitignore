@@ -16,4 +16,7 @@
 # macOS
 .DS_Store
 
+# vim
+*.swp
+
 vendor/

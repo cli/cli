@@ -2,6 +2,7 @@ package fork
 
 import (
 	"net/http"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -44,8 +45,11 @@ func runCommand(httpClient *http.Client, remotes []*context.Remote, isTTY bool, 
 			if remotes == nil {
 				return []*context.Remote{
 					{
-						Remote: &git.Remote{Name: "origin"},
-						Repo:   ghrepo.New("OWNER", "REPO"),
+						Remote: &git.Remote{
+							Name:     "origin",
+							FetchURL: &url.URL{},
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
 					},
 				}, nil
 			}
@@ -179,11 +183,11 @@ func TestRepoFork_reuseRemote(t *testing.T) {
 	stubSpinner()
 	remotes := []*context.Remote{
 		{
-			Remote: &git.Remote{Name: "origin"},
+			Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{}},
 			Repo:   ghrepo.New("someone", "REPO"),
 		},
 		{
-			Remote: &git.Remote{Name: "upstream"},
+			Remote: &git.Remote{Name: "upstream", FetchURL: &url.URL{}},
 			Repo:   ghrepo.New("OWNER", "REPO"),
 		},
 	}
@@ -462,6 +466,50 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
 	}
+	reg.Verify(t)
+}
+
+func TestRepoFork_in_parent_match_protocol(t *testing.T) {
+	stubSpinner()
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	var seenCmds []*exec.Cmd
+	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmds = append(seenCmds, cmd)
+		return &test.OutputStub{}
+	})()
+
+	remotes := []*context.Remote{
+		{
+			Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
+				Scheme: "ssh",
+			}},
+			Repo: ghrepo.New("OWNER", "REPO"),
+		},
+	}
+
+	output, err := runCommand(httpClient, remotes, true, "--remote")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	expectedCmds := []string{
+		"git remote rename origin upstream",
+		"git remote add -f origin git@github.com:someone/REPO.git",
+	}
+
+	for x, cmd := range seenCmds {
+		assert.Equal(t, expectedCmds[x], strings.Join(cmd.Args, " "))
+	}
+
+	assert.Equal(t, "", output.String())
+
+	test.ExpectLines(t, output.Stderr(),
+		"Created fork.*someone/REPO",
+		"Added remote.*origin")
 	reg.Verify(t)
 }
 

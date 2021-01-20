@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -136,6 +137,8 @@ type PullRequest struct {
 	Milestone struct {
 		Title string
 	}
+	Comments       Comments
+	ReactionGroups ReactionGroups
 }
 
 type NotFoundError struct {
@@ -602,6 +605,30 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
+				comments(last: 1) {
+					nodes {
+						author {
+							login
+						}
+						authorAssociation
+						body
+						createdAt
+						includesCreatedEdit
+						reactionGroups {
+							content
+							users {
+								totalCount
+							}
+						}
+					}
+					totalCount
+				}
+				reactionGroups {
+					content
+					users {
+						totalCount
+					}
+				}
 			}
 		}
 	}`
@@ -621,11 +648,10 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	return &resp.Repository.PullRequest, nil
 }
 
-func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string) (*PullRequest, error) {
+func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, stateFilters []string) (*PullRequest, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
-				ID    githubv4.ID
 				Nodes []PullRequest
 			}
 		}
@@ -637,9 +663,9 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 	}
 
 	query := `
-	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!) {
+	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {
 		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: OPEN, first: 30) {
+			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
 				nodes {
 					id
 					number
@@ -712,6 +738,30 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					milestone{
 						title
 					}
+					comments(last: 1) {
+						nodes {
+							author {
+								login
+							}
+							authorAssociation
+							body
+							createdAt
+							includesCreatedEdit
+							reactionGroups {
+								content
+								users {
+									totalCount
+								}
+							}
+						}
+						totalCount
+					}
+					reactionGroups {
+						content
+						users {
+							totalCount
+						}
+					}
 				}
 			}
 		}
@@ -726,6 +776,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		"owner":       repo.RepoOwner(),
 		"repo":        repo.RepoName(),
 		"headRefName": branchWithoutOwner,
+		"states":      stateFilters,
 	}
 
 	var resp response
@@ -734,18 +785,23 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 		return nil, err
 	}
 
-	for _, pr := range resp.Repository.PullRequests.Nodes {
-		if pr.HeadLabel() == headBranch {
-			if baseBranch != "" {
-				if pr.BaseRefName != baseBranch {
-					continue
-				}
-			}
+	prs := resp.Repository.PullRequests.Nodes
+	sortPullRequestsByState(prs)
+
+	for _, pr := range prs {
+		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
 			return &pr, nil
 		}
 	}
 
-	return nil, &NotFoundError{fmt.Errorf("no open pull requests found for branch %q", headBranch)}
+	return nil, &NotFoundError{fmt.Errorf("no pull requests found for branch %q", headBranch)}
+}
+
+// sortPullRequestsByState sorts a PullRequest slice by open-first
+func sortPullRequestsByState(prs []PullRequest) {
+	sort.SliceStable(prs, func(a, b int) bool {
+		return prs[a].State == "OPEN"
+	})
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository

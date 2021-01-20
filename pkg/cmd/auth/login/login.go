@@ -12,11 +12,10 @@ import (
 	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -88,7 +87,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if cmd.Flags().Changed("hostname") {
-				if err := hostnameValidator(opts.Hostname); err != nil {
+				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}
@@ -134,7 +133,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(opts.Hostname, cfg)
+		err = shared.ValidateHostCfg(opts.Hostname, cfg)
 		if err != nil {
 			return err
 		}
@@ -166,7 +165,7 @@ func loginRun(opts *LoginOptions) error {
 		if isEnterprise {
 			err := prompt.SurveyAskOne(&survey.Input{
 				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(hostnameValidator))
+			}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
@@ -178,9 +177,9 @@ func loginRun(opts *LoginOptions) error {
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
 
 	if existingToken != "" && opts.Interactive {
-		err := client.ValidateHostCfg(hostname, cfg)
+		err := shared.ValidateHostCfg(hostname, cfg)
 		if err == nil {
-			apiClient, err := client.ClientFromCfg(hostname, cfg)
+			apiClient, err := shared.ClientFromCfg(hostname, cfg)
 			if err != nil {
 				return err
 			}
@@ -227,11 +226,13 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
+	userValidated := false
 	if authMode == 0 {
-		_, err := authflow.AuthFlowWithConfig(cfg, hostname, "", opts.Scopes)
+		_, err := authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", opts.Scopes)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		userValidated = true
 	} else {
 		fmt.Fprintln(opts.IO.ErrOut)
 		fmt.Fprintln(opts.IO.ErrOut, heredoc.Doc(getAccessTokenTip(hostname)))
@@ -252,13 +253,15 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		err = client.ValidateHostCfg(hostname, cfg)
+		err = shared.ValidateHostCfg(hostname, cfg)
 		if err != nil {
 			return err
 		}
 	}
 
-	gitProtocol := "https"
+	cs := opts.IO.ColorScheme()
+
+	var gitProtocol string
 	if opts.Interactive {
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: "Choose default git protocol",
@@ -279,22 +282,27 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 
-		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", utils.GreenCheck())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	apiClient, err := client.ClientFromCfg(hostname, cfg)
-	if err != nil {
-		return err
-	}
+	var username string
+	if userValidated {
+		username, _ = cfg.Get(hostname, "user")
+	} else {
+		apiClient, err := shared.ClientFromCfg(hostname, cfg)
+		if err != nil {
+			return err
+		}
 
-	username, err := api.CurrentLoginName(apiClient, hostname)
-	if err != nil {
-		return fmt.Errorf("error using api: %w", err)
-	}
+		username, err = api.CurrentLoginName(apiClient, hostname)
+		if err != nil {
+			return fmt.Errorf("error using api: %w", err)
+		}
 
-	err = cfg.Set(hostname, "user", username)
-	if err != nil {
-		return err
+		err = cfg.Set(hostname, "user", username)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = cfg.Write()
@@ -302,19 +310,15 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", utils.GreenCheck(), utils.Bold(username))
-
-	return nil
-}
-
-func hostnameValidator(v interface{}) error {
-	val := v.(string)
-	if len(strings.TrimSpace(val)) < 1 {
-		return errors.New("a value is required")
+	if opts.Interactive && gitProtocol == "https" {
+		err := shared.GitCredentialSetup(cfg, hostname, username)
+		if err != nil {
+			return err
+		}
 	}
-	if strings.ContainsRune(val, '/') || strings.ContainsRune(val, ':') {
-		return errors.New("invalid hostname")
-	}
+
+	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
+
 	return nil
 }
 

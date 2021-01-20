@@ -1,7 +1,6 @@
 package checkout
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
 
@@ -44,12 +44,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd := &cobra.Command{
 		Use:   "checkout {<number> | <url> | <branch>}",
 		Short: "Check out a pull request in git",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required")}
-			}
-			return nil
-		},
+		Args:  cmdutil.MinimumArgs(1, "argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -171,7 +166,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	for _, args := range cmdQueue {
-		cmd := exec.Command(args[0], args[1:]...)
+		// TODO: reuse the result of this lookup across loop iteration
+		exe, err := safeexec.LookPath(args[0])
+		if err != nil {
+			return err
+		}
+		cmd := exec.Command(exe, args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := run.PrepareCmd(cmd).Run(); err != nil {

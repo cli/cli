@@ -117,7 +117,7 @@ func viewRun(opts *ViewOptions) error {
 		content := gistFile.Content
 		if strings.Contains(gistFile.Type, "markdown") && !opts.Raw {
 			style := markdown.GetStyle(opts.IO.DetectTerminalTheme())
-			rendered, err := markdown.Render(gistFile.Content, style)
+			rendered, err := markdown.Render(gistFile.Content, style, "")
 			if err == nil {
 				content = rendered
 			}

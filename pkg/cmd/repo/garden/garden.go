@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
@@ -119,6 +121,7 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 }
 
 func gardenRun(opts *GardenOptions) error {
+	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
 
 	if runtime.GOOS == "windows" {
@@ -187,7 +190,7 @@ func gardenRun(opts *GardenOptions) error {
 	oldTTYCommand := exec.Command("stty", sttyFileArg, "/dev/tty", "-g")
 	oldTTYSettings, err := oldTTYCommand.CombinedOutput()
 	if err != nil {
-		fmt.Fprintln(out, "getting TTY setings failed:", string(oldTTYSettings))
+		fmt.Fprintln(out, "getting TTY settings failed:", string(oldTTYSettings))
 		return err
 	}
 
@@ -198,7 +201,7 @@ func gardenRun(opts *GardenOptions) error {
 	if err != nil {
 		return err
 	}
-	player := &Player{0, 0, utils.Bold("@"), geo, 0}
+	player := &Player{0, 0, cs.Bold("@"), geo, 0}
 
 	garden := plantGarden(commits, geo)
 	if len(garden) < geo.Height {
@@ -210,11 +213,27 @@ func gardenRun(opts *GardenOptions) error {
 		geo.Width = 0
 	}
 	clear(opts.IO)
-	drawGarden(out, garden, player)
+	drawGarden(opts.IO, garden, player)
 
 	// thanks stackoverflow https://stackoverflow.com/a/17278776
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "cbreak", "min", "1").Run()
 	_ = exec.Command("stty", sttyFileArg, "/dev/tty", "-echo").Run()
+
+	walkAway := func() {
+		clear(opts.IO)
+		fmt.Fprint(out, "\033[?25h")
+		_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("You turn and walk away from the wildflower garden..."))
+	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		walkAway()
+		os.Exit(0)
+	}()
 
 	var b []byte = make([]byte, 3)
 	for {
@@ -284,7 +303,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 
 		// status line stuff
-		sl := statusLine(garden, player)
+		sl := statusLine(garden, player, opts.IO)
 
 		fmt.Fprint(out, "\033[;H") // move to top left
 		for y := 0; y < player.Geo.Height-1; y++ {
@@ -293,15 +312,10 @@ func gardenRun(opts *GardenOptions) error {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out)
 
-		fmt.Fprint(out, utils.Bold(sl))
+		fmt.Fprint(out, cs.Bold(sl))
 	}
 
-	clear(opts.IO)
-	fmt.Fprint(out, "\033[?25h")
-	_ = exec.Command("stty", sttyFileArg, "/dev/tty", strings.TrimSpace(string(oldTTYSettings))).Run()
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, utils.Bold("You turn and walk away from the wildflower garden..."))
-
+	walkAway()
 	return nil
 }
 
@@ -409,7 +423,10 @@ func plantGarden(commits []*Commit, geo *Geometry) [][]*Cell {
 	return garden
 }
 
-func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
+func drawGarden(io *iostreams.IOStreams, garden [][]*Cell, player *Player) {
+	out := io.Out
+	cs := io.ColorScheme()
+
 	fmt.Fprint(out, "\033[?25l") // hide cursor. it needs to be restored at command exit.
 	sl := ""
 	for y, gardenRow := range garden {
@@ -418,7 +435,7 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 			underPlayer := (player.X == x && player.Y == y)
 			if underPlayer {
 				sl = gardenCell.StatusLine
-				char = utils.Bold(player.Char)
+				char = cs.Bold(player.Char)
 
 				if strings.Contains(gardenCell.StatusLine, "stream") {
 					player.ShoeMoistureContent = 5
@@ -433,20 +450,29 @@ func drawGarden(out io.Writer, garden [][]*Cell, player *Player) {
 	}
 
 	fmt.Println()
-	fmt.Fprintln(out, utils.Bold(sl))
+	fmt.Fprintln(out, cs.Bold(sl))
 }
 
-func statusLine(garden [][]*Cell, player *Player) string {
-	statusLine := garden[player.Y][player.X].StatusLine + "         "
+func statusLine(garden [][]*Cell, player *Player, io *iostreams.IOStreams) string {
+	width := io.TerminalWidth()
+	statusLines := []string{garden[player.Y][player.X].StatusLine}
+
 	if player.ShoeMoistureContent > 1 {
-		statusLine += "\nYour shoes squish with water from the stream."
+		statusLines = append(statusLines, "Your shoes squish with water from the stream.")
 	} else if player.ShoeMoistureContent == 1 {
-		statusLine += "\nYour shoes seem to have dried out."
+		statusLines = append(statusLines, "Your shoes seem to have dried out.")
 	} else {
-		statusLine += "\n                                             "
+		statusLines = append(statusLines, "")
 	}
 
-	return statusLine
+	for i, line := range statusLines {
+		if len(line) < width {
+			paddingSize := width - len(line)
+			statusLines[i] = line + strings.Repeat(" ", paddingSize)
+		}
+	}
+
+	return strings.Join(statusLines, "\n")
 }
 
 func shaToColorFunc(sha string) func(string) string {

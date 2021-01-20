@@ -6,11 +6,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -76,7 +76,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 		`),
-		Args: cobra.MinimumNArgs(1),
+		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -307,13 +307,19 @@ func createRun(opts *CreateOptions) error {
 }
 
 func gitTagInfo(tagName string) (string, error) {
-	cmd := exec.Command("git", "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	if err != nil {
+		return "", err
+	}
 	b, err := run.PrepareCmd(cmd).Output()
 	return string(b), err
 }
 
 func detectPreviousTag(headRef string) (string, error) {
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
+	cmd, err := git.GitCommand("describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
+	if err != nil {
+		return "", err
+	}
 	b, err := run.PrepareCmd(cmd).Output()
 	return strings.TrimSpace(string(b)), err
 }
@@ -324,7 +330,10 @@ type logEntry struct {
 }
 
 func changelogForRange(refRange string) ([]logEntry, error) {
-	cmd := exec.Command("git", "-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
+	cmd, err := git.GitCommand("-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
+	if err != nil {
+		return nil, err
+	}
 	b, err := run.PrepareCmd(cmd).Output()
 	if err != nil {
 		return nil, err

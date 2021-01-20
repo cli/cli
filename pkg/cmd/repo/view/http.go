@@ -15,6 +15,7 @@ var NotFoundError = errors.New("not found")
 type RepoReadme struct {
 	Filename string
 	Content  string
+	BaseURL  string
 }
 
 func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string) (*RepoReadme, error) {
@@ -22,6 +23,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 	var response struct {
 		Name    string
 		Content string
+		HTMLURL string `json:"html_url"`
 	}
 
 	err := apiClient.REST(repo.RepoHost(), "GET", getReadmePath(repo, branch), nil, &response)
@@ -41,6 +43,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 	return &RepoReadme{
 		Filename: response.Name,
 		Content:  string(decoded),
+		BaseURL:  response.HTMLURL,
 	}, nil
 }
 

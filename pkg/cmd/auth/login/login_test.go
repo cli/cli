@@ -8,7 +8,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -193,7 +193,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		opts      *LoginOptions
 		httpStubs func(*httpmock.Registry)
 		wantHosts string
-		wantErr   *regexp.Regexp
+		wantErr   string
 	}{
 		{
 			name: "with token",
@@ -223,7 +223,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("read:org"))
 			},
-			wantErr: regexp.MustCompile(`missing required scope 'repo'`),
+			wantErr: `could not validate token: missing required scope 'repo'`,
 		},
 		{
 			name: "missing read scope",
@@ -234,7 +234,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo"))
 			},
-			wantErr: regexp.MustCompile(`missing required scope 'read:org'`),
+			wantErr: `could not validate token: missing required scope 'read:org'`,
 		},
 		{
 			name: "has admin scope",
@@ -262,11 +262,11 @@ func Test_loginRun_nontty(t *testing.T) {
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := client.ClientFromCfg
+			origClientFromCfg := shared.ClientFromCfg
 			defer func() {
-				client.ClientFromCfg = origClientFromCfg
+				shared.ClientFromCfg = origClientFromCfg
 			}()
-			client.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
 				httpClient := &http.Client{Transport: reg}
 				return api.NewClientFromHTTP(httpClient), nil
 			}
@@ -282,14 +282,10 @@ func Test_loginRun_nontty(t *testing.T) {
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := loginRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())
@@ -342,6 +338,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)        // auth mode: token
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
+				as.StubOne(false)    // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
@@ -363,6 +360,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)              // auth mode: token
 				as.StubOne("def456")       // auth token
 				as.StubOne("HTTPS")        // git_protocol
+				as.StubOne(false)          // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
@@ -383,6 +381,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(1)        // auth mode: token
 				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
+				as.StubOne(false)    // cache credentials
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
@@ -426,11 +425,11 @@ func Test_loginRun_Survey(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := client.ClientFromCfg
+			origClientFromCfg := shared.ClientFromCfg
 			defer func() {
-				client.ClientFromCfg = origClientFromCfg
+				shared.ClientFromCfg = origClientFromCfg
 			}()
-			client.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
+			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
 				httpClient := &http.Client{Transport: reg}
 				return api.NewClientFromHTTP(httpClient), nil
 			}
