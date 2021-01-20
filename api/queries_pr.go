@@ -1144,7 +1144,7 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 	return err
 }
 
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod, body *string) error {
 	mergeMethod := githubv4.PullRequestMergeMethodMerge
 	switch m {
 	case PullRequestMergeMethodRebase:
@@ -1169,6 +1169,10 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 	if m == PullRequestMergeMethodSquash {
 		commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
 		input.CommitHeadline = &commitHeadline
+	}
+	if body != nil {
+		commitBody := githubv4.String(*body)
+		input.CommitBody = &commitBody
 	}
 
 	variables := map[string]interface{}{
