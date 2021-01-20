@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
@@ -19,7 +18,6 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -777,7 +775,6 @@ func TestPRView_tty_Comments(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			stubSpinner()
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 			for name, file := range tt.fixtures {
@@ -872,9 +869,4 @@ func TestPRView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}
-}
-
-func stubSpinner() {
-	utils.StartSpinner = func(_ *spinner.Spinner) {}
-	utils.StopSpinner = func(_ *spinner.Spinner) {}
 }
