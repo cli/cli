@@ -2,16 +2,77 @@
   "data": {
     "repository": {
       "pullRequest": {
-        "comments": {
+        "reviews": {
           "nodes": [
             {
               "author": {
-                "login": "monalisa"
+                "login": "sam"
               },
               "authorAssociation": "NONE",
-              "body": "Comment 1",
-              "createdAt": "2020-01-01T12:00:00Z",
-              "includesCreatedEdit": true,
+              "body": "Review 1",
+              "createdAt": "2020-01-02T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 1
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 1
+                  }
+                }
+              ],
+              "state": "COMMENTED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-1"
+            },
+            {
+              "author": {
+                "login": "matt"
+              },
+              "authorAssociation": "OWNER",
+              "body": "Review 2",
+              "createdAt": "2020-01-04T12:00:00Z",
+              "includesCreatedEdit": false,
               "reactionGroups": [
                 {
                   "content": "CONFUSED",
@@ -22,66 +83,7 @@
                 {
                   "content": "EYES",
                   "users": {
-                    "totalCount": 2
-                  }
-                },
-                {
-                  "content": "HEART",
-                  "users": {
-                    "totalCount": 3
-                  }
-                },
-                {
-                  "content": "HOORAY",
-                  "users": {
-                    "totalCount": 4
-                  }
-                },
-                {
-                  "content": "LAUGH",
-                  "users": {
-                    "totalCount": 5
-                  }
-                },
-                {
-                  "content": "ROCKET",
-                  "users": {
-                    "totalCount": 6
-                  }
-                },
-                {
-                  "content": "THUMBS_DOWN",
-                  "users": {
-                    "totalCount": 7
-                  }
-                },
-                {
-                  "content": "THUMBS_UP",
-                  "users": {
-                    "totalCount": 8
-                  }
-                }
-              ]
-            },
-            {
-              "author": {
-                "login": "johnnytest"
-              },
-              "authorAssociation": "CONTRIBUTOR",
-              "body": "Comment 2",
-              "createdAt": "2020-01-03T12:00:00Z",
-              "includesCreatedEdit": false,
-              "reactionGroups": [
-                {
-                  "content": "CONFUSED",
-                  "users": {
-                    "totalCount": 0
-                  }
-                },
-                {
-                  "content": "EYES",
-                  "users": {
-                    "totalCount": 0
+                    "totalCount": 1
                   }
                 },
                 {
@@ -120,16 +122,18 @@
                     "totalCount": 0
                   }
                 }
-              ]
+              ],
+              "state": "CHANGES_REQUESTED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-2"
             },
             {
               "author": {
-                "login": "elvisp"
+                "login": "leah"
               },
               "authorAssociation": "MEMBER",
-              "body": "Comment 3",
-              "createdAt": "2020-01-05T12:00:00Z",
-              "includesCreatedEdit": false,
+              "body": "Review 3",
+              "createdAt": "2020-01-06T12:00:00Z",
+              "includesCreatedEdit": true,
               "reactionGroups": [
                 {
                   "content": "CONFUSED",
@@ -179,15 +183,17 @@
                     "totalCount": 0
                   }
                 }
-              ]
+              ],
+              "state": "APPROVED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-3"
             },
             {
               "author": {
-                "login": "loislane"
+                "login": "louise"
               },
-              "authorAssociation": "OWNER",
-              "body": "Comment 4",
-              "createdAt": "2020-01-07T12:00:00Z",
+              "authorAssociation": "NONE",
+              "body": "Review 4",
+              "createdAt": "2020-01-08T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -238,15 +244,17 @@
                     "totalCount": 0
                   }
                 }
-              ]
+              ],
+              "state": "DISMISSED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-4"
             },
             {
               "author": {
-                "login": "marseilles"
+                "login": "david"
               },
-              "authorAssociation": "COLLABORATOR",
-              "body": "Comment 5",
-              "createdAt": "2020-01-09T12:00:00Z",
+              "authorAssociation": "NONE",
+              "body": "Review 5",
+              "createdAt": "2020-01-10T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -297,7 +305,9 @@
                     "totalCount": 0
                   }
                 }
-              ]
+              ],
+              "state": "PENDING",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-5"
             }
           ],
           "totalCount": 5
