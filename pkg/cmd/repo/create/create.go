@@ -231,7 +231,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, &opts.ConfirmSubmit)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID)
 		if err != nil {
 			return err
 		}
@@ -369,7 +369,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *bool) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
