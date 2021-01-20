@@ -7,13 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -33,6 +31,7 @@ type ForkOptions struct {
 	Remote       bool
 	PromptClone  bool
 	PromptRemote bool
+	RemoteName   string
 }
 
 var Since = func(t time.Time) time.Duration {
@@ -78,6 +77,7 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
+	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
 
 	return cmd
 }
@@ -226,40 +226,13 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if remoteDesired {
-			remoteName := ""
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Fork remote name?",
-				Default: "origin",
-			}, &remoteName)
-			if err != nil {
-				return fmt.Errorf("failed to prompt: %w", err)
-			}
-
+			remoteName := opts.RemoteName
 			remotes, err := opts.Remotes()
 			if err != nil {
 				return err
 			}
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				renameTarget := ""
-				err = prompt.SurveyAskOne(&survey.Input{
-					Message: "There is already remote with same name. Source remote name?",
-					Default: "upstream",
-				}, &renameTarget)
-				if err != nil {
-					return fmt.Errorf("failed to prompt: %w", err)
-				}
-
-				renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
-				if err != nil {
-					return err
-				}
-				err = run.PrepareCmd(renameCmd).Run()
-				if err != nil {
-					return err
-				}
-				if connectedToTerminal {
-					fmt.Fprintf(stderr, "%s Renamed %s remote to %s\n", cs.SuccessIcon(), cs.Bold(remoteName), cs.Bold(renameTarget))
-				}
+				return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
 			}
 
 			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
