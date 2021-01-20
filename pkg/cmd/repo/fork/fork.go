@@ -127,18 +127,6 @@ func forkRun(opts *ForkOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	stderr := opts.IO.ErrOut
-	s := utils.Spinner(stderr)
-	stopSpinner := func() {}
-
-	if connectedToTerminal {
-		loading := cs.Gray("Forking ") + cs.Bold(cs.Gray(ghrepo.FullName(repoToFork))) + cs.Gray("...")
-		s.Suffix = " " + loading
-		s.FinalMSG = cs.Gray(fmt.Sprintf("- %s\n", loading))
-		utils.StartSpinner(s)
-		stopSpinner = func() {
-			utils.StopSpinner(s)
-		}
-	}
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -147,13 +135,12 @@ func forkRun(opts *ForkOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
+	opts.IO.StartProgressIndicator()
 	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
-		stopSpinner()
 		return fmt.Errorf("failed to fork: %w", err)
 	}
-
-	stopSpinner()
 
 	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
 	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
