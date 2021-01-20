@@ -1,4 +1,4 @@
-# Installing gh on Linux
+# Installing gh on Linux and FreeBSD
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
@@ -95,7 +95,21 @@ sudo pacman -S github-cli
 
 ### Android
 
-Android users can install via Termux:
+Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page):
+
+```bash
+pkg install gh
+```
+
+### FreeBSD
+
+FreeBSD users can install from the [ports collection](https://www.freshports.org/devel/gh/):
+
+```bash
+cd /usr/ports/devel/gh/ && make install clean
+```
+
+Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 
 ```bash
 pkg install gh
@@ -130,6 +144,13 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 
 ```bash
 nix-env -iA nixos.gitAndTools.gh
+```
+
+### openSUSE Tumbleweed
+
+openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+```bash
+sudo zypper in gh
 ```
 
 ### Snaps

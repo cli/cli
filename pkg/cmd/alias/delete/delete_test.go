@@ -76,9 +76,7 @@ func TestAliasDelete(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
-				if assert.Error(t, err) {
-					assert.Equal(t, tt.wantErr, err.Error())
-				}
+				assert.EqualError(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)

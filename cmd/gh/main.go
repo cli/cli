@@ -16,11 +16,11 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/internal/update"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
 	"github.com/cli/cli/pkg/cmd/factory"
 	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/update"
 	"github.com/cli/cli/utils"
 	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
@@ -140,7 +140,6 @@ func main() {
 		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-		fmt.Fprintln(stderr, "You can also set the one of the auth token environment variables, if preferred.")
 		os.Exit(4)
 	}
 

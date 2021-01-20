@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -30,6 +31,7 @@ type ViewOptions struct {
 
 	SelectorArg string
 	BrowserMode bool
+	Comments    bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -73,26 +75,23 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
 
 	return cmd
 }
 
 func viewRun(opts *ViewOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, _, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	opts.IO.StartProgressIndicator()
+	pr, err := retrievePullRequest(opts)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
-	openURL := pr.URL
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY()
 
 	if opts.BrowserMode {
+		openURL := pr.URL
 		if connectedToTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
@@ -108,7 +107,12 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts.IO, pr)
+		return printHumanPrPreview(opts, pr)
+	}
+
+	if opts.Comments {
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.Reviews))
+		return nil
 	}
 
 	return printRawPrPreview(opts.IO, pr)
@@ -140,22 +144,26 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
-	out := io.Out
-
-	cs := io.ColorScheme()
+func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
-	fmt.Fprintf(out, "%s", shared.StateTitleWithColor(cs, *pr))
-	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
-		" • %s wants to merge %s into %s from %s",
+	fmt.Fprintf(out,
+		"%s • %s wants to merge %s into %s from %s\n",
+		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
-	)))
-	fmt.Fprintln(out)
+	)
+
+	// Reactions
+	if reactions := shared.ReactionGroupList(pr.ReactionGroups); reactions != "" {
+		fmt.Fprint(out, reactions)
+		fmt.Fprintln(out)
+	}
 
 	// Metadata
 	if reviewers := prReviewerList(*pr, cs); reviewers != "" {
@@ -180,19 +188,32 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	}
 
 	// Body
-	if pr.Body != "" {
-		fmt.Fprintln(out)
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(pr.Body, style, "")
+	var md string
+	var err error
+	if pr.Body == "" {
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(pr.Body, style, "")
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(out, md)
 	}
-	fmt.Fprintln(out)
+	fmt.Fprintf(out, "\n%s\n", md)
+
+	// Reviews and Comments
+	if pr.Comments.TotalCount > 0 || pr.Reviews.TotalCount > 0 {
+		preview := !opts.Comments
+		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.DisplayableReviews(), preview)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(out, comments)
+	}
 
 	// Footer
 	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+
 	return nil
 }
 
@@ -214,7 +235,7 @@ type reviewerState struct {
 func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) string {
 	state := reviewer.State
 	if state == dismissedReviewState {
-		// Show "DISMISSED" review as "COMMENTED", since "dimissed" only makes
+		// Show "DISMISSED" review as "COMMENTED", since "dismissed" only makes
 		// sense when displayed in an events timeline but not in the final tally.
 		state = commentedReviewState
 	}
@@ -372,4 +393,52 @@ func prStateWithDraft(pr *api.PullRequest) string {
 	}
 
 	return pr.State
+}
+
+func retrievePullRequest(opts *ViewOptions) (*api.PullRequest, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.BrowserMode {
+		return pr, nil
+	}
+
+	var errp, errc error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var reviews *api.PullRequestReviews
+		reviews, errp = api.ReviewsForPullRequest(apiClient, repo, pr)
+		pr.Reviews = *reviews
+	}()
+
+	if opts.Comments {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var comments *api.Comments
+			comments, errc = api.CommentsForPullRequest(apiClient, repo, pr)
+			pr.Comments = *comments
+		}()
+	}
+
+	wg.Wait()
+
+	if errp != nil {
+		err = errp
+	}
+	if errc != nil {
+		err = errc
+	}
+	return pr, err
 }

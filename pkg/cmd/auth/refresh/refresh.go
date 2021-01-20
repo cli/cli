@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -21,6 +22,8 @@ type RefreshOptions struct {
 	Hostname string
 	Scopes   []string
 	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
+
+	Interactive bool
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
@@ -50,21 +53,15 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			# => open a browser to ensure your authentication credentials have the correct minimum scopes
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
+			opts.Interactive = opts.IO.CanPrompt()
 
-			if !isTTY {
-				return fmt.Errorf("not attached to a terminal; in headless environments, GITHUB_TOKEN is recommended")
-			}
-
-			if opts.Hostname == "" && !opts.IO.CanPrompt() {
-				// here, we know we are attached to a TTY but prompts are disabled
+			if !opts.Interactive && opts.Hostname == "" {
 				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return refreshRun(opts)
 		},
 	}
@@ -115,8 +112,26 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		var roErr *config.ReadOnlyEnvError
+		if errors.As(err, &roErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
+			fmt.Fprint(opts.IO.ErrOut, "To refresh credentials stored in GitHub CLI, first clear the value from the environment.\n")
+			return cmdutil.SilentError
+		}
 		return err
 	}
 
-	return opts.AuthFlow(cfg, opts.IO, hostname, opts.Scopes)
+	if err := opts.AuthFlow(cfg, opts.IO, hostname, opts.Scopes); err != nil {
+		return err
+	}
+
+	protocol, _ := cfg.Get(hostname, "git_protocol")
+	if opts.Interactive && protocol == "https" {
+		username, _ := cfg.Get(hostname, "user")
+		if err := shared.GitCredentialSetup(cfg, hostname, username); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -77,11 +77,11 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else if tt.wantErr != "" {
-				t.Errorf("expected error %q, got nil", tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())
@@ -168,6 +168,16 @@ func Test_RepoClone(t *testing.T) {
 			args: "Owner/Repo",
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
+		{
+			name: "clone wiki",
+			args: "Owner/Repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "wiki URL",
+			args: "https://github.com/owner/repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -179,7 +189,8 @@ func Test_RepoClone(t *testing.T) {
 					"name": "REPO",
 					"owner": {
 						"login": "OWNER"
-					}
+					},
+					"hasWikiEnabled": true
 				} } }
 				`))
 

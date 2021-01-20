@@ -24,6 +24,8 @@ type ChecksOptions struct {
 	Branch     func() (string, error)
 	Remotes    func() (context.Remotes, error)
 
+	WebMode bool
+
 	SelectorArg string
 }
 
@@ -60,6 +62,8 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
+
 	return cmd
 }
 
@@ -70,7 +74,7 @@ func checksRun(opts *ChecksOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	pr, _, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
 	}
@@ -82,6 +86,16 @@ func checksRun(opts *ChecksOptions) error {
 	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	if len(rollup) == 0 {
 		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
+	}
+
+	isTerminal := opts.IO.IsStdoutTTY()
+
+	if opts.WebMode {
+		openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
+		if isTerminal {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		}
+		return utils.OpenInBrowser(openURL)
 	}
 
 	passing := 0
@@ -164,9 +178,8 @@ func checksRun(opts *ChecksOptions) error {
 		if b0 == b1 {
 			if n0 == n1 {
 				return l0 < l1
-			} else {
-				return n0 < n1
 			}
+			return n0 < n1
 		}
 
 		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
@@ -175,7 +188,7 @@ func checksRun(opts *ChecksOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, o := range outputs {
-		if opts.IO.IsStdoutTTY() {
+		if isTerminal {
 			tp.AddField(o.mark, nil, o.markColor)
 			tp.AddField(o.name, nil, nil)
 			tp.AddField(o.elapsed, nil, nil)
@@ -211,7 +224,7 @@ func checksRun(opts *ChecksOptions) error {
 		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
 	}
 
-	if opts.IO.IsStdoutTTY() {
+	if isTerminal {
 		fmt.Fprintln(opts.IO.Out, summary)
 		fmt.Fprintln(opts.IO.Out)
 	}

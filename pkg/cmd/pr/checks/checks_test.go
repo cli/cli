@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,11 +88,13 @@ func Test_checksRun(t *testing.T) {
 		{
 			name: "no checks",
 			stubs: func(reg *httpmock.Registry) {
-				reg.StubResponse(200, bytes.NewBufferString(`
-				  { "data": { "repository": {
-				  	"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-				  } } }
-				`))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
+						} } }
+					`))
 			},
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
@@ -124,10 +127,12 @@ func Test_checksRun(t *testing.T) {
 			name:   "no checks",
 			nontty: true,
 			stubs: func(reg *httpmock.Registry) {
-				reg.StubResponse(200, bytes.NewBufferString(`
-				  { "data": { "repository": {
-						"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-				  } } }
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
+						} } }
 				`))
 			},
 			wantOut: "",
@@ -190,13 +195,73 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			err := checksRun(opts)
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
-			} else if tt.wantErr != "" {
-				t.Errorf("expected %q, got nil error", tt.wantErr)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
+		})
+	}
+}
+
+func TestChecksRun_web(t *testing.T) {
+	tests := []struct {
+		name       string
+		isTTY      bool
+		wantStderr string
+		wantStdout string
+	}{
+		{
+			name:       "tty",
+			isTTY:      true,
+			wantStderr: "Opening github.com/OWNER/REPO/pull/123/checks in your browser.\n",
+			wantStdout: "",
+		},
+		{
+			name:       "nontty",
+			isTTY:      false,
+			wantStderr: "",
+			wantStdout: "",
+		},
+	}
+
+	reg := &httpmock.Registry{}
+
+	opts := &ChecksOptions{
+		WebMode: true,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		SelectorArg: "123",
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reg.Register(
+				httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse("./fixtures/allPassing.json"))
+
+			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdoutTTY(tc.isTTY)
+			io.SetStdinTTY(tc.isTTY)
+			io.SetStderrTTY(tc.isTTY)
+
+			opts.IO = io
+
+			cs, teardown := test.InitCmdStubber()
+			defer teardown()
+
+			cs.Stub("") // browser open
+
+			err := checksRun(opts)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantStdout, stdout.String())
+			assert.Equal(t, tc.wantStderr, stderr.String())
+			reg.Verify(t)
 		})
 	}
 }

@@ -38,8 +38,9 @@ type CreateOptions struct {
 	RootDirOverride string
 	RepoOverride    string
 
-	Autofill bool
-	WebMode  bool
+	Autofill    bool
+	WebMode     bool
+	RecoverFile string
 
 	IsDraft    bool
 	Title      string
@@ -52,6 +53,8 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+
+	MaintainerCanModify bool
 }
 
 type CreateContext struct {
@@ -90,10 +93,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			A prompt will also ask for the title and the body of the pull request. Use '--title'
 			and '--body' to skip this, or use '--fill' to autofill these values from git commits.
+
+			By default users with write access to the base respository can add new commits to your branch.
+			If undesired, you may disable access of maintainers by using '--no-maintainer-edit'
+			You can always change this setting later via the web interface.
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
-			$ gh pr create --reviewer monalisa,hubot
+			$ gh pr create --reviewer monalisa,hubot  --reviewer myorg/team-name
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 		`),
@@ -102,6 +109,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
+			opts.MaintainerCanModify = !noMaintainerEdit
+
+			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
+				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
+			}
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
 				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
@@ -112,6 +125,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
+			}
+			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
+				return errors.New("the --no-maintainer-edit flag is not supported with --web")
 			}
 
 			if runF != nil {
@@ -129,11 +145,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
-	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people by their `login`")
+	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
+	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
 }
@@ -141,14 +159,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 func createRun(opts *CreateOptions) (err error) {
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
-		return err
+		return
 	}
 
 	client := ctx.Client
 
 	state, err := NewIssueState(*ctx, *opts)
 	if err != nil {
-		return err
+		return
 	}
 
 	if opts.WebMode {
@@ -156,9 +174,9 @@ func createRun(opts *CreateOptions) (err error) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
-		err := handlePush(*opts, *ctx)
+		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return err
+			return
 		}
 		return previewPR(*opts, *ctx, *state)
 	}
@@ -199,35 +217,46 @@ func createRun(opts *CreateOptions) (err error) {
 	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return err
+			return
 		}
 		return submitPR(*opts, *ctx, *state)
+	}
+
+	if opts.RecoverFile != "" {
+		err = shared.FillFromJSON(opts.IO, opts.RecoverFile, state)
+		if err != nil {
+			return fmt.Errorf("failed to recover input: %w", err)
+		}
 	}
 
 	if !opts.TitleProvided {
 		err = shared.TitleSurvey(state)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
 	editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 	if err != nil {
-		return err
+		return
 	}
+
+	defer shared.PreserveInput(opts.IO, state, &err)()
 
 	templateContent := ""
 	if !opts.BodyProvided {
-		templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
+		if opts.RecoverFile == "" {
+			templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
 
-		templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
-		if err != nil {
-			return err
+			templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
+			if err != nil {
+				return
+			}
 		}
 
 		err = shared.BodySurvey(state, templateContent, editorCommand)
 		if err != nil {
-			return err
+			return
 		}
 
 		if state.Body == "" {
@@ -242,14 +271,20 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == shared.MetadataAction {
-		err = shared.MetadataSurvey(opts.IO, client, ctx.BaseRepo, state)
+		fetcher := &shared.MetadataFetcher{
+			IO:        opts.IO,
+			APIClient: client,
+			Repo:      ctx.BaseRepo,
+			State:     state,
+		}
+		err = shared.MetadataSurvey(opts.IO, ctx.BaseRepo, fetcher, state)
 		if err != nil {
-			return err
+			return
 		}
 
 		action, err = shared.ConfirmSubmission(!state.HasMetadata(), false)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
@@ -260,7 +295,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	err = handlePush(*opts, *ctx)
 	if err != nil {
-		return err
+		return
 	}
 
 	if action == shared.PreviewAction {
@@ -271,7 +306,8 @@ func createRun(opts *CreateOptions) (err error) {
 		return submitPR(*opts, *ctx, *state)
 	}
 
-	return errors.New("expected to cancel, preview, or submit")
+	err = errors.New("expected to cancel, preview, or submit")
+	return
 }
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
@@ -362,7 +398,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 
 	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
 		err := initDefaultTitleBody(ctx, state)
-		if err != nil {
+		if err != nil && opts.Autofill {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
@@ -537,11 +573,12 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	client := ctx.Client
 
 	params := map[string]interface{}{
-		"title":       state.Title,
-		"body":        state.Body,
-		"draft":       state.Draft,
-		"baseRefName": ctx.BaseBranch,
-		"headRefName": ctx.HeadBranchLabel,
+		"title":               state.Title,
+		"body":                state.Body,
+		"draft":               state.Draft,
+		"baseRefName":         ctx.BaseBranch,
+		"headRefName":         ctx.HeadBranchLabel,
+		"maintainerCanModify": opts.MaintainerCanModify,
 	}
 
 	if params["title"] == "" {
@@ -666,7 +703,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 	u := ghrepo.GenerateRepoURL(
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
-		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranch))
+		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranchLabel))
 	url, err := shared.WithPrAndIssueQueryParams(u, state)
 	if err != nil {
 		return "", err

@@ -190,7 +190,7 @@ func gardenRun(opts *GardenOptions) error {
 	oldTTYCommand := exec.Command("stty", sttyFileArg, "/dev/tty", "-g")
 	oldTTYSettings, err := oldTTYCommand.CombinedOutput()
 	if err != nil {
-		fmt.Fprintln(out, "getting TTY setings failed:", string(oldTTYSettings))
+		fmt.Fprintln(out, "getting TTY settings failed:", string(oldTTYSettings))
 		return err
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,8 @@ type CreateOptions struct {
 	Public           bool
 	Filenames        []string
 	FilenameOverride string
+
+	WebMode bool
 
 	HttpClient func() (*http.Client, error)
 }
@@ -86,6 +89,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
 	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
 	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
 	return cmd
@@ -137,6 +141,12 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIcon(), completionMessage)
+
+	if opts.WebMode {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
+
+		return utils.OpenInBrowser(gist.HTMLURL)
+	}
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
 
@@ -217,8 +227,8 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 	}
 	requestBody := bytes.NewReader(requestByte)
 
-	apliClient := api.NewClientFromHTTP(client)
-	err = apliClient.REST(hostname, "POST", path, requestBody, &result)
+	apiClient := api.NewClientFromHTTP(client)
+	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
 	if err != nil {
 		return nil, err
 	}
