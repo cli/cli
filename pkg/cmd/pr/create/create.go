@@ -53,6 +53,8 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+
+	MaintainerCanModify bool
 }
 
 type CreateContext struct {
@@ -91,6 +93,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			A prompt will also ask for the title and the body of the pull request. Use '--title'
 			and '--body' to skip this, or use '--fill' to autofill these values from git commits.
+
+			By default users with write access to the base respository can add new commits to your branch.
+			If undesired, you may disable access of maintainers by using '--no-maintainer-edit'
+			You can always change this setting later via the web interface.
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
@@ -103,6 +109,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
+			opts.MaintainerCanModify = !noMaintainerEdit
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
 				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
@@ -117,6 +125,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
 				return errors.New("the --reviewer flag is not supported with --web")
+			}
+			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
+				return errors.New("the --no-maintainer-edit flag is not supported with --web")
 			}
 
 			if runF != nil {
@@ -139,6 +150,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
@@ -561,11 +573,12 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	client := ctx.Client
 
 	params := map[string]interface{}{
-		"title":       state.Title,
-		"body":        state.Body,
-		"draft":       state.Draft,
-		"baseRefName": ctx.BaseBranch,
-		"headRefName": ctx.HeadBranchLabel,
+		"title":               state.Title,
+		"body":                state.Body,
+		"draft":               state.Draft,
+		"baseRefName":         ctx.BaseBranch,
+		"headRefName":         ctx.HeadBranchLabel,
+		"maintainerCanModify": opts.MaintainerCanModify,
 	}
 
 	if params["title"] == "" {
