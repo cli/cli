@@ -119,9 +119,9 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
-				GITHUB_TOKEN: an authentication token for github.com API requests.
+				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for github.com API requests.
 
-				GITHUB_ENTERPRISE_TOKEN: an authentication token for API requests to GitHub Enterprise.
+				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication token for API requests to GitHub Enterprise.
 
 				GH_HOST: make the request to a GitHub host other than github.com.
 			`),
@@ -403,7 +403,7 @@ func parseField(f string) (string, string, error) {
 
 func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	if strings.HasPrefix(v, "@") {
-		return readUserFile(v[1:], opts.IO.In)
+		return opts.IO.ReadUserFile(v[1:])
 	}
 
 	if n, err := strconv.Atoi(v); err == nil {
@@ -420,21 +420,6 @@ func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	default:
 		return fillPlaceholders(v, opts)
 	}
-}
-
-func readUserFile(fn string, stdin io.ReadCloser) ([]byte, error) {
-	var r io.ReadCloser
-	if fn == "-" {
-		r = stdin
-	} else {
-		var err error
-		r, err = os.Open(fn)
-		if err != nil {
-			return nil, err
-		}
-	}
-	defer r.Close()
-	return ioutil.ReadAll(r)
 }
 
 func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) {

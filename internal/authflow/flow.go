@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/auth"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/browser"
-	"github.com/cli/cli/utils"
-	"github.com/mattn/go-colorable"
+	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/oauth"
 )
 
 var (
@@ -23,12 +23,13 @@ var (
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
 
-func AuthFlowWithConfig(cfg config.Config, hostname, notice string, additionalScopes []string) (string, error) {
+func AuthFlowWithConfig(cfg config.Config, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
-	stderr := colorable.NewColorableStderr()
+	stderr := IO.ErrOut
+	cs := IO.ColorScheme()
 
-	token, userLogin, err := authFlow(hostname, stderr, notice, additionalScopes)
+	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes)
 	if err != nil {
 		return "", err
 	}
@@ -48,65 +49,78 @@ func AuthFlowWithConfig(cfg config.Config, hostname, notice string, additionalSc
 	}
 
 	fmt.Fprintf(stderr, "%s Authentication complete. %s to continue...\n",
-		utils.GreenCheck(), utils.Bold("Press Enter"))
-	_ = waitForEnter(os.Stdin)
+		cs.SuccessIcon(), cs.Bold("Press Enter"))
+	_ = waitForEnter(IO.In)
 
 	return token, nil
 }
 
-func authFlow(oauthHost string, w io.Writer, notice string, additionalScopes []string) (string, string, error) {
-	var verboseStream io.Writer
-	if strings.Contains(os.Getenv("DEBUG"), "oauth") {
-		verboseStream = w
+func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string) (string, string, error) {
+	w := IO.ErrOut
+	cs := IO.ColorScheme()
+
+	httpClient := http.DefaultClient
+	if envDebug := os.Getenv("DEBUG"); envDebug != "" {
+		logTraffic := strings.Contains(envDebug, "api") || strings.Contains(envDebug, "oauth")
+		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 
-	minimumScopes := []string{"repo", "read:org", "gist"}
+	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
 	scopes := append(minimumScopes, additionalScopes...)
 
-	flow := &auth.OAuthFlow{
+	callbackURI := "http://127.0.0.1/callback"
+	if ghinstance.IsEnterprise(oauthHost) {
+		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
+		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
+		callbackURI = "http://localhost/"
+	}
+
+	flow := &oauth.Flow{
 		Hostname:     oauthHost,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
+		CallbackURI:  callbackURI,
 		Scopes:       scopes,
-		WriteSuccessHTML: func(w io.Writer) {
-			fmt.Fprintln(w, oauthSuccessPage)
+		DisplayCode: func(code, verificationURL string) error {
+			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
+			return nil
 		},
-		VerboseStream: verboseStream,
-		HTTPClient:    http.DefaultClient,
-		OpenInBrowser: func(url, code string) error {
-			if code != "" {
-				fmt.Fprintf(w, "%s First copy your one-time code: %s\n", utils.Yellow("!"), utils.Bold(code))
-			}
-			fmt.Fprintf(w, "- %s to open %s in your browser... ", utils.Bold("Press Enter"), oauthHost)
-			_ = waitForEnter(os.Stdin)
+		BrowseURL: func(url string) error {
+			fmt.Fprintf(w, "- %s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
+			_ = waitForEnter(IO.In)
 
 			browseCmd, err := browser.Command(url)
 			if err != nil {
 				return err
 			}
-			err = browseCmd.Run()
-			if err != nil {
-				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", utils.Red("!"), url)
+			if err := browseCmd.Run(); err != nil {
+				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
 			}
 			return nil
 		},
+		WriteSuccessHTML: func(w io.Writer) {
+			fmt.Fprintln(w, oauthSuccessPage)
+		},
+		HTTPClient: httpClient,
+		Stdin:      IO.In,
+		Stdout:     w,
 	}
 
 	fmt.Fprintln(w, notice)
 
-	token, err := flow.ObtainAccessToken()
+	token, err := flow.DetectFlow()
 	if err != nil {
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(oauthHost, token)
+	userLogin, err := getViewer(oauthHost, token.Token)
 	if err != nil {
 		return "", "", err
 	}
 
-	return token, userLogin, nil
+	return token.Token, userLogin, nil
 }
 
 func getViewer(hostname, token string) (string, error) {

@@ -222,7 +222,7 @@ func Test_ViewRun(t *testing.T) {
 
 
 
-				View this repository on GitHub: https://github.com/OWNER/REPO
+				View this repository on GitHub: https://github.com/OWNER/REPO/tree/feat%2Fawesome
 			`),
 		},
 		{

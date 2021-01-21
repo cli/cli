@@ -3,6 +3,9 @@ package update
 import (
 	"fmt"
 	"io/ioutil"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -10,6 +13,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
+
+var gitDescribeSuffixRE = regexp.MustCompile(`\d+-\d+-g[a-f0-9]{8}$`)
 
 // ReleaseInfo stores information about a release
 type ReleaseInfo struct {
@@ -24,31 +29,31 @@ type StateEntry struct {
 
 // CheckForUpdate checks whether this software has had a newer release on GitHub
 func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
-	latestRelease, err := getLatestReleaseInfo(client, stateFilePath, repo, currentVersion)
+	stateEntry, _ := getStateEntry(stateFilePath)
+	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
+		return nil, nil
+	}
+
+	releaseInfo, err := getLatestReleaseInfo(client, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	if versionGreaterThan(latestRelease.Version, currentVersion) {
-		return latestRelease, nil
+	err = setStateEntry(stateFilePath, time.Now(), *releaseInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	if versionGreaterThan(releaseInfo.Version, currentVersion) {
+		return releaseInfo, nil
 	}
 
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
-	stateEntry, err := getStateEntry(stateFilePath)
-	if err == nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
-		return &stateEntry.LatestRelease, nil
-	}
-
+func getLatestReleaseInfo(client *api.Client, repo string) (*ReleaseInfo, error) {
 	var latestRelease ReleaseInfo
-	err = client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
-	if err != nil {
-		return nil, err
-	}
-
-	err = setStateEntry(stateFilePath, time.Now(), latestRelease)
+	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +88,12 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 }
 
 func versionGreaterThan(v, w string) bool {
+	w = gitDescribeSuffixRE.ReplaceAllStringFunc(w, func(m string) string {
+		idx := strings.IndexRune(m, '-')
+		n, _ := strconv.Atoi(m[0:idx])
+		return fmt.Sprintf("%d-pre.0", n+1)
+	})
+
 	vv, ve := version.NewVersion(v)
 	vw, we := version.NewVersion(w)
 

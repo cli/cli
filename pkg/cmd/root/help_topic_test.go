@@ -34,7 +34,7 @@ func TestNewHelpTopic(t *testing.T) {
 			topic:    "environment",
 			args:     []string{"invalid"},
 			flags:    []string{},
-			wantsErr: true,
+			wantsErr: false,
 		},
 		{
 			name:     "more than zero flags",
@@ -48,7 +48,7 @@ func TestNewHelpTopic(t *testing.T) {
 			topic:    "environment",
 			args:     []string{"help"},
 			flags:    []string{},
-			wantsErr: true,
+			wantsErr: false,
 		},
 		{
 			name:     "help flag",

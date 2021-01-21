@@ -17,6 +17,10 @@ func DisableAuthCheck(cmd *cobra.Command) {
 }
 
 func CheckAuth(cfg config.Config) bool {
+	if config.AuthTokenProvidedFromEnv() {
+		return true
+	}
+
 	hosts, err := cfg.Hosts()
 	if err != nil {
 		return false

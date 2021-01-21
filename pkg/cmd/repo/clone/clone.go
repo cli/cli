@@ -23,7 +23,6 @@ type CloneOptions struct {
 	IO         *iostreams.IOStreams
 
 	GitArgs    []string
-	Directory  string
 	Repository string
 }
 
@@ -38,14 +37,14 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		DisableFlagsInUseLine: true,
 
 		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
 		Short: "Clone a repository locally",
 		Long: heredoc.Doc(`
 			Clone a GitHub repository locally.
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
-			
+
 			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,12 +82,13 @@ func cloneRun(opts *CloneOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	respositoryIsURL := strings.Contains(opts.Repository, ":")
-	repositoryIsFullName := !respositoryIsURL && strings.Contains(opts.Repository, "/")
+	repositoryIsURL := strings.Contains(opts.Repository, ":")
+	repositoryIsFullName := !repositoryIsURL && strings.Contains(opts.Repository, "/")
 
 	var repo ghrepo.Interface
 	var protocol string
-	if respositoryIsURL {
+
+	if repositoryIsURL {
 		repoURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
 			return err
@@ -124,6 +124,12 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 
+	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
+	if wantsWiki {
+		repoName := strings.TrimSuffix(repo.RepoName(), ".wiki")
+		repo = ghrepo.NewWithHost(repo.RepoOwner(), repoName, repo.RepoHost())
+	}
+
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
@@ -131,6 +137,14 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+
+	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
+	if wantsWiki {
+		if !canonicalRepo.HasWikiEnabled {
+			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
+		}
+		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
+	}
 
 	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
 	if err != nil {

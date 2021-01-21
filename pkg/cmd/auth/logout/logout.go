@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -106,6 +105,12 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		var roErr *config.ReadOnlyEnvError
+		if errors.As(err, &roErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
+			fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
+			return cmdutil.SilentError
+		}
 		return err
 	}
 
@@ -151,8 +156,9 @@ func logoutRun(opts *LogoutOptions) error {
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	if isTTY {
+		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s%s\n",
-			utils.GreenCheck(), utils.Bold(hostname), usernameStr)
+			cs.SuccessIcon(), cs.Bold(hostname), usernameStr)
 	}
 
 	return nil

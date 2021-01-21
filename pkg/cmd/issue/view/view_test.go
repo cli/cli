@@ -2,10 +2,10 @@ package view
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -16,14 +16,8 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -67,12 +61,15 @@ func TestIssueView_web(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -86,26 +83,29 @@ func TestIssueView_web(t *testing.T) {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/123 in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_web_numberArgWithHash(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -119,14 +119,14 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/123 in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -192,7 +192,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				t.Errorf("error running `issue view`: %v", err)
 			}
 
-			eq(t, output.Stderr(), "")
+			assert.Equal(t, "", output.Stderr())
 
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
@@ -208,7 +208,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture: "./fixtures/issueView_preview.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open.*marseilles opened about 292 years ago.*9 comments`,
+				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -217,7 +217,8 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture: "./fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open.*marseilles opened about 292 years ago.*9 comments`,
+				`Open.*marseilles opened about 9 years ago.*9 comments`,
+				`8 \x{1f615} • 7 \x{1f440} • 6 \x{2764}\x{fe0f} • 5 \x{1f389} • 4 \x{1f604} • 3 \x{1f680} • 2 \x{1f44e} • 1 \x{1f44d}`,
 				`Assignees:.*marseilles, monaco\n`,
 				`Labels:.*one, two, three, four, five\n`,
 				`Projects:.*Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
@@ -230,7 +231,8 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture: "./fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Open.*marseilles opened about 292 years ago.*9 comments`,
+				`Open.*marseilles opened about 9 years ago.*9 comments`,
+				`No description provided`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
@@ -238,7 +240,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 			fixture: "./fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
 				`ix of coins`,
-				`Closed.*marseilles opened about 292 years ago.*9 comments`,
+				`Closed.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -256,7 +258,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				t.Errorf("error running `issue view`: %v", err)
 			}
 
-			eq(t, output.Stderr(), "")
+			assert.Equal(t, "", output.Stderr())
 
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
@@ -267,11 +269,14 @@ func TestIssueView_web_notFound(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "errors": [
-		{ "message": "Could not resolve to an Issue with the number of 9999." }
-	] }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "errors": [
+				{ "message": "Could not resolve to an Issue with the number of 9999." }
+			] }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -294,12 +299,15 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": false
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": false
+			} } }
+		`),
+	)
 
 	_, err := runCommand(http, true, `6666`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
@@ -311,12 +319,15 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-		"number": 123,
-		"url": "https://github.com/OWNER/REPO/issues/123"
-	} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"number": 123,
+				"url": "https://github.com/OWNER/REPO/issues/123"
+			} } } }
+			`),
+	)
 
 	var seenCmd *exec.Cmd
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
@@ -330,11 +341,155 @@ func TestIssueView_web_urlArg(t *testing.T) {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	eq(t, output.String(), "")
+	assert.Equal(t, "", output.String())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/123")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
+}
+
+func TestIssueView_tty_Comments(t *testing.T) {
+	tests := map[string]struct {
+		cli             string
+		fixtures        map[string]string
+		expectedOutputs []string
+		wantsErr        bool
+	}{
+		"without comments flag": {
+			cli: "123",
+			fixtures: map[string]string{
+				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
+			},
+			expectedOutputs: []string{
+				`some title`,
+				`some body`,
+				`———————— Not showing 4 comments ————————`,
+				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
+				`Comment 5`,
+				`Use --comments to view the full conversation`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
+			},
+		},
+		"with comments flag": {
+			cli: "123 --comments",
+			fixtures: map[string]string{
+				"IssueByNumber":    "./fixtures/issueView_previewSingleComment.json",
+				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
+			},
+			expectedOutputs: []string{
+				`some title`,
+				`some body`,
+				`monalisa • Jan  1, 2020 • Edited`,
+				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,
+				`Comment 1`,
+				`johnnytest \(Contributor\) • Jan  1, 2020`,
+				`Comment 2`,
+				`elvisp \(Member\) • Jan  1, 2020`,
+				`Comment 3`,
+				`loislane \(Owner\) • Jan  1, 2020`,
+				`Comment 4`,
+				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
+				`Comment 5`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
+			},
+		},
+		"with invalid comments flag": {
+			cli:      "123 --comments 3",
+			wantsErr: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			http := &httpmock.Registry{}
+			defer http.Verify(t)
+			for name, file := range tc.fixtures {
+				name := fmt.Sprintf(`query %s\b`, name)
+				http.Register(httpmock.GraphQL(name), httpmock.FileResponse(file))
+			}
+			output, err := runCommand(http, true, tc.cli)
+			if tc.wantsErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, "", output.Stderr())
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
+	}
+}
+
+func TestIssueView_nontty_Comments(t *testing.T) {
+	tests := map[string]struct {
+		cli             string
+		fixtures        map[string]string
+		expectedOutputs []string
+		wantsErr        bool
+	}{
+		"without comments flag": {
+			cli: "123",
+			fixtures: map[string]string{
+				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
+			},
+			expectedOutputs: []string{
+				`title:\tsome title`,
+				`state:\tOPEN`,
+				`author:\tmarseilles`,
+				`comments:\t5`,
+				`some body`,
+			},
+		},
+		"with comments flag": {
+			cli: "123 --comments",
+			fixtures: map[string]string{
+				"IssueByNumber":    "./fixtures/issueView_previewSingleComment.json",
+				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
+			},
+			expectedOutputs: []string{
+				`author:\tmonalisa`,
+				`association:\t`,
+				`edited:\ttrue`,
+				`Comment 1`,
+				`author:\tjohnnytest`,
+				`association:\tcontributor`,
+				`edited:\tfalse`,
+				`Comment 2`,
+				`author:\telvisp`,
+				`association:\tmember`,
+				`edited:\tfalse`,
+				`Comment 3`,
+				`author:\tloislane`,
+				`association:\towner`,
+				`edited:\tfalse`,
+				`Comment 4`,
+				`author:\tmarseilles`,
+				`association:\tcollaborator`,
+				`edited:\tfalse`,
+				`Comment 5`,
+			},
+		},
+		"with invalid comments flag": {
+			cli:      "123 --comments 3",
+			wantsErr: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			http := &httpmock.Registry{}
+			defer http.Verify(t)
+			for name, file := range tc.fixtures {
+				name := fmt.Sprintf(`query %s\b`, name)
+				http.Register(httpmock.GraphQL(name), httpmock.FileResponse(file))
+			}
+			output, err := runCommand(http, false, tc.cli)
+			if tc.wantsErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, "", output.Stderr())
+			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
+	}
 }
