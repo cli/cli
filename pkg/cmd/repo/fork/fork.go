@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type ForkOptions struct {
@@ -26,6 +27,7 @@ type ForkOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 
+	GitArgs      []string
 	Repository   string
 	Clone        bool
 	Remote       bool
@@ -48,16 +50,24 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "fork [<repository>]",
-		Args:  cobra.MaximumNArgs(1),
+		Use: "fork [<repository>] [-- <gitflags>...]",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
+				return cmdutil.FlagError{Err: fmt.Errorf("repository argument required when passing 'git clone' flags")}
+			}
+			return nil
+		},
 		Short: "Create a fork of a repository",
 		Long: `Create a fork of a repository.
 
-With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.`,
+With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.
+
+Additional 'git clone' flags can be passed in by listing them after '--'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
 			if len(args) > 0 {
 				opts.Repository = args[0]
+				opts.GitArgs = args[1:]
 			}
 
 			if promptOk && !cmd.Flags().Changed("clone") {
@@ -74,6 +84,12 @@ With no argument, creates a fork of the current repository. Otherwise, forks the
 			return forkRun(opts)
 		},
 	}
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		if err == pflag.ErrHelp {
+			return err
+		}
+		return &cmdutil.FlagError{Err: fmt.Errorf("%w\nSeparate git clone flags with '--'.", err)}
+	})
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
@@ -243,7 +259,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 		if cloneDesired {
 			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-			cloneDir, err := git.RunClone(forkedRepoURL, []string{})
+			cloneDir, err := git.RunClone(forkedRepoURL, opts.GitArgs)
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}

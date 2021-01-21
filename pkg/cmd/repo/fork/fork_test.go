@@ -495,6 +495,35 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 	reg.Verify(t)
 }
 
+func Test_RepoFork_gitFlags(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone --depth 1 https://github.com/someone/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git`, 0, "")
+
+	output, err := runCommand(httpClient, nil, false, "--clone OWNER/REPO -- --depth 1")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, output.Stderr(), "")
+	reg.Verify(t)
+}
+
+func Test_RepoFork_flagError(t *testing.T) {
+	_, err := runCommand(nil, nil, true, "--depth 1 OWNER/REPO")
+	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
 func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
