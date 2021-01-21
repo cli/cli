@@ -5,6 +5,8 @@ export CGO_CFLAGS
 CGO_LDFLAGS ?= $(filter -g -L% -l% -O%,${LDFLAGS})
 export CGO_LDFLAGS
 
+## The following tasks delegate to `script/build.go` so they can be run cross-platform.
+
 .PHONY: bin/gh
 bin/gh: script/build
 	@script/build bin/gh
@@ -20,9 +22,12 @@ clean: script/build
 manpages: script/build
 	@script/build manpages
 
+# just a convenience task around `go test`
 .PHONY: test
 test:
 	go test ./...
+
+## Site-related tasks are exclusively intended for use by the GitHub CLI team and for our release automation.
 
 site:
 	git clone https://github.com/github/cli.github.com.git "$@"
@@ -44,6 +49,8 @@ endif
 	sed -i.bak -E 's/(assign version = )".+"/\1"$(GITHUB_REF:refs/tags/v%=%)"/' site/index.html
 	rm -f site/index.html.bak
 	git -C site commit -m '$(GITHUB_REF:refs/tags/v%=%)' index.html
+
+## Install/uninstall tasks are here for use on *nix platform. On Windows, there is no equivalent.
 
 DESTDIR :=
 prefix  := /usr/local
