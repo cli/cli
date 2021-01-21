@@ -681,9 +681,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return nil
 		}
 
-		opts.IO.StartProgressIndicator()
 		err := pushBranch()
-		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
