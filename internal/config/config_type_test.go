@@ -55,16 +55,47 @@ func Test_defaultConfig(t *testing.T) {
 	assert.Equal(t, "", hostsBuf.String())
 
 	proto, err := cfg.Get("", "git_protocol")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "https", proto)
 
 	editor, err := cfg.Get("", "editor")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", editor)
 
 	aliases, err := cfg.Aliases()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, len(aliases.All()), 1)
 	expansion, _ := aliases.Get("co")
 	assert.Equal(t, expansion, "pr checkout")
+}
+
+func Test_ValidateValue(t *testing.T) {
+	err := ValidateValue("git_protocol", "sshpps")
+	assert.EqualError(t, err, "invalid value")
+
+	err = ValidateValue("git_protocol", "ssh")
+	assert.NoError(t, err)
+
+	err = ValidateValue("editor", "vim")
+	assert.NoError(t, err)
+
+	err = ValidateValue("got", "123")
+	assert.NoError(t, err)
+}
+
+func Test_ValidateKey(t *testing.T) {
+	err := ValidateKey("invalid")
+	assert.EqualError(t, err, "invalid key")
+
+	err = ValidateKey("git_protocol")
+	assert.NoError(t, err)
+
+	err = ValidateKey("editor")
+	assert.NoError(t, err)
+
+	err = ValidateKey("prompt")
+	assert.NoError(t, err)
+
+	err = ValidateKey("pager")
+	assert.NoError(t, err)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -58,14 +59,21 @@ func TestIssueReopen(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": true, "title": "The title of the issue"}
-	} } }
-	`))
-
-	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issue": { "id": "THE-ID", "number": 2, "closed": true, "title": "The title of the issue"}
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation IssueReopen\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["issueId"], "THE-ID")
+			}),
+	)
 
 	output, err := runCommand(http, true, "2")
 	if err != nil {
@@ -83,12 +91,14 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issue": { "number": 2, "closed": false, "title": "The title of the issue"}
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issue": { "number": 2, "closed": false, "title": "The title of the issue"}
+			} } }`),
+	)
 
 	output, err := runCommand(http, true, "2")
 	if err != nil {
@@ -106,11 +116,13 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": false
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": false
+			} } }`),
+	)
 
 	_, err := runCommand(http, true, "2")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {

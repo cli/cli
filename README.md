@@ -42,22 +42,22 @@ For more information and distro-specific instructions, see the [Linux installati
 
 ### Windows
 
-`gh` is available via [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], and as downloadable MSI.
+
+
+#### WinGet
+
+| Install:            | Upgrade:            |
+| ------------------- | --------------------|
+| `winget install gh` | `winget install gh` |
+
+<i>WinGet does not have a specialized `upgrade` command yet, but the `install` command should work for upgrading to a newer version of GitHub CLI.</i>
 
 #### scoop
 
-Install:
-
-```powershell
-scoop bucket add github-gh https://github.com/cli/scoop-gh.git
-scoop install gh
-```
-
-Upgrade:
-
-```powershell
-scoop update gh
-```
+| Install:           | Upgrade:           |
+| ------------------ | ------------------ |
+| `scoop install gh` | `scoop update gh`  |
 
 #### Chocolatey
 
@@ -88,6 +88,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [manual]: https://cli.github.com/manual/
 [Homebrew]: https://brew.sh
 [MacPorts]: https://www.macports.org
+[winget]: https://github.com/microsoft/winget-cli
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [releases page]: https://github.com/cli/cli/releases/latest

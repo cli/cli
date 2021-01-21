@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/cli/cli/test"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -254,6 +255,26 @@ func Test_createRun(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "web arg",
+			opts: &CreateOptions{
+				WebMode:   true,
+				Filenames: []string{fixtureFile},
+			},
+			wantOut:    "Opening gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
+			wantErr:    false,
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
+						"content": "{}",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
@@ -270,6 +291,13 @@ func Test_createRun(t *testing.T) {
 		io, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
 
+		cs, cmdTeardown := test.InitCmdStubber()
+		defer cmdTeardown()
+
+		if tt.opts.WebMode {
+			cs.Stub("")
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
 			stdin.WriteString(tt.stdin)
 
@@ -285,6 +313,12 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantParams, reqBody)
+
+			if tt.opts.WebMode {
+				browserCall := cs.Calls[0].Args
+				assert.Equal(t, browserCall[len(browserCall)-1], "https://gist.github.com/aa5a315d61ae9438b18d")
+			}
+
 			reg.Verify(t)
 		})
 	}

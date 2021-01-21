@@ -19,7 +19,7 @@ import (
 func makeCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
 	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
 	return &http.Client{
-		Transport: CacheReponse(cacheTTL, cacheDir)(httpClient.Transport),
+		Transport: CacheResponse(cacheTTL, cacheDir)(httpClient.Transport),
 	}
 }
 
@@ -39,8 +39,8 @@ func isCacheableResponse(res *http.Response) bool {
 	return res.StatusCode < 500 && res.StatusCode != 403
 }
 
-// CacheReponse produces a RoundTripper that caches HTTP responses to disk for a specified amount of time
-func CacheReponse(ttl time.Duration, dir string) ClientOption {
+// CacheResponse produces a RoundTripper that caches HTTP responses to disk for a specified amount of time
+func CacheResponse(ttl time.Duration, dir string) ClientOption {
 	fs := fileStorage{
 		dir: dir,
 		ttl: ttl,

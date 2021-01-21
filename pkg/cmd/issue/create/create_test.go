@@ -3,16 +3,19 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -21,13 +24,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
@@ -79,83 +75,166 @@ func TestIssueCreate_nontty_error(t *testing.T) {
 	defer http.Verify(t)
 
 	_, err := runCommand(http, false, `-t hello`)
-	if err == nil {
-		t.Fatal("expected error running command `issue create`")
-	}
-
-	assert.Equal(t, "must provide --title and --body when not running interactively", err.Error())
+	assert.EqualError(t, err, "must provide --title and --body when not running interactively")
 }
 
 func TestIssueCreate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "createIssue": { "issue": {
-			"URL": "https://github.com/OWNER/REPO/issues/12"
-		} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+				{ "data": { "createIssue": { "issue": {
+					"URL": "https://github.com/OWNER/REPO/issues/12"
+				} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["repositoryId"], "REPOID")
+				assert.Equal(t, inputs["title"], "hello")
+				assert.Equal(t, inputs["body"], "cash rules everything around me")
+			}),
+	)
 
 	output, err := runCommand(http, true, `-t hello -b "cash rules everything around me"`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
+
+func TestIssueCreate_recover(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+		httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "MonaLisa", "id": "MONAID" },
+			"repository": {
+				"l000": { "name": "bug", "id": "BUGID" },
+				"l001": { "name": "TODO", "id": "TODOID" }
 			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
+		} }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "recovered title", inputs["title"])
+			assert.Equal(t, "recovered body", inputs["body"])
+			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+		}))
 
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "cash rules everything around me")
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Title",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:    "Body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	assert.NoError(t, err)
+
+	state := prShared.IssueMetadataState{
+		Title:  "recovered title",
+		Body:   "recovered body",
+		Labels: []string{"bug", "TODO"},
+	}
+
+	data, err := json.Marshal(state)
+	assert.NoError(t, err)
+
+	_, err = tmpfile.Write(data)
+	assert.NoError(t, err)
+
+	args := fmt.Sprintf("--recover '%s'", tmpfile.Name())
+
+	output, err := runCommandWithRootDirOverridden(http, true, args, "")
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": true
-		} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "createIssue": { "issue": {
-			"URL": "https://github.com/OWNER/REPO/issues/12"
-		} } } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+			{ "data": { "createIssue": { "issue": {
+				"URL": "https://github.com/OWNER/REPO/issues/12"
+			} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["repositoryId"], "REPOID")
+				assert.Equal(t, inputs["title"], "hello")
+				assert.Equal(t, inputs["body"], "I have a suggestion for an enhancement")
+			}),
+	)
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
+
+	// template
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "index",
 			Value: 1,
 		},
 	})
+	// body
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:    "body",
+			Name:    "Body",
 			Default: true,
 		},
-	})
+	}) // body
+	// confirm
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmation",
@@ -168,23 +247,65 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[1].Body)
-	reqBody := struct {
-		Variables struct {
-			Input struct {
-				RepositoryID string
-				Title        string
-				Body         string
-			}
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
 
-	eq(t, reqBody.Variables.Input.RepositoryID, "REPOID")
-	eq(t, reqBody.Variables.Input.Title, "hello")
-	eq(t, reqBody.Variables.Input.Body, "I have a suggestion for an enhancement")
+func TestIssueCreate_continueInBrowser(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`),
+	)
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	// title
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "Title",
+			Value: "hello",
+		},
+	})
+	// confirm
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+
+	var seenCmd *exec.Cmd
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		seenCmd = cmd
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, true, `-b body`)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		
+		Creating issue in OWNER/REPO
+		
+		Opening github.com/OWNER/REPO/issues/new in your browser.
+	`), output.Stderr())
+
+	if seenCmd == nil {
+		t.Fatal("expected a command to run")
+	}
+	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {
@@ -243,12 +364,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"URL": "https://github.com/OWNER/REPO/issues/12"
 		} } } }
 	`, func(inputs map[string]interface{}) {
-			eq(t, inputs["title"], "TITLE")
-			eq(t, inputs["body"], "BODY")
-			eq(t, inputs["assigneeIds"], []interface{}{"MONAID"})
-			eq(t, inputs["labelIds"], []interface{}{"BUGID", "TODOID"})
-			eq(t, inputs["projectIds"], []interface{}{"ROADMAPID"})
-			eq(t, inputs["milestoneId"], "BIGONEID")
+			assert.Equal(t, "TITLE", inputs["title"])
+			assert.Equal(t, "BODY", inputs["body"])
+			assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
 			if v, ok := inputs["userIds"]; ok {
 				t.Errorf("did not expect userIds: %v", v)
 			}
@@ -262,19 +383,21 @@ func TestIssueCreate_metadata(t *testing.T) {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	eq(t, output.String(), "https://github.com/OWNER/REPO/issues/12\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
 }
 
 func TestIssueCreate_disabledIssues(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": {
-			"id": "REPOID",
-			"hasIssuesEnabled": false
-		} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": false
+			} } }`),
+	)
 
 	_, err := runCommand(http, true, `-t heres -b johnny`)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
@@ -302,9 +425,9 @@ func TestIssueCreate_web(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new")
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new", url)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
@@ -327,7 +450,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	eq(t, url, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle")
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/issues/new in your browser.\n")
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }

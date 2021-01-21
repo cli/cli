@@ -33,12 +33,8 @@ type Issue struct {
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Comments  struct {
-		TotalCount int
-	}
-	Author struct {
-		Login string
-	}
+	Comments  Comments
+	Author    Author
 	Assignees struct {
 		Nodes []struct {
 			Login string
@@ -65,10 +61,15 @@ type Issue struct {
 	Milestone struct {
 		Title string
 	}
+	ReactionGroups ReactionGroups
 }
 
 type IssuesDisabledError struct {
 	error
+}
+
+type Author struct {
+	Login string
 }
 
 const fragments = `
@@ -78,7 +79,7 @@ const fragments = `
 		url
 		state
 		updatedAt
-		labels(first: 3) {
+		labels(first: 100) {
 			nodes {
 				name
 			}
@@ -251,13 +252,13 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 
 	if milestoneString != "" {
 		var milestone *RepoMilestone
-		if milestoneNumber, err := strconv.Atoi(milestoneString); err == nil {
-			milestone, err = MilestoneByNumber(client, repo, milestoneNumber)
+		if milestoneNumber, err := strconv.ParseInt(milestoneString, 10, 32); err == nil {
+			milestone, err = MilestoneByNumber(client, repo, int32(milestoneNumber))
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			milestone, err = MilestoneByTitle(client, repo, milestoneString)
+			milestone, err = MilestoneByTitle(client, repo, "all", milestoneString)
 			if err != nil {
 				return nil, err
 			}
@@ -341,7 +342,22 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				author {
 					login
 				}
-				comments {
+				comments(last: 1) {
+					nodes {
+						author {
+							login
+						}
+						authorAssociation
+						body
+						createdAt
+						includesCreatedEdit
+						reactionGroups {
+							content
+							users {
+								totalCount
+							}
+						}
+					}
 					totalCount
 				}
 				number
@@ -370,8 +386,14 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					}
 					totalCount
 				}
-				milestone{
+				milestone {
 					title
+				}
+				reactionGroups {
+					content
+					users {
+						totalCount
+					}
 				}
 			}
 		}
@@ -458,4 +480,12 @@ func milestoneNodeIdToDatabaseId(nodeId string) (string, error) {
 		return "", fmt.Errorf("couldn't get database id from node id")
 	}
 	return splitted[1], nil
+}
+
+func (i Issue) Link() string {
+	return i.URL
+}
+
+func (i Issue) Identifier() string {
+	return i.ID
 }

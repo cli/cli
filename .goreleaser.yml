@@ -15,7 +15,7 @@ builds:
       binary: bin/gh
       main: ./cmd/gh
       ldflags:
-        - -s -w -X github.com/cli/cli/command.Version={{.Version}} -X github.com/cli/cli/command.BuildDate={{time "2006-01-02"}}
+        - -s -w -X github.com/cli/cli/internal/build.Version={{.Version}} -X github.com/cli/cli/internal/build.Date={{time "2006-01-02"}}
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
@@ -24,7 +24,9 @@ builds:
   - <<: *build_defaults
     id: linux
     goos: [linux]
-    goarch: [386, amd64, arm64]
+    goarch: [386, arm, amd64, arm64]
+    env:
+      - CGO_ENABLED=0
 
   - <<: *build_defaults
     id: windows

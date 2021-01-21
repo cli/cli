@@ -7,12 +7,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/githubtemplate"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
@@ -28,6 +26,7 @@ type CreateOptions struct {
 
 	RepoOverride string
 	WebMode      bool
+	RecoverFile  string
 
 	Title       string
 	Body        string
@@ -65,6 +64,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			bodyProvided := cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
+			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
+				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
+			}
+
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
@@ -85,30 +88,24 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
+	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *CreateOptions) (err error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
-		return err
+		return
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
-		return err
+		return
 	}
 
-	var nonLegacyTemplateFiles []string
-	if opts.RootDirOverride != "" {
-		nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(opts.RootDirOverride, "ISSUE_TEMPLATE")
-	} else if opts.RepoOverride == "" {
-		if rootDir, err := git.ToplevelDir(); err == nil {
-			nonLegacyTemplateFiles = githubtemplate.FindNonLegacy(rootDir, "ISSUE_TEMPLATE")
-		}
-	}
+	templateFiles, legacyTemplate := prShared.FindTemplates(opts.RootDirOverride, "ISSUE_TEMPLATE")
 
 	isTerminal := opts.IO.IsStdoutTTY()
 
@@ -117,14 +114,32 @@ func createRun(opts *CreateOptions) error {
 		milestones = []string{opts.Milestone}
 	}
 
+	tb := prShared.IssueMetadataState{
+		Type:       prShared.IssueMetadata,
+		Assignees:  opts.Assignees,
+		Labels:     opts.Labels,
+		Projects:   opts.Projects,
+		Milestones: milestones,
+		Title:      opts.Title,
+		Body:       opts.Body,
+	}
+
+	if opts.RecoverFile != "" {
+		err = prShared.FillFromJSON(opts.IO, opts.RecoverFile, &tb)
+		if err != nil {
+			err = fmt.Errorf("failed to recover input: %w", err)
+			return
+		}
+	}
+
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if opts.Title != "" || opts.Body != "" {
-			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, opts.Title, opts.Body, opts.Assignees, opts.Labels, opts.Projects, milestones)
+			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 			if err != nil {
-				return err
+				return
 			}
-		} else if len(nonLegacyTemplateFiles) > 1 {
+		} else if len(templateFiles) > 1 {
 			openURL += "/choose"
 		}
 		if isTerminal {
@@ -139,68 +154,91 @@ func createRun(opts *CreateOptions) error {
 
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
-		return err
+		return
 	}
 	if !repo.HasIssuesEnabled {
-		return fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(baseRepo))
+		err = fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(baseRepo))
+		return
 	}
 
 	action := prShared.SubmitAction
-	tb := prShared.IssueMetadataState{
-		Type:       prShared.IssueMetadata,
-		Assignees:  opts.Assignees,
-		Labels:     opts.Labels,
-		Projects:   opts.Projects,
-		Milestones: milestones,
-	}
-
-	title := opts.Title
-	body := opts.Body
 
 	if opts.Interactive {
-		var legacyTemplateFile *string
-		if opts.RepoOverride == "" {
-			if rootDir, err := git.ToplevelDir(); err == nil {
-				// TODO: figure out how to stub this in tests
-				legacyTemplateFile = githubtemplate.FindLegacy(rootDir, "ISSUE_TEMPLATE")
+		var editorCommand string
+		editorCommand, err = cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return
+		}
+
+		defer prShared.PreserveInput(opts.IO, &tb, &err)()
+
+		if opts.Title == "" {
+			err = prShared.TitleSurvey(&tb)
+			if err != nil {
+				return
 			}
 		}
 
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return err
+		if opts.Body == "" {
+			templateContent := ""
+
+			if opts.RecoverFile == "" {
+				templateContent, err = prShared.TemplateSurvey(templateFiles, legacyTemplate, tb)
+				if err != nil {
+					return
+				}
+			}
+
+			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			if err != nil {
+				return
+			}
+
+			if tb.Body == "" {
+				tb.Body = templateContent
+			}
 		}
 
-		err = prShared.TitleBodySurvey(opts.IO, editorCommand, &tb, apiClient, baseRepo, title, body, prShared.Defaults{}, nonLegacyTemplateFiles, legacyTemplateFile, false, repo.ViewerCanTriage())
+		action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())
 		if err != nil {
-			return fmt.Errorf("could not collect title and/or body: %w", err)
+			err = fmt.Errorf("unable to confirm: %w", err)
+			return
 		}
 
-		action = tb.Action
+		if action == prShared.MetadataAction {
+			fetcher := &prShared.MetadataFetcher{
+				IO:        opts.IO,
+				APIClient: apiClient,
+				Repo:      baseRepo,
+				State:     &tb,
+			}
+			err = prShared.MetadataSurvey(opts.IO, baseRepo, fetcher, &tb)
+			if err != nil {
+				return
+			}
 
-		if tb.Action == prShared.CancelAction {
+			action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), false)
+			if err != nil {
+				return
+			}
+		}
+
+		if action == prShared.CancelAction {
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-
-			return nil
-		}
-
-		if title == "" {
-			title = tb.Title
-		}
-		if body == "" {
-			body = tb.Body
+			return
 		}
 	} else {
-		if title == "" {
-			return fmt.Errorf("title can't be blank")
+		if tb.Title == "" {
+			err = fmt.Errorf("title can't be blank")
+			return
 		}
 	}
 
 	if action == prShared.PreviewAction {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, title, body, tb.Assignees, tb.Labels, tb.Projects, tb.Milestones)
+		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 		if err != nil {
-			return err
+			return
 		}
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
@@ -208,18 +246,19 @@ func createRun(opts *CreateOptions) error {
 		return utils.OpenInBrowser(openURL)
 	} else if action == prShared.SubmitAction {
 		params := map[string]interface{}{
-			"title": title,
-			"body":  body,
+			"title": tb.Title,
+			"body":  tb.Body,
 		}
 
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
 		if err != nil {
-			return err
+			return
 		}
 
-		newIssue, err := api.IssueCreate(apiClient, repo, params)
+		var newIssue *api.Issue
+		newIssue, err = api.IssueCreate(apiClient, repo, params)
 		if err != nil {
-			return err
+			return
 		}
 
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
@@ -227,5 +266,5 @@ func createRun(opts *CreateOptions) error {
 		panic("Unreachable state")
 	}
 
-	return nil
+	return
 }

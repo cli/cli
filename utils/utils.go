@@ -2,12 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/browser"
 )
@@ -59,6 +57,22 @@ func FuzzyAgo(ago time.Duration) string {
 	return fmtDuration(int(ago.Hours()/24/365), "year")
 }
 
+func FuzzyAgoAbbr(now time.Time, createdAt time.Time) string {
+	ago := now.Sub(createdAt)
+
+	if ago < time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Minutes()), "m")
+	}
+	if ago < 24*time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Hours()), "h")
+	}
+	if ago < 30*24*time.Hour {
+		return fmt.Sprintf("%d%s", int(ago.Hours())/24, "d")
+	}
+
+	return createdAt.Format("Jan _2, 2006")
+}
+
 func Humanize(s string) string {
 	// Replaces - and _ with spaces.
 	replace := "_-"
@@ -72,20 +86,6 @@ func Humanize(s string) string {
 	return strings.Map(h, s)
 }
 
-// We do this so we can stub out the spinner in tests -- it made things really flakey. This is not
-// an elegant solution.
-var StartSpinner = func(s *spinner.Spinner) {
-	s.Start()
-}
-
-var StopSpinner = func(s *spinner.Spinner) {
-	s.Stop()
-}
-
-func Spinner(w io.Writer) *spinner.Spinner {
-	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
-}
-
 func IsURL(s string) bool {
 	return strings.HasPrefix(s, "http:/") || strings.HasPrefix(s, "https:/")
 }
@@ -96,16 +96,4 @@ func DisplayURL(urlStr string) string {
 		return urlStr
 	}
 	return u.Hostname() + u.Path
-}
-
-func GreenCheck() string {
-	return Green("✓")
-}
-
-func YellowDash() string {
-	return Yellow("-")
-}
-
-func RedX() string {
-	return Red("X")
 }

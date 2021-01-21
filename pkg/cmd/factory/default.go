@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -31,11 +33,16 @@ func New(appVersion string) *cmdutil.Factory {
 		return cachedConfig, configError
 	}
 
+	hostOverride := ""
+	if !strings.EqualFold(ghinstance.Default(), ghinstance.OverridableDefault()) {
+		hostOverride = ghinstance.OverridableDefault()
+	}
+
 	rr := &remoteResolver{
 		readRemotes: git.Remotes,
 		getConfig:   configFunc,
 	}
-	remotesFunc := rr.Resolver()
+	remotesFunc := rr.Resolver(hostOverride)
 
 	return &cmdutil.Factory{
 		IOStreams: io,

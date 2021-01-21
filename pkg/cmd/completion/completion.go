@@ -14,22 +14,44 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 	var shellType string
 
 	cmd := &cobra.Command{
-		Use:   "completion",
+		Use:   "completion -s <shell>",
 		Short: "Generate shell completion scripts",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Generate shell completion scripts for GitHub CLI commands.
 
-			The output of this command will be computer code and is meant to be saved to a
-			file or immediately evaluated by an interactive shell.
-
-			For example, for bash you could add this to your '~/.bash_profile':
-
-				eval "$(gh completion -s bash)"
-
-			When installing GitHub CLI through a package manager, however, it's possible that
+			When installing GitHub CLI through a package manager, it's possible that
 			no additional shell configuration is necessary to gain completion support. For
 			Homebrew, see https://docs.brew.sh/Shell-Completion
-		`),
+
+			If you need to set up completions manually, follow the instructions below. The exact
+			config file locations might vary based on your system. Make sure to restart your
+			shell before testing whether completions are working.
+
+			### bash
+
+			Add this to your %[1]s~/.bash_profile%[1]s:
+
+				eval "$(gh completion -s bash)"
+			
+			### zsh
+
+			Generate a %[1]s_gh%[1]s completion script and put it somewhere in your %[1]s$fpath%[1]s:
+
+				gh completion -s zsh > /usr/local/share/zsh/site-functions/_gh
+
+			Ensure that the following is present in your %[1]s~/.zshrc%[1]s:
+
+				autoload -U compinit
+				compinit -i
+			
+			Zsh version 5.7 or later is recommended.
+
+			### fish
+
+			Generate a %[1]sgh.fish%[1]s completion script:
+
+				gh completion -s fish > ~/.config/fish/completions/gh.fish
+		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if shellType == "" {
 				if io.IsStdoutTTY() {
@@ -54,6 +76,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 				return fmt.Errorf("unsupported shell type %q", shellType)
 			}
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

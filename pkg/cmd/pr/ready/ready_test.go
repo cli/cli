@@ -143,12 +143,20 @@ func TestPRReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"pullRequest": { "number": 444, "closed": false, "isDraft": true}
-	} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`{"id": "THE-ID"}`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "id": "THE-ID", "number": 444, "closed": false, "isDraft": true}
+			} } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestReadyForReview\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
 
 	output, err := runCommand(http, true, "444")
 	if err != nil {
@@ -166,11 +174,13 @@ func TestPRReady_alreadyReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"pullRequest": { "number": 445, "closed": false, "isDraft": false}
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "number": 445, "closed": false, "isDraft": false}
+			} } }`),
+	)
 
 	output, err := runCommand(http, true, "445")
 	if err != nil {
@@ -188,11 +198,13 @@ func TestPRReady_closed(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"pullRequest": { "number": 446, "closed": true, "isDraft": true}
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"pullRequest": { "number": 446, "closed": true, "isDraft": true}
+			} } }`),
+	)
 
 	output, err := runCommand(http, true, "446")
 	if err == nil {

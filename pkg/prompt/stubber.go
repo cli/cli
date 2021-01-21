@@ -31,6 +31,7 @@ func InitAskStubber() (*AskStubber, func()) {
 		}
 		stubbedPrompt := as.StubOnes[count]
 		if stubbedPrompt.Default {
+			// TODO this is failing for basic AskOne invocations with a string result.
 			defaultValue := reflect.ValueOf(p).Elem().FieldByName("Default")
 			_ = core.WriteAnswer(response, "", defaultValue)
 		} else {
@@ -45,11 +46,14 @@ func InitAskStubber() (*AskStubber, func()) {
 		count := as.Count
 		as.Count += 1
 		if count >= len(as.Stubs) {
-			panic(fmt.Sprintf("more asks than stubs. most recent call: %v", qs))
+			panic(fmt.Sprintf("more asks than stubs. most recent call: %#v", qs))
 		}
 
 		// actually set response
 		stubbedQuestions := as.Stubs[count]
+		if len(stubbedQuestions) != len(qs) {
+			panic(fmt.Sprintf("asked questions: %d; stubbed questions: %d", len(qs), len(stubbedQuestions)))
+		}
 		for i, sq := range stubbedQuestions {
 			q := qs[i]
 			if q.Name != sq.Name {

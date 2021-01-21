@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_CacheReponse(t *testing.T) {
+func Test_CacheResponse(t *testing.T) {
 	counter := 0
 	fakeHTTP := funcTripper{
 		roundTrip: func(req *http.Request) (*http.Response, error) {
@@ -32,7 +32,7 @@ func Test_CacheReponse(t *testing.T) {
 	}
 
 	cacheDir := filepath.Join(t.TempDir(), "gh-cli-cache")
-	httpClient := NewHTTPClient(ReplaceTripper(fakeHTTP), CacheReponse(time.Minute, cacheDir))
+	httpClient := NewHTTPClient(ReplaceTripper(fakeHTTP), CacheResponse(time.Minute, cacheDir))
 
 	do := func(method, url string, body io.Reader) (string, error) {
 		req, err := http.NewRequest(method, url, body)

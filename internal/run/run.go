@@ -3,8 +3,10 @@ package run
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,7 +25,13 @@ var PrepareCmd = func(cmd *exec.Cmd) Runnable {
 // SetPrepareCmd overrides PrepareCmd and returns a func to revert it back
 func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
 	origPrepare := PrepareCmd
-	PrepareCmd = fn
+	PrepareCmd = func(cmd *exec.Cmd) Runnable {
+		// normalize git executable name for consistency in tests
+		if baseName := filepath.Base(cmd.Args[0]); baseName == "git" || baseName == "git.exe" {
+			cmd.Args[0] = "git"
+		}
+		return fn(cmd)
+	}
 	return func() {
 		PrepareCmd = origPrepare
 	}
@@ -36,7 +44,7 @@ type cmdWithStderr struct {
 
 func (c cmdWithStderr) Output() ([]byte, error) {
 	if os.Getenv("DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
 		return c.Cmd.Output()
@@ -52,7 +60,7 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 
 func (c cmdWithStderr) Run() error {
 	if os.Getenv("DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "%v\n", c.Cmd.Args)
+		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
 		return c.Cmd.Run()
@@ -79,4 +87,13 @@ func (e CmdError) Error() string {
 		msg += "\n"
 	}
 	return fmt.Sprintf("%s%s: %s", msg, e.Args[0], e.Err)
+}
+
+func printArgs(w io.Writer, args []string) error {
+	if len(args) > 0 {
+		// print commands, but omit the full path to an executable
+		args = append([]string{filepath.Base(args[0])}, args[1:]...)
+	}
+	_, err := fmt.Fprintf(w, "%v\n", args)
+	return err
 }

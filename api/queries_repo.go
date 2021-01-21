@@ -27,6 +27,7 @@ type Repository struct {
 
 	IsPrivate        bool
 	HasIssuesEnabled bool
+	HasWikiEnabled   bool
 	ViewerPermission string
 	DefaultBranchRef BranchRef
 
@@ -92,16 +93,24 @@ func (r Repository) ViewerCanTriage() bool {
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
+	fragment repo on Repository {
+		id
+		name
+		owner { login }
+		hasIssuesEnabled
+		description
+		hasWikiEnabled
+		viewerPermission
+		defaultBranchRef {
+			name
+		}
+	}
+
 	query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {
-			id
-			name
-			owner { login }
-			hasIssuesEnabled
-			description
-			viewerPermission
-			defaultBranchRef {
-				name
+			...repo
+			parent {
+				...repo
 			}
 			mergeCommitAllowed
 			squashMergeAllowed
@@ -464,6 +473,28 @@ func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 	return "", errors.New("not found")
 }
 
+func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {
+	if len(m2.AssignableUsers) > 0 || len(m.AssignableUsers) == 0 {
+		m.AssignableUsers = m2.AssignableUsers
+	}
+
+	if len(m2.Teams) > 0 || len(m.Teams) == 0 {
+		m.Teams = m2.Teams
+	}
+
+	if len(m2.Labels) > 0 || len(m.Labels) == 0 {
+		m.Labels = m2.Labels
+	}
+
+	if len(m2.Projects) > 0 || len(m.Projects) == 0 {
+		m.Projects = m2.Projects
+	}
+
+	if len(m2.Milestones) > 0 || len(m.Milestones) == 0 {
+		m.Milestones = m2.Milestones
+	}
+}
+
 type RepoMetadataInput struct {
 	Assignees  bool
 	Reviewers  bool
@@ -536,7 +567,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Milestones {
 		count++
 		go func() {
-			milestones, err := RepoMilestones(client, repo)
+			milestones, err := RepoMilestones(client, repo, "open")
 			if err != nil {
 				err = fmt.Errorf("error fetching milestones: %w", err)
 			}
@@ -797,8 +828,8 @@ type RepoMilestone struct {
 	Title string
 }
 
-// RepoMilestones fetches all open milestones in a repository
-func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, error) {
+// RepoMilestones fetches milestones in a repository
+func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]RepoMilestone, error) {
 	type responseData struct {
 		Repository struct {
 			Milestones struct {
@@ -807,13 +838,26 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"milestones(states: [OPEN], first: 100, after: $endCursor)"`
+			} `graphql:"milestones(states: $states, first: 100, after: $endCursor)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	var states []githubv4.MilestoneState
+	switch state {
+	case "open":
+		states = []githubv4.MilestoneState{"OPEN"}
+	case "closed":
+		states = []githubv4.MilestoneState{"CLOSED"}
+	case "all":
+		states = []githubv4.MilestoneState{"OPEN", "CLOSED"}
+	default:
+		return nil, fmt.Errorf("invalid state: %s", state)
 	}
 
 	variables := map[string]interface{}{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
+		"states":    states,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
@@ -837,8 +881,8 @@ func RepoMilestones(client *Client, repo ghrepo.Interface) ([]RepoMilestone, err
 	return milestones, nil
 }
 
-func MilestoneByTitle(client *Client, repo ghrepo.Interface, title string) (*RepoMilestone, error) {
-	milestones, err := RepoMilestones(client, repo)
+func MilestoneByTitle(client *Client, repo ghrepo.Interface, state, title string) (*RepoMilestone, error) {
+	milestones, err := RepoMilestones(client, repo, state)
 	if err != nil {
 		return nil, err
 	}
@@ -851,7 +895,7 @@ func MilestoneByTitle(client *Client, repo ghrepo.Interface, title string) (*Rep
 	return nil, fmt.Errorf("no milestone found with title %q", title)
 }
 
-func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int) (*RepoMilestone, error) {
+func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int32) (*RepoMilestone, error) {
 	var query struct {
 		Repository struct {
 			Milestone *RepoMilestone `graphql:"milestone(number: $number)"`
