@@ -22,18 +22,18 @@
    # installs to '/usr/local' by default; sudo may be required
    $ make install
    
-   # install to a different location
+   # or, install to a different location
    $ make install prefix=/path/to/gh
    ```
 
    #### Windows 
    ```sh
-   # build the binary
-   > go build -o gh.exe ./cmd/gh
+   # build the `bin\gh.exe` binary
+   > go run script/build.go
    ```
    There is no install step available on Windows.
 
 3. Run `gh version` to check if it worked.
 
    #### Windows
-   Run `.\gh version` to check if it worked.
+   Run `bin\gh version` to check if it worked.
