@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -228,19 +229,16 @@ func Test_RepoClone_hasParent(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git clone
-	cs.Stub("") // git remote add
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t master -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}
-
-	assert.Equal(t, 2, cs.Count)
-	assert.Equal(t, "git -C REPO remote add -t master -f upstream https://github.com/hubot/ORIG.git", strings.Join(cs.Calls[1].Args, " "))
 }
 
 func Test_RepoClone_withoutUsername(t *testing.T) {

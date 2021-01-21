@@ -3,12 +3,10 @@ package git
 import (
 	"os/exec"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_UncommittedChangeCount(t *testing.T) {
@@ -199,18 +197,15 @@ func TestAddUpstreamRemote(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs, restore := test.InitCmdStubber()
-			defer restore()
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
 
-			cs.Stub("") // git remote add -f
+			cs.Register(tt.want, 0, "")
 
 			err := AddUpstreamRemote(tt.upstreamURL, tt.cloneDir, tt.branches)
 			if err != nil {
 				t.Fatalf("error running command `git remote add -f`: %v", err)
 			}
-
-			assert.Equal(t, 1, cs.Count)
-			assert.Equal(t, tt.want, strings.Join(cs.Calls[0].Args, " "))
 		})
 	}
 }
