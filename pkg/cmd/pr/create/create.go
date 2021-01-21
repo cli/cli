@@ -590,7 +590,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return err
 	}
 
+	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.BaseRepo.(*api.Repository), params)
+	opts.IO.StopProgressIndicator()
 	if pr != nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
@@ -626,7 +628,9 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// if a head repository could not be determined so far, automatically create
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
+		opts.IO.StartProgressIndicator()
 		headRepo, err = api.ForkRepo(client, ctx.BaseRepo)
+		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
 		}
