@@ -260,9 +260,6 @@ func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, er
 		opt := mergeOption{title: "Squash and merge", method: api.PullRequestMergeMethodSquash}
 		mergeOpts = append(mergeOpts, opt)
 	}
-	if len(mergeOpts) == 0 {
-		return 0, fmt.Errorf("The repo %s has no merge options enabled", ghrepo.FullName(baseRepo))
-	}
 
 	var surveyOpts []string
 	for _, v := range mergeOpts {
