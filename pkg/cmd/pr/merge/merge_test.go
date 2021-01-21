@@ -571,8 +571,8 @@ func TestPRMerge_interactive(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
-			"squashMergeAllowed": true,
-			"rebaseMergeAllowed": true
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
 		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -626,8 +626,8 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
-			"squashMergeAllowed": true,
-			"rebaseMergeAllowed": true
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
 		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -680,8 +680,8 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
-			"squashMergeAllowed": true,
-			"rebaseMergeAllowed": true
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
 		} } }`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
@@ -706,4 +706,18 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 	}
 
 	assert.Equal(t, "Cancelled.\n", output.Stderr())
+}
+
+func Test_mergeMethodSurvey(t *testing.T) {
+	repo := &api.Repository{
+		MergeCommitAllowed: false,
+		RebaseMergeAllowed: true,
+		SquashMergeAllowed: true,
+	}
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+	as.StubOne(0) // Select first option which is rebase merge
+	method, err := mergeMethodSurvey(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, api.PullRequestMergeMethodRebase, method)
 }

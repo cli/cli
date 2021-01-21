@@ -34,8 +34,8 @@ type Repository struct {
 	Parent *Repository
 
 	MergeCommitAllowed bool
-	SquashMergeAllowed bool
 	RebaseMergeAllowed bool
+	SquashMergeAllowed bool
 
 	// pseudo-field that keeps track of host name of this repo
 	hostname string
@@ -113,8 +113,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 				...repo
 			}
 			mergeCommitAllowed
-			squashMergeAllowed
 			rebaseMergeAllowed
+			squashMergeAllowed
 		}
 	}`
 	variables := map[string]interface{}{
