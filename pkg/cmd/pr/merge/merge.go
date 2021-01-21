@@ -19,8 +19,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cancelError = errors.New("cancelError")
-
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -143,14 +141,21 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
-
-			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, r, crossRepoPR)
+			mergeMethod, err = mergeMethodSurvey(r)
 			if err != nil {
-				if errors.Is(err, cancelError) {
-					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-					return cmdutil.SilentError
-				}
 				return err
+			}
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			if err != nil {
+				return err
+			}
+			confirm, err := confirmSurvey()
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+				return cmdutil.SilentError
 			}
 		}
 
@@ -236,32 +241,46 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func prInteractiveMerge(opts *MergeOptions, baseRepo *api.Repository, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
-	var mergeOpts []string
+func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, error) {
+	type mergeOption struct {
+		title  string
+		method api.PullRequestMergeMethod
+	}
+
+	var mergeOpts []mergeOption
 	if baseRepo.MergeCommitAllowed {
-		mergeOpts = append(mergeOpts, "Create a merge commit")
+		opt := mergeOption{title: "Create a merge commit", method: api.PullRequestMergeMethodMerge}
+		mergeOpts = append(mergeOpts, opt)
 	}
 	if baseRepo.RebaseMergeAllowed {
-		mergeOpts = append(mergeOpts, "Rebase and merge")
+		opt := mergeOption{title: "Rebase and merge", method: api.PullRequestMergeMethodRebase}
+		mergeOpts = append(mergeOpts, opt)
 	}
 	if baseRepo.SquashMergeAllowed {
-		mergeOpts = append(mergeOpts, "Squash and merge")
+		opt := mergeOption{title: "Squash and merge", method: api.PullRequestMergeMethodSquash}
+		mergeOpts = append(mergeOpts, opt)
 	}
 	if len(mergeOpts) == 0 {
-		return 0, false, fmt.Errorf("no merge options enabled, please enable at least one for your repo")
+		return 0, fmt.Errorf("The repo %s has no merge options enabled", ghrepo.FullName(baseRepo))
 	}
 
-	mergeMethodQuestion := &survey.Question{
-		Name: "mergeMethod",
-		Prompt: &survey.Select{
-			Message: "What merge method would you like to use?",
-			Options: mergeOpts,
-			Default: "Create a merge commit",
-		},
+	var surveyOpts []string
+	for _, v := range mergeOpts {
+		surveyOpts = append(surveyOpts, v.title)
 	}
 
-	qs := []*survey.Question{mergeMethodQuestion}
+	prompt := &survey.Select{
+		Message: "What merge method would you like to use?",
+		Options: surveyOpts,
+		Default: "Create a merge commit",
+	}
 
+	var result int
+	err := survey.AskOne(prompt, &result)
+	return mergeOpts[result].method, err
+}
+
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
 		if opts.CanDeleteLocalBranch {
@@ -270,49 +289,23 @@ func prInteractiveMerge(opts *MergeOptions, baseRepo *api.Repository, crossRepoP
 			message = "Delete the branch on GitHub?"
 		}
 
-		deleteBranchQuestion := &survey.Question{
-			Name: "deleteBranch",
-			Prompt: &survey.Confirm{
-				Message: message,
-				Default: false,
-			},
-		}
-		qs = append(qs, deleteBranchQuestion)
-	}
-
-	qs = append(qs, &survey.Question{
-		Name: "isConfirmed",
-		Prompt: &survey.Confirm{
-			Message: "Submit?",
+		var result bool
+		submit := &survey.Confirm{
+			Message: message,
 			Default: false,
-		},
-	})
-
-	answers := struct {
-		MergeMethod  int
-		DeleteBranch bool
-		IsConfirmed  bool
-	}{
-		DeleteBranch: opts.DeleteBranch,
+		}
+		err := survey.AskOne(submit, &result)
+		return result, err
 	}
+	return false, nil
+}
 
-	err := prompt.SurveyAsk(qs, &answers)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not prompt: %w", err)
+func confirmSurvey() (bool, error) {
+	var confirm bool
+	submit := &survey.Confirm{
+		Message: "Submit?",
+		Default: true,
 	}
-	if !answers.IsConfirmed {
-		return 0, false, cancelError
-	}
-
-	var mergeMethod api.PullRequestMergeMethod
-	switch answers.MergeMethod {
-	case 0:
-		mergeMethod = api.PullRequestMergeMethodMerge
-	case 1:
-		mergeMethod = api.PullRequestMergeMethodRebase
-	case 2:
-		mergeMethod = api.PullRequestMergeMethodSquash
-	}
-
-	return mergeMethod, answers.DeleteBranch, nil
+	err := survey.AskOne(submit, &confirm)
+	return confirm, err
 }
