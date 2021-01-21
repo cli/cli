@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var cancelError = errors.New("cancelError")
+
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -137,7 +139,12 @@ func mergeRun(opts *MergeOptions) error {
 		mergeMethod := opts.MergeMethod
 
 		if opts.InteractiveMode {
-			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, crossRepoPR, baseRepo, apiClient)
+			r, err := api.GitHubRepo(apiClient, baseRepo)
+			if err != nil {
+				return err
+			}
+
+			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, r, crossRepoPR)
 			if err != nil {
 				if errors.Is(err, cancelError) {
 					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
@@ -229,35 +236,17 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-var cancelError = errors.New("cancelError")
-
-func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool, repo ghrepo.Interface, apiClient *api.Client) (api.PullRequestMergeMethod, bool, error) {
-	var baseRepo *api.Repository
-
-	if r, ok := repo.(*api.Repository); ok {
-		baseRepo = r
-	} else {
-		var err error
-		baseRepo, err = api.GitHubRepo(apiClient, repo)
-		if err != nil {
-			return 0, false, fmt.Errorf("could not fetch merge options: %w", err)
-		}
-	}
-
+func prInteractiveMerge(opts *MergeOptions, baseRepo *api.Repository, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
 	var mergeOpts []string
-
 	if baseRepo.MergeCommitAllowed {
 		mergeOpts = append(mergeOpts, "Create a merge commit")
 	}
-
 	if baseRepo.RebaseMergeAllowed {
 		mergeOpts = append(mergeOpts, "Rebase and merge")
 	}
-
 	if baseRepo.SquashMergeAllowed {
 		mergeOpts = append(mergeOpts, "Squash and merge")
 	}
-
 	if len(mergeOpts) == 0 {
 		return 0, false, fmt.Errorf("no merge options enabled, please enable at least one for your repo")
 	}
