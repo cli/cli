@@ -147,5 +147,6 @@ func TestPrClose_deleteBranch(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr close` %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), `Closed pull request #96 \(The title of the PR\)`, `Deleted branch blueberries`)
 }

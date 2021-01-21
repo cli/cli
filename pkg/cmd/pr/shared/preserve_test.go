@@ -98,6 +98,7 @@ func Test_PreserveInput(t *testing.T) {
 			assert.NoError(t, err)
 
 			if tt.wantPreservation {
+				//nolint:staticcheck // prefer exact matchers over ExpectLines
 				test.ExpectLines(t, errOut.String(), tt.wantErrLine)
 				preserved := &IssueMetadataState{}
 				assert.NoError(t, json.Unmarshal(data, preserved))

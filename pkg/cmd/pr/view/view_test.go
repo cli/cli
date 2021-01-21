@@ -338,6 +338,7 @@ func TestPRView_Preview_nontty(t *testing.T) {
 
 			assert.Equal(t, "", output.Stderr())
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
@@ -483,6 +484,7 @@ func TestPRView_Preview(t *testing.T) {
 
 			assert.Equal(t, "", output.Stderr())
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
@@ -798,6 +800,7 @@ func TestPRView_tty_Comments(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, "", output.Stderr())
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}
@@ -876,6 +879,7 @@ func TestPRView_nontty_Comments(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, "", output.Stderr())
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}

@@ -279,6 +279,7 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Added remote.*origin")
@@ -304,6 +305,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Cloned fork")
@@ -331,6 +333,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Cloned fork")
@@ -386,6 +389,7 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Renamed.*origin.*remote to.*upstream",
@@ -450,6 +454,7 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Added remote.*origin")

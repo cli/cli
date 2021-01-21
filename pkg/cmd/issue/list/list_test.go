@@ -80,6 +80,7 @@ func TestIssueList_nontty(t *testing.T) {
 	}
 
 	eq(t, output.Stderr(), "")
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.String(),
 		`1[\t]+number won[\t]+label[\t]+\d+`,
 		`2[\t]+number too[\t]+label[\t]+\d+`,
