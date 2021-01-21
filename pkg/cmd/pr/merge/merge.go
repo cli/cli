@@ -31,8 +31,7 @@ type MergeOptions struct {
 	DeleteBranch bool
 	MergeMethod  api.PullRequestMergeMethod
 
-	Body        string
-	BodyChanged bool
+	Body *string
 
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
@@ -98,7 +97,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 
-			opts.BodyChanged = cmd.Flags().Changed("body")
+			if cmd.Flags().Changed("body") {
+				bodyStr, _ := cmd.Flags().GetString("body")
+				opts.Body = &bodyStr
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -108,7 +110,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body for merge commit")
+	cmd.Flags().StringP("body", "b", "", "Body for merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -153,12 +155,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		var body *string = nil
-		if opts.BodyChanged {
-			body = &opts.Body
-		}
-
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, body)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, opts.Body)
 		if err != nil {
 			return err
 		}
