@@ -130,11 +130,21 @@ func mergeRun(opts *MergeOptions) error {
 
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+	isTerminal := opts.IO.IsStdoutTTY()
 
-	if opts.InteractiveMode {
-		mergeMethod, deleteBranch, err = prInteractiveMerge(opts.DeleteLocalBranch, crossRepoPR, baseRepo, apiClient)
-		if err != nil {
-			return nil
+	isPRAlreadyMerged := pr.State == "MERGED"
+	if !isPRAlreadyMerged {
+		mergeMethod := opts.MergeMethod
+
+		if opts.InteractiveMode {
+			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, crossRepoPR, baseRepo, apiClient)
+			if err != nil {
+				if errors.Is(err, cancelError) {
+					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+					return cmdutil.SilentError
+				}
+				return err
+			}
 		}
 
 		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod)
@@ -219,7 +229,9 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, repo ghrepo.Interface, apiClient *api.Client) (api.PullRequestMergeMethod, bool, error) {
+var cancelError = errors.New("cancelError")
+
+func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool, repo ghrepo.Interface, apiClient *api.Client) (api.PullRequestMergeMethod, bool, error) {
 	var baseRepo *api.Repository
 
 	if r, ok := repo.(*api.Repository); ok {
@@ -232,21 +244,21 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, repo ghrepo.In
 		}
 	}
 
-	var opts []string
+	var mergeOpts []string
 
 	if baseRepo.MergeCommitAllowed {
-		opts = append(opts, "Create a merge commit")
+		mergeOpts = append(mergeOpts, "Create a merge commit")
 	}
 
 	if baseRepo.RebaseMergeAllowed {
-		opts = append(opts, "Rebase and merge")
+		mergeOpts = append(mergeOpts, "Rebase and merge")
 	}
 
 	if baseRepo.SquashMergeAllowed {
-		opts = append(opts, "Squash and merge")
+		mergeOpts = append(mergeOpts, "Squash and merge")
 	}
 
-	if len(opts) == 0 {
+	if len(mergeOpts) == 0 {
 		return 0, false, fmt.Errorf("no merge options enabled, please enable at least one for your repo")
 	}
 
@@ -254,7 +266,7 @@ func prInteractiveMerge(deleteLocalBranch bool, crossRepoPR bool, repo ghrepo.In
 		Name: "mergeMethod",
 		Prompt: &survey.Select{
 			Message: "What merge method would you like to use?",
-			Options: opts,
+			Options: mergeOpts,
 			Default: "Create a merge commit",
 		},
 	}
