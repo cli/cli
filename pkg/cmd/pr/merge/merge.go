@@ -269,14 +269,14 @@ func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, er
 		surveyOpts = append(surveyOpts, v.title)
 	}
 
-	prompt := &survey.Select{
+	mergeQuestion := &survey.Select{
 		Message: "What merge method would you like to use?",
 		Options: surveyOpts,
 		Default: "Create a merge commit",
 	}
 
 	var result int
-	err := survey.AskOne(prompt, &result)
+	err := prompt.SurveyAskOne(mergeQuestion, &result)
 	return mergeOpts[result].method, err
 }
 
@@ -294,10 +294,11 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 			Message: message,
 			Default: false,
 		}
-		err := survey.AskOne(submit, &result)
+		err := prompt.SurveyAskOne(submit, &result)
 		return result, err
 	}
-	return false, nil
+
+	return opts.DeleteBranch, nil
 }
 
 func confirmSurvey() (bool, error) {
@@ -306,6 +307,6 @@ func confirmSurvey() (bool, error) {
 		Message: "Submit?",
 		Default: true,
 	}
-	err := survey.AskOne(submit, &confirm)
+	err := prompt.SurveyAskOne(submit, &confirm)
 	return confirm, err
 }

@@ -567,6 +567,14 @@ func TestPRMerge_interactive(t *testing.T) {
 			"number": 3
 		}] } } } }`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"squashMergeAllowed": true,
+			"rebaseMergeAllowed": true
+		} } }`))
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
@@ -589,20 +597,9 @@ func TestPRMerge_interactive(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "mergeMethod",
-			Value: 0,
-		},
-		{
-			Name:  "deleteBranch",
-			Value: true,
-		},
-		{
-			Name:  "isConfirmed",
-			Value: true,
-		},
-	})
+	as.StubOne(0)    // Merge method survey
+	as.StubOne(true) // Delete branch survey
+	as.StubOne(true) // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if err != nil {
@@ -625,6 +622,14 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 			"number": 3
 		}] } } } }`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"squashMergeAllowed": true,
+			"rebaseMergeAllowed": true
+		} } }`))
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
@@ -647,16 +652,8 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "mergeMethod",
-			Value: 0,
-		},
-		{
-			Name:  "isConfirmed",
-			Value: true,
-		},
-	})
+	as.StubOne(0)    // Merge method survey
+	as.StubOne(true) // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "-d")
 	if err != nil {
@@ -678,6 +675,14 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 			"id": "THE-ID",
 			"number": 3
 		}] } } } }`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"squashMergeAllowed": true,
+			"rebaseMergeAllowed": true
+		} } }`))
 
 	cs, cmdTeardown := test.InitCmdStubber()
 	defer cmdTeardown()
@@ -691,20 +696,9 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "mergeMethod",
-			Value: 0,
-		},
-		{
-			Name:  "deleteBranch",
-			Value: true,
-		},
-		{
-			Name:  "isConfirmed",
-			Value: false,
-		},
-	})
+	as.StubOne(0)     // Merge method survey
+	as.StubOne(true)  // Delete branch survey
+	as.StubOne(false) // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if !errors.Is(err, cmdutil.SilentError) {
