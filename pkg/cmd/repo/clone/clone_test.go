@@ -221,7 +221,7 @@ func Test_RepoClone_hasParent(t *testing.T) {
 							"login": "hubot"
 						},
 						"defaultBranchRef": {
-							"name": "master"
+							"name": "trunk"
 						}
 					}
 				} } }
@@ -233,7 +233,7 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO remote add -t master -f upstream https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
