@@ -551,7 +551,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
 func TestPRMerge_interactive(t *testing.T) {
