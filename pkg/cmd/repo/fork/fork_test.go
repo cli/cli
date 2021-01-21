@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
@@ -20,7 +19,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -204,7 +202,6 @@ func TestRepoFork_outside_parent_nontty(t *testing.T) {
 }
 
 func TestRepoFork_already_forked(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
@@ -229,7 +226,6 @@ func TestRepoFork_already_forked(t *testing.T) {
 }
 
 func TestRepoFork_reuseRemote(t *testing.T) {
-	stubSpinner()
 	remotes := []*context.Remote{
 		{
 			Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{}},
@@ -257,7 +253,6 @@ func TestRepoFork_reuseRemote(t *testing.T) {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
@@ -283,7 +278,6 @@ func TestRepoFork_in_parent(t *testing.T) {
 }
 
 func TestRepoFork_outside(t *testing.T) {
-	stubSpinner()
 	tests := []struct {
 		name string
 		args string
@@ -322,7 +316,6 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
@@ -352,7 +345,6 @@ func TestRepoFork_in_parent_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
@@ -381,7 +373,6 @@ func TestRepoFork_outside_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
@@ -412,7 +403,6 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
@@ -444,7 +434,6 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
@@ -476,7 +465,6 @@ func TestRepoFork_in_parent_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
@@ -508,7 +496,6 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_match_protocol(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
@@ -544,14 +531,6 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 		"Created fork.*someone/REPO",
 		"Added remote.*fork")
 	reg.Verify(t)
-}
-
-func stubSpinner() {
-	// not bothering with teardown since we never want spinners when doing tests
-	utils.StartSpinner = func(_ *spinner.Spinner) {
-	}
-	utils.StopSpinner = func(_ *spinner.Spinner) {
-	}
 }
 
 func stubSince(d time.Duration) func() {
