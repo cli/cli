@@ -282,6 +282,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	})
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -410,6 +411,7 @@ func TestIssueCreate_web(t *testing.T) {
 	defer http.Verify(t)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -435,6 +437,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	defer http.Verify(t)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}

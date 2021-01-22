@@ -85,6 +85,7 @@ func TestRepoCreate(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -170,6 +171,7 @@ func TestRepoCreate_outsideGitWorkDir(t *testing.T) {
 		{},
 		{},
 	}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		if len(cmdOutputs) == 0 {
 			t.Fatal("Too many calls to git command")
@@ -244,6 +246,7 @@ func TestRepoCreate_org(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -326,6 +329,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -409,6 +413,7 @@ func TestRepoCreate_template(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -489,6 +494,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}

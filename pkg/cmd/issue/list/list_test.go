@@ -72,6 +72,7 @@ func TestIssueList_nontty(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.Stderr())
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.String(),
 		`1[\t]+number won[\t]+label[\t]+\d+`,
 		`2[\t]+number too[\t]+label[\t]+\d+`,
@@ -210,6 +211,7 @@ func TestIssueList_web(t *testing.T) {
 	defer http.Verify(t)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}

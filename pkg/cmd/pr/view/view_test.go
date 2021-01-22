@@ -374,6 +374,7 @@ func TestPRView_Preview_nontty(t *testing.T) {
 
 			assert.Equal(t, "", output.Stderr())
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
@@ -552,6 +553,7 @@ func TestPRView_Preview(t *testing.T) {
 
 			assert.Equal(t, "", output.Stderr())
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
@@ -563,6 +565,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView.json"))
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
@@ -597,6 +600,7 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView_NoActiveBranch.json"))
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		switch strings.Join(cmd.Args, " ") {
 		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
@@ -631,6 +635,7 @@ func TestPRView_web_numberArg(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -664,6 +669,7 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -697,6 +703,7 @@ func TestPRView_web_urlArg(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -732,6 +739,7 @@ func TestPRView_web_branchArg(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -768,6 +776,7 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	)
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -875,6 +884,7 @@ func TestPRView_tty_Comments(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, "", output.Stderr())
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}
@@ -980,6 +990,7 @@ func TestPRView_nontty_Comments(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, "", output.Stderr())
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}

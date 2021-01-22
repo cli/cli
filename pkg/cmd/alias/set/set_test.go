@@ -83,7 +83,9 @@ func TestAliasSet_empty_aliases(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Added alias")
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.String(), "")
 
 	expected := `aliases:
@@ -105,6 +107,7 @@ func TestAliasSet_existing_alias(t *testing.T) {
 	output, err := runCommand(cfg, true, "co 'pr checkout -Rcool/repo'")
 	require.NoError(t, err)
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Changed alias.*co.*from.*pr checkout.*to.*pr checkout -Rcool/repo")
 }
 
@@ -117,8 +120,10 @@ func TestAliasSet_space_args(t *testing.T) {
 	output, err := runCommand(cfg, true, `il 'issue list -l "cool story"'`)
 	require.NoError(t, err)
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), `Adding alias for.*il.*issue list -l "cool story"`)
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, mainBuf.String(), `il: issue list -l "cool story"`)
 }
 
@@ -153,7 +158,9 @@ func TestAliasSet_arg_processing(t *testing.T) {
 				t.Fatalf("got unexpected error running %s: %s", c.Cmd, err)
 			}
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.Stderr(), c.ExpectedOutputLine)
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, mainBuf.String(), c.ExpectedConfigLine)
 		})
 	}
@@ -175,6 +182,7 @@ aliases:
     diff: pr diff
 `
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*diff.*pr diff", "Added alias.")
 	assert.Equal(t, expected, mainBuf.String())
 }
@@ -196,6 +204,7 @@ func TestAliasSet_existing_aliases(t *testing.T) {
     view: pr view
 `
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*view.*pr view", "Added alias.")
 	assert.Equal(t, expected, mainBuf.String())
 
@@ -221,6 +230,7 @@ func TestShellAlias_flag(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*igrep")
 
 	expected := `aliases:
@@ -238,6 +248,7 @@ func TestShellAlias_bang(t *testing.T) {
 	output, err := runCommand(cfg, true, "igrep '!gh issue list | grep'")
 	require.NoError(t, err)
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*igrep")
 
 	expected := `aliases:
