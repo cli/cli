@@ -279,7 +279,9 @@ func TestInheritEnv(t *testing.T) {
 			assert.Equal(t, tt.wants.token, val)
 
 			err := cfg.CheckWriteable(tt.hostname, "oauth_token")
-			assert.Equal(t, tt.wants.writeable, err == nil)
+			if tt.wants.writeable != (err == nil) {
+				t.Errorf("CheckWriteable() = %v, wants %v", err, tt.wants.writeable)
+			}
 		})
 	}
 }

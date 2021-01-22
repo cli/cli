@@ -3,6 +3,9 @@ package update
 import (
 	"fmt"
 	"io/ioutil"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -10,6 +13,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
+
+var gitDescribeSuffixRE = regexp.MustCompile(`\d+-\d+-g[a-f0-9]{8}$`)
 
 // ReleaseInfo stores information about a release
 type ReleaseInfo struct {
@@ -83,6 +88,12 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 }
 
 func versionGreaterThan(v, w string) bool {
+	w = gitDescribeSuffixRE.ReplaceAllStringFunc(w, func(m string) string {
+		idx := strings.IndexRune(m, '-')
+		n, _ := strconv.Atoi(m[0:idx])
+		return fmt.Sprintf("%d-pre.0", n+1)
+	})
+
 	vv, ve := version.NewVersion(v)
 	vw, we := version.NewVersion(w)
 

@@ -307,8 +307,13 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 	return
 }
 
-func AddUpstreamRemote(upstreamURL, cloneDir string) error {
-	cloneCmd, err := GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
+func AddUpstreamRemote(upstreamURL, cloneDir string, branches []string) error {
+	args := []string{"-C", cloneDir, "remote", "add"}
+	for _, branch := range branches {
+		args = append(args, "-t", branch)
+	}
+	args = append(args, "-f", "upstream", upstreamURL)
+	cloneCmd, err := GitCommand(args...)
 	if err != nil {
 		return err
 	}

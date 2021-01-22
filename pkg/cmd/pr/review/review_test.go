@@ -475,10 +475,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 	})
 
 	_, err := runCommand(http, nil, true, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, "this type of review cannot be blank", err.Error())
+	assert.EqualError(t, err, "this type of review cannot be blank")
 }
 
 func TestPRReview_interactive_blank_approve(t *testing.T) {

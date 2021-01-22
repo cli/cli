@@ -15,19 +15,6 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
-type PullRequestReviewState int
-
-const (
-	ReviewApprove PullRequestReviewState = iota
-	ReviewRequestChanges
-	ReviewComment
-)
-
-type PullRequestReviewInput struct {
-	Body  string
-	State PullRequestReviewState
-}
-
 type PullRequestsPayload struct {
 	ViewerCreated   PullRequestAndTotalCount
 	ReviewRequested PullRequestAndTotalCount
@@ -103,14 +90,6 @@ type PullRequest struct {
 		}
 		TotalCount int
 	}
-	Reviews struct {
-		Nodes []struct {
-			Author struct {
-				Login string
-			}
-			State string
-		}
-	}
 	Assignees struct {
 		Nodes []struct {
 			Login string
@@ -139,6 +118,7 @@ type PullRequest struct {
 	}
 	Comments       Comments
 	ReactionGroups ReactionGroups
+	Reviews        PullRequestReviews
 }
 
 type NotFoundError struct {
@@ -154,6 +134,14 @@ func (pr PullRequest) HeadLabel() string {
 		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
 	}
 	return pr.HeadRefName
+}
+
+func (pr PullRequest) Link() string {
+	return pr.URL
+}
+
+func (pr PullRequest) Identifier() string {
+	return pr.ID
 }
 
 type PullRequestReviewStatus struct {
@@ -218,6 +206,18 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		summary.Total++
 	}
 	return
+}
+
+func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
+	published := []PullRequestReview{}
+	for _, prr := range pr.Reviews.Nodes {
+		//Dont display pending reviews
+		//Dont display commenting reviews without top level comment body
+		if prr.State != "PENDING" && !(prr.State == "COMMENTED" && prr.Body == "") {
+			published = append(published, prr)
+		}
+	}
+	return PullRequestReviews{Nodes: published, TotalCount: len(published)}
 }
 
 func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
@@ -570,15 +570,6 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 					}
 					totalCount
 				}
-				reviews(last: 100) {
-					nodes {
-						author {
-						  login
-						}
-						state
-					}
-					totalCount
-				}
 				assignees(first: 100) {
 					nodes {
 						login
@@ -605,30 +596,8 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
-				comments(last: 1) {
-					nodes {
-						author {
-							login
-						}
-						authorAssociation
-						body
-						createdAt
-						includesCreatedEdit
-						reactionGroups {
-							content
-							users {
-								totalCount
-							}
-						}
-					}
-					totalCount
-				}
-				reactionGroups {
-					content
-					users {
-						totalCount
-					}
-				}
+				` + commentsFragment() + `
+				` + reactionGroupsFragment() + `
 			}
 		}
 	}`
@@ -703,15 +672,6 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 						}
 						totalCount
 					}
-					reviews(last: 100) {
-						nodes {
-							author {
-							  login
-							}
-							state
-						}
-						totalCount
-					}
 					assignees(first: 100) {
 						nodes {
 							login
@@ -738,30 +698,8 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					milestone{
 						title
 					}
-					comments(last: 1) {
-						nodes {
-							author {
-								login
-							}
-							authorAssociation
-							body
-							createdAt
-							includesCreatedEdit
-							reactionGroups {
-								content
-								users {
-									totalCount
-								}
-							}
-						}
-						totalCount
-					}
-					reactionGroups {
-						content
-						users {
-							totalCount
-						}
-					}
+					` + commentsFragment() + `
+					` + reactionGroupsFragment() + `
 				}
 			}
 		}
@@ -821,7 +759,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 	for key, val := range params {
 		switch key {
-		case "title", "body", "draft", "baseRefName", "headRefName":
+		case "title", "body", "draft", "baseRefName", "headRefName", "maintainerCanModify":
 			inputParams[key] = val
 		}
 	}
@@ -904,34 +842,6 @@ func isBlank(v interface{}) bool {
 	default:
 		return true
 	}
-}
-
-func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {
-	var mutation struct {
-		AddPullRequestReview struct {
-			ClientMutationID string
-		} `graphql:"addPullRequestReview(input:$input)"`
-	}
-
-	state := githubv4.PullRequestReviewEventComment
-	switch input.State {
-	case ReviewApprove:
-		state = githubv4.PullRequestReviewEventApprove
-	case ReviewRequestChanges:
-		state = githubv4.PullRequestReviewEventRequestChanges
-	}
-
-	body := githubv4.String(input.Body)
-	variables := map[string]interface{}{
-		"input": githubv4.AddPullRequestReviewInput{
-			PullRequestID: pr.ID,
-			Event:         &state,
-			Body:          &body,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	return gql.MutateNamed(context.Background(), "PullRequestReviewAdd", &mutation, variables)
 }
 
 func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]interface{}, limit int) (*PullRequestAndTotalCount, error) {
@@ -1144,7 +1054,7 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 	return err
 }
 
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod) error {
+func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod, body *string) error {
 	mergeMethod := githubv4.PullRequestMergeMethodMerge
 	switch m {
 	case PullRequestMergeMethodRebase:
@@ -1169,6 +1079,10 @@ func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m 
 	if m == PullRequestMergeMethodSquash {
 		commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
 		input.CommitHeadline = &commitHeadline
+	}
+	if body != nil {
+		commitBody := githubv4.String(*body)
+		input.CommitBody = &commitBody
 	}
 
 	variables := map[string]interface{}{

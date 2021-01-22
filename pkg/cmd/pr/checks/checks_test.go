@@ -195,10 +195,10 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			err := checksRun(opts)
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
-			} else if tt.wantErr != "" {
-				t.Errorf("expected %q, got nil error", tt.wantErr)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())

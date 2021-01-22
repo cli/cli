@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
@@ -16,7 +15,6 @@ import (
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -374,7 +372,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				`some title`,
 				`some body`,
 				`———————— Not showing 4 comments ————————`,
-				`marseilles \(collaborator\) • Jan  1, 2020 • Newest comment`,
+				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
 				`Comment 5`,
 				`Use --comments to view the full conversation`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -389,16 +387,16 @@ func TestIssueView_tty_Comments(t *testing.T) {
 			expectedOutputs: []string{
 				`some title`,
 				`some body`,
-				`monalisa • Jan  1, 2020 • edited`,
+				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,
 				`Comment 1`,
-				`johnnytest \(contributor\) • Jan  1, 2020`,
+				`johnnytest \(Contributor\) • Jan  1, 2020`,
 				`Comment 2`,
-				`elvisp \(member\) • Jan  1, 2020`,
+				`elvisp \(Member\) • Jan  1, 2020`,
 				`Comment 3`,
-				`loislane \(owner\) • Jan  1, 2020`,
+				`loislane \(Owner\) • Jan  1, 2020`,
 				`Comment 4`,
-				`marseilles \(collaborator\) • Jan  1, 2020 • Newest comment`,
+				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
 				`Comment 5`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
@@ -410,7 +408,6 @@ func TestIssueView_tty_Comments(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			stubSpinner()
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 			for name, file := range tc.fixtures {
@@ -503,9 +500,4 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
-}
-
-func stubSpinner() {
-	utils.StartSpinner = func(_ *spinner.Spinner) {}
-	utils.StopSpinner = func(_ *spinner.Spinner) {}
 }

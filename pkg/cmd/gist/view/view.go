@@ -34,7 +34,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view {<gist id> | <gist url>}",
 		Short: "View a gist",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "cannot view: gist argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Selector = args[0]
 

@@ -481,3 +481,11 @@ func milestoneNodeIdToDatabaseId(nodeId string) (string, error) {
 	}
 	return splitted[1], nil
 }
+
+func (i Issue) Link() string {
+	return i.URL
+}
+
+func (i Issue) Identifier() string {
+	return i.ID
+}

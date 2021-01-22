@@ -27,11 +27,12 @@ import (
 
 func Test_NewCmdMerge(t *testing.T) {
 	tests := []struct {
-		name    string
-		args    string
-		isTTY   bool
-		want    MergeOptions
-		wantErr string
+		name     string
+		args     string
+		isTTY    bool
+		want     MergeOptions
+		wantBody string
+		wantErr  string
 	}{
 		{
 			name:  "number argument",
@@ -58,6 +59,20 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeMethod:             api.PullRequestMergeMethodMerge,
 				InteractiveMode:         true,
 			},
+		},
+		{
+			name:  "body",
+			args:  "123 -bcool",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             api.PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+			},
+			wantBody: "cool",
 		},
 		{
 			name:    "no argument with --repo override",
@@ -123,6 +138,12 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.CanDeleteLocalBranch, opts.CanDeleteLocalBranch)
 			assert.Equal(t, tt.want.MergeMethod, opts.MergeMethod)
 			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
+
+			if tt.wantBody == "" {
+				assert.Nil(t, opts.Body)
+			} else {
+				assert.Equal(t, tt.wantBody, *opts.Body)
+			}
 		})
 	}
 }
@@ -524,7 +545,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
 func TestPRMerge_interactive(t *testing.T) {

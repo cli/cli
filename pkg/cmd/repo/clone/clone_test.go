@@ -78,11 +78,11 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else if tt.wantErr != "" {
-				t.Errorf("expected error %q, got nil", tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())
@@ -229,6 +229,9 @@ func Test_RepoClone_hasParent(t *testing.T) {
 						"name": "ORIG",
 						"owner": {
 							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "trunk"
 						}
 					}
 				} } }
@@ -236,10 +239,11 @@ func Test_RepoClone_hasParent(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := run.Stub()
-	defer restore(t)
-	cs.Register(`git clone`, 0, "")
-	cs.Register(`git -C REPO remote add -f upstream https://github\.com/hubot/ORIG\.git`, 0, "")
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {

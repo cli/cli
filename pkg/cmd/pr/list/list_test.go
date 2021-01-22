@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -20,12 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
@@ -122,11 +115,11 @@ func TestPRList_filtering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eq(t, output.Stderr(), "")
-	eq(t, output.String(), `
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, `
 No pull requests match your search in OWNER/REPO
 
-`)
+`, output.String())
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
@@ -221,12 +214,12 @@ func TestPRList_web(t *testing.T) {
 
 	expectedURL := "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk"
 
-	eq(t, output.String(), "")
-	eq(t, output.Stderr(), "Opening github.com/OWNER/REPO/pulls in your browser.\n")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
 
 	if seenCmd == nil {
 		t.Fatal("expected a command to run")
 	}
 	url := seenCmd.Args[len(seenCmd.Args)-1]
-	eq(t, url, expectedURL)
+	assert.Equal(t, url, expectedURL)
 }

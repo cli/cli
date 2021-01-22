@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -17,20 +18,19 @@ func TestNewCmdComment(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		output   CommentOptions
+		output   shared.CommentableOptions
 		wantsErr bool
 	}{
 		{
 			name:     "no arguments",
 			input:    "",
-			output:   CommentOptions{},
+			output:   shared.CommentableOptions{},
 			wantsErr: true,
 		},
 		{
 			name:  "issue number",
 			input: "1",
-			output: CommentOptions{
-				SelectorArg: "1",
+			output: shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
@@ -40,8 +40,7 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:  "issue url",
 			input: "https://github.com/OWNER/REPO/issues/12",
-			output: CommentOptions{
-				SelectorArg: "https://github.com/OWNER/REPO/issues/12",
+			output: shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
@@ -51,10 +50,9 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:  "body flag",
 			input: "1 --body test",
-			output: CommentOptions{
-				SelectorArg: "1",
+			output: shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeInline,
+				InputType:   shared.InputTypeInline,
 				Body:        "test",
 			},
 			wantsErr: false,
@@ -62,10 +60,9 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:  "editor flag",
 			input: "1 --editor",
-			output: CommentOptions{
-				SelectorArg: "1",
+			output: shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeEditor,
+				InputType:   shared.InputTypeEditor,
 				Body:        "",
 			},
 			wantsErr: false,
@@ -73,10 +70,9 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:  "web flag",
 			input: "1 --web",
-			output: CommentOptions{
-				SelectorArg: "1",
+			output: shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeWeb,
+				InputType:   shared.InputTypeWeb,
 				Body:        "",
 			},
 			wantsErr: false,
@@ -84,25 +80,25 @@ func TestNewCmdComment(t *testing.T) {
 		{
 			name:     "editor and web flags",
 			input:    "1 --editor --web",
-			output:   CommentOptions{},
+			output:   shared.CommentableOptions{},
 			wantsErr: true,
 		},
 		{
 			name:     "editor and body flags",
 			input:    "1 --editor --body test",
-			output:   CommentOptions{},
+			output:   shared.CommentableOptions{},
 			wantsErr: true,
 		},
 		{
 			name:     "web and body flags",
 			input:    "1 --web --body test",
-			output:   CommentOptions{},
+			output:   shared.CommentableOptions{},
 			wantsErr: true,
 		},
 		{
 			name:     "editor, web, and body flags",
 			input:    "1 --editor --web --body test",
-			output:   CommentOptions{},
+			output:   shared.CommentableOptions{},
 			wantsErr: true,
 		},
 	}
@@ -121,8 +117,8 @@ func TestNewCmdComment(t *testing.T) {
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
 
-			var gotOpts *CommentOptions
-			cmd := NewCmdComment(f, func(opts *CommentOptions) error {
+			var gotOpts *shared.CommentableOptions
+			cmd := NewCmdComment(f, func(opts *shared.CommentableOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -140,7 +136,6 @@ func TestNewCmdComment(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
 			assert.Equal(t, tt.output.Body, gotOpts.Body)
@@ -151,38 +146,20 @@ func TestNewCmdComment(t *testing.T) {
 func Test_commentRun(t *testing.T) {
 	tests := []struct {
 		name      string
-		input     *CommentOptions
+		input     *shared.CommentableOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
 		stderr    string
 	}{
 		{
-			name: "interactive web",
-			input: &CommentOptions{
-				SelectorArg: "123",
-				Interactive: true,
-				InputType:   0,
-				Body:        "",
-
-				InputTypeSurvey: func() (inputType, error) { return inputTypeWeb, nil },
-				OpenInBrowser:   func(string) error { return nil },
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueFromNumber(t, reg)
-			},
-			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
-		},
-		{
 			name: "interactive editor",
-			input: &CommentOptions{
-				SelectorArg: "123",
+			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
 
-				EditSurvey:          func() (string, error) { return "comment body", nil },
-				InputTypeSurvey:     func() (inputType, error) { return inputTypeEditor, nil },
-				ConfirmSubmitSurvey: func() (bool, error) { return true, nil },
+				InteractiveEditSurvey: func() (string, error) { return "comment body", nil },
+				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueFromNumber(t, reg)
@@ -192,10 +169,9 @@ func Test_commentRun(t *testing.T) {
 		},
 		{
 			name: "non-interactive web",
-			input: &CommentOptions{
-				SelectorArg: "123",
+			input: &shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeWeb,
+				InputType:   shared.InputTypeWeb,
 				Body:        "",
 
 				OpenInBrowser: func(string) error { return nil },
@@ -207,10 +183,9 @@ func Test_commentRun(t *testing.T) {
 		},
 		{
 			name: "non-interactive editor",
-			input: &CommentOptions{
-				SelectorArg: "123",
+			input: &shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeEditor,
+				InputType:   shared.InputTypeEditor,
 				Body:        "",
 
 				EditSurvey: func() (string, error) { return "comment body", nil },
@@ -223,10 +198,9 @@ func Test_commentRun(t *testing.T) {
 		},
 		{
 			name: "non-interactive inline",
-			input: &CommentOptions{
-				SelectorArg: "123",
+			input: &shared.CommentableOptions{
 				Interactive: false,
-				InputType:   inputTypeInline,
+				InputType:   shared.InputTypeInline,
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -246,16 +220,15 @@ func Test_commentRun(t *testing.T) {
 		defer reg.Verify(t)
 		tt.httpStubs(t, reg)
 
+		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+
 		tt.input.IO = io
-		tt.input.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-		tt.input.BaseRepo = func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		}
+		tt.input.HttpClient = httpClient
+		tt.input.RetrieveCommentable = retrieveIssue(tt.input.HttpClient, baseRepo, "123")
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := commentRun(tt.input)
+			err := shared.CommentableRun(tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
