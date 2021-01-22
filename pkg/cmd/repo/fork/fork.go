@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -234,8 +235,21 @@ func forkRun(opts *ForkOptions) error {
 			if err != nil {
 				return err
 			}
+
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
+				if connectedToTerminal {
+					return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
+				} else {
+					renameTarget := "upstream"
+					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+					if err != nil {
+						return err
+					}
+					err = run.PrepareCmd(renameCmd).Run()
+					if err != nil {
+						return err
+					}
+				}
 			}
 
 			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
