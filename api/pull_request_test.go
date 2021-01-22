@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPullRequest_ChecksStatus(t *testing.T) {
@@ -31,11 +33,11 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 	} }] } }
 	`
 	err := json.Unmarshal([]byte(payload), &pr)
-	eq(t, err, nil)
+	assert.NoError(t, err)
 
 	checks := pr.ChecksStatus()
-	eq(t, checks.Total, 8)
-	eq(t, checks.Pending, 3)
-	eq(t, checks.Failing, 3)
-	eq(t, checks.Passing, 2)
+	assert.Equal(t, 8, checks.Total)
+	assert.Equal(t, 3, checks.Pending)
+	assert.Equal(t, 3, checks.Failing)
+	assert.Equal(t, 2, checks.Passing)
 }

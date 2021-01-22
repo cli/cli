@@ -1,4 +1,4 @@
-# Installing gh on Linux
+# Installing gh on Linux and FreeBSD
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
@@ -81,9 +81,9 @@ Install and upgrade:
 1. Download the `.rpm` file from the [releases page][];
 2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
 
-## Community-supported methods
+## Unofficial, Community-supported methods
 
-Our team does not directly maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them.
+The core GitHub CLI team does not maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them. They are linked here as a convenience and their presence does not imply continued oversight from the CLI core team. Users who choose to use them do so at their own risk.
 
 ### Arch Linux
 
@@ -95,10 +95,39 @@ sudo pacman -S github-cli
 
 ### Android
 
-Android users can install via Termux:
+Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page):
 
 ```bash
 pkg install gh
+```
+
+### FreeBSD
+
+FreeBSD users can install from the [ports collection](https://www.freshports.org/devel/gh/):
+
+```bash
+cd /usr/ports/devel/gh/ && make install clean
+```
+
+Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
+
+```bash
+pkg install gh
+```
+
+### Gentoo
+
+Gentoo Linux users can install from the [main portage tree](https://packages.gentoo.org/packages/dev-util/github-cli):
+
+``` bash
+emerge -av github-cli
+```
+
+Upgrading can be done by updating the portage tree and then requesting an upgrade:
+
+``` bash
+emerge --sync
+emerge -u github-cli
 ```
 
 ### Kiss Linux
@@ -117,6 +146,24 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?sho
 nix-env -iA nixos.gitAndTools.gh
 ```
 
+### openSUSE Tumbleweed
+
+openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+```bash
+sudo zypper in gh
+```
+
+### Snaps
+
+Many Linux distro users can install using Snapd from the [Snap Store](https://snapcraft.io/gh) or the associated [repo](https://github.com/casperdcl/cli/tree/snap)
+
+```bash
+sudo snap install --edge gh && snap connect gh:ssh-keys
+```
+> Snaps are auto-updated every 6 hours. `Snapd` is required and is available on a wide range of Linux distros.
+> Find out which distros have Snapd pre-installed and how to install it in the [Snapcraft Installation Docs](https://snapcraft.io/docs/installing-snapd)
+>
+> **Note:** `snap connect gh:ssh-keys` is needed for all authentication and SSH needs.
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli

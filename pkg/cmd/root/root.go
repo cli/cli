@@ -19,6 +19,8 @@ import (
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
+	secretCmd "github.com/cli/cli/pkg/cmd/secret"
+	sshKeyCmd "github.com/cli/cli/pkg/cmd/ssh-key"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -50,10 +52,16 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.SetOut(f.IOStreams.Out)
 	cmd.SetErr(f.IOStreams.ErrOut)
 
+	cs := f.IOStreams.ColorScheme()
+
+	helpHelper := func(command *cobra.Command, args []string) {
+		rootHelpFunc(cs, command, args)
+	}
+
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(rootHelpFunc)
+	cmd.SetHelpFunc(helpHelper)
 	cmd.SetUsageFunc(rootUsageFunc)
-	cmd.SetFlagErrorFunc(rootFlagErrrorFunc)
+	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
 	formattedVersion := versionCmd.Format(version, buildDate)
 	cmd.SetVersionTemplate(formattedVersion)
@@ -68,6 +76,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
+	cmd.AddCommand(secretCmd.NewCmdSecret(f))
+	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -86,9 +96,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
+	referenceCmd := NewHelpTopic("reference")
+	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
+	cmd.AddCommand(referenceCmd)
 
 	cmdutil.DisableAuthCheck(cmd)
 
+	// this needs to appear last:
+	referenceCmd.Long = referenceLong(cmd)
 	return cmd
 }
 

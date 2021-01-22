@@ -5,18 +5,11 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
@@ -32,15 +25,19 @@ func TestGraphQL(t *testing.T) {
 		}
 	}{}
 
-	http.StubResponse(200, bytes.NewBufferString(`{"data":{"viewer":{"login":"hubot"}}}`))
+	http.Register(
+		httpmock.GraphQL("QUERY"),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"hubot"}}}`),
+	)
+
 	err := client.GraphQL("github.com", "QUERY", vars, &response)
-	eq(t, err, nil)
-	eq(t, response.Viewer.Login, "hubot")
+	assert.NoError(t, err)
+	assert.Equal(t, "hubot", response.Viewer.Login)
 
 	req := http.Requests[0]
 	reqBody, _ := ioutil.ReadAll(req.Body)
-	eq(t, string(reqBody), `{"query":"QUERY","variables":{"name":"Mona"}}`)
-	eq(t, req.Header.Get("Authorization"), "token OTOKEN")
+	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
+	assert.Equal(t, "token OTOKEN", req.Header.Get("Authorization"))
 }
 
 func TestGraphQLError(t *testing.T) {
@@ -48,12 +45,17 @@ func TestGraphQLError(t *testing.T) {
 	client := NewClient(ReplaceTripper(http))
 
 	response := struct{}{}
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "errors": [
-		{"message":"OH NO"},
-		{"message":"this is fine"}
-	  ]
-	}`))
+
+	http.Register(
+		httpmock.GraphQL(""),
+		httpmock.StringResponse(`
+			{ "errors": [
+				{"message":"OH NO"},
+				{"message":"this is fine"}
+			  ]
+			}
+		`),
+	)
 
 	err := client.GraphQL("github.com", "", nil, &response)
 	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
@@ -68,11 +70,14 @@ func TestRESTGetDelete(t *testing.T) {
 		ReplaceTripper(http),
 	)
 
-	http.StubResponse(204, bytes.NewBuffer([]byte{}))
+	http.Register(
+		httpmock.REST("DELETE", "applications/CLIENTID/grant"),
+		httpmock.StatusStringResponse(204, "{}"),
+	)
 
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("github.com", "DELETE", "applications/CLIENTID/grant", r, nil)
-	eq(t, err, nil)
+	assert.NoError(t, err)
 }
 
 func TestRESTError(t *testing.T) {

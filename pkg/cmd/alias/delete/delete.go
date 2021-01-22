@@ -6,7 +6,6 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -63,7 +62,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		redCheck := utils.Red("✓")
+		redCheck := opts.IO.ColorScheme().Red("✓")
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", redCheck, opts.Name, expansion)
 	}
 

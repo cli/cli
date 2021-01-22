@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
@@ -20,10 +21,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func runCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
+func runCommand(httpClient *http.Client, cli string, isTTY bool) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStdinTTY(true)
+	io.SetStdoutTTY(isTTY)
+	io.SetStdinTTY(isTTY)
 	fac := &cmdutil.Factory{
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
@@ -84,6 +85,7 @@ func TestRepoCreate(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -106,7 +108,7 @@ func TestRepoCreate(t *testing.T) {
 		},
 	})
 
-	output, err := runCommand(httpClient, "REPO")
+	output, err := runCommand(httpClient, "REPO", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -118,6 +120,84 @@ func TestRepoCreate(t *testing.T) {
 		t.Fatal("expected a command to run")
 	}
 	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	if len(reg.Requests) != 1 {
+		t.Fatalf("expected 1 HTTP request, got %d", len(reg.Requests))
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
+		t.Errorf("expected %q, got %q", "REPO", repoName)
+	}
+	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
+		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
+	}
+	if _, ownerSet := reqBody.Variables.Input["ownerId"]; ownerSet {
+		t.Error("expected ownerId not to be set")
+	}
+}
+
+func TestRepoCreate_outsideGitWorkDir(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
+		httpmock.StringResponse(`
+		{ "data": { "createRepository": {
+			"repository": {
+				"id": "REPOID",
+				"url": "https://github.com/OWNER/REPO",
+				"name": "REPO",
+				"owner": {
+					"login": "OWNER"
+				}
+			}
+		} } }`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	var seenCmds []*exec.Cmd
+	cmdOutputs := []test.OutputStub{
+		{
+			Error: errors.New("Not a git repository"),
+		},
+		{},
+		{},
+	}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		if len(cmdOutputs) == 0 {
+			t.Fatal("Too many calls to git command")
+		}
+		out := cmdOutputs[0]
+		cmdOutputs = cmdOutputs[1:]
+		seenCmds = append(seenCmds, cmd)
+		return &out
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(httpClient, "REPO --private --confirm", false)
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	assert.Equal(t, "https://github.com/OWNER/REPO\n", output.String())
+	assert.Equal(t, "", output.Stderr())
+
+	if len(seenCmds) != 3 {
+		t.Fatal("expected three commands to run")
+	}
+
+	assert.Equal(t, "git rev-parse --show-toplevel", strings.Join(seenCmds[0].Args, " "))
+	assert.Equal(t, "git init REPO", strings.Join(seenCmds[1].Args, " "))
+	assert.Equal(t, "git -C REPO remote add origin https://github.com/OWNER/REPO.git", strings.Join(seenCmds[2].Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -166,6 +246,7 @@ func TestRepoCreate_org(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -188,7 +269,7 @@ func TestRepoCreate_org(t *testing.T) {
 		},
 	})
 
-	output, err := runCommand(httpClient, "ORG/REPO")
+	output, err := runCommand(httpClient, "ORG/REPO", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -248,6 +329,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -270,7 +352,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		},
 	})
 
-	output, err := runCommand(httpClient, "ORG/REPO --team monkeys")
+	output, err := runCommand(httpClient, "ORG/REPO --team monkeys", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -331,6 +413,7 @@ func TestRepoCreate_template(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -353,7 +436,7 @@ func TestRepoCreate_template(t *testing.T) {
 		},
 	})
 
-	output, err := runCommand(httpClient, "REPO --template='OWNER/REPO'")
+	output, err := runCommand(httpClient, "REPO --template='OWNER/REPO'", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -411,6 +494,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 	httpClient := &http.Client{Transport: reg}
 
 	var seenCmd *exec.Cmd
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
 	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
 		seenCmd = cmd
 		return &test.OutputStub{}
@@ -441,7 +525,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 		},
 	})
 
-	output, err := runCommand(httpClient, "")
+	output, err := runCommand(httpClient, "", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}

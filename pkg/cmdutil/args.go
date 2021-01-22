@@ -8,6 +8,19 @@ import (
 	"github.com/spf13/pflag"
 )
 
+func MinimumArgs(n int, msg string) cobra.PositionalArgs {
+	if msg == "" {
+		return cobra.MinimumNArgs(1)
+	}
+
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < n {
+			return &FlagError{Err: errors.New(msg)}
+		}
+		return nil
+	}
+}
+
 func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
 		return nil

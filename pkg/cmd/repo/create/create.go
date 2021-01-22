@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -232,7 +231,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, &opts.ConfirmSubmit)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID)
 		if err != nil {
 			return err
 		}
@@ -246,11 +245,11 @@ func createRun(opts *CreateOptions) error {
 
 		stderr := opts.IO.ErrOut
 		stdout := opts.IO.Out
-		greenCheck := utils.Green("✓")
+		cs := opts.IO.ColorScheme()
 		isTTY := opts.IO.IsStdoutTTY()
 
 		if isTTY {
-			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", greenCheck, ghrepo.FullName(repo))
+			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", cs.SuccessIcon(), ghrepo.FullName(repo))
 		} else {
 			fmt.Fprintln(stdout, repo.URL)
 		}
@@ -272,35 +271,46 @@ func createRun(opts *CreateOptions) error {
 				return err
 			}
 			if isTTY {
-				fmt.Fprintf(stderr, "%s Added remote %s\n", greenCheck, remoteURL)
+				fmt.Fprintf(stderr, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 			}
-		} else if opts.IO.CanPrompt() {
-			doSetup := createLocalDirectory
-			if !doSetup {
-				err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &doSetup)
+		} else {
+			if opts.IO.CanPrompt() {
+				if !createLocalDirectory {
+					err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &createLocalDirectory)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			if createLocalDirectory {
+				path := repo.Name
+
+				gitInit, err := git.GitCommand("init", path)
 				if err != nil {
 					return err
 				}
-			}
-			if doSetup {
-				path := repo.Name
-
-				gitInit := git.GitCommand("init", path)
-				gitInit.Stdout = stdout
+				isTTY := opts.IO.IsStdoutTTY()
+				if isTTY {
+					gitInit.Stdout = stdout
+				}
 				gitInit.Stderr = stderr
 				err = run.PrepareCmd(gitInit).Run()
 				if err != nil {
 					return err
 				}
-				gitRemoteAdd := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+				if err != nil {
+					return err
+				}
 				gitRemoteAdd.Stdout = stdout
 				gitRemoteAdd.Stderr = stderr
 				err = run.PrepareCmd(gitRemoteAdd).Run()
 				if err != nil {
 					return err
 				}
-
-				fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", utils.GreenCheck(), path)
+				if isTTY {
+					fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", cs.SuccessIcon(), path)
+				}
 			}
 		}
 
@@ -359,7 +369,7 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, isConfirmFlagPassed *bool) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""

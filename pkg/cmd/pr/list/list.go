@@ -145,15 +145,16 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
+	cs := opts.IO.ColorScheme()
 	table := utils.NewTablePrinter(opts.IO)
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, shared.ColorFuncForPR(pr))
+		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPR(pr)))
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
-		table.AddField(pr.HeadLabel(), nil, utils.Cyan)
+		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
 		}

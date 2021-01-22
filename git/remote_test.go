@@ -1,6 +1,10 @@
 package git
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func Test_parseRemotes(t *testing.T) {
 	remoteList := []string{
@@ -12,20 +16,20 @@ func Test_parseRemotes(t *testing.T) {
 		"zardoz\thttps://example.com/zed.git (push)",
 	}
 	r := parseRemotes(remoteList)
-	eq(t, len(r), 4)
+	assert.Equal(t, 4, len(r))
 
-	eq(t, r[0].Name, "mona")
-	eq(t, r[0].FetchURL.String(), "ssh://git@github.com/monalisa/myfork.git")
+	assert.Equal(t, "mona", r[0].Name)
+	assert.Equal(t, "ssh://git@github.com/monalisa/myfork.git", r[0].FetchURL.String())
 	if r[0].PushURL != nil {
 		t.Errorf("expected no PushURL, got %q", r[0].PushURL)
 	}
-	eq(t, r[1].Name, "origin")
-	eq(t, r[1].FetchURL.Path, "/monalisa/octo-cat.git")
-	eq(t, r[1].PushURL.Path, "/monalisa/octo-cat-push.git")
+	assert.Equal(t, "origin", r[1].Name)
+	assert.Equal(t, "/monalisa/octo-cat.git", r[1].FetchURL.Path)
+	assert.Equal(t, "/monalisa/octo-cat-push.git", r[1].PushURL.Path)
 
-	eq(t, r[2].Name, "upstream")
-	eq(t, r[2].FetchURL.Host, "example.com")
-	eq(t, r[2].PushURL.Host, "github.com")
+	assert.Equal(t, "upstream", r[2].Name)
+	assert.Equal(t, "example.com", r[2].FetchURL.Host)
+	assert.Equal(t, "github.com", r[2].PushURL.Host)
 
-	eq(t, r[3].Name, "zardoz")
+	assert.Equal(t, "zardoz", r[3].Name)
 }

@@ -26,11 +26,15 @@ Prerequisites:
 - Go 1.13+ for building the binary
 - Go 1.15+ for running the test suite
 
-Build with: `make` or `go build -o bin/gh ./cmd/gh`
+Build with:
+* Unix-like systems: `make`
+* Windows: `go run script/build.go`
 
-Run the new binary as: `./bin/gh`
+Run the new binary as:
+* Unix-like systems: `bin/gh`
+* Windows: `bin\gh`
 
-Run tests with: `make test` or `go test ./...`
+Run tests with: `go test ./...`
 
 ## Submitting a pull request
 
@@ -43,6 +47,10 @@ Contributions to this project are [released][legal] to the public under the [pro
 Please note that this project adheres to a [Contributor Code of Conduct][code-of-conduct]. By participating in this project you agree to abide by its terms.
 
 We generate manual pages from source on every release. You do not need to submit pull requests for documentation specifically; manual pages for commands will automatically get updated after your pull requests gets accepted.
+
+## Design guidelines
+
+You may reference the [CLI Design System][] when suggesting features, and are welcome to use our [Google Docs Template][] to suggest designs.
 
 ## Resources
 
@@ -61,3 +69,5 @@ We generate manual pages from source on every release. You do not need to submit
 [How to Contribute to Open Source]: https://opensource.guide/how-to-contribute/
 [Using Pull Requests]: https://docs.github.com/en/free-pro-team@latest/github/collaborating-with-issues-and-pull-requests/about-pull-requests
 [GitHub Help]: https://docs.github.com/
+[CLI Design System]: https://primer.style/cli/
+[Google Docs Template]: https://docs.google.com/document/d/1JIRErIUuJ6fTgabiFYfCH3x91pyHuytbfa0QLnTfXKM/edit#heading=h.or54sa47ylpg

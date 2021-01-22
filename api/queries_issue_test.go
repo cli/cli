@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"testing"
@@ -16,30 +15,36 @@ func TestIssueList(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issues": {
-			"nodes": [],
-			"pageInfo": {
-				"hasNextPage": true,
-				"endCursor": "ENDCURSOR"
-			}
-		}
-	} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issues": {
-			"nodes": [],
-			"pageInfo": {
-				"hasNextPage": false,
-				"endCursor": "ENDCURSOR"
-			}
-		}
-	} } }
-	`))
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+					"nodes": [],
+					"pageInfo": {
+						"hasNextPage": true,
+						"endCursor": "ENDCURSOR"
+					}
+				}
+			} } }
+		`),
+	)
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+					"nodes": [],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": "ENDCURSOR"
+					}
+				}
+			} } }
+			`),
+	)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	_, err := IssueList(client, repo, "open", []string{}, "", 251, "", "", "")
@@ -75,44 +80,51 @@ func TestIssueList_pagination(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))
 
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issues": {
-			"nodes": [
-				{
-					"title": "issue1",
-					"labels": { "nodes": [ { "name": "bug" } ], "totalCount": 1 },
-					"assignees": { "nodes": [ { "login": "user1" } ], "totalCount": 1 }
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+					"nodes": [
+						{
+							"title": "issue1",
+							"labels": { "nodes": [ { "name": "bug" } ], "totalCount": 1 },
+							"assignees": { "nodes": [ { "login": "user1" } ], "totalCount": 1 }
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": true,
+						"endCursor": "ENDCURSOR"
+					},
+					"totalCount": 2
 				}
-			],
-			"pageInfo": {
-				"hasNextPage": true,
-				"endCursor": "ENDCURSOR"
-			},
-			"totalCount": 2
-		}
-	} } }
-	`))
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"hasIssuesEnabled": true,
-		"issues": {
-			"nodes": [
-				{
-					"title": "issue2",
-					"labels": { "nodes": [ { "name": "enhancement" } ], "totalCount": 1 },
-					"assignees": { "nodes": [ { "login": "user2" } ], "totalCount": 1 }
+			} } }
+			`),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+					"nodes": [
+						{
+							"title": "issue2",
+							"labels": { "nodes": [ { "name": "enhancement" } ], "totalCount": 1 },
+							"assignees": { "nodes": [ { "login": "user2" } ], "totalCount": 1 }
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": "ENDCURSOR"
+					},
+					"totalCount": 2
 				}
-			],
-			"pageInfo": {
-				"hasNextPage": false,
-				"endCursor": "ENDCURSOR"
-			},
-			"totalCount": 2
-		}
-	} } }
-	`))
+			} } }
+			`),
+	)
 
 	repo := ghrepo.New("OWNER", "REPO")
 	res, err := IssueList(client, repo, "", nil, "", 0, "", "", "")
