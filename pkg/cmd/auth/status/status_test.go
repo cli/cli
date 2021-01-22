@@ -200,7 +200,7 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs:  func(reg *httpmock.Registry) {},
 			wantErrOut: regexp.MustCompile(`(?s)Hostname "github.example.com" not found among authenticated GitHub hosts`),
-			wantErr:    regexp.MustCompile(``),
+			wantErr:    "SilentError",
 		},
 	}
 
