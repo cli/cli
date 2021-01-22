@@ -81,11 +81,6 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		return nil
 	}
 
-	var err error
-	if tb.Assignees, err = ReplaceAtMeLogin(tb.Assignees, client, baseRepo); err != nil {
-		return err
-	}
-
 	if err := fillMetadata(client, baseRepo, tb); err != nil {
 		return err
 	}
@@ -196,17 +191,47 @@ func quoteValueForQuery(v string) string {
 	return v
 }
 
-// ReplaceAtMeLogin iterates over the list of specified login names, replacing
-// any "@me" mentions with the current user LoginName.
-func ReplaceAtMeLogin(logins []string, client *api.Client, repo ghrepo.Interface) ([]string, error) {
-	for i, u := range logins {
-		if strings.EqualFold(u, "@me") {
-			login, err := api.CurrentLoginName(client, repo.RepoHost())
-			if err != nil {
-				return logins, fmt.Errorf("@me resolve: failed obtaining user id: %w", err)
-			}
-			logins[i] = login
+// MeReplacer resolves usages of `@me` to the handle of the currently logged in user.
+type MeReplacer struct {
+	apiClient *api.Client
+	hostname  string
+	login     string
+}
+
+func NewMeReplacer(apiClient *api.Client, hostname string) *MeReplacer {
+	return &MeReplacer{
+		apiClient: apiClient,
+		hostname:  hostname,
+	}
+}
+
+func (r *MeReplacer) currentLogin() (string, error) {
+	if r.login != "" {
+		return r.login, nil
+	}
+	login, err := api.CurrentLoginName(r.apiClient, r.hostname)
+	if err != nil {
+		return "", fmt.Errorf("failed resolving `@me` to your user handle: %w", err)
+	}
+	r.login = login
+	return login, nil
+}
+
+func (r *MeReplacer) Replace(handle string) (string, error) {
+	if handle == "@me" {
+		return r.currentLogin()
+	}
+	return handle, nil
+}
+
+func (r *MeReplacer) ReplaceSlice(handles []string) ([]string, error) {
+	res := make([]string, len(handles))
+	for i, h := range handles {
+		var err error
+		res[i], err = r.Replace(h)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return logins, nil
+	return res, nil
 }

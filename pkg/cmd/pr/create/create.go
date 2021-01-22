@@ -386,10 +386,16 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		milestoneTitles = []string{opts.Milestone}
 	}
 
+	meReplacer := shared.NewMeReplacer(ctx.Client, ctx.BaseRepo.RepoHost())
+	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	if err != nil {
+		return nil, err
+	}
+
 	state := &shared.IssueMetadataState{
 		Type:       shared.PRMetadata,
 		Reviewers:  opts.Reviewers,
-		Assignees:  opts.Assignees,
+		Assignees:  assignees,
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestoneTitles,

@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -115,9 +116,15 @@ func createRun(opts *CreateOptions) (err error) {
 		milestones = []string{opts.Milestone}
 	}
 
+	meReplacer := shared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	if err != nil {
+		return err
+	}
+
 	tb := prShared.IssueMetadataState{
 		Type:       prShared.IssueMetadata,
-		Assignees:  opts.Assignees,
+		Assignees:  assignees,
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestones,
@@ -131,11 +138,6 @@ func createRun(opts *CreateOptions) (err error) {
 			err = fmt.Errorf("failed to recover input: %w", err)
 			return
 		}
-	}
-
-	opts.Assignees, err = prShared.ReplaceAtMeLogin(opts.Assignees, apiClient, baseRepo)
-	if err != nil {
-		return err
 	}
 
 	if opts.WebMode {

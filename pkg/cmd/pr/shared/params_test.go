@@ -78,7 +78,7 @@ func Test_listURLWithQuery(t *testing.T) {
 	}
 }
 
-func TestReplaceAtMeLogin(t *testing.T) {
+func TestMeReplacer_Replace(t *testing.T) {
 	rtSuccess := &httpmock.Registry{}
 	rtSuccess.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
@@ -129,13 +129,14 @@ func TestReplaceAtMeLogin(t *testing.T) {
 				logins: []string{"some", "@me", "other"},
 			},
 			verify:  rtFailure.Verify,
-			want:    []string{"some", "@me", "other"},
+			want:    []string(nil),
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReplaceAtMeLogin(tt.args.logins, tt.args.client, tt.args.repo)
+			me := NewMeReplacer(tt.args.client, tt.args.repo.RepoHost())
+			got, err := me.ReplaceSlice(tt.args.logins)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReplaceAtMeLogin() error = %v, wantErr %v", err, tt.wantErr)
 				return
