@@ -123,7 +123,11 @@ func (c *ColorScheme) Blue(t string) string {
 }
 
 func (c *ColorScheme) SuccessIcon() string {
-	return c.Green("✓")
+	return c.SuccessIconOfColor(c.Green)
+}
+
+func (c *ColorScheme) SuccessIconOfColor(colo func(string) string) string {
+	return colo("✓")
 }
 
 func (c *ColorScheme) WarningIcon() string {

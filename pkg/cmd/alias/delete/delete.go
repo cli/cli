@@ -63,7 +63,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIcon(), opts.Name, expansion)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconOfColor(cs.Red), opts.Name, expansion)
 	}
 
 	return nil

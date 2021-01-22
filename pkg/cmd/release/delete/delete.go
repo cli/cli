@@ -92,7 +92,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	iofmt := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted release %s\n", iofmt.SuccessIcon(), release.TagName)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted release %s\n", iofmt.SuccessIconOfColor(iofmt.Red), release.TagName)
 	if !release.IsDraft {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Note that the %s git tag still remains in the repository\n", iofmt.WarningIcon(), release.TagName)
 	}

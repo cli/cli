@@ -86,7 +86,7 @@ func closeRun(opts *CloseOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", cs.SuccessIcon(), pr.Number, pr.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", cs.SuccessIconOfColor(cs.Red), pr.Number, pr.Title)
 
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 
@@ -132,7 +132,7 @@ func closeRun(opts *CloseOptions) error {
 				return err
 			}
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIcon(), cs.Cyan(pr.HeadRefName), branchSwitchString)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconOfColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil

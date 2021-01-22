@@ -249,7 +249,7 @@ func createRun(opts *CreateOptions) error {
 		isTTY := opts.IO.IsStdoutTTY()
 
 		if isTTY {
-			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", cs.SuccessIcon(), ghrepo.FullName(repo))
+			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", cs.SuccessIconOfColor(cs.Green), ghrepo.FullName(repo))
 		} else {
 			fmt.Fprintln(stdout, repo.URL)
 		}

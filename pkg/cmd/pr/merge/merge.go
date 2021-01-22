@@ -160,7 +160,7 @@ func mergeRun(opts *MergeOptions) error {
 			case api.PullRequestMergeMethodSquash:
 				action = "Squashed and merged"
 			}
-			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIcon(), action, pr.Number, pr.Title)
+			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconOfColor(cs.Magenta), action, pr.Number, pr.Title)
 		}
 	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode {
 		err := prompt.SurveyAskOne(&survey.Confirm{
@@ -221,7 +221,7 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIcon(), cs.Cyan(pr.HeadRefName), branchSwitchString)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconOfColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
 	}
 
 	return nil
