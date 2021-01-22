@@ -145,13 +145,25 @@ func mergeRun(opts *MergeOptions) error {
 		mergeMethod := opts.MergeMethod
 
 		if opts.InteractiveMode {
-			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, crossRepoPR)
+			r, err := api.GitHubRepo(apiClient, baseRepo)
 			if err != nil {
-				if errors.Is(err, cancelError) {
-					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-					return cmdutil.SilentError
-				}
 				return err
+			}
+			mergeMethod, err = mergeMethodSurvey(r)
+			if err != nil {
+				return err
+			}
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			if err != nil {
+				return err
+			}
+			confirm, err := confirmSurvey()
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+				return cmdutil.SilentError
 			}
 		}
 
@@ -237,20 +249,43 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-var cancelError = errors.New("cancelError")
-
-func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
-	mergeMethodQuestion := &survey.Question{
-		Name: "mergeMethod",
-		Prompt: &survey.Select{
-			Message: "What merge method would you like to use?",
-			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
-			Default: "Create a merge commit",
-		},
+func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, error) {
+	type mergeOption struct {
+		title  string
+		method api.PullRequestMergeMethod
 	}
 
-	qs := []*survey.Question{mergeMethodQuestion}
+	var mergeOpts []mergeOption
+	if baseRepo.MergeCommitAllowed {
+		opt := mergeOption{title: "Create a merge commit", method: api.PullRequestMergeMethodMerge}
+		mergeOpts = append(mergeOpts, opt)
+	}
+	if baseRepo.RebaseMergeAllowed {
+		opt := mergeOption{title: "Rebase and merge", method: api.PullRequestMergeMethodRebase}
+		mergeOpts = append(mergeOpts, opt)
+	}
+	if baseRepo.SquashMergeAllowed {
+		opt := mergeOption{title: "Squash and merge", method: api.PullRequestMergeMethodSquash}
+		mergeOpts = append(mergeOpts, opt)
+	}
 
+	var surveyOpts []string
+	for _, v := range mergeOpts {
+		surveyOpts = append(surveyOpts, v.title)
+	}
+
+	mergeQuestion := &survey.Select{
+		Message: "What merge method would you like to use?",
+		Options: surveyOpts,
+		Default: "Create a merge commit",
+	}
+
+	var result int
+	err := prompt.SurveyAskOne(mergeQuestion, &result)
+	return mergeOpts[result].method, err
+}
+
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
 		if opts.CanDeleteLocalBranch {
@@ -259,49 +294,24 @@ func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool) (api.PullRequestMe
 			message = "Delete the branch on GitHub?"
 		}
 
-		deleteBranchQuestion := &survey.Question{
-			Name: "deleteBranch",
-			Prompt: &survey.Confirm{
-				Message: message,
-				Default: false,
-			},
-		}
-		qs = append(qs, deleteBranchQuestion)
-	}
-
-	qs = append(qs, &survey.Question{
-		Name: "isConfirmed",
-		Prompt: &survey.Confirm{
-			Message: "Submit?",
+		var result bool
+		submit := &survey.Confirm{
+			Message: message,
 			Default: false,
-		},
-	})
-
-	answers := struct {
-		MergeMethod  int
-		DeleteBranch bool
-		IsConfirmed  bool
-	}{
-		DeleteBranch: opts.DeleteBranch,
+		}
+		err := prompt.SurveyAskOne(submit, &result)
+		return result, err
 	}
 
-	err := prompt.SurveyAsk(qs, &answers)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not prompt: %w", err)
-	}
-	if !answers.IsConfirmed {
-		return 0, false, cancelError
-	}
+	return opts.DeleteBranch, nil
+}
 
-	var mergeMethod api.PullRequestMergeMethod
-	switch answers.MergeMethod {
-	case 0:
-		mergeMethod = api.PullRequestMergeMethodMerge
-	case 1:
-		mergeMethod = api.PullRequestMergeMethodRebase
-	case 2:
-		mergeMethod = api.PullRequestMergeMethodSquash
+func confirmSurvey() (bool, error) {
+	var confirm bool
+	submit := &survey.Confirm{
+		Message: "Submit?",
+		Default: true,
 	}
-
-	return mergeMethod, answers.DeleteBranch, nil
+	err := prompt.SurveyAskOne(submit, &confirm)
+	return confirm, err
 }
