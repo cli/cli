@@ -190,6 +190,17 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: xyz456.*Token: abc123`),
+		}, {
+			name: "missing hostname",
+			opts: &StatusOptions{
+				Hostname: "github.example.com",
+			},
+			cfg: func(c config.Config) {
+				_ = c.Set("github.com", "oauth_token", "abc123")
+			},
+			httpStubs:  func(reg *httpmock.Registry) {},
+			wantErrOut: regexp.MustCompile(`(?s)Hostname "github.example.com" not found among authenticated GitHub hosts`),
+			wantErr:    "SilentError",
 		},
 	}
 
