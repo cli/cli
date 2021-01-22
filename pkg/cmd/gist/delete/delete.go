@@ -2,14 +2,15 @@ package delete
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"net/http"
-	"strings"
 )
 
 type DeleteOptions struct {
@@ -28,7 +29,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "delete {<gist ID> | <gist URL>}",
 		Short: "Delete a gist",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "cannot delete: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
 			if runF != nil {

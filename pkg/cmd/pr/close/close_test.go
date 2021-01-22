@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -135,18 +136,17 @@ func TestPrClose_deleteBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git rev-parse --verify blueberries`
-	cs.Stub("") // git branch -d
-	cs.Stub("") // git push origin --delete blueberries
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, true, `96 --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr close` %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), `Closed pull request #96 \(The title of the PR\)`, `Deleted branch blueberries`)
 }

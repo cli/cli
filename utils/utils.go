@@ -2,12 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/browser"
 )
@@ -86,20 +84,6 @@ func Humanize(s string) string {
 	}
 
 	return strings.Map(h, s)
-}
-
-// We do this so we can stub out the spinner in tests -- it made things really flakey. This is not
-// an elegant solution.
-var StartSpinner = func(s *spinner.Spinner) {
-	s.Start()
-}
-
-var StopSpinner = func(s *spinner.Spinner) {
-	s.Stop()
-}
-
-func Spinner(w io.Writer) *spinner.Spinner {
-	return spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(w))
 }
 
 func IsURL(s string) bool {

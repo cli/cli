@@ -8,20 +8,6 @@ import (
 	"github.com/cli/cli/internal/config"
 )
 
-func ValidateHostCfg(hostname string, cfg config.Config) error {
-	apiClient, err := ClientFromCfg(hostname, cfg)
-	if err != nil {
-		return err
-	}
-
-	err = apiClient.HasMinimumScopes(hostname)
-	if err != nil {
-		return fmt.Errorf("could not validate token: %w", err)
-	}
-
-	return nil
-}
-
 var ClientFromCfg = func(hostname string, cfg config.Config) (*api.Client, error) {
 	var opts []api.ClientOption
 

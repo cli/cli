@@ -31,6 +31,8 @@ type MergeOptions struct {
 	DeleteBranch bool
 	MergeMethod  api.PullRequestMergeMethod
 
+	Body *string
+
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
 	InteractiveMode         bool
@@ -95,6 +97,11 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 
+			if cmd.Flags().Changed("body") {
+				bodyStr, _ := cmd.Flags().GetString("body")
+				opts.Body = &bodyStr
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -103,6 +110,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
+	cmd.Flags().StringP("body", "b", "", "Body for merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -124,8 +132,8 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if pr.Mergeable == "CONFLICTING" {
-		err := fmt.Errorf("%s Pull request #%d (%s) has conflicts and isn't mergeable ", cs.Red("!"), pr.Number, pr.Title)
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has conflicts and isn't mergeable\n", cs.Red("!"), pr.Number, pr.Title)
+		return cmdutil.SilentError
 	}
 
 	deleteBranch := opts.DeleteBranch
@@ -137,17 +145,29 @@ func mergeRun(opts *MergeOptions) error {
 		mergeMethod := opts.MergeMethod
 
 		if opts.InteractiveMode {
-			mergeMethod, deleteBranch, err = prInteractiveMerge(opts, crossRepoPR)
+			r, err := api.GitHubRepo(apiClient, baseRepo)
 			if err != nil {
-				if errors.Is(err, cancelError) {
-					fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-					return cmdutil.SilentError
-				}
 				return err
+			}
+			mergeMethod, err = mergeMethodSurvey(r)
+			if err != nil {
+				return err
+			}
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			if err != nil {
+				return err
+			}
+			confirm, err := confirmSurvey()
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+				return cmdutil.SilentError
 			}
 		}
 
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod)
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, opts.Body)
 		if err != nil {
 			return err
 		}
@@ -162,7 +182,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconOfColor(cs.Magenta), action, pr.Number, pr.Title)
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
@@ -170,15 +190,17 @@ func mergeRun(opts *MergeOptions) error {
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+	} else if crossRepoPR {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch {
+	if !deleteBranch || crossRepoPR {
 		return nil
 	}
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch && !crossRepoPR {
+	if opts.CanDeleteLocalBranch {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -210,7 +232,7 @@ func mergeRun(opts *MergeOptions) error {
 		}
 	}
 
-	if !isPRAlreadyMerged && !crossRepoPR {
+	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
 		// The ref might have already been deleted by GitHub
@@ -227,20 +249,43 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-var cancelError = errors.New("cancelError")
-
-func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool) (api.PullRequestMergeMethod, bool, error) {
-	mergeMethodQuestion := &survey.Question{
-		Name: "mergeMethod",
-		Prompt: &survey.Select{
-			Message: "What merge method would you like to use?",
-			Options: []string{"Create a merge commit", "Rebase and merge", "Squash and merge"},
-			Default: "Create a merge commit",
-		},
+func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, error) {
+	type mergeOption struct {
+		title  string
+		method api.PullRequestMergeMethod
 	}
 
-	qs := []*survey.Question{mergeMethodQuestion}
+	var mergeOpts []mergeOption
+	if baseRepo.MergeCommitAllowed {
+		opt := mergeOption{title: "Create a merge commit", method: api.PullRequestMergeMethodMerge}
+		mergeOpts = append(mergeOpts, opt)
+	}
+	if baseRepo.RebaseMergeAllowed {
+		opt := mergeOption{title: "Rebase and merge", method: api.PullRequestMergeMethodRebase}
+		mergeOpts = append(mergeOpts, opt)
+	}
+	if baseRepo.SquashMergeAllowed {
+		opt := mergeOption{title: "Squash and merge", method: api.PullRequestMergeMethodSquash}
+		mergeOpts = append(mergeOpts, opt)
+	}
 
+	var surveyOpts []string
+	for _, v := range mergeOpts {
+		surveyOpts = append(surveyOpts, v.title)
+	}
+
+	mergeQuestion := &survey.Select{
+		Message: "What merge method would you like to use?",
+		Options: surveyOpts,
+		Default: "Create a merge commit",
+	}
+
+	var result int
+	err := prompt.SurveyAskOne(mergeQuestion, &result)
+	return mergeOpts[result].method, err
+}
+
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
 		if opts.CanDeleteLocalBranch {
@@ -249,49 +294,24 @@ func prInteractiveMerge(opts *MergeOptions, crossRepoPR bool) (api.PullRequestMe
 			message = "Delete the branch on GitHub?"
 		}
 
-		deleteBranchQuestion := &survey.Question{
-			Name: "deleteBranch",
-			Prompt: &survey.Confirm{
-				Message: message,
-				Default: false,
-			},
-		}
-		qs = append(qs, deleteBranchQuestion)
-	}
-
-	qs = append(qs, &survey.Question{
-		Name: "isConfirmed",
-		Prompt: &survey.Confirm{
-			Message: "Submit?",
+		var result bool
+		submit := &survey.Confirm{
+			Message: message,
 			Default: false,
-		},
-	})
-
-	answers := struct {
-		MergeMethod  int
-		DeleteBranch bool
-		IsConfirmed  bool
-	}{
-		DeleteBranch: opts.DeleteBranch,
+		}
+		err := prompt.SurveyAskOne(submit, &result)
+		return result, err
 	}
 
-	err := prompt.SurveyAsk(qs, &answers)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not prompt: %w", err)
-	}
-	if !answers.IsConfirmed {
-		return 0, false, cancelError
-	}
+	return opts.DeleteBranch, nil
+}
 
-	var mergeMethod api.PullRequestMergeMethod
-	switch answers.MergeMethod {
-	case 0:
-		mergeMethod = api.PullRequestMergeMethodMerge
-	case 1:
-		mergeMethod = api.PullRequestMergeMethodRebase
-	case 2:
-		mergeMethod = api.PullRequestMergeMethodSquash
+func confirmSurvey() (bool, error) {
+	var confirm bool
+	submit := &survey.Confirm{
+		Message: "Submit?",
+		Default: true,
 	}
-
-	return mergeMethod, answers.DeleteBranch, nil
+	err := prompt.SurveyAskOne(submit, &confirm)
+	return confirm, err
 }

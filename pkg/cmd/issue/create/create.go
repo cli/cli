@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -53,6 +54,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
+			$ gh issue create --assignee @me
 			$ gh issue create --project "Roadmap"
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -84,7 +86,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
-	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`")
+	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
@@ -114,9 +116,15 @@ func createRun(opts *CreateOptions) (err error) {
 		milestones = []string{opts.Milestone}
 	}
 
+	meReplacer := shared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	if err != nil {
+		return err
+	}
+
 	tb := prShared.IssueMetadataState{
 		Type:       prShared.IssueMetadata,
-		Assignees:  opts.Assignees,
+		Assignees:  assignees,
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestones,
@@ -134,7 +142,14 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		if opts.Title != "" || opts.Body != "" {
+		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
+			if len(opts.Projects) > 0 {
+				var err error
+				tb.Projects, err = api.ProjectNamesToPaths(apiClient, baseRepo, tb.Projects)
+				if err != nil {
+					return fmt.Errorf("could not add to project: %w", err)
+				}
+			}
 			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 			if err != nil {
 				return
@@ -235,6 +250,13 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == prShared.PreviewAction {
+		if len(tb.Projects) > 0 {
+			var err error
+			tb.Projects, err = api.ProjectNamesToPaths(apiClient, repo, tb.Projects)
+			if err != nil {
+				return fmt.Errorf("could not add to project: %w", err)
+			}
+		}
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
 		if err != nil {

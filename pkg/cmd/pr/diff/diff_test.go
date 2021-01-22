@@ -174,10 +174,7 @@ func TestPRDiff_no_current_pr(t *testing.T) {
 	)
 
 	_, err := runCommand(http, nil, false, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, `no pull requests found for branch "feature"`, err.Error())
+	assert.EqualError(t, err, `no pull requests found for branch "feature"`)
 }
 
 func TestPRDiff_argument_not_found(t *testing.T) {
@@ -197,10 +194,7 @@ func TestPRDiff_argument_not_found(t *testing.T) {
 	)
 
 	_, err := runCommand(http, nil, false, "123")
-	if err == nil {
-		t.Fatal("expected error", err)
-	}
-	assert.Equal(t, `could not find pull request diff: pull request not found`, err.Error())
+	assert.EqualError(t, err, `could not find pull request diff: pull request not found`)
 }
 
 func TestPRDiff_notty(t *testing.T) {

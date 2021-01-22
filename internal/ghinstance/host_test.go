@@ -139,7 +139,7 @@ func TestHostnameValidator(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.Equal(t, nil, err)
+			assert.NoError(t, err)
 		})
 	}
 }

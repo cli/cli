@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -11,37 +12,55 @@ import (
 	"github.com/cli/cli/utils"
 )
 
-func RawCommentList(comments api.Comments) string {
+type Comment interface {
+	AuthorLogin() string
+	Association() string
+	Content() string
+	Created() time.Time
+	IsEdited() bool
+	Link() string
+	Reactions() api.ReactionGroups
+	Status() string
+}
+
+func RawCommentList(comments api.Comments, reviews api.PullRequestReviews) string {
+	sortedComments := sortComments(comments, reviews)
 	var b strings.Builder
-	for _, comment := range comments.Nodes {
+	for _, comment := range sortedComments {
 		fmt.Fprint(&b, formatRawComment(comment))
 	}
 	return b.String()
 }
 
-func formatRawComment(comment api.Comment) string {
+func formatRawComment(comment Comment) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "author:\t%s\n", comment.Author.Login)
-	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.AuthorAssociation))
-	fmt.Fprintf(&b, "edited:\t%t\n", comment.IncludesCreatedEdit)
+	fmt.Fprintf(&b, "author:\t%s\n", comment.AuthorLogin())
+	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.Association()))
+	fmt.Fprintf(&b, "edited:\t%t\n", comment.IsEdited())
+	fmt.Fprintf(&b, "status:\t%s\n", formatRawCommentStatus(comment.Status()))
 	fmt.Fprintln(&b, "--")
-	fmt.Fprintln(&b, comment.Body)
+	fmt.Fprintln(&b, comment.Content())
 	fmt.Fprintln(&b, "--")
 	return b.String()
 }
 
-func CommentList(io *iostreams.IOStreams, comments api.Comments) (string, error) {
+func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.PullRequestReviews, preview bool) (string, error) {
+	sortedComments := sortComments(comments, reviews)
+	if preview && len(sortedComments) > 0 {
+		sortedComments = sortedComments[len(sortedComments)-1:]
+	}
 	var b strings.Builder
 	cs := io.ColorScheme()
-	retrievedCount := len(comments.Nodes)
-	hiddenCount := comments.TotalCount - retrievedCount
+	totalCount := comments.TotalCount + reviews.TotalCount
+	retrievedCount := len(sortedComments)
+	hiddenCount := totalCount - retrievedCount
 
 	if hiddenCount > 0 {
 		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
 
-	for i, comment := range comments.Nodes {
+	for i, comment := range sortedComments {
 		last := i+1 == retrievedCount
 		cmt, err := formatComment(io, comment, last)
 		if err != nil {
@@ -61,18 +80,21 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments) (string, error)
 	return b.String(), nil
 }
 
-func formatComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (string, error) {
+func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (string, error) {
 	var b strings.Builder
 	cs := io.ColorScheme()
 
 	// Header
-	fmt.Fprint(&b, cs.Bold(comment.Author.Login))
-	if comment.AuthorAssociation != "NONE" {
-		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.ToLower(comment.AuthorAssociation))))
+	fmt.Fprint(&b, cs.Bold(comment.AuthorLogin()))
+	if comment.Status() != "" {
+		fmt.Fprint(&b, formatCommentStatus(cs, comment.Status()))
 	}
-	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))))
-	if comment.IncludesCreatedEdit {
-		fmt.Fprint(&b, cs.Bold(" • edited"))
+	if comment.Association() != "NONE" {
+		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.Title(strings.ToLower(comment.Association())))))
+	}
+	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created()))))
+	if comment.IsEdited() {
+		fmt.Fprint(&b, cs.Bold(" • Edited"))
 	}
 	if newest {
 		fmt.Fprint(&b, cs.Bold(" • "))
@@ -81,20 +103,82 @@ func formatComment(io *iostreams.IOStreams, comment api.Comment, newest bool) (s
 	fmt.Fprintln(&b)
 
 	// Reactions
-	if reactions := ReactionGroupList(comment.ReactionGroups); reactions != "" {
+	if reactions := ReactionGroupList(comment.Reactions()); reactions != "" {
 		fmt.Fprint(&b, reactions)
 		fmt.Fprintln(&b)
 	}
 
 	// Body
-	if comment.Body != "" {
+	var md string
+	var err error
+	if comment.Content() == "" {
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
+	} else {
 		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(comment.Body, style, "")
+		md, err = markdown.Render(comment.Content(), style, "")
 		if err != nil {
 			return "", err
 		}
-		fmt.Fprint(&b, md)
+	}
+	fmt.Fprint(&b, md)
+
+	// Footer
+	if comment.Link() != "" {
+		fmt.Fprintf(&b, cs.Gray("View the full review: %s\n\n"), comment.Link())
 	}
 
 	return b.String(), nil
+}
+
+func sortComments(cs api.Comments, rs api.PullRequestReviews) []Comment {
+	comments := cs.Nodes
+	reviews := rs.Nodes
+	var sorted []Comment = make([]Comment, len(comments)+len(reviews))
+
+	var i int
+	for _, c := range comments {
+		sorted[i] = c
+		i++
+	}
+	for _, r := range reviews {
+		sorted[i] = r
+		i++
+	}
+
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Created().Before(sorted[j].Created())
+	})
+
+	return sorted
+}
+
+const (
+	approvedStatus         = "APPROVED"
+	changesRequestedStatus = "CHANGES_REQUESTED"
+	commentedStatus        = "COMMENTED"
+	dismissedStatus        = "DISMISSED"
+)
+
+func formatCommentStatus(cs *iostreams.ColorScheme, status string) string {
+	switch status {
+	case approvedStatus:
+		return fmt.Sprintf(" %s", cs.Green("approved"))
+	case changesRequestedStatus:
+		return fmt.Sprintf(" %s", cs.Red("requested changes"))
+	case commentedStatus, dismissedStatus:
+		return fmt.Sprintf(" %s", strings.ToLower(status))
+	}
+
+	return ""
+}
+
+func formatRawCommentStatus(status string) string {
+	if status == approvedStatus ||
+		status == changesRequestedStatus ||
+		status == commentedStatus ||
+		status == dismissedStatus {
+		return strings.ReplaceAll(strings.ToLower(status), "_", " ")
+	}
+
+	return "none"
 }

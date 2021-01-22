@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -46,6 +47,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list -l "help wanted"
 			$ gh issue list -A monalisa
+			$ gh issue list -a @me
 			$ gh issue list --web
 			$ gh issue list --milestone 'MVP'
 		`),
@@ -91,15 +93,29 @@ func listRun(opts *ListOptions) error {
 
 	isTerminal := opts.IO.IsStdoutTTY()
 
+	meReplacer := shared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	filterAssignee, err := meReplacer.Replace(opts.Assignee)
+	if err != nil {
+		return err
+	}
+	filterAuthor, err := meReplacer.Replace(opts.Author)
+	if err != nil {
+		return err
+	}
+	filterMention, err := meReplacer.Replace(opts.Mention)
+	if err != nil {
+		return err
+	}
+
 	if opts.WebMode {
 		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
 		openURL, err := prShared.ListURLWithQuery(issueListURL, prShared.FilterOptions{
 			Entity:    "issue",
 			State:     opts.State,
-			Assignee:  opts.Assignee,
+			Assignee:  filterAssignee,
 			Labels:    opts.Labels,
-			Author:    opts.Author,
-			Mention:   opts.Mention,
+			Author:    filterAuthor,
+			Mention:   filterMention,
 			Milestone: opts.Milestone,
 		})
 		if err != nil {
@@ -111,7 +127,7 @@ func listRun(opts *ListOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	listResult, err := api.IssueList(apiClient, baseRepo, opts.State, opts.Labels, opts.Assignee, opts.LimitResults, opts.Author, opts.Mention, opts.Milestone)
+	listResult, err := api.IssueList(apiClient, baseRepo, opts.State, opts.Labels, filterAssignee, opts.LimitResults, filterAuthor, filterMention, opts.Milestone)
 	if err != nil {
 		return err
 	}

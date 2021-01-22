@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -80,13 +81,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 func viewRun(opts *ViewOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	opts.IO.StartProgressIndicator()
+	pr, err := retrievePullRequest(opts)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
@@ -101,16 +98,6 @@ func viewRun(opts *ViewOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	if opts.Comments {
-		opts.IO.StartProgressIndicator()
-		comments, err := api.CommentsForPullRequest(apiClient, repo, pr)
-		opts.IO.StopProgressIndicator()
-		if err != nil {
-			return err
-		}
-		pr.Comments = *comments
-	}
-
 	opts.IO.DetectTerminalTheme()
 
 	err = opts.IO.StartPager()
@@ -120,11 +107,11 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts.IO, pr)
+		return printHumanPrPreview(opts, pr)
 	}
 
 	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments))
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.Reviews))
 		return nil
 	}
 
@@ -157,9 +144,9 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
-	out := io.Out
-	cs := io.ColorScheme()
+func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
@@ -201,21 +188,23 @@ func printHumanPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	}
 
 	// Body
-	fmt.Fprintln(out)
+	var md string
+	var err error
 	if pr.Body == "" {
-		pr.Body = "_No description provided_"
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(pr.Body, style, "")
+		if err != nil {
+			return err
+		}
 	}
-	style := markdown.GetStyle(io.TerminalTheme())
-	md, err := markdown.Render(pr.Body, style, "")
-	if err != nil {
-		return err
-	}
-	fmt.Fprint(out, md)
-	fmt.Fprintln(out)
+	fmt.Fprintf(out, "\n%s\n", md)
 
-	// Comments
-	if pr.Comments.TotalCount > 0 {
-		comments, err := shared.CommentList(io, pr.Comments)
+	// Reviews and Comments
+	if pr.Comments.TotalCount > 0 || pr.Reviews.TotalCount > 0 {
+		preview := !opts.Comments
+		comments, err := shared.CommentList(opts.IO, pr.Comments, pr.DisplayableReviews(), preview)
 		if err != nil {
 			return err
 		}
@@ -404,4 +393,52 @@ func prStateWithDraft(pr *api.PullRequest) string {
 	}
 
 	return pr.State
+}
+
+func retrievePullRequest(opts *ViewOptions) (*api.PullRequest, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.BrowserMode {
+		return pr, nil
+	}
+
+	var errp, errc error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var reviews *api.PullRequestReviews
+		reviews, errp = api.ReviewsForPullRequest(apiClient, repo, pr)
+		pr.Reviews = *reviews
+	}()
+
+	if opts.Comments {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var comments *api.Comments
+			comments, errc = api.CommentsForPullRequest(apiClient, repo, pr)
+			pr.Comments = *comments
+		}()
+	}
+
+	wg.Wait()
+
+	if errp != nil {
+		err = errp
+	}
+	if errc != nil {
+		err = errc
+	}
+	return pr, err
 }

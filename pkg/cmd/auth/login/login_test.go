@@ -3,9 +3,11 @@ package login
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"regexp"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/auth/shared"
@@ -189,17 +191,22 @@ func Test_NewCmdLogin(t *testing.T) {
 
 func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      *LoginOptions
-		httpStubs func(*httpmock.Registry)
-		wantHosts string
-		wantErr   *regexp.Regexp
+		name       string
+		opts       *LoginOptions
+		httpStubs  func(*httpmock.Registry)
+		env        map[string]string
+		wantHosts  string
+		wantErr    string
+		wantStderr string
 	}{
 		{
 			name: "with token",
 			opts: &LoginOptions{
 				Hostname: "github.com",
 				Token:    "abc123",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
 			wantHosts: "github.com:\n    oauth_token: abc123\n",
 		},
@@ -223,7 +230,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("read:org"))
 			},
-			wantErr: regexp.MustCompile(`missing required scope 'repo'`),
+			wantErr: `error validating token: missing required scope 'repo'`,
 		},
 		{
 			name: "missing read scope",
@@ -234,7 +241,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo"))
 			},
-			wantErr: regexp.MustCompile(`missing required scope 'read:org'`),
+			wantErr: `error validating token: missing required scope 'read:org'`,
 		},
 		{
 			name: "has admin scope",
@@ -247,6 +254,36 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			wantHosts: "github.com:\n    oauth_token: abc456\n",
 		},
+		{
+			name: "github.com token from environment",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc456",
+			},
+			env: map[string]string{
+				"GH_TOKEN": "value_from_env",
+			},
+			wantErr: "SilentError",
+			wantStderr: heredoc.Doc(`
+				The value of the GH_TOKEN environment variable is being used for authentication.
+				To have GitHub CLI store credentials instead, first clear the value from the environment.
+			`),
+		},
+		{
+			name: "GHE token from environment",
+			opts: &LoginOptions{
+				Hostname: "ghe.io",
+				Token:    "abc456",
+			},
+			env: map[string]string{
+				"GH_ENTERPRISE_TOKEN": "value_from_env",
+			},
+			wantErr: "SilentError",
+			wantStderr: heredoc.Doc(`
+				The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
+				To have GitHub CLI store credentials instead, first clear the value from the environment.
+			`),
+		},
 	}
 
 	for _, tt := range tests {
@@ -256,7 +293,8 @@ func Test_loginRun_nontty(t *testing.T) {
 		io.SetStdoutTTY(false)
 
 		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			cfg := config.NewBlankConfig()
+			return config.InheritEnv(cfg), nil
 		}
 
 		tt.opts.IO = io
@@ -271,10 +309,23 @@ func Test_loginRun_nontty(t *testing.T) {
 				return api.NewClientFromHTTP(httpClient), nil
 			}
 
+			old_GH_TOKEN := os.Getenv("GH_TOKEN")
+			os.Setenv("GH_TOKEN", tt.env["GH_TOKEN"])
+			old_GITHUB_TOKEN := os.Getenv("GITHUB_TOKEN")
+			os.Setenv("GITHUB_TOKEN", tt.env["GITHUB_TOKEN"])
+			old_GH_ENTERPRISE_TOKEN := os.Getenv("GH_ENTERPRISE_TOKEN")
+			os.Setenv("GH_ENTERPRISE_TOKEN", tt.env["GH_ENTERPRISE_TOKEN"])
+			old_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
+			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.env["GITHUB_ENTERPRISE_TOKEN"])
+			defer func() {
+				os.Setenv("GH_TOKEN", old_GH_TOKEN)
+				os.Setenv("GITHUB_TOKEN", old_GITHUB_TOKEN)
+				os.Setenv("GH_ENTERPRISE_TOKEN", old_GH_ENTERPRISE_TOKEN)
+				os.Setenv("GITHUB_ENTERPRISE_TOKEN", old_GITHUB_ENTERPRISE_TOKEN)
+			}()
+
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
-			} else {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			}
 
 			mainBuf := bytes.Buffer{}
@@ -282,18 +333,14 @@ func Test_loginRun_nontty(t *testing.T) {
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := loginRun(tt.opts)
-			assert.Equal(t, tt.wantErr == nil, err == nil)
-			if err != nil {
-				if tt.wantErr != nil {
-					assert.True(t, tt.wantErr.MatchString(err.Error()))
-					return
-				} else {
-					t.Fatalf("unexpected error: %s", err)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())
-			assert.Equal(t, "", stderr.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			reg.Verify(t)
 		})
@@ -319,7 +366,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				_ = cfg.Set("github.com", "oauth_token", "ghi789")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -329,7 +376,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(false) // do not continue
 			},
 			wantHosts:  "", // nothing should have been written to hosts
-			wantErrOut: regexp.MustCompile("Logging into github.com"),
+			wantErrOut: nil,
 		},
 		{
 			name: "hostname set",
@@ -345,7 +392,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(false)    // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -367,7 +414,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				as.StubOne(false)          // cache credentials
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,read:public_key"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
@@ -440,7 +487,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			} else {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,read:public_key"))
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))

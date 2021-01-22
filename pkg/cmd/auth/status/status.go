@@ -81,11 +81,13 @@ func statusRun(opts *StatusOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var failed bool
+	var isHostnameFound bool
 
 	for _, hostname := range hostnames {
 		if opts.Hostname != "" && opts.Hostname != hostname {
 			continue
 		}
+		isHostnameFound = true
 
 		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
 		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
@@ -137,6 +139,12 @@ func statusRun(opts *StatusOptions) error {
 
 		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
 		// not to since I wanted this command to be read-only.
+	}
+
+	if !isHostnameFound {
+		fmt.Fprintf(stderr,
+			"Hostname %q not found among authenticated GitHub hosts\n", opts.Hostname)
+		return cmdutil.SilentError
 	}
 
 	for _, hostname := range hostnames {

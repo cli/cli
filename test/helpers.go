@@ -49,6 +49,7 @@ type CmdStubber struct {
 	Calls []*exec.Cmd
 }
 
+// Deprecated: use run.Stub
 func InitCmdStubber() (*CmdStubber, func()) {
 	cs := CmdStubber{}
 	teardown := run.SetPrepareCmd(createStubbedPrepareCmd(&cs))
@@ -90,6 +91,7 @@ type T interface {
 	Errorf(string, ...interface{})
 }
 
+// Deprecated: prefer exact matches for command output
 func ExpectLines(t T, output string, lines ...string) {
 	t.Helper()
 	var r *regexp.Regexp

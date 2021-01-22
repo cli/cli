@@ -3,13 +3,10 @@ package fork
 import (
 	"net/http"
 	"net/url"
-	"os/exec"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
@@ -20,7 +17,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/test"
-	"github.com/cli/cli/utils"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -85,21 +81,67 @@ func runCommand(httpClient *http.Client, remotes []*context.Remote, isTTY bool, 
 func TestRepoFork_nontty(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	_, restore := run.Stub()
+	defer restore(t)
 
 	output, err := runCommand(httpClient, nil, false, "")
 	if err != nil {
 		t.Fatalf("error running command `repo fork`: %v", err)
 	}
 
-	assert.Equal(t, 0, len(cs.Calls))
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+
+}
+
+func TestRepoFork_existing_remote_error(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	_, err := runCommand(httpClient, nil, false, "--remote")
+	if err == nil {
+		t.Fatal("expected error running command `repo fork`")
+	}
+
+	assert.Equal(t, "a remote called 'origin' already exists. You can rerun this command with --remote-name to specify a different remote name.", err.Error())
+
 	reg.Verify(t)
+}
+
+func TestRepoFork_no_existing_remote(t *testing.T) {
+	remotes := []*context.Remote{
+		{
+			Remote: &git.Remote{
+				Name:     "upstream",
+				FetchURL: &url.URL{},
+			},
+			Repo: ghrepo.New("OWNER", "REPO"),
+		},
+	}
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	cs, restore := run.Stub()
+	defer restore(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/someone/REPO\.git`, 0, "")
+
+	output, err := runCommand(httpClient, remotes, false, "--remote")
+	if err != nil {
+		t.Fatalf("error running command `repo fork`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestRepoFork_in_parent_nontty(t *testing.T) {
@@ -108,20 +150,15 @@ func TestRepoFork_in_parent_nontty(t *testing.T) {
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, restore := run.Stub()
+	defer restore(t)
 
-	cs.Stub("") // git remote rename
-	cs.Stub("") // git remote add
+	cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
 
-	output, err := runCommand(httpClient, nil, false, "--remote")
+	output, err := runCommand(httpClient, nil, false, "--remote --remote-name=fork")
 	if err != nil {
 		t.Fatalf("error running command `repo fork`: %v", err)
 	}
-
-	assert.Equal(t, 2, len(cs.Calls))
-	assert.Equal(t, "git remote rename origin upstream", strings.Join(cs.Calls[0].Args, " "))
-	assert.Equal(t, "git remote add -f origin https://github.com/someone/REPO.git", strings.Join(cs.Calls[1].Args, " "))
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
@@ -131,14 +168,15 @@ func TestRepoFork_in_parent_nontty(t *testing.T) {
 func TestRepoFork_outside_parent_nontty(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
+	reg.Verify(t)
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, restore := run.Stub()
+	defer restore(t)
 
-	cs.Stub("") // git clone
-	cs.Stub("") // git remote add
+	cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	output, err := runCommand(httpClient, nil, false, "--clone OWNER/REPO")
 	if err != nil {
@@ -146,29 +184,22 @@ func TestRepoFork_outside_parent_nontty(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	assert.Equal(t, "git clone https://github.com/someone/REPO.git", strings.Join(cs.Calls[0].Args, " "))
-	assert.Equal(t, "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[1].Args, " "))
-
 	assert.Equal(t, output.Stderr(), "")
-	reg.Verify(t)
+
 }
 
 func TestRepoFork_already_forked(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	_, restore := run.Stub()
+	defer restore(t)
 
 	output, err := runCommand(httpClient, nil, true, "--remote=false")
 	if err != nil {
 		t.Errorf("got unexpected error: %v", err)
 	}
-
-	assert.Equal(t, 0, len(cs.Calls))
 
 	r := regexp.MustCompile(`someone/REPO.*already exists`)
 	if !r.MatchString(output.Stderr()) {
@@ -180,7 +211,6 @@ func TestRepoFork_already_forked(t *testing.T) {
 }
 
 func TestRepoFork_reuseRemote(t *testing.T) {
-	stubSpinner()
 	remotes := []*context.Remote{
 		{
 			Remote: &git.Remote{Name: "origin", FetchURL: &url.URL{}},
@@ -208,13 +238,12 @@ func TestRepoFork_reuseRemote(t *testing.T) {
 }
 
 func TestRepoFork_in_parent(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	_, restore := run.Stub()
+	defer restore(t)
 	defer stubSince(2 * time.Second)()
 
 	output, err := runCommand(httpClient, nil, true, "--remote=false")
@@ -222,7 +251,6 @@ func TestRepoFork_in_parent(t *testing.T) {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	assert.Equal(t, 0, len(cs.Calls))
 	assert.Equal(t, "", output.String())
 
 	r := regexp.MustCompile(`Created fork.*someone/REPO`)
@@ -234,7 +262,6 @@ func TestRepoFork_in_parent(t *testing.T) {
 }
 
 func TestRepoFork_outside(t *testing.T) {
-	stubSpinner()
 	tests := []struct {
 		name string
 		args string
@@ -273,52 +300,40 @@ func TestRepoFork_outside(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmds []*exec.Cmd
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmds = append(seenCmds, cmd)
-		return &test.OutputStub{}
-	})()
+	cs, restore := run.Stub()
+	defer restore(t)
 
-	output, err := runCommand(httpClient, nil, true, "--remote")
+	cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+
+	output, err := runCommand(httpClient, nil, true, "--remote --remote-name=fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	expectedCmds := []string{
-		"git remote rename origin upstream",
-		"git remote add -f origin https://github.com/someone/REPO.git",
-	}
-
-	for x, cmd := range seenCmds {
-		assert.Equal(t, expectedCmds[x], strings.Join(cmd.Args, " "))
-	}
-
 	assert.Equal(t, "", output.String())
-
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
-		"Added remote.*origin")
+		"Added remote.*fork")
 	reg.Verify(t)
 }
 
 func TestRepoFork_outside_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, restore := run.Stub()
+	defer restore(t)
 
-	cs.Stub("") // git clone
-	cs.Stub("") // git remote add
+	cs.Register(`git clone https://github\.com/someone/REPO\.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	output, err := runCommand(httpClient, nil, true, "--clone OWNER/REPO")
 	if err != nil {
@@ -326,10 +341,7 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	assert.Equal(t, "git clone https://github.com/someone/REPO.git", strings.Join(cs.Calls[0].Args, " "))
-	assert.Equal(t, "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[1].Args, " "))
-
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Cloned fork")
@@ -337,17 +349,16 @@ func TestRepoFork_outside_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_yes(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, restore := run.Stub()
+	defer restore(t)
 
-	cs.Stub("") // git clone
-	cs.Stub("") // git remote add
+	cs.Register(`git clone https://github\.com/someone/REPO\.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	defer prompt.StubConfirm(true)()
 
@@ -357,10 +368,7 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	assert.Equal(t, "git clone https://github.com/someone/REPO.git", strings.Join(cs.Calls[0].Args, " "))
-	assert.Equal(t, "git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[1].Args, " "))
-
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
 		"Cloned fork")
@@ -368,17 +376,13 @@ func TestRepoFork_outside_survey_yes(t *testing.T) {
 }
 
 func TestRepoFork_outside_survey_no(t *testing.T) {
-	stubSpinner()
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	cmdRun := false
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		cmdRun = true
-		return &test.OutputStub{}
-	})()
+	_, restore := run.Stub()
+	defer restore(t)
 
 	defer prompt.StubConfirm(false)()
 
@@ -388,8 +392,6 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	assert.Equal(t, false, cmdRun)
 
 	r := regexp.MustCompile(`Created fork.*someone/REPO`)
 	if !r.MatchString(output.Stderr()) {
@@ -400,55 +402,41 @@ func TestRepoFork_outside_survey_no(t *testing.T) {
 }
 
 func TestRepoFork_in_parent_survey_yes(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 	defer stubSince(2 * time.Second)()
 
-	var seenCmds []*exec.Cmd
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmds = append(seenCmds, cmd)
-		return &test.OutputStub{}
-	})()
+	cs, restore := run.Stub()
+	defer restore(t)
+
+	cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
 
 	defer prompt.StubConfirm(true)()
 
-	output, err := runCommand(httpClient, nil, true, "")
+	output, err := runCommand(httpClient, nil, true, "--remote-name=fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	expectedCmds := []string{
-		"git remote rename origin upstream",
-		"git remote add -f origin https://github.com/someone/REPO.git",
-	}
-
-	for x, cmd := range seenCmds {
-		assert.Equal(t, expectedCmds[x], strings.Join(cmd.Args, " "))
-	}
-
 	assert.Equal(t, "", output.String())
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
-		"Renamed.*origin.*remote to.*upstream",
-		"Added remote.*origin")
+		"Added remote.*fork")
 	reg.Verify(t)
 }
 
 func TestRepoFork_in_parent_survey_no(t *testing.T) {
-	stubSpinner()
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 	defer stubSince(2 * time.Second)()
 
-	cmdRun := false
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		cmdRun = true
-		return &test.OutputStub{}
-	})()
+	_, restore := run.Stub()
+	defer restore(t)
 
 	defer prompt.StubConfirm(false)()
 
@@ -459,28 +447,53 @@ func TestRepoFork_in_parent_survey_no(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 
-	assert.Equal(t, false, cmdRun)
-
 	r := regexp.MustCompile(`Created fork.*someone/REPO`)
 	if !r.MatchString(output.Stderr()) {
 		t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
 		return
 	}
-	reg.Verify(t)
 }
 
-func TestRepoFork_in_parent_match_protocol(t *testing.T) {
-	stubSpinner()
+func Test_RepoFork_gitFlags(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmds []*exec.Cmd
-	defer run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmds = append(seenCmds, cmd)
-		return &test.OutputStub{}
-	})()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone --depth 1 https://github.com/someone/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github.com/OWNER/REPO.git`, 0, "")
+
+	output, err := runCommand(httpClient, nil, false, "--clone OWNER/REPO -- --depth 1")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, output.Stderr(), "")
+	reg.Verify(t)
+}
+
+func Test_RepoFork_flagError(t *testing.T) {
+	_, err := runCommand(nil, nil, true, "--depth 1 OWNER/REPO")
+	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
+func TestRepoFork_in_parent_match_protocol(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	cs, restore := run.Stub()
+	defer restore(t)
+
+	cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
 
 	remotes := []*context.Remote{
 		{
@@ -491,34 +504,17 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 		},
 	}
 
-	output, err := runCommand(httpClient, remotes, true, "--remote")
+	output, err := runCommand(httpClient, remotes, true, "--remote --remote-name=fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)
 	}
 
-	expectedCmds := []string{
-		"git remote rename origin upstream",
-		"git remote add -f origin git@github.com:someone/REPO.git",
-	}
-
-	for x, cmd := range seenCmds {
-		assert.Equal(t, expectedCmds[x], strings.Join(cmd.Args, " "))
-	}
-
 	assert.Equal(t, "", output.String())
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(),
 		"Created fork.*someone/REPO",
-		"Added remote.*origin")
-	reg.Verify(t)
-}
-
-func stubSpinner() {
-	// not bothering with teardown since we never want spinners when doing tests
-	utils.StartSpinner = func(_ *spinner.Spinner) {
-	}
-	utils.StopSpinner = func(_ *spinner.Spinner) {
-	}
+		"Added remote.*fork")
 }
 
 func stubSince(d time.Duration) func() {
