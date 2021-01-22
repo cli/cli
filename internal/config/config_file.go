@@ -15,7 +15,7 @@ import (
 )
 
 func ConfigDir() string {
-	homeDir, _ := DeprecatedHomeDirPath(".config", "gh")
+	homeDir, _ := homeDirAutoMigrate()
 	return homeDir
 }
 
@@ -31,33 +31,60 @@ func ParseDefaultConfig() (Config, error) {
 	return ParseConfig(ConfigFile())
 }
 
-// Get the absolute path for a folder or file. Support for the old homedir method
-// Use os.UserHomeDir() for all new uses of the user's home dir.
-// Tied to https://github.com/cli/cli/pull/2740
-func DeprecatedHomeDirPath(elem ...string) (string, error) {
-	oldHomeDir, err := homedir.Dir()
-	if err != nil {
-		return "", err
-	}
-
+func HomeDirPath(subdir string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		// TODO: remove go-homedir fallback in GitHub CLI v2
+		if legacyDir, err := homedir.Dir(); err == nil {
+			return filepath.Join(legacyDir, subdir), nil
+		}
 		return "", err
 	}
 
-	fullOldPath := filepath.Join(append([]string{oldHomeDir}, elem...)...)
-	fullPath := filepath.Join(append([]string{homeDir}, elem...)...)
-
-	if fullOldPath != fullPath && len(elem) > 0 {
-		oldStat, err := os.Stat(fullOldPath)
-		if os.IsNotExist(err) && !oldStat.IsDir() {
-			return fullPath, nil
-		}
-
-		err = os.Rename(fullOldPath, fullPath)
-		return fullPath, err
+	newPath := filepath.Join(homeDir, subdir)
+	if s, err := os.Stat(newPath); err == nil && s.IsDir() {
+		return newPath, nil
 	}
-	return fullPath, err
+
+	// TODO: remove go-homedir fallback in GitHub CLI v2
+	if legacyDir, err := homedir.Dir(); err == nil {
+		legacyPath := filepath.Join(legacyDir, subdir)
+		if s, err := os.Stat(legacyPath); err == nil && s.IsDir() {
+			return legacyPath, nil
+		}
+	}
+
+	return newPath, nil
+}
+
+// Looks up the `~/.config/gh` directory with backwards-compatibility with go-homedir and auto-migration
+// when an old homedir location was found.
+func homeDirAutoMigrate() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// TODO: remove go-homedir fallback in GitHub CLI v2
+		if legacyDir, err := homedir.Dir(); err == nil {
+			return filepath.Join(legacyDir, ".config", "gh"), nil
+		}
+		return "", err
+	}
+
+	newPath := filepath.Join(homeDir, ".config", "gh")
+	_, newPathErr := os.Stat(newPath)
+	if newPathErr == nil || !os.IsNotExist(err) {
+		return newPath, newPathErr
+	}
+
+	// TODO: remove go-homedir fallback in GitHub CLI v2
+	if legacyDir, err := homedir.Dir(); err == nil {
+		legacyPath := filepath.Join(legacyDir, ".config", "gh")
+		if s, err := os.Stat(legacyPath); err == nil && s.IsDir() {
+			_ = os.MkdirAll(filepath.Dir(newPath), 0755)
+			return newPath, os.Rename(legacyPath, newPath)
+		}
+	}
+
+	return newPath, nil
 }
 
 var ReadConfigFile = func(filename string) ([]byte, error) {
