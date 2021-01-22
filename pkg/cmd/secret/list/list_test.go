@@ -191,6 +191,7 @@ func Test_listRun(t *testing.T) {
 
 			reg.Verify(t)
 
+			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, stdout.String(), tt.wantOut...)
 		})
 	}

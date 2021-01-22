@@ -218,6 +218,7 @@ func TestPRReview_url_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 }
 
@@ -260,6 +261,7 @@ func TestPRReview_number_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 }
 
@@ -293,6 +295,7 @@ func TestPRReview_no_arg(t *testing.T) {
 		t.Fatalf("error running pr review: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Reviewed pull request #123")
 }
 
@@ -425,8 +428,10 @@ func TestPRReview_interactive(t *testing.T) {
 		t.Fatalf("got unexpected error running pr review: %s", err)
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.String(),
 		"Got:",
 		"cool.*story")
@@ -470,10 +475,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 	})
 
 	_, err := runCommand(http, nil, true, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, "this type of review cannot be blank", err.Error())
+	assert.EqualError(t, err, "this type of review cannot be blank")
 }
 
 func TestPRReview_interactive_blank_approve(t *testing.T) {
@@ -532,5 +534,6 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 		t.Errorf("did not expect to see body printed in %s", output.String())
 	}
 
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Approved pull request #123")
 }

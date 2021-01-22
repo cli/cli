@@ -29,3 +29,12 @@ var reactionEmoji = map[string]string{
 	"ROCKET":      "\U0001f680",
 	"EYES":        "\U0001f440",
 }
+
+func reactionGroupsFragment() string {
+	return `reactionGroups {
+						content
+						users {
+							totalCount
+						}
+					}`
+}

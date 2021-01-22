@@ -60,13 +60,13 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			# approve the pull request of the current branch
 			$ gh pr review --approve
-			
+
 			# leave a review comment for the current branch
 			$ gh pr review --comment -b "interesting"
-			
+
 			# add a review for a specific pull request
 			$ gh pr review 123
-			
+
 			# request changes on a specific pull request
 			$ gh pr review 123 -r -b "needs more ASCII art"
 		`),

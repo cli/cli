@@ -14,6 +14,14 @@ const (
 	GITHUB_ENTERPRISE_TOKEN = "GITHUB_ENTERPRISE_TOKEN"
 )
 
+type ReadOnlyEnvError struct {
+	Variable string
+}
+
+func (e *ReadOnlyEnvError) Error() string {
+	return fmt.Sprintf("read-only value in %s", e.Variable)
+}
+
 func InheritEnv(c Config) Config {
 	return &envConfig{Config: c}
 }
@@ -56,7 +64,7 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
-			return fmt.Errorf("read-only token in %s cannot be modified", env)
+			return &ReadOnlyEnvError{Variable: env}
 		}
 	}
 

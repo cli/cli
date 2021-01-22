@@ -22,7 +22,7 @@ var PrepareCmd = func(cmd *exec.Cmd) Runnable {
 	return &cmdWithStderr{cmd}
 }
 
-// SetPrepareCmd overrides PrepareCmd and returns a func to revert it back
+// Deprecated: use Stub
 func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
 	origPrepare := PrepareCmd
 	PrepareCmd = func(cmd *exec.Cmd) Runnable {

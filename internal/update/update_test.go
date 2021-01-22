@@ -34,6 +34,27 @@ func TestCheckForUpdate(t *testing.T) {
 			ExpectsResult:  true,
 		},
 		{
+			Name:           "current is built from source",
+			CurrentVersion: "v1.2.3-123-gdeadbeef",
+			LatestVersion:  "v1.2.3",
+			LatestURL:      "https://www.spacejam.com/archive/spacejam/movie/jam.htm",
+			ExpectsResult:  false,
+		},
+		{
+			Name:           "current is built from source after a prerelease",
+			CurrentVersion: "v1.2.3-rc.1-123-gdeadbeef",
+			LatestVersion:  "v1.2.3",
+			LatestURL:      "https://www.spacejam.com/archive/spacejam/movie/jam.htm",
+			ExpectsResult:  true,
+		},
+		{
+			Name:           "latest is newer than version build from source",
+			CurrentVersion: "v1.2.3-123-gdeadbeef",
+			LatestVersion:  "v1.2.4",
+			LatestURL:      "https://www.spacejam.com/archive/spacejam/movie/jam.htm",
+			ExpectsResult:  true,
+		},
+		{
 			Name:           "latest is current",
 			CurrentVersion: "v1.0.0",
 			LatestVersion:  "v1.0.0",

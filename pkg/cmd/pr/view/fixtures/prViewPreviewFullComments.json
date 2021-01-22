@@ -69,7 +69,7 @@
               },
               "authorAssociation": "CONTRIBUTOR",
               "body": "Comment 2",
-              "createdAt": "2020-01-01T12:00:00Z",
+              "createdAt": "2020-01-03T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -128,7 +128,7 @@
               },
               "authorAssociation": "MEMBER",
               "body": "Comment 3",
-              "createdAt": "2020-01-01T12:00:00Z",
+              "createdAt": "2020-01-05T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -187,7 +187,7 @@
               },
               "authorAssociation": "OWNER",
               "body": "Comment 4",
-              "createdAt": "2020-01-01T12:00:00Z",
+              "createdAt": "2020-01-07T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -246,7 +246,7 @@
               },
               "authorAssociation": "COLLABORATOR",
               "body": "Comment 5",
-              "createdAt": "2020-01-01T12:00:00Z",
+              "createdAt": "2020-01-09T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {

@@ -157,3 +157,7 @@ func (e *GhEditor) Prompt(config *survey.PromptConfig) (interface{}, error) {
 	}
 	return e.prompt(initialValue, config)
 }
+
+func DefaultEditorName() string {
+	return filepath.Base(defaultEditor)
+}
