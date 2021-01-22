@@ -61,7 +61,7 @@ type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
 	RepoContext        *context.ResolvedRemotes
-	BaseRepo           ghrepo.Interface
+	BaseRepo           *api.Repository
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
@@ -146,7 +146,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
-	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`")
+	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
@@ -264,7 +264,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	allowMetadata := ctx.BaseRepo.(*api.Repository).ViewerCanTriage()
+	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmSubmission(!state.HasMetadata(), allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
@@ -386,10 +386,16 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		milestoneTitles = []string{opts.Milestone}
 	}
 
+	meReplacer := shared.NewMeReplacer(ctx.Client, ctx.BaseRepo.RepoHost())
+	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	if err != nil {
+		return nil, err
+	}
+
 	state := &shared.IssueMetadataState{
 		Type:       shared.PRMetadata,
 		Reviewers:  opts.Reviewers,
-		Assignees:  opts.Assignees,
+		Assignees:  assignees,
 		Labels:     opts.Labels,
 		Projects:   opts.Projects,
 		Milestones: milestoneTitles,
@@ -591,7 +597,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	}
 
 	opts.IO.StartProgressIndicator()
-	pr, err := api.CreatePullRequest(client, ctx.BaseRepo.(*api.Repository), params)
+	pr, err := api.CreatePullRequest(client, ctx.BaseRepo, params)
 	opts.IO.StopProgressIndicator()
 	if pr != nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
