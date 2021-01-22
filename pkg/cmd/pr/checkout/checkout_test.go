@@ -646,3 +646,45 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	assert.Equal(t, "git submodule sync --recursive", strings.Join(ranCommands[3], " "))
 	assert.Equal(t, "git submodule update --init --recursive", strings.Join(ranCommands[4], " "))
 }
+
+func TestPRCheckout_force(t *testing.T) {
+	http := &httpmock.Registry{}
+
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
+	{ "data": { "repository": { "pullRequest": {
+		"number": 123,
+		"headRefName": "feature",
+		"headRepositoryOwner": {
+			"login": "hubot"
+		},
+		"headRepository": {
+			"name": "REPO"
+		},
+		"isCrossRepository": false,
+		"maintainerCanModify": false
+	} } } }
+	`))
+
+	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		switch strings.Join(cmd.Args, " ") {
+		case "git show-ref --verify -- refs/heads/feature":
+			return &test.OutputStub{}
+		default:
+			ranCommands = append(ranCommands, cmd.Args)
+			return &test.OutputStub{}
+		}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, nil, "master", `123 --force`)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+
+	assert.Equal(t, len(ranCommands), 3)
+	assert.Equal(t, "git fetch origin +refs/heads/feature:refs/remotes/origin/feature", strings.Join(ranCommands[0], " "))
+	assert.Equal(t, "git checkout feature", strings.Join(ranCommands[1], " "))
+	assert.Equal(t, "git reset --hard refs/remotes/origin/feature", strings.Join(ranCommands[2], " "))
+}

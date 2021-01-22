@@ -30,6 +30,7 @@ type CheckoutOptions struct {
 
 	SelectorArg       string
 	RecurseSubmodules bool
+	Force             bool
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -60,7 +61,8 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all active submodules (recursively)")
+	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all submodules after checkout")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
 
 	return cmd
 }
@@ -116,7 +118,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 		// local branch already exists
 		if _, err := git.ShowRefs("refs/heads/" + newBranchName); err == nil {
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			if opts.Force {
+				cmdQueue = append(cmdQueue, []string{"git", "reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			} else {
+				// TODO: check if non-fast-forward and suggest to use `--force`
+				cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			}
 		} else {
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", "-b", newBranchName, "--no-track", remoteBranch})
 			cmdQueue = append(cmdQueue, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), headRemote.Name})
@@ -139,11 +146,24 @@ func checkoutRun(opts *CheckoutOptions) error {
 		ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 		if newBranchName == currentBranch {
 			// PR head matches currently checked out branch
+
 			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, ref})
-			cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+
+			if opts.Force {
+				cmdQueue = append(cmdQueue, []string{"git", "reset", "--hard", "FETCH_HEAD"})
+			} else {
+				// TODO: check if non-fast-forward and suggest to use `--force`
+				cmdQueue = append(cmdQueue, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+			}
 		} else {
 			// create a new branch
-			cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
+
+			if opts.Force {
+				cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName), "--force"})
+			} else {
+				// TODO: check if non-fast-forward and suggest to use `--force`
+				cmdQueue = append(cmdQueue, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
+			}
 			cmdQueue = append(cmdQueue, []string{"git", "checkout", newBranchName})
 		}
 
