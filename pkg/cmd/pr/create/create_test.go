@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -166,7 +165,7 @@ func TestPRCreate_recover(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:\%H,\%s --cherry origin/master...feature`, 0, "")
+	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -329,15 +328,13 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 			assert.Equal(t, "feature", input["headRefName"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -757,16 +754,15 @@ func TestPRCreate_webProject(t *testing.T) {
 			} } } }
 			`))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
-	cs.Stub("")                                         // browser
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+	cs.Register(``, 0, "") // browser
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -777,12 +773,6 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-
-	assert.Equal(t, 6, len(cs.Calls))
-	assert.Equal(t, "git push --set-upstream origin HEAD:feature", strings.Join(cs.Calls[4].Args, " "))
-	browserCall := cs.Calls[5].Args
-	url := strings.ReplaceAll(browserCall[len(browserCall)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
