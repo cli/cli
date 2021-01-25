@@ -688,3 +688,39 @@ func TestPRCheckout_force(t *testing.T) {
 	assert.Equal(t, "git checkout feature", strings.Join(ranCommands[1], " "))
 	assert.Equal(t, "git reset --hard refs/remotes/origin/feature", strings.Join(ranCommands[2], " "))
 }
+
+func TestPRCheckout_detach(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
+ 	{ "data": { "repository": { "pullRequest": {
+ 		"number": 123,
+ 		"headRef": "f8f8f8",
+ 		"headRepositoryOwner": {
+ 			"login": "hubot"
+ 		},
+ 		"headRepository": {
+ 			"name": "REPO"
+ 		},
+ 		"isCrossRepository": true,
+ 		"maintainerCanModify": true
+ 	} } } }
+ 	`))
+
+	ranCommands := [][]string{}
+	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
+	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
+		ranCommands = append(ranCommands, cmd.Args)
+		return &test.OutputStub{}
+	})
+	defer restoreCmd()
+
+	output, err := runCommand(http, nil, "", `123 --detach`)
+	assert.Nil(t, err)
+	assert.Equal(t, "", output.String())
+
+	assert.Equal(t, 2, len(ranCommands))
+	assert.Equal(t, "git fetch origin refs/pull/123/head", strings.Join(ranCommands[0], " "))
+	assert.Equal(t, "git checkout --detach FETCH_HEAD", strings.Join(ranCommands[1], " "))
+}
