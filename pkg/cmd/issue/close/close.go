@@ -75,7 +75,7 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", cs.Red("✔"), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", cs.SuccessIconWithColor(cs.Red), issue.Number, issue.Title)
 
 	return nil
 }

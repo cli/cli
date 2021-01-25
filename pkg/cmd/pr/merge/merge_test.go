@@ -523,7 +523,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	}
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
-	test.ExpectLines(t, output.Stderr(), "✔ Deleted branch blueberries and switched to branch master")
+	test.ExpectLines(t, output.Stderr(), "✓ Deleted branch blueberries and switched to branch master")
 }
 
 func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
