@@ -104,7 +104,7 @@ func TestRepoFork_existing_remote_error(t *testing.T) {
 	defer reg.StubWithFixturePath(200, "./forkResult.json")()
 	httpClient := &http.Client{Transport: reg}
 
-	_, err := runCommand(httpClient, nil, false, "--remote")
+	_, err := runCommand(httpClient, nil, true, "--remote")
 	if err == nil {
 		t.Fatal("expected error running command `repo fork`")
 	}
@@ -114,7 +114,7 @@ func TestRepoFork_existing_remote_error(t *testing.T) {
 	reg.Verify(t)
 }
 
-func TestRepoFork_no_existing_remote(t *testing.T) {
+func TestRepoFork_no_conflicting_remote(t *testing.T) {
 	remotes := []*context.Remote{
 		{
 			Remote: &git.Remote{
@@ -153,9 +153,10 @@ func TestRepoFork_in_parent_nontty(t *testing.T) {
 	cs, restore := run.Stub()
 	defer restore(t)
 
-	cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+	cs.Register("git remote rename origin upstream", 0, "")
+	cs.Register(`git remote add -f origin https://github\.com/someone/REPO\.git`, 0, "")
 
-	output, err := runCommand(httpClient, nil, false, "--remote --remote-name=fork")
+	output, err := runCommand(httpClient, nil, false, "--remote")
 	if err != nil {
 		t.Fatalf("error running command `repo fork`: %v", err)
 	}
