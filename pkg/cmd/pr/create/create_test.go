@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -101,8 +102,11 @@ func TestPRCreate_nontty_web(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
-	cs.Register(``, 0, "") // browser
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
+	})
 
 	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
 	require.NoError(t, err)
@@ -165,7 +169,7 @@ func TestPRCreate_recover(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -533,7 +537,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 	cs.Register(`git status --porcelain`, 0, "")
 
 	as, teardown := prompt.InitAskStubber()
@@ -684,13 +688,8 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 			] } } } }`),
 	)
 
-	_, err := runCommand(http, nil, "feature", true, `-title -body -H feature`)
-	if err == nil {
-		t.Fatal("error expected, got nil")
-	}
-	if err.Error() != "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123" {
-		t.Errorf("got error %q", err)
-	}
+	_, err := runCommand(http, nil, "feature", true, `-t title -b body -H feature`)
+	assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
 }
 
 func TestPRCreate_web(t *testing.T) {
@@ -709,9 +708,12 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(``, 0, "") // browser
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
+	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -760,9 +762,12 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(``, 0, "") // browser
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
+	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -819,7 +824,11 @@ func Test_determineTrackingBranch_hasMatch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature`, 0, "abc HEAD\nbca refs/remotes/origin/feature\nabc refs/remotes/upstream/feature")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadb00f refs/remotes/origin/feature
+		deadbeef refs/remotes/upstream/feature
+	`))
 
 	remotes := context.Remotes{
 		&context.Remote{
@@ -845,8 +854,14 @@ func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "abc HEAD\nbca refs/remotes/origin/feature")
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
+		branch.feature.remote origin
+		branch.feature.merge refs/heads/great-feat
+	`))
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadb00f refs/remotes/origin/feature
+	`))
 
 	remotes := context.Remotes{
 		&context.Remote{
