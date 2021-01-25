@@ -240,6 +240,8 @@ func forkRun(opts *ForkOptions) error {
 				if connectedToTerminal {
 					return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
 				} else {
+					// TODO next major version we should break this behavior and force users to opt into
+					// remote renaming in a scripting context via --remote-name
 					renameTarget := "upstream"
 					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
 					if err != nil {
