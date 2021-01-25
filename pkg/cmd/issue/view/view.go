@@ -9,7 +9,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
@@ -23,20 +22,21 @@ import (
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
 	WebMode     bool
 	Comments    bool
+
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
+		Now:        time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -141,7 +141,7 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 
 func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	out := opts.IO.Out
-	now := time.Now()
+	now := opts.Now()
 	ago := now.Sub(issue.CreatedAt)
 	cs := opts.IO.ColorScheme()
 
