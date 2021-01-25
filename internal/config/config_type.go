@@ -318,13 +318,11 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 		}
 
 		if hostValue != "" {
-			// TODO: avoid hardcoding this
-			return hostValue, "~/.config/gh/hosts.yml", nil
+			return hostValue, HostsConfigFile(), nil
 		}
 	}
 
-	// TODO: avoid hardcoding this
-	defaultSource := "~/.config/gh/config.yml"
+	defaultSource := ConfigFile()
 
 	value, err := c.GetStringValue(key)
 
@@ -420,7 +418,7 @@ func (c *fileConfig) Write() error {
 		return err
 	}
 
-	return WriteConfigFile(hostsConfigFile(filename), yamlNormalize(hostsBytes))
+	return WriteConfigFile(HostsConfigFile(), yamlNormalize(hostsBytes))
 }
 
 func yamlNormalize(b []byte) []byte {
