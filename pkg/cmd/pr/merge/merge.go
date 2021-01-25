@@ -131,13 +131,12 @@ func mergeRun(opts *MergeOptions) error {
 		return err
 	}
 
-	localBranchName, err := git.CurrentBranch()
-	if err == nil {
+	if opts.SelectorArg == "" {
 		localBranchLastCommit, err := git.LastCommit()
 		if err == nil {
-			if localBranchName == pr.HeadRefName && localBranchLastCommit.Sha != pr.Commits.Nodes[0].Commit.Oid {
+			if localBranchLastCommit.Sha != pr.Commits.Nodes[0].Commit.Oid {
 				fmt.Fprintf(opts.IO.ErrOut,
-					"%s Pull request #%d (%s) may have a last commit that is different from local one\n", utils.Yellow("!"), pr.Number, pr.Title)
+					"%s Pull request #%d (%s) has diverged from local branch\n", cs.Yellow("!"), pr.Number, pr.Title)
 			}
 		}
 	}

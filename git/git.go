@@ -181,7 +181,11 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 }
 
 func LastCommit() (*Commit, error) {
-	logCmd := GitCommand("-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "-1")
+	logCmd, err := GitCommand("-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "-1")
+	if err != nil {
+		return nil, err
+	}
+
 	output, err := run.PrepareCmd(logCmd).Output()
 	if err != nil {
 		return nil, err
