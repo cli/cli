@@ -116,6 +116,13 @@
               "login": "OWNER"
             },
             "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "123456789"
+                  }
+                }
+              ],
               "totalCount": 8
             },
             "isCrossRepository": false,

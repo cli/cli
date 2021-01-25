@@ -180,6 +180,33 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 	return commits, nil
 }
 
+func LastCommit() (*Commit, error) {
+	logCmd, err := GitCommand("-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "-1")
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := run.PrepareCmd(logCmd).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := outputLines(output)
+	if len(lines) != 1 {
+		return nil, ErrNotOnAnyBranch
+	}
+
+	split := strings.SplitN(lines[0], ",", 2)
+	if len(split) != 2 {
+		return nil, ErrNotOnAnyBranch
+	}
+
+	return &Commit{
+		Sha:   split[0],
+		Title: split[1],
+	}, nil
+}
+
 func CommitBody(sha string) (string, error) {
 	showCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
 	if err != nil {

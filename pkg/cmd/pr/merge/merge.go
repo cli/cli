@@ -131,6 +131,16 @@ func mergeRun(opts *MergeOptions) error {
 		return err
 	}
 
+	if opts.SelectorArg == "" {
+		localBranchLastCommit, err := git.LastCommit()
+		if err == nil {
+			if localBranchLastCommit.Sha != pr.Commits.Nodes[0].Commit.Oid {
+				fmt.Fprintf(opts.IO.ErrOut,
+					"%s Pull request #%d (%s) has diverged from local branch\n", cs.Yellow("!"), pr.Number, pr.Title)
+			}
+		}
+	}
+
 	if pr.Mergeable == "CONFLICTING" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has conflicts and isn't mergeable\n", cs.Red("!"), pr.Number, pr.Title)
 		return cmdutil.SilentError
