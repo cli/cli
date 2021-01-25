@@ -123,10 +123,10 @@ func (c *ColorScheme) Blue(t string) string {
 }
 
 func (c *ColorScheme) SuccessIcon() string {
-	return c.SuccessIconOfColor(c.Green)
+	return c.SuccessIconWithColor(c.Green)
 }
 
-func (c *ColorScheme) SuccessIconOfColor(colo func(string) string) string {
+func (c *ColorScheme) SuccessIconWithColor(colo func(string) string) string {
 	return colo("✓")
 }
 

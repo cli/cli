@@ -166,7 +166,7 @@ func setRun(opts *SetOptions) error {
 			target = ghrepo.FullName(baseRepo)
 		}
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconOfColor(cs.Green), opts.SecretName, target)
+		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), opts.SecretName, target)
 	}
 
 	return nil

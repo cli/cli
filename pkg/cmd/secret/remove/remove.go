@@ -85,7 +85,7 @@ func removeRun(opts *RemoveOptions) error {
 			target = ghrepo.FullName(baseRepo)
 		}
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Removed secret %s from %s\n", cs.SuccessIconOfColor(cs.Red), opts.SecretName, target)
+		fmt.Fprintf(opts.IO.Out, "%s Removed secret %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.SecretName, target)
 	}
 
 	return nil

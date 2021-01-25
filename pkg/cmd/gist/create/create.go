@@ -140,7 +140,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("%s Failed to create gist: %w", cs.Red("X"), err)
 	}
 
-	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIconOfColor(cs.Green), completionMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
 
 	if opts.WebMode {
 		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
