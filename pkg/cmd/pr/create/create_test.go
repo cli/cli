@@ -98,24 +98,21 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // browser
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
+	})
 
 	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-
-	assert.Equal(t, 3, len(cs.Calls))
-	browserCall := cs.Calls[2].Args
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", browserCall[len(browserCall)-1])
-
 }
 
 func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
@@ -168,12 +165,11 @@ func TestPRCreate_recover(t *testing.T) {
 			assert.Equal(t, "recovered body", input["body"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -245,12 +241,10 @@ func TestPRCreate_nontty(t *testing.T) {
 			}),
 	)
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Register(`git status --porcelain`, 0, "")
 
 	output, err := runCommand(http, nil, "feature", false, `-t "my title" -b "my body" -H feature`)
 	require.NoError(t, err)
@@ -288,15 +282,13 @@ func TestPRCreate(t *testing.T) {
 			assert.Equal(t, "feature", input["headRefName"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -340,15 +332,13 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 			assert.Equal(t, "feature", input["headRefName"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -396,15 +386,14 @@ func TestPRCreate_createFork(t *testing.T) {
 			assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("") // git status
-	cs.Stub("") // git remote add
-	cs.Stub("") // git push
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
+	cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -412,9 +401,6 @@ func TestPRCreate_createFork(t *testing.T) {
 
 	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
 	require.NoError(t, err)
-
-	assert.Equal(t, []string{"git", "remote", "add", "-f", "fork", "https://github.com/monalisa/REPO.git"}, cs.Calls[3].Args)
-	assert.Equal(t, []string{"git", "push", "--set-upstream", "fork", "HEAD:feature"}, cs.Calls[4].Args)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
@@ -548,12 +534,11 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 			assert.Equal(t, "- commit 1\n- commit 0\n\nFixes a bug and Closes an issue", input["body"].(string))
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
+	cs.Register(`git status --porcelain`, 0, "")
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
@@ -682,13 +667,6 @@ func TestPRCreate_metadata(t *testing.T) {
 			assert.Equal(t, true, inputs["union"])
 		}))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-
 	output, err := runCommand(http, nil, "feature", true, `-t TITLE -b BODY -H feature -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
 	assert.NoError(t, err)
 
@@ -710,21 +688,8 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 			] } } } }`),
 	)
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("") // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("") // git status
-
-	_, err := runCommand(http, nil, "feature", true, `-ttitle -bbody -H feature`)
-	if err == nil {
-		t.Fatal("error expected, got nil")
-	}
-	if err.Error() != "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123" {
-		t.Errorf("got error %q", err)
-	}
+	_, err := runCommand(http, nil, "feature", true, `-t title -b body -H feature`)
+	assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
 }
 
 func TestPRCreate_web(t *testing.T) {
@@ -737,16 +702,18 @@ func TestPRCreate_web(t *testing.T) {
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
-	cs.Stub("")                                         // browser
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
+	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -757,11 +724,6 @@ func TestPRCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-
-	assert.Equal(t, 6, len(cs.Calls))
-	assert.Equal(t, "git push --set-upstream origin HEAD:feature", strings.Join(cs.Calls[4].Args, " "))
-	browserCall := cs.Calls[5].Args
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", browserCall[len(browserCall)-1])
 }
 
 func TestPRCreate_webProject(t *testing.T) {
@@ -794,16 +756,18 @@ func TestPRCreate_webProject(t *testing.T) {
 			} } } }
 			`))
 
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("")                                         // git config --get-regexp (determineTrackingBranch)
-	cs.Stub("")                                         // git show-ref --verify   (determineTrackingBranch)
-	cs.Stub("")                                         // git status
-	cs.Stub("1234567890,commit 0\n2345678901,commit 1") // git log
-	cs.Stub("")                                         // git push
-	cs.Stub("")                                         // browser
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
+	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -814,23 +778,16 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-
-	assert.Equal(t, 6, len(cs.Calls))
-	assert.Equal(t, "git push --set-upstream origin HEAD:feature", strings.Join(cs.Calls[4].Args, " "))
-	browserCall := cs.Calls[5].Args
-	url := strings.ReplaceAll(browserCall[len(browserCall)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
 
 	remotes := context.Remotes{}
-
-	cs.Stub("")              // git config --get-regexp (ReadBranchConfig)
-	cs.Stub("deadbeef HEAD") // git show-ref --verify   (ShowRefs)
 
 	ref := determineTrackingBranch(remotes, "feature")
 	if ref != nil {
@@ -839,9 +796,11 @@ func Test_determineTrackingBranch_empty(t *testing.T) {
 }
 
 func Test_determineTrackingBranch_noMatch(t *testing.T) {
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
 
 	remotes := context.Remotes{
 		&context.Remote{
@@ -853,10 +812,6 @@ func Test_determineTrackingBranch_noMatch(t *testing.T) {
 			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
 	}
-
-	cs.Stub("") // git config --get-regexp (ReadBranchConfig)
-	cs.Stub(`deadbeef HEAD
-deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 
 	ref := determineTrackingBranch(remotes, "feature")
 	if ref != nil {
@@ -865,9 +820,15 @@ deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
 }
 
 func Test_determineTrackingBranch_hasMatch(t *testing.T) {
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadb00f refs/remotes/origin/feature
+		deadbeef refs/remotes/upstream/feature
+	`))
 
 	remotes := context.Remotes{
 		&context.Remote{
@@ -880,26 +841,27 @@ func Test_determineTrackingBranch_hasMatch(t *testing.T) {
 		},
 	}
 
-	cs.Stub("") // git config --get-regexp (ReadBranchConfig)
-	cs.Stub(`deadbeef HEAD
-deadb00f refs/remotes/origin/feature
-deadbeef refs/remotes/upstream/feature`) // git show-ref --verify (ShowRefs)
-
 	ref := determineTrackingBranch(remotes, "feature")
 	if ref == nil {
 		t.Fatal("expected result, got nil")
 	}
-
-	assert.Equal(t, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/feature", "refs/remotes/upstream/feature"}, cs.Calls[1].Args)
 
 	assert.Equal(t, "upstream", ref.RemoteName)
 	assert.Equal(t, "feature", ref.BranchName)
 }
 
 func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
+		branch.feature.remote origin
+		branch.feature.merge refs/heads/great-feat
+	`))
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
+		deadbeef HEAD
+		deadb00f refs/remotes/origin/feature
+	`))
 
 	remotes := context.Remotes{
 		&context.Remote{
@@ -908,17 +870,10 @@ func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
 		},
 	}
 
-	cs.Stub(`branch.feature.remote origin
-branch.feature.merge refs/heads/great-feat`) // git config --get-regexp (ReadBranchConfig)
-	cs.Stub(`deadbeef HEAD
-deadb00f refs/remotes/origin/feature`) // git show-ref --verify (ShowRefs)
-
 	ref := determineTrackingBranch(remotes, "feature")
 	if ref != nil {
 		t.Errorf("expected nil result, got %v", ref)
 	}
-
-	assert.Equal(t, []string{"git", "show-ref", "--verify", "--", "HEAD", "refs/remotes/origin/great-feat", "refs/remotes/origin/feature"}, cs.Calls[1].Args)
 }
 
 func Test_generateCompareURL(t *testing.T) {
