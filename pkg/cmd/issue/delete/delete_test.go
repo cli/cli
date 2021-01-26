@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"github.com/cli/cli/pkg/prompt"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -74,6 +75,9 @@ func TestIssueDelete(t *testing.T) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.StubOne("13")
 
 	output, err := runCommand(httpRegistry, true, "13")
 	if err != nil {
@@ -84,6 +88,34 @@ func TestIssueDelete(t *testing.T) {
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueDelete_cancel(t *testing.T) {
+	httpRegistry := &httpmock.Registry{}
+	defer httpRegistry.Verify(t)
+
+	httpRegistry.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issue": { "id": "THE-ID", "number": 13, "title": "The title of the issue"}
+			} } }`),
+	)
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+	as.StubOne("14")
+
+	output, err := runCommand(httpRegistry, true, "13")
+	if err != nil {
+		t.Fatalf("error running command `issue delete`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Issue #13 was not deleted`)
+
+	if !r.MatchString(output.String()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
 	}
 }
 
