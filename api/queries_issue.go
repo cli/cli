@@ -351,6 +351,8 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 						body
 						createdAt
 						includesCreatedEdit
+						isMinimized
+						minimizedReason
 						reactionGroups {
 							content
 							users {
