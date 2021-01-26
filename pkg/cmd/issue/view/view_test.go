@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,13 +72,13 @@ func TestIssueView_web(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w 123")
 	if err != nil {
@@ -87,12 +87,6 @@ func TestIssueView_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_web_numberArgWithHash(t *testing.T) {
@@ -109,13 +103,13 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w \"#123\"")
 	if err != nil {
@@ -124,12 +118,6 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -301,21 +289,9 @@ func TestIssueView_web_notFound(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
-
 	_, err := runCommand(http, true, "-w 9999")
 	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	if seenCmd != nil {
-		t.Fatal("did not expect any command to run")
 	}
 }
 
@@ -353,13 +329,13 @@ func TestIssueView_web_urlArg(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w https://github.com/OWNER/REPO/issues/123")
 	if err != nil {
@@ -367,12 +343,6 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_tty_Comments(t *testing.T) {
