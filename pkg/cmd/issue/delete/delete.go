@@ -1,8 +1,12 @@
 package delete
 
 import (
+	"errors"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/pkg/prompt"
 	"net/http"
+	"strconv"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -65,12 +69,32 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
+	if !opts.IO.CanPrompt() {
+		return errors.New("deleting issues is only supported when running interactively")
+	}
+
+	answer := ""
+	err = prompt.SurveyAskOne(
+		&survey.Input{
+			Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
+		},
+		&answer,
+	)
+	if err != nil {
+		return err
+	}
+	answerInt, err := strconv.Atoi(answer)
+	if err != nil || answerInt != issue.Number {
+		fmt.Fprintf(opts.IO.Out, "Issue #%d was not deleted.\n", issue.Number)
+		return nil
+	}
+
 	err = api.IssueDelete(apiClient, baseRepo, *issue)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issue #%d (%s)\n", cs.Red("✔"), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issue #%d (%s).\n", cs.Red("✔"), issue.Number, issue.Title)
 
 	return nil
 }
