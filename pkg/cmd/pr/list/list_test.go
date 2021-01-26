@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -72,7 +71,7 @@ func TestPRList(t *testing.T) {
 	assert.Equal(t, heredoc.Doc(`
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
-		
+
 		#32  New feature            feature
 		#29  Fixed bad bug          hubot:bug-fix
 		#28  Improve documentation  docs
@@ -199,27 +198,19 @@ func TestPRList_web(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
 	if err != nil {
 		t.Errorf("error running command `pr list` with `--web` flag: %v", err)
 	}
 
-	expectedURL := "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk"
-
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, url, expectedURL)
 }
