@@ -80,16 +80,6 @@ type PullRequest struct {
 			}
 		}
 	}
-	ReviewRequests struct {
-		Nodes []struct {
-			RequestedReviewer struct {
-				TypeName string `json:"__typename"`
-				Login    string
-				Name     string
-			}
-		}
-		TotalCount int
-	}
 	Assignees struct {
 		Nodes []struct {
 			Login string
@@ -119,6 +109,18 @@ type PullRequest struct {
 	Comments       Comments
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
+	ReviewRequests ReviewRequests
+}
+
+type ReviewRequests struct {
+	Nodes []struct {
+		RequestedReviewer struct {
+			TypeName string `json:"__typename"`
+			Login    string
+			Name     string
+		}
+	}
+	TotalCount int
 }
 
 type NotFoundError struct {

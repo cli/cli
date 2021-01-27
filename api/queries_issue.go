@@ -24,44 +24,52 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	ID        string
-	Number    int
-	Title     string
-	URL       string
-	State     string
-	Closed    bool
-	Body      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Comments  Comments
-	Author    Author
-	Assignees struct {
-		Nodes []struct {
-			Login string
-		}
-		TotalCount int
+	ID             string
+	Number         int
+	Title          string
+	URL            string
+	State          string
+	Closed         bool
+	Body           string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Comments       Comments
+	Author         Author
+	Assignees      Assignees
+	Labels         Labels
+	ProjectCards   ProjectCards
+	Milestone      Milestone
+	ReactionGroups ReactionGroups
+}
+
+type Assignees struct {
+	Nodes []struct {
+		Login string
 	}
-	Labels struct {
-		Nodes []struct {
+	TotalCount int
+}
+
+type Labels struct {
+	Nodes []struct {
+		Name string
+	}
+	TotalCount int
+}
+
+type ProjectCards struct {
+	Nodes []struct {
+		Project struct {
 			Name string
 		}
-		TotalCount int
-	}
-	ProjectCards struct {
-		Nodes []struct {
-			Project struct {
-				Name string
-			}
-			Column struct {
-				Name string
-			}
+		Column struct {
+			Name string
 		}
-		TotalCount int
 	}
-	Milestone struct {
-		Title string
-	}
-	ReactionGroups ReactionGroups
+	TotalCount int
+}
+
+type Milestone struct {
+	Title string
 }
 
 type IssuesDisabledError struct {
@@ -485,6 +493,20 @@ func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
 	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
 
+	return err
+}
+
+func IssueUpdate(client *Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
+	var mutation struct {
+		UpdateIssue struct {
+			Issue struct {
+				ID string
+			}
+		} `graphql:"updateIssue(input: $input)"`
+	}
+	variables := map[string]interface{}{"input": params}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "IssueUpdate", &mutation, variables)
 	return err
 }
 
