@@ -12,7 +12,6 @@ cat > createrepo/Dockerfile << EOF
 FROM fedora:32
 RUN yum install -y createrepo_c
 RUN mkdir /packages
-CMD touch /tmp/foo
 COPY dist/*.rpm /packages/
 RUN createrepo /packages
 EOF
