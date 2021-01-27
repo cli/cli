@@ -566,7 +566,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(``, 0, "")
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", url)
@@ -585,6 +585,11 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView_NoActiveBranch.json"))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	_, err := runCommand(http, "blueberries", true, "-w")
 	if err == nil || err.Error() != `no pull requests found for branch "blueberries"` {

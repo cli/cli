@@ -97,9 +97,10 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git checkout -b feature --no-track origin/feature`, 0, "")
+	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	if !assert.NoError(t, err) {
@@ -131,9 +132,10 @@ func TestPRCheckout_urlArg(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git checkout -b feature --no-track origin/feature`, 0, "")
+	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `https://github.com/OWNER/REPO/pull/123/files`)
 	assert.NoError(t, err)
@@ -284,9 +286,10 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git merge --ff-only refs/remotes/robot-fork/feature`, 0, "")
+	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git checkout -b feature --no-track robot-fork/feature`, 0, "")
+	cs.Register(`git config branch\.feature\.remote robot-fork`, 0, "")
+	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, remotes, "master", `123`)
 	assert.NoError(t, err)
@@ -316,7 +319,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
@@ -349,10 +352,8 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
 	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -382,10 +383,8 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
 	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote https://github\.com/hubot/REPO\.git`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "", `123`)
 	assert.NoError(t, err)
@@ -415,10 +414,8 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
 	cs.Register(`git merge --ff-only FETCH_HEAD`, 0, "")
-	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "feature", `123`)
 	assert.NoError(t, err)
@@ -443,6 +440,9 @@ func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 		"maintainerCanModify": false
 	} } } }
 	`))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.EqualError(t, err, `invalid branch name: "-foo"`)
@@ -472,7 +472,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote https://github\.com/hubot/REPO\.git`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")

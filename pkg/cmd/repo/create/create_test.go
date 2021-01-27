@@ -156,8 +156,9 @@ func TestRepoCreate_outsideGitWorkDir(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 1, "")
+	cs.Register(`git init REPO`, 0, "")
+	cs.Register(`git -C REPO remote add origin https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	output, err := runCommand(httpClient, "REPO --private --confirm", false)
 	if err != nil {
