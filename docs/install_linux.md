@@ -46,6 +46,8 @@ sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.re
 sudo dnf install gh
 ```
 
+**Note**: In case of immutable operating systems like Fedora Silverblue, it is recommended to install `gh` within a [toolbox container](https://docs.fedoraproject.org/en-US/fedora-silverblue/toolbox).
+
 Upgrade:
 
 ```bash
