@@ -3,11 +3,8 @@ package create
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -84,13 +81,11 @@ func TestRepoCreate(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
@@ -115,11 +110,6 @@ func TestRepoCreate(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -163,25 +153,11 @@ func TestRepoCreate_outsideGitWorkDir(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmds []*exec.Cmd
-	cmdOutputs := []test.OutputStub{
-		{
-			Error: errors.New("Not a git repository"),
-		},
-		{},
-		{},
-	}
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		if len(cmdOutputs) == 0 {
-			t.Fatal("Too many calls to git command")
-		}
-		out := cmdOutputs[0]
-		cmdOutputs = cmdOutputs[1:]
-		seenCmds = append(seenCmds, cmd)
-		return &out
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	output, err := runCommand(httpClient, "REPO --private --confirm", false)
 	if err != nil {
@@ -190,14 +166,6 @@ func TestRepoCreate_outsideGitWorkDir(t *testing.T) {
 
 	assert.Equal(t, "https://github.com/OWNER/REPO\n", output.String())
 	assert.Equal(t, "", output.Stderr())
-
-	if len(seenCmds) != 3 {
-		t.Fatal("expected three commands to run")
-	}
-
-	assert.Equal(t, "git rev-parse --show-toplevel", strings.Join(seenCmds[0].Args, " "))
-	assert.Equal(t, "git init REPO", strings.Join(seenCmds[1].Args, " "))
-	assert.Equal(t, "git -C REPO remote add origin https://github.com/OWNER/REPO.git", strings.Join(seenCmds[2].Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -245,13 +213,11 @@ func TestRepoCreate_org(t *testing.T) {
 		} } }`))
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/ORG/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
@@ -276,11 +242,6 @@ func TestRepoCreate_org(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	assert.Equal(t, "git remote add -f origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -328,13 +289,11 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 		} } }`))
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/ORG/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
@@ -359,11 +318,6 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository ORG/REPO on GitHub\n✓ Added remote https://github.com/ORG/REPO.git\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	assert.Equal(t, "git remote add -f origin https://github.com/ORG/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -412,13 +366,11 @@ func TestRepoCreate_template(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
@@ -443,11 +395,6 @@ func TestRepoCreate_template(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
@@ -493,13 +440,11 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 		} } }`))
 	httpClient := &http.Client{Transport: reg}
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 
 	as, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
@@ -532,11 +477,6 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	assert.Equal(t, "git remote add -f origin https://github.com/OWNER/REPO.git", strings.Join(seenCmd.Args, " "))
 
 	var reqBody struct {
 		Query     string
