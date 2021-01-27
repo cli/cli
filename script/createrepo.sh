@@ -22,3 +22,4 @@ docker build -t createrepo createrepo/
 docker create -ti --name runcreaterepo createrepo bash
 docker cp runcreaterepo:/packages/repodata .
 docker rm -f runcreaterepo
+rm -rf createrepo
