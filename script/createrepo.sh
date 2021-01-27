@@ -1,24 +1,12 @@
 #!/bin/bash
 set -e
-# This script:
-
-# - creates a dockerfile
-# - prepares a docker image that can run `createrepo` that has the latest release rpms
-# - "runs" the image by creating a throwaay container
-# - copies the result of createrepo out of the throwaway container
-# - destroys the throwaway container
-mkdir -p createrepo/dist
+mkdir createrepo
 cat > createrepo/Dockerfile << EOF
 FROM fedora:32
 RUN yum install -y createrepo_c
-RUN mkdir /packages
-COPY dist/*.rpm /packages/
-RUN createrepo /packages
+ENTRYPOINT ["createrepo", "/packages"]
 EOF
 
-cp dist/*.rpm createrepo/dist/
 docker build -t createrepo createrepo/
-docker create -ti --name runcreaterepo createrepo bash
-docker cp runcreaterepo:/packages/repodata .
-docker rm -f runcreaterepo
+docker run --rm --volume "$PWD/dist":/packages createrepo
 rm -rf createrepo
