@@ -74,7 +74,7 @@ jobs:
           mkdir -p site/packages/rpm
           cp dist/*.rpm site/packages/rpm/
           ./script/createrepo.sh
-          mv repodata site/packages/rpm/
+          cp -r repodata site/packages/rpm/
           pushd site/packages/rpm
           gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
