@@ -3,7 +3,6 @@ package checkout
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -21,18 +20,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-type errorStub struct {
-	message string
-}
-
-func (s errorStub) Output() ([]byte, error) {
-	return nil, errors.New(s.message)
-}
-
-func (s errorStub) Run() error {
-	return errors.New(s.message)
-}
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
