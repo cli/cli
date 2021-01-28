@@ -3,6 +3,7 @@ package run
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -12,9 +13,11 @@ type T interface {
 	Errorf(string, ...interface{})
 }
 
+// Stub installs a catch-all for all external commands invoked from gh. It returns a restore func that, when
+// invoked from tests, fails the current test if some stubs that were registered were never matched.
 func Stub() (*CommandStubber, func(T)) {
 	cs := &CommandStubber{}
-	teardown := SetPrepareCmd(func(cmd *exec.Cmd) Runnable {
+	teardown := setPrepareCmd(func(cmd *exec.Cmd) Runnable {
 		s := cs.find(cmd.Args)
 		if s == nil {
 			panic(fmt.Sprintf("no exec stub for `%s`", strings.Join(cmd.Args, " ")))
@@ -43,13 +46,33 @@ func Stub() (*CommandStubber, func(T)) {
 	}
 }
 
+func setPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
+	origPrepare := PrepareCmd
+	PrepareCmd = func(cmd *exec.Cmd) Runnable {
+		// normalize git executable name for consistency in tests
+		if baseName := filepath.Base(cmd.Args[0]); baseName == "git" || baseName == "git.exe" {
+			cmd.Args[0] = "git"
+		}
+		return fn(cmd)
+	}
+	return func() {
+		PrepareCmd = origPrepare
+	}
+}
+
+// CommandStubber stubs out invocations to external commands.
 type CommandStubber struct {
 	stubs []*commandStub
 }
 
-func (cs *CommandStubber) Register(p string, exitStatus int, output string, callbacks ...CommandCallback) {
+// Register a stub for an external command. Pattern is a regular expression, output is the standard output
+// from a command. Pass callbacks to inspect raw arguments that the command was invoked with.
+func (cs *CommandStubber) Register(pattern string, exitStatus int, output string, callbacks ...CommandCallback) {
+	if len(pattern) < 1 {
+		panic("cannot use empty regexp pattern")
+	}
 	cs.stubs = append(cs.stubs, &commandStub{
-		pattern:    regexp.MustCompile(p),
+		pattern:    regexp.MustCompile(pattern),
 		exitStatus: exitStatus,
 		stdout:     output,
 		callbacks:  callbacks,
@@ -76,6 +99,7 @@ type commandStub struct {
 	callbacks  []CommandCallback
 }
 
+// Run satisfies Runnable
 func (s *commandStub) Run() error {
 	if s.exitStatus != 0 {
 		return fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
@@ -83,6 +107,7 @@ func (s *commandStub) Run() error {
 	return nil
 }
 
+// Output satisfies Runnable
 func (s *commandStub) Output() ([]byte, error) {
 	if s.exitStatus != 0 {
 		return []byte(nil), fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)

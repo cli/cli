@@ -22,21 +22,6 @@ var PrepareCmd = func(cmd *exec.Cmd) Runnable {
 	return &cmdWithStderr{cmd}
 }
 
-// Deprecated: use Stub
-func SetPrepareCmd(fn func(*exec.Cmd) Runnable) func() {
-	origPrepare := PrepareCmd
-	PrepareCmd = func(cmd *exec.Cmd) Runnable {
-		// normalize git executable name for consistency in tests
-		if baseName := filepath.Base(cmd.Args[0]); baseName == "git" || baseName == "git.exe" {
-			cmd.Args[0] = "git"
-		}
-		return fn(cmd)
-	}
-	return func() {
-		PrepareCmd = origPrepare
-	}
-}
-
 // cmdWithStderr augments exec.Cmd by adding stderr to the error message
 type cmdWithStderr struct {
 	*exec.Cmd

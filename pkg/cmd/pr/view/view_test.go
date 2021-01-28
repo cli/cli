@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -564,18 +563,14 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView.json"))
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		switch strings.Join(cmd.Args, " ") {
-		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &test.OutputStub{}
-		default:
-			seenCmd = cmd
-			return &test.OutputStub{}
-		}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "blueberries", true, "-w")
 	if err != nil {
@@ -584,14 +579,6 @@ func TestPRView_web_currentBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	if url != "https://github.com/OWNER/REPO/pull/10" {
-		t.Errorf("got: %q", url)
-	}
 }
 
 func TestPRView_web_noResultsForBranch(t *testing.T) {
@@ -599,26 +586,14 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	defer http.Verify(t)
 	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.FileResponse("./fixtures/prView_NoActiveBranch.json"))
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		switch strings.Join(cmd.Args, " ") {
-		case `git config --get-regexp ^branch\.blueberries\.(remote|merge)$`:
-			return &test.OutputStub{}
-		default:
-			seenCmd = cmd
-			return &test.OutputStub{}
-		}
-	})
-	defer restoreCmd()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	_, err := runCommand(http, "blueberries", true, "-w")
 	if err == nil || err.Error() != `no pull requests found for branch "blueberries"` {
 		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	if seenCmd != nil {
-		t.Fatalf("unexpected command: %v", seenCmd.Args)
 	}
 }
 
@@ -634,13 +609,13 @@ func TestPRView_web_numberArg(t *testing.T) {
 			} } } }`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "master", true, "-w 23")
 	if err != nil {
@@ -648,12 +623,6 @@ func TestPRView_web_numberArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 }
 
 func TestPRView_web_numberArgWithHash(t *testing.T) {
@@ -668,13 +637,13 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 			} } } }`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "master", true, `-w "#23"`)
 	if err != nil {
@@ -682,12 +651,6 @@ func TestPRView_web_numberArgWithHash(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 }
 
 func TestPRView_web_urlArg(t *testing.T) {
@@ -702,13 +665,13 @@ func TestPRView_web_urlArg(t *testing.T) {
 			} } } }`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "master", true, "-w https://github.com/OWNER/REPO/pull/23/files")
 	if err != nil {
@@ -716,12 +679,6 @@ func TestPRView_web_urlArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 }
 
 func TestPRView_web_branchArg(t *testing.T) {
@@ -738,13 +695,13 @@ func TestPRView_web_branchArg(t *testing.T) {
 			] } } } }`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "master", true, "-w blueberries")
 	if err != nil {
@@ -752,12 +709,6 @@ func TestPRView_web_branchArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
 }
 
 func TestPRView_web_branchWithOwnerArg(t *testing.T) {
@@ -775,13 +726,13 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 			] } } } }`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/hubot/REPO/pull/23", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, "master", true, "-w hubot:blueberries")
 	if err != nil {
@@ -789,12 +740,6 @@ func TestPRView_web_branchWithOwnerArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/hubot/REPO/pull/23", url)
 }
 
 func TestPRView_tty_Comments(t *testing.T) {

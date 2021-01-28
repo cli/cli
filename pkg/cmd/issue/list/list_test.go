@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -235,29 +235,21 @@ func TestIssueList_web(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "--web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1")
 	if err != nil {
 		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
 	}
 
-	expectedURL := "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1"
-
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, expectedURL, url)
 }
 
 func TestIssueList_milestoneNotFound(t *testing.T) {

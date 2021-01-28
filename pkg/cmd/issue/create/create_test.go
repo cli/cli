@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -281,13 +280,14 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 		},
 	})
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, `-b body`)
 	if err != nil {
@@ -296,17 +296,11 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		
+
 		Creating issue in OWNER/REPO
-		
+
 		Opening github.com/OWNER/REPO/issues/new in your browser.
 	`), output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {
@@ -419,24 +413,20 @@ func TestIssueCreate_web(t *testing.T) {
 		`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, `--web -a @me`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", url)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
@@ -445,24 +435,20 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, `-w -t mytitle -b mybody`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
@@ -480,24 +466,20 @@ func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
 		`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, `-w -t mytitle -b mybody -a @me`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", url)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
@@ -580,24 +562,20 @@ func TestIssueCreate_webProject(t *testing.T) {
 			} } } }
 			`))
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, `-w -t Title -p Cleanup`)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
 
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := strings.ReplaceAll(seenCmd.Args[len(seenCmd.Args)-1], "^", "")
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", url)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }
