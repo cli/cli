@@ -467,6 +467,27 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 	return err
 }
 
+func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
+	var mutation struct {
+		DeleteIssue struct {
+			Repository struct {
+				ID githubv4.ID
+			}
+		} `graphql:"deleteIssue(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.DeleteIssueInput{
+			IssueID: issue.ID,
+		},
+	}
+
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
+
+	return err
+}
+
 // milestoneNodeIdToDatabaseId extracts the REST Database ID from the GraphQL Node ID
 // This conversion is necessary since the GraphQL API requires the use of the milestone's database ID
 // for querying the related issues.
