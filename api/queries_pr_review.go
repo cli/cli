@@ -118,8 +118,20 @@ func (prr PullRequestReview) Created() time.Time {
 	return prr.CreatedAt
 }
 
+func (prr PullRequestReview) HiddenReason() string {
+	return ""
+}
+
 func (prr PullRequestReview) IsEdited() bool {
 	return prr.IncludesCreatedEdit
+}
+
+func (prr PullRequestReview) IsHidden() bool {
+	return false
+}
+
+func (prr PullRequestReview) Link() string {
+	return prr.URL
 }
 
 func (prr PullRequestReview) Reactions() ReactionGroups {
@@ -128,8 +140,4 @@ func (prr PullRequestReview) Reactions() ReactionGroups {
 
 func (prr PullRequestReview) Status() string {
 	return prr.State
-}
-
-func (prr PullRequestReview) Link() string {
-	return prr.URL
 }

@@ -21,6 +21,8 @@ type Comment struct {
 	Body                string
 	CreatedAt           time.Time
 	IncludesCreatedEdit bool
+	IsMinimized         bool
+	MinimizedReason     string
 	ReactionGroups      ReactionGroups
 }
 
@@ -143,6 +145,8 @@ func commentsFragment() string {
 							body
 							createdAt
 							includesCreatedEdit
+							isMinimized
+							minimizedReason
 							` + reactionGroupsFragment() + `
 						}
 						totalCount
@@ -165,8 +169,20 @@ func (c Comment) Created() time.Time {
 	return c.CreatedAt
 }
 
+func (c Comment) HiddenReason() string {
+	return c.MinimizedReason
+}
+
 func (c Comment) IsEdited() bool {
 	return c.IncludesCreatedEdit
+}
+
+func (c Comment) IsHidden() bool {
+	return c.IsMinimized
+}
+
+func (c Comment) Link() string {
+	return ""
 }
 
 func (c Comment) Reactions() ReactionGroups {
@@ -174,9 +190,5 @@ func (c Comment) Reactions() ReactionGroups {
 }
 
 func (c Comment) Status() string {
-	return ""
-}
-
-func (c Comment) Link() string {
 	return ""
 }
