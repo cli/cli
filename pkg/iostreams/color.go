@@ -94,6 +94,10 @@ func (c *ColorScheme) Gray(t string) string {
 	return gray(t)
 }
 
+func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
+	return c.Gray(fmt.Sprintf(t, args...))
+}
+
 func (c *ColorScheme) Magenta(t string) string {
 	if !c.enabled {
 		return t
@@ -106,6 +110,10 @@ func (c *ColorScheme) Cyan(t string) string {
 		return t
 	}
 	return cyan(t)
+}
+
+func (c *ColorScheme) Cyanf(t string, args ...interface{}) string {
+	return c.Cyan(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) CyanBold(t string) string {
