@@ -1,20 +1,18 @@
 package delete
 
 import (
-	"errors"
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/pkg/prompt"
-	"net/http"
-	"strconv"
-
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
+	"net/http"
+	"strconv"
 )
 
 type DeleteOptions struct {
@@ -69,24 +67,23 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	if !opts.IO.CanPrompt() {
-		return errors.New("deleting issues is only supported when running interactively")
-	}
-
-	answer := ""
-	err = prompt.SurveyAskOne(
-		&survey.Input{
-			Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
-		},
-		&answer,
-	)
-	if err != nil {
-		return err
-	}
-	answerInt, err := strconv.Atoi(answer)
-	if err != nil || answerInt != issue.Number {
-		fmt.Fprintf(opts.IO.Out, "Issue #%d was not deleted.\n", issue.Number)
-		return nil
+	// When executed in an interactive shell, require confirmation. Otherwise skip confirmation.
+	if opts.IO.CanPrompt() {
+		answer := ""
+		err = prompt.SurveyAskOne(
+			&survey.Input{
+				Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
+			},
+			&answer,
+		)
+		if err != nil {
+			return err
+		}
+		answerInt, err := strconv.Atoi(answer)
+		if err != nil || answerInt != issue.Number {
+			fmt.Fprintf(opts.IO.Out, "Issue #%d was not deleted.\n", issue.Number)
+			return nil
+		}
 	}
 
 	err = api.IssueDelete(apiClient, baseRepo, *issue)
