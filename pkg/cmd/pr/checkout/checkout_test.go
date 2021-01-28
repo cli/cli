@@ -165,7 +165,7 @@ func TestPRCheckout_urlArg_differentBase(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch https://github\.com/OTHER/POE\.git refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote https://github\.com/OTHER/POE\.git`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
@@ -210,7 +210,7 @@ func TestPRCheckout_branchArg(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 0, "")
+	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
