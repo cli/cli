@@ -111,7 +111,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.Reviews))
+		fmt.Fprint(opts.IO.Out, shared.RawCommentList(pr.Comments, pr.DisplayableReviews()))
 		return nil
 	}
 

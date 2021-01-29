@@ -17,7 +17,9 @@ type Comment interface {
 	Association() string
 	Content() string
 	Created() time.Time
+	HiddenReason() string
 	IsEdited() bool
+	IsHidden() bool
 	Link() string
 	Reactions() api.ReactionGroups
 	Status() string
@@ -33,6 +35,9 @@ func RawCommentList(comments api.Comments, reviews api.PullRequestReviews) strin
 }
 
 func formatRawComment(comment Comment) string {
+	if comment.IsHidden() {
+		return ""
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "author:\t%s\n", comment.AuthorLogin())
 	fmt.Fprintf(&b, "association:\t%s\n", strings.ToLower(comment.Association()))
@@ -55,7 +60,7 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 	retrievedCount := len(sortedComments)
 	hiddenCount := totalCount - retrievedCount
 
-	if hiddenCount > 0 {
+	if preview && hiddenCount > 0 {
 		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
@@ -72,7 +77,7 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 		}
 	}
 
-	if hiddenCount > 0 {
+	if preview && hiddenCount > 0 {
 		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
 		fmt.Fprintln(&b)
 	}
@@ -83,6 +88,10 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (string, error) {
 	var b strings.Builder
 	cs := io.ColorScheme()
+
+	if comment.IsHidden() {
+		return cs.Bold(formatHiddenComment(comment)), nil
+	}
 
 	// Header
 	fmt.Fprint(&b, cs.Bold(comment.AuthorLogin()))
@@ -181,4 +190,14 @@ func formatRawCommentStatus(status string) string {
 	}
 
 	return "none"
+}
+
+func formatHiddenComment(comment Comment) string {
+	var b strings.Builder
+	fmt.Fprint(&b, comment.AuthorLogin())
+	if comment.Association() != "NONE" {
+		fmt.Fprintf(&b, " (%s)", strings.Title(strings.ToLower(comment.Association())))
+	}
+	fmt.Fprintf(&b, " • This comment has been marked as %s\n\n", comment.HiddenReason())
+	return b.String()
 }

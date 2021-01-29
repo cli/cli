@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -177,7 +178,7 @@ func forkRun(opts *ForkOptions) error {
 		}
 	} else {
 		if connectedToTerminal {
-			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
+			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
@@ -234,8 +235,23 @@ func forkRun(opts *ForkOptions) error {
 			if err != nil {
 				return err
 			}
+
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
+				if connectedToTerminal {
+					return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
+				} else {
+					// TODO next major version we should break this behavior and force users to opt into
+					// remote renaming in a scripting context via --remote-name
+					renameTarget := "upstream"
+					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+					if err != nil {
+						return err
+					}
+					err = run.PrepareCmd(renameCmd).Run()
+					if err != nil {
+						return err
+					}
+				}
 			}
 
 			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)

@@ -44,7 +44,7 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string(nil),
 				token:     "",
-				source:    "~/.config/gh/config.yml",
+				source:    ".config.gh.config.yml",
 				writeable: true,
 			},
 		},
@@ -80,7 +80,7 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string{"github.com"},
 				token:     "",
-				source:    "~/.config/gh/config.yml",
+				source:    ".config.gh.config.yml",
 				writeable: true,
 			},
 		},
@@ -92,7 +92,7 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string{"github.com"},
 				token:     "",
-				source:    "~/.config/gh/config.yml",
+				source:    ".config.gh.config.yml",
 				writeable: true,
 			},
 		},
@@ -131,7 +131,7 @@ func TestInheritEnv(t *testing.T) {
 			wants: wants{
 				hosts:     []string{"github.com"},
 				token:     "OTOKEN",
-				source:    "~/.config/gh/hosts.yml",
+				source:    ".config.gh.hosts.yml",
 				writeable: true,
 			},
 		},
@@ -273,7 +273,7 @@ func TestInheritEnv(t *testing.T) {
 
 			val, source, _ := cfg.GetWithSource(tt.hostname, "oauth_token")
 			assert.Equal(t, tt.wants.token, val)
-			assert.Equal(t, tt.wants.source, source)
+			assert.Regexp(t, tt.wants.source, source)
 
 			val, _ = cfg.Get(tt.hostname, "oauth_token")
 			assert.Equal(t, tt.wants.token, val)

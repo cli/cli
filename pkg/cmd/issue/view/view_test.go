@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
@@ -71,13 +72,13 @@ func TestIssueView_web(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w 123")
 	if err != nil {
@@ -86,12 +87,6 @@ func TestIssueView_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_web_numberArgWithHash(t *testing.T) {
@@ -108,13 +103,13 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w \"#123\"")
 	if err != nil {
@@ -123,12 +118,6 @@ func TestIssueView_web_numberArgWithHash(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -251,20 +240,38 @@ func TestIssueView_tty_Preview(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			defer http.Verify(t)
+			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
 
-			http.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
 
-			output, err := runCommand(http, true, "123")
-			if err != nil {
-				t.Errorf("error running `issue view`: %v", err)
+			httpReg.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
+
+			opts := ViewOptions{
+				IO: io,
+				Now: func() time.Time {
+					t, _ := time.Parse(time.RFC822, "03 Nov 20 15:04 UTC")
+					return t
+				},
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: httpReg}, nil
+				},
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.New("OWNER", "REPO"), nil
+				},
+				SelectorArg: "123",
 			}
 
-			assert.Equal(t, "", output.Stderr())
+			err := viewRun(&opts)
+			assert.NoError(t, err)
+
+			assert.Equal(t, "", stderr.String())
 
 			//nolint:staticcheck // prefer exact matchers over ExpectLines
-			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+			test.ExpectLines(t, stdout.String(), tc.expectedOutputs...)
 		})
 	}
 }
@@ -282,21 +289,12 @@ func TestIssueView_web_notFound(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
-	})
-	defer restoreCmd()
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	_, err := runCommand(http, true, "-w 9999")
 	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	if seenCmd != nil {
-		t.Fatal("did not expect any command to run")
 	}
 }
 
@@ -334,13 +332,13 @@ func TestIssueView_web_urlArg(t *testing.T) {
 			`),
 	)
 
-	var seenCmd *exec.Cmd
-	//nolint:staticcheck // SA1019 TODO: rewrite to use run.Stub
-	restoreCmd := run.SetPrepareCmd(func(cmd *exec.Cmd) run.Runnable {
-		seenCmd = cmd
-		return &test.OutputStub{}
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 	})
-	defer restoreCmd()
 
 	output, err := runCommand(http, true, "-w https://github.com/OWNER/REPO/issues/123")
 	if err != nil {
@@ -348,12 +346,6 @@ func TestIssueView_web_urlArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-
-	if seenCmd == nil {
-		t.Fatal("expected a command to run")
-	}
-	url := seenCmd.Args[len(seenCmd.Args)-1]
-	assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
 }
 
 func TestIssueView_tty_Comments(t *testing.T) {
@@ -371,7 +363,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 			expectedOutputs: []string{
 				`some title`,
 				`some body`,
-				`———————— Not showing 4 comments ————————`,
+				`———————— Not showing 5 comments ————————`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
 				`Comment 5`,
 				`Use --comments to view the full conversation`,
@@ -396,6 +388,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				`Comment 3`,
 				`loislane \(Owner\) • Jan  1, 2020`,
 				`Comment 4`,
+				`sam-spam • This comment has been marked as spam`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
 				`Comment 5`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -443,7 +436,7 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`title:\tsome title`,
 				`state:\tOPEN`,
 				`author:\tmarseilles`,
-				`comments:\t5`,
+				`comments:\t6`,
 				`some body`,
 			},
 		},

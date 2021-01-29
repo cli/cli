@@ -88,7 +88,7 @@ func readyRun(opts *ReadyOptions) error {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIcon(), pr.Number)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
 
 	return nil
 }

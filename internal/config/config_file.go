@@ -14,7 +14,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	GH_CONFIG_DIR = "GH_CONFIG_DIR"
+)
+
 func ConfigDir() string {
+	if v := os.Getenv(GH_CONFIG_DIR); v != "" {
+		return v
+	}
+
 	homeDir, _ := homeDirAutoMigrate()
 	return homeDir
 }
@@ -23,12 +31,12 @@ func ConfigFile() string {
 	return path.Join(ConfigDir(), "config.yml")
 }
 
-func hostsConfigFile(filename string) string {
-	return path.Join(path.Dir(filename), "hosts.yml")
+func HostsConfigFile() string {
+	return path.Join(ConfigDir(), "hosts.yml")
 }
 
 func ParseDefaultConfig() (Config, error) {
-	return ParseConfig(ConfigFile())
+	return parseConfig(ConfigFile())
 }
 
 func HomeDirPath(subdir string) (string, error) {
@@ -201,7 +209,7 @@ func migrateConfig(filename string) error {
 	return cfg.Write()
 }
 
-func ParseConfig(filename string) (Config, error) {
+func parseConfig(filename string) (Config, error) {
 	_, root, err := parseConfigFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -222,7 +230,7 @@ func ParseConfig(filename string) (Config, error) {
 			return nil, fmt.Errorf("failed to reparse migrated config: %w", err)
 		}
 	} else {
-		if _, hostsRoot, err := parseConfigFile(hostsConfigFile(filename)); err == nil {
+		if _, hostsRoot, err := parseConfigFile(HostsConfigFile()); err == nil {
 			if len(hostsRoot.Content[0].Content) > 0 {
 				newContent := []*yaml.Node{
 					{Value: "hosts"},

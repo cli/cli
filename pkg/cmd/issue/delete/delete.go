@@ -1,19 +1,21 @@
-package close
+package delete
 
 import (
 	"fmt"
-	"net/http"
-
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
+	"net/http"
+	"strconv"
 )
 
-type CloseOptions struct {
+type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
@@ -22,16 +24,16 @@ type CloseOptions struct {
 	SelectorArg string
 }
 
-func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Command {
-	opts := &CloseOptions{
+func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
+	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "close {<number> | <url>}",
-		Short: "Close issue",
+		Use:   "delete {<number> | <url>}",
+		Short: "Delete issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -44,14 +46,14 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			if runF != nil {
 				return runF(opts)
 			}
-			return closeRun(opts)
+			return deleteRun(opts)
 		},
 	}
 
 	return cmd
 }
 
-func closeRun(opts *CloseOptions) error {
+func deleteRun(opts *DeleteOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -65,17 +67,31 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	if issue.Closed {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
-		return nil
+	// When executed in an interactive shell, require confirmation. Otherwise skip confirmation.
+	if opts.IO.CanPrompt() {
+		answer := ""
+		err = prompt.SurveyAskOne(
+			&survey.Input{
+				Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
+			},
+			&answer,
+		)
+		if err != nil {
+			return err
+		}
+		answerInt, err := strconv.Atoi(answer)
+		if err != nil || answerInt != issue.Number {
+			fmt.Fprintf(opts.IO.Out, "Issue #%d was not deleted.\n", issue.Number)
+			return nil
+		}
 	}
 
-	err = api.IssueClose(apiClient, baseRepo, *issue)
+	err = api.IssueDelete(apiClient, baseRepo, *issue)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Closed issue #%d (%s)\n", cs.SuccessIconWithColor(cs.Red), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issue #%d (%s).\n", cs.Red("✔"), issue.Number, issue.Title)
 
 	return nil
 }

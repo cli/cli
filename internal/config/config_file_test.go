@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ hosts:
     user: monalisa
     oauth_token: OTOKEN
 `, "")()
-	config, err := ParseConfig("config.yml")
+	config, err := parseConfig("config.yml")
 	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
 	assert.NoError(t, err)
@@ -36,7 +37,7 @@ hosts:
     user: monalisa
     oauth_token: OTOKEN
 `, "")()
-	config, err := ParseConfig("config.yml")
+	config, err := parseConfig("config.yml")
 	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
 	assert.NoError(t, err)
@@ -52,7 +53,7 @@ github.com:
   user: monalisa
   oauth_token: OTOKEN
 `)()
-	config, err := ParseConfig("config.yml")
+	config, err := parseConfig("config.yml")
 	assert.NoError(t, err)
 	user, err := config.Get("github.com", "user")
 	assert.NoError(t, err)
@@ -74,7 +75,7 @@ example.com:
     oauth_token: NOTTHIS
     git_protocol: https
 `)()
-	config, err := ParseConfig("config.yml")
+	config, err := parseConfig("config.yml")
 	assert.NoError(t, err)
 	val, err := config.Get("example.com", "git_protocol")
 	assert.NoError(t, err)
@@ -87,7 +88,7 @@ example.com:
 	assert.Equal(t, "ssh", val)
 }
 
-func Test_ParseConfig_migrateConfig(t *testing.T) {
+func Test_parseConfig_migrateConfig(t *testing.T) {
 	defer StubConfig(`---
 github.com:
   - user: keiyuri
@@ -99,7 +100,7 @@ github.com:
 	defer StubWriteConfig(&mainBuf, &hostsBuf)()
 	defer StubBackupConfig()()
 
-	_, err := ParseConfig("config.yml")
+	_, err := parseConfig("config.yml")
 	assert.NoError(t, err)
 
 	expectedHosts := `github.com:
@@ -143,6 +144,26 @@ func Test_parseConfigFile(t *testing.T) {
 			}
 			assert.Equal(t, yaml.MappingNode, yamlRoot.Content[0].Kind)
 			assert.Equal(t, 0, len(yamlRoot.Content[0].Content))
+		})
+	}
+}
+
+func Test_ConfigDir(t *testing.T) {
+	tests := []struct {
+		envVar string
+		want   string
+	}{
+		{"/tmp/gh", ".tmp.gh"},
+		{"", ".config.gh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("envVar: %q", tt.envVar), func(t *testing.T) {
+			if tt.envVar != "" {
+				os.Setenv(GH_CONFIG_DIR, tt.envVar)
+				defer os.Unsetenv(GH_CONFIG_DIR)
+			}
+			assert.Regexp(t, tt.want, ConfigDir())
 		})
 	}
 }

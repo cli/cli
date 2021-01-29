@@ -80,14 +80,12 @@ func removeRun(opts *RemoveOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
+		target := orgName
 		if orgName == "" {
-			fmt.Fprintf(opts.IO.Out,
-				"%s Removed secret %s from %s\n", cs.SuccessIcon(), opts.SecretName, ghrepo.FullName(baseRepo))
-		} else {
-			fmt.Fprintf(opts.IO.Out,
-				"%s Removed secret %s from %s\n", cs.SuccessIcon(), opts.SecretName, orgName)
+			target = ghrepo.FullName(baseRepo)
 		}
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Removed secret %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.SecretName, target)
 	}
 
 	return nil

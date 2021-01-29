@@ -351,6 +351,8 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 						body
 						createdAt
 						includesCreatedEdit
+						isMinimized
+						minimizedReason
 						reactionGroups {
 							content
 							users {
@@ -461,6 +463,27 @@ func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
 
 	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
+
+	return err
+}
+
+func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
+	var mutation struct {
+		DeleteIssue struct {
+			Repository struct {
+				ID githubv4.ID
+			}
+		} `graphql:"deleteIssue(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.DeleteIssueInput{
+			IssueID: issue.ID,
+		},
+	}
+
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
 
 	return err
 }
