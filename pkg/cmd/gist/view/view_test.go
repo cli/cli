@@ -132,6 +132,27 @@ func Test_viewRun(t *testing.T) {
 			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
 		},
 		{
+			name: "filename selected, raw",
+			opts: &ViewOptions{
+				Selector: "1234",
+				Filename: "cicada.txt",
+				Raw:      true,
+			},
+			gist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "bwhiizzzbwhuiiizzzz",
+						Type:    "text/plain",
+					},
+					"foo.md": {
+						Content: "# foo",
+						Type:    "application/markdown",
+					},
+				},
+			},
+			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
+		},
+		{
 			name: "multiple files, no description",
 			opts: &ViewOptions{
 				Selector: "1234",
@@ -171,7 +192,7 @@ func Test_viewRun(t *testing.T) {
 			wantOut: "some files\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                              \n  • foo                                                                       \n\n\n\n",
 		},
 		{
-			name: "raw",
+			name: "multiple files, raw",
 			opts: &ViewOptions{
 				Selector: "1234",
 				Raw:      true,

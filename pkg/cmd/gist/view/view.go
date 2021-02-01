@@ -89,11 +89,6 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
-	if gist.Description != "" {
-		fmt.Fprintf(opts.IO.Out, "%s\n", cs.Bold(gist.Description))
-	}
-
 	if opts.Filename != "" {
 		gistFile, ok := gist.Files[opts.Filename]
 		if !ok {
@@ -106,6 +101,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	showFilenames := len(gist.Files) > 1
+
+	cs := opts.IO.ColorScheme()
+	if gist.Description != "" && showFilenames {
+		fmt.Fprintf(opts.IO.Out, "%s\n", cs.Bold(gist.Description))
+	}
 
 	outs := []string{} // to ensure consistent ordering
 
