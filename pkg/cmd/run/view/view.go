@@ -21,9 +21,11 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -155,6 +157,19 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"job": carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+			if len(c.Args) > 0 {
+				return action.ActionWorkflowJobs(cmd, c.Args[0], action.RunOpts{All: true})
+			}
+			return carapace.ActionValues()
+		}),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionWorkflowRuns(cmd, action.RunOpts{All: true}),
+	)
 
 	return cmd
 }

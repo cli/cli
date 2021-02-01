@@ -110,6 +110,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
+	cmdutil.InitCompletions(cmd)
+
 	// this needs to appear last:
 	referenceCmd.Long = referenceLong(cmd)
 	return cmd

@@ -11,9 +11,11 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -90,6 +92,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"author":   action.ActionUsers(cmd, action.UserOpts{Users: true}),
+		"assignee": action.ActionAssignableUsers(cmd),
+		"base":     action.ActionBranches(cmd),
+		"label": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionLabels(cmd).Invoke(c).Filter(c.Parts).ToA()
+		}),
+		"state": carapace.ActionValues("open", "closed", "merged", "all"),
+	})
 
 	return cmd
 }

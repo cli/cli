@@ -9,8 +9,10 @@ import (
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -60,6 +62,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"workflow": action.ActionWorkflows(cmd, action.WorkflowOpts{Enabled: true, Id: true, Name: true}),
+	})
 
 	return cmd
 }

@@ -7,7 +7,9 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -43,6 +45,10 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 			return reopenRun(opts)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionPullRequests(cmd, action.PullRequestOpts{Closed: true}),
+	)
 
 	return cmd
 }

@@ -14,9 +14,11 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -69,6 +71,21 @@ With '--branch', view a specific branch of the repository.`,
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a repository in the browser")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "View a specific branch of the repository")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"branch": carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+			if len(c.Args) > 0 {
+				cmd.Flags().String("repo", c.Args[0], "fake repo flag for ActionBranches")
+				return action.ActionBranches(cmd)
+			} else {
+				return carapace.ActionValues()
+			}
+		}),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionOwnerRepositories(cmd),
+	)
 
 	return cmd
 }

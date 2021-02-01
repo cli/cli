@@ -15,10 +15,12 @@ import (
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/cli/cli/pkg/text"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -132,6 +134,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file`")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"target": action.ActionBranches(cmd),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionReleases(cmd),
+	)
+	carapace.Gen(cmd).PositionalAnyCompletion(carapace.ActionFiles())
 
 	return cmd
 }

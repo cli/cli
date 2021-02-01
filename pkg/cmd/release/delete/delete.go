@@ -9,8 +9,10 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +49,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.SkipConfirm, "yes", "y", false, "Skip the confirmation prompt")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionReleases(cmd),
+	)
 
 	return cmd
 }

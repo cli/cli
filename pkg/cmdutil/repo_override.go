@@ -4,6 +4,8 @@ import (
 	"os"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmdutil/action"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -22,4 +24,8 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 			}
 		}
 	}
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"repo": action.ActionOwnerRepositories(cmd),
+	})
 }

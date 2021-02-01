@@ -9,9 +9,11 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -92,6 +94,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"language": action.ActionLanguages(),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionUsers(cmd, action.UserOpts{Users: true, Organizations: true}),
+	)
 
 	return cmd
 }

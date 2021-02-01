@@ -2,17 +2,20 @@ package delete
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
-	"net/http"
-	"strconv"
 )
 
 type DeleteOptions struct {
@@ -49,6 +52,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			return deleteRun(opts)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionIssues(cmd, action.IssueOpts{Open: true, Closed: true}),
+	)
 
 	return cmd
 }

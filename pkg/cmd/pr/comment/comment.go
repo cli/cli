@@ -7,6 +7,8 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -74,6 +76,14 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().BoolP("editor", "e", false, "Add body using editor")
 	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"body-file": carapace.ActionFiles(),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionPullRequests(cmd, action.PullRequestOpts{Open: true}),
+	)
 
 	return cmd
 }

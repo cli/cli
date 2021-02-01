@@ -18,9 +18,11 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -176,6 +178,22 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"assignee": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionAssignableUsers(cmd).Invoke(c).Filter(c.Parts).ToA()
+		}),
+		"base": action.ActionBranches(cmd),
+		"head": action.ActionBranches(cmd),
+		"label": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionLabels(cmd).Invoke(c).Filter(c.Parts).ToA()
+		}),
+		"milestone": action.ActionMilestones(cmd),
+		"project":   action.ActionProjects(cmd, action.ProjectOpts{Open: true}),
+		"reviewer": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionAssignableUsers(cmd).Invoke(c).Filter(c.Parts).ToA()
+		}),
+	})
 
 	return cmd
 }

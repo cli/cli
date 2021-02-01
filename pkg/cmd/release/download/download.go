@@ -12,7 +12,9 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -78,6 +80,21 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"dir": carapace.ActionDirectories(),
+		"pattern": carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+			if len(c.Args) > 0 {
+				return action.ActionReleaseAssets(cmd, c.Args[0])
+			} else {
+				return carapace.ActionValues()
+			}
+		}),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionReleases(cmd),
+	)
 
 	return cmd
 }

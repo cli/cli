@@ -9,8 +9,10 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/release/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -65,6 +67,20 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionReleases(cmd),
+	)
+	carapace.Gen(cmd).PositionalAnyCompletion(
+		carapace.ActionMultiParts("#", func(c carapace.Context) carapace.Action {
+			switch len(c.Parts) {
+			case 0:
+				return carapace.ActionFiles()
+			default:
+				return carapace.ActionValues()
+			}
+		}),
+	)
 
 	return cmd
 }

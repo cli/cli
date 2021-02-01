@@ -10,8 +10,10 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -60,6 +62,10 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"hostname": action.ActionConfigHosts(),
+	})
 
 	return cmd
 }

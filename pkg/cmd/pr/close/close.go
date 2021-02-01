@@ -8,7 +8,9 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +53,10 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after close")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionPullRequests(cmd, action.PullRequestOpts{Open: true}),
+	)
 
 	return cmd
 }

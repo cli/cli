@@ -17,8 +17,10 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -127,6 +129,14 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"ref": action.ActionBranches(cmd),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionWorkflows(cmd, action.WorkflowOpts{Enabled: true, Id: true, Name: true}),
+	)
 
 	return cmd
 }

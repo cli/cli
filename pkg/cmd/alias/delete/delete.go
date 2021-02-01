@@ -5,7 +5,9 @@ import (
 
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -35,6 +37,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			return deleteRun(opts)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionAliases(),
+	)
 
 	return cmd
 }

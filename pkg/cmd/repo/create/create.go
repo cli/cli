@@ -16,8 +16,10 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -123,6 +125,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		// TODO team
+		"template": action.ActionOwnerRepositories(cmd),
+	})
 
 	return cmd
 }

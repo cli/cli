@@ -10,8 +10,10 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -71,6 +73,13 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"hostname": action.ActionConfigHosts(),
+		"scopes": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionAuthScopes().Invoke(c).Filter(c.Parts).ToA()
+		}),
+	})
 
 	return cmd
 }

@@ -9,7 +9,9 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +49,10 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			return closeRun(opts)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionIssues(cmd, action.IssueOpts{Open: true}),
+	)
 
 	return cmd
 }

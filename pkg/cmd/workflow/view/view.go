@@ -12,9 +12,11 @@ import (
 	runShared "github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -78,6 +80,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open workflow in the browser")
 	cmd.Flags().BoolVarP(&opts.YAML, "yaml", "y", false, "View the workflow yaml file")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to view")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"ref": action.ActionBranches(cmd),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionWorkflows(cmd, action.WorkflowOpts{Enabled: true, Id: true, Name: true}),
+	)
 
 	return cmd
 }

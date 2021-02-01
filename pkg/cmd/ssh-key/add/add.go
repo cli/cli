@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +52,11 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 	}
 
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title for the new key")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		carapace.ActionFiles(),
+	)
+
 	return cmd
 }
 

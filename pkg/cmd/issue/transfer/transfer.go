@@ -11,7 +11,9 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/rsteube/carapace"
 	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
@@ -50,6 +52,11 @@ func NewCmdTransfer(f *cmdutil.Factory, runF func(*TransferOptions) error) *cobr
 			return transferRun(&opts)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionIssues(cmd, action.IssueOpts{Open: true, Closed: true}),
+		action.ActionOwnerRepositories(cmd),
+	)
 
 	return cmd
 }

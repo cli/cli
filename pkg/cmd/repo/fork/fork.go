@@ -15,9 +15,11 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -112,6 +114,14 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"org": action.ActionUsers(cmd, action.UserOpts{Organizations: true}),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionOwnerRepositories(cmd),
+	)
 
 	return cmd
 }

@@ -17,8 +17,10 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -119,6 +121,18 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"org": action.ActionUsers(cmd, action.UserOpts{Organizations: true}),
+		"repos": carapace.ActionMultiParts(",", func(c carapace.Context) carapace.Action {
+			return action.ActionOwnerRepositories(cmd).Invoke(c).Filter(c.Parts).ToA()
+		}),
+		"visibility": carapace.ActionValues("all", "private", "selected"),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionSecrets(cmd, cmd.Flag("org").Value.String()),
+	)
 
 	return cmd
 }

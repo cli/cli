@@ -9,9 +9,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/cmdutil/action"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/set"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -94,6 +96,25 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 	cmd.Flags().StringVarP(&opts.DestinationDir, "dir", "D", ".", "The directory to download artifacts into")
 	cmd.Flags().StringArrayVarP(&opts.Names, "name", "n", nil, "Only download artifacts that match any of the given names")
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"dir": carapace.ActionDirectories(),
+		// TODO name
+	})
+
+	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
+		"dir": carapace.ActionDirectories(),
+		"name": carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+			if len(c.Args) > 0 {
+				return action.ActionWorkflowArtifactNames(cmd, c.Args[0])
+			}
+			return carapace.ActionValues()
+		}),
+	})
+
+	carapace.Gen(cmd).PositionalCompletion(
+		action.ActionWorkflowRuns(cmd, action.RunOpts{Successful: true}),
+	)
 
 	return cmd
 }
