@@ -57,7 +57,7 @@ jobs:
           echo "moved ${#cards[@]} cards to the Done column"
       
       - name: Install packaging dependencies
-        run: sudo apt-get install -y createrepo rpm reprepro
+        run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
         run: |
           gpg --import --no-tty --batch --yes < script/pubkey.asc
@@ -73,7 +73,8 @@ jobs:
         run: |
           mkdir -p site/packages/rpm
           cp dist/*.rpm site/packages/rpm/
-          createrepo site/packages/rpm
+          ./script/createrepo.sh
+          cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
           gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
