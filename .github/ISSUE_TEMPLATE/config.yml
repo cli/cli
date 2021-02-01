@@ -6,6 +6,3 @@ contact_links:
   - name: Ask a question about the GitHub API
     about: Please check out the GitHub community forum for discussions about the GitHub API.
     url: https://github.community/c/github-ecosystem/37
-  - name: Report a security vulnerability
-    about: Please disclose any security vulnerabilities privately here.
-    url: https://bounty.github.com/
