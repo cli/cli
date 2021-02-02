@@ -122,9 +122,9 @@ func viewRun(opts *ViewOptions) error {
 				content = rendered
 			}
 		}
-		out += fmt.Sprintf("%s", content)
+		out += content
 		if opts.Filename == "" {
-			out += fmt.Sprintf("\n\n")
+			out += "\n\n"
 		}
 
 		outs = append(outs, out)
