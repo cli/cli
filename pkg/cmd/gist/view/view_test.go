@@ -129,7 +129,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
+			wantOut: "bwhiizzzbwhuiiizzzz",
 		},
 		{
 			name: "filename selected, raw",
@@ -150,7 +150,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
+			wantOut: "bwhiizzzbwhuiiizzzz",
 		},
 		{
 			name: "multiple files, no description",
