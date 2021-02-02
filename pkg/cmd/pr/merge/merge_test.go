@@ -626,9 +626,14 @@ func TestPRMerge_interactive(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)    // Merge method survey
-	as.StubOne(true) // Delete branch survey
-	as.StubOne(true) // Confirm submit survey
+	as.StubOne(0)                   // Merge method survey
+	as.StubOne(true)                // Delete branch survey
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if err != nil {
@@ -682,8 +687,14 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)    // Merge method survey
-	as.StubOne(true) // Confirm submit survey
+	as.StubOne(0)                   // Merge method survey
+	as.StubOne(true)                // Confirm submit survey
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
 
 	output, err := runCommand(http, "blueberries", true, "-d")
 	if err != nil {
@@ -692,6 +703,138 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", "Deleted branch blueberries and switched to branch master")
+}
+
+func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [{
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"},
+			"id": "THE-ID",
+			"number": 3
+		}] } } } }`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "cool story", input["commitBody"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.StubOne(2)                   // Merge method survey
+	as.StubOne(false)               // Delete branch survey
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{ // Edit Commit Msg editor survey
+		{
+			Name:  "body",
+			Value: "cool story",
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommand(http, "blueberries", true, "")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "✔ Squashed and merged pull request #3 ()\n", output.Stderr())
+}
+
+func TestPRMerge_interactiveSquashEditCommitMsgDefaultBody(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequests": { "nodes": [{
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"},
+			"id": "THE-ID",
+			"number": 3,
+			"viewerMergeBodyText": "Co-authored by: Octocat <octocat@github.com>",
+			"viewerMergeHeadlineText": "Add new feat (#33)"
+		}] } } } }`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "Add new feat (#33)\n\nCo-authored by: Octocat <octocat@github.com>", input["commitBody"])
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.StubOne(2)                   // Merge method survey
+	as.StubOne(false)               // Delete branch survey
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 1,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{ // Edit Commit Msg editor survey
+		{
+			Name:    "body",
+			Default: true,
+		},
+	})
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 0,
+		},
+	})
+
+	output, err := runCommand(http, "blueberries", true, "")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "✔ Squashed and merged pull request #3 ()\n", output.Stderr())
 }
 
 func TestPRMerge_interactiveCancelled(t *testing.T) {
@@ -724,9 +867,14 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)     // Merge method survey
-	as.StubOne(true)  // Delete branch survey
-	as.StubOne(false) // Confirm submit survey
+	as.StubOne(0)                   // Merge method survey
+	as.StubOne(true)                // Delete branch survey
+	as.Stub([]*prompt.QuestionStub{ // Confirm submit survey
+		{
+			Name:  "confirmation",
+			Value: 2,
+		},
+	})
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if !errors.Is(err, cmdutil.SilentError) {
