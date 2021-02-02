@@ -116,9 +116,11 @@ type PullRequest struct {
 	Milestone struct {
 		Title string
 	}
-	Comments       Comments
-	ReactionGroups ReactionGroups
-	Reviews        PullRequestReviews
+	Comments                Comments
+	ReactionGroups          ReactionGroups
+	Reviews                 PullRequestReviews
+	ViewerMergeBodyText     string
+	ViewerMergeHeadlineText string
 }
 
 type NotFoundError struct {
@@ -596,6 +598,8 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
+				viewerMergeBodyText
+				viewerMergeHeadlineText
 				` + commentsFragment() + `
 				` + reactionGroupsFragment() + `
 			}
