@@ -109,7 +109,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
+			wantOut: "bwhiizzzbwhuiiizzzz\n",
 		},
 		{
 			name: "filename selected",
@@ -129,7 +129,28 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "bwhiizzzbwhuiiizzzz\n\n",
+			wantOut: "bwhiizzzbwhuiiizzzz\n",
+		},
+		{
+			name: "filename selected, raw",
+			opts: &ViewOptions{
+				Selector: "1234",
+				Filename: "cicada.txt",
+				Raw:      true,
+			},
+			gist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "bwhiizzzbwhuiiizzzz",
+						Type:    "text/plain",
+					},
+					"foo.md": {
+						Content: "# foo",
+						Type:    "application/markdown",
+					},
+				},
+			},
+			wantOut: "bwhiizzzbwhuiiizzzz\n",
 		},
 		{
 			name: "multiple files, no description",
@@ -148,7 +169,26 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n  # foo                                                                       \n\n\n\n",
+			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n  # foo                                                                       \n\n",
+		},
+		{
+			name: "multiple files, trailing newlines",
+			opts: &ViewOptions{
+				Selector: "1234",
+			},
+			gist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "bwhiizzzbwhuiiizzzz\n",
+						Type:    "text/plain",
+					},
+					"foo.txt": {
+						Content: "bar\n",
+						Type:    "text/plain",
+					},
+				},
+			},
+			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.txt\n\nbar\n",
 		},
 		{
 			name: "multiple files, description",
@@ -168,10 +208,10 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "some files\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                              \n  • foo                                                                       \n\n\n\n",
+			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                              \n  • foo                                                                       \n\n",
 		},
 		{
-			name: "raw",
+			name: "multiple files, raw",
 			opts: &ViewOptions{
 				Selector: "1234",
 				Raw:      true,
@@ -189,7 +229,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "some files\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n- foo\n\n",
+			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n- foo\n",
 		},
 	}
 

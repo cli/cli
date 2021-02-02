@@ -49,9 +49,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "do not try and render markdown")
-	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "open gist in browser")
-	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "display a single file of the gist")
+	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "Print raw instead of rendered gist contents")
+	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open gist in the browser")
+	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Display a single file from the gist")
 
 	return cmd
 }
@@ -89,48 +89,64 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
-	if gist.Description != "" {
-		fmt.Fprintf(opts.IO.Out, "%s\n", cs.Bold(gist.Description))
+	theme := opts.IO.DetectTerminalTheme()
+	markdownStyle := markdown.GetStyle(theme)
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
+	}
+	defer opts.IO.StopPager()
+
+	render := func(gf *shared.GistFile) error {
+		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
+			rendered, err := markdown.Render(gf.Content, markdownStyle, "")
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprint(opts.IO.Out, rendered)
+			return err
+		}
+
+		if _, err := fmt.Fprint(opts.IO.Out, gf.Content); err != nil {
+			return err
+		}
+		if !strings.HasSuffix(gf.Content, "\n") {
+			_, err := fmt.Fprint(opts.IO.Out, "\n")
+			return err
+		}
+		return nil
 	}
 
 	if opts.Filename != "" {
 		gistFile, ok := gist.Files[opts.Filename]
 		if !ok {
-			return fmt.Errorf("gist has no such file %q", opts.Filename)
+			return fmt.Errorf("gist has no such file: %q", opts.Filename)
 		}
+		return render(gistFile)
+	}
 
-		gist.Files = map[string]*shared.GistFile{
-			opts.Filename: gistFile,
-		}
+	cs := opts.IO.ColorScheme()
+
+	if gist.Description != "" {
+		fmt.Fprintf(opts.IO.Out, "%s\n\n", cs.Bold(gist.Description))
 	}
 
 	showFilenames := len(gist.Files) > 1
-
-	outs := []string{} // to ensure consistent ordering
-
-	for filename, gistFile := range gist.Files {
-		out := ""
-		if showFilenames {
-			out += fmt.Sprintf("%s\n\n", cs.Gray(filename))
-		}
-		content := gistFile.Content
-		if strings.Contains(gistFile.Type, "markdown") && !opts.Raw {
-			style := markdown.GetStyle(opts.IO.DetectTerminalTheme())
-			rendered, err := markdown.Render(gistFile.Content, style, "")
-			if err == nil {
-				content = rendered
-			}
-		}
-		out += fmt.Sprintf("%s\n\n", content)
-
-		outs = append(outs, out)
+	filenames := make([]string, 0, len(gist.Files))
+	for fn := range gist.Files {
+		filenames = append(filenames, fn)
 	}
+	sort.Strings(filenames)
 
-	sort.Strings(outs)
-
-	for _, out := range outs {
-		fmt.Fprint(opts.IO.Out, out)
+	for i, fn := range filenames {
+		if showFilenames {
+			fmt.Fprintf(opts.IO.Out, "%s\n\n", cs.Gray(fn))
+		}
+		if err := render(gist.Files[fn]); err != nil {
+			return err
+		}
+		if i < len(filenames)-1 {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
 	}
 
 	return nil
