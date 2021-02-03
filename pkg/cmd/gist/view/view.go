@@ -19,10 +19,11 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 
-	Selector string
-	Filename string
-	Raw      bool
-	Web      bool
+	Selector  string
+	Filename  string
+	Raw       bool
+	Web       bool
+	ListFiles bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -32,7 +33,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<gist id> | <gist url>}",
+		Use:   "view {<id> | <url>}",
 		Short: "View a gist",
 		Args:  cmdutil.MinimumArgs(1, "cannot view: gist argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,6 +52,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "Print raw instead of rendered gist contents")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open gist in the browser")
+	cmd.Flags().BoolVarP(&opts.ListFiles, "files", "", false, "List file names from the gist")
 	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Display a single file from the gist")
 
 	return cmd
@@ -126,7 +128,7 @@ func viewRun(opts *ViewOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	if gist.Description != "" {
+	if gist.Description != "" && !opts.ListFiles {
 		fmt.Fprintf(opts.IO.Out, "%s\n\n", cs.Bold(gist.Description))
 	}
 
@@ -136,6 +138,13 @@ func viewRun(opts *ViewOptions) error {
 		filenames = append(filenames, fn)
 	}
 	sort.Strings(filenames)
+
+	if opts.ListFiles {
+		for _, fn := range filenames {
+			fmt.Fprintln(opts.IO.Out, fn)
+		}
+		return nil
+	}
 
 	for i, fn := range filenames {
 		if showFilenames {

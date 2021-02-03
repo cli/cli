@@ -25,16 +25,18 @@ func TestNewCmdView(t *testing.T) {
 			tty:  true,
 			cli:  "123",
 			wants: ViewOptions{
-				Raw:      false,
-				Selector: "123",
+				Raw:       false,
+				Selector:  "123",
+				ListFiles: false,
 			},
 		},
 		{
 			name: "nontty no arguments",
 			cli:  "123",
 			wants: ViewOptions{
-				Raw:      true,
-				Selector: "123",
+				Raw:       true,
+				Selector:  "123",
+				ListFiles: false,
 			},
 		},
 		{
@@ -42,9 +44,20 @@ func TestNewCmdView(t *testing.T) {
 			cli:  "-fcool.txt 123",
 			tty:  true,
 			wants: ViewOptions{
-				Raw:      false,
-				Selector: "123",
-				Filename: "cool.txt",
+				Raw:       false,
+				Selector:  "123",
+				Filename:  "cool.txt",
+				ListFiles: false,
+			},
+		},
+		{
+			name: "files passed",
+			cli:  "--files 123",
+			tty:  true,
+			wants: ViewOptions{
+				Raw:       false,
+				Selector:  "123",
+				ListFiles: true,
 			},
 		},
 	}
@@ -92,14 +105,16 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "no such gist",
 			opts: &ViewOptions{
-				Selector: "1234",
+				Selector:  "1234",
+				ListFiles: false,
 			},
 			wantErr: true,
 		},
 		{
 			name: "one file",
 			opts: &ViewOptions{
-				Selector: "1234",
+				Selector:  "1234",
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
@@ -114,8 +129,9 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "filename selected",
 			opts: &ViewOptions{
-				Selector: "1234",
-				Filename: "cicada.txt",
+				Selector:  "1234",
+				Filename:  "cicada.txt",
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
@@ -134,9 +150,10 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "filename selected, raw",
 			opts: &ViewOptions{
-				Selector: "1234",
-				Filename: "cicada.txt",
-				Raw:      true,
+				Selector:  "1234",
+				Filename:  "cicada.txt",
+				Raw:       true,
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
@@ -155,7 +172,8 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "multiple files, no description",
 			opts: &ViewOptions{
-				Selector: "1234",
+				Selector:  "1234",
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
@@ -174,7 +192,8 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "multiple files, trailing newlines",
 			opts: &ViewOptions{
-				Selector: "1234",
+				Selector:  "1234",
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Files: map[string]*shared.GistFile{
@@ -193,7 +212,8 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "multiple files, description",
 			opts: &ViewOptions{
-				Selector: "1234",
+				Selector:  "1234",
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Description: "some files",
@@ -213,8 +233,9 @@ func Test_viewRun(t *testing.T) {
 		{
 			name: "multiple files, raw",
 			opts: &ViewOptions{
-				Selector: "1234",
-				Raw:      true,
+				Selector:  "1234",
+				Raw:       true,
+				ListFiles: false,
 			},
 			gist: &shared.Gist{
 				Description: "some files",
@@ -230,6 +251,46 @@ func Test_viewRun(t *testing.T) {
 				},
 			},
 			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n- foo\n",
+		},
+		{
+			name: "one file, list files",
+			opts: &ViewOptions{
+				Selector:  "1234",
+				Raw:       false,
+				ListFiles: true,
+			},
+			gist: &shared.Gist{
+				Description: "some files",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "bwhiizzzbwhuiiizzzz",
+						Type:    "text/plain",
+					},
+				},
+			},
+			wantOut: "cicada.txt\n",
+		},
+		{
+			name: "multiple file, list files",
+			opts: &ViewOptions{
+				Selector:  "1234",
+				Raw:       false,
+				ListFiles: true,
+			},
+			gist: &shared.Gist{
+				Description: "some files",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "bwhiizzzbwhuiiizzzz",
+						Type:    "text/plain",
+					},
+					"foo.md": {
+						Content: "- foo",
+						Type:    "application/markdown",
+					},
+				},
+			},
+			wantOut: "cicada.txt\nfoo.md\n",
 		},
 	}
 
