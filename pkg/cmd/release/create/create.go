@@ -61,17 +61,29 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	var notesFile string
 
 	cmd := &cobra.Command{
+		DisableFlagsInUseLine: true,
+
 		Use:   "create <tag> [<files>...]",
 		Short: "Create a new release",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Create a new GitHub Release for a repository.
 
 			A list of asset files may be given to upload to the new release. To define a
-			display label for an asset, append text starting with '#' after the file name.
-		`),
+			display label for an asset, append text starting with %[1]s#%[1]s after the file name.
+
+			If a matching git tag does not yet exist, one will automatically get created
+			from the latest state of the default branch. Use %[1]s--target%[1]s to override this.
+			To fetch the new tag locally after the release, do %[1]sgit fetch --tags origin%[1]s.
+
+			To create a release from an annotated git tag, first create one locally with
+			git, push the tag to GitHub, then run this command.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
+
+			# upload all tarballs in a directory as release assets
+			$ gh release create v1.2.3 ./dist/*.tgz
 
 			# upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
@@ -116,7 +128,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
-	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or commit SHA (default: main branch)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file`")
