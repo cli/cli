@@ -33,7 +33,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<gist id> | <gist url>}",
+		Use:   "view {<id> | <url>}",
 		Short: "View a gist",
 		Args:  cmdutil.MinimumArgs(1, "cannot view: gist argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,7 +52,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "Print raw instead of rendered gist contents")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open gist in the browser")
-	cmd.Flags().BoolVarP(&opts.ListFiles, "files", "", false, "Display filenames list from the gist")
+	cmd.Flags().BoolVarP(&opts.ListFiles, "files", "", false, "List file names from the gist")
 	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Display a single file from the gist")
 
 	return cmd

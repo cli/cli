@@ -27,7 +27,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete {<gist ID> | <gist URL>}",
+		Use:   "delete {<id> | <url>}",
 		Short: "Delete a gist",
 		Args:  cmdutil.MinimumArgs(1, "cannot delete: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {

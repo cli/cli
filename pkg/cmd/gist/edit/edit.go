@@ -47,7 +47,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "edit {<gist ID> | <gist URL>}",
+		Use:   "edit {<id> | <url>}",
 		Short: "Edit one of your gists",
 		Args:  cmdutil.MinimumArgs(1, "cannot edit: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -60,7 +60,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			return editRun(&opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "a specific file to edit")
+	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
 }
