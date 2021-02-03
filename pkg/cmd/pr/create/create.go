@@ -84,20 +84,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Create a pull request on GitHub.
 
 			When the current branch isn't fully pushed to a git remote, a prompt will ask where
-			to push the branch and offer an option to fork the base repository. Use '--head' to
+			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
-			A prompt will also ask for the title and the body of the pull request. Use '--title'
-			and '--body' to skip this, or use '--fill' to autofill these values from git commits.
+			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s
+			and %[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
 
-			By default users with write access to the base respository can add new commits to your branch.
-			If undesired, you may disable access of maintainers by using '--no-maintainer-edit'
-			You can always change this setting later via the web interface.
-		`),
+			Link an issue to the pull request by referencing the issue in the body of the pull
+			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
+			will automatically get closed when the pull request gets merged.
+
+			By default, users with write access to the base respository can push new commits to the
+			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
 			$ gh pr create --reviewer monalisa,hubot  --reviewer myorg/team-name
@@ -113,21 +116,21 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.MaintainerCanModify = !noMaintainerEdit
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
-				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("`--recover` only supported when running interactively")}
 			}
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return &cmdutil.FlagError{Err: errors.New("--title or --fill required when not running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("`--title` or `--fill` required when not running interactively")}
 			}
 
 			if opts.IsDraft && opts.WebMode {
-				return errors.New("the --draft flag is not supported with --web")
+				return errors.New("the `--draft` flag is not supported with `--web`")
 			}
 			if len(opts.Reviewers) > 0 && opts.WebMode {
-				return errors.New("the --reviewer flag is not supported with --web")
+				return errors.New("the `--reviewer` flag is not supported with `--web`")
 			}
 			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
-				return errors.New("the --no-maintainer-edit flag is not supported with --web")
+				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
 			}
 
 			if runF != nil {
