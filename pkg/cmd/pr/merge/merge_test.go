@@ -716,6 +716,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register("git -c log.ShowSignature=false log --pretty=format:%H,%s -1", 0, "")
 	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
