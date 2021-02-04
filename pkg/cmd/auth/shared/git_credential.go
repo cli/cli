@@ -6,11 +6,52 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 )
+
+type GitCredentialFlow struct {
+	shouldSetup bool
+	helper      string
+	scopes      []string
+}
+
+func (flow *GitCredentialFlow) Prompt(hostname string) error {
+	flow.helper, _ = gitCredentialHelper(hostname)
+	if isOurCredentialHelper(flow.helper) {
+		flow.scopes = append(flow.scopes, "workflow")
+		return nil
+	}
+
+	err := prompt.SurveyAskOne(&survey.Confirm{
+		Message: "Authenticate Git with your GitHub credentials?",
+		Default: true,
+	}, &flow.shouldSetup)
+	if err != nil {
+		return fmt.Errorf("could not prompt: %w", err)
+	}
+	if flow.shouldSetup {
+		flow.scopes = append(flow.scopes, "workflow")
+	}
+
+	return nil
+}
+
+func (flow *GitCredentialFlow) Scopes() []string {
+	return flow.scopes
+}
+
+func (flow *GitCredentialFlow) ShouldSetup() bool {
+	return flow.shouldSetup
+}
+
+func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error {
+	return GitCredentialSetup(hostname, username, authToken, flow.helper)
+}
 
 func GitCredentialSetup(hostname, username, password, helper string) error {
 	if helper == "" {

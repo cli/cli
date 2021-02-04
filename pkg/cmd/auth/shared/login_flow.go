@@ -51,26 +51,14 @@ func Login(opts *LoginOptions) error {
 		gitProtocol = strings.ToLower(proto)
 	}
 
-	minimumScopes := []string{"repo", "read:org"}
+	var additionalScopes []string
 
-	var credentialHelper string
-	var configureGitCredential bool
+	credentialFlow := &GitCredentialFlow{}
 	if opts.Interactive && gitProtocol == "https" {
-		credentialHelper, _ = gitCredentialHelper(hostname)
-		if isOurCredentialHelper(credentialHelper) {
-			minimumScopes = append(minimumScopes, "workflow")
-		} else {
-			err := prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Authenticate Git with your GitHub credentials?",
-				Default: true,
-			}, &configureGitCredential)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-			if configureGitCredential {
-				minimumScopes = append(minimumScopes, "workflow")
-			}
+		if err := credentialFlow.Prompt(hostname); err != nil {
+			return err
 		}
+		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
 	var keyToUpload string
@@ -101,7 +89,7 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 	if keyToUpload != "" {
-		minimumScopes = append(minimumScopes, "admin:public_key")
+		additionalScopes = append(additionalScopes, "admin:public_key")
 	}
 
 	var authMode int
@@ -125,12 +113,13 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, minimumScopes...))
+		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...))
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
 		userValidated = true
 	} else {
+		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 			The minimum required scopes are %s.
@@ -183,8 +172,8 @@ func Login(opts *LoginOptions) error {
 		return err
 	}
 
-	if configureGitCredential {
-		err := GitCredentialSetup(hostname, username, authToken, credentialHelper)
+	if credentialFlow.ShouldSetup() {
+		err := credentialFlow.Setup(hostname, username, authToken)
 		if err != nil {
 			return err
 		}
