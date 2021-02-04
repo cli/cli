@@ -32,7 +32,8 @@ type MergeOptions struct {
 	DeleteBranch bool
 	MergeMethod  api.PullRequestMergeMethod
 
-	Body *string
+	Body         string
+	BodyProvided bool
 
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
@@ -99,8 +100,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 
 			if cmd.Flags().Changed("body") {
-				bodyStr, _ := cmd.Flags().GetString("body")
-				opts.Body = &bodyStr
+				opts.BodyProvided = true
 			}
 
 			if runF != nil {
@@ -111,7 +111,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
-	cmd.Flags().StringP("body", "b", "", "Body for merge commit")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body for merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -155,8 +155,6 @@ func mergeRun(opts *MergeOptions) error {
 	if !isPRAlreadyMerged {
 		mergeMethod := opts.MergeMethod
 
-		action := shared.SubmitAction
-
 		if opts.InteractiveMode {
 			r, err := api.GitHubRepo(apiClient, baseRepo)
 			if err != nil {
@@ -171,9 +169,9 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			allowEditMsg := mergeMethod != api.PullRequestMergeMethodRebase
+			allowEditMsg := (mergeMethod != api.PullRequestMergeMethodRebase) && !opts.BodyProvided
 
-			action, err = confirmSubmission(allowEditMsg)
+			action, err := confirmSurvey(allowEditMsg)
 			if err != nil {
 				return fmt.Errorf("unable to confirm: %w", err)
 			}
@@ -185,37 +183,32 @@ func mergeRun(opts *MergeOptions) error {
 					return err
 				}
 
-				if opts.Body == nil {
-					var body string
-
-					if mergeMethod == api.PullRequestMergeMethodSquash {
-						body = fmt.Sprintf("%s\n\n%s", pr.ViewerMergeHeadlineText, pr.ViewerMergeBodyText)
-					}
-
-					opts.Body = &body
-				}
-
-				err := commitMsgSurvey(opts.Body, editorCommand)
+				msg, err := commitMsgSurvey(editorCommand)
 				if err != nil {
 					return err
 				}
+				opts.Body = msg
+				opts.BodyProvided = true
 
-				action, err = confirmSubmission(false)
+				action, err = confirmSurvey(false)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
 			}
-
 			if action == shared.CancelAction {
 				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
 				return cmdutil.SilentError
 			}
 		}
-		if action == shared.SubmitAction {
-			err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, opts.Body)
-			if err != nil {
-				return err
-			}
+
+		var body *string
+		if opts.BodyProvided {
+			body = &opts.Body
+		}
+
+		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, body)
+		if err != nil {
+			return err
 		}
 
 		if isTerminal {
@@ -352,69 +345,48 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 	return opts.DeleteBranch, nil
 }
 
-func confirmSubmission(allowEditMsg bool) (shared.Action, error) {
+func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	const (
 		submitLabel        = "Submit"
-		editCommitMsgLabel = "Edit Commit Message"
+		editCommitMsgLabel = "Edit commit message"
 		cancelLabel        = "Cancel"
 	)
+
 	options := []string{submitLabel}
 	if allowEditMsg {
 		options = append(options, editCommitMsgLabel)
 	}
 	options = append(options, cancelLabel)
 
-	confirmAnswers := struct {
-		Confirmation int
-	}{}
-
-	confirmQs := []*survey.Question{
-		{
-			Name: "confirmation",
-			Prompt: &survey.Select{
-				Message: "What's next?",
-				Options: options,
-			},
-		},
+	var result string
+	submit := &survey.Select{
+		Message: "What's next?",
+		Options: options,
 	}
-
-	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
+	err := prompt.SurveyAskOne(submit, &result)
 	if err != nil {
-		return -1, fmt.Errorf("could not prompt: %w", err)
+		return shared.CancelAction, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	switch options[confirmAnswers.Confirmation] {
+	switch result {
 	case submitLabel:
 		return shared.SubmitAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
-	case cancelLabel:
-		return shared.CancelAction, nil
 	default:
-		return -1, fmt.Errorf("invalid index: %d", confirmAnswers.Confirmation)
+		return shared.CancelAction, nil
 	}
 }
 
-func commitMsgSurvey(body *string, editorCommand string) error {
-	qs := []*survey.Question{
-		{
-			Name: "body",
-			Prompt: &surveyext.GhEditor{
-				BlankAllowed:  true,
-				EditorCommand: editorCommand,
-				Editor: &survey.Editor{
-					Message:       "Body",
-					AppendDefault: true,
-					Default:       *body,
-					FileName:      "*.md",
-				},
-			},
+func commitMsgSurvey(editorCommand string) (string, error) {
+	var result string
+	q := &surveyext.GhEditor{
+		EditorCommand: editorCommand,
+		Editor: &survey.Editor{
+			Message:  "Body",
+			FileName: "*.md",
 		},
 	}
-	err := prompt.SurveyAsk(qs, body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	err := prompt.SurveyAskOne(q, &result)
+	return result, err
 }
