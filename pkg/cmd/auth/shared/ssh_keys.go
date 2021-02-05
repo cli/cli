@@ -87,7 +87,7 @@ func generateSSHKey() (string, error) {
 
 	var sshPassphrase string
 	err = prompt.SurveyAskOne(&survey.Password{
-		Message: "Enter the passphrase for your new SSH key",
+		Message: "Enter a passphrase for your new SSH key (Optional)",
 	}, &sshPassphrase)
 	if err != nil {
 		return "", fmt.Errorf("could not prompt: %w", err)
