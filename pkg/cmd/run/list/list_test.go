@@ -73,6 +73,6 @@ func TestNewCmdList(t *testing.T) {
 	}
 }
 
-//func TestForDemo(t *testing.T) {
-//	assert.Equal(t, 1, 0)
-//}
+func TestForDemo(t *testing.T) {
+	assert.Equal(t, 1, 0)
+}
