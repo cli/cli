@@ -3,7 +3,6 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -108,15 +107,7 @@ func listRun(opts *ListOptions) error {
 			tp.AddField(shared.Symbol(cs, run.Status, run.Conclusion), nil, nil)
 		}
 
-		commitLines := strings.Split(run.HeadCommit.Message, "\n")
-		var commitMsg string
-		if len(commitLines) > 0 {
-			commitMsg = commitLines[0]
-		} else {
-			commitMsg = run.HeadSha[0:8]
-		}
-
-		tp.AddField(commitMsg, nil, cs.Bold)
+		tp.AddField(run.CommitMsg(), nil, cs.Bold)
 
 		tp.AddField(run.Name, nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)

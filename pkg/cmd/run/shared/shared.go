@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -57,6 +58,15 @@ type Run struct {
 
 type Commit struct {
 	Message string
+}
+
+func (r Run) CommitMsg() string {
+	commitLines := strings.Split(r.HeadCommit.Message, "\n")
+	if len(commitLines) > 0 {
+		return commitLines[0]
+	} else {
+		return r.HeadSha[0:8]
+	}
 }
 
 type Job struct {
@@ -203,7 +213,7 @@ func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Int
 	for _, run := range runs {
 		symbol := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
-			fmt.Sprintf("%s %s (%s)", symbol, run.Name, run.HeadBranch))
+			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
@@ -213,6 +223,10 @@ func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Int
 		Options:  candidates,
 		PageSize: 10,
 	}, &selected)
+
+	if err != nil {
+		return "", err
+	}
 
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
