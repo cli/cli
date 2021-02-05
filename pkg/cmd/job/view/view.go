@@ -115,7 +115,6 @@ func runView(opts *ViewOptions) error {
 			opts.IO.StopProgressIndicator()
 		}
 
-		// TODO if only one job in run, don't bother prompting just select it
 		jobID, err = promptForJob(*opts, client, repo, *run)
 		if err != nil {
 			// TODO error handle
@@ -218,6 +217,10 @@ func promptForJob(opts ViewOptions, client *api.Client, repo ghrepo.Interface, r
 	jobs, err := shared.GetJobs(client, repo, run)
 	if err != nil {
 		return "", err
+	}
+
+	if len(jobs) == 1 {
+		return fmt.Sprintf("%d", jobs[0].ID), nil
 	}
 
 	var selected int
