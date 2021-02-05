@@ -2,9 +2,11 @@ package view
 
 import (
 	"bytes"
+	"io/ioutil"
 	"testing"
 
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,6 +15,7 @@ func TestNewCmdView(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
+		tty      bool
 		wants    ViewOptions
 		wantsErr bool
 	}{
@@ -31,7 +34,13 @@ func TestNewCmdView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := &cmdutil.Factory{}
+			io, _, _, _ := iostreams.Test()
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -43,8 +52,8 @@ func TestNewCmdView(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
