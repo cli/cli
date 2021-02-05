@@ -120,7 +120,7 @@ func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
 	defer http.Verify(t)
 
 	output, err := runCommand(http, nil, "feature", false, "")
-	assert.EqualError(t, err, "--title or --fill required when not running interactively")
+	assert.EqualError(t, err, "`--title` or `--fill` required when not running interactively")
 
 	assert.Equal(t, "", output.String())
 }
