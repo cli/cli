@@ -32,7 +32,7 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 
 func actionsRun(opts ActionsOptions) {
 	cs := opts.IO.ColorScheme()
-	fmt.Fprint(opts.IO.Out, fmt.Sprintf(heredoc.Doc(`
+	fmt.Fprint(opts.IO.Out, heredoc.Docf(`
 		Welcome to GitHub Actions on the command line.
 
 		%s
@@ -49,7 +49,7 @@ func actionsRun(opts ActionsOptions) {
 		%s
 		gh job view:   View details for a given job
 		gh job run:    Run a given job within a workflow
-	`),
+	`,
 		cs.Bold("Working with workflows"),
 		cs.Bold("Working with runs"),
 		cs.Bold("Working with jobs within runs")))

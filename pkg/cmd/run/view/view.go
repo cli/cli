@@ -115,10 +115,7 @@ func runView(opts *ViewOptions) error {
 		if annotationErr != nil {
 			break
 		}
-
-		for _, a := range as {
-			annotations = append(annotations, a)
-		}
+		annotations = append(annotations, as...)
 	}
 
 	if annotationErr != nil {

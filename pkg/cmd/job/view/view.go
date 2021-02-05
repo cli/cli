@@ -115,6 +115,7 @@ func runView(opts *ViewOptions) error {
 			opts.IO.StopProgressIndicator()
 		}
 
+		// TODO if only one job in run, don't bother prompting just select it
 		jobID, err = promptForJob(*opts, client, repo, *run)
 		if err != nil {
 			// TODO error handle
@@ -146,7 +147,7 @@ func runView(opts *ViewOptions) error {
 			if n <= 0 {
 				break
 			}
-			fmt.Fprintf(out, string(buff[0:n]))
+			fmt.Fprint(out, string(buff[0:n]))
 			if err != nil {
 				break
 			}
