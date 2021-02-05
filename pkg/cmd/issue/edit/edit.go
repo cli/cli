@@ -22,14 +22,14 @@ type EditOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	DetermineEditor    func() (string, error)
-	FieldsToEditSurvey func(*prShared.EditableOptions) error
-	EditableSurvey     func(string, *prShared.EditableOptions) error
-	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.EditableOptions) error
+	FieldsToEditSurvey func(*prShared.Editable) error
+	EditFieldsSurvey   func(*prShared.Editable, string) error
+	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
 
 	SelectorArg string
 	Interactive bool
 
-	prShared.EditableOptions
+	prShared.Editable
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -38,7 +38,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		HttpClient:         f.HttpClient,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
-		EditableSurvey:     prShared.EditableSurvey,
+		EditFieldsSurvey:   prShared.EditFieldsSurvey,
 		FetchOptions:       prShared.FetchOptions,
 	}
 
@@ -62,25 +62,25 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			flags := cmd.Flags()
 			if flags.Changed("title") {
-				opts.EditableOptions.TitleEdited = true
+				opts.Editable.TitleEdited = true
 			}
 			if flags.Changed("body") {
-				opts.EditableOptions.BodyEdited = true
+				opts.Editable.BodyEdited = true
 			}
 			if flags.Changed("assignee") {
-				opts.EditableOptions.AssigneesEdited = true
+				opts.Editable.AssigneesEdited = true
 			}
 			if flags.Changed("label") {
-				opts.EditableOptions.LabelsEdited = true
+				opts.Editable.LabelsEdited = true
 			}
 			if flags.Changed("project") {
-				opts.EditableOptions.ProjectsEdited = true
+				opts.Editable.ProjectsEdited = true
 			}
 			if flags.Changed("milestone") {
-				opts.EditableOptions.MilestoneEdited = true
+				opts.Editable.MilestoneEdited = true
 			}
 
-			if !opts.EditableOptions.Dirty() {
+			if !opts.Editable.Dirty() {
 				opts.Interactive = true
 			}
 
@@ -96,12 +96,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.EditableOptions.Title, "title", "t", "", "Revise the issue title.")
-	cmd.Flags().StringVarP(&opts.EditableOptions.Body, "body", "b", "", "Revise the issue body.")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Assignees, "assignee", "a", nil, "Set assigned people by their `login`. Use \"@me\" to self-assign.")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Labels, "label", "l", nil, "Set the issue labels by `name`")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Projects, "project", "p", nil, "Set the projects the issue belongs to by `name`")
-	cmd.Flags().StringVarP(&opts.EditableOptions.Milestone, "milestone", "m", "", "Set the milestone the issue belongs to by `name`")
+	cmd.Flags().StringVarP(&opts.Editable.Title, "title", "t", "", "Revise the issue title.")
+	cmd.Flags().StringVarP(&opts.Editable.Body, "body", "b", "", "Revise the issue body.")
+	cmd.Flags().StringSliceVarP(&opts.Editable.Assignees, "assignee", "a", nil, "Set assigned people by their `login`. Use \"@me\" to self-assign.")
+	cmd.Flags().StringSliceVarP(&opts.Editable.Labels, "label", "l", nil, "Set the issue labels by `name`")
+	cmd.Flags().StringSliceVarP(&opts.Editable.Projects, "project", "p", nil, "Set the projects the issue belongs to by `name`")
+	cmd.Flags().StringVarP(&opts.Editable.Milestone, "milestone", "m", "", "Set the milestone the issue belongs to by `name`")
 
 	return cmd
 }
@@ -118,23 +118,23 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	editOptions := opts.EditableOptions
-	editOptions.TitleDefault = issue.Title
-	editOptions.BodyDefault = issue.Body
-	editOptions.AssigneesDefault = issue.Assignees
-	editOptions.LabelsDefault = issue.Labels
-	editOptions.ProjectsDefault = issue.ProjectCards
-	editOptions.MilestoneDefault = issue.Milestone
+	editable := opts.Editable
+	editable.TitleDefault = issue.Title
+	editable.BodyDefault = issue.Body
+	editable.AssigneesDefault = issue.Assignees
+	editable.LabelsDefault = issue.Labels
+	editable.ProjectsDefault = issue.ProjectCards
+	editable.MilestoneDefault = issue.Milestone
 
 	if opts.Interactive {
-		err = opts.FieldsToEditSurvey(&editOptions)
+		err = opts.FieldsToEditSurvey(&editable)
 		if err != nil {
 			return err
 		}
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = opts.FetchOptions(apiClient, repo, &editOptions)
+	err = opts.FetchOptions(apiClient, repo, &editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -145,14 +145,14 @@ func editRun(opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
-		err = opts.EditableSurvey(editorCommand, &editOptions)
+		err = opts.EditFieldsSurvey(&editable, editorCommand)
 		if err != nil {
 			return err
 		}
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = updateIssue(apiClient, repo, issue.ID, editOptions)
+	err = updateIssue(apiClient, repo, issue.ID, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -163,61 +163,28 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func updateIssue(client *api.Client, repo ghrepo.Interface, id string, options prShared.EditableOptions) error {
-	params := githubv4.UpdateIssueInput{ID: id}
-	if options.TitleEdited {
-		title := githubv4.String(options.Title)
-		params.Title = &title
+func updateIssue(client *api.Client, repo ghrepo.Interface, id string, options prShared.Editable) error {
+	var err error
+	params := githubv4.UpdateIssueInput{
+		ID:    id,
+		Title: options.TitleParam(),
+		Body:  options.BodyParam(),
 	}
-	if options.BodyEdited {
-		body := githubv4.String(options.Body)
-		params.Body = &body
+	params.AssigneeIDs, err = options.AssigneesParam(client, repo)
+	if err != nil {
+		return err
 	}
-	if options.AssigneesEdited {
-		meReplacer := prShared.NewMeReplacer(client, repo.RepoHost())
-		assignees, err := meReplacer.ReplaceSlice(options.Assignees)
-		if err != nil {
-			return err
-		}
-		ids, err := options.Metadata.MembersToIDs(assignees)
-		if err != nil {
-			return err
-		}
-		assigneeIDs := make([]githubv4.ID, len(ids))
-		for i, v := range ids {
-			assigneeIDs[i] = v
-		}
-		params.AssigneeIDs = &assigneeIDs
+	params.LabelIDs, err = options.LabelsParam()
+	if err != nil {
+		return err
 	}
-	if options.LabelsEdited {
-		ids, err := options.Metadata.LabelsToIDs(options.Labels)
-		if err != nil {
-			return err
-		}
-		labelIDs := make([]githubv4.ID, len(ids))
-		for i, v := range ids {
-			labelIDs[i] = v
-		}
-		params.LabelIDs = &labelIDs
+	params.ProjectIDs, err = options.ProjectsParam()
+	if err != nil {
+		return err
 	}
-	if options.ProjectsEdited {
-		ids, err := options.Metadata.ProjectsToIDs(options.Projects)
-		if err != nil {
-			return err
-		}
-		projectIDs := make([]githubv4.ID, len(ids))
-		for i, v := range ids {
-			projectIDs[i] = v
-		}
-		params.ProjectIDs = &projectIDs
-	}
-	if options.MilestoneEdited {
-		id, err := options.Metadata.MilestoneToID(options.Milestone)
-		if err != nil {
-			return err
-		}
-		milestoneID := githubv4.ID(id)
-		params.MilestoneID = &milestoneID
+	params.MilestoneID, err = options.MilestoneParam()
+	if err != nil {
+		return err
 	}
 	return api.IssueUpdate(client, repo, params)
 }
