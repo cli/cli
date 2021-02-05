@@ -51,6 +51,12 @@ type Run struct {
 	ID         int
 	HeadBranch string `json:"head_branch"`
 	JobsURL    string `json:"jobs_url"`
+	HeadCommit Commit `json:"head_commit"`
+	HeadSha    string `json:"head_sha"`
+}
+
+type Commit struct {
+	Message string
 }
 
 type Job struct {
@@ -68,21 +74,6 @@ type Step struct {
 	Status     Status
 	Conclusion Conclusion
 	Number     int
-}
-
-func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) string {
-	if status == Completed {
-		switch conclusion {
-		case Success:
-			return cs.SuccessIcon()
-		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(cs.Gray)
-		default:
-			return cs.FailureIcon()
-		}
-	}
-
-	return cs.Yellow("-")
 }
 
 type Annotation struct {
@@ -237,4 +228,19 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, erro
 	}
 
 	return &result, nil
+}
+
+func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) string {
+	if status == Completed {
+		switch conclusion {
+		case Success:
+			return cs.SuccessIcon()
+		case Skipped, Cancelled, Neutral:
+			return cs.SuccessIconWithColor(cs.Gray)
+		default:
+			return cs.FailureIcon()
+		}
+	}
+
+	return cs.Yellow("-")
 }

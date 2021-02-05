@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -99,7 +100,7 @@ func listRun(opts *ListOptions) error {
 		opts.IO.StopProgressIndicator()
 	}
 	for _, run := range runs {
-		idStr := cs.Cyanf("%d", run.ID)
+		//idStr := cs.Cyanf("%d", run.ID)
 		if opts.PlainOutput {
 			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
@@ -107,18 +108,26 @@ func listRun(opts *ListOptions) error {
 			tp.AddField(shared.Symbol(cs, run.Status, run.Conclusion), nil, nil)
 		}
 
+		commitLines := strings.Split(run.HeadCommit.Message, "\n")
+		var commitMsg string
+		if len(commitLines) > 0 {
+			commitMsg = commitLines[0]
+		} else {
+			commitMsg = run.HeadSha[0:8]
+		}
+
+		tp.AddField(commitMsg, nil, cs.Bold)
+
 		tp.AddField(run.Name, nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 
-		elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-		tp.AddField(fmt.Sprintf("%s", elapsed), nil, nil)
-
 		if opts.PlainOutput {
-			tp.AddField(fmt.Sprintf("%d", run.ID), nil, nil)
-		} else {
-			tp.AddField(fmt.Sprintf("(ID %s)", idStr), nil, nil)
+			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
+			tp.AddField(fmt.Sprintf("%s", elapsed), nil, nil)
 		}
+
+		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
 
 		tp.EndRow()
 	}
