@@ -165,6 +165,8 @@ func run(args ...string) error {
 	}
 	announce(args...)
 	cmd := exec.Command(exe, args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
