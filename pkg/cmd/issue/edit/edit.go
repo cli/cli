@@ -30,7 +30,6 @@ type EditOptions struct {
 
 	SelectorArg string
 	Interactive bool
-	WebMode     bool
 
 	prShared.EditableOptions
 }
@@ -89,7 +88,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("--tile, --body, --assignee, --label, --project, --milestone, or --web required when not running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("--tile, --body, --assignee, --label, --project, or --milestone required when not running interactively")}
 			}
 
 			if runF != nil {
@@ -100,7 +99,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
 	cmd.Flags().StringVarP(&opts.EditableOptions.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.EditableOptions.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
@@ -121,14 +119,6 @@ func editRun(opts *EditOptions) error {
 	issue, repo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
 		return err
-	}
-
-	if opts.WebMode {
-		openURL := issue.URL
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
-		}
-		return opts.OpenInBrowser(openURL)
 	}
 
 	editOptions := opts.EditableOptions

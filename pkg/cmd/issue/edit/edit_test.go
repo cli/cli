@@ -37,16 +37,6 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "web flag",
-			input: "23 --web",
-			output: EditOptions{
-				SelectorArg: "23",
-				Interactive: true,
-				WebMode:     true,
-			},
-			wantsErr: false,
-		},
-		{
 			name:  "title flag",
 			input: "23 --title test",
 			output: EditOptions{
@@ -153,7 +143,6 @@ func TestNewCmdEdit(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
-			assert.Equal(t, tt.output.WebMode, gotOpts.WebMode)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.EditableOptions, gotOpts.EditableOptions)
 		})
@@ -168,18 +157,6 @@ func Test_editRun(t *testing.T) {
 		stdout    string
 		stderr    string
 	}{
-		{
-			name: "web mode",
-			input: &EditOptions{
-				SelectorArg:   "123",
-				WebMode:       true,
-				OpenInBrowser: func(string) error { return nil },
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-			},
-			stderr: "Opening github.com/OWNER/REPO/issue/123 in your browser.\n",
-		},
 		{
 			name: "non-interactive",
 			input: &EditOptions{
