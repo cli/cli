@@ -32,8 +32,7 @@ type MergeOptions struct {
 	DeleteBranch bool
 	MergeMethod  api.PullRequestMergeMethod
 
-	Body         string
-	BodyProvided bool
+	Body string
 
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
@@ -98,10 +97,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
-
-			if cmd.Flags().Changed("body") {
-				opts.BodyProvided = true
-			}
 
 			if runF != nil {
 				return runF(opts)
@@ -169,7 +164,7 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			allowEditMsg := (mergeMethod != api.PullRequestMergeMethodRebase) && !opts.BodyProvided
+			allowEditMsg := mergeMethod != api.PullRequestMergeMethodRebase
 
 			action, err := confirmSurvey(allowEditMsg)
 			if err != nil {
@@ -183,12 +178,19 @@ func mergeRun(opts *MergeOptions) error {
 					return err
 				}
 
-				msg, err := commitMsgSurvey(editorCommand)
+				if opts.Body == "" {
+					if mergeMethod == api.PullRequestMergeMethodMerge {
+						opts.Body = pr.Title
+					} else {
+						opts.Body = pr.ViewerMergeBodyText
+					}
+				}
+
+				msg, err := commitMsgSurvey(opts.Body, editorCommand)
 				if err != nil {
 					return err
 				}
 				opts.Body = msg
-				opts.BodyProvided = true
 
 				action, err = confirmSurvey(false)
 				if err != nil {
@@ -202,7 +204,7 @@ func mergeRun(opts *MergeOptions) error {
 		}
 
 		var body *string
-		if opts.BodyProvided {
+		if opts.Body != "" {
 			body = &opts.Body
 		}
 
@@ -378,13 +380,15 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	}
 }
 
-func commitMsgSurvey(editorCommand string) (string, error) {
+func commitMsgSurvey(msg string, editorCommand string) (string, error) {
 	var result string
 	q := &surveyext.GhEditor{
 		EditorCommand: editorCommand,
 		Editor: &survey.Editor{
-			Message:  "Body",
-			FileName: "*.md",
+			Message:       "Body",
+			AppendDefault: true,
+			Default:       msg,
+			FileName:      "*.md",
 		},
 	}
 	err := prompt.SurveyAskOne(q, &result)

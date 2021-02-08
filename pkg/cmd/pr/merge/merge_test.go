@@ -71,7 +71,6 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeMethod:             api.PullRequestMergeMethodMerge,
 				InteractiveMode:         true,
 				Body:                    "cool",
-				BodyProvided:            true,
 			},
 		},
 		{
@@ -139,7 +138,6 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.MergeMethod, opts.MergeMethod)
 			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
 			assert.Equal(t, tt.want.Body, opts.Body)
-			assert.Equal(t, tt.want.BodyProvided, opts.BodyProvided)
 		})
 	}
 }

@@ -88,6 +88,8 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+
+	ViewerMergeBodyText string
 }
 
 type ReviewRequests struct {
@@ -584,6 +586,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				milestone{
 					title
 				}
+				viewerMergeBodyText
 				` + commentsFragment() + `
 				` + reactionGroupsFragment() + `
 			}
