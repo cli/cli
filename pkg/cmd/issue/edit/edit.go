@@ -99,12 +99,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.EditableOptions.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
-	cmd.Flags().StringVarP(&opts.EditableOptions.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Labels, "label", "l", nil, "Add labels by `name`")
-	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Projects, "project", "p", nil, "Add the issue to projects by `name`")
-	cmd.Flags().StringVarP(&opts.EditableOptions.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
+	cmd.Flags().StringVarP(&opts.EditableOptions.Title, "title", "t", "", "Revise the issue title.")
+	cmd.Flags().StringVarP(&opts.EditableOptions.Body, "body", "b", "", "Revise the issue body.")
+	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Assignees, "assignee", "a", nil, "Set assigned people by their `login`. Use \"@me\" to self-assign.")
+	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Labels, "label", "l", nil, "Set the issue labels by `name`")
+	cmd.Flags().StringSliceVarP(&opts.EditableOptions.Projects, "project", "p", nil, "Set the projects the issue belongs to by `name`")
+	cmd.Flags().StringVarP(&opts.EditableOptions.Milestone, "milestone", "m", "", "Set the milestone the issue belongs to by `name`")
 
 	return cmd
 }
