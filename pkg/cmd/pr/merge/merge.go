@@ -183,7 +183,15 @@ func mergeRun(opts *MergeOptions) error {
 					return err
 				}
 
-				msg, err := commitMsgSurvey(editorCommand)
+				if !opts.BodyProvided {
+					if mergeMethod == api.PullRequestMergeMethodMerge {
+						opts.Body = pr.Title
+					} else {
+						opts.Body = pr.ViewerMergeBodyText
+					}
+				}
+
+				msg, err := commitMsgSurvey(opts.Body, editorCommand)
 				if err != nil {
 					return err
 				}
@@ -378,13 +386,15 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	}
 }
 
-func commitMsgSurvey(editorCommand string) (string, error) {
+func commitMsgSurvey(msg string, editorCommand string) (string, error) {
 	var result string
 	q := &surveyext.GhEditor{
 		EditorCommand: editorCommand,
 		Editor: &survey.Editor{
-			Message:  "Body",
-			FileName: "*.md",
+			Message:       "Body",
+			AppendDefault: true,
+			Default:       msg,
+			FileName:      "*.md",
 		},
 	}
 	err := prompt.SurveyAskOne(q, &result)
