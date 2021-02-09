@@ -1,0 +1,148 @@
+{
+"total": 10000,
+"data": [
+{
+"address": "TDqMwZVTSPLTCZQC55Db3J69eXY7HLCmfs",
+"balance": 9770001108929350,
+"power": 0,
+"totalTransactionCount": 33
+},
+{
+"address": "TA9FnQrLGdgLW6cwBKue9DyqSBz1UNzUMR",
+"balance": 2630797836762880,
+"power": 23000000000000,
+"totalTransactionCount": 53113
+},
+{
+"address": "TKh6XHr7ciNjhUTdbTS5gcnvQmcRXCpDTk",
+"balance": 2377787040061539,
+"power": 0,
+"totalTransactionCount": 152
+},
+{
+"address": "TNaRAoLUyYEV2uF7GUrzSjRQTU8v5ZJ5VR",
+"balance": 2083304990370301,
+"power": 0,
+"totalTransactionCount": 11065124
+},
+{
+"address": "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR",
+"balance": 1760627511172828,
+"power": 0,
+"totalTransactionCount": 1045942
+},
+{
+"address": "TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9",
+"balance": 1663648832376932,
+"power": 6442761345000000,
+"totalTransactionCount": 1137
+},
+{
+"address": "TE2RzoSV3wFK99w6J9UnnZ4vLfXYoxvRwP",
+"balance": 1083038112701233,
+"power": 0,
+"totalTransactionCount": 99266
+},
+{
+"address": "TTd9qHyjqiUkfTxe3gotbuTMpjU8LEbpkN",
+"balance": 1068198904191500,
+"power": 0,
+"totalTransactionCount": 58793
+},
+{
+"address": "TDdZXzGcXZ75KBLMgWUdsAAuz6KQPEgmsb",
+"balance": 992240778982494,
+"power": 0,
+"totalTransactionCount": 152
+},
+{
+"address": "TTR9YAXwFCfLKboX8e9eg5fY8eDMrSgE6V",
+"balance": 952626396142222,
+"power": 0,
+"totalTransactionCount": 127
+},
+{
+"address": "TUTtLtGjXWqkTAow7jj7oMhTGLe9XB9YMA",
+"balance": 903995492933867,
+"power": 0,
+"totalTransactionCount": 133
+},
+{
+"address": "TChvKhEVXKMP19tiQzBchh6Dm7cyZjuPco",
+"balance": 903636587000000,
+"power": 0,
+"totalTransactionCount": 86
+},
+{
+"address": "TLgzJvHDArCZLCsgJo4XsEaBT8Te1af8n2",
+"balance": 792899176953861,
+"power": 0,
+"totalTransactionCount": 666829
+},
+{
+"address": "TA5vCXk4f1SrCMfz361UxUNABRGP1g2F1r",
+"balance": 755352402536119,
+"power": 0,
+"totalTransactionCount": 296363
+},
+{
+"address": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
+"balance": 611902811947003,
+"power": 0,
+"totalTransactionCount": 2763682
+},
+{
+"address": "TRmZhWz9kneZM4wzDnBdYXiqa33e5rrcKN",
+"balance": 474789790749423,
+"power": 0,
+"totalTransactionCount": 93
+},
+{
+"address": "TWd4WrZ9wn84f5x1hZhL4DHvk738ns5jwb",
+"balance": 462466747168772,
+"power": 3239581502000000,
+"totalTransactionCount": 570
+},
+{
+"address": "TV9p7kGr2JNiBYfuyyem6CuHrbfJXEQpFj",
+"balance": 449287701308114,
+"power": 0,
+"totalTransactionCount": 127
+},
+{
+"address": "TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX",
+"balance": 439184189658026,
+"power": 0,
+"totalTransactionCount": 16642802
+},
+{
+"address": "TDDfvZoT1A2CAF9m4mm29xKw2oY8fDYmeu",
+"balance": 356701217786532,
+"power": 0,
+"totalTransactionCount": 938
+}
+],
+"contractMap": {
+"TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE": true,
+"TV9p7kGr2JNiBYfuyyem6CuHrbfJXEQpFj": false,
+"TE2RzoSV3wFK99w6J9UnnZ4vLfXYoxvRwP": true,
+"TA5vCXk4f1SrCMfz361UxUNABRGP1g2F1r": false,
+"TTR9YAXwFCfLKboX8e9eg5fY8eDMrSgE6V": false,
+"TA9FnQrLGdgLW6cwBKue9DyqSBz1UNzUMR": false,
+"TNaRAoLUyYEV2uF7GUrzSjRQTU8v5ZJ5VR": false,
+"TUTtLtGjXWqkTAow7jj7oMhTGLe9XB9YMA": false,
+"TAUN6FwrnwwmaEqYcckffC7wYmbaS6cBiX": false,
+"TDqMwZVTSPLTCZQC55Db3J69eXY7HLCmfs": false,
+"TMuA6YqfCeX8EhbfYEg5y7S4DqzSJireY9": false,
+"TRmZhWz9kneZM4wzDnBdYXiqa33e5rrcKN": false,
+"TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR": true,
+"TKh6XHr7ciNjhUTdbTS5gcnvQmcRXCpDTk": false,
+"TWd4WrZ9wn84f5x1hZhL4DHvk738ns5jwb": false,
+"TDDfvZoT1A2CAF9m4mm29xKw2oY8fDYmeu": false,
+"TLgzJvHDArCZLCsgJo4XsEaBT8Te1af8n2": true,
+"TChvKhEVXKMP19tiQzBchh6Dm7cyZjuPco": false,
+"TTd9qHyjqiUkfTxe3gotbuTMpjU8LEbpkN": false,
+"TDdZXzGcXZ75KBLMgWUdsAAuz6KQPEgmsb": false
+},
+"rangeTotal": 21403441
+}
