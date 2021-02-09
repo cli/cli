@@ -12,7 +12,6 @@ import (
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +21,6 @@ type EditOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	OpenInBrowser      func(string) error
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(*prShared.EditableOptions) error
 	EditableSurvey     func(string, *prShared.EditableOptions) error
@@ -38,7 +36,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
 		HttpClient:         f.HttpClient,
-		OpenInBrowser:      utils.OpenInBrowser,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditableSurvey:     prShared.EditableSurvey,
