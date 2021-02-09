@@ -1,0 +1,2 @@
+​$ platform mount:upload -e master --mount web/sites/default/files/ --source ./web/sites/default/files/
+$ platform mount:upload -e master --mount private/ --source ./private/
