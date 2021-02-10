@@ -542,12 +542,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "index",
-			Value: 0,
-		},
-	}) // template
+	as.StubOne(0) // template
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "Body",

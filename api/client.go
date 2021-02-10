@@ -111,6 +111,10 @@ type Client struct {
 	http *http.Client
 }
 
+func (c *Client) HTTP() *http.Client {
+	return c.http
+}
+
 type graphQLResponse struct {
 	Data   interface{}
 	Errors []GraphQLError

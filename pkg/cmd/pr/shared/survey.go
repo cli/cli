@@ -74,60 +74,6 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-// Deprecated: use SelectTemplate instead
-func TemplateSurvey(templateFiles []string, legacyTemplate string, state IssueMetadataState) (templateContent string, err error) {
-	if len(templateFiles) == 0 && legacyTemplate == "" {
-		return
-	}
-
-	if len(templateFiles) > 0 {
-		templateContent, err = selectTemplate(templateFiles, legacyTemplate, state.Type)
-	} else {
-		templateContent = string(githubtemplate.ExtractContents(legacyTemplate))
-	}
-
-	return
-}
-
-func selectTemplate(nonLegacyTemplatePaths []string, legacyTemplatePath string, metadataType metadataStateType) (string, error) {
-	templateResponse := struct {
-		Index int
-	}{}
-	templateNames := make([]string, 0, len(nonLegacyTemplatePaths))
-	for _, p := range nonLegacyTemplatePaths {
-		templateNames = append(templateNames, githubtemplate.ExtractName(p))
-	}
-	if metadataType == IssueMetadata {
-		templateNames = append(templateNames, "Open a blank issue")
-	} else if metadataType == PRMetadata {
-		templateNames = append(templateNames, "Open a blank pull request")
-	}
-
-	selectQs := []*survey.Question{
-		{
-			Name: "index",
-			Prompt: &survey.Select{
-				Message: "Choose a template",
-				Options: templateNames,
-			},
-		},
-	}
-	if err := prompt.SurveyAsk(selectQs, &templateResponse); err != nil {
-		return "", fmt.Errorf("could not prompt: %w", err)
-	}
-
-	if templateResponse.Index == len(nonLegacyTemplatePaths) { // the user has selected the blank template
-		if legacyTemplatePath != "" {
-			templateContents := githubtemplate.ExtractContents(legacyTemplatePath)
-			return string(templateContents), nil
-		} else {
-			return "", nil
-		}
-	}
-	templateContents := githubtemplate.ExtractContents(nonLegacyTemplatePaths[templateResponse.Index])
-	return string(templateContents), nil
-}
-
 func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string) error {
 	if templateContent != "" {
 		if state.Body != "" {
