@@ -7,174 +7,199 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/set"
 	"github.com/cli/cli/pkg/surveyext"
-	"github.com/shurcooL/githubv4"
 )
 
 type Editable struct {
-	Title        string
-	TitleDefault string
-	TitleEdited  bool
+	Title     EditableString
+	Body      EditableString
+	Reviewers EditableSlice
+	Assignees EditableSlice
+	Labels    EditableSlice
+	Projects  EditableSlice
+	Milestone EditableString
+	Metadata  api.RepoMetadataResult
+}
 
-	Body        string
-	BodyDefault string
-	BodyEdited  bool
+type EditableString struct {
+	Value   string
+	Default string
+	Options []string
+	Edited  bool
+}
 
-	Reviewers        []string
-	ReviewersDefault api.ReviewRequests
-	ReviewersOptions []string
-	ReviewersEdited  bool
-	ReviewersAllowed bool
-
-	Assignees        []string
-	AssigneesDefault api.Assignees
-	AssigneesOptions []string
-	AssigneesEdited  bool
-
-	Labels        []string
-	LabelsDefault api.Labels
-	LabelsOptions []string
-	LabelsEdited  bool
-
-	Projects        []string
-	ProjectsDefault api.ProjectCards
-	ProjectsOptions []string
-	ProjectsEdited  bool
-
-	Milestone        string
-	MilestoneDefault api.Milestone
-	MilestoneOptions []string
-	MilestoneEdited  bool
-
-	Metadata api.RepoMetadataResult
+type EditableSlice struct {
+	Value   []string
+	Add     []string
+	Remove  []string
+	Default []string
+	Options []string
+	Edited  bool
+	Allowed bool
 }
 
 func (e Editable) Dirty() bool {
-	return e.TitleEdited ||
-		e.BodyEdited ||
-		e.ReviewersEdited ||
-		e.AssigneesEdited ||
-		e.LabelsEdited ||
-		e.ProjectsEdited ||
-		e.MilestoneEdited
+	return e.Title.Edited ||
+		e.Body.Edited ||
+		e.Reviewers.Edited ||
+		e.Assignees.Edited ||
+		e.Labels.Edited ||
+		e.Projects.Edited ||
+		e.Milestone.Edited
 }
 
-func (e Editable) TitleParam() *githubv4.String {
-	if !e.TitleEdited {
+func (e Editable) TitleValue() *string {
+	if !e.Title.Edited {
 		return nil
 	}
-	s := githubv4.String(e.Title)
-	return &s
+	return &e.Title.Value
 }
 
-func (e Editable) BodyParam() *githubv4.String {
-	if !e.BodyEdited {
+func (e Editable) BodyValue() *string {
+	if !e.Body.Edited {
 		return nil
 	}
-	s := githubv4.String(e.Body)
-	return &s
+	return &e.Body.Value
 }
 
-func (e Editable) ReviewersParams() (*[]githubv4.ID, *[]githubv4.ID, error) {
-	if !e.ReviewersEdited {
+func (e Editable) ReviewerIds() (*[]string, *[]string, error) {
+	if !e.Reviewers.Edited {
 		return nil, nil, nil
+	}
+	if len(e.Reviewers.Add) != 0 || len(e.Reviewers.Remove) != 0 {
+		s := set.NewStringSet()
+		s.AddValues(e.Reviewers.Default)
+		s.AddValues(e.Reviewers.Add)
+		s.RemoveValues(e.Reviewers.Remove)
+		e.Reviewers.Value = s.ToSlice()
 	}
 	var userReviewers []string
 	var teamReviewers []string
-	for _, r := range e.Reviewers {
+	for _, r := range e.Reviewers.Value {
 		if strings.ContainsRune(r, '/') {
 			teamReviewers = append(teamReviewers, r)
 		} else {
 			userReviewers = append(userReviewers, r)
 		}
 	}
-	userIds, err := toParams(userReviewers, e.Metadata.MembersToIDs)
+	userIds, err := e.Metadata.MembersToIDs(userReviewers)
 	if err != nil {
 		return nil, nil, err
 	}
-	teamIds, err := toParams(teamReviewers, e.Metadata.TeamsToIDs)
+	teamIds, err := e.Metadata.TeamsToIDs(teamReviewers)
 	if err != nil {
 		return nil, nil, err
 	}
-	return userIds, teamIds, nil
+	return &userIds, &teamIds, nil
 }
 
-func (e Editable) AssigneesParam(client *api.Client, repo ghrepo.Interface) (*[]githubv4.ID, error) {
-	if !e.AssigneesEdited {
+func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]string, error) {
+	if !e.Assignees.Edited {
 		return nil, nil
 	}
-	meReplacer := NewMeReplacer(client, repo.RepoHost())
-	assignees, err := meReplacer.ReplaceSlice(e.Assignees)
-	if err != nil {
-		return nil, err
+	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
+		meReplacer := NewMeReplacer(client, repo.RepoHost())
+		s := set.NewStringSet()
+		s.AddValues(e.Assignees.Default)
+		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
+		if err != nil {
+			return nil, err
+		}
+		s.AddValues(add)
+		remove, err := meReplacer.ReplaceSlice(e.Assignees.Remove)
+		if err != nil {
+			return nil, err
+		}
+		s.RemoveValues(remove)
+		e.Assignees.Value = s.ToSlice()
 	}
-	return toParams(assignees, e.Metadata.MembersToIDs)
+	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
+	return &a, err
 }
 
-func (e Editable) LabelsParam() (*[]githubv4.ID, error) {
-	if !e.LabelsEdited {
+func (e Editable) LabelIds() (*[]string, error) {
+	if !e.Labels.Edited {
 		return nil, nil
 	}
-	return toParams(e.Labels, e.Metadata.LabelsToIDs)
+	if len(e.Labels.Add) != 0 || len(e.Labels.Remove) != 0 {
+		s := set.NewStringSet()
+		s.AddValues(e.Labels.Default)
+		s.AddValues(e.Labels.Add)
+		s.RemoveValues(e.Labels.Remove)
+		e.Labels.Value = s.ToSlice()
+	}
+	l, err := e.Metadata.LabelsToIDs(e.Labels.Value)
+	return &l, err
 }
 
-func (e Editable) ProjectsParam() (*[]githubv4.ID, error) {
-	if !e.ProjectsEdited {
+func (e Editable) ProjectIds() (*[]string, error) {
+	if !e.Projects.Edited {
 		return nil, nil
 	}
-	return toParams(e.Projects, e.Metadata.ProjectsToIDs)
+	if len(e.Projects.Add) != 0 || len(e.Projects.Remove) != 0 {
+		s := set.NewStringSet()
+		s.AddValues(e.Projects.Default)
+		s.AddValues(e.Projects.Add)
+		s.RemoveValues(e.Projects.Remove)
+		e.Projects.Value = s.ToSlice()
+	}
+	p, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
+	return &p, err
 }
 
-func (e Editable) MilestoneParam() (*githubv4.ID, error) {
-	if !e.MilestoneEdited {
+func (e Editable) MilestoneId() (*string, error) {
+	if !e.Milestone.Edited {
 		return nil, nil
 	}
-	if e.Milestone == noMilestone || e.Milestone == "" {
-		return githubv4.NewID(nil), nil
+	if e.Milestone.Value == noMilestone || e.Milestone.Value == "" {
+		s := ""
+		return &s, nil
 	}
-	return toParam(e.Milestone, e.Metadata.MilestoneToID)
+	m, err := e.Metadata.MilestoneToID(e.Milestone.Value)
+	return &m, err
 }
 
 func EditFieldsSurvey(editable *Editable, editorCommand string) error {
 	var err error
-	if editable.TitleEdited {
-		editable.Title, err = titleSurvey(editable.TitleDefault)
+	if editable.Title.Edited {
+		editable.Title.Value, err = titleSurvey(editable.Title.Default)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.BodyEdited {
-		editable.Body, err = bodySurvey(editable.BodyDefault, editorCommand)
+	if editable.Body.Edited {
+		editable.Body.Value, err = bodySurvey(editable.Body.Default, editorCommand)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.ReviewersEdited {
-		editable.Reviewers, err = reviewersSurvey(editable.ReviewersDefault, editable.ReviewersOptions)
+	if editable.Reviewers.Edited {
+		editable.Reviewers.Value, err = multiSelectSurvey("Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.AssigneesEdited {
-		editable.Assignees, err = assigneesSurvey(editable.AssigneesDefault, editable.AssigneesOptions)
+	if editable.Assignees.Edited {
+		editable.Assignees.Value, err = multiSelectSurvey("Assignees", editable.Assignees.Default, editable.Assignees.Options)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.LabelsEdited {
-		editable.Labels, err = labelsSurvey(editable.LabelsDefault, editable.LabelsOptions)
+	if editable.Labels.Edited {
+		editable.Labels.Value, err = multiSelectSurvey("Labels", editable.Labels.Default, editable.Labels.Options)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.ProjectsEdited {
-		editable.Projects, err = projectsSurvey(editable.ProjectsDefault, editable.ProjectsOptions)
+	if editable.Projects.Edited {
+		editable.Projects.Value, err = multiSelectSurvey("Projects", editable.Projects.Default, editable.Projects.Options)
 		if err != nil {
 			return err
 		}
 	}
-	if editable.MilestoneEdited {
-		editable.Milestone, err = milestoneSurvey(editable.MilestoneDefault, editable.MilestoneOptions)
+	if editable.Milestone.Edited {
+		editable.Milestone.Value, err = milestoneSurvey(editable.Milestone.Default, editable.Milestone.Options)
 		if err != nil {
 			return err
 		}
@@ -200,41 +225,36 @@ func FieldsToEditSurvey(editable *Editable) error {
 		return false
 	}
 
-	results := []string{}
 	opts := []string{"Title", "Body"}
-	if editable.ReviewersAllowed {
+	if editable.Reviewers.Allowed {
 		opts = append(opts, "Reviewers")
 	}
 	opts = append(opts, "Assignees", "Labels", "Projects", "Milestone")
-	q := &survey.MultiSelect{
-		Message: "What would you like to edit?",
-		Options: opts,
-	}
-	err := survey.AskOne(q, &results)
+	results, err := multiSelectSurvey("What would you like to edit?", []string{}, opts)
 	if err != nil {
 		return err
 	}
 
 	if contains(results, "Title") {
-		editable.TitleEdited = true
+		editable.Title.Edited = true
 	}
 	if contains(results, "Body") {
-		editable.BodyEdited = true
+		editable.Body.Edited = true
 	}
 	if contains(results, "Reviewers") {
-		editable.ReviewersEdited = true
+		editable.Reviewers.Edited = true
 	}
 	if contains(results, "Assignees") {
-		editable.AssigneesEdited = true
+		editable.Assignees.Edited = true
 	}
 	if contains(results, "Labels") {
-		editable.LabelsEdited = true
+		editable.Labels.Edited = true
 	}
 	if contains(results, "Projects") {
-		editable.ProjectsEdited = true
+		editable.Projects.Edited = true
 	}
 	if contains(results, "Milestone") {
-		editable.MilestoneEdited = true
+		editable.Milestone.Edited = true
 	}
 
 	return nil
@@ -242,11 +262,11 @@ func FieldsToEditSurvey(editable *Editable) error {
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
 	input := api.RepoMetadataInput{
-		Reviewers:  editable.ReviewersEdited,
-		Assignees:  editable.AssigneesEdited,
-		Labels:     editable.LabelsEdited,
-		Projects:   editable.ProjectsEdited,
-		Milestones: editable.MilestoneEdited,
+		Reviewers:  editable.Reviewers.Edited,
+		Assignees:  editable.Assignees.Edited,
+		Labels:     editable.Labels.Edited,
+		Projects:   editable.Projects.Edited,
+		Milestones: editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
 	if err != nil {
@@ -275,11 +295,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 	}
 
 	editable.Metadata = *metadata
-	editable.ReviewersOptions = append(users, teams...)
-	editable.AssigneesOptions = users
-	editable.LabelsOptions = labels
-	editable.ProjectsOptions = projects
-	editable.MilestoneOptions = milestones
+	editable.Reviewers.Options = append(users, teams...)
+	editable.Assignees.Options = users
+	editable.Labels.Options = labels
+	editable.Projects.Options = projects
+	editable.Milestone.Options = milestones
 
 	return nil
 }
@@ -297,9 +317,9 @@ func titleSurvey(title string) (string, error) {
 func bodySurvey(body, editorCommand string) (string, error) {
 	var result string
 	q := &surveyext.GhEditor{
-		BlankAllowed:  true,
 		EditorCommand: editorCommand,
-		Editor: &survey.Editor{Message: "Body",
+		Editor: &survey.Editor{
+			Message:       "Body",
 			FileName:      "*.md",
 			Default:       body,
 			HideDefault:   true,
@@ -310,79 +330,21 @@ func bodySurvey(body, editorCommand string) (string, error) {
 	return result, err
 }
 
-func reviewersSurvey(reviewers api.ReviewRequests, opts []string) ([]string, error) {
-	if len(opts) == 0 {
+func multiSelectSurvey(message string, defaults, options []string) ([]string, error) {
+	if len(options) == 0 {
 		return nil, nil
-	}
-	logins := []string{}
-	for _, a := range reviewers.Nodes {
-		logins = append(logins, a.RequestedReviewer.Login)
 	}
 	var results []string
 	q := &survey.MultiSelect{
-		Message: "Reviewers",
-		Options: opts,
-		Default: logins,
+		Message: message,
+		Options: options,
+		Default: defaults,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err
 }
 
-func assigneesSurvey(assignees api.Assignees, opts []string) ([]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	logins := []string{}
-	for _, a := range assignees.Nodes {
-		logins = append(logins, a.Login)
-	}
-	var results []string
-	q := &survey.MultiSelect{
-		Message: "Assignees",
-		Options: opts,
-		Default: logins,
-	}
-	err := survey.AskOne(q, &results)
-	return results, err
-}
-
-func labelsSurvey(labels api.Labels, opts []string) ([]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	names := []string{}
-	for _, l := range labels.Nodes {
-		names = append(names, l.Name)
-	}
-	var results []string
-	q := &survey.MultiSelect{
-		Message: "Labels",
-		Options: opts,
-		Default: names,
-	}
-	err := survey.AskOne(q, &results)
-	return results, err
-}
-
-func projectsSurvey(projectCards api.ProjectCards, opts []string) ([]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	names := []string{}
-	for _, c := range projectCards.Nodes {
-		names = append(names, c.Project.Name)
-	}
-	var results []string
-	q := &survey.MultiSelect{
-		Message: "Projects",
-		Options: opts,
-		Default: names,
-	}
-	err := survey.AskOne(q, &results)
-	return results, err
-}
-
-func milestoneSurvey(milestone api.Milestone, opts []string) (string, error) {
+func milestoneSurvey(title string, opts []string) (string, error) {
 	if len(opts) == 0 {
 		return "", nil
 	}
@@ -390,7 +352,7 @@ func milestoneSurvey(milestone api.Milestone, opts []string) (string, error) {
 	q := &survey.Select{
 		Message: "Milestone",
 		Options: opts,
-		Default: milestone.Title,
+		Default: title,
 	}
 	err := survey.AskOne(q, &result)
 	return result, err
@@ -404,25 +366,4 @@ func confirmSurvey() (bool, error) {
 	}
 	err := survey.AskOne(q, &result)
 	return result, err
-}
-
-func toParams(s []string, mapper func([]string) ([]string, error)) (*[]githubv4.ID, error) {
-	ids, err := mapper(s)
-	if err != nil {
-		return nil, err
-	}
-	gIds := make([]githubv4.ID, len(ids))
-	for i, v := range ids {
-		gIds[i] = v
-	}
-	return &gIds, nil
-}
-
-func toParam(s string, mapper func(string) (string, error)) (*githubv4.ID, error) {
-	id, err := mapper(s)
-	if err != nil {
-		return nil, err
-	}
-	gId := githubv4.ID(id)
-	return &gId, nil
 }

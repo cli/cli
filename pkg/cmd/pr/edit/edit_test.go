@@ -29,7 +29,7 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:  "issue number argument",
+			name:  "pull request number argument",
 			input: "23",
 			output: EditOptions{
 				SelectorArg: "23",
@@ -43,8 +43,10 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Title:       "test",
-					TitleEdited: true,
+					Title: shared.EditableString{
+						Value:  "test",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -55,56 +57,122 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Body:       "test",
-					BodyEdited: true,
+					Body: shared.EditableString{
+						Value:  "test",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "reviewer flag",
-			input: "23 --reviewer owner/team,monalisa",
+			name:  "add-reviewer flag",
+			input: "23 --add-reviewer monalisa,owner/core",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Reviewers:       []string{"owner/team", "monalisa"},
-					ReviewersEdited: true,
+					Reviewers: shared.EditableSlice{
+						Add:    []string{"monalisa", "owner/core"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "assignee flag",
-			input: "23 --assignee monalisa,hubot",
+			name:  "remove-reviewer flag",
+			input: "23 --remove-reviewer monalisa,owner/core",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Assignees:       []string{"monalisa", "hubot"},
-					AssigneesEdited: true,
+					Reviewers: shared.EditableSlice{
+						Remove: []string{"monalisa", "owner/core"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "label flag",
-			input: "23 --label feature,TODO,bug",
+			name:  "add-assignee flag",
+			input: "23 --add-assignee monalisa,hubot",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Labels:       []string{"feature", "TODO", "bug"},
-					LabelsEdited: true,
+					Assignees: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "project flag",
-			input: "23 --project Cleanup,Roadmap",
+			name:  "remove-assignee flag",
+			input: "23 --remove-assignee monalisa,hubot",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Projects:       []string{"Cleanup", "Roadmap"},
-					ProjectsEdited: true,
+					Assignees: shared.EditableSlice{
+						Remove: []string{"monalisa", "hubot"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "add-label flag",
+			input: "23 --add-label feature,TODO,bug",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Labels: shared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "remove-label flag",
+			input: "23 --remove-label feature,TODO,bug",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Labels: shared.EditableSlice{
+						Remove: []string{"feature", "TODO", "bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "add-project flag",
+			input: "23 --add-project Cleanup,Roadmap",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Projects: shared.EditableSlice{
+						Add:    []string{"Cleanup", "Roadmap"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "remove-project flag",
+			input: "23 --remove-project Cleanup,Roadmap",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Projects: shared.EditableSlice{
+						Remove: []string{"Cleanup", "Roadmap"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -115,8 +183,10 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Milestone:       "GA",
-					MilestoneEdited: true,
+					Milestone: shared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -176,20 +246,38 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Interactive: false,
 				Editable: shared.Editable{
-					Title:           "new title",
-					TitleEdited:     true,
-					Body:            "new body",
-					BodyEdited:      true,
-					Reviewers:       []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
-					ReviewersEdited: true,
-					Assignees:       []string{"monalisa", "hubot"},
-					AssigneesEdited: true,
-					Labels:          []string{"feature", "TODO", "bug"},
-					LabelsEdited:    true,
-					Projects:        []string{"Cleanup", "Roadmap"},
-					ProjectsEdited:  true,
-					Milestone:       "GA",
-					MilestoneEdited: true,
+					Title: shared.EditableString{
+						Value:  "new title",
+						Edited: true,
+					},
+					Body: shared.EditableString{
+						Value:  "new body",
+						Edited: true,
+					},
+					Reviewers: shared.EditableSlice{
+						Add:    []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
+						Remove: []string{"dependabot"},
+						Edited: true,
+					},
+					Assignees: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: shared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: shared.EditableSlice{
+						Add:    []string{"Cleanup", "Roadmap"},
+						Remove: []string{"Features"},
+						Edited: true,
+					},
+					Milestone: shared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
 				},
 				Fetcher: testFetcher{},
 			},
@@ -207,18 +295,33 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Interactive: false,
 				Editable: shared.Editable{
-					Title:           "new title",
-					TitleEdited:     true,
-					Body:            "new body",
-					BodyEdited:      true,
-					Assignees:       []string{"monalisa", "hubot"},
-					AssigneesEdited: true,
-					Labels:          []string{"feature", "TODO", "bug"},
-					LabelsEdited:    true,
-					Projects:        []string{"Cleanup", "Roadmap"},
-					ProjectsEdited:  true,
-					Milestone:       "GA",
-					MilestoneEdited: true,
+					Title: shared.EditableString{
+						Value:  "new title",
+						Edited: true,
+					},
+					Body: shared.EditableString{
+						Value:  "new body",
+						Edited: true,
+					},
+					Assignees: shared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: shared.EditableSlice{
+						Value:  []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: shared.EditableSlice{
+						Value:  []string{"Cleanup", "Roadmap"},
+						Remove: []string{"Features"},
+						Edited: true,
+					},
+					Milestone: shared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
 				},
 				Fetcher: testFetcher{},
 			},
@@ -405,28 +508,28 @@ func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interf
 }
 
 func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {
-	e.TitleEdited = true
-	e.BodyEdited = true
+	e.Title.Edited = true
+	e.Body.Edited = true
 	if !s.skipReviewers {
-		e.ReviewersEdited = true
+		e.Reviewers.Edited = true
 	}
-	e.AssigneesEdited = true
-	e.LabelsEdited = true
-	e.ProjectsEdited = true
-	e.MilestoneEdited = true
+	e.Assignees.Edited = true
+	e.Labels.Edited = true
+	e.Projects.Edited = true
+	e.Milestone.Edited = true
 	return nil
 }
 
 func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
-	e.Title = "new title"
-	e.Body = "new body"
+	e.Title.Value = "new title"
+	e.Body.Value = "new body"
 	if !s.skipReviewers {
-		e.Reviewers = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+		e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
 	}
-	e.Assignees = []string{"monalisa", "hubot"}
-	e.Labels = []string{"feature", "TODO", "bug"}
-	e.Projects = []string{"Cleanup", "Roadmap"}
-	e.Milestone = "GA"
+	e.Assignees.Value = []string{"monalisa", "hubot"}
+	e.Labels.Value = []string{"feature", "TODO", "bug"}
+	e.Projects.Value = []string{"Cleanup", "Roadmap"}
+	e.Milestone.Value = "GA"
 	return nil
 }
 

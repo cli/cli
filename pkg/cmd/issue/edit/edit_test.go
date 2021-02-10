@@ -42,8 +42,10 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Title:       "test",
-					TitleEdited: true,
+					Title: prShared.EditableString{
+						Value:  "test",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -54,44 +56,94 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Body:       "test",
-					BodyEdited: true,
+					Body: prShared.EditableString{
+						Value:  "test",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "assignee flag",
-			input: "23 --assignee monalisa,hubot",
+			name:  "add-assignee flag",
+			input: "23 --add-assignee monalisa,hubot",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Assignees:       []string{"monalisa", "hubot"},
-					AssigneesEdited: true,
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "label flag",
-			input: "23 --label feature,TODO,bug",
+			name:  "remove-assignee flag",
+			input: "23 --remove-assignee monalisa,hubot",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Labels:       []string{"feature", "TODO", "bug"},
-					LabelsEdited: true,
+					Assignees: prShared.EditableSlice{
+						Remove: []string{"monalisa", "hubot"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
 		},
 		{
-			name:  "project flag",
-			input: "23 --project Cleanup,Roadmap",
+			name:  "add-label flag",
+			input: "23 --add-label feature,TODO,bug",
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Projects:       []string{"Cleanup", "Roadmap"},
-					ProjectsEdited: true,
+					Labels: prShared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "remove-label flag",
+			input: "23 --remove-label feature,TODO,bug",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: prShared.Editable{
+					Labels: prShared.EditableSlice{
+						Remove: []string{"feature", "TODO", "bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "add-project flag",
+			input: "23 --add-project Cleanup,Roadmap",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: prShared.Editable{
+					Projects: prShared.EditableSlice{
+						Add:    []string{"Cleanup", "Roadmap"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "remove-project flag",
+			input: "23 --remove-project Cleanup,Roadmap",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: prShared.Editable{
+					Projects: prShared.EditableSlice{
+						Remove: []string{"Cleanup", "Roadmap"},
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -102,8 +154,10 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Milestone:       "GA",
-					MilestoneEdited: true,
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
 				},
 			},
 			wantsErr: false,
@@ -163,18 +217,33 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Interactive: false,
 				Editable: prShared.Editable{
-					Title:           "new title",
-					TitleEdited:     true,
-					Body:            "new body",
-					BodyEdited:      true,
-					Assignees:       []string{"monalisa", "hubot"},
-					AssigneesEdited: true,
-					Labels:          []string{"feature", "TODO", "bug"},
-					LabelsEdited:    true,
-					Projects:        []string{"Cleanup", "Roadmap"},
-					ProjectsEdited:  true,
-					Milestone:       "GA",
-					MilestoneEdited: true,
+					Title: prShared.EditableString{
+						Value:  "new title",
+						Edited: true,
+					},
+					Body: prShared.EditableString{
+						Value:  "new body",
+						Edited: true,
+					},
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: prShared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: prShared.EditableSlice{
+						Add:    []string{"Cleanup", "Roadmap"},
+						Remove: []string{"Features"},
+						Edited: true,
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -191,21 +260,21 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Interactive: true,
 				FieldsToEditSurvey: func(eo *prShared.Editable) error {
-					eo.TitleEdited = true
-					eo.BodyEdited = true
-					eo.AssigneesEdited = true
-					eo.LabelsEdited = true
-					eo.ProjectsEdited = true
-					eo.MilestoneEdited = true
+					eo.Title.Edited = true
+					eo.Body.Edited = true
+					eo.Assignees.Edited = true
+					eo.Labels.Edited = true
+					eo.Projects.Edited = true
+					eo.Milestone.Edited = true
 					return nil
 				},
 				EditFieldsSurvey: func(eo *prShared.Editable, _ string) error {
-					eo.Title = "new title"
-					eo.Body = "new body"
-					eo.Assignees = []string{"monalisa", "hubot"}
-					eo.Labels = []string{"feature", "TODO", "bug"}
-					eo.Projects = []string{"Cleanup", "Roadmap"}
-					eo.Milestone = "GA"
+					eo.Title.Value = "new title"
+					eo.Body.Value = "new body"
+					eo.Assignees.Value = []string{"monalisa", "hubot"}
+					eo.Labels.Value = []string{"feature", "TODO", "bug"}
+					eo.Projects.Value = []string{"Cleanup", "Roadmap"}
+					eo.Milestone.Value = "GA"
 					return nil
 				},
 				FetchOptions:    prShared.FetchOptions,
