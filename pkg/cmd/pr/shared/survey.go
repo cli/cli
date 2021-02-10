@@ -74,6 +74,7 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
+// Deprecated: use SelectTemplate instead
 func TemplateSurvey(templateFiles []string, legacyTemplate string, state IssueMetadataState) (templateContent string, err error) {
 	if len(templateFiles) == 0 && legacyTemplate == "" {
 		return

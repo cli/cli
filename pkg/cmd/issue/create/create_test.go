@@ -204,6 +204,16 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			} } }`),
 	)
 	http.Register(
+		httpmock.GraphQL(`query IssueTemplates\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "issueTemplates": [
+				{ "name": "Bug report",
+				  "body": "Does not work :((" },
+				{ "name": "Submit a request",
+				  "body": "I have a suggestion for an enhancement" }
+			] } } }`),
+	)
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 			{ "data": { "createIssue": { "issue": {
@@ -220,12 +230,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	defer teardown()
 
 	// template
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "index",
-			Value: 1,
-		},
-	})
+	as.StubOne(1)
 	// body
 	as.Stub([]*prompt.QuestionStub{
 		{
@@ -283,7 +288,6 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
@@ -416,7 +420,6 @@ func TestIssueCreate_web(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", url)
@@ -438,7 +441,6 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
@@ -469,7 +471,6 @@ func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", url)
@@ -565,7 +566,6 @@ func TestIssueCreate_webProject(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
 	cs.Register(`https://github\.com`, 0, "", func(args []string) {
 		url := strings.ReplaceAll(args[len(args)-1], "^", "")
 		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", url)
