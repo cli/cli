@@ -116,6 +116,9 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 			    }
 			  }
 			'
+			
+			$ etag="$(gh api -i https://api.github.com/users/defunkt | grep -i ^etag: | cut -d: -f2)"
+			$ gh api -i https://api.github.com/users/defunkt -H "If-None-Match:$etag"
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
