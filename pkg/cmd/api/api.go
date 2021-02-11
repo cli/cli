@@ -55,44 +55,57 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
 		Short: "Make an authenticated GitHub API request",
-		Long: `Makes an authenticated HTTP request to the GitHub API and prints the response.
+		Long: heredoc.Docf(`
+			Makes an authenticated HTTP request to the GitHub API and prints the response.
 
-The endpoint argument should either be a path of a GitHub API v3 endpoint, or
-"graphql" to access the GitHub API v4.
+			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
+			"graphql" to access the GitHub API v4.
 
-Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
-get replaced with values from the repository of the current directory.
+			Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
+			get replaced with values from the repository of the current directory.
 
-The default HTTP request method is "GET" normally and "POST" if any parameters
-were added. Override the method with '--method'.
+			The default HTTP request method is "GET" normally and "POST" if any parameters
+			were added. Override the method with %[1]s--method%[1]s.
 
-Pass one or more '--raw-field' values in "key=value" format to add
-JSON-encoded string parameters to the POST body.
+			Pass one or more %[1]s--raw-field%[1]s values in "key=value" format to add
+			JSON-encoded string parameters to the POST body.
 
-The '--field' flag behaves like '--raw-field' with magic type conversion based
-on the format of the value:
+			The %[1]s--field%[1]s flag behaves like %[1]s--raw-field%[1]s with magic type conversion based
+			on the format of the value:
 
-- literal values "true", "false", "null", and integer numbers get converted to
-  appropriate JSON types;
-- placeholder values ":owner", ":repo", and ":branch" get populated with values
-  from the repository of the current directory;
-- if the value starts with "@", the rest of the value is interpreted as a
-  filename to read the value from. Pass "-" to read from standard input.
+			- literal values "true", "false", "null", and integer numbers get converted to
+			  appropriate JSON types;
+			- placeholder values ":owner", ":repo", and ":branch" get populated with values
+			  from the repository of the current directory;
+			- if the value starts with "@", the rest of the value is interpreted as a
+			  filename to read the value from. Pass "-" to read from standard input.
 
-For GraphQL requests, all fields other than "query" and "operationName" are
-interpreted as GraphQL variables.
+			For GraphQL requests, all fields other than "query" and "operationName" are
+			interpreted as GraphQL variables.
 
-Raw request body may be passed from the outside via a file specified by '--input'.
-Pass "-" to read from standard input. In this mode, parameters specified via
-'--field' flags are serialized into URL query parameters.
+			Raw request body may be passed from the outside via a file specified by %[1]s--input%[1]s.
+			Pass "-" to read from standard input. In this mode, parameters specified via
+			%[1]s--field%[1]s flags are serialized into URL query parameters.
 
-In '--paginate' mode, all pages of results will sequentially be requested until
-there are no more pages of results. For GraphQL requests, this requires that the
-original query accepts an '$endCursor: String' variable and that it fetches the
-'pageInfo{ hasNextPage, endCursor }' set of fields from a collection.`,
+			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
+			there are no more pages of results. For GraphQL requests, this requires that the
+			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
+			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
+		`, "`"),
 		Example: heredoc.Doc(`
+			# list releases in the current repository
 			$ gh api repos/:owner/:repo/releases
 
+			# post an issue comment
+			$ gh api repos/:owner/:repo/issues/123/comments -f body='Hi from CLI'
+
+			# add parameters to a GET request
+			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
+
+			# set a custom HTTP header
+			$ gh api -H 'Accept: application/vnd.github.XYZ-preview+json' ...
+
+			# list releases with GraphQL
 			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
 			  query($name: String!, $owner: String!) {
 			    repository(owner: $owner, name: $name) {
@@ -103,6 +116,7 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 			  }
 			'
 
+			# list all repositories for a user
 			$ gh api graphql --paginate -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -119,9 +133,11 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
-				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for github.com API requests.
+				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for
+				github.com API requests.
 
-				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication token for API requests to GitHub Enterprise.
+				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an
+				authentication token for API requests to GitHub Enterprise.
 
 				GH_HOST: make the request to a GitHub host other than github.com.
 			`),
@@ -153,12 +169,12 @@ original query accepts an '$endCursor: String' variable and that it fetches the
 
 	cmd.Flags().StringVar(&opts.Hostname, "hostname", "", "The GitHub hostname for the request (default \"github.com\")")
 	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
-	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a parameter of inferred type")
-	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an additional HTTP request header")
+	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in `key=value` format")
+	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
+	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	return cmd
 }
