@@ -227,6 +227,16 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.Approved {
 				fmt.Fprint(w, cs.Green("✓ Approved"))
 			}
+
+			// add padding between reviews & merge status
+			fmt.Fprint(w, " ")
+
+			if pr.MergeStateStatus == "BEHIND" {
+				fmt.Fprint(w, cs.Yellow("- Not up to date"))
+			} else {
+				fmt.Fprint(w, cs.Green("✓ Up to date"))
+			}
+
 		} else {
 			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(cs, pr))
 		}
