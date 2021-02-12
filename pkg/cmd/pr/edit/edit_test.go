@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
+	shared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -41,7 +42,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --title test",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Title:       "test",
 					TitleEdited: true,
 				},
@@ -53,9 +54,21 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --body test",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Body:       "test",
 					BodyEdited: true,
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "reviewer flag",
+			input: "23 --reviewer owner/team,monalisa",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Reviewers:       []string{"owner/team", "monalisa"},
+					ReviewersEdited: true,
 				},
 			},
 			wantsErr: false,
@@ -65,7 +78,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --assignee monalisa,hubot",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Assignees:       []string{"monalisa", "hubot"},
 					AssigneesEdited: true,
 				},
@@ -77,7 +90,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --label feature,TODO,bug",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Labels:       []string{"feature", "TODO", "bug"},
 					LabelsEdited: true,
 				},
@@ -89,7 +102,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --project Cleanup,Roadmap",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Projects:       []string{"Cleanup", "Roadmap"},
 					ProjectsEdited: true,
 				},
@@ -101,7 +114,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --milestone GA",
 			output: EditOptions{
 				SelectorArg: "23",
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
 					Milestone:       "GA",
 					MilestoneEdited: true,
 				},
@@ -162,7 +175,38 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				SelectorArg: "123",
 				Interactive: false,
-				Editable: prShared.Editable{
+				Editable: shared.Editable{
+					Title:           "new title",
+					TitleEdited:     true,
+					Body:            "new body",
+					BodyEdited:      true,
+					Reviewers:       []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
+					ReviewersEdited: true,
+					Assignees:       []string{"monalisa", "hubot"},
+					AssigneesEdited: true,
+					Labels:          []string{"feature", "TODO", "bug"},
+					LabelsEdited:    true,
+					Projects:        []string{"Cleanup", "Roadmap"},
+					ProjectsEdited:  true,
+					Milestone:       "GA",
+					MilestoneEdited: true,
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockPullRequestGet(t, reg)
+				mockRepoMetadata(t, reg, false)
+				mockPullRequestUpdate(t, reg)
+				mockPullRequestReviewersUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "non-interactive skip reviewers",
+			input: &EditOptions{
+				SelectorArg: "123",
+				Interactive: false,
+				Editable: shared.Editable{
 					Title:           "new title",
 					TitleEdited:     true,
 					Body:            "new body",
@@ -176,47 +220,47 @@ func Test_editRun(t *testing.T) {
 					Milestone:       "GA",
 					MilestoneEdited: true,
 				},
-				FetchOptions: prShared.FetchOptions,
+				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-				mockRepoMetadata(t, reg)
-				mockIssueUpdate(t, reg)
+				mockPullRequestGet(t, reg)
+				mockRepoMetadata(t, reg, true)
+				mockPullRequestUpdate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
 			name: "interactive",
 			input: &EditOptions{
-				SelectorArg: "123",
-				Interactive: true,
-				FieldsToEditSurvey: func(eo *prShared.Editable) error {
-					eo.TitleEdited = true
-					eo.BodyEdited = true
-					eo.AssigneesEdited = true
-					eo.LabelsEdited = true
-					eo.ProjectsEdited = true
-					eo.MilestoneEdited = true
-					return nil
-				},
-				EditFieldsSurvey: func(eo *prShared.Editable, _ string) error {
-					eo.Title = "new title"
-					eo.Body = "new body"
-					eo.Assignees = []string{"monalisa", "hubot"}
-					eo.Labels = []string{"feature", "TODO", "bug"}
-					eo.Projects = []string{"Cleanup", "Roadmap"}
-					eo.Milestone = "GA"
-					return nil
-				},
-				FetchOptions:    prShared.FetchOptions,
-				DetermineEditor: func() (string, error) { return "vim", nil },
+				SelectorArg:     "123",
+				Interactive:     true,
+				Surveyor:        testSurveyor{},
+				Fetcher:         testFetcher{},
+				EditorRetriever: testEditorRetriever{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-				mockRepoMetadata(t, reg)
-				mockIssueUpdate(t, reg)
+				mockPullRequestGet(t, reg)
+				mockRepoMetadata(t, reg, false)
+				mockPullRequestUpdate(t, reg)
+				mockPullRequestReviewersUpdate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "interactive skip reviewers",
+			input: &EditOptions{
+				SelectorArg:     "123",
+				Interactive:     true,
+				Surveyor:        testSurveyor{skipReviewers: true},
+				Fetcher:         testFetcher{},
+				EditorRetriever: testEditorRetriever{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockPullRequestGet(t, reg)
+				mockRepoMetadata(t, reg, true)
+				mockPullRequestUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 	}
 	for _, tt := range tests {
@@ -245,18 +289,19 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
+func mockPullRequestGet(_ *testing.T, reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+			{ "data": { "repository": { "pullRequest": {
+				"id": "456",
 				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issue/123"
+				"url": "https://github.com/OWNER/REPO/pull/123"
 			} } } }`),
 	)
 }
 
-func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
+func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
@@ -312,15 +357,79 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	if !skipReviewers {
+		reg.Register(
+			httpmock.GraphQL(`query OrganizationTeamList\b`),
+			httpmock.StringResponse(`
+		{ "data": { "organization": { "teams": {
+			"nodes": [
+				{ "slug": "external", "id": "EXTERNALID" },
+				{ "slug": "core", "id": "COREID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	}
 }
 
-func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockPullRequestUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.GraphQL(`mutation IssueUpdate\b`),
+		httpmock.GraphQL(`mutation PullRequestUpdate\b`),
 		httpmock.GraphQLMutation(`
-				{ "data": { "updateIssue": { "issue": {
-					"id": "123"
+				{ "data": { "updatePullRequest": { "pullRequest": {
+					"id": "456"
 				} } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
+}
+
+func mockPullRequestReviewersUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
+		httpmock.GraphQLMutation(`
+				{ "data": { "requestReviews": { "pullRequest": {
+					"id": "456"
+				} } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+type testFetcher struct{}
+type testSurveyor struct {
+	skipReviewers bool
+}
+type testEditorRetriever struct{}
+
+func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
+	return shared.FetchOptions(client, repo, opts)
+}
+
+func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {
+	e.TitleEdited = true
+	e.BodyEdited = true
+	if !s.skipReviewers {
+		e.ReviewersEdited = true
+	}
+	e.AssigneesEdited = true
+	e.LabelsEdited = true
+	e.ProjectsEdited = true
+	e.MilestoneEdited = true
+	return nil
+}
+
+func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
+	e.Title = "new title"
+	e.Body = "new body"
+	if !s.skipReviewers {
+		e.Reviewers = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+	}
+	e.Assignees = []string{"monalisa", "hubot"}
+	e.Labels = []string{"feature", "TODO", "bug"}
+	e.Projects = []string{"Cleanup", "Roadmap"}
+	e.Milestone = "GA"
+	return nil
+}
+
+func (t testEditorRetriever) Retrieve() (string, error) {
+	return "vim", nil
 }

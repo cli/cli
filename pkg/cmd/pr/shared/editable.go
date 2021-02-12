@@ -2,14 +2,16 @@ package shared
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/surveyext"
+	"github.com/shurcooL/githubv4"
 )
 
-type EditableOptions struct {
+type Editable struct {
 	Title        string
 	TitleDefault string
 	TitleEdited  bool
@@ -47,7 +49,7 @@ type EditableOptions struct {
 	Metadata api.RepoMetadataResult
 }
 
-func (e EditableOptions) Dirty() bool {
+func (e Editable) Dirty() bool {
 	return e.TitleEdited ||
 		e.BodyEdited ||
 		e.ReviewersEdited ||
@@ -57,48 +59,125 @@ func (e EditableOptions) Dirty() bool {
 		e.MilestoneEdited
 }
 
-func EditableSurvey(editorCommand string, options *EditableOptions) error {
-	if options.TitleEdited {
-		title, err := titleSurvey(options.TitleDefault)
-		if err != nil {
-			return err
-		}
-		options.Title = title
+func (e Editable) TitleParam() *githubv4.String {
+	if !e.TitleEdited {
+		return nil
 	}
-	if options.BodyEdited {
-		body, err := bodySurvey(options.BodyDefault, editorCommand)
-		if err != nil {
-			return err
-		}
-		options.Body = body
+	s := githubv4.String(e.Title)
+	return &s
+}
+
+func (e Editable) BodyParam() *githubv4.String {
+	if !e.BodyEdited {
+		return nil
 	}
-	if options.AssigneesEdited {
-		assignees, err := assigneesSurvey(options.AssigneesDefault, options.AssigneesOptions)
-		if err != nil {
-			return err
-		}
-		options.Assignees = assignees
+	s := githubv4.String(e.Body)
+	return &s
+}
+
+func (e Editable) ReviewersParams() (*[]githubv4.ID, *[]githubv4.ID, error) {
+	if !e.ReviewersEdited {
+		return nil, nil, nil
 	}
-	if options.LabelsEdited {
-		labels, err := labelsSurvey(options.LabelsDefault, options.LabelsOptions)
-		if err != nil {
-			return err
+	var userReviewers []string
+	var teamReviewers []string
+	for _, r := range e.Reviewers {
+		if strings.ContainsRune(r, '/') {
+			teamReviewers = append(teamReviewers, r)
+		} else {
+			userReviewers = append(userReviewers, r)
 		}
-		options.Labels = labels
 	}
-	if options.ProjectsEdited {
-		projects, err := projectsSurvey(options.ProjectsDefault, options.ProjectsOptions)
-		if err != nil {
-			return err
-		}
-		options.Projects = projects
+	userIds, err := toParams(userReviewers, e.Metadata.MembersToIDs)
+	if err != nil {
+		return nil, nil, err
 	}
-	if options.MilestoneEdited {
-		milestone, err := milestoneSurvey(options.MilestoneDefault, options.MilestoneOptions)
+	teamIds, err := toParams(teamReviewers, e.Metadata.TeamsToIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	return userIds, teamIds, nil
+}
+
+func (e Editable) AssigneesParam(client *api.Client, repo ghrepo.Interface) (*[]githubv4.ID, error) {
+	if !e.AssigneesEdited {
+		return nil, nil
+	}
+	meReplacer := NewMeReplacer(client, repo.RepoHost())
+	assignees, err := meReplacer.ReplaceSlice(e.Assignees)
+	if err != nil {
+		return nil, err
+	}
+	return toParams(assignees, e.Metadata.MembersToIDs)
+}
+
+func (e Editable) LabelsParam() (*[]githubv4.ID, error) {
+	if !e.LabelsEdited {
+		return nil, nil
+	}
+	return toParams(e.Labels, e.Metadata.LabelsToIDs)
+}
+
+func (e Editable) ProjectsParam() (*[]githubv4.ID, error) {
+	if !e.ProjectsEdited {
+		return nil, nil
+	}
+	return toParams(e.Projects, e.Metadata.ProjectsToIDs)
+}
+
+func (e Editable) MilestoneParam() (*githubv4.ID, error) {
+	if !e.MilestoneEdited {
+		return nil, nil
+	}
+	if e.Milestone == noMilestone || e.Milestone == "" {
+		return githubv4.NewID(nil), nil
+	}
+	return toParam(e.Milestone, e.Metadata.MilestoneToID)
+}
+
+func EditFieldsSurvey(editable *Editable, editorCommand string) error {
+	var err error
+	if editable.TitleEdited {
+		editable.Title, err = titleSurvey(editable.TitleDefault)
 		if err != nil {
 			return err
 		}
-		options.Milestone = milestone
+	}
+	if editable.BodyEdited {
+		editable.Body, err = bodySurvey(editable.BodyDefault, editorCommand)
+		if err != nil {
+			return err
+		}
+	}
+	if editable.ReviewersEdited {
+		editable.Reviewers, err = reviewersSurvey(editable.ReviewersDefault, editable.ReviewersOptions)
+		if err != nil {
+			return err
+		}
+	}
+	if editable.AssigneesEdited {
+		editable.Assignees, err = assigneesSurvey(editable.AssigneesDefault, editable.AssigneesOptions)
+		if err != nil {
+			return err
+		}
+	}
+	if editable.LabelsEdited {
+		editable.Labels, err = labelsSurvey(editable.LabelsDefault, editable.LabelsOptions)
+		if err != nil {
+			return err
+		}
+	}
+	if editable.ProjectsEdited {
+		editable.Projects, err = projectsSurvey(editable.ProjectsDefault, editable.ProjectsOptions)
+		if err != nil {
+			return err
+		}
+	}
+	if editable.MilestoneEdited {
+		editable.Milestone, err = milestoneSurvey(editable.MilestoneDefault, editable.MilestoneOptions)
+		if err != nil {
+			return err
+		}
 	}
 	confirm, err := confirmSurvey()
 	if err != nil {
@@ -111,7 +190,7 @@ func EditableSurvey(editorCommand string, options *EditableOptions) error {
 	return nil
 }
 
-func FieldsToEditSurvey(options *EditableOptions) error {
+func FieldsToEditSurvey(editable *Editable) error {
 	contains := func(s []string, str string) bool {
 		for _, v := range s {
 			if v == str {
@@ -123,7 +202,7 @@ func FieldsToEditSurvey(options *EditableOptions) error {
 
 	results := []string{}
 	opts := []string{"Title", "Body"}
-	if options.ReviewersAllowed {
+	if editable.ReviewersAllowed {
 		opts = append(opts, "Reviewers")
 	}
 	opts = append(opts, "Assignees", "Labels", "Projects", "Milestone")
@@ -137,37 +216,37 @@ func FieldsToEditSurvey(options *EditableOptions) error {
 	}
 
 	if contains(results, "Title") {
-		options.TitleEdited = true
+		editable.TitleEdited = true
 	}
 	if contains(results, "Body") {
-		options.BodyEdited = true
+		editable.BodyEdited = true
 	}
 	if contains(results, "Reviewers") {
-		options.ReviewersEdited = true
+		editable.ReviewersEdited = true
 	}
 	if contains(results, "Assignees") {
-		options.AssigneesEdited = true
+		editable.AssigneesEdited = true
 	}
 	if contains(results, "Labels") {
-		options.LabelsEdited = true
+		editable.LabelsEdited = true
 	}
 	if contains(results, "Projects") {
-		options.ProjectsEdited = true
+		editable.ProjectsEdited = true
 	}
 	if contains(results, "Milestone") {
-		options.MilestoneEdited = true
+		editable.MilestoneEdited = true
 	}
 
 	return nil
 }
 
-func FetchOptions(client *api.Client, repo ghrepo.Interface, options *EditableOptions) error {
+func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
 	input := api.RepoMetadataInput{
-		Reviewers:  options.ReviewersEdited,
-		Assignees:  options.AssigneesEdited,
-		Labels:     options.LabelsEdited,
-		Projects:   options.ProjectsEdited,
-		Milestones: options.MilestoneEdited,
+		Reviewers:  editable.ReviewersEdited,
+		Assignees:  editable.AssigneesEdited,
+		Labels:     editable.LabelsEdited,
+		Projects:   editable.ProjectsEdited,
+		Milestones: editable.MilestoneEdited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
 	if err != nil {
@@ -195,12 +274,12 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, options *EditableOp
 		milestones = append(milestones, m.Title)
 	}
 
-	options.Metadata = *metadata
-	options.ReviewersOptions = append(users, teams...)
-	options.AssigneesOptions = users
-	options.LabelsOptions = labels
-	options.ProjectsOptions = projects
-	options.MilestoneOptions = milestones
+	editable.Metadata = *metadata
+	editable.ReviewersOptions = append(users, teams...)
+	editable.AssigneesOptions = users
+	editable.LabelsOptions = labels
+	editable.ProjectsOptions = projects
+	editable.MilestoneOptions = milestones
 
 	return nil
 }
@@ -231,8 +310,26 @@ func bodySurvey(body, editorCommand string) (string, error) {
 	return result, err
 }
 
-func assigneesSurvey(assignees api.Assignees, assigneesOpts []string) ([]string, error) {
-	if len(assigneesOpts) == 0 {
+func reviewersSurvey(reviewers api.ReviewRequests, opts []string) ([]string, error) {
+	if len(opts) == 0 {
+		return nil, nil
+	}
+	logins := []string{}
+	for _, a := range reviewers.Nodes {
+		logins = append(logins, a.RequestedReviewer.Login)
+	}
+	var results []string
+	q := &survey.MultiSelect{
+		Message: "Reviewers",
+		Options: opts,
+		Default: logins,
+	}
+	err := survey.AskOne(q, &results)
+	return results, err
+}
+
+func assigneesSurvey(assignees api.Assignees, opts []string) ([]string, error) {
+	if len(opts) == 0 {
 		return nil, nil
 	}
 	logins := []string{}
@@ -242,15 +339,15 @@ func assigneesSurvey(assignees api.Assignees, assigneesOpts []string) ([]string,
 	var results []string
 	q := &survey.MultiSelect{
 		Message: "Assignees",
-		Options: assigneesOpts,
+		Options: opts,
 		Default: logins,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err
 }
 
-func labelsSurvey(labels api.Labels, labelOpts []string) ([]string, error) {
-	if len(labelOpts) == 0 {
+func labelsSurvey(labels api.Labels, opts []string) ([]string, error) {
+	if len(opts) == 0 {
 		return nil, nil
 	}
 	names := []string{}
@@ -260,15 +357,15 @@ func labelsSurvey(labels api.Labels, labelOpts []string) ([]string, error) {
 	var results []string
 	q := &survey.MultiSelect{
 		Message: "Labels",
-		Options: labelOpts,
+		Options: opts,
 		Default: names,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err
 }
 
-func projectsSurvey(projectCards api.ProjectCards, projectsOpts []string) ([]string, error) {
-	if len(projectsOpts) == 0 {
+func projectsSurvey(projectCards api.ProjectCards, opts []string) ([]string, error) {
+	if len(opts) == 0 {
 		return nil, nil
 	}
 	names := []string{}
@@ -278,21 +375,21 @@ func projectsSurvey(projectCards api.ProjectCards, projectsOpts []string) ([]str
 	var results []string
 	q := &survey.MultiSelect{
 		Message: "Projects",
-		Options: projectsOpts,
+		Options: opts,
 		Default: names,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err
 }
 
-func milestoneSurvey(milestone api.Milestone, milestoneOpts []string) (string, error) {
-	if len(milestoneOpts) == 0 {
+func milestoneSurvey(milestone api.Milestone, opts []string) (string, error) {
+	if len(opts) == 0 {
 		return "", nil
 	}
 	var result string
 	q := &survey.Select{
 		Message: "Milestone",
-		Options: milestoneOpts,
+		Options: opts,
 		Default: milestone.Title,
 	}
 	err := survey.AskOne(q, &result)
@@ -307,4 +404,25 @@ func confirmSurvey() (bool, error) {
 	}
 	err := survey.AskOne(q, &result)
 	return result, err
+}
+
+func toParams(s []string, mapper func([]string) ([]string, error)) (*[]githubv4.ID, error) {
+	ids, err := mapper(s)
+	if err != nil {
+		return nil, err
+	}
+	gIds := make([]githubv4.ID, len(ids))
+	for i, v := range ids {
+		gIds[i] = v
+	}
+	return &gIds, nil
+}
+
+func toParam(s string, mapper func(string) (string, error)) (*githubv4.ID, error) {
+	id, err := mapper(s)
+	if err != nil {
+		return nil, err
+	}
+	gId := githubv4.ID(id)
+	return &gId, nil
 }
