@@ -49,11 +49,27 @@ type Assignees struct {
 	TotalCount int
 }
 
+func (a Assignees) Logins() []string {
+	logins := make([]string, len(a.Nodes))
+	for i, a := range a.Nodes {
+		logins[i] = a.Login
+	}
+	return logins
+}
+
 type Labels struct {
 	Nodes []struct {
 		Name string
 	}
 	TotalCount int
+}
+
+func (l Labels) Names() []string {
+	names := make([]string, len(l.Nodes))
+	for i, l := range l.Nodes {
+		names[i] = l.Name
+	}
+	return names
 }
 
 type ProjectCards struct {
@@ -66,6 +82,14 @@ type ProjectCards struct {
 		}
 	}
 	TotalCount int
+}
+
+func (p ProjectCards) ProjectNames() []string {
+	names := make([]string, len(p.Nodes))
+	for i, c := range p.Nodes {
+		names[i] = c.Project.Name
+	}
+	return names
 }
 
 type Milestone struct {

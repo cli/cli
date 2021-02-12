@@ -47,11 +47,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Short: "Edit an issue",
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
-			$ gh issue edit 23 --label "bug,help wanted"
-			$ gh issue edit 23 --label bug --label "help wanted"
-			$ gh issue edit 23 --assignee monalisa,hubot
-			$ gh issue edit 23 --assignee @me
-			$ gh issue edit 23 --project "Roadmap"
+			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
+			$ gh issue edit 23 --add-assignee @me --remove-assignee monalisa,hubot
+			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
+			$ gh issue edit 23 --milestone "Version 1"
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,22 +61,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			flags := cmd.Flags()
 			if flags.Changed("title") {
-				opts.Editable.TitleEdited = true
+				opts.Editable.Title.Edited = true
 			}
 			if flags.Changed("body") {
-				opts.Editable.BodyEdited = true
+				opts.Editable.Body.Edited = true
 			}
-			if flags.Changed("assignee") {
-				opts.Editable.AssigneesEdited = true
+			if flags.Changed("add-assignee") || flags.Changed("remove-assignee") {
+				opts.Editable.Assignees.Edited = true
 			}
-			if flags.Changed("label") {
-				opts.Editable.LabelsEdited = true
+			if flags.Changed("add-label") || flags.Changed("remove-label") {
+				opts.Editable.Labels.Edited = true
 			}
-			if flags.Changed("project") {
-				opts.Editable.ProjectsEdited = true
+			if flags.Changed("add-project") || flags.Changed("remove-project") {
+				opts.Editable.Projects.Edited = true
 			}
 			if flags.Changed("milestone") {
-				opts.Editable.MilestoneEdited = true
+				opts.Editable.Milestone.Edited = true
 			}
 
 			if !opts.Editable.Dirty() {
@@ -85,7 +84,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("--tile, --body, --assignee, --label, --project, or --milestone required when not running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("field to edit flag required when not running interactively")}
 			}
 
 			if runF != nil {
@@ -96,12 +95,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Editable.Title, "title", "t", "", "Revise the issue title.")
-	cmd.Flags().StringVarP(&opts.Editable.Body, "body", "b", "", "Revise the issue body.")
-	cmd.Flags().StringSliceVarP(&opts.Editable.Assignees, "assignee", "a", nil, "Set assigned people by their `login`. Use \"@me\" to self-assign.")
-	cmd.Flags().StringSliceVarP(&opts.Editable.Labels, "label", "l", nil, "Set the issue labels by `name`")
-	cmd.Flags().StringSliceVarP(&opts.Editable.Projects, "project", "p", nil, "Set the projects the issue belongs to by `name`")
-	cmd.Flags().StringVarP(&opts.Editable.Milestone, "milestone", "m", "", "Set the milestone the issue belongs to by `name`")
+	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
+	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Add, "add-label", nil, "Add labels by `name`")
+	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Remove, "remove-label", nil, "Remove labels by `name`")
+	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the issue to projects by `name`")
+	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the issue from projects by `name`")
+	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the issue belongs to by `name`")
 
 	return cmd
 }
@@ -119,12 +121,12 @@ func editRun(opts *EditOptions) error {
 	}
 
 	editable := opts.Editable
-	editable.TitleDefault = issue.Title
-	editable.BodyDefault = issue.Body
-	editable.AssigneesDefault = issue.Assignees
-	editable.LabelsDefault = issue.Labels
-	editable.ProjectsDefault = issue.ProjectCards
-	editable.MilestoneDefault = issue.Milestone
+	editable.Title.Default = issue.Title
+	editable.Body.Default = issue.Body
+	editable.Assignees.Default = issue.Assignees.Logins()
+	editable.Labels.Default = issue.Labels.Names()
+	editable.Projects.Default = issue.ProjectCards.ProjectNames()
+	editable.Milestone.Default = issue.Milestone.Title
 
 	if opts.Interactive {
 		err = opts.FieldsToEditSurvey(&editable)
@@ -167,24 +169,59 @@ func updateIssue(client *api.Client, repo ghrepo.Interface, id string, options p
 	var err error
 	params := githubv4.UpdateIssueInput{
 		ID:    id,
-		Title: options.TitleParam(),
-		Body:  options.BodyParam(),
+		Title: ghString(options.TitleValue()),
+		Body:  ghString(options.BodyValue()),
 	}
-	params.AssigneeIDs, err = options.AssigneesParam(client, repo)
+	assigneeIds, err := options.AssigneeIds(client, repo)
 	if err != nil {
 		return err
 	}
-	params.LabelIDs, err = options.LabelsParam()
+	params.AssigneeIDs = ghIds(assigneeIds)
+	labelIds, err := options.LabelIds()
 	if err != nil {
 		return err
 	}
-	params.ProjectIDs, err = options.ProjectsParam()
+	params.LabelIDs = ghIds(labelIds)
+	projectIds, err := options.ProjectIds()
 	if err != nil {
 		return err
 	}
-	params.MilestoneID, err = options.MilestoneParam()
+	params.ProjectIDs = ghIds(projectIds)
+	milestoneId, err := options.MilestoneId()
 	if err != nil {
 		return err
 	}
+	params.MilestoneID = ghId(milestoneId)
 	return api.IssueUpdate(client, repo, params)
+}
+
+func ghIds(s *[]string) *[]githubv4.ID {
+	if s == nil {
+		return nil
+	}
+	ids := make([]githubv4.ID, len(*s))
+	for i, v := range *s {
+		ids[i] = v
+	}
+	return &ids
+}
+
+func ghId(s *string) *githubv4.ID {
+	if s == nil {
+		return nil
+	}
+	if *s == "" {
+		r := githubv4.ID(nil)
+		return &r
+	}
+	r := githubv4.ID(*s)
+	return &r
+}
+
+func ghString(s *string) *githubv4.String {
+	if s == nil {
+		return nil
+	}
+	r := githubv4.String(*s)
+	return &r
 }
