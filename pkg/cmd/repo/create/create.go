@@ -250,7 +250,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, projectDirErr)
 		if err != nil {
 			return err
 		}
@@ -388,11 +388,13 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, projectDirErr error) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
-	if repoOwner != "" {
+	if projectDirErr == nil {
+		promptString = fmt.Sprintf("This will add remote origin to your current directory. Continue? ")
+	} else if repoOwner != "" {
 		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
 	} else {
 		promptString = fmt.Sprintf("This will create '%s' in your current directory. Continue? ", repoName)
