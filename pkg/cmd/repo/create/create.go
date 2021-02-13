@@ -393,7 +393,7 @@ func confirmSubmission(repoName string, repoOwner string, projectDirErr error) (
 
 	promptString := ""
 	if projectDirErr == nil {
-		promptString = fmt.Sprintf("This will add remote origin to your current directory. Continue? ")
+		promptString = fmt.Sprint("This will add remote origin to your current directory. Continue? ")
 	} else if repoOwner != "" {
 		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
 	} else {
