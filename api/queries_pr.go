@@ -28,16 +28,17 @@ type PullRequestAndTotalCount struct {
 }
 
 type PullRequest struct {
-	ID          string
-	Number      int
-	Title       string
-	State       string
-	Closed      bool
-	URL         string
-	BaseRefName string
-	HeadRefName string
-	Body        string
-	Mergeable   string
+	ID                  string
+	Number              int
+	Title               string
+	State               string
+	Closed              bool
+	URL                 string
+	BaseRefName         string
+	HeadRefName         string
+	Body                string
+	Mergeable           string
+  ViewerMergeBodyText string
 
 	Author struct {
 		Login string
@@ -80,46 +81,33 @@ type PullRequest struct {
 			}
 		}
 	}
-	ReviewRequests struct {
-		Nodes []struct {
-			RequestedReviewer struct {
-				TypeName string `json:"__typename"`
-				Login    string
-				Name     string
-			}
+	Assignees      Assignees
+	Labels         Labels
+	ProjectCards   ProjectCards
+	Milestone      Milestone
+	Comments       Comments
+	ReactionGroups ReactionGroups
+	Reviews        PullRequestReviews
+	ReviewRequests ReviewRequests
+}
+
+type ReviewRequests struct {
+	Nodes []struct {
+		RequestedReviewer struct {
+			TypeName string `json:"__typename"`
+			Login    string
+			Name     string
 		}
-		TotalCount int
 	}
-	Assignees struct {
-		Nodes []struct {
-			Login string
-		}
-		TotalCount int
+	TotalCount int
+}
+
+func (r ReviewRequests) Logins() []string {
+	logins := make([]string, len(r.Nodes))
+	for i, a := range r.Nodes {
+		logins[i] = a.RequestedReviewer.Login
 	}
-	Labels struct {
-		Nodes []struct {
-			Name string
-		}
-		TotalCount int
-	}
-	ProjectCards struct {
-		Nodes []struct {
-			Project struct {
-				Name string
-			}
-			Column struct {
-				Name string
-			}
-		}
-		TotalCount int
-	}
-	Milestone struct {
-		Title string
-	}
-	Comments            Comments
-	ReactionGroups      ReactionGroups
-	Reviews             PullRequestReviews
-	ViewerMergeBodyText string
+	return logins
 }
 
 type NotFoundError struct {
@@ -816,6 +804,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		reviewParams["teamIds"] = ids
 	}
 
+	//TODO: How much work to extract this into own method and use for create and edit?
 	if len(reviewParams) > 0 {
 		reviewQuery := `
 		mutation PullRequestCreateRequestReviews($input: RequestReviewsInput!) {
@@ -833,6 +822,34 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 
 	return pr, nil
+}
+
+func UpdatePullRequest(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
+	var mutation struct {
+		UpdatePullRequest struct {
+			PullRequest struct {
+				ID string
+			}
+		} `graphql:"updatePullRequest(input: $input)"`
+	}
+	variables := map[string]interface{}{"input": params}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "PullRequestUpdate", &mutation, variables)
+	return err
+}
+
+func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params githubv4.RequestReviewsInput) error {
+	var mutation struct {
+		RequestReviews struct {
+			PullRequest struct {
+				ID string
+			}
+		} `graphql:"requestReviews(input: $input)"`
+	}
+	variables := map[string]interface{}{"input": params}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "PullRequestUpdateRequestReviews", &mutation, variables)
+	return err
 }
 
 func isBlank(v interface{}) bool {

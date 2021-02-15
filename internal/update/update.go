@@ -18,8 +18,9 @@ var gitDescribeSuffixRE = regexp.MustCompile(`\d+-\d+-g[a-f0-9]{8}$`)
 
 // ReleaseInfo stores information about a release
 type ReleaseInfo struct {
-	Version string `json:"tag_name"`
-	URL     string `json:"html_url"`
+	Version     string    `json:"tag_name"`
+	URL         string    `json:"html_url"`
+	PublishedAt time.Time `json:"published_at"`
 }
 
 type StateEntry struct {
