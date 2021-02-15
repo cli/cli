@@ -132,6 +132,11 @@ func Test_HasMinimumScopes(t *testing.T) {
 			wantErr: "",
 		},
 		{
+			name:    "write:org satisfies read:org",
+			header:  "repo, write:org",
+			wantErr: "",
+		},
+		{
 			name:    "insufficient scope",
 			header:  "repo",
 			wantErr: "missing required scope 'read:org'",

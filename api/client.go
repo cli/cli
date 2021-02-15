@@ -216,7 +216,7 @@ func (c Client) HasMinimumScopes(hostname string) error {
 		missingScopes = append(missingScopes, "repo")
 	}
 
-	if !search["read:org"] && !search["admin:org"] {
+	if !search["read:org"] && !search["write:org"] && !search["admin:org"] {
 		missingScopes = append(missingScopes, "read:org")
 	}
 
