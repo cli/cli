@@ -38,7 +38,7 @@ type PullRequest struct {
 	HeadRefName         string
 	Body                string
 	Mergeable           string
-  ViewerMergeBodyText string
+	ViewerMergeBodyText string
 
 	Author struct {
 		Login string
