@@ -42,7 +42,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				DeleteBranch:            false,
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
-				MergeMethod:             api.PullRequestMergeMethodMerge,
+				MergeMethod:             PullRequestMergeMethodMerge,
 				InteractiveMode:         true,
 			},
 		},
@@ -55,7 +55,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				DeleteBranch:            false,
 				IsDeleteBranchIndicated: true,
 				CanDeleteLocalBranch:    true,
-				MergeMethod:             api.PullRequestMergeMethodMerge,
+				MergeMethod:             PullRequestMergeMethodMerge,
 				InteractiveMode:         true,
 			},
 		},
@@ -68,7 +68,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				DeleteBranch:            false,
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
-				MergeMethod:             api.PullRequestMergeMethodMerge,
+				MergeMethod:             PullRequestMergeMethodMerge,
 				InteractiveMode:         true,
 				Body:                    "cool",
 			},
@@ -787,5 +787,5 @@ func Test_mergeMethodSurvey(t *testing.T) {
 	as.StubOne(0) // Select first option which is rebase merge
 	method, err := mergeMethodSurvey(repo)
 	assert.Nil(t, err)
-	assert.Equal(t, api.PullRequestMergeMethodRebase, method)
+	assert.Equal(t, PullRequestMergeMethodRebase, method)
 }

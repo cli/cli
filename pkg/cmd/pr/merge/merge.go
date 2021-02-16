@@ -30,7 +30,10 @@ type MergeOptions struct {
 
 	SelectorArg  string
 	DeleteBranch bool
-	MergeMethod  api.PullRequestMergeMethod
+	MergeMethod  PullRequestMergeMethod
+
+	AutoMerge        bool
+	AutoMergeDisable bool
 
 	Body string
 
@@ -75,15 +78,15 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			methodFlags := 0
 			if flagMerge {
-				opts.MergeMethod = api.PullRequestMergeMethodMerge
+				opts.MergeMethod = PullRequestMergeMethodMerge
 				methodFlags++
 			}
 			if flagRebase {
-				opts.MergeMethod = api.PullRequestMergeMethodRebase
+				opts.MergeMethod = PullRequestMergeMethodRebase
 				methodFlags++
 			}
 			if flagSquash {
-				opts.MergeMethod = api.PullRequestMergeMethodSquash
+				opts.MergeMethod = PullRequestMergeMethodSquash
 				methodFlags++
 			}
 			if methodFlags == 0 {
@@ -110,6 +113,8 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
+	cmd.Flags().BoolVar(&opts.AutoMerge, "auto", false, "Automatically merge only after necessary requirements are met")
+	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
 	return cmd
 }
 
@@ -125,6 +130,19 @@ func mergeRun(opts *MergeOptions) error {
 	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
 	if err != nil {
 		return err
+	}
+
+	isTerminal := opts.IO.IsStdoutTTY()
+
+	if opts.AutoMergeDisable {
+		err := disableAutoMerge(httpClient, baseRepo, pr.ID)
+		if err != nil {
+			return err
+		}
+		if isTerminal {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Auto-merge disabled for pull request #%d\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+		}
+		return nil
 	}
 
 	if opts.SelectorArg == "" {
@@ -144,18 +162,26 @@ func mergeRun(opts *MergeOptions) error {
 
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
-	isTerminal := opts.IO.IsStdoutTTY()
 
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
-		mergeMethod := opts.MergeMethod
+		payload := mergePayload{
+			repo:          baseRepo,
+			pullRequestID: pr.ID,
+			method:        opts.MergeMethod,
+			auto:          opts.AutoMerge,
+			commitBody:    opts.Body,
+		}
+		if opts.Body != "" {
+			payload.setCommitBody = true
+		}
 
 		if opts.InteractiveMode {
 			r, err := api.GitHubRepo(apiClient, baseRepo)
 			if err != nil {
 				return err
 			}
-			mergeMethod, err = mergeMethodSurvey(r)
+			payload.method, err = mergeMethodSurvey(r)
 			if err != nil {
 				return err
 			}
@@ -164,7 +190,7 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			allowEditMsg := mergeMethod != api.PullRequestMergeMethodRebase
+			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 
 			action, err := confirmSurvey(allowEditMsg)
 			if err != nil {
@@ -178,19 +204,19 @@ func mergeRun(opts *MergeOptions) error {
 					return err
 				}
 
-				if opts.Body == "" {
-					if mergeMethod == api.PullRequestMergeMethodMerge {
-						opts.Body = pr.Title
+				if payload.commitBody == "" {
+					if payload.method == PullRequestMergeMethodMerge {
+						payload.commitBody = pr.Title
 					} else {
-						opts.Body = pr.ViewerMergeBodyText
+						payload.commitBody = pr.ViewerMergeBodyText
 					}
 				}
 
-				msg, err := commitMsgSurvey(opts.Body, editorCommand)
+				payload.commitBody, err = commitMsgSurvey(payload.commitBody, editorCommand)
 				if err != nil {
 					return err
 				}
-				opts.Body = msg
+				payload.setCommitBody = true
 
 				action, err = confirmSurvey(false)
 				if err != nil {
@@ -203,27 +229,38 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		var body *string
-		if opts.Body != "" {
-			body = &opts.Body
+		if !payload.setCommitSubject && payload.method == PullRequestMergeMethodSquash {
+			payload.commitSubject = fmt.Sprintf("%s (#%d)", pr.Title, pr.Number)
+			payload.setCommitSubject = true
 		}
 
-		err = api.PullRequestMerge(apiClient, baseRepo, pr, mergeMethod, body)
+		err = mergePullRequest(httpClient, payload)
 		if err != nil {
 			return err
 		}
 
 		if isTerminal {
-			action := "Merged"
-			switch mergeMethod {
-			case api.PullRequestMergeMethodRebase:
-				action = "Rebased and merged"
-			case api.PullRequestMergeMethodSquash:
-				action = "Squashed and merged"
+			if payload.auto {
+				method := ""
+				switch payload.method {
+				case PullRequestMergeMethodRebase:
+					method = " via rebase"
+				case PullRequestMergeMethodSquash:
+					method = " via squash"
+				}
+				fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d will automatically get merged%s when all requiremenets are met\n", cs.SuccessIconWithColor(cs.Green), pr.Number, method)
+			} else {
+				action := "Merged"
+				switch payload.method {
+				case PullRequestMergeMethodRebase:
+					action = "Rebased and merged"
+				case PullRequestMergeMethodSquash:
+					action = "Squashed and merged"
+				}
+				fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
 			}
-			fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMerge {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
@@ -235,7 +272,7 @@ func mergeRun(opts *MergeOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch || crossRepoPR {
+	if !deleteBranch || crossRepoPR || opts.AutoMerge {
 		return nil
 	}
 
@@ -290,23 +327,23 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, error) {
+func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error) {
 	type mergeOption struct {
 		title  string
-		method api.PullRequestMergeMethod
+		method PullRequestMergeMethod
 	}
 
 	var mergeOpts []mergeOption
 	if baseRepo.MergeCommitAllowed {
-		opt := mergeOption{title: "Create a merge commit", method: api.PullRequestMergeMethodMerge}
+		opt := mergeOption{title: "Create a merge commit", method: PullRequestMergeMethodMerge}
 		mergeOpts = append(mergeOpts, opt)
 	}
 	if baseRepo.RebaseMergeAllowed {
-		opt := mergeOption{title: "Rebase and merge", method: api.PullRequestMergeMethodRebase}
+		opt := mergeOption{title: "Rebase and merge", method: PullRequestMergeMethodRebase}
 		mergeOpts = append(mergeOpts, opt)
 	}
 	if baseRepo.SquashMergeAllowed {
-		opt := mergeOption{title: "Squash and merge", method: api.PullRequestMergeMethodSquash}
+		opt := mergeOption{title: "Squash and merge", method: PullRequestMergeMethodSquash}
 		mergeOpts = append(mergeOpts, opt)
 	}
 
@@ -318,7 +355,6 @@ func mergeMethodSurvey(baseRepo *api.Repository) (api.PullRequestMergeMethod, er
 	mergeQuestion := &survey.Select{
 		Message: "What merge method would you like to use?",
 		Options: surveyOpts,
-		Default: "Create a merge commit",
 	}
 
 	var result int

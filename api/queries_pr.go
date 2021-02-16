@@ -140,14 +140,6 @@ type PullRequestReviewStatus struct {
 	ReviewRequired   bool
 }
 
-type PullRequestMergeMethod int
-
-const (
-	PullRequestMergeMethodMerge PullRequestMergeMethod = iota
-	PullRequestMergeMethodRebase
-	PullRequestMergeMethodSquash
-)
-
 func (pr *PullRequest) ReviewStatus() PullRequestReviewStatus {
 	var status PullRequestReviewStatus
 	switch pr.ReviewDecision {
@@ -1070,47 +1062,6 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 
 	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
-
-	return err
-}
-
-func PullRequestMerge(client *Client, repo ghrepo.Interface, pr *PullRequest, m PullRequestMergeMethod, body *string) error {
-	mergeMethod := githubv4.PullRequestMergeMethodMerge
-	switch m {
-	case PullRequestMergeMethodRebase:
-		mergeMethod = githubv4.PullRequestMergeMethodRebase
-	case PullRequestMergeMethodSquash:
-		mergeMethod = githubv4.PullRequestMergeMethodSquash
-	}
-
-	var mutation struct {
-		MergePullRequest struct {
-			PullRequest struct {
-				ID githubv4.ID
-			}
-		} `graphql:"mergePullRequest(input: $input)"`
-	}
-
-	input := githubv4.MergePullRequestInput{
-		PullRequestID: pr.ID,
-		MergeMethod:   &mergeMethod,
-	}
-
-	if m == PullRequestMergeMethodSquash {
-		commitHeadline := githubv4.String(fmt.Sprintf("%s (#%d)", pr.Title, pr.Number))
-		input.CommitHeadline = &commitHeadline
-	}
-	if body != nil {
-		commitBody := githubv4.String(*body)
-		input.CommitBody = &commitBody
-	}
-
-	variables := map[string]interface{}{
-		"input": input,
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestMerge", &mutation, variables)
 
 	return err
 }
