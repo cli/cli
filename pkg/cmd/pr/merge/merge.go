@@ -243,7 +243,7 @@ func mergeRun(opts *MergeOptions) error {
 				case PullRequestMergeMethodSquash:
 					method = " via squash"
 				}
-				fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d will automatically get merged%s when all requiremenets are met\n", cs.SuccessIconWithColor(cs.Green), pr.Number, method)
+				fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d will automatically get merged%s when all requirements are met\n", cs.SuccessIconWithColor(cs.Green), pr.Number, method)
 			} else {
 				action := "Merged"
 				switch payload.method {
