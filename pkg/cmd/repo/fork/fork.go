@@ -63,6 +63,8 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.
 
+By default, the new fork is set to be your 'origin' remote and any existing origin remote is renamed to 'upstream'. To alter this behavior, you can set a name for the new fork's remote with --remote-name.
+
 Additional 'git clone' flags can be passed in by listing them after '--'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
@@ -237,20 +239,14 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				if connectedToTerminal {
-					return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
-				} else {
-					// TODO next major version we should break this behavior and force users to opt into
-					// remote renaming in a scripting context via --remote-name
-					renameTarget := "upstream"
-					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
-					if err != nil {
-						return err
-					}
-					err = run.PrepareCmd(renameCmd).Run()
-					if err != nil {
-						return err
-					}
+				renameTarget := "upstream"
+				renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+				if err != nil {
+					return err
+				}
+				err = run.PrepareCmd(renameCmd).Run()
+				if err != nil {
+					return err
 				}
 			}
 
