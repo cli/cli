@@ -239,7 +239,6 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/vnd.github.merge-info-preview+json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
