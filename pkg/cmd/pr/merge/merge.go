@@ -229,11 +229,6 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		if !payload.setCommitSubject && payload.method == PullRequestMergeMethodSquash {
-			payload.commitSubject = fmt.Sprintf("%s (#%d)", pr.Title, pr.Number)
-			payload.setCommitSubject = true
-		}
-
 		err = mergePullRequest(httpClient, payload)
 		if err != nil {
 			return err

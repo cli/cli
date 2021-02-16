@@ -500,7 +500,7 @@ func TestPrMerge_squash(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
-			assert.Equal(t, "The title of the PR (#3)", input["commitHeadline"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
 
 	_, cmdTeardown := run.Stub()
