@@ -15,7 +15,10 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/spf13/cobra"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -104,27 +107,63 @@ func editRun(opts *EditOptions) error {
 
 	if addFilename != "" {
 		//Add files to an existing gist
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		wd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
 
-		text, err := opts.Edit(editorCommand, addFilename, "", opts.IO)
+		m, err := filepath.Glob(wd + "/[^.]*.*")
 		if err != nil {
 			return err
 		}
 
-		if text == "" {
-			return fmt.Errorf("Contents can't be empty")
+		filesToAdd := map[string]*shared.GistFile{}
+		fileExists := false
+
+		for _, f := range m {
+			if addFilename == filepath.Base(f) {
+				fileExists = true
+				break
+			}
 		}
 
-		filesToAdd := map[string]*shared.GistFile{
-			addFilename: {
+		if fileExists {
+			content, err := ioutil.ReadFile(addFilename)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %w", addFilename, err)
+			}
+
+			if string(content) == "" {
+				return fmt.Errorf("Contents can't be empty")
+			}
+
+			filesToAdd[addFilename] = &shared.GistFile{
+				Filename: addFilename,
+				Content:  string(content),
+			}
+			gist.Files = filesToAdd
+		} else {
+			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+			if err != nil {
+				return err
+			}
+
+			text, err := opts.Edit(editorCommand, addFilename, "", opts.IO)
+			if err != nil {
+				return err
+			}
+
+			if text == "" {
+				return fmt.Errorf("Contents can't be empty")
+			}
+
+			filesToAdd[addFilename] = &shared.GistFile{
 				Filename: addFilename,
 				Content:  text,
-			},
+			}
+
+			gist.Files = filesToAdd
 		}
-		gist.Files = filesToAdd
 
 		err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
 		if err != nil {
