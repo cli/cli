@@ -104,9 +104,21 @@ func editRun(opts *EditOptions) error {
 	filesToUpdate := map[string]string{}
 
 	addFilename := opts.AddFilename
+	fileExists := false
 
 	if addFilename != "" {
 		//Add files to an existing gist
+		if fi, err := os.Stat(addFilename); err != nil {
+			return err
+		} else {
+			switch mode := fi.Mode(); {
+			case mode.IsDir():
+				return fmt.Errorf("found directory %s", addFilename)
+			case mode.IsRegular():
+				fileExists = true
+			}
+		}
+
 		wd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -118,11 +130,18 @@ func editRun(opts *EditOptions) error {
 		}
 
 		filesToAdd := map[string]*shared.GistFile{}
-		fileExists := false
 
 		for _, f := range m {
 			if addFilename == filepath.Base(f) {
-				fileExists = true
+				choice := false
+				err := prompt.Confirm("File found in this directory. Proceed?", &choice)
+				if err != nil {
+					return err
+				}
+
+				if choice {
+					fileExists = true
+				}
 				break
 			}
 		}
@@ -137,8 +156,10 @@ func editRun(opts *EditOptions) error {
 				return fmt.Errorf("Contents can't be empty")
 			}
 
-			filesToAdd[addFilename] = &shared.GistFile{
-				Filename: addFilename,
+			filename := filepath.Base(addFilename)
+
+			filesToAdd[filename] = &shared.GistFile{
+				Filename: filename,
 				Content:  string(content),
 			}
 			gist.Files = filesToAdd
