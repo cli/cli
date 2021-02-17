@@ -35,7 +35,15 @@ func TestNewCmdEdit(t *testing.T) {
 			cli:  "123 --filename cool.md",
 			wants: EditOptions{
 				Selector: "123",
-				Filename: "cool.md",
+				EditFilename: "cool.md",
+			},
+		},
+		{
+			name: "add",
+			cli: "123 --add cool.md",
+			wants: EditOptions{
+				Selector: "123",
+				AddFilename: "cool.md",
 			},
 		},
 	}
@@ -60,7 +68,8 @@ func TestNewCmdEdit(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.Filename, gotOpts.Filename)
+			assert.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
+			assert.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
 			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
 		})
 	}
@@ -210,6 +219,19 @@ func Test_editRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantStderr: "You do not own this gist.",
+		},
+		{
+			name: "add file to existing gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"foo.txt": {
+						Filename: "foo.txt",
+						Content: "bwhiizzzbwhuiiizzzz",
+						Type: "text/plain",
+					},
+				},
+			},
 		},
 	}
 

@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"sort"
-	"strings"
-
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -19,6 +15,9 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/spf13/cobra"
+	"net/http"
+	"sort"
+	"strings"
 )
 
 type EditOptions struct {
@@ -28,8 +27,9 @@ type EditOptions struct {
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
 
-	Selector string
-	Filename string
+	Selector     string
+	EditFilename string
+	AddFilename  string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -48,7 +48,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "edit {<id> | <url>}",
-		Short: "Edit one of your gists",
+		Short: "Edit one of your gists or add new ones to it",
 		Args:  cmdutil.MinimumArgs(1, "cannot edit: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
@@ -60,7 +60,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			return editRun(&opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Select a file to edit")
+	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a file")
+	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
 }
@@ -99,89 +100,121 @@ func editRun(opts *EditOptions) error {
 
 	filesToUpdate := map[string]string{}
 
-	for {
-		filename := opts.Filename
-		candidates := []string{}
-		for filename := range gist.Files {
-			candidates = append(candidates, filename)
-		}
+	addFilename := opts.AddFilename
 
-		sort.Strings(candidates)
-
-		if filename == "" {
-			if len(candidates) == 1 {
-				filename = candidates[0]
-			} else {
-				if !opts.IO.CanPrompt() {
-					return errors.New("unsure what file to edit; either specify --filename or run interactively")
-				}
-				err = prompt.SurveyAskOne(&survey.Select{
-					Message: "Edit which file?",
-					Options: candidates,
-				}, &filename)
-
-				if err != nil {
-					return fmt.Errorf("could not prompt: %w", err)
-				}
-			}
-		}
-
-		if _, ok := gist.Files[filename]; !ok {
-			return fmt.Errorf("gist has no file %q", filename)
-		}
-
+	if addFilename != "" {
+		//Add files to an existing gist
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-		text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
 
+		text, err := opts.Edit(editorCommand, addFilename, "", opts.IO)
 		if err != nil {
 			return err
 		}
 
-		if text != gist.Files[filename].Content {
-			gistFile := gist.Files[filename]
-			gistFile.Content = text // so it appears if they re-edit
-			filesToUpdate[filename] = text
+		if text == "" {
+			return fmt.Errorf("Contents can't be empty")
 		}
 
-		if !opts.IO.CanPrompt() {
-			break
-		}
-
-		if len(candidates) == 1 {
-			break
-		}
-
-		choice := ""
-
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: "What next?",
-			Options: []string{
-				"Edit another file",
-				"Submit",
-				"Cancel",
+		filesToAdd := map[string]*shared.GistFile{
+			addFilename: {
+				Filename: addFilename,
+				Content:  text,
 			},
-		}, &choice)
+		}
+		gist.Files = filesToAdd
 
+		err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
 		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
+			return err
 		}
+	} else {
+		for {
+			filename := opts.EditFilename
+			candidates := []string{}
+			for filename := range gist.Files {
+				candidates = append(candidates, filename)
+			}
 
-		stop := false
+			sort.Strings(candidates)
 
-		switch choice {
-		case "Edit another file":
-			continue
-		case "Submit":
-			stop = true
-		case "Cancel":
-			return cmdutil.SilentError
-		}
+			if filename == "" {
+				if len(candidates) == 1 {
+					filename = candidates[0]
+				} else {
+					if !opts.IO.CanPrompt() {
+						return errors.New("unsure what file to edit; either specify --filename or run interactively")
+					}
+					err = prompt.SurveyAskOne(&survey.Select{
+						Message: "Edit which file?",
+						Options: candidates,
+					}, &filename)
 
-		if stop {
-			break
+					if err != nil {
+						return fmt.Errorf("could not prompt: %w", err)
+					}
+				}
+			}
+
+			if _, ok := gist.Files[filename]; !ok {
+				return fmt.Errorf("gist has no file %q", filename)
+			}
+
+			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+			if err != nil {
+				return err
+			}
+			text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
+
+			if err != nil {
+				return err
+			}
+
+			if text != gist.Files[filename].Content {
+				gistFile := gist.Files[filename]
+				gistFile.Content = text // so it appears if they re-edit
+				filesToUpdate[filename] = text
+			}
+
+			if !opts.IO.CanPrompt() {
+				break
+			}
+
+			if len(candidates) == 1 {
+				break
+			}
+
+			choice := ""
+
+			err = prompt.SurveyAskOne(&survey.Select{
+				Message: "What next?",
+				Options: []string{
+					"Edit another file",
+					"Submit",
+					"Cancel",
+				},
+			}, &choice)
+
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+
+			stop := false
+
+			switch choice {
+			case "Edit another file":
+				continue
+			case "Submit":
+				stop = true
+			case "Cancel":
+				return cmdutil.SilentError
+			}
+
+			if stop {
+				break
+			}
 		}
 	}
 
