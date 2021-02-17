@@ -1,12 +1,7 @@
 package shared
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,10 +9,9 @@ import (
 	"runtime"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/safeexec"
 )
@@ -115,57 +109,11 @@ func (c *sshContext) generateSSHKey() (string, error) {
 }
 
 func sshKeyUpload(httpClient *http.Client, hostname, keyFile string) error {
-	url := ghinstance.RESTPrefix(hostname) + "user/keys"
-
 	f, err := os.Open(keyFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	keyBytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
 
-	payload := map[string]string{
-		"title": "GitHub CLI",
-		"key":   string(keyBytes),
-	}
-
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		var httpError api.HTTPError
-		err := api.HandleHTTPError(resp)
-		if errors.As(err, &httpError) && isDuplicateError(&httpError) {
-			return nil
-		}
-		return err
-	}
-
-	_, err = io.Copy(ioutil.Discard, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func isDuplicateError(err *api.HTTPError) bool {
-	return err.StatusCode == 422 && len(err.Errors) == 1 &&
-		err.Errors[0].Field == "key" && err.Errors[0].Message == "key is already in use"
+	return add.SSHKeyUpload(httpClient, hostname, f, "GitHub CLI")
 }
