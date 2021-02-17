@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
+	"time"
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/cli/cli/api"
@@ -161,13 +163,16 @@ func main() {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		msg := fmt.Sprintf("%s %s → %s\n%s",
+		ghExe, _ := os.Executable()
+		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of gh is available:", "yellow"),
 			ansi.Color(buildVersion, "cyan"),
-			ansi.Color(newRelease.Version, "cyan"),
+			ansi.Color(newRelease.Version, "cyan"))
+		if suggestBrewUpgrade(newRelease, ghExe) {
+			fmt.Fprintf(stderr, "To upgrade, run: %s\n", "brew update && brew upgrade gh")
+		}
+		fmt.Fprintf(stderr, "%s\n\n",
 			ansi.Color(newRelease.URL, "yellow"))
-
-		fmt.Fprintf(stderr, "\n\n%s\n\n", msg)
 	}
 }
 
@@ -258,4 +263,25 @@ func apiVerboseLog() api.ClientOption {
 	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
 	colorize := utils.IsTerminal(os.Stderr)
 	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
+}
+
+// Suggest to `brew upgrade gh` only if gh was found under homebrew prefix and when the release was
+// published over 24h ago, allowing homebrew-core ample time to merge the formula bump.
+func suggestBrewUpgrade(rel *update.ReleaseInfo, ghBinary string) bool {
+	if rel.PublishedAt.IsZero() || time.Since(rel.PublishedAt) < time.Duration(time.Hour*24) {
+		return false
+	}
+
+	brewExe, err := safeexec.LookPath("brew")
+	if err != nil {
+		return false
+	}
+
+	brewPrefixBytes, err := exec.Command(brewExe, "--prefix").Output()
+	if err != nil {
+		return false
+	}
+
+	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
+	return strings.HasPrefix(ghBinary, brewBinPrefix)
 }

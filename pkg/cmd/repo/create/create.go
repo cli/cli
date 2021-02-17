@@ -49,10 +49,26 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create [<name>]",
 		Short: "Create a new repository",
-		Long:  `Create a new GitHub repository.`,
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Docf(`
+			Create a new GitHub repository.
+
+			When the current directory is a local git repository, the new repository will be added
+			as the "origin" git remote. Otherwise, the command will prompt to clone the new
+			repository into a sub-directory.
+
+			To create a repository non-interactively, supply the following:
+			- the name argument;
+			- the %[1]s--confirm%[1]s flag;
+			- one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
+
+			To toggle off %[1]s--enable-issues%[1]s or %[1]s--enable-wiki%[1]s, which are enabled
+			by default, use the %[1]s--enable-issues=false%[1]s syntax.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# create a repository under your account using the current directory name
+			$ git init my-project
+			$ cd my-project
 			$ gh repo create
 
 			# create a repository with a specific name
@@ -60,12 +76,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			# create a repository in an organization
 			$ gh repo create cli/my-project
+
+			# disable issues and wiki
+			$ gh repo create --enable-issues=false --enable-wiki=false
 	  `),
 		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(
-				`A repository can be supplied as an argument in any of the following formats:
-           - <OWNER/REPO>
-           - by URL, e.g. "https://github.com/OWNER/REPO"`),
+			"help:arguments": heredoc.Doc(`
+				A repository can be supplied as an argument in any of the following formats:
+				- "OWNER/REPO"
+				- by URL, e.g. "https://github.com/OWNER/REPO"
+			`),
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -78,32 +98,31 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				}
 
 				if !opts.Internal && !opts.Private && !opts.Public {
-					return &cmdutil.FlagError{Err: errors.New("--public, --private, or --internal required when not running interactively")}
+					return &cmdutil.FlagError{Err: errors.New("`--public`, `--private`, or `--internal` required when not running interactively")}
 				}
+			}
+
+			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || cmd.Flags().Changed("enable-issues") || cmd.Flags().Changed("enable-wiki")) {
+				return &cmdutil.FlagError{Err: errors.New("The `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")}
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || !opts.EnableIssues || !opts.EnableWiki) {
-				return &cmdutil.FlagError{Err: errors.New(`The '--template' option is not supported with '--homepage, --team, --enable-issues or --enable-wiki'`)}
-			}
-
 			return createRun(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of repository")
-	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page URL")
-	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The name of the organization team to be granted access")
-	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template repository")
+	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the repository")
+	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page `URL`")
+	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The `name` of the organization team to be granted access")
+	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template `repository`")
 	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public")
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
-	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Confirm the submission directly")
+	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
 
 	return cmd
 }
@@ -139,7 +158,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if enabledFlagCount > 1 {
-		return fmt.Errorf("expected exactly one of --public, --private, or --internal to be true")
+		return fmt.Errorf("expected exactly one of `--public`, `--private`, or `--internal` to be true")
 	} else if enabledFlagCount == 1 {
 		isVisibilityPassed = true
 	}

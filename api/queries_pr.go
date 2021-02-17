@@ -16,10 +16,11 @@ import (
 )
 
 type PullRequestsPayload struct {
-	ViewerCreated   PullRequestAndTotalCount
-	ReviewRequested PullRequestAndTotalCount
-	CurrentPR       *PullRequest
-	DefaultBranch   string
+	ViewerCreated    PullRequestAndTotalCount
+	ReviewRequested  PullRequestAndTotalCount
+	CurrentPR        *PullRequest
+	DefaultBranch    string
+	StrictProtection bool
 }
 
 type PullRequestAndTotalCount struct {
@@ -28,16 +29,17 @@ type PullRequestAndTotalCount struct {
 }
 
 type PullRequest struct {
-	ID          string
-	Number      int
-	Title       string
-	State       string
-	Closed      bool
-	URL         string
-	BaseRefName string
-	HeadRefName string
-	Body        string
-	Mergeable   string
+	ID               string
+	Number           int
+	Title            string
+	State            string
+	Closed           bool
+	URL              string
+	BaseRefName      string
+	HeadRefName      string
+	Body             string
+	Mergeable        string
+	MergeStateStatus string
 
 	Author struct {
 		Login string
@@ -80,45 +82,33 @@ type PullRequest struct {
 			}
 		}
 	}
-	ReviewRequests struct {
-		Nodes []struct {
-			RequestedReviewer struct {
-				TypeName string `json:"__typename"`
-				Login    string
-				Name     string
-			}
-		}
-		TotalCount int
-	}
-	Assignees struct {
-		Nodes []struct {
-			Login string
-		}
-		TotalCount int
-	}
-	Labels struct {
-		Nodes []struct {
-			Name string
-		}
-		TotalCount int
-	}
-	ProjectCards struct {
-		Nodes []struct {
-			Project struct {
-				Name string
-			}
-			Column struct {
-				Name string
-			}
-		}
-		TotalCount int
-	}
-	Milestone struct {
-		Title string
-	}
+	Assignees      Assignees
+	Labels         Labels
+	ProjectCards   ProjectCards
+	Milestone      Milestone
 	Comments       Comments
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
+	ReviewRequests ReviewRequests
+}
+
+type ReviewRequests struct {
+	Nodes []struct {
+		RequestedReviewer struct {
+			TypeName string `json:"__typename"`
+			Login    string
+			Name     string
+		}
+	}
+	TotalCount int
+}
+
+func (r ReviewRequests) Logins() []string {
+	logins := make([]string, len(r.Nodes))
+	for i, a := range r.Nodes {
+		logins[i] = a.RequestedReviewer.Login
+	}
+	return logins
 }
 
 type NotFoundError struct {
@@ -301,7 +291,10 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	type response struct {
 		Repository struct {
 			DefaultBranchRef struct {
-				Name string
+				Name                 string
+				BranchProtectionRule struct {
+					RequiresStrictStatusChecks bool
+				}
 			}
 			PullRequests edges
 			PullRequest  *PullRequest
@@ -353,6 +346,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		state
 		url
 		headRefName
+		mergeStateStatus
 		headRepositoryOwner {
 			login
 		}
@@ -369,7 +363,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { name }
+			defaultBranchRef { 
+				name 
+				branchProtectionRule {
+					requiresStrictStatusChecks
+				}
+			}
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
 				edges {
@@ -384,7 +383,12 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		queryPrefix = `
 		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { name }
+			defaultBranchRef { 
+				name 
+				branchProtectionRule {
+					requiresStrictStatusChecks
+				}
+			}
 				pullRequest(number: $number) {
 					...prWithReviews
 				}
@@ -471,8 +475,9 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR:     currentPR,
-		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
+		CurrentPR:        currentPR,
+		DefaultBranch:    resp.Repository.DefaultBranchRef.Name,
+		StrictProtection: resp.Repository.DefaultBranchRef.BranchProtectionRule.RequiresStrictStatusChecks,
 	}
 
 	return &payload, nil
@@ -814,6 +819,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		reviewParams["teamIds"] = ids
 	}
 
+	//TODO: How much work to extract this into own method and use for create and edit?
 	if len(reviewParams) > 0 {
 		reviewQuery := `
 		mutation PullRequestCreateRequestReviews($input: RequestReviewsInput!) {
@@ -831,6 +837,34 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 
 	return pr, nil
+}
+
+func UpdatePullRequest(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
+	var mutation struct {
+		UpdatePullRequest struct {
+			PullRequest struct {
+				ID string
+			}
+		} `graphql:"updatePullRequest(input: $input)"`
+	}
+	variables := map[string]interface{}{"input": params}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "PullRequestUpdate", &mutation, variables)
+	return err
+}
+
+func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params githubv4.RequestReviewsInput) error {
+	var mutation struct {
+		RequestReviews struct {
+			PullRequest struct {
+				ID string
+			}
+		} `graphql:"requestReviews(input: $input)"`
+	}
+	variables := map[string]interface{}{"input": params}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "PullRequestUpdateRequestReviews", &mutation, variables)
+	return err
 }
 
 func isBlank(v interface{}) bool {
