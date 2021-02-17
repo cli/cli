@@ -246,14 +246,20 @@ func createRun(opts *CreateOptions) (err error) {
 
 	defer shared.PreserveInput(opts.IO, state, &err)()
 
-	templateContent := ""
 	if !opts.BodyProvided {
+		templateContent := ""
 		if opts.RecoverFile == "" {
-			templateFiles, legacyTemplate := shared.FindTemplates(opts.RootDirOverride, "PULL_REQUEST_TEMPLATE")
-
-			templateContent, err = shared.TemplateSurvey(templateFiles, legacyTemplate, *state)
+			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
+			var template shared.Template
+			template, err = tpl.Choose()
 			if err != nil {
 				return
+			}
+
+			if template != nil {
+				templateContent = string(template.Body())
+			} else {
+				templateContent = string(tpl.LegacyBody())
 			}
 		}
 

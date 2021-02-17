@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func makeCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
+func NewCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
 	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
 	return &http.Client{
 		Transport: CacheResponse(cacheTTL, cacheDir)(httpClient.Transport),

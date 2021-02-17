@@ -25,9 +25,9 @@ type CreateOptions struct {
 
 	RootDirOverride string
 
-	RepoOverride string
-	WebMode      bool
-	RecoverFile  string
+	HasRepoOverride bool
+	WebMode         bool
+	RecoverFile     string
 
 	Title       string
 	Body        string
@@ -64,7 +64,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
-			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
 				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
@@ -107,8 +107,6 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	templateFiles, legacyTemplate := prShared.FindTemplates(opts.RootDirOverride, "ISSUE_TEMPLATE")
-
 	isTerminal := opts.IO.IsStdoutTTY()
 
 	var milestones []string
@@ -140,6 +138,8 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
+	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
+
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
@@ -154,7 +154,7 @@ func createRun(opts *CreateOptions) (err error) {
 			if err != nil {
 				return
 			}
-		} else if len(templateFiles) > 1 {
+		} else if ok, _ := tpl.HasTemplates(); ok {
 			openURL += "/choose"
 		}
 		if isTerminal {
@@ -177,6 +177,7 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	action := prShared.SubmitAction
+	templateNameForSubmit := ""
 
 	if opts.Interactive {
 		var editorCommand string
@@ -198,9 +199,17 @@ func createRun(opts *CreateOptions) (err error) {
 			templateContent := ""
 
 			if opts.RecoverFile == "" {
-				templateContent, err = prShared.TemplateSurvey(templateFiles, legacyTemplate, tb)
+				var template shared.Template
+				template, err = tpl.Choose()
 				if err != nil {
 					return
+				}
+
+				if template != nil {
+					templateContent = string(template.Body())
+					templateNameForSubmit = template.NameForSubmit()
+				} else {
+					templateContent = string(tpl.LegacyBody())
 				}
 			}
 
@@ -270,6 +279,9 @@ func createRun(opts *CreateOptions) (err error) {
 		params := map[string]interface{}{
 			"title": tb.Title,
 			"body":  tb.Body,
+		}
+		if templateNameForSubmit != "" {
+			params["issueTemplate"] = templateNameForSubmit
 		}
 
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)

@@ -295,7 +295,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ReviewRequested edges
 	}
 
-	cachedClient := makeCachedClient(client.http, time.Hour*24)
+	cachedClient := NewCachedClient(client.http, time.Hour*24)
 	prFeatures, err := determinePullRequestFeatures(cachedClient, repo.RepoHost())
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 }
 
 func prCommitsFragment(httpClient *http.Client, hostname string) (string, error) {
-	cachedClient := makeCachedClient(httpClient, time.Hour*24)
+	cachedClient := NewCachedClient(httpClient, time.Hour*24)
 	if prFeatures, err := determinePullRequestFeatures(cachedClient, hostname); err != nil {
 		return "", err
 	} else if !prFeatures.HasStatusCheckRollup {
