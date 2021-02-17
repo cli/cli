@@ -689,19 +689,23 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 }
 
 func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [{
-			"headRefName": "blueberries",
+		{ "data": { "repository": { "pullRequest": {
 			"headRepositoryOwner": {"login": "OWNER"},
 			"id": "THE-ID",
 			"number": 3,
 			"title": "title"
-		}] } } } }`))
-	http.Register(
+		} } } }`))
+	tr.Register(
 		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
@@ -709,25 +713,22 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 			"rebaseMergeAllowed": true,
 			"squashMergeAllowed": true
 		} } }`))
-	http.Register(
+	tr.Register(
 		httpmock.GraphQL(`query PullRequestMergeText\b`),
 		httpmock.StringResponse(`
 		{ "data": { "node": {
-			"viewerMergeBodyText": ""
+			"viewerMergeBodyText": "default body text"
 		} } }`))
-	http.Register(
+	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
-			assert.Equal(t, "cool story", input["commitBody"].(string))
+			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register("git -c log.ShowSignature=false log --pretty=format:%H,%s -1", 0, "")
-	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -735,15 +736,21 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 	as.StubOne(2)                     // Merge method survey
 	as.StubOne(false)                 // Delete branch survey
 	as.StubOne("Edit commit message") // Confirm submit survey
-	as.StubOne("cool story")          // Edit commit message survey
 	as.StubOne("Submit")              // Confirm submit survey
 
-	output, err := runCommand(http, "blueberries", true, "")
-	if err != nil {
-		t.Fatalf("Got unexpected error running `pr merge` %s", err)
-	}
+	err := mergeRun(&MergeOptions{
+		IO:     io,
+		Editor: testEditor{},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		InteractiveMode: true,
+	})
+	assert.NoError(t, err)
 
-	assert.Equal(t, "✓ Squashed and merged pull request #3 (title)\n", output.Stderr())
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Squashed and merged pull request #3 (title)\n", stderr.String())
 }
 
 func TestPRMerge_interactiveCancelled(t *testing.T) {
@@ -884,4 +891,10 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
+}
+
+type testEditor struct{}
+
+func (e testEditor) Edit(filename, text string) (string, error) {
+	return strings.ToUpper(text), nil
 }
