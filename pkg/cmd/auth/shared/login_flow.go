@@ -27,6 +27,8 @@ type LoginOptions struct {
 	Interactive bool
 	Web         bool
 	Scopes      []string
+
+	sshContext sshContext
 }
 
 func Login(opts *LoginOptions) error {
@@ -63,7 +65,7 @@ func Login(opts *LoginOptions) error {
 
 	var keyToUpload string
 	if opts.Interactive && gitProtocol == "ssh" {
-		pubKeys, err := localPublicKeys()
+		pubKeys, err := opts.sshContext.localPublicKeys()
 		if err != nil {
 			return err
 		}
@@ -82,7 +84,7 @@ func Login(opts *LoginOptions) error {
 			}
 		} else {
 			var err error
-			keyToUpload, err = generateSSHKey()
+			keyToUpload, err = opts.sshContext.generateSSHKey()
 			if err != nil {
 				return err
 			}
@@ -180,7 +182,7 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		err := sshKeyUpload(httpClient, keyToUpload)
+		err := sshKeyUpload(httpClient, hostname, keyToUpload)
 		if err != nil {
 			return err
 		}

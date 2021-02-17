@@ -22,8 +22,24 @@ import (
 	"github.com/cli/safeexec"
 )
 
-func localPublicKeys() ([]string, error) {
-	sshDir, err := config.HomeDirPath(".ssh")
+type sshContext struct {
+	configDir string
+	keygenExe string
+}
+
+func (c *sshContext) sshDir() (string, error) {
+	if c.configDir != "" {
+		return c.configDir, nil
+	}
+	dir, err := config.HomeDirPath(".ssh")
+	if err == nil {
+		c.configDir = dir
+	}
+	return dir, err
+}
+
+func (c *sshContext) localPublicKeys() ([]string, error) {
+	sshDir, err := c.sshDir()
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +47,11 @@ func localPublicKeys() ([]string, error) {
 	return filepath.Glob(filepath.Join(sshDir, "*.pub"))
 }
 
-func findKeygen() (string, error) {
+func (c *sshContext) findKeygen() (string, error) {
+	if c.keygenExe != "" {
+		return c.keygenExe, nil
+	}
+
 	keygenExe, err := safeexec.LookPath("ssh-keygen")
 	if err != nil && runtime.GOOS == "windows" {
 		// We can try and find ssh-keygen in a Git for Windows install
@@ -42,11 +62,15 @@ func findKeygen() (string, error) {
 			}
 		}
 	}
+
+	if err == nil {
+		c.keygenExe = keygenExe
+	}
 	return keygenExe, err
 }
 
-func generateSSHKey() (string, error) {
-	keygenExe, err := findKeygen()
+func (c *sshContext) generateSSHKey() (string, error) {
+	keygenExe, err := c.findKeygen()
 	if err != nil {
 		// give up silently if `ssh-keygen` is not available
 		return "", nil
@@ -64,7 +88,7 @@ func generateSSHKey() (string, error) {
 		return "", nil
 	}
 
-	sshDir, err := config.HomeDirPath(".ssh")
+	sshDir, err := c.sshDir()
 	if err != nil {
 		return "", err
 	}
@@ -78,13 +102,6 @@ func generateSSHKey() (string, error) {
 	}
 
 	var sshLabel string
-	// err = prompt.SurveyAskOne(&survey.Input{
-	// 	Message: "Enter the label for your new SSH key",
-	// }, &sshLabel)
-	// if err != nil {
-	// 	return "", fmt.Errorf("could not prompt: %w", err)
-	// }
-
 	var sshPassphrase string
 	err = prompt.SurveyAskOne(&survey.Password{
 		Message: "Enter a passphrase for your new SSH key (Optional)",
@@ -97,8 +114,8 @@ func generateSSHKey() (string, error) {
 	return keyFile + ".pub", run.PrepareCmd(keygenCmd).Run()
 }
 
-func sshKeyUpload(httpClient *http.Client, keyFile string) error {
-	url := ghinstance.RESTPrefix(ghinstance.OverridableDefault()) + "user/keys"
+func sshKeyUpload(httpClient *http.Client, hostname, keyFile string) error {
+	url := ghinstance.RESTPrefix(hostname) + "user/keys"
 
 	f, err := os.Open(keyFile)
 	if err != nil {
