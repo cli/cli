@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/browser"
 	"github.com/cli/cli/pkg/iostreams"
@@ -23,7 +22,12 @@ var (
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
 )
 
-func AuthFlowWithConfig(cfg config.Config, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
+type iconfig interface {
+	Set(string, string, string) error
+	Write() error
+}
+
+func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
 	stderr := IO.ErrOut
@@ -65,7 +69,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 
-	minimumScopes := []string{"repo", "read:org", "gist", "workflow"}
+	minimumScopes := []string{"repo", "read:org", "gist"}
 	scopes := append(minimumScopes, additionalScopes...)
 
 	callbackURI := "http://127.0.0.1/callback"
