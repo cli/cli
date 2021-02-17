@@ -27,6 +27,10 @@ func (t *issueTemplate) Name() string {
 	return t.Gname
 }
 
+func (t *issueTemplate) NameForSubmit() string {
+	return t.Gname
+}
+
 func (t *issueTemplate) Body() []byte {
 	return []byte(t.Gbody)
 }
@@ -95,6 +99,7 @@ func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, er
 
 type Template interface {
 	Name() string
+	NameForSubmit() string
 	Body() []byte
 }
 
@@ -123,7 +128,7 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir stri
 	}
 }
 
-func (m *templateManager) HasAPI() (bool, error) {
+func (m *templateManager) hasAPI() (bool, error) {
 	if m.isPR {
 		return false, nil
 	}
@@ -190,7 +195,7 @@ func (m *templateManager) memoizedFetch() error {
 }
 
 func (m *templateManager) fetch() error {
-	hasAPI, err := m.HasAPI()
+	hasAPI, err := m.hasAPI()
 	if err != nil {
 		return err
 	}
@@ -245,6 +250,10 @@ type filesystemTemplate struct {
 
 func (t *filesystemTemplate) Name() string {
 	return githubtemplate.ExtractName(t.path)
+}
+
+func (t *filesystemTemplate) NameForSubmit() string {
+	return ""
 }
 
 func (t *filesystemTemplate) Body() []byte {

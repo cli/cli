@@ -207,9 +207,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 				if template != nil {
 					templateContent = string(template.Body())
-					if ok, _ := tpl.HasAPI(); ok {
-						templateNameForSubmit = template.Name()
-					}
+					templateNameForSubmit = template.NameForSubmit()
 				} else {
 					templateContent = string(tpl.LegacyBody())
 				}
