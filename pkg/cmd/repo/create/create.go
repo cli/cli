@@ -304,32 +304,11 @@ func createRun(opts *CreateOptions) error {
 			}
 			if createLocalDirectory {
 				path := repo.Name
-
-				gitInit, err := git.GitCommand("init", path)
-				if err != nil {
-					return err
-				}
-				isTTY := opts.IO.IsStdoutTTY()
-				if isTTY {
-					gitInit.Stdout = stdout
-				}
-				gitInit.Stderr = stderr
-				err = run.PrepareCmd(gitInit).Run()
-				if err != nil {
-					return err
-				}
-				gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
-				if err != nil {
-					return err
-				}
-				gitRemoteAdd.Stdout = stdout
-				gitRemoteAdd.Stderr = stderr
-				err = run.PrepareCmd(gitRemoteAdd).Run()
-				if err != nil {
+				if err := localInit(opts.IO, remoteURL, path, opts.Template != ""); err != nil {
 					return err
 				}
 				if isTTY {
-					fmt.Fprintf(stderr, "%s Initialized repository in './%s/'\n", cs.SuccessIcon(), path)
+					fmt.Fprintf(stderr, "%s Initialized repository in \"%s\"\n", cs.SuccessIcon(), path)
 				}
 			}
 		}
@@ -338,6 +317,40 @@ func createRun(opts *CreateOptions) error {
 	}
 	fmt.Fprintln(opts.IO.Out, "Discarding...")
 	return nil
+}
+
+func localInit(io *iostreams.IOStreams, remoteURL, path string, isTemplate bool) error {
+	if isTemplate {
+		cloneCmd, err := git.GitCommand("clone", remoteURL, path)
+		if err != nil {
+			return err
+		}
+		cloneCmd.Stdout = io.Out
+		cloneCmd.Stderr = io.ErrOut
+		return run.PrepareCmd(cloneCmd).Run()
+	}
+
+	gitInit, err := git.GitCommand("init", path)
+	if err != nil {
+		return err
+	}
+	isTTY := io.IsStdoutTTY()
+	if isTTY {
+		gitInit.Stdout = io.Out
+	}
+	gitInit.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitInit).Run()
+	if err != nil {
+		return err
+	}
+
+	gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+	if err != nil {
+		return err
+	}
+	gitRemoteAdd.Stdout = io.Out
+	gitRemoteAdd.Stderr = io.ErrOut
+	return run.PrepareCmd(gitRemoteAdd).Run()
 }
 
 func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName string) (string, string, string, error) {
