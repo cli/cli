@@ -21,6 +21,7 @@ const (
 	PreviewAction
 	CancelAction
 	MetadataAction
+	EditCommitMessageAction
 
 	noMilestone = "(none)"
 )
