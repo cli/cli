@@ -36,6 +36,7 @@ type ForkOptions struct {
 	PromptClone  bool
 	PromptRemote bool
 	RemoteName   string
+	Rename       bool
 }
 
 var Since = func(t time.Time) time.Duration {
@@ -87,6 +88,10 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 
 			if promptOk && !cmd.Flags().Changed("remote") {
 				opts.PromptRemote = true
+			}
+
+			if !cmd.Flags().Changed("remote-name") {
+				opts.Rename = true
 			}
 
 			if runF != nil {
@@ -247,14 +252,18 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				renameTarget := "upstream"
-				renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
-				if err != nil {
-					return err
-				}
-				err = run.PrepareCmd(renameCmd).Run()
-				if err != nil {
-					return err
+				if opts.Rename {
+					renameTarget := "upstream"
+					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+					if err != nil {
+						return err
+					}
+					err = run.PrepareCmd(renameCmd).Run()
+					if err != nil {
+						return err
+					}
+				} else {
+					return fmt.Errorf("value of --remote-name can't already exist: '%s'", remoteName)
 				}
 			}
 

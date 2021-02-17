@@ -37,6 +37,7 @@ func TestNewCmdFork(t *testing.T) {
 				Repository: "foo/bar",
 				GitArgs:    []string{"TODO"},
 				RemoteName: "origin",
+				Rename:     true,
 			},
 		},
 		{
@@ -50,6 +51,7 @@ func TestNewCmdFork(t *testing.T) {
 			wants: ForkOptions{
 				Repository: "foo/bar",
 				RemoteName: "origin",
+				Rename:     true,
 			},
 		},
 		{
@@ -58,10 +60,20 @@ func TestNewCmdFork(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "remote name",
+			cli:  "--remote --remote-name=foo",
+			wants: ForkOptions{
+				RemoteName: "foo",
+				Rename:     false,
+				Remote:     true,
+			},
+		},
+		{
 			name: "blank nontty",
 			cli:  "",
 			wants: ForkOptions{
 				RemoteName: "origin",
+				Rename:     true,
 			},
 		},
 		{
@@ -72,6 +84,7 @@ func TestNewCmdFork(t *testing.T) {
 				RemoteName:   "origin",
 				PromptClone:  true,
 				PromptRemote: true,
+				Rename:       true,
 			},
 		},
 		{
@@ -79,6 +92,7 @@ func TestNewCmdFork(t *testing.T) {
 			cli:  "--clone",
 			wants: ForkOptions{
 				RemoteName: "origin",
+				Rename:     true,
 			},
 		},
 		{
@@ -87,6 +101,7 @@ func TestNewCmdFork(t *testing.T) {
 			wants: ForkOptions{
 				RemoteName: "origin",
 				Remote:     true,
+				Rename:     true,
 			},
 		},
 	}
@@ -235,6 +250,22 @@ func TestRepoFork_no_conflicting_remote(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func TestRepoFork_existing_remote_error(t *testing.T) {
+	defer stubSince(2 * time.Second)()
+	reg := &httpmock.Registry{}
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	_, err := runCommand(httpClient, nil, true, "--remote --remote-name='origin'")
+	if err == nil {
+		t.Fatal("expected error running command `repo fork`")
+	}
+
+	assert.Equal(t, "value of --remote-name can't already exist: 'origin'", err.Error())
+
+	reg.Verify(t)
 }
 
 func TestRepoFork_in_parent_tty(t *testing.T) {
