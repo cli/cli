@@ -87,6 +87,8 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 			api.AddHeaderFunc("Accept", func(req *http.Request) (string, error) {
 				// antiope-preview: Checks
 				accept := "application/vnd.github.antiope-preview+json"
+				// introduced for #2952: pr branch up to date status
+				accept += ", application/vnd.github.merge-info-preview+json"
 				if ghinstance.IsEnterprise(req.URL.Hostname()) {
 					// shadow-cat-preview: Draft pull requests
 					accept += ", application/vnd.github.shadow-cat-preview"
