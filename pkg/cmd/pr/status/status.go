@@ -114,7 +114,7 @@ func statusRun(opts *StatusOptions) error {
 		currentPR = nil
 	}
 	if currentPR != nil {
-		printPrs(opts.IO, 1, prPayload.StrictProtection, *currentPR)
+		printPrs(opts.IO, 1, *currentPR)
 	} else if currentPRHeadRef == "" {
 		shared.PrintMessage(opts.IO, "  There is no current branch")
 	} else {
@@ -124,7 +124,7 @@ func statusRun(opts *StatusOptions) error {
 
 	shared.PrintHeader(opts.IO, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
-		printPrs(opts.IO, prPayload.ViewerCreated.TotalCount, prPayload.StrictProtection, prPayload.ViewerCreated.PullRequests...)
+		printPrs(opts.IO, prPayload.ViewerCreated.TotalCount, prPayload.ViewerCreated.PullRequests...)
 	} else {
 		shared.PrintMessage(opts.IO, "  You have no open pull requests")
 	}
@@ -132,7 +132,7 @@ func statusRun(opts *StatusOptions) error {
 
 	shared.PrintHeader(opts.IO, "Requesting a code review from you")
 	if prPayload.ReviewRequested.TotalCount > 0 {
-		printPrs(opts.IO, prPayload.ReviewRequested.TotalCount, prPayload.StrictProtection, prPayload.ReviewRequested.PullRequests...)
+		printPrs(opts.IO, prPayload.ReviewRequested.TotalCount, prPayload.ReviewRequested.PullRequests...)
 	} else {
 		shared.PrintMessage(opts.IO, "  You have no pull requests to review")
 	}
@@ -178,7 +178,7 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 	return
 }
 
-func printPrs(io *iostreams.IOStreams, totalCount int, strictProtection bool, prs ...api.PullRequest) {
+func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	w := io.Out
 	cs := io.ColorScheme()
 
@@ -228,15 +228,14 @@ func printPrs(io *iostreams.IOStreams, totalCount int, strictProtection bool, pr
 				fmt.Fprint(w, cs.Green("✓ Approved"))
 			}
 
-			// only check if the "up to date" setting is checked in repo settings
-			if strictProtection {
-				// add padding between reviews & merge status
-				fmt.Fprint(w, " ")
-
-				if pr.MergeStateStatus == "BEHIND" {
-					fmt.Fprint(w, cs.Yellow("- Not up to date"))
-				} else {
-					fmt.Fprint(w, cs.Green("✓ Up to date"))
+			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {
+				switch pr.MergeStateStatus {
+				case "BEHIND":
+					fmt.Fprintf(w, " %s", cs.Yellow("- Not up to date"))
+				case "UNKNOWN", "DIRTY":
+					// do not print anything
+				default:
+					fmt.Fprintf(w, " %s", cs.Green("✓ Up to date"))
 				}
 			}
 
