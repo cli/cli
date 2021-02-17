@@ -1,6 +1,7 @@
 package fork
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -71,6 +72,10 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 			if len(args) > 0 {
 				opts.Repository = args[0]
 				opts.GitArgs = args[1:]
+			}
+
+			if opts.RemoteName == "" {
+				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
 			}
 
 			if promptOk && !cmd.Flags().Changed("clone") {
