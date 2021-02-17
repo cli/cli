@@ -3,6 +3,7 @@ package merge
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
@@ -97,4 +98,41 @@ func disableAutoMerge(client *http.Client, repo ghrepo.Interface, prID string) e
 
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
 	return gql.MutateNamed(context.Background(), "PullRequestAutoMergeDisable", &mutation, variables)
+}
+
+func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, mergeMethod PullRequestMergeMethod) (string, error) {
+	var method githubv4.PullRequestMergeMethod
+	switch mergeMethod {
+	case PullRequestMergeMethodMerge:
+		method = githubv4.PullRequestMergeMethodMerge
+	case PullRequestMergeMethodRebase:
+		method = githubv4.PullRequestMergeMethodRebase
+	case PullRequestMergeMethodSquash:
+		method = githubv4.PullRequestMergeMethodSquash
+	}
+
+	var query struct {
+		Node struct {
+			PullRequest struct {
+				ViewerMergeBodyText string `graphql:"viewerMergeBodyText(mergeType: $method)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $prID)"`
+	}
+
+	variables := map[string]interface{}{
+		"prID":   githubv4.ID(prID),
+		"method": method,
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+	err := gql.QueryNamed(context.Background(), "PullRequestMergeText", &query, variables)
+	if err != nil {
+		// Tolerate this API missing in older GitHub Enterprise
+		if strings.Contains(err.Error(), "Field 'viewerMergeBodyText' doesn't exist") {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return query.Node.PullRequest.ViewerMergeBodyText, nil
 }

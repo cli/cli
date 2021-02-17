@@ -704,6 +704,12 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 			"squashMergeAllowed": true
 		} } }`))
 	http.Register(
+		httpmock.GraphQL(`query PullRequestMergeText\b`),
+		httpmock.StringResponse(`
+		{ "data": { "node": {
+			"viewerMergeBodyText": ""
+		} } }`))
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))

@@ -204,11 +204,10 @@ func mergeRun(opts *MergeOptions) error {
 					return err
 				}
 
-				if payload.commitBody == "" {
-					if payload.method == PullRequestMergeMethodMerge {
-						payload.commitBody = pr.Title
-					} else {
-						payload.commitBody = pr.ViewerMergeBodyText
+				if !payload.setCommitBody {
+					payload.commitBody, err = getMergeText(httpClient, baseRepo, pr.ID, payload.method)
+					if err != nil {
+						return err
 					}
 				}
 
