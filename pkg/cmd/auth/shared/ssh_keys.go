@@ -121,6 +121,7 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	keyBytes, err := ioutil.ReadAll(f)
 	if err != nil {
 		return err
