@@ -132,6 +132,7 @@ func createRun(opts *CreateOptions) error {
 	isNameAnArg := false
 	isDescEmpty := opts.Description == ""
 	isVisibilityPassed := false
+	inLocalRepo := projectDirErr == nil
 
 	if opts.Name != "" {
 		isNameAnArg = true
@@ -250,7 +251,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, projectDirErr)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerID, inLocalRepo)
 		if err != nil {
 			return err
 		}
@@ -284,7 +285,7 @@ func createRun(opts *CreateOptions) error {
 		}
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-		if projectDirErr == nil {
+		if inLocalRepo {
 			_, err = git.AddRemote("origin", remoteURL)
 			if err != nil {
 				return err
@@ -295,7 +296,7 @@ func createRun(opts *CreateOptions) error {
 		} else {
 			if opts.IO.CanPrompt() {
 				if !createLocalDirectory {
-					err := prompt.Confirm(fmt.Sprintf("Create a local project directory for %s?", ghrepo.FullName(repo)), &createLocalDirectory)
+					err := prompt.Confirm(fmt.Sprintf(`Create a local project directory for "%s"?`, ghrepo.FullName(repo)), &createLocalDirectory)
 					if err != nil {
 						return err
 					}
@@ -388,16 +389,18 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, projectDirErr error) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
-	if projectDirErr == nil {
-		promptString = "This will add remote origin to your current directory. Continue? "
-	} else if repoOwner != "" {
-		promptString = fmt.Sprintf("This will create '%s/%s' in your current directory. Continue? ", repoOwner, repoName)
+	if inLocalRepo {
+		promptString = `This will add an "origin" git remote to your local repository. Continue?`
 	} else {
-		promptString = fmt.Sprintf("This will create '%s' in your current directory. Continue? ", repoName)
+		targetRepo := repoName
+		if repoOwner != "" {
+			targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
+		}
+		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
 	}
 
 	confirmSubmitQuestion := &survey.Question{
