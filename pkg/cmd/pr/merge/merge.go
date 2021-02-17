@@ -32,7 +32,7 @@ type MergeOptions struct {
 	DeleteBranch bool
 	MergeMethod  PullRequestMergeMethod
 
-	AutoMerge        bool
+	AutoMergeEnable  bool
 	AutoMergeDisable bool
 
 	Body    string
@@ -115,7 +115,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
-	cmd.Flags().BoolVar(&opts.AutoMerge, "auto", false, "Automatically merge only after necessary requirements are met")
+	cmd.Flags().BoolVar(&opts.AutoMergeEnable, "auto", false, "Automatically merge only after necessary requirements are met")
 	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
 	return cmd
 }
@@ -171,7 +171,7 @@ func mergeRun(opts *MergeOptions) error {
 			repo:          baseRepo,
 			pullRequestID: pr.ID,
 			method:        opts.MergeMethod,
-			auto:          opts.AutoMerge,
+			auto:          opts.AutoMergeEnable,
 			commitBody:    opts.Body,
 			setCommitBody: opts.BodySet,
 		}
@@ -254,7 +254,7 @@ func mergeRun(opts *MergeOptions) error {
 				fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
 			}
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMerge {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMergeEnable {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
@@ -266,7 +266,7 @@ func mergeRun(opts *MergeOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch || crossRepoPR || opts.AutoMerge {
+	if !deleteBranch || crossRepoPR || opts.AutoMergeEnable {
 		return nil
 	}
 

@@ -69,7 +69,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 
 	if payload.auto {
 		var mutation struct {
-			AnablePullRequestAutoMerge struct {
+			EnablePullRequestAutoMerge struct {
 				ClientMutationId string
 			} `graphql:"enablePullRequestAutoMerge(input: $input)"`
 		}

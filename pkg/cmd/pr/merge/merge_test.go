@@ -801,3 +801,87 @@ func Test_mergeMethodSurvey(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, PullRequestMergeMethodRebase, method)
 }
+
+func TestMergeRun_autoMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequest": {
+			"id": "THE-ID",
+			"number": 123,
+			"title": "The title of the PR",
+			"state": "OPEN",
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"}
+		} } } }`))
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeEnable: true,
+		MergeMethod:     PullRequestMergeMethodSquash,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+}
+
+func TestMergeRun_disableAutoMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestByNumber\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "pullRequest": {
+			"id": "THE-ID",
+			"number": 123,
+			"title": "The title of the PR",
+			"state": "OPEN",
+			"headRefName": "blueberries",
+			"headRepositoryOwner": {"login": "OWNER"}
+		} } } }`))
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestAutoMergeDisable\b`),
+		httpmock.StringResponse(`{}`))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:      "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeDisable: true,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
+}
