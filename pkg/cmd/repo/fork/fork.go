@@ -263,7 +263,7 @@ func forkRun(opts *ForkOptions) error {
 						return err
 					}
 				} else {
-					return fmt.Errorf("value of --remote-name can't already exist: '%s'", remoteName)
+					return fmt.Errorf("a git remote named '%s' already exists", remoteName)
 				}
 			}
 

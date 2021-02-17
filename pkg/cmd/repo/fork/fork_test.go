@@ -263,7 +263,7 @@ func TestRepoFork_existing_remote_error(t *testing.T) {
 		t.Fatal("expected error running command `repo fork`")
 	}
 
-	assert.Equal(t, "value of --remote-name can't already exist: 'origin'", err.Error())
+	assert.Equal(t, "a git remote named 'origin' already exists", err.Error())
 
 	reg.Verify(t)
 }
