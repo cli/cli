@@ -20,6 +20,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type editor interface {
+	Edit(string, string) (string, error)
+}
+
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -37,6 +41,7 @@ type MergeOptions struct {
 
 	Body    string
 	BodySet bool
+	Editor  editor
 
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
@@ -102,6 +107,11 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 			opts.BodySet = cmd.Flags().Changed("body")
+
+			opts.Editor = &userEditor{
+				io:     opts.IO,
+				config: opts.Config,
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -198,12 +208,6 @@ func mergeRun(opts *MergeOptions) error {
 			}
 
 			if action == shared.EditCommitMessageAction {
-				var editorCommand string
-				editorCommand, err = cmdutil.DetermineEditor(opts.Config)
-				if err != nil {
-					return err
-				}
-
 				if !payload.setCommitBody {
 					payload.commitBody, err = getMergeText(httpClient, baseRepo, pr.ID, payload.method)
 					if err != nil {
@@ -211,7 +215,7 @@ func mergeRun(opts *MergeOptions) error {
 					}
 				}
 
-				payload.commitBody, err = commitMsgSurvey(payload.commitBody, editorCommand)
+				payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
 				if err != nil {
 					return err
 				}
@@ -410,17 +414,16 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	}
 }
 
-func commitMsgSurvey(msg string, editorCommand string) (string, error) {
-	var result string
-	q := &surveyext.GhEditor{
-		EditorCommand: editorCommand,
-		Editor: &survey.Editor{
-			Message:       "Body",
-			AppendDefault: true,
-			Default:       msg,
-			FileName:      "*.md",
-		},
+type userEditor struct {
+	io     *iostreams.IOStreams
+	config func() (config.Config, error)
+}
+
+func (e *userEditor) Edit(filename, startingText string) (string, error) {
+	editorCommand, err := cmdutil.DetermineEditor(e.config)
+	if err != nil {
+		return "", err
 	}
-	err := prompt.SurveyAskOne(q, &result)
-	return result, err
+
+	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
 }
