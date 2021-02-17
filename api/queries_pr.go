@@ -16,11 +16,10 @@ import (
 )
 
 type PullRequestsPayload struct {
-	ViewerCreated    PullRequestAndTotalCount
-	ReviewRequested  PullRequestAndTotalCount
-	CurrentPR        *PullRequest
-	DefaultBranch    string
-	StrictProtection bool
+	ViewerCreated   PullRequestAndTotalCount
+	ReviewRequested PullRequestAndTotalCount
+	CurrentPR       *PullRequest
+	DefaultBranch   string
 }
 
 type PullRequestAndTotalCount struct {
@@ -56,6 +55,12 @@ type PullRequest struct {
 	IsCrossRepository   bool
 	IsDraft             bool
 	MaintainerCanModify bool
+
+	BaseRef struct {
+		BranchProtectionRule struct {
+			RequiresStrictStatusChecks bool
+		}
+	}
 
 	ReviewDecision string
 
@@ -283,10 +288,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 	type response struct {
 		Repository struct {
 			DefaultBranchRef struct {
-				Name                 string
-				BranchProtectionRule struct {
-					RequiresStrictStatusChecks bool
-				}
+				Name string
 			}
 			PullRequests edges
 			PullRequest  *PullRequest
@@ -341,6 +343,11 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		mergeStateStatus
 		headRepositoryOwner {
 			login
+		}
+		baseRef {
+			branchProtectionRule {
+				requiresStrictStatusChecks
+			}
 		}
 		isCrossRepository
 		isDraft
@@ -467,9 +474,8 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 			PullRequests: reviewRequested,
 			TotalCount:   resp.ReviewRequested.TotalCount,
 		},
-		CurrentPR:        currentPR,
-		DefaultBranch:    resp.Repository.DefaultBranchRef.Name,
-		StrictProtection: resp.Repository.DefaultBranchRef.BranchProtectionRule.RequiresStrictStatusChecks,
+		CurrentPR:     currentPR,
+		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
 	}
 
 	return &payload, nil
