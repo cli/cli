@@ -5,6 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -15,12 +22,6 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/pkg/surveyext"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 )
 
 type EditOptions struct {
@@ -28,8 +29,8 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 
-	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
-
+	Edit         func(string, string, string, *iostreams.IOStreams) (string, error)
+	Add          func(string, string, *iostreams.IOStreams) (string, error)
 	Selector     string
 	EditFilename string
 	AddFilename  string
@@ -45,6 +46,13 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				editorCmd,
 				"*."+filename,
 				defaultContent,
+				io.In, io.Out, io.ErrOut, nil)
+		},
+		Add: func(editorCmd, filename string, io *iostreams.IOStreams) (string, error) {
+			return surveyext.Edit(
+				editorCmd,
+				"*."+filename,
+				"",
 				io.In, io.Out, io.ErrOut, nil)
 		},
 	}
@@ -104,59 +112,33 @@ func editRun(opts *EditOptions) error {
 	filesToUpdate := map[string]string{}
 
 	addFilename := opts.AddFilename
-	fileExists := false
+	cs := opts.IO.ColorScheme()
 
 	if addFilename != "" {
-		//Add files to an existing gist
-		if fi, err := os.Stat(addFilename); err != nil {
-			return err
-		} else {
-			switch mode := fi.Mode(); {
-			case mode.IsDir():
-				return fmt.Errorf("found directory %s", addFilename)
-			case mode.IsRegular():
-				fileExists = true
-			}
-		}
-
-		wd, err := os.Getwd()
+		//Add files to an existing gist. Aborts when file is already present
+		// in the directory but the user chooses not to proceed
+		filenamePath, fileExists, userAbort, err := processFiles(addFilename)
 		if err != nil {
-			return err
-		}
-
-		m, err := filepath.Glob(wd + "/[^.]*.*")
-		if err != nil {
-			return err
+			return fmt.Errorf("%s %s", cs.Red("!"), err)
 		}
 
 		filesToAdd := map[string]*shared.GistFile{}
 
-		for _, f := range m {
-			if addFilename == filepath.Base(f) {
-				choice := false
-				err := prompt.Confirm("File found in this directory. Proceed?", &choice)
-				if err != nil {
-					return err
-				}
-
-				if choice {
-					fileExists = true
-				}
-				break
-			}
+		if userAbort {
+			return nil
 		}
 
+		filename := filepath.Base(filenamePath)
+
 		if fileExists {
-			content, err := ioutil.ReadFile(addFilename)
+			content, err := ioutil.ReadFile(filenamePath)
 			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", addFilename, err)
+				return fmt.Errorf("%s failed to read file %s: %w", cs.FailureIcon(), addFilename, err)
 			}
 
 			if string(content) == "" {
-				return fmt.Errorf("Contents can't be empty")
+				return fmt.Errorf("%s Contents can't be empty", cs.FailureIcon())
 			}
-
-			filename := filepath.Base(addFilename)
 
 			filesToAdd[filename] = &shared.GistFile{
 				Filename: filename,
@@ -169,17 +151,17 @@ func editRun(opts *EditOptions) error {
 				return err
 			}
 
-			text, err := opts.Edit(editorCommand, addFilename, "", opts.IO)
+			text, err := opts.Add(editorCommand, filename, opts.IO)
 			if err != nil {
 				return err
 			}
 
 			if text == "" {
-				return fmt.Errorf("Contents can't be empty")
+				return fmt.Errorf("%s Contents can't be empty", cs.Red("!"))
 			}
 
-			filesToAdd[addFilename] = &shared.GistFile{
-				Filename: addFilename,
+			filesToAdd[filename] = &shared.GistFile{
+				Filename: filename,
 				Content:  text,
 			}
 
@@ -190,6 +172,11 @@ func editRun(opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
+
+		completionMessage := filename + " added to gist"
+
+		fmt.Fprintf(opts.IO.Out, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
+
 	} else {
 		for {
 			filename := opts.EditFilename
@@ -314,4 +301,47 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	}
 
 	return nil
+}
+
+func processFiles(filename string) (string, bool, bool, error) {
+	fileExists := false
+
+	if fi, err := os.Stat(filename); err != nil {
+	} else {
+		switch mode := fi.Mode(); {
+		case mode.IsDir():
+			return "", false, false, fmt.Errorf("found directory %s" , filename)
+		case mode.IsRegular():
+			fileExists = true
+		}
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", false, false, err
+	}
+
+	m, err := filepath.Glob(wd + "/[^.]*.*")
+	if err != nil {
+		return "", false, false, err
+	}
+
+	for _, f := range m {
+		if filename == filepath.Base(f) {
+			choice := false
+			err := prompt.Confirm("File found in this directory. Proceed?", &choice)
+			if err != nil {
+				return "", false, false, err
+			}
+
+			if choice {
+				fileExists = true
+			} else {
+				return "", true, true, nil
+			}
+			break
+		}
+	}
+
+	return filename, fileExists, false, nil
 }
