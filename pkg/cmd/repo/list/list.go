@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
@@ -153,13 +152,13 @@ func listRun(opts *ListOptions) error {
 
 		if tp.IsTTY() {
 			tp.AddField(nameWithOwner, nil, cs.Bold)
-			tp.AddField(info, nil, infoColor)
 			tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
+			tp.AddField(info, nil, infoColor)
 			tp.AddField(utils.FuzzyAgoAbbr(now, repo.UpdatedAt), nil, nil)
 		} else {
 			tp.AddField(nameWithOwner, nil, nil)
-			tp.AddField(visibility, nil, nil)
 			tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
+			tp.AddField(visibility, nil, nil)
 			tp.AddField(updatedAt, nil, nil)
 		}
 		tp.EndRow()
@@ -196,22 +195,21 @@ type Repository struct {
 
 func (r Repository) Info() string {
 	var info string
+	var tags []string
 
 	if r.IsPrivate {
-		info = "private"
+		tags = append(tags, "private")
 	}
 	if r.IsFork {
-		info += " fork"
+		tags = append(tags, "fork")
 	}
 	if r.IsArchived {
-		info += " archived"
+		tags = append(tags, "archived")
 	}
 
-	if info != "" {
-		info = strings.TrimPrefix(info, " ")
-		infoRunes := []rune(info)
-		infoRunes[0] = unicode.ToUpper(infoRunes[0])
-		info = fmt.Sprintf("(%s)", string(infoRunes))
+	if len(tags) > 0 {
+		tags[0] = strings.Title(tags[0])
+		info = strings.Join(tags, ", ")
 	}
 
 	return info
