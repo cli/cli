@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
+	"golang.org/x/sync/errgroup"
 )
 
 type PullRequestsPayload struct {
@@ -232,14 +233,16 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 }
 
 type pullRequestFeature struct {
-	HasReviewDecision    bool
-	HasStatusCheckRollup bool
+	HasReviewDecision       bool
+	HasStatusCheckRollup    bool
+	HasBranchProtectionRule bool
 }
 
 func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prFeatures pullRequestFeature, err error) {
 	if !ghinstance.IsEnterprise(hostname) {
 		prFeatures.HasReviewDecision = true
 		prFeatures.HasStatusCheckRollup = true
+		prFeatures.HasBranchProtectionRule = true
 		return
 	}
 
@@ -256,8 +259,26 @@ func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prF
 		} `graphql:"Commit: __type(name: \"Commit\")"`
 	}
 
+	// needs to be a separate query because the backend only supports 2 `__type` expressions in one query
+	var featureDetection2 struct {
+		Ref struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Ref: __type(name: \"Ref\")"`
+	}
+
 	v4 := graphQLClient(httpClient, hostname)
-	err = v4.QueryNamed(context.Background(), "PullRequest_fields", &featureDetection, nil)
+
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		return v4.QueryNamed(context.Background(), "PullRequest_fields", &featureDetection, nil)
+	})
+	g.Go(func() error {
+		return v4.QueryNamed(context.Background(), "PullRequest_fields2", &featureDetection2, nil)
+	})
+
+	err = g.Wait()
 	if err != nil {
 		return
 	}
@@ -272,6 +293,12 @@ func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prF
 		switch field.Name {
 		case "statusCheckRollup":
 			prFeatures.HasStatusCheckRollup = true
+		}
+	}
+	for _, field := range featureDetection2.Ref.Fields {
+		switch field.Name {
+		case "branchProtectionRule":
+			prFeatures.HasBranchProtectionRule = true
 		}
 	}
 	return
@@ -333,6 +360,16 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		`
 	}
 
+	var requiresStrictStatusChecks string
+	if prFeatures.HasBranchProtectionRule {
+		requiresStrictStatusChecks = `
+		baseRef {
+			branchProtectionRule {
+				requiresStrictStatusChecks
+			}
+		}`
+	}
+
 	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {
 		number
@@ -344,11 +381,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		headRepositoryOwner {
 			login
 		}
-		baseRef {
-			branchProtectionRule {
-				requiresStrictStatusChecks
-			}
-		}
+		%s
 		isCrossRepository
 		isDraft
 		%s
@@ -357,16 +390,13 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		...pr
 		%s
 	}
-	`, statusesFragment, reviewsFragment)
+	`, requiresStrictStatusChecks, statusesFragment, reviewsFragment)
 
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
 			defaultBranchRef { 
 				name 
-				branchProtectionRule {
-					requiresStrictStatusChecks
-				}
 			}
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
@@ -382,12 +412,9 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		queryPrefix = `
 		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-			defaultBranchRef { 
-				name 
-				branchProtectionRule {
-					requiresStrictStatusChecks
+				defaultBranchRef { 
+					name 
 				}
-			}
 				pullRequest(number: $number) {
 					...prWithReviews
 				}
