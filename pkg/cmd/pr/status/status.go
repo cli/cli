@@ -227,6 +227,18 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.Approved {
 				fmt.Fprint(w, cs.Green("✓ Approved"))
 			}
+
+			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {
+				switch pr.MergeStateStatus {
+				case "BEHIND":
+					fmt.Fprintf(w, " %s", cs.Yellow("- Not up to date"))
+				case "UNKNOWN", "DIRTY":
+					// do not print anything
+				default:
+					fmt.Fprintf(w, " %s", cs.Green("✓ Up to date"))
+				}
+			}
+
 		} else {
 			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(cs, pr))
 		}
