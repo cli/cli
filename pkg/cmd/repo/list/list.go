@@ -20,7 +20,6 @@ type FilterOptions struct {
 	Visibility string // private, public
 	Fork       bool
 	Source     bool
-	Archived   bool
 }
 
 type ListOptions struct {
@@ -33,7 +32,6 @@ type ListOptions struct {
 	Visibility string
 	Fork       bool
 	Source     bool
-	Archived   bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -43,11 +41,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	var (
-		flagPublic   bool
-		flagPrivate  bool
-		flagSource   bool
-		flagFork     bool
-		flagArchived bool
+		flagPublic  bool
+		flagPrivate bool
+		flagSource  bool
+		flagFork    bool
 	)
 
 	cmd := &cobra.Command{
@@ -72,7 +69,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				opts.Visibility = "public"
 			}
 
-			opts.Archived = flagArchived
 			opts.Fork = flagFork
 			opts.Source = flagSource
 
@@ -91,7 +87,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&flagPrivate, "private", false, "Show only private repositories")
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
 	cmd.Flags().BoolVar(&flagSource, "source", false, "Show only source repositories")
-	cmd.Flags().BoolVar(&flagArchived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&flagFork, "fork", false, "Show only forks")
 
 	return cmd
@@ -119,7 +114,6 @@ func listRun(opts *ListOptions) error {
 		Visibility: opts.Visibility,
 		Fork:       opts.Fork,
 		Source:     opts.Source,
-		Archived:   opts.Archived,
 	}
 
 	listResult, err := listRepos(apiClient, ghinstance.OverridableDefault(), opts.Limit, owner, filter)
@@ -131,7 +125,7 @@ func listRun(opts *ListOptions) error {
 
 	tp := utils.NewTablePrinter(opts.IO)
 
-	notArchived := (filter.Fork || filter.Source) && !filter.Archived
+	notArchived := filter.Fork || filter.Source
 
 	matchCount := len(listResult.Repositories)
 	now := time.Now()
@@ -172,7 +166,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if isTerminal {
-		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Archived
+		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source
 		title := listHeader(owner, matchCount, listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}

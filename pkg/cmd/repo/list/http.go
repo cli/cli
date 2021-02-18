@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/cli/cli/api"
@@ -14,35 +13,21 @@ type RepositoryList struct {
 }
 
 func listRepos(client *api.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	type reposBlock struct {
-		TotalCount      int
-		RepositoryCount int
-		Nodes           []Repository
-		PageInfo        struct {
-			HasNextPage bool
-			EndCursor   string
-		}
-	}
-
 	type response struct {
 		RepositoryOwner struct {
-			Repositories reposBlock
+			Repositories struct {
+				TotalCount      int
+				RepositoryCount int
+				Nodes           []Repository
+				PageInfo        struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			}
 		}
-		Search reposBlock
 	}
 
-	fragment := `
-	fragment repo on Repository {
-		nameWithOwner
-		description
-		isFork
-		isPrivate
-		isArchived
-		updatedAt
-	}`
-
-	// If `--archived` wasn't specified, use `repositoryOwner.repositores`
-	query := fragment + `
+	query := `
 	query RepoList($owner: String!, $per_page: Int!, $endCursor: String, $fork: Boolean, $privacy: RepositoryPrivacy) {
 		repositoryOwner(login: $owner) {
 			repositories(
@@ -54,7 +39,12 @@ func listRepos(client *api.Client, hostname string, limit int, owner string, fil
 				orderBy: { field: UPDATED_AT, direction: DESC }) {
 					totalCount
 					nodes {
-						...repo
+						nameWithOwner
+						description
+						isFork
+						isPrivate
+						isArchived
+						updatedAt
 					}
 					pageInfo {
 						hasNextPage
@@ -70,59 +60,23 @@ func listRepos(client *api.Client, hostname string, limit int, owner string, fil
 	}
 
 	variables := map[string]interface{}{
+		"owner":     githubv4.String(owner),
 		"per_page":  githubv4.Int(perPage),
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	hasArchivedFilter := filter.Archived
-
-	if hasArchivedFilter {
-		// If `--archived` was specified, use the `search` API rather than
-		// `repositoryOwner.repositories`
-		query = fragment + `
-		query RepoList($per_page: Int!, $endCursor: String, $query: String!) {
-			search(first: $per_page, after:$endCursor, type: REPOSITORY, query: $query) {
-				repositoryCount
-				nodes {
-					... on Repository {
-						...repo
-					}
-				}
-				pageInfo {
-					hasNextPage
-					endCursor
-				}
-			}
-		}`
-
-		search := []string{fmt.Sprintf("user:%s archived:true fork:true sort:updated-desc", owner)}
-
-		switch filter.Visibility {
-		case "private":
-			search = append(search, "is:private")
-		case "public":
-			search = append(search, "is:public")
-		default:
-			search = append(search, "is:all")
-		}
-
-		variables["query"] = strings.Join(search, " ")
+	if filter.Visibility != "" {
+		variables["privacy"] = githubv4.RepositoryPrivacy(strings.ToUpper(filter.Visibility))
 	} else {
-		variables["owner"] = githubv4.String(owner)
+		variables["privacy"] = (*githubv4.RepositoryPrivacy)(nil)
+	}
 
-		if filter.Visibility != "" {
-			variables["privacy"] = githubv4.RepositoryPrivacy(strings.ToUpper(filter.Visibility))
-		} else {
-			variables["privacy"] = (*githubv4.RepositoryPrivacy)(nil)
-		}
-
-		if filter.Fork {
-			variables["fork"] = githubv4.Boolean(true)
-		} else if filter.Source {
-			variables["fork"] = githubv4.Boolean(false)
-		} else {
-			variables["fork"] = (*githubv4.Boolean)(nil)
-		}
+	if filter.Fork {
+		variables["fork"] = githubv4.Boolean(true)
+	} else if filter.Source {
+		variables["fork"] = githubv4.Boolean(false)
+	} else {
+		variables["fork"] = (*githubv4.Boolean)(nil)
 	}
 
 	var repos []Repository
@@ -137,11 +91,7 @@ pagination:
 			return nil, err
 		}
 
-		if hasArchivedFilter {
-			repos = append(repos, result.Search.Nodes...)
-		} else {
-			repos = append(repos, result.RepositoryOwner.Repositories.Nodes...)
-		}
+		repos = append(repos, result.RepositoryOwner.Repositories.Nodes...)
 
 		if len(repos) >= limit {
 			if len(repos) > limit {
@@ -151,21 +101,13 @@ pagination:
 		}
 
 		if !result.RepositoryOwner.Repositories.PageInfo.HasNextPage {
-			if !result.Search.PageInfo.HasNextPage {
-				break
-			}
+			break
 		}
 
 		variables["endCursor"] = githubv4.String(result.RepositoryOwner.Repositories.PageInfo.EndCursor)
-		if hasArchivedFilter {
-			variables["endCursor"] = githubv4.String(result.Search.PageInfo.EndCursor)
-		}
 	}
 
 	totalCount = result.RepositoryOwner.Repositories.TotalCount
-	if hasArchivedFilter {
-		totalCount = result.Search.RepositoryCount
-	}
 
 	listResult := &RepositoryList{
 		Repositories: repos,
