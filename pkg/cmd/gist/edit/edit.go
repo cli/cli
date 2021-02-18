@@ -115,18 +115,13 @@ func editRun(opts *EditOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	if addFilename != "" {
-		//Add files to an existing gist. Aborts when file is already present
-		// in the directory but the user chooses not to proceed
-		filenamePath, fileExists, userAbort, err := processFiles(addFilename)
+		//Add files to an existing gist.
+		filenamePath, fileExists, err := processFiles(addFilename)
 		if err != nil {
 			return fmt.Errorf("%s %s", cs.Red("!"), err)
 		}
 
 		filesToAdd := map[string]*shared.GistFile{}
-
-		if userAbort {
-			return nil
-		}
 
 		filename := filepath.Base(filenamePath)
 
@@ -303,14 +298,14 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	return nil
 }
 
-func processFiles(filename string) (string, bool, bool, error) {
+func processFiles(filename string) (string, bool, error) {
 	fileExists := false
 
 	if fi, err := os.Stat(filename); err != nil {
 	} else {
 		switch mode := fi.Mode(); {
 		case mode.IsDir():
-			return "", false, false, fmt.Errorf("found directory %s" , filename)
+			return "", false, fmt.Errorf("found directory %s" , filename)
 		case mode.IsRegular():
 			fileExists = true
 		}
@@ -318,30 +313,20 @@ func processFiles(filename string) (string, bool, bool, error) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", false, false, err
+		return "", false, err
 	}
 
 	m, err := filepath.Glob(wd + "/[^.]*.*")
 	if err != nil {
-		return "", false, false, err
+		return "", false, err
 	}
 
 	for _, f := range m {
 		if filename == filepath.Base(f) {
-			choice := false
-			err := prompt.Confirm("File found in this directory. Proceed?", &choice)
-			if err != nil {
-				return "", false, false, err
-			}
-
-			if choice {
-				fileExists = true
-			} else {
-				return "", true, true, nil
-			}
+			fileExists = true
 			break
 		}
 	}
 
-	return filename, fileExists, false, nil
+	return filename, fileExists, nil
 }
