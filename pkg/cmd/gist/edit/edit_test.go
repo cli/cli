@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	fixtureFile = "../fixture.txt"
+	fixtureFile     = "../fixture.txt"
 	nonExistentFile = "../file.txt"
 )
 
@@ -261,7 +261,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename:  "foo.txt",
+				AddFilename: "foo.txt",
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
@@ -293,7 +293,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename:  "/Users/octocat/foo.txt",
+				AddFilename: "/Users/octocat/foo.txt",
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
@@ -325,7 +325,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename:  "../foo.txt",
+				AddFilename: "../foo.txt",
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
