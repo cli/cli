@@ -305,7 +305,7 @@ func processFiles(filename string) (string, bool, error) {
 	} else {
 		switch mode := fi.Mode(); {
 		case mode.IsDir():
-			return "", false, fmt.Errorf("found directory %s" , filename)
+			return "", false, fmt.Errorf("found directory %s", filename)
 		case mode.IsRegular():
 			fileExists = true
 		}
