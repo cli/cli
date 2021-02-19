@@ -10,8 +10,8 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Get(host, key string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], nil
+func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
+	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
 }
 
 func Test_helperRun(t *testing.T) {
@@ -29,6 +29,7 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
 						"example.com:user":        "monalisa",
 						"example.com:oauth_token": "OTOKEN",
 					}, nil
@@ -53,6 +54,7 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
 						"example.com:user":        "monalisa",
 						"example.com:oauth_token": "OTOKEN",
 					}, nil
@@ -78,6 +80,7 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
 						"example.com:user":        "monalisa",
 						"example.com:oauth_token": "OTOKEN",
 					}, nil
@@ -101,6 +104,7 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
+						"_source":          "/Users/monalisa/.config/gh/hosts.yml",
 						"example.com:user": "monalisa",
 					}, nil
 				},
@@ -119,6 +123,7 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
 						"example.com:user":        "monalisa",
 						"example.com:oauth_token": "OTOKEN",
 					}, nil
@@ -131,6 +136,31 @@ func Test_helperRun(t *testing.T) {
 			`),
 			wantErr:    true,
 			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "token from env",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "GITHUB_ENTERPRISE_TOKEN",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=hubot
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=x-access-token
+				password=OTOKEN
+			`),
 			wantStderr: "",
 		},
 	}
