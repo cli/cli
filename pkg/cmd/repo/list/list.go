@@ -31,12 +31,15 @@ type ListOptions struct {
 	Visibility string
 	Fork       bool
 	Source     bool
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Now:        time.Now,
 	}
 
 	var (
@@ -127,7 +130,7 @@ func listRun(opts *ListOptions) error {
 	notArchived := filter.Fork || filter.Source
 
 	matchCount := len(listResult.Repositories)
-	now := time.Now()
+	now := opts.Now()
 
 	for _, repo := range listResult.Repositories {
 		if notArchived && repo.IsArchived {
