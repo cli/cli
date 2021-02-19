@@ -38,8 +38,8 @@ func Test_fileExists(t *testing.T) {
 
 func Test_getFilesToAdd(t *testing.T) {
 	gf, err := getFilesToAdd(fixtureFile, &EditOptions{
-		AddFilename:  fixtureFile,
-		IO: &iostreams.IOStreams{},
+		AddFilename: fixtureFile,
+		IO:          &iostreams.IOStreams{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
