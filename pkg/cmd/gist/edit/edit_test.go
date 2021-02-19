@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -22,22 +23,34 @@ const (
 	nonExistentFile = "../file.txt"
 )
 
-func Test_processFiles(t *testing.T) {
-	filePath, fileExists, err := processFiles(fixtureFile)
+func Test_fileExists(t *testing.T) {
+	fixtureFileExists, err := fileExists(fixtureFile)
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
 
-	assert.Equal(t, "../fixture.txt", filePath)
-	assert.Equal(t, true, fileExists)
+	assert.Equal(t, true, fixtureFileExists)
 
-	filePath, fileExists, err = processFiles(nonExistentFile)
+	neFileExists, err := fileExists(nonExistentFile)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, false, neFileExists)
+}
+
+func Test_getFilesToAdd(t *testing.T) {
+	gf, err := getFilesToAdd(fixtureFile, &EditOptions{
+		AddFilename:  fixtureFile,
+		IO: &iostreams.IOStreams{},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error processing files: %s", err)
 	}
 
-	assert.Equal(t, "../file.txt", filePath)
-	assert.Equal(t, false, fileExists)
+	assert.Equal(t, map[string]*shared.GistFile{
+		filepath.Base(fixtureFile): {
+			Filename: filepath.Base(fixtureFile),
+			Content:  "{}",
+		},
+	}, gf)
 }
 
 func TestNewCmdEdit(t *testing.T) {

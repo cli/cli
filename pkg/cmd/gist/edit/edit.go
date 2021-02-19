@@ -59,7 +59,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "edit {<id> | <url>}",
-		Short: "Edit one of your gists or add new ones to it",
+		Short: "Edit or add files in a gist",
 		Args:  cmdutil.MinimumArgs(1, "cannot edit: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
@@ -116,147 +116,109 @@ func editRun(opts *EditOptions) error {
 
 	if addFilename != "" {
 		//Add files to an existing gist.
-		filenamePath, fileExists, err := processFiles(addFilename)
+		files, err := getFilesToAdd(addFilename, opts)
 		if err != nil {
-			return fmt.Errorf("%s %s", cs.Red("!"), err)
+			return err
 		}
 
-		filesToAdd := map[string]*shared.GistFile{}
+		fmt.Printf("%v", files)
 
-		filename := filepath.Base(filenamePath)
-
-		if fileExists {
-			content, err := ioutil.ReadFile(filenamePath)
-			if err != nil {
-				return fmt.Errorf("%s failed to read file %s: %w", cs.FailureIcon(), addFilename, err)
-			}
-
-			if string(content) == "" {
-				return fmt.Errorf("%s Contents can't be empty", cs.FailureIcon())
-			}
-
-			filesToAdd[filename] = &shared.GistFile{
-				Filename: filename,
-				Content:  string(content),
-			}
-			gist.Files = filesToAdd
-		} else {
-			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-			if err != nil {
-				return err
-			}
-
-			text, err := opts.Add(editorCommand, filename, opts.IO)
-			if err != nil {
-				return err
-			}
-
-			if text == "" {
-				return fmt.Errorf("%s Contents can't be empty", cs.Red("!"))
-			}
-
-			filesToAdd[filename] = &shared.GistFile{
-				Filename: filename,
-				Content:  text,
-			}
-
-			gist.Files = filesToAdd
-		}
-
+		gist.Files = files
 		err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
 		if err != nil {
 			return err
 		}
 
-		completionMessage := filename + " added to gist"
+		completionMessage := filepath.Base(addFilename) + " added to gist"
 
 		fmt.Fprintf(opts.IO.Out, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
 
-	} else {
-		for {
-			filename := opts.EditFilename
-			candidates := []string{}
-			for filename := range gist.Files {
-				candidates = append(candidates, filename)
-			}
+		return nil
+	}
 
-			sort.Strings(candidates)
+	for {
+		filename := opts.EditFilename
+		candidates := []string{}
+		for filename := range gist.Files {
+			candidates = append(candidates, filename)
+		}
 
-			if filename == "" {
-				if len(candidates) == 1 {
-					filename = candidates[0]
-				} else {
-					if !opts.IO.CanPrompt() {
-						return errors.New("unsure what file to edit; either specify --filename or run interactively")
-					}
-					err = prompt.SurveyAskOne(&survey.Select{
-						Message: "Edit which file?",
-						Options: candidates,
-					}, &filename)
+		sort.Strings(candidates)
 
-					if err != nil {
-						return fmt.Errorf("could not prompt: %w", err)
-					}
+		if filename == "" {
+			if len(candidates) == 1 {
+				filename = candidates[0]
+			} else {
+				if !opts.IO.CanPrompt() {
+					return errors.New("unsure what file to edit; either specify --filename or run interactively")
+				}
+				err = prompt.SurveyAskOne(&survey.Select{
+					Message: "Edit which file?",
+					Options: candidates,
+				}, &filename)
+
+				if err != nil {
+					return fmt.Errorf("could not prompt: %w", err)
 				}
 			}
+		}
 
-			if _, ok := gist.Files[filename]; !ok {
-				return fmt.Errorf("gist has no file %q", filename)
-			}
+		if _, ok := gist.Files[filename]; !ok {
+			return fmt.Errorf("gist has no file %q", filename)
+		}
 
-			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-			if err != nil {
-				return err
-			}
-			text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
+		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return err
+		}
+		text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
 
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
+		}
 
-			if text != gist.Files[filename].Content {
-				gistFile := gist.Files[filename]
-				gistFile.Content = text // so it appears if they re-edit
-				filesToUpdate[filename] = text
-			}
+		if text != gist.Files[filename].Content {
+			gistFile := gist.Files[filename]
+			gistFile.Content = text // so it appears if they re-edit
+			filesToUpdate[filename] = text
+		}
 
-			if !opts.IO.CanPrompt() {
-				break
-			}
+		if !opts.IO.CanPrompt() {
+			break
+		}
 
-			if len(candidates) == 1 {
-				break
-			}
+		if len(candidates) == 1 {
+			break
+		}
 
-			choice := ""
+		choice := ""
 
-			err = prompt.SurveyAskOne(&survey.Select{
-				Message: "What next?",
-				Options: []string{
-					"Edit another file",
-					"Submit",
-					"Cancel",
-				},
-			}, &choice)
+		err = prompt.SurveyAskOne(&survey.Select{
+			Message: "What next?",
+			Options: []string{
+				"Edit another file",
+				"Submit",
+				"Cancel",
+			},
+		}, &choice)
 
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
 
-			stop := false
+		stop := false
 
-			switch choice {
-			case "Edit another file":
-				continue
-			case "Submit":
-				stop = true
-			case "Cancel":
-				return cmdutil.SilentError
-			}
+		switch choice {
+		case "Edit another file":
+			continue
+		case "Submit":
+			stop = true
+		case "Cancel":
+			return cmdutil.SilentError
+		}
 
-			if stop {
-				break
-			}
+		if stop {
+			break
 		}
 	}
 
@@ -298,35 +260,73 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	return nil
 }
 
-func processFiles(filename string) (string, bool, error) {
-	fileExists := false
+func getFilesToAdd(file string, opts *EditOptions) (map[string]*shared.GistFile, error) {
+	cs := opts.IO.ColorScheme()
 
-	if fi, err := os.Stat(filename); err != nil {
+	fileExists, err := fileExists(file)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s", cs.Red("!"), err)
+	}
+
+	filesToAdd := map[string]*shared.GistFile{}
+
+	filename := filepath.Base(file)
+
+	if fileExists {
+		content, err := ioutil.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("%s failed to read file %s: %w", cs.FailureIcon(), file, err)
+		}
+
+		if string(content) == "" {
+			return nil, fmt.Errorf("%s Contents can't be empty", cs.FailureIcon())
+		}
+
+		filesToAdd[filename] = &shared.GistFile{
+			Filename: filename,
+			Content:  string(content),
+		}
+		return filesToAdd, nil
 	} else {
-		switch mode := fi.Mode(); {
-		case mode.IsDir():
-			return "", false, fmt.Errorf("found directory %s", filename)
-		case mode.IsRegular():
-			fileExists = true
+		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return nil, err
+		}
+
+		text, err := opts.Add(editorCommand, filename, opts.IO)
+		if err != nil {
+			return nil, err
+		}
+
+		if text == "" {
+			return nil, fmt.Errorf("%s Contents can't be empty", cs.Red("!"))
+		}
+
+		filesToAdd[filename] = &shared.GistFile{
+			Filename: filename,
+			Content:  text,
+		}
+
+		return filesToAdd, nil
+	}
+}
+
+func fileExists(filename string) (bool, error) {
+
+	fi, err := os.Stat(filename)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
 		}
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", false, err
+	switch mode := fi.Mode(); {
+	case mode.IsDir():
+		return false, fmt.Errorf("found directory %s", filename)
+	case mode.IsRegular():
+		return true, nil
 	}
 
-	m, err := filepath.Glob(wd + "/[^.]*.*")
-	if err != nil {
-		return "", false, err
-	}
-
-	for _, f := range m {
-		if filename == filepath.Base(f) {
-			fileExists = true
-			break
-		}
-	}
-
-	return filename, fileExists, nil
+	return false, nil
 }
