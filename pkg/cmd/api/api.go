@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"regexp"
@@ -24,6 +25,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
 
@@ -320,8 +322,31 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	}
 
 	if opts.Template != "" {
+		templateFuncs := map[string]interface{}{
+			"color": func(colorName string, input interface{}) (string, error) {
+				var text string
+				switch tt := input.(type) {
+				case string:
+					text = tt
+				case float64:
+					if math.Trunc(tt) == tt {
+						text = strconv.FormatFloat(tt, 'f', 0, 64)
+					} else {
+						text = strconv.FormatFloat(tt, 'f', 2, 64)
+					}
+				case nil:
+					text = ""
+				case bool:
+					text = fmt.Sprintf("%v", tt)
+				default:
+					return "", fmt.Errorf("cannot convert type to string: %v", tt)
+				}
+				return ansi.Color(text, colorName), nil
+			},
+		}
+
 		// TODO: reuse parsed template across pagination invocations
-		t := template.Must(template.New("").Parse(opts.Template))
+		t := template.Must(template.New("").Funcs(templateFuncs).Parse(opts.Template))
 
 		var jsonData []byte
 		jsonData, err = ioutil.ReadAll(responseBody)
