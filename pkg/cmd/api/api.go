@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -40,6 +41,7 @@ type ApiOptions struct {
 	ShowResponseHeaders bool
 	Paginate            bool
 	Silent              bool
+	Template            string
 	CacheTTL            time.Duration
 
 	HttpClient func() (*http.Client, error)
@@ -189,6 +191,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
+	cmd.Flags().StringVarP(&opts.Template, "format", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVar(&cacheDuration, "cache", "", "Cache the response for the specified duration")
 	return cmd
 }
@@ -316,7 +319,27 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if isJSON && opts.IO.ColorEnabled() {
+	if opts.Template != "" {
+		// TODO: reuse parsed template across pagination invocations
+		t := template.Must(template.New("").Parse(opts.Template))
+
+		var jsonData []byte
+		jsonData, err = ioutil.ReadAll(responseBody)
+		if err != nil {
+			return
+		}
+
+		var m interface{}
+		err = json.Unmarshal(jsonData, &m)
+		if err != nil {
+			return
+		}
+
+		err = t.Execute(opts.IO.Out, m)
+		if err != nil {
+			return
+		}
+	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
