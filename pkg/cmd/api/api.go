@@ -14,8 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -38,6 +40,7 @@ type ApiOptions struct {
 	ShowResponseHeaders bool
 	Paginate            bool
 	Silent              bool
+	CacheTTL            time.Duration
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -51,6 +54,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		BaseRepo:   f.BaseRepo,
 		Branch:     f.Branch,
 	}
+
+	var cacheDuration string
 
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
@@ -160,6 +165,14 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
 			}
 
+			if cacheDuration != "" {
+				cacheTTL, err := time.ParseDuration(cacheDuration)
+				if err != nil {
+					return fmt.Errorf("error parsing `--cache` value: %w", err)
+				}
+				opts.CacheTTL = cacheTTL
+			}
+
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -176,6 +189,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
+	cmd.Flags().StringVar(&cacheDuration, "cache", "", "Cache the response for the specified duration")
 	return cmd
 }
 
@@ -218,6 +232,9 @@ func apiRun(opts *ApiOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+	if opts.CacheTTL > 0 {
+		httpClient = api.NewCachedClient(httpClient, opts.CacheTTL)
 	}
 
 	headersOutputStream := opts.IO.Out
