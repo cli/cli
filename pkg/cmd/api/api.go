@@ -25,6 +25,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/itchyny/gojq"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +46,7 @@ type ApiOptions struct {
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
+	FilterOutput        string
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -195,6 +197,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "format", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVar(&cacheDuration, "cache", "", "Cache the response for the specified duration")
+	cmd.Flags().StringVar(&opts.FilterOutput, "filter", "", "Filter the response using jq syntax")
 	return cmd
 }
 
@@ -321,7 +324,40 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.Template != "" {
+	if opts.FilterOutput != "" {
+		var query *gojq.Query
+		query, err = gojq.Parse(opts.FilterOutput)
+		if err != nil {
+			return
+		}
+
+		var jsonData []byte
+		jsonData, err = ioutil.ReadAll(responseBody)
+		if err != nil {
+			return
+		}
+
+		var responseData interface{}
+		err = json.Unmarshal(jsonData, &responseData)
+		if err != nil {
+			return
+		}
+
+		iter := query.Run(responseData)
+		for {
+			var v interface{}
+			var ok bool
+			v, ok = iter.Next()
+			if !ok {
+				break
+			}
+			err, ok = v.(error)
+			if ok {
+				return
+			}
+			fmt.Fprintf(opts.IO.Out, "%v\n", v)
+		}
+	} else if opts.Template != "" {
 		templateFuncs := map[string]interface{}{
 			"color": func(colorName string, input interface{}) (string, error) {
 				var text string
