@@ -14,6 +14,7 @@ import (
 type Editable struct {
 	Title     EditableString
 	Body      EditableString
+	Base      EditableString
 	Reviewers EditableSlice
 	Assignees EditableSlice
 	Labels    EditableSlice
@@ -42,6 +43,7 @@ type EditableSlice struct {
 func (e Editable) Dirty() bool {
 	return e.Title.Edited ||
 		e.Body.Edited ||
+		e.Base.Edited ||
 		e.Reviewers.Edited ||
 		e.Assignees.Edited ||
 		e.Labels.Edited ||

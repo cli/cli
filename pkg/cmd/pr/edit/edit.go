@@ -70,6 +70,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if flags.Changed("body") {
 				opts.Editable.Body.Edited = true
 			}
+			if flags.Changed("base") {
+				opts.Editable.Base.Edited = true
+			}
 			if flags.Changed("add-reviewer") || flags.Changed("remove-reviewer") {
 				opts.Editable.Reviewers.Edited = true
 			}
@@ -104,6 +107,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
+	cmd.Flags().StringVarP(&opts.Editable.Base.Value, "base", "B", "", "Change the base `branch` for this pull request")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add reviewers by their `login`.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself.")
@@ -133,6 +137,7 @@ func editRun(opts *EditOptions) error {
 	editable.Reviewers.Allowed = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
+	editable.Base.Default = pr.BaseRefName
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
@@ -203,6 +208,9 @@ func updatePullRequest(client *api.Client, repo ghrepo.Interface, id string, edi
 		return err
 	}
 	params.MilestoneID = ghId(milestoneId)
+	if editable.Base.Edited {
+		params.BaseRefName = ghString(&editable.Base.Value)
+	}
 	err = api.UpdatePullRequest(client, repo, params)
 	if err != nil {
 		return err
