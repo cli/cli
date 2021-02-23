@@ -3,6 +3,7 @@ package create
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -81,6 +82,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Branch:     f.Branch,
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a pull request",
@@ -133,6 +136,21 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
 			}
 
+			if bodyFile != "" {
+				var b []byte
+				var err error
+				if bodyFile == "-" {
+					b, err = ioutil.ReadAll(opts.IO.In)
+				} else {
+					b, err = ioutil.ReadFile(bodyFile)
+				}
+				if err != nil {
+					return err
+				}
+				opts.Body = string(b)
+				opts.BodyProvided = true
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -144,6 +162,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
 	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
+	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body from file. Use - to read the body from the standard input.")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
