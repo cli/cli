@@ -35,9 +35,9 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "close [<number> | <url> | <branch>]",
+		Use:   "close {<number> | <url> | <branch>}",
 		Short: "Close a pull request",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
