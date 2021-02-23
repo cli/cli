@@ -11,3 +11,237 @@ liberapay: # Replace with a single Liberapay username
 issuehunt: # Replace with a single IssueHunt username
 otechie: # Replace with a single Otechie username
 custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+xmlns:rawvoice="http://www.rawvoice.com/rawvoiceRssModule/"
+xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0"
+>
+
+<channel>
+	<title>ESMA &#8211; XBRL International</title>
+	<atom:link href="https://www.xbrl.org/tag/esma/feed/" rel="self" type="application/rss+xml" />
+	<link>https://www.xbrl.org</link>
+	<description>The Business Reporting Standard</description>
+	<lastBuildDate>
+	Fri, 19 Feb 2021 08:50:37 +0000	</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.1.8</generator>
+<!-- podcast_generator="Blubrry PowerPress/6.3.1" mode="advanced" -->
+	<itunes:summary>This program offers interviews and insight from leading business reporting experts, on-site reporting from conferences and advice on the implementation and use of XBRL, the open international standard for digital business reporting. The XBRL Standard is managed by XBRL International, a global not for profit consortium, committed to improving business reporting in the public interest. XBRL is currently used in more than 50 countries, with government agencies and other organisations using it to replace older, paper-based reports with more useful, more effective and more accurate digital versions.</itunes:summary>
+	<itunes:author>XBRL International</itunes:author>
+	<itunes:explicit>clean</itunes:explicit>
+	<itunes:image href="https://www.xbrl.org/wp-content/plugins/powerpress/itunes_default.jpg" />
+	<itunes:owner><li>ZacksJPMorganCHASEInternationalAssociationsHQ<li>
+		<itunes:name>XBRL International</itunes:name>
+		<itunes:email>info@xbrl.org</itunes:email>
+	</itunes:owner>
+	<managingEditor>info@xbrl.org (XBRL International)</managingEditor>
+	<itunes:subtitle>XBRL is the business reporting standard used around the world for interactive business reporting.</itunes:subtitle>
+	<image>
+		<title>ESMA &#8211; XBRL International</title>
+		<url>https://www.xbrl.org/wp-content/plugins/powerpress/rss_default.jpg</url>
+		<link>https://www.xbrl.org</link>
+	</image>
+	<itunes:category text="Business" />
+	<itunes:category text="Technology" />
+	<item>
+		<title>ESMA supports International Sustainability Standards (and XBRL)</title>
+		<link>https://www.xbrl.org/news/esma-supports-international-sustainability-standards-and-xbrl/</link>
+				<pubDate>Fri, 18 Dec 2020 11:35:01 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[EU]]></category>
+		<category><![CDATA[SSB]]></category>
+		<category><![CDATA[Standards]]></category>
+		<category><![CDATA[Sustainability]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=8943</guid>
+				<description><![CDATA[This week the European Securities and Markets Authority (ESMA) published a supportive response to the IFRS Foundation’s consultation on establishing a new Sustainability Standards Board (SSB). ESMA believes that an SSB under the auspices of the IFRS Trustees could succeed in consolidating existing environmental reporting frameworks and, with a credible full-time board of independent technical [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This week the European Securities and Markets Authority (ESMA) published a supportive response to the IFRS Foundation’s consultation on establishing a new Sustainability Standards Board (SSB).<span id="more-8943"></span></p>
+<p>ESMA believes that an SSB under the auspices of the IFRS Trustees could succeed in consolidating existing environmental reporting frameworks and, with a credible full-time board of independent technical experts, would be well set up to maintain sustainability standards.</p>
+<p>ESMA stressed that the SSB, if established, should develop digital representations of its sustainability standards using a common XBRL Taxonomy. By ensuring non-financial reporting rules are digitised, the SSB and IASB would be able to better integrate financial and non-financial data.</p>
+<p>The response also noted ESMA’s willingness to collaborate on the development of disclosure standards for sustainability reporting. As the EU has already begun to look at standardisation in this area, it’s important that any future international standards are developed in conversation with existing efforts to ensure international and regional comparability.</p>
+<p>Read ESMA’s response to the consultation <a href="https://www.esma.europa.eu/sites/default/files/library/esma32-334-334_esma_response_to_ifrs_foundation_consultation_on_sustainability_reporting.pdf" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D875ef8078b%26e%3D45983b0199&amp;source=gmail&amp;ust=1608371974830000&amp;usg=AFQjCNEt9rsm8CJDW8J4yOGUC3oZdHeMHQ">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA’s new Powers put to use on Data Quality.</title>
+		<link>https://www.xbrl.org/news/esmas-new-powers-put-to-use-on-data-quality/</link>
+				<pubDate>Fri, 20 Nov 2020 14:38:52 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[Data]]></category>
+		<category><![CDATA[Data Quality]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[EU]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=8791</guid>
+				<description><![CDATA[Revised regulation recently gave the European Securities and Markets Authority (ESMA) some new so-called &#8220;convergence&#8221; powers to identify and co-ordinate supervisory priorities in response to key risks across the Union. This coming year, ESMA has identified market data quality as one of its Union Strategic Priority. ESMA highlights that data is now a core element [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revised regulation recently gave the European Securities and Markets Authority (ESMA) some new so-called &#8220;convergence&#8221; powers to identify and co-ordinate supervisory priorities in response to key risks across the Union.<span id="more-8791"></span></p>
+<p>This coming year, ESMA has identified market data quality as one of its Union Strategic Priority. ESMA highlights that data is now a core element of securities markets regulation, and a vital component of National Competent Authorities’ data-driven approaches to supervision. While data reporting requirements and dataset quality have grown enormously since 2008, with data this crucial to supervision across the EU, getting reporting right must be a priority.</p>
+<p>ESMA is co-ordinating supervisory action in 2021 to improve the quality of data reported associated with a range of market reporting, including trade repository reporting. It points to the need for a better understanding of disclosure requirements to avoid poor and late reporting.</p>
+<p>In ESMA’s words, “Making progress in improving data quality is important to investors, market participants and regulators as reliable and timely data is needed to deter and detect market abuse, provide transparency calculations and identify systemic and counterparty risk building up in jurisdictions.”</p>
+<p><em>Here at XBRL International we entirely agree with the need for regulators to focus on data quality. Of course, the XBRL standard provides some unique ways to control data flows, including by defining machine-executable open data quality rules that must be passed prior to successfully submitting reports. We look forward to seeing data quality as a key item in regulatory agendas right around the world.<br />
+</em><br />
+Read more <a href="https://www.esma.europa.eu/press-news/esma-news/esma-identifies-costs-and-performance-and-data-quality-new-union-strategic" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D7bc3527bf3%26e%3D45983b0199&amp;source=gmail&amp;ust=1605968414992000&amp;usg=AFQjCNHyVOoMIk0-kcCE57sgI4EukA7E4g">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA emphasises need for ESG Standards and Access to Data</title>
+		<link>https://www.xbrl.org/news/esma-emphasises-need-for-esg-standards-and-access-to-data/</link>
+				<pubDate>Fri, 24 Jul 2020 10:50:35 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[Disclosure]]></category>
+		<category><![CDATA[ESG]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[EU]]></category>
+		<category><![CDATA[Non-Financial]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=8171</guid>
+				<description><![CDATA[The European Securities and Markets Authority (ESMA) has emphasised the need for standardised Environmental, Social and Governance (ESG) disclosures in its response to the European Commission’s (EC’s) consultation on the renewed sustainable finance strategy. Amongst a broad range of measures designed to promote sustainable finance, ESMA identifies the lack of access to structured sustainability data [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The European Securities and Markets Authority (ESMA) has emphasised the need for standardised Environmental, Social and Governance (ESG) disclosures in its response to the European Commission’s (EC’s) consultation on the renewed sustainable finance strategy.<br />
+<span id="more-8171"></span><br />
+Amongst a broad range of measures designed to promote sustainable finance, ESMA identifies the lack of access to structured sustainability data as a key obstacle to integrating ESG factors into financial decision making.</p>
+<p>ESMA encourages the EC to work towards uniform standards, and offers to assist in the standards making process (something EFRAG is taking the lead on) to make ESG disclosure more comparable, reliable and relevant. ESMA, and the other EU supervisory authorities, also urge the EC to focus on the need for the establishment of a &#8220;publicly accessible, single EU data platform covering both financial and ESG information [that] would grant all market participants equal and timely access to publicly reported information&#8221;.</p>
+<p>ESMA also points to its <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=9f18c96fe2&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D9f18c96fe2%26e%3D45983b0199&amp;source=gmail&amp;ust=1595669683623000&amp;usg=AFQjCNGxVsvoE2HNG_zPWaUEkU_aueF3tg">response</a> to the Non-Financial Reporting Directive review consultation for further information.</p>
+<p>See ESMA&#8217;s response to the consultation on the renewed sustainable finance strategy <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=754898f54f&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D754898f54f%26e%3D45983b0199&amp;source=gmail&amp;ust=1595669683623000&amp;usg=AFQjCNHxkgiQKeQ4JharPf7FXbrtze2GCA">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA updates ESEF Guidance</title>
+		<link>https://www.xbrl.org/news/esma-updates-esef-guidance/</link>
+				<pubDate>Fri, 10 Jul 2020 12:15:36 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESEF]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[Guidance]]></category>
+		<category><![CDATA[iXBRL]]></category>
+		<category><![CDATA[Reporting]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=8090</guid>
+				<description><![CDATA[This week the European Securities and Markets Authority (ESMA) published an update to the ESEF Reporting Manual. The ESEF Reporting Manual is a great resource for all stakeholders involved in ESEF implementation, and should be a of particular use to those who will be preparing IFRS financial statements in iXBRL for the first time. This [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This week the European Securities and Markets Authority (ESMA) published an update to the ESEF Reporting Manual. <span id="more-8090"></span></p>
+<p>The ESEF Reporting Manual is a great resource for all stakeholders involved in ESEF implementation, and should be a of particular use to those who will be preparing IFRS financial statements in iXBRL for the first time.</p>
+<p>This week’s update expands the existing guidance, and reflects developments in the technical specifications.</p>
+<p>The updated reporting manual can be found <a href="https://www.esma.europa.eu/sites/default/files/library/esma32-60-254_esef_reporting_manual.pdf.pdf">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA urges transparency on Covid-19 financial effects</title>
+		<link>https://www.xbrl.org/news/esma-urges-transparency-on-covid-19-financial-effects/</link>
+				<pubDate>Fri, 29 May 2020 09:51:31 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[Europe]]></category>
+		<category><![CDATA[Reporting]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7838</guid>
+				<description><![CDATA[With Covid-19 creating significant uncertainty amongst businesses and the economic and financial system, the need for strong transparency and clear communication has only increased. The European Securities and Markets Authority (ESMA) has underlined the importance of transparency and consistency with reporting requirements when disclosing the financial effects of Covid-19 in half-yearly financial reports. Where necessary, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>With Covid-19 creating significant uncertainty amongst businesses and the economic and financial system, the need for strong transparency and clear communication has only increased.</p>
+<p>The European Securities and Markets Authority (ESMA) has underlined the importance of transparency and consistency with reporting requirements when disclosing the financial effects of Covid-19 in half-yearly financial reports.</p>
+<p>Where necessary, ESMA urges listed companies to take advantage of reporting delays to ensure accounts are up-to-date and clearly show the impacts, uncertainties, and risks relating to Covid-19. They have also stressed the need for individual entity-specific information on the past and future impact of Covid-19 on strategy and operations, and to include any mitigating actions in place to address the effects of the pandemic.</p>
+<p>In the current complex environment, high-quality financial reports are especially important. ESMA’s statement also calls on auditors and audit committees to enhance their oversight role, given the current situation.</p>
+<p>ESMA&#8217;s recommendations are broadly in line with similar announcements from other securities regulators around the world. At one level, market uncertainty can only be reduced through a combination of macro-factors (lower global health risks from the disease) and micro-factors (which companies are coping, or will cope, with the impact of Covid-19?). Disclosure has never been more vital.</p>
+<p>Read ESMA’s statement <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=21d17d377c&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D21d17d377c%26e%3D45983b0199&amp;source=gmail&amp;ust=1590831408786000&amp;usg=AFQjCNHuRW15OqTkSPxX3NLoGYPykz54lA">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA publishes ESEF Conformance Suite</title>
+		<link>https://www.xbrl.org/news/esma-publishes-esef-conformance-suite/</link>
+				<pubDate>Fri, 27 Mar 2020 11:47:13 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESEF]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[Europe]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7467</guid>
+				<description><![CDATA[This week the European Securities and Markets Authority (ESMA) published a European Single Electronic Filing (ESEF) conformance suite to facilitate implementation of the regulations that came into effect at the start of this year. The Conformance Suite is aimed at XBRL software developers and is designed to test whether Inline XBRL software can create and [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This week the European Securities and Markets Authority (ESMA) published a European Single Electronic Filing (ESEF) conformance suite to facilitate implementation of the regulations that came into effect at the start of this year.</p>
+<p>The Conformance Suite is aimed at XBRL software developers and is designed to test whether Inline XBRL software can create and consume filings in line with certain requirements set out in the ESEF filing manual. Conformance Suite tests are an important part of the XBRL standards which facilitate interoperability. Vendors that want to ensure that their software works with other XBRL tools should start with <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=2af23ec391&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D2af23ec391%26e%3D45983b0199&amp;source=gmail&amp;ust=1585394620041000&amp;usg=AFQjCNELrFHIvVTDtpf3AfzUMerPz4D04g">XBRL Software Certification </a>.</p>
+<p>Read more and download the files <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=7adbf56fa4&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D7adbf56fa4%26e%3D45983b0199&amp;source=gmail&amp;ust=1585394620041000&amp;usg=AFQjCNHfHoavrqOP1EsVslAE-x5_eJ0ILQ">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA Commits to Stronger ESG Regulation</title>
+		<link>https://www.xbrl.org/news/esma-commits-to-stronger-esg-regulation/</link>
+				<pubDate>Fri, 14 Feb 2020 10:03:10 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[Disclosure]]></category>
+		<category><![CDATA[ESG]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[EU]]></category>
+		<category><![CDATA[Sustainability]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7251</guid>
+				<description><![CDATA[Earlier this month the European Securities and Markets Authority (ESMA) published its Strategy on Sustainable Finance. The strategy sets out how ESMA will place sustainability at the core of its activities by embedding Environmental, Social, and Governance (ESG) considerations into its work. Amongst other measures, ESMA plans to integrate sustainability in the development of a [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Earlier this month the European Securities and Markets Authority (ESMA) published its <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=2578ee5682&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D2578ee5682%26e%3D45983b0199&amp;source=gmail&amp;ust=1581758384289000&amp;usg=AFQjCNGAOiZw79PWFOJgSah-n0-ySRVR0g">Strategy on Sustainable Finance</a>. The strategy sets out how ESMA will place sustainability at the core of its activities by embedding Environmental, Social, and Governance (ESG) considerations into its work. <span id="more-7251"></span></p>
+<p>Amongst other measures, ESMA plans to integrate sustainability in the development of a ‘single set of standards, transparency obligations and enhancement of due diligence processes on financial markets participants in relation to ESG.’</p>
+<p>A key priority of 2020 will be the completion of a regulatory framework for disclosure requirements on sustainability-related disclosures in the financial services sector. Technical standards and an EU taxonomy for sustainable finance will be developed.</p>
+<p>&#8220;Key pillars supporting the shift towards a more sustainable financial system are the measurement, verification and disclosure of ESG factors. It is important that public authorities step in and establish robust ESG standards and supervise the relevant actors and products to prevent the risk of greenwashing;&#8221; said Steven Maijoor, Chair of ESMA, in a <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=f2a8ff46a0&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3Df2a8ff46a0%26e%3D45983b0199&amp;source=gmail&amp;ust=1581758384289000&amp;usg=AFQjCNG0dc_P-mhXd4k_eMzWqwDYhRJkkg">keynote address</a> on sustainable finance issues at the European Financial Forum in Dublin this week.</p>
+<p>With investor demand for ESG information growing, we support further standardisation of ESG-related disclosure requirements. To ensure proper transparency and comparability of ESG information, internationally coordinated standards for reporting in structured Inline XBRL need to be developed and implemented.</p>
+<p>Read more and access the strategy document <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=d39db0c0d3&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3Dd39db0c0d3%26e%3D45983b0199&amp;source=gmail&amp;ust=1581758384289000&amp;usg=AFQjCNGeUcN3Jr15kj7fZJodMgGTtmnakg">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA Updates Taxonomy in Advance of ESEF</title>
+		<link>https://www.xbrl.org/news/esma-updates-taxonomy-in-advance-of-esef/</link>
+				<pubDate>Fri, 10 Jan 2020 13:09:01 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESEF]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[Taxonomy]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7166</guid>
+				<description><![CDATA[At the end of 2020 the European Securities and Markets Authority (ESMA) updated the ESEF XBRL taxonomy files to reflect the 2019 update of the ESEF Regulation. The XBRL taxonomy files that have been released are based on the IFRS Taxonomy and compliant with all technical and legal requirements of the ESEF regulation. They are also available in all [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>At the end of 2020 the European Securities and Markets Authority (ESMA) updated the <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=8a5d581adf&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D8a5d581adf%26e%3D45983b0199&amp;source=gmail&amp;ust=1578747916324000&amp;usg=AFQjCNF2O3M9rsJBJTUIRD_jPQPQGynJHw">ESEF XBRL taxonomy files </a>to reflect the 2019 update of the <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=065391a2e4&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D065391a2e4%26e%3D45983b0199&amp;source=gmail&amp;ust=1578747916324000&amp;usg=AFQjCNGLKXTSOe2oZ2TrOFRJrAQIPrRXLw">ESEF Regulation</a>.</p>
+<p>The XBRL taxonomy files that have been released are based on the IFRS Taxonomy and compliant with all technical and legal requirements of the ESEF regulation. They are also available in all official EU languages.</p>
+<p>Read more and access the files <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=6637db90bd&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D6637db90bd%26e%3D45983b0199&amp;source=gmail&amp;ust=1578747916324000&amp;usg=AFQjCNETfROR9L-jlc-pxt_1iV40t8g9Xg">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA Review of MiFID II Recommends Establishing Consolidated Tape for Equity</title>
+		<link>https://www.xbrl.org/news/esma-review-of-mifid-ii-recommends-establishing-consolidated-tape-for-equity/</link>
+				<pubDate>Fri, 13 Dec 2019 12:40:24 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[Capital Markets]]></category>
+		<category><![CDATA[Data]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[EU]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7136</guid>
+				<description><![CDATA[The European Securities and Markets Authority (ESMA) review of market data prices has found that the Markets in Financial Instruments Directive (MiFID II) has not delivered on its objective of reducing the cost of market data or of establishing a consolidated tape for equities. MiFID II requires venues and data providers to publish market data [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The European Securities and Markets Authority (ESMA) review of market data prices has found that the Markets in Financial Instruments Directive (MiFID II) has not delivered on its objective of reducing the cost of market data or of establishing a consolidated tape for equities.</p>
+<p>MiFID II requires venues and data providers to publish market data on a reasonable commercial basis, in a disaggregated format and free of charge 15 minutes after publication. However, the report indicates that access to data remains complicated and expensive.</p>
+<p>Access to market data is essential for ensuring transparency, fair, efficient markets and unified EU markets. ESMA recommends a mix of supervisory and legislative changes to improve this area, including establishing a real-time consolidated tape in order to ensure fair access to this essential information across the EU.</p>
+<p>Following the publication of this report ESMA will begin work on the supervisory changes needed to improve the quality and access of market data across the EU.</p>
+<p>Read more and access the report <a href="https://xbrl.us3.list-manage.com/track/click?u=fbbc983fbc59adb89ff279b5b&amp;id=849b28c125&amp;e=45983b0199" target="_blank" rel="noopener noreferrer" data-saferedirecturl="https://www.google.com/url?q=https://xbrl.us3.list-manage.com/track/click?u%3Dfbbc983fbc59adb89ff279b5b%26id%3D849b28c125%26e%3D45983b0199&amp;source=gmail&amp;ust=1576326247707000&amp;usg=AFQjCNG1bgPNMbTXqQ6h4hGK0NSEwr1ncg">here</a>.</p>
+]]></content:encoded>
+										</item>
+		<item>
+		<title>ESMA Clarifies</title>
+		<link>https://www.xbrl.org/news/esma-clarifies/</link>
+				<pubDate>Fri, 29 Nov 2019 12:06:36 +0000</pubDate>
+		<dc:creator><![CDATA[Editor]]></dc:creator>
+				<category><![CDATA[ESEF]]></category>
+		<category><![CDATA[ESMA]]></category>
+		<category><![CDATA[Reporting]]></category>
+		<category><![CDATA[XBRL]]></category>
+
+		<guid isPermaLink="false">https://www.xbrl.org/?post_type=news&#038;p=7092</guid>
+				<description><![CDATA[On a Eurofiling call this week ESMA clarified a question that we’ve certainly heard from around Europe and the world. Basically — what happens to PDF versions of an annual report? ESMA emphasises that EU issuers are only compliant with the ESEF regulation if the publication of an Annual Financial Report to the public (eg. on [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>On a Eurofiling call this week ESMA clarified a question that we’ve certainly heard from around Europe and the world. Basically — what happens to PDF versions of an annual report?</p>
+<p>ESMA emphasises that EU issuers are only compliant with the ESEF regulation if the publication of an Annual Financial Report to the public (eg. on their website) is the same as the iXBRL document they send to their OAM. If issuers choose and/or are allowed to by national laws to disclose any additional reports on their website (e.g. in PDF), then its content must be consistent with the ESEF report.</p>
+<p>Please note that position is an ESMA staff view at this stage and not an official position of ESMA&#8217;s Board of Supervisors.  However, it seems logical to us that the ESEF document &#8212; in XHTML/Inline XBRL  &#8212; is the authoritative disclosure and therefore any additional disclosure must be consistent with the ESEF report.</p>
+]]></content:encoded>
+										</item>
+	</channel>
+</rss>
