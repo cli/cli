@@ -163,12 +163,19 @@ func main() {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		ghExe, _ := os.Executable()
+		isHomebrew := false
+		if ghExe, err := os.Executable(); err == nil {
+			isHomebrew = isUnderHomebrew(ghExe)
+		}
+		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
+			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
+			return
+		}
 		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of gh is available:", "yellow"),
 			ansi.Color(buildVersion, "cyan"),
 			ansi.Color(newRelease.Version, "cyan"))
-		if suggestBrewUpgrade(newRelease, ghExe) {
+		if isHomebrew {
 			fmt.Fprintf(stderr, "To upgrade, run: %s\n", "brew update && brew upgrade gh")
 		}
 		fmt.Fprintf(stderr, "%s\n\n",
@@ -265,13 +272,12 @@ func apiVerboseLog() api.ClientOption {
 	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
 }
 
-// Suggest to `brew upgrade gh` only if gh was found under homebrew prefix and when the release was
-// published over 24h ago, allowing homebrew-core ample time to merge the formula bump.
-func suggestBrewUpgrade(rel *update.ReleaseInfo, ghBinary string) bool {
-	if rel.PublishedAt.IsZero() || time.Since(rel.PublishedAt) < time.Duration(time.Hour*24) {
-		return false
-	}
+func isRecentRelease(publishedAt time.Time) bool {
+	return !publishedAt.IsZero() && time.Since(publishedAt) < time.Hour*24
+}
 
+// Check whether the gh binary was found under the Homebrew prefix
+func isUnderHomebrew(ghBinary string) bool {
 	brewExe, err := safeexec.LookPath("brew")
 	if err != nil {
 		return false
