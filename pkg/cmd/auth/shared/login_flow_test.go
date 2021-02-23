@@ -101,3 +101,55 @@ func TestLogin_ssh(t *testing.T) {
 	assert.Equal(t, "ATOKEN", cfg["example.com:oauth_token"])
 	assert.Equal(t, "ssh", cfg["example.com:git_protocol"])
 }
+
+func Test_scopesSentence(t *testing.T) {
+	type args struct {
+		scopes       []string
+		isEnterprise bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "basic scopes",
+			args: args{
+				scopes:       []string{"repo", "read:org"},
+				isEnterprise: false,
+			},
+			want: "'repo', 'read:org'",
+		},
+		{
+			name: "empty",
+			args: args{
+				scopes:       []string(nil),
+				isEnterprise: false,
+			},
+			want: "",
+		},
+		{
+			name: "workflow scope for dotcom",
+			args: args{
+				scopes:       []string{"repo", "workflow"},
+				isEnterprise: false,
+			},
+			want: "'repo', 'workflow'",
+		},
+		{
+			name: "workflow scope for GHE",
+			args: args{
+				scopes:       []string{"repo", "workflow"},
+				isEnterprise: true,
+			},
+			want: "'repo', 'workflow' (GHE 3.0+)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := scopesSentence(tt.args.scopes, tt.args.isEnterprise); got != tt.want {
+				t.Errorf("scopesSentence() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

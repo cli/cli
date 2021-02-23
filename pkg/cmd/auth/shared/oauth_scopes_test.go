@@ -52,7 +52,9 @@ func Test_HasMinimumScopes(t *testing.T) {
 			fakehttp := &httpmock.Registry{}
 			defer fakehttp.Verify(t)
 
+			var gotAuthorization string
 			fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+				gotAuthorization = req.Header.Get("authorization")
 				return &http.Response{
 					Request:    req,
 					StatusCode: 200,
@@ -70,6 +72,7 @@ func Test_HasMinimumScopes(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			assert.Equal(t, gotAuthorization, "token ATOKEN")
 		})
 	}
 
