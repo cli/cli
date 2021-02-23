@@ -249,8 +249,8 @@ func createRun(opts *CreateOptions) (err error) {
 
 		if action == prShared.CancelAction {
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-			err = nil // avoid triggering PreserveInput
-			return cmdutil.SilentError
+			err = cmdutil.SilentError
+			return
 		}
 	} else {
 		if tb.Title == "" {
