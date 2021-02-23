@@ -179,6 +179,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	return cmd
 }
 
+func IapiRun(opts *ApiOptions) error {
+	return apiRun(opts)
+}
+
 func apiRun(opts *ApiOptions) error {
 	params, err := parseFields(opts)
 	if err != nil {
@@ -300,7 +304,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	}
 
 	if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		err = jsoncolor.Write(os.Stdout, responseBody, "  ")
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
 	}
