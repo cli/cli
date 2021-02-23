@@ -23,8 +23,17 @@ func TestNewCmdEdit(t *testing.T) {
 		wantsErr bool
 	}{
 		{
-			name:     "no argument",
-			input:    "",
+			name:  "no argument",
+			input: "",
+			output: EditOptions{
+				SelectorArg: "",
+				Interactive: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "two arguments",
+			input:    "1 2",
 			output:   EditOptions{},
 			wantsErr: true,
 		},
