@@ -299,7 +299,8 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == shared.CancelAction {
 		fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-		return nil
+		err = cmdutil.SilentError
+		return
 	}
 
 	err = handlePush(*opts, *ctx)
