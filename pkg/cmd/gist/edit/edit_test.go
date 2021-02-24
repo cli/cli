@@ -20,21 +20,7 @@ import (
 
 const (
 	fixtureFile     = "../fixture.txt"
-	nonExistentFile = "../file.txt"
 )
-
-func Test_fileExists(t *testing.T) {
-	fixtureFileExists, err := fileExists(fixtureFile)
-	if err != nil {
-		t.Fatalf("unexpected error processing files: %s", err)
-	}
-
-	assert.Equal(t, true, fixtureFileExists)
-
-	neFileExists, err := fileExists(nonExistentFile)
-	assert.Equal(t, nil, err)
-	assert.Equal(t, false, neFileExists)
-}
 
 func Test_getFilesToAdd(t *testing.T) {
 	gf, err := getFilesToAdd(fixtureFile, &EditOptions{
@@ -255,38 +241,6 @@ func Test_editRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantStderr: "You do not own this gist.",
-		},
-		{
-			name: "add file to existing gist",
-			gist: &shared.Gist{
-				ID: "1234",
-				Files: map[string]*shared.GistFile{
-					"sample.txt": {
-						Filename: "sample.txt",
-						Content:  "bwhiizzzbwhuiiizzzz",
-						Type:     "text/plain",
-					},
-				},
-				Owner: &shared.GistOwner{Login: "octocat"},
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("POST", "gists/1234"),
-					httpmock.StatusStringResponse(201, "{}"))
-			},
-			opts: &EditOptions{
-				AddFilename: "foo.txt",
-			},
-			wantParams: map[string]interface{}{
-				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
-				"files": map[string]interface{}{
-					"foo.txt": map[string]interface{}{
-						"content":  "new content to existing gist",
-						"filename": "foo.txt",
-					},
-				},
-			},
 		},
 		{
 			name: "add file to existing gist with absolute path",
