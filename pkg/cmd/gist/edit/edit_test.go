@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	fixtureFile     = "../fixture.txt"
+	fixtureFile = "../fixture.txt"
 )
 
 func Test_getFilesToAdd(t *testing.T) {
@@ -243,7 +243,7 @@ func Test_editRun(t *testing.T) {
 			wantStderr: "You do not own this gist.",
 		},
 		{
-			name: "add file to existing gist with absolute path",
+			name: "add file to existing gist",
 			gist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
@@ -260,50 +260,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename: "/Users/octocat/foo.txt",
-			},
-			wantParams: map[string]interface{}{
-				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
-				"files": map[string]interface{}{
-					"foo.txt": map[string]interface{}{
-						"content":  "new content to existing gist",
-						"filename": "foo.txt",
-					},
-				},
-			},
-		},
-		{
-			name: "add file to existing gist with relative path",
-			gist: &shared.Gist{
-				ID: "1234",
-				Files: map[string]*shared.GistFile{
-					"sample.txt": {
-						Filename: "sample.txt",
-						Content:  "bwhiizzzbwhuiiizzzz",
-						Type:     "text/plain",
-					},
-				},
-				Owner: &shared.GistOwner{Login: "octocat"},
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("POST", "gists/1234"),
-					httpmock.StatusStringResponse(201, "{}"))
-			},
-			opts: &EditOptions{
-				AddFilename: "../foo.txt",
-			},
-			wantParams: map[string]interface{}{
-				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
-				"files": map[string]interface{}{
-					"foo.txt": map[string]interface{}{
-						"content":  "new content to existing gist",
-						"filename": "foo.txt",
-					},
-				},
+				AddFilename: "../fixture.txt",
 			},
 		},
 	}
@@ -336,10 +293,6 @@ func Test_editRun(t *testing.T) {
 
 		tt.opts.Edit = func(_, _, _ string, _ *iostreams.IOStreams) (string, error) {
 			return "new file content", nil
-		}
-
-		tt.opts.Add = func(_, _ string, _ *iostreams.IOStreams) (string, error) {
-			return "new content to existing gist", nil
 		}
 
 		tt.opts.HttpClient = func() (*http.Client, error) {

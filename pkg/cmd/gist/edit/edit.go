@@ -29,7 +29,6 @@ type EditOptions struct {
 	Config     func() (config.Config, error)
 
 	Edit         func(string, string, string, *iostreams.IOStreams) (string, error)
-	Add          func(string, string, *iostreams.IOStreams) (string, error)
 	Selector     string
 	EditFilename string
 	AddFilename  string
@@ -45,13 +44,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				editorCmd,
 				"*."+filename,
 				defaultContent,
-				io.In, io.Out, io.ErrOut, nil)
-		},
-		Add: func(editorCmd, filename string, io *iostreams.IOStreams) (string, error) {
-			return surveyext.Edit(
-				editorCmd,
-				"*."+filename,
-				"",
 				io.In, io.Out, io.ErrOut, nil)
 		},
 	}
