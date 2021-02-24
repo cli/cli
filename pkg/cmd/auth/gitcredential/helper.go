@@ -11,8 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const tokenUser = "x-access-token"
+
 type config interface {
-	Get(string, string) (string, error)
+	GetWithSource(string, string) (string, string, error)
 }
 
 type CredentialOptions struct {
@@ -98,13 +100,19 @@ func helperRun(opts *CredentialOptions) error {
 		return err
 	}
 
-	gotUser, _ := cfg.Get(wants["host"], "user")
-	gotToken, _ := cfg.Get(wants["host"], "oauth_token")
+	var gotUser string
+	gotToken, source, _ := cfg.GetWithSource(wants["host"], "oauth_token")
+	if strings.HasSuffix(source, "_TOKEN") {
+		gotUser = tokenUser
+	} else {
+		gotUser, _, _ = cfg.GetWithSource(wants["host"], "user")
+	}
+
 	if gotUser == "" || gotToken == "" {
 		return cmdutil.SilentError
 	}
 
-	if wants["username"] != "" && !strings.EqualFold(wants["username"], gotUser) {
+	if wants["username"] != "" && gotUser != tokenUser && !strings.EqualFold(wants["username"], gotUser) {
 		return cmdutil.SilentError
 	}
 
