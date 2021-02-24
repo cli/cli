@@ -2,6 +2,7 @@ package mergeconflict
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -41,8 +42,64 @@ func NewCmdMergeconflict(f *cmdutil.Factory, runF func(*MCOpts) error) *cobra.Co
 	return cmd
 }
 
+type Drawable interface {
+	Draw(s tcell.Screen, style tcell.Style)
+}
+
+type GameObject struct {
+	x      int
+	y      int
+	w      int
+	h      int
+	Sprite string
+}
+
+func (g *GameObject) Transform(x, y int) {
+	g.x += x
+	g.y += y
+}
+
+func (g *GameObject) Draw(s tcell.Screen, style tcell.Style) {
+	lines := strings.Split(g.Sprite, "\n")
+	for i, l := range lines {
+		drawStr(s, g.x, g.y+i, style, l)
+	}
+}
+
+type CommitLauncher struct {
+	GameObject
+	shas []string
+}
+
+func (cl *CommitLauncher) launch() {
+	// TODO
+}
+
+func NewCommitLauncher(shas []string) *CommitLauncher {
+	return &CommitLauncher{
+		shas: shas,
+		GameObject: GameObject{
+			Sprite: "-=$^$=-",
+			w:      7,
+			h:      1,
+		},
+	}
+}
+
 func mergeconflictRun(opts *MCOpts) error {
 	// TODO
+
+	cl := NewCommitLauncher([]string{
+		"1234567890",
+		"0987654321",
+	})
+
+	cl.Transform(37, 12)
+
+	gobjs := []Drawable{
+		cl,
+	}
+
 	style := tcell.StyleDefault
 
 	s, err := tcell.NewScreen()
@@ -84,6 +141,10 @@ loop:
 		case <-quit:
 			break loop
 		case <-time.After(time.Millisecond * 100):
+		}
+
+		for _, gobj := range gobjs {
+			gobj.Draw(s, style)
 		}
 		//s.Clear()
 		drawStr(s, 0, 0, style, "hi")
