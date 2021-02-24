@@ -21,6 +21,24 @@ func MinimumArgs(n int, msg string) cobra.PositionalArgs {
 	}
 }
 
+func ExactArgs(n int, msg string) cobra.PositionalArgs {
+	if msg == "" {
+		return cobra.MinimumNArgs(1)
+	}
+
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) > n {
+			return &FlagError{Err: errors.New("too many arguments")}
+		}
+
+		if len(args) < n {
+			return &FlagError{Err: errors.New("not enough arguments")}
+		}
+
+		return nil
+	}
+}
+
 func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
 		return nil
