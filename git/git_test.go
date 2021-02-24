@@ -1,11 +1,46 @@
 package git
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/cli/cli/internal/run"
 )
+
+func setGitDir(t *testing.T, dir string) {
+	// TODO: also set XDG_CONFIG_HOME, GIT_CONFIG_NOSYSTEM
+	old_GIT_DIR := os.Getenv("GIT_DIR")
+	os.Setenv("GIT_DIR", dir)
+	t.Cleanup(func() {
+		os.Setenv("GIT_DIR", old_GIT_DIR)
+	})
+}
+
+func TestLastCommit(t *testing.T) {
+	setGitDir(t, "./fixtures/simple.git")
+	c, err := LastCommit()
+	if err != nil {
+		t.Fatalf("LastCommit error: %v", err)
+	}
+	if c.Sha != "6f1a2405cace1633d89a79c74c65f22fe78f9659" {
+		t.Errorf("expected sha %q, got %q", "6f1a2405cace1633d89a79c74c65f22fe78f9659", c.Sha)
+	}
+	if c.Title != "Second commit" {
+		t.Errorf("expected title %q, got %q", "Second commit", c.Title)
+	}
+}
+
+func TestCommitBody(t *testing.T) {
+	setGitDir(t, "./fixtures/simple.git")
+	body, err := CommitBody("6f1a2405cace1633d89a79c74c65f22fe78f9659")
+	if err != nil {
+		t.Fatalf("CommitBody error: %v", err)
+	}
+	if body != "I'm starting to get the hang of things\n" {
+		t.Errorf("expected %q, got %q", "I'm starting to get the hang of things\n", body)
+	}
+}
 
 func Test_UncommittedChangeCount(t *testing.T) {
 	type c struct {
