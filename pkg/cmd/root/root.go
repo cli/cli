@@ -13,6 +13,7 @@ import (
 	completionCmd "github.com/cli/cli/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
 	"github.com/cli/cli/pkg/cmd/factory"
+	gameCmd "github.com/cli/cli/pkg/cmd/game"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
@@ -74,6 +75,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+	cmd.AddCommand(gameCmd.NewCmdGame(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
