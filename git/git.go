@@ -180,43 +180,30 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 	return commits, nil
 }
 
+func lookupCommit(sha, format string) ([]byte, error) {
+	logCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:"+format, sha)
+	if err != nil {
+		return nil, err
+	}
+	return run.PrepareCmd(logCmd).Output()
+}
+
 func LastCommit() (*Commit, error) {
-	logCmd, err := GitCommand("-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "-1")
+	output, err := lookupCommit("HEAD", "%H,%s")
 	if err != nil {
 		return nil, err
 	}
 
-	output, err := run.PrepareCmd(logCmd).Output()
-	if err != nil {
-		return nil, err
-	}
-
-	lines := outputLines(output)
-	if len(lines) != 1 {
-		return nil, ErrNotOnAnyBranch
-	}
-
-	split := strings.SplitN(lines[0], ",", 2)
-	if len(split) != 2 {
-		return nil, ErrNotOnAnyBranch
-	}
-
+	idx := bytes.IndexByte(output, ',')
 	return &Commit{
-		Sha:   split[0],
-		Title: split[1],
+		Sha:   string(output[0:idx]),
+		Title: strings.TrimSpace(string(output[idx+1:])),
 	}, nil
 }
 
 func CommitBody(sha string) (string, error) {
-	showCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
-	if err != nil {
-		return "", err
-	}
-	output, err := run.PrepareCmd(showCmd).Output()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
+	output, err := lookupCommit(sha, "%b")
+	return string(output), err
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration
