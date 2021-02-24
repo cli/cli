@@ -260,7 +260,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename: "../fixture.txt",
+				AddFilename: fixtureFile,
 			},
 		},
 	}
