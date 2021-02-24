@@ -128,6 +128,10 @@ func mergeconflictRun(opts *MCOpts) error {
 					return
 				case tcell.KeyCtrlL:
 					s.Sync()
+				case tcell.KeyLeft:
+					cl.Transform(-1, 0)
+				case tcell.KeyRight:
+					cl.Transform(1, 0)
 				}
 			case *tcell.EventResize:
 				s.Sync()
@@ -143,11 +147,11 @@ loop:
 		case <-time.After(time.Millisecond * 100):
 		}
 
+		s.Clear()
 		for _, gobj := range gobjs {
 			gobj.Draw(s, style)
 		}
-		//s.Clear()
-		drawStr(s, 0, 0, style, "hi")
+		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
 	}
 
