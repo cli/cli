@@ -118,6 +118,15 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	render := func(gf *shared.GistFile) error {
+		isBinary, err := shared.IsBinaryContents([]byte(gf.Content))
+		if err != nil {
+			return err
+		}
+
+		if isBinary {
+			gf.Content = "Skipping rendering binary content..."
+		}
+
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
 			rendered, err := markdown.Render(gf.Content, markdownStyle, "")
 			if err != nil {
@@ -134,6 +143,7 @@ func viewRun(opts *ViewOptions) error {
 			_, err := fmt.Fprint(opts.IO.Out, "\n")
 			return err
 		}
+
 		return nil
 	}
 
@@ -142,6 +152,16 @@ func viewRun(opts *ViewOptions) error {
 		if !ok {
 			return fmt.Errorf("gist has no such file: %q", opts.Filename)
 		}
+
+		isBinary, err := shared.IsBinaryContents([]byte(gistFile.Content))
+		if err != nil {
+			return err
+		}
+
+		if isBinary {
+			return fmt.Errorf("Error: file contents is binary")
+		}
+
 		return render(gistFile)
 	}
 
@@ -154,8 +174,19 @@ func viewRun(opts *ViewOptions) error {
 	for fn := range gist.Files {
 		filenames = append(filenames, fn)
 	}
-	sort.Strings(filenames)
 
+	if len(filenames) == 1 {
+		isBinary, err := shared.IsBinaryContents([]byte(gist.Files[filenames[0]].Content))
+		if err != nil {
+			return err
+		}
+
+		if isBinary {
+			return fmt.Errorf("Error: file contents is binary")
+		}
+	}
+
+	sort.Strings(filenames)
 	if opts.ListFiles {
 		for _, fn := range filenames {
 			fmt.Fprintln(opts.IO.Out, fn)

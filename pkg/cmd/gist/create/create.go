@@ -30,8 +30,7 @@ type CreateOptions struct {
 	Public           bool
 	Filenames        []string
 	FilenameOverride string
-
-	WebMode bool
+	WebMode          bool
 
 	HttpClient func() (*http.Client, error)
 }
@@ -164,6 +163,8 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 		var filename string
 		var content []byte
 		var err error
+		var isBinary bool
+
 		if f == "-" {
 			if filenameOverride != "" {
 				filename = filenameOverride
@@ -180,6 +181,16 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
+
+			isBinary, err = shared.IsBinaryContents(content)
+			if err != nil {
+				return nil, err
+			}
+
+			if isBinary {
+				return nil, fmt.Errorf("binary file not supported")
+			}
+
 			filename = path.Base(f)
 		}
 

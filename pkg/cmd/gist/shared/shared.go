@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"net/http"
 	"net/url"
 	"strings"
@@ -146,4 +147,35 @@ pagination:
 	}
 
 	return gists, nil
+}
+
+func IsBinaryFile(file string) (bool, error) {
+	detectedMime, err := mimetype.DetectFile(file)
+	if err != nil {
+		return false, err
+	}
+
+	isBinary := true
+
+	for mime := detectedMime; mime != nil; mime = mime.Parent() {
+		if mime.Is("text/plain") {
+			isBinary = false
+		}
+	}
+
+	return isBinary, nil
+}
+
+func IsBinaryContents(contents []byte) (bool, error) {
+	detectedMime := mimetype.Detect(contents)
+
+	isBinary := true
+
+	for mime := detectedMime; mime != nil; mime = mime.Parent() {
+		if mime.Is("text/plain") {
+			isBinary = false
+		}
+	}
+
+	return isBinary, nil
 }

@@ -148,6 +148,15 @@ func editRun(opts *EditOptions) error {
 			return fmt.Errorf("gist has no file %q", filename)
 		}
 
+		isBinary, err := shared.IsBinaryContents([]byte(gist.Files[filename].Content))
+		if err != nil {
+			return err
+		}
+
+		if isBinary {
+			return fmt.Errorf("Editing binary files not supported")
+		}
+
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
