@@ -168,10 +168,16 @@ type CommitLauncher struct {
 
 type CommitShot struct {
 	GameObject
+	life int
 	// TODO store colors here i guess?
 }
 
-func (cs *CommitShot) Update() {}
+func (cs *CommitShot) Update() {
+	if cs.life == 0 {
+		cs.Game.Destroy(cs)
+	}
+	cs.life--
+}
 
 func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 	sprite := ""
@@ -179,6 +185,7 @@ func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 		sprite += string(c) + "\n"
 	}
 	return &CommitShot{
+		life: 3,
 		GameObject: GameObject{
 			Sprite: sprite,
 			x:      x,
@@ -377,9 +384,7 @@ func mergeconflictRun(opts *MCOpts) error {
 		}
 	}()
 
-	// TODO scroll issue titles
 	// TODO collision detection
-	// TODO removal of shas after firing
 	// TODO UI
 
 loop:
@@ -405,6 +410,7 @@ loop:
 }
 
 func drawStr(s tcell.Screen, x, y int, style tcell.Style, str string) {
+	// TODO put this into Game
 	for _, c := range str {
 		var comb []rune
 		w := runewidth.RuneWidth(c)
