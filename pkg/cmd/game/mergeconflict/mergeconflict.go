@@ -218,7 +218,6 @@ loop:
 		}
 
 		s.Clear()
-		// TODO port to something like game.Draw
 		game.Draw()
 		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
