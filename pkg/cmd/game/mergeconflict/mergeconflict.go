@@ -1,6 +1,7 @@
 package mergeconflict
 
 import (
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -65,6 +66,72 @@ func (g *GameObject) Draw(s tcell.Screen, style tcell.Style) {
 	for i, l := range lines {
 		drawStr(s, g.x, g.y+i, style, l)
 	}
+}
+
+type Direction int // either -1 or 1
+
+type Issue struct {
+	GameObject
+	dir Direction
+}
+
+func NewIssue(x, y int, dir Direction, text string, game *Game) *Issue {
+	return &Issue{
+		dir: dir,
+		GameObject: GameObject{
+			x:      x,
+			y:      y,
+			w:      len(text),
+			h:      1,
+			Sprite: text,
+			Game:   game,
+		},
+	}
+}
+
+// would be nice to just call "spawn" at random intervals but have the spawner lock itself if it's already got something still going
+// how should it track if it's active?
+type IssueSpawner struct {
+	GameObject
+	issues []string
+	locked bool
+}
+
+func NewIssueSpawner(x, y int, game *Game) *IssueSpawner {
+	return &IssueSpawner{
+		GameObject: GameObject{
+			x:    x,
+			y:    y,
+			Game: game,
+		},
+	}
+}
+
+func (is *IssueSpawner) Spawn() {
+	// TODO LOCKING AND UNLOCKING
+	if !is.locked || len(is.issues) == 0 {
+		// TODO eventually, notice if all spawners are empty and trigger win condition
+		return
+	}
+
+	issueText := is.issues[0]
+	is.issues = is.issues[1:]
+	// is.x is either 0 or maxwidth
+	x := is.x
+	var dir Direction
+	dir = -1
+	if is.x == 0 {
+		x = 0 - len(issueText) + 1
+		dir = 1
+	}
+
+	is.Game.AddDrawable(NewIssue(x, is.y, dir, issueText, is.Game))
+}
+
+// TODO grab full issue list, shuffle it, then round robin add to each issue spawner one at a time
+
+func (is *IssueSpawner) AddIssue(issue string) {
+	is.issues = append(is.issues, issue)
 }
 
 type CommitLauncher struct {
@@ -161,18 +228,68 @@ func mergeconflictRun(opts *MCOpts) error {
 		Style:  style,
 	}
 
+	// TODO get real issues
+	issues := []string{
+		"#123 Florp the jobnicorn",
+		"#666 your software has inadvertantly caused a rift between realities and now a legion of demons is slipping through",
+		"#56789 This repository has TOO MANY ISSUES",
+		"#126 Flop the bazbotter",
+		"#223 bump a dependency",
+		"#323 quux a barbaz",
+		"#423 bazzle the foobar machine",
+		"#523 bazbar the fooquux",
+		"#623 have you ever really thought about",
+		"#723 there is nothing",
+		"#823 but have you ever really looked at the stars",
+		"#923 too many icicles",
+		"#133 determine best way to bar the foo",
+		"#143 refactor the test suite's implementation of things that should never be said aloud",
+		"#163 it's miller time",
+	}
+
+	rand.Shuffle(len(issues), func(i, j int) {
+		issues[i], issues[j] = issues[j], issues[i]
+	})
+
+	// TODO enforce game dimensions, don't bother supporting resizes
+
+	issueSpawners := []*IssueSpawner{}
+	i := 0
+	y := 2
+	x := 0
+	// if ix is even, x = 0
+	// if ix is odd, x = mw
+	maxWidth := 80
+	for i < 10 {
+		if i%2 == 0 {
+			x = 0
+		} else {
+			x = maxWidth
+		}
+
+		issueSpawners = append(issueSpawners, NewIssueSpawner(x, y+i, game))
+
+		i++
+	}
+
+	for ix, issueText := range issues {
+		spawnerIx := ix % len(issueSpawners)
+		issueSpawners[spawnerIx].AddIssue(issueText)
+	}
+
+	// TODO get real commits
 	cl := NewCommitLauncher(game, []string{
-		"42c111790cdfff5",
-		"bd86fdfe2e43049",
-		"a16d7a0c5650212",
-		"5698c23c1041df3",
-		"d24c3076e3c3a04",
-		"e4ce0d76aac90a0",
-		"896f2273e85da9a",
-		"66d4307bce0d018",
-		"79b77b4273f2ce3",
-		"61eb7eeeab3f346",
-		"56ead91702e6157",
+		"42c111790c",
+		"bd86fdfe2e",
+		"a16d7a0c56",
+		"5698c23c10",
+		"d24c3076e3",
+		"e4ce0d76aa",
+		"896f2273e8",
+		"66d4307bce",
+		"79b77b4273",
+		"61eb7eeeab",
+		"56ead91702",
 	})
 
 	cl.Transform(37, 20)
@@ -208,6 +325,11 @@ func mergeconflictRun(opts *MCOpts) error {
 			}
 		}
 	}()
+
+	// TODO scroll issue titles
+	// TODO collision detection
+	// TODO removal of shas after firing
+	// TODO UI
 
 loop:
 	for {
