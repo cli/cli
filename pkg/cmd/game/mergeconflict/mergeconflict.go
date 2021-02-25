@@ -164,7 +164,8 @@ func (is *IssueSpawner) AddIssue(issue string) {
 
 type CommitLauncher struct {
 	GameObject
-	shas []string
+	cooldown int
+	shas     []string
 }
 
 type CommitShot struct {
@@ -186,7 +187,7 @@ func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 		sprite += string(c) + "\n"
 	}
 	return &CommitShot{
-		life: 3,
+		life: 3, // TODO commits were detecting themselves
 		GameObject: GameObject{
 			Sprite: sprite,
 			x:      x,
@@ -198,9 +199,18 @@ func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 	}
 }
 
-func (cl *CommitLauncher) Update() {}
+func (cl *CommitLauncher) Update() {
+	if cl.cooldown > 0 {
+		cl.cooldown--
+	}
+}
 
 func (cl *CommitLauncher) Launch() {
+	if cl.cooldown > 0 {
+		return
+	}
+	cl.cooldown = 4
+
 	if len(cl.shas) == 1 {
 		// TODO need to signal game over
 		return
@@ -319,13 +329,16 @@ func (g *Game) DetectHits(r *Ray) {
 	thisShot := 0
 	for _, point := range r.Points {
 		r, _, _, _ := g.Screen.GetContent(point.X, point.Y)
+		g.Debugf("found at point %s: %s\n", point, string(r))
 		if r == ' ' {
 			continue
 		}
 		thisShot++
 	}
+	// TODO if this knows about the shas then i can do additional bonus based on matching characters
 	if thisShot == 10 {
 		// TODO announce GET! in a hype zone
+		g.Debugf("GET!\n")
 		thisShot *= 2
 	}
 
@@ -350,6 +363,15 @@ func (r *Ray) AddPoint(x, y int) {
 }
 
 func mergeconflictRun(opts *MCOpts) error {
+	repo, err := opts.BaseRepo()
+	if err != nil {
+		return fmt.Errorf("could not determine base repo: %w", err)
+	}
+	client, err := opts.HttpClient()
+	if err != nil {
+		return fmt.Errorf("could not build http client: %w", err)
+	}
+
 	f, _ := os.Create("mclog.txt")
 	logger := log.New(f, "", log.Lshortfile)
 	logger.Println("hey what's up")
@@ -418,20 +440,12 @@ func mergeconflictRun(opts *MCOpts) error {
 		issueSpawners[spawnerIx].AddIssue(issueText)
 	}
 
-	// TODO get real commits
-	cl := NewCommitLauncher(game, []string{
-		"42c111790c",
-		"bd86fdfe2e",
-		"a16d7a0c56",
-		"5698c23c10",
-		"d24c3076e3",
-		"e4ce0d76aa",
-		"896f2273e8",
-		"66d4307bce",
-		"79b77b4273",
-		"61eb7eeeab",
-		"56ead91702",
-	})
+	shas, err := getShas(client, repo)
+	if err != nil {
+		return fmt.Errorf("failed to get shas for %s: %w", ghrepo.FullName(repo), err)
+	}
+
+	cl := NewCommitLauncher(game, shas)
 
 	cl.Transform(37, 13)
 
@@ -470,8 +484,13 @@ func mergeconflictRun(opts *MCOpts) error {
 		}
 	}()
 
-	// TODO collision detection
 	// TODO UI
+	// - hype zone / score log
+	// - high score listing
+	// - commits left
+	// - "now playing" note
+	// - key legend
+	// TODO high score saving/loading
 
 loop:
 	for {
