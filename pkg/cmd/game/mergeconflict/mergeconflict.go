@@ -52,6 +52,7 @@ type GameObject struct {
 	w      int
 	h      int
 	Sprite string
+	Game   Game
 }
 
 func (g *GameObject) Transform(x, y int) {
@@ -71,35 +72,79 @@ type CommitLauncher struct {
 	shas []string
 }
 
-func (cl *CommitLauncher) launch() {
-	// TODO
+type CommitShot struct {
+	GameObject
+	// TODO store colors here i guess?
 }
 
-func NewCommitLauncher(shas []string) *CommitLauncher {
+func NewCommitShot(g Game, x, y int, sha string) *CommitShot {
+	sprite := ""
+	for _, c := range sha {
+		sprite += string(c) + "\n"
+	}
+	return &CommitShot{
+		GameObject: GameObject{
+			Sprite: sprite,
+			x:      x,
+			y:      y,
+			w:      1,
+			h:      len(sha),
+			Game:   g,
+		},
+	}
+}
+
+func (cl *CommitLauncher) Launch() {
+	if len(cl.shas) == 1 {
+		// TODO need to signal game over
+		return
+	}
+	sha := cl.shas[0]
+	cl.shas = cl.shas[1:]
+	shot := NewCommitShot(cl.Game, cl.x+3, cl.y+len(sha)+1, sha)
+	cl.Game.AddDrawable(shot)
+}
+
+func NewCommitLauncher(g Game, shas []string) *CommitLauncher {
 	return &CommitLauncher{
 		shas: shas,
 		GameObject: GameObject{
 			Sprite: "-=$^$=-",
 			w:      7,
 			h:      1,
+			Game:   g,
 		},
 	}
 }
 
-func mergeconflictRun(opts *MCOpts) error {
-	// TODO
+type Game struct {
+	drawables []Drawable
+	Screen    tcell.Screen
+	Style     tcell.Style
+}
 
-	cl := NewCommitLauncher([]string{
-		"1234567890",
-		"0987654321",
-	})
+func (g *Game) AddDrawable(d Drawable) {
+	g.drawables = append(g.drawables, d)
+}
 
-	cl.Transform(37, 12)
-
-	gobjs := []Drawable{
-		cl,
+func (g *Game) Destroy(d Drawable) {
+	newDrawables := []Drawable{}
+	for _, dd := range g.drawables {
+		if dd == d {
+			continue
+		}
+		newDrawables = append(newDrawables, dd)
 	}
+	g.drawables = newDrawables
+}
 
+func (g *Game) Draw() {
+	for _, gobj := range g.drawables {
+		gobj.Draw(g.Screen, g.Style)
+	}
+}
+
+func mergeconflictRun(opts *MCOpts) error {
 	style := tcell.StyleDefault
 
 	s, err := tcell.NewScreen()
@@ -109,8 +154,22 @@ func mergeconflictRun(opts *MCOpts) error {
 	if err = s.Init(); err != nil {
 		return err
 	}
-
 	s.SetStyle(style)
+
+	game := Game{
+		Screen: s,
+		Style:  style,
+	}
+
+	cl := NewCommitLauncher(game, []string{
+		"1234567890",
+		"0987654321",
+	})
+
+	cl.Transform(37, 12)
+
+	game.AddDrawable(cl)
+
 	quit := make(chan struct{})
 	go func() {
 		for {
@@ -148,9 +207,8 @@ loop:
 		}
 
 		s.Clear()
-		for _, gobj := range gobjs {
-			gobj.Draw(s, style)
-		}
+		// TODO port to something like game.Draw
+		game.Draw()
 		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
 	}
