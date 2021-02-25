@@ -110,8 +110,8 @@ func (i *Issue) Update() {
 // how should it track if it's active?
 type IssueSpawner struct {
 	GameObject
-	issues []string
-	locked bool
+	issues    []string
+	countdown int
 }
 
 func NewIssueSpawner(x, y int, game *Game) *IssueSpawner {
@@ -124,19 +124,25 @@ func NewIssueSpawner(x, y int, game *Game) *IssueSpawner {
 	}
 }
 
+func (is *IssueSpawner) Update() {
+	if is.countdown > 0 {
+		is.countdown--
+	}
+}
+
 func (is *IssueSpawner) Spawn() {
 	// TODO LOCKING AND UNLOCKING
-	if is.locked || len(is.issues) == 0 {
-		is.Game.Debugf("%s %s\n", is.locked, len(is.issues))
+	if is.countdown > 0 || len(is.issues) == 0 {
 		// TODO eventually, notice if all spawners are empty and trigger win condition
+		is.Game.Debugf("%s is dry", is)
 		return
 	}
 
-	// TODO punting on unlocking for now so each spawner will only spawn once
-	is.locked = true
-
 	issueText := is.issues[0]
 	is.issues = is.issues[1:]
+
+	is.countdown = len(issueText) + 5 // add arbitrary cool off
+
 	// is.x is either 0 or maxwidth
 	x := is.x
 	var dir Direction
@@ -307,7 +313,10 @@ func mergeconflictRun(opts *MCOpts) error {
 			x = game.MaxWidth
 		}
 
-		issueSpawners = append(issueSpawners, NewIssueSpawner(x, y+i, game))
+		is := NewIssueSpawner(x, y+i, game)
+
+		issueSpawners = append(issueSpawners, is)
+		game.AddDrawable(is)
 
 		i++
 	}
