@@ -50,8 +50,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "edit {<id> | <url>}",
-		Short: "Edit or add files in a gist",
-		Args:  cmdutil.MinimumArgs(1, "cannot edit: gist argument required"),
+		Short: "Edit one of your gists",
+		Args:  cmdutil.ExactArgs(1, "cannot edit: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
 
