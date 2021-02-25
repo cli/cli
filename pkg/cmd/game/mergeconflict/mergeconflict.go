@@ -114,6 +114,9 @@ func (is *IssueSpawner) Spawn() {
 		return
 	}
 
+	// TODO punting on unlocking for now so each spawner will only spawn once
+	is.locked = true
+
 	issueText := is.issues[0]
 	is.issues = is.issues[1:]
 	// is.x is either 0 or maxwidth
@@ -257,8 +260,6 @@ func mergeconflictRun(opts *MCOpts) error {
 	i := 0
 	y := 2
 	x := 0
-	// if ix is even, x = 0
-	// if ix is odd, x = mw
 	maxWidth := 80
 	for i < 10 {
 		if i%2 == 0 {
@@ -340,6 +341,15 @@ loop:
 		}
 
 		s.Clear()
+		// TODO
+		spawner := issueSpawners[rand.Intn(len(issueSpawners))]
+		spawner.Spawn()
+		// taking a break to eat, next is:
+		// - pick a random spawner
+		// - call spawn
+		// - figure out locking
+		// - consider an Update function for all drawables so that issues can animate themselves across the screen
+		// - actually animate the issues
 		game.Draw()
 		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
