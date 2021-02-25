@@ -218,7 +218,7 @@ func (cl *CommitLauncher) Launch() {
 	sha := cl.shas[0]
 	cl.shas = cl.shas[1:]
 	shotX := cl.x + 3
-	shotY := cl.y - len(sha) - 1
+	shotY := cl.y - len(sha)
 	shot := NewCommitShot(cl.Game, shotX, shotY, sha)
 	// TODO add ToRay to CommitShot
 	ray := &Ray{}
