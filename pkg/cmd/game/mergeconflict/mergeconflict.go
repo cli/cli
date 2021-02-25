@@ -1,6 +1,7 @@
 package mergeconflict
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -134,7 +135,7 @@ func (is *IssueSpawner) Spawn() {
 	// TODO LOCKING AND UNLOCKING
 	if is.countdown > 0 || len(is.issues) == 0 {
 		// TODO eventually, notice if all spawners are empty and trigger win condition
-		is.Game.Debugf("%s is dry", is)
+		//is.Game.Debugf("%s is dry", is)
 		return
 	}
 
@@ -206,7 +207,15 @@ func (cl *CommitLauncher) Launch() {
 	}
 	sha := cl.shas[0]
 	cl.shas = cl.shas[1:]
-	shot := NewCommitShot(cl.Game, cl.x+3, cl.y-len(sha)-1, sha)
+	shotX := cl.x + 3
+	shotY := cl.y - len(sha) - 1
+	shot := NewCommitShot(cl.Game, shotX, shotY, sha)
+	// TODO add ToRay to CommitShot
+	ray := &Ray{}
+	for i := 0; i < len(sha); i++ {
+		ray.AddPoint(shotX, shotY+i)
+	}
+	cl.Game.DetectHits(ray)
 	cl.Game.AddDrawable(shot)
 }
 
@@ -220,6 +229,31 @@ func NewCommitLauncher(g *Game, shas []string) *CommitLauncher {
 			Game:   g,
 		},
 	}
+}
+
+type Score struct {
+	GameObject
+	score int
+}
+
+func NewScore(x, y int, game *Game) *Score {
+	text := fmt.Sprintf("SCORE: %d", 0)
+	return &Score{
+		GameObject: GameObject{
+			x:      x,
+			y:      y,
+			w:      len(text),
+			h:      1,
+			Game:   game,
+			Sprite: text,
+		},
+	}
+}
+
+func (s *Score) Update() {
+	text := fmt.Sprintf("SCORE: %d", s.score)
+	s.Sprite = text
+	s.w = len(text)
 }
 
 type Game struct {
@@ -259,6 +293,29 @@ func (g *Game) Draw() {
 	for _, gobj := range g.drawables {
 		gobj.Draw()
 	}
+}
+
+func (g *Game) DetectHits(r *Ray) {
+	for _, point := range r.Points {
+		g.Debugf("CHECKING FOR HIT AT %s", point)
+	}
+}
+
+type Point struct {
+	X int
+	Y int
+}
+
+func (p Point) String() string {
+	return fmt.Sprintf("<%d, %d>", p.X, p.Y)
+}
+
+type Ray struct {
+	Points []Point
+}
+
+func (r *Ray) AddPoint(x, y int) {
+	r.Points = append(r.Points, Point{X: x, Y: y})
 }
 
 func mergeconflictRun(opts *MCOpts) error {
@@ -310,10 +367,9 @@ func mergeconflictRun(opts *MCOpts) error {
 	// TODO enforce game dimensions, don't bother supporting resizes
 
 	issueSpawners := []*IssueSpawner{}
-	i := 0
 	y := 2
 	x := 0
-	for i < 10 {
+	for i := 0; i < 10; i++ {
 		if i%2 == 0 {
 			x = 0
 		} else {
@@ -324,16 +380,12 @@ func mergeconflictRun(opts *MCOpts) error {
 
 		issueSpawners = append(issueSpawners, is)
 		game.AddDrawable(is)
-
-		i++
 	}
 
 	for ix, issueText := range issues {
 		spawnerIx := ix % len(issueSpawners)
 		issueSpawners[spawnerIx].AddIssue(issueText)
 	}
-
-	game.Debugf("%#v\n", issueSpawners)
 
 	// TODO get real commits
 	cl := NewCommitLauncher(game, []string{
@@ -353,6 +405,9 @@ func mergeconflictRun(opts *MCOpts) error {
 	cl.Transform(37, 13)
 
 	game.AddDrawable(cl)
+
+	score := NewScore(40, 17, game)
+	game.AddDrawable(score)
 
 	quit := make(chan struct{})
 	go func() {
