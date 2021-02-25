@@ -193,7 +193,7 @@ func (cl *CommitLauncher) Launch() {
 	}
 	sha := cl.shas[0]
 	cl.shas = cl.shas[1:]
-	shot := NewCommitShot(cl.Game, cl.x+3, cl.y-len(sha), sha)
+	shot := NewCommitShot(cl.Game, cl.x+3, cl.y-len(sha)-1, sha)
 	cl.Game.AddDrawable(shot)
 }
 
@@ -334,7 +334,7 @@ func mergeconflictRun(opts *MCOpts) error {
 		"56ead91702",
 	})
 
-	cl.Transform(37, 20)
+	cl.Transform(37, 13)
 
 	game.AddDrawable(cl)
 
