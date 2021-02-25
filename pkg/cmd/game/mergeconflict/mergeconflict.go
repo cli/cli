@@ -1,8 +1,10 @@
 package mergeconflict
 
 import (
+	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -124,7 +126,8 @@ func NewIssueSpawner(x, y int, game *Game) *IssueSpawner {
 
 func (is *IssueSpawner) Spawn() {
 	// TODO LOCKING AND UNLOCKING
-	if !is.locked || len(is.issues) == 0 {
+	if is.locked || len(is.issues) == 0 {
+		is.Game.Debugf("%s %s\n", is.locked, len(is.issues))
 		// TODO eventually, notice if all spawners are empty and trigger win condition
 		return
 	}
@@ -211,6 +214,11 @@ type Game struct {
 	Screen    tcell.Screen
 	Style     tcell.Style
 	MaxWidth  int
+	Logger    *log.Logger
+}
+
+func (g *Game) Debugf(format string, v ...interface{}) {
+	g.Logger.Printf(format, v...)
 }
 
 func (g *Game) AddDrawable(d Drawable) {
@@ -228,6 +236,12 @@ func (g *Game) Destroy(d Drawable) {
 	g.drawables = newDrawables
 }
 
+func (g *Game) Update() {
+	for _, gobj := range g.drawables {
+		gobj.Update()
+	}
+}
+
 func (g *Game) Draw() {
 	for _, gobj := range g.drawables {
 		gobj.Draw()
@@ -235,6 +249,10 @@ func (g *Game) Draw() {
 }
 
 func mergeconflictRun(opts *MCOpts) error {
+	f, _ := os.Create("mclog.txt")
+	logger := log.New(f, "", log.Lshortfile)
+	logger.Println("hey what's up")
+
 	style := tcell.StyleDefault
 
 	s, err := tcell.NewScreen()
@@ -250,6 +268,7 @@ func mergeconflictRun(opts *MCOpts) error {
 		Screen:   s,
 		Style:    style,
 		MaxWidth: 80,
+		Logger:   logger,
 	}
 
 	// TODO get real issues
@@ -297,6 +316,8 @@ func mergeconflictRun(opts *MCOpts) error {
 		spawnerIx := ix % len(issueSpawners)
 		issueSpawners[spawnerIx].AddIssue(issueText)
 	}
+
+	game.Debugf("%#v\n", issueSpawners)
 
 	// TODO get real commits
 	cl := NewCommitLauncher(game, []string{
@@ -361,15 +382,9 @@ loop:
 		}
 
 		s.Clear()
-		// TODO
 		spawner := issueSpawners[rand.Intn(len(issueSpawners))]
 		spawner.Spawn()
-		// taking a break to eat, next is:
-		// - pick a random spawner
-		// - call spawn
-		// - figure out locking
-		// - consider an Update function for all drawables so that issues can animate themselves across the screen
-		// - actually animate the issues
+		game.Update()
 		game.Draw()
 		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
