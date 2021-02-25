@@ -52,7 +52,7 @@ type GameObject struct {
 	w      int
 	h      int
 	Sprite string
-	Game   Game
+	Game   *Game
 }
 
 func (g *GameObject) Transform(x, y int) {
@@ -77,7 +77,7 @@ type CommitShot struct {
 	// TODO store colors here i guess?
 }
 
-func NewCommitShot(g Game, x, y int, sha string) *CommitShot {
+func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 	sprite := ""
 	for _, c := range sha {
 		sprite += string(c) + "\n"
@@ -101,11 +101,11 @@ func (cl *CommitLauncher) Launch() {
 	}
 	sha := cl.shas[0]
 	cl.shas = cl.shas[1:]
-	shot := NewCommitShot(cl.Game, cl.x+3, cl.y+len(sha)+1, sha)
+	shot := NewCommitShot(cl.Game, cl.x+3, cl.y-len(sha), sha)
 	cl.Game.AddDrawable(shot)
 }
 
-func NewCommitLauncher(g Game, shas []string) *CommitLauncher {
+func NewCommitLauncher(g *Game, shas []string) *CommitLauncher {
 	return &CommitLauncher{
 		shas: shas,
 		GameObject: GameObject{
@@ -156,17 +156,26 @@ func mergeconflictRun(opts *MCOpts) error {
 	}
 	s.SetStyle(style)
 
-	game := Game{
+	game := &Game{
 		Screen: s,
 		Style:  style,
 	}
 
 	cl := NewCommitLauncher(game, []string{
-		"1234567890",
-		"0987654321",
+		"42c111790cdfff5",
+		"bd86fdfe2e43049",
+		"a16d7a0c5650212",
+		"5698c23c1041df3",
+		"d24c3076e3c3a04",
+		"e4ce0d76aac90a0",
+		"896f2273e85da9a",
+		"66d4307bce0d018",
+		"79b77b4273f2ce3",
+		"61eb7eeeab3f346",
+		"56ead91702e6157",
 	})
 
-	cl.Transform(37, 12)
+	cl.Transform(37, 20)
 
 	game.AddDrawable(cl)
 
@@ -177,6 +186,8 @@ func mergeconflictRun(opts *MCOpts) error {
 			switch ev := ev.(type) {
 			case *tcell.EventKey:
 				switch ev.Rune() {
+				case ' ':
+					cl.Launch()
 				case 'q':
 					close(quit)
 					return
