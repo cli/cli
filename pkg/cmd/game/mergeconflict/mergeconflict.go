@@ -236,6 +236,10 @@ type Score struct {
 	score int
 }
 
+func (s *Score) Add(i int) {
+	s.score += i
+}
+
 func NewScore(x, y int, game *Game) *Score {
 	text := fmt.Sprintf("SCORE: %d", 0)
 	return &Score{
@@ -295,10 +299,37 @@ func (g *Game) Draw() {
 	}
 }
 
-func (g *Game) DetectHits(r *Ray) {
-	for _, point := range r.Points {
-		g.Debugf("CHECKING FOR HIT AT %s", point)
+func (g *Game) FindGameObject(fn func(Drawable) bool) Drawable {
+	for _, gobj := range g.drawables {
+		if fn(gobj) {
+			return gobj
+		}
 	}
+	return nil
+}
+
+func (g *Game) DetectHits(r *Ray) {
+	score := g.FindGameObject(func(gobj Drawable) bool {
+		_, ok := gobj.(*Score)
+		return ok
+	})
+	if score == nil {
+		panic("could not find score game object")
+	}
+	thisShot := 0
+	for _, point := range r.Points {
+		r, _, _, _ := g.Screen.GetContent(point.X, point.Y)
+		if r == ' ' {
+			continue
+		}
+		thisShot++
+	}
+	if thisShot == 10 {
+		// TODO announce GET! in a hype zone
+		thisShot *= 2
+	}
+
+	score.(*Score).Add(thisShot)
 }
 
 type Point struct {
