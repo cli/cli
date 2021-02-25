@@ -44,7 +44,8 @@ func NewCmdMergeconflict(f *cmdutil.Factory, runF func(*MCOpts) error) *cobra.Co
 }
 
 type Drawable interface {
-	Draw(s tcell.Screen, style tcell.Style)
+	Draw()
+	Update()
 }
 
 type GameObject struct {
@@ -61,10 +62,12 @@ func (g *GameObject) Transform(x, y int) {
 	g.y += y
 }
 
-func (g *GameObject) Draw(s tcell.Screen, style tcell.Style) {
+func (g *GameObject) Draw() {
+	screen := g.Game.Screen
+	style := g.Game.Style
 	lines := strings.Split(g.Sprite, "\n")
 	for i, l := range lines {
-		drawStr(s, g.x, g.y+i, style, l)
+		drawStr(screen, g.x, g.y+i, style, l)
 	}
 }
 
@@ -86,6 +89,18 @@ func NewIssue(x, y int, dir Direction, text string, game *Game) *Issue {
 			Sprite: text,
 			Game:   game,
 		},
+	}
+}
+
+func (i *Issue) Update() {
+	i.Transform(int(i.dir), 0)
+	if i.dir > 0 && i.x > 5+i.Game.MaxWidth {
+		// hoping this is enough for GC to claim
+		i.Game.Destroy(i)
+	}
+
+	if i.dir < 0 && i.x < -5-len(i.Sprite) {
+		i.Game.Destroy(i)
 	}
 }
 
@@ -147,6 +162,8 @@ type CommitShot struct {
 	// TODO store colors here i guess?
 }
 
+func (cs *CommitShot) Update() {}
+
 func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 	sprite := ""
 	for _, c := range sha {
@@ -163,6 +180,8 @@ func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 		},
 	}
 }
+
+func (cl *CommitLauncher) Update() {}
 
 func (cl *CommitLauncher) Launch() {
 	if len(cl.shas) == 1 {
@@ -191,6 +210,7 @@ type Game struct {
 	drawables []Drawable
 	Screen    tcell.Screen
 	Style     tcell.Style
+	MaxWidth  int
 }
 
 func (g *Game) AddDrawable(d Drawable) {
@@ -210,7 +230,7 @@ func (g *Game) Destroy(d Drawable) {
 
 func (g *Game) Draw() {
 	for _, gobj := range g.drawables {
-		gobj.Draw(g.Screen, g.Style)
+		gobj.Draw()
 	}
 }
 
@@ -227,8 +247,9 @@ func mergeconflictRun(opts *MCOpts) error {
 	s.SetStyle(style)
 
 	game := &Game{
-		Screen: s,
-		Style:  style,
+		Screen:   s,
+		Style:    style,
+		MaxWidth: 80,
 	}
 
 	// TODO get real issues
@@ -260,12 +281,11 @@ func mergeconflictRun(opts *MCOpts) error {
 	i := 0
 	y := 2
 	x := 0
-	maxWidth := 80
 	for i < 10 {
 		if i%2 == 0 {
 			x = 0
 		} else {
-			x = maxWidth
+			x = game.MaxWidth
 		}
 
 		issueSpawners = append(issueSpawners, NewIssueSpawner(x, y+i, game))
