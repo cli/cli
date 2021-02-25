@@ -164,7 +164,7 @@ func (is *IssueSpawner) AddIssue(issue string) {
 
 type CommitLauncher struct {
 	GameObject
-	cooldown int
+	cooldown int // prevents double shooting which make bullets collide
 	shas     []string
 }
 
@@ -187,7 +187,7 @@ func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 		sprite += string(c) + "\n"
 	}
 	return &CommitShot{
-		life: 3, // TODO commits were detecting themselves
+		life: 3,
 		GameObject: GameObject{
 			Sprite: sprite,
 			x:      x,
@@ -394,23 +394,9 @@ func mergeconflictRun(opts *MCOpts) error {
 		Logger:   logger,
 	}
 
-	// TODO get real issues
-	issues := []string{
-		"#123 Florp the jobnicorn",
-		"#666 your software has inadvertantly caused a rift between realities and now a legion of demons is slipping through",
-		"#56789 This repository has TOO MANY ISSUES",
-		"#126 Flop the bazbotter",
-		"#223 bump a dependency",
-		"#323 quux a barbaz",
-		"#423 bazzle the foobar machine",
-		"#523 bazbar the fooquux",
-		"#623 have you ever really thought about",
-		"#723 there is nothing",
-		"#823 but have you ever really looked at the stars",
-		"#923 too many icicles",
-		"#133 determine best way to bar the foo",
-		"#143 refactor the test suite's implementation of things that should never be said aloud",
-		"#163 it's miller time",
+	issues, err := getIssues(client, repo)
+	if err != nil {
+		return fmt.Errorf("failed to get issues for %s: %w", ghrepo.FullName(repo), err)
 	}
 
 	rand.Shuffle(len(issues), func(i, j int) {
