@@ -40,7 +40,7 @@ func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
 		return err
 	}
 
-	req.Header.Set("Authorization", "token "+authToken)
+	req.Header.Set("Autorization", "token "+authToken)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
