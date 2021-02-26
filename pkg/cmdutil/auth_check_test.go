@@ -51,7 +51,10 @@ func Test_CheckAuth(t *testing.T) {
 				tokenValue = "TOKEN"
 			}
 			t.Cleanup(env.WithEnv(map[string]string{
-				"GITHUB_TOKEN": tokenValue,
+				"GH_TOKEN":                tokenValue,
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
 			}))
 
 			cfg := config.NewBlankConfig()
