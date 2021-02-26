@@ -22,6 +22,27 @@ jobs:
 
       - name: Run tests
         run: go test -race ./...
+        # catch tests that are not well-isolated from the user's environment
+        env:
+          GH_TOKEN: ENVTOKEN
+          GITHUB_TOKEN: ENVTOKEN
+          GH_ENTERPRISE_TOKEN: ENVTOKEN
+          GITHUB_ENTERPRISE_TOKEN: ENVTOKEN
+          GH_REPO: ENVOWNER/ENVREPO
+          GH_HOST: envhost.net
+          GH_EDITOR: env-editor
+          GIT_EDITOR: env-editor
+          VISUAL: env-editor
+          EDITOR: env-editor
+          BROWSER: env-browser
+          DEBUG: 1
+          GH_PAGER: envpager
+          PAGER: envpager
+          GLAMOUR_STYLE: envstyle.json
+          NO_COLOR: 1
+          CLICOLOR: 1
+          CLICOLOR_FORCE: 1
+          GH_NO_UPDATE_NOTIFIER: 1
 
       - name: Build
         run: go build -v ./cmd/gh
