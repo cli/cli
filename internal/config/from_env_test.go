@@ -1,25 +1,14 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/pkg/env"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInheritEnv(t *testing.T) {
-	orig_GITHUB_TOKEN := os.Getenv("GITHUB_TOKEN")
-	orig_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
-	orig_GH_TOKEN := os.Getenv("GH_TOKEN")
-	orig_GH_ENTERPRISE_TOKEN := os.Getenv("GH_ENTERPRISE_TOKEN")
-	t.Cleanup(func() {
-		os.Setenv("GITHUB_TOKEN", orig_GITHUB_TOKEN)
-		os.Setenv("GITHUB_ENTERPRISE_TOKEN", orig_GITHUB_ENTERPRISE_TOKEN)
-		os.Setenv("GH_TOKEN", orig_GH_TOKEN)
-		os.Setenv("GH_ENTERPRISE_TOKEN", orig_GH_ENTERPRISE_TOKEN)
-	})
-
 	type wants struct {
 		hosts     []string
 		token     string
@@ -260,10 +249,12 @@ func TestInheritEnv(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
-			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
-			os.Setenv("GH_TOKEN", tt.GH_TOKEN)
-			os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
+			t.Cleanup(env.WithEnv(map[string]string{
+				"GITHUB_TOKEN":            tt.GITHUB_TOKEN,
+				"GITHUB_ENTERPRISE_TOKEN": tt.GITHUB_ENTERPRISE_TOKEN,
+				"GH_TOKEN":                tt.GH_TOKEN,
+				"GH_ENTERPRISE_TOKEN":     tt.GH_ENTERPRISE_TOKEN,
+			}))
 
 			baseCfg := NewFromString(tt.baseConfig)
 			cfg := InheritEnv(baseCfg)
@@ -287,17 +278,6 @@ func TestInheritEnv(t *testing.T) {
 }
 
 func TestAuthTokenProvidedFromEnv(t *testing.T) {
-	orig_GITHUB_TOKEN := os.Getenv("GITHUB_TOKEN")
-	orig_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
-	orig_GH_TOKEN := os.Getenv("GH_TOKEN")
-	orig_GH_ENTERPRISE_TOKEN := os.Getenv("GH_ENTERPRISE_TOKEN")
-	t.Cleanup(func() {
-		os.Setenv("GITHUB_TOKEN", orig_GITHUB_TOKEN)
-		os.Setenv("GITHUB_ENTERPRISE_TOKEN", orig_GITHUB_ENTERPRISE_TOKEN)
-		os.Setenv("GH_TOKEN", orig_GH_TOKEN)
-		os.Setenv("GH_ENTERPRISE_TOKEN", orig_GH_ENTERPRISE_TOKEN)
-	})
-
 	tests := []struct {
 		name                    string
 		GITHUB_TOKEN            string
@@ -334,10 +314,12 @@ func TestAuthTokenProvidedFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
-			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
-			os.Setenv("GH_TOKEN", tt.GH_TOKEN)
-			os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
+			t.Cleanup(env.WithEnv(map[string]string{
+				"GITHUB_TOKEN":            tt.GITHUB_TOKEN,
+				"GITHUB_ENTERPRISE_TOKEN": tt.GITHUB_ENTERPRISE_TOKEN,
+				"GH_TOKEN":                tt.GH_TOKEN,
+				"GH_ENTERPRISE_TOKEN":     tt.GH_ENTERPRISE_TOKEN,
+			}))
 			assert.Equal(t, tt.provided, AuthTokenProvidedFromEnv())
 		})
 	}

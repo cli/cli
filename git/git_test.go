@@ -6,15 +6,17 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/env"
 )
 
 func setGitDir(t *testing.T, dir string) {
-	// TODO: also set XDG_CONFIG_HOME, GIT_CONFIG_NOSYSTEM
-	old_GIT_DIR := os.Getenv("GIT_DIR")
-	os.Setenv("GIT_DIR", dir)
-	t.Cleanup(func() {
-		os.Setenv("GIT_DIR", old_GIT_DIR)
+	wd, _ := os.Getwd()
+	reset := env.WithEnv(map[string]string{
+		"GIT_DIR":             dir,
+		"XDG_CONFIG_HOME":     wd,
+		"GIT_CONFIG_NOSYSTEM": "1",
 	})
+	t.Cleanup(reset)
 }
 
 func TestLastCommit(t *testing.T) {

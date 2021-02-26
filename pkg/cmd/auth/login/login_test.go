@@ -3,7 +3,6 @@ package login
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/env"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -204,6 +204,12 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "abc123",
 			},
+			env: map[string]string{
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
+			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
@@ -214,6 +220,12 @@ func Test_loginRun_nontty(t *testing.T) {
 			opts: &LoginOptions{
 				Hostname: "albert.wesker",
 				Token:    "abc123",
+			},
+			env: map[string]string{
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -226,6 +238,12 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "abc456",
 			},
+			env: map[string]string{
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
+			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("read:org"))
 			},
@@ -237,6 +255,12 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "abc456",
 			},
+			env: map[string]string{
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
+			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo"))
 			},
@@ -247,6 +271,12 @@ func Test_loginRun_nontty(t *testing.T) {
 			opts: &LoginOptions{
 				Hostname: "github.com",
 				Token:    "abc456",
+			},
+			env: map[string]string{
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
@@ -260,7 +290,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			env: map[string]string{
-				"GH_TOKEN": "value_from_env",
+				"GH_TOKEN":                "ENVTOKEN",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "",
+				"GITHUB_ENTERPRISE_TOKEN": "",
 			},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
@@ -275,7 +308,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			env: map[string]string{
-				"GH_ENTERPRISE_TOKEN": "value_from_env",
+				"GH_TOKEN":                "",
+				"GITHUB_TOKEN":            "",
+				"GH_ENTERPRISE_TOKEN":     "ENVTOKEN",
+				"GITHUB_ENTERPRISE_TOKEN": "",
 			},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
@@ -303,20 +339,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			old_GH_TOKEN := os.Getenv("GH_TOKEN")
-			os.Setenv("GH_TOKEN", tt.env["GH_TOKEN"])
-			old_GITHUB_TOKEN := os.Getenv("GITHUB_TOKEN")
-			os.Setenv("GITHUB_TOKEN", tt.env["GITHUB_TOKEN"])
-			old_GH_ENTERPRISE_TOKEN := os.Getenv("GH_ENTERPRISE_TOKEN")
-			os.Setenv("GH_ENTERPRISE_TOKEN", tt.env["GH_ENTERPRISE_TOKEN"])
-			old_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
-			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.env["GITHUB_ENTERPRISE_TOKEN"])
-			defer func() {
-				os.Setenv("GH_TOKEN", old_GH_TOKEN)
-				os.Setenv("GITHUB_TOKEN", old_GITHUB_TOKEN)
-				os.Setenv("GH_ENTERPRISE_TOKEN", old_GH_ENTERPRISE_TOKEN)
-				os.Setenv("GITHUB_ENTERPRISE_TOKEN", old_GITHUB_ENTERPRISE_TOKEN)
-			}()
+			t.Cleanup(env.WithEnv(tt.env))
 
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
