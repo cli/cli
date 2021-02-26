@@ -42,6 +42,12 @@ func TestCommitBody(t *testing.T) {
 	}
 }
 
+/*
+	NOTE: below this are stubbed git tests, i.e. those that do not actually invoke `git`. If possible, utilize
+	`setGitDir()` to allow new tests to interact with `git`. For write operations, you can use `t.TempDir()` to
+	host a temporary git repository that is safe to be changed.
+*/
+
 func Test_UncommittedChangeCount(t *testing.T) {
 	type c struct {
 		Label    string
