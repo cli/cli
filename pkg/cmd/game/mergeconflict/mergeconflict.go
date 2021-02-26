@@ -52,12 +52,13 @@ type Drawable interface {
 }
 
 type GameObject struct {
-	x      int
-	y      int
-	w      int
-	h      int
-	Sprite string
-	Game   *Game
+	x             int
+	y             int
+	w             int
+	h             int
+	Sprite        string
+	Game          *Game
+	StyleOverride *tcell.Style
 }
 
 func (g *GameObject) Transform(x, y int) {
@@ -68,6 +69,9 @@ func (g *GameObject) Transform(x, y int) {
 func (g *GameObject) Draw() {
 	screen := g.Game.Screen
 	style := g.Game.Style
+	if g.StyleOverride != nil {
+		style = *g.StyleOverride
+	}
 	lines := strings.Split(g.Sprite, "\n")
 	for i, l := range lines {
 		drawStr(screen, g.x, g.y+i, style, l)
@@ -82,15 +86,17 @@ type Issue struct {
 }
 
 func NewIssue(x, y int, dir Direction, text string, game *Game) *Issue {
+	style := game.Style.Foreground(tcell.ColorWhite).Background(tcell.ColorBlack)
 	return &Issue{
 		dir: dir,
 		GameObject: GameObject{
-			x:      x,
-			y:      y,
-			w:      len(text),
-			h:      1,
-			Sprite: text,
-			Game:   game,
+			x:             x,
+			y:             y,
+			w:             len(text),
+			h:             1,
+			Sprite:        text,
+			Game:          game,
+			StyleOverride: &style,
 		},
 	}
 }
@@ -164,8 +170,9 @@ func (is *IssueSpawner) AddIssue(issue string) {
 
 type CommitLauncher struct {
 	GameObject
-	cooldown int // prevents double shooting which make bullets collide
-	shas     []string
+	cooldown     int // prevents double shooting which make bullets collide
+	shas         []string
+	rainbowIndex int
 }
 
 type CommitShot struct {
@@ -205,6 +212,29 @@ func (cl *CommitLauncher) Update() {
 	}
 }
 
+func (cl *CommitLauncher) ColorForShot(sha string) tcell.Style {
+	style := cl.Game.Style
+	switch cl.rainbowIndex {
+	case 0:
+		style = style.Foreground(tcell.ColorRed)
+	case 1:
+		style = style.Foreground(tcell.ColorOrange)
+	case 2:
+		style = style.Foreground(tcell.ColorYellow)
+	case 3:
+		style = style.Foreground(tcell.ColorGreen)
+	case 4:
+		style = style.Foreground(tcell.ColorBlue)
+	case 5:
+		style = style.Foreground(tcell.ColorIndigo)
+	case 6:
+		style = style.Foreground(tcell.ColorPurple)
+	}
+	cl.rainbowIndex++
+	cl.rainbowIndex %= 7
+	return style
+}
+
 func (cl *CommitLauncher) Launch() {
 	if cl.cooldown > 0 {
 		return
@@ -220,6 +250,8 @@ func (cl *CommitLauncher) Launch() {
 	shotX := cl.x + 3
 	shotY := cl.y - len(sha)
 	shot := NewCommitShot(cl.Game, shotX, shotY, sha)
+	style := cl.ColorForShot(sha)
+	shot.StyleOverride = &style
 	// TODO add ToRay to CommitShot
 	ray := &Ray{}
 	for i := 0; i < len(sha); i++ {
