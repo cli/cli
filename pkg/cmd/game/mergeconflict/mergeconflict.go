@@ -523,7 +523,8 @@ loop:
 		spawner.Spawn()
 		game.Update()
 		game.Draw()
-		drawStr(s, 20, 0, style, "!!! M E R G E  C O N F L I C T !!!")
+		titleStyle := style.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite)
+		drawStr(s, 25, 0, titleStyle, "!!! M E R G E  C O N F L I C T !!!")
 		s.Show()
 	}
 
