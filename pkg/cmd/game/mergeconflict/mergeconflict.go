@@ -148,7 +148,7 @@ func (is *IssueSpawner) Spawn() {
 	issueText := is.issues[0]
 	is.issues = is.issues[1:]
 
-	is.countdown = len(issueText) + 5 // add arbitrary cool off
+	is.countdown = len(issueText) + 3 // add arbitrary cool off
 
 	// is.x is either 0 or maxwidth
 	x := is.x
@@ -355,8 +355,15 @@ func (g *Game) DetectHits(r *Ray) {
 		_, ok := gobj.(*Score)
 		return ok
 	})
+	scoreLog := g.FindGameObject(func(gobj Drawable) bool {
+		_, ok := gobj.(*ScoreLog)
+		return ok
+	})
 	if score == nil {
 		panic("could not find score game object")
+	}
+	if scoreLog == nil {
+		panic("could not find score log game object")
 	}
 	thisShot := 0
 	for _, point := range r.Points {
@@ -368,12 +375,15 @@ func (g *Game) DetectHits(r *Ray) {
 		thisShot++
 	}
 	// TODO if this knows about the shas then i can do additional bonus based on matching characters
+	bonus := false
 	if thisShot == 10 {
+		bonus = true
 		// TODO announce GET! in a hype zone
 		g.Debugf("GET!\n")
 		thisShot *= 2
 	}
 
+	scoreLog.(*ScoreLog).Log(thisShot, bonus)
 	score.(*Score).Add(thisShot)
 }
 
@@ -392,6 +402,38 @@ type Ray struct {
 
 func (r *Ray) AddPoint(x, y int) {
 	r.Points = append(r.Points, Point{X: x, Y: y})
+}
+
+type ScoreLog struct {
+	GameObject
+	log []string
+}
+
+func NewScoreLog(x, y int, game *Game) *ScoreLog {
+	return &ScoreLog{
+		GameObject: GameObject{
+			x:    x,
+			y:    y,
+			Game: game,
+		},
+	}
+}
+
+func (sl *ScoreLog) Update() {
+	sl.Sprite = strings.Join(sl.log, "\n")
+	sl.h = len(sl.log)
+	sl.w = 15
+}
+
+func (sl *ScoreLog) Log(value int, get bool) {
+	msg := fmt.Sprintf("%d points!", value)
+	if get {
+		msg = fmt.Sprintf("%d points BONUS GET!", value)
+	}
+	sl.log = append(sl.log, msg)
+	if len(sl.log) > 5 {
+		sl.log = sl.log[1:]
+	}
 }
 
 func mergeconflictRun(opts *MCOpts) error {
@@ -469,8 +511,11 @@ func mergeconflictRun(opts *MCOpts) error {
 
 	game.AddDrawable(cl)
 
-	score := NewScore(40, 17, game)
+	score := NewScore(40, 18, game)
 	game.AddDrawable(score)
+
+	scoreLog := NewScoreLog(15, 15, game)
+	game.AddDrawable(scoreLog)
 
 	quit := make(chan struct{})
 	go func() {
