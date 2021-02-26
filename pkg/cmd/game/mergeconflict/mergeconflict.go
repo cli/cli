@@ -138,7 +138,6 @@ func (is *IssueSpawner) Update() {
 }
 
 func (is *IssueSpawner) Spawn() {
-	// TODO LOCKING AND UNLOCKING
 	if is.countdown > 0 || len(is.issues) == 0 {
 		// TODO eventually, notice if all spawners are empty and trigger win condition
 		//is.Game.Debugf("%s is dry", is)
@@ -162,8 +161,6 @@ func (is *IssueSpawner) Spawn() {
 	is.Game.AddDrawable(NewIssue(x, is.y, dir, issueText, is.Game))
 }
 
-// TODO grab full issue list, shuffle it, then round robin add to each issue spawner one at a time
-
 func (is *IssueSpawner) AddIssue(issue string) {
 	is.issues = append(is.issues, issue)
 }
@@ -178,7 +175,6 @@ type CommitLauncher struct {
 type CommitShot struct {
 	GameObject
 	life int
-	// TODO store colors here i guess?
 }
 
 func (cs *CommitShot) Update() {
@@ -257,7 +253,7 @@ func (cl *CommitLauncher) Launch() {
 	for i := 0; i < len(sha); i++ {
 		ray.AddPoint(shotX, shotY+i)
 	}
-	cl.Game.DetectHits(ray)
+	cl.Game.DetectHits(ray, shot.Sprite)
 	cl.Game.AddDrawable(shot)
 }
 
@@ -350,7 +346,7 @@ func (g *Game) FindGameObject(fn func(Drawable) bool) Drawable {
 	return nil
 }
 
-func (g *Game) DetectHits(r *Ray) {
+func (g *Game) DetectHits(r *Ray, shaText string) {
 	score := g.FindGameObject(func(gobj Drawable) bool {
 		_, ok := gobj.(*Score)
 		return ok
@@ -366,25 +362,34 @@ func (g *Game) DetectHits(r *Ray) {
 		panic("could not find score log game object")
 	}
 	thisShot := 0
-	for _, point := range r.Points {
+	matchesMultiplier := 1
+	for i, point := range r.Points {
 		r, _, _, _ := g.Screen.GetContent(point.X, point.Y)
 		g.Debugf("found at point %s: %s\n", point, string(r))
 		if r == ' ' {
 			continue
 		}
+		if byte(r) == shaText[i] {
+			g.Debugf("OMG CHARACTER HIT %s\n", string(r))
+			matchesMultiplier *= 2
+		}
+
 		thisShot++
 	}
 	// TODO if this knows about the shas then i can do additional bonus based on matching characters
 	bonus := false
 	if thisShot == 10 {
+		matchesMultiplier *= 2
+	}
+	if matchesMultiplier > 1 {
 		bonus = true
-		// TODO announce GET! in a hype zone
-		g.Debugf("GET!\n")
-		thisShot *= 2
+		thisShot *= matchesMultiplier
 	}
 
-	scoreLog.(*ScoreLog).Log(thisShot, bonus)
-	score.(*Score).Add(thisShot)
+	if thisShot > 0 {
+		scoreLog.(*ScoreLog).Log(thisShot, bonus)
+		score.(*Score).Add(thisShot)
+	}
 }
 
 type Point struct {
