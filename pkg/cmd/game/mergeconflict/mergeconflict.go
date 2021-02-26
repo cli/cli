@@ -168,7 +168,7 @@ func (is *IssueSpawner) AddIssue(issue string) {
 type CommitLauncher struct {
 	GameObject
 	cooldown     int // prevents double shooting which make bullets collide
-	shas         []string
+	Shas         []string
 	rainbowIndex int
 }
 
@@ -237,12 +237,12 @@ func (cl *CommitLauncher) Launch() {
 	}
 	cl.cooldown = 4
 
-	if len(cl.shas) == 1 {
+	if len(cl.Shas) == 1 {
 		// TODO need to signal game over
 		return
 	}
-	sha := cl.shas[0]
-	cl.shas = cl.shas[1:]
+	sha := cl.Shas[0]
+	cl.Shas = cl.Shas[1:]
 	shotX := cl.x + 3
 	shotY := cl.y - len(sha)
 	shot := NewCommitShot(cl.Game, shotX, shotY, sha)
@@ -259,7 +259,7 @@ func (cl *CommitLauncher) Launch() {
 
 func NewCommitLauncher(g *Game, shas []string) *CommitLauncher {
 	return &CommitLauncher{
-		shas: shas,
+		Shas: shas,
 		GameObject: GameObject{
 			Sprite: "-=$^$=-",
 			w:      7,
@@ -267,6 +267,30 @@ func NewCommitLauncher(g *Game, shas []string) *CommitLauncher {
 			Game:   g,
 		},
 	}
+}
+
+type CommitCounter struct {
+	cl *CommitLauncher
+	GameObject
+}
+
+func NewCommitCounter(x, y int, cl *CommitLauncher, game *Game) *CommitCounter {
+	return &CommitCounter{
+		cl: cl,
+		GameObject: GameObject{
+			x:      x,
+			y:      y,
+			h:      1,
+			Sprite: fmt.Sprintf("%d commits remain", len(cl.Shas)),
+			Game:   game,
+		},
+	}
+}
+
+func (cc *CommitCounter) Update() {
+	sprite := fmt.Sprintf("%d commits remain", len(cc.cl.Shas))
+	cc.Sprite = sprite
+	cc.w = len(sprite)
 }
 
 type Score struct {
@@ -376,7 +400,7 @@ func (g *Game) DetectHits(r *Ray, shaText string) {
 
 		thisShot++
 	}
-	// TODO if this knows about the shas then i can do additional bonus based on matching characters
+
 	bonus := false
 	if thisShot == 10 {
 		matchesMultiplier *= 2
@@ -511,10 +535,11 @@ func mergeconflictRun(opts *MCOpts) error {
 	}
 
 	cl := NewCommitLauncher(game, shas)
-
 	cl.Transform(37, 13)
-
 	game.AddDrawable(cl)
+
+	cc := NewCommitCounter(35, 14, cl, game)
+	game.AddDrawable(cc)
 
 	score := NewScore(40, 18, game)
 	game.AddDrawable(score)
@@ -553,9 +578,7 @@ func mergeconflictRun(opts *MCOpts) error {
 	}()
 
 	// TODO UI
-	// - hype zone / score log
 	// - high score listing
-	// - commits left
 	// - "now playing" note
 	// - key legend
 	// TODO high score saving/loading
