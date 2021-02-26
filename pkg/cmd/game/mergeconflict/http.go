@@ -157,9 +157,7 @@ func getIssues(client *http.Client, repo ghrepo.Interface) ([]string, error) {
 			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
 		}
 
-		for _, issue := range response.Repository.Issues.Nodes {
-			issues = append(issues, issue)
-		}
+		issues = append(issues, response.Repository.Issues.Nodes...)
 
 		if response.Repository.Issues.PageInfo.HasNextPage {
 			variables["endCursor"] = response.Repository.Issues.PageInfo.EndCursor
