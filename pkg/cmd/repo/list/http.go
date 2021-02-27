@@ -2,6 +2,7 @@ package list
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -45,7 +46,18 @@ type RepositoryList struct {
 	TotalCount   int
 }
 
+type FilterOptions struct {
+	Visibility string // private, public
+	Fork       bool
+	Source     bool
+	Language   string
+}
+
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
+	if filter.Language != "" {
+		return searchRepos(client, hostname, limit, owner, filter)
+	}
+
 	perPage := limit
 	if perPage > 100 {
 		perPage = 100
@@ -97,11 +109,11 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 		},
 	})
 
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
 	listResult := RepositoryList{}
 pagination:
 	for {
 		result := reflect.New(query)
-		gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
 		err := gql.QueryNamed(context.Background(), "RepositoryList", result.Interface(), variables)
 		if err != nil {
 			return nil, err
@@ -125,4 +137,90 @@ pagination:
 	}
 
 	return &listResult, nil
+}
+
+func searchRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
+	type query struct {
+		Search struct {
+			RepositoryCount int
+			Nodes           []struct {
+				Repository Repository `graphql:"...on Repository"`
+			}
+			PageInfo struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		} `graphql:"search(type: REPOSITORY, query: $query, first: $perPage, after: $endCursor)"`
+	}
+
+	perPage := limit
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	variables := map[string]interface{}{
+		"query":     githubv4.String(searchQuery(owner, filter)),
+		"perPage":   githubv4.Int(perPage),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
+	listResult := RepositoryList{}
+pagination:
+	for {
+		var result query
+		err := gql.QueryNamed(context.Background(), "RepositoryListSearch", &result, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		listResult.TotalCount = result.Search.RepositoryCount
+		for _, node := range result.Search.Nodes {
+			if listResult.Owner == "" {
+				idx := strings.IndexRune(node.Repository.NameWithOwner, '/')
+				listResult.Owner = node.Repository.NameWithOwner[:idx]
+			}
+			listResult.Repositories = append(listResult.Repositories, node.Repository)
+			if len(listResult.Repositories) >= limit {
+				break pagination
+			}
+		}
+
+		if !result.Search.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(result.Search.PageInfo.EndCursor)
+	}
+
+	return &listResult, nil
+}
+
+func searchQuery(owner string, filter FilterOptions) string {
+	queryParts := []string{"sort:updated-desc"}
+	if owner == "" {
+		queryParts = append(queryParts, "user:@me")
+	} else {
+		queryParts = append(queryParts, "user:"+owner)
+	}
+
+	if filter.Fork {
+		queryParts = append(queryParts, "fork:only")
+	} else if filter.Source {
+		queryParts = append(queryParts, "fork:false")
+	} else {
+		queryParts = append(queryParts, "fork:true")
+	}
+
+	if filter.Language != "" {
+		queryParts = append(queryParts, fmt.Sprintf("language:%q", filter.Language))
+	}
+
+	switch filter.Visibility {
+	case "public":
+		queryParts = append(queryParts, "is:public")
+	case "private":
+		queryParts = append(queryParts, "is:private")
+	}
+
+	return strings.Join(queryParts, " ")
 }

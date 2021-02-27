@@ -33,6 +33,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "",
 				Fork:       false,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -44,6 +45,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "",
 				Fork:       false,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -55,6 +57,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "",
 				Fork:       false,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -66,6 +69,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "public",
 				Fork:       false,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -77,6 +81,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "private",
 				Fork:       false,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -88,6 +93,7 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "",
 				Fork:       true,
 				Source:     false,
+				Language:   "",
 			},
 		},
 		{
@@ -99,6 +105,19 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "",
 				Fork:       false,
 				Source:     true,
+				Language:   "",
+			},
+		},
+		{
+			name: "with language",
+			cli:  "-l go",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "",
+				Fork:       false,
+				Source:     false,
+				Language:   "go",
 			},
 		},
 		{

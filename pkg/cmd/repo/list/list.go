@@ -13,12 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type FilterOptions struct {
-	Visibility string // private, public
-	Fork       bool
-	Source     bool
-}
-
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
@@ -29,6 +23,7 @@ type ListOptions struct {
 	Visibility string
 	Fork       bool
 	Source     bool
+	Language   string
 
 	Now func() time.Time
 }
@@ -83,6 +78,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
+	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
 
 	return cmd
 }
@@ -97,6 +93,7 @@ func listRun(opts *ListOptions) error {
 		Visibility: opts.Visibility,
 		Fork:       opts.Fork,
 		Source:     opts.Source,
+		Language:   opts.Language,
 	}
 
 	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, opts.Owner, filter)
@@ -132,7 +129,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source
+		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
@@ -144,9 +141,15 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 	if totalMatchCount == 0 {
 		if hasFilters {
 			return "No results match your search"
+		} else if owner != "" {
+			return "There are no repositories in @" + owner
 		}
-		return "There are no repositories in @" + owner
+		return "No results"
 	}
 
-	return fmt.Sprintf("Showing %d of %d repositories in @%s", matchCount, totalMatchCount, owner)
+	var matchStr string
+	if hasFilters {
+		matchStr = " that match your search"
+	}
+	return fmt.Sprintf("Showing %d of %d repositories in @%s%s", matchCount, totalMatchCount, owner, matchStr)
 }
