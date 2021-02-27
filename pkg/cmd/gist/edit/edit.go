@@ -28,7 +28,8 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 
-	Edit         func(string, string, string, *iostreams.IOStreams) (string, error)
+	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
+
 	Selector     string
 	EditFilename string
 	AddFilename  string
@@ -62,7 +63,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			return editRun(&opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a file")
+
+	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
 	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
@@ -106,8 +108,7 @@ func editRun(opts *EditOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	if addFilename != "" {
-		//Add files to an existing gist.
-		files, err := getFilesToAdd(addFilename, opts)
+		files, err := getFilesToAdd(addFilename)
 		if err != nil {
 			return err
 		}
@@ -118,10 +119,7 @@ func editRun(opts *EditOptions) error {
 			return err
 		}
 
-		completionMessage := filepath.Base(addFilename) + " added to gist"
-
-		fmt.Fprintf(opts.IO.Out, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
-
+		fmt.Fprintf(opts.IO.Out, "%s %s added to gist\n", cs.SuccessIconWithColor(cs.Green), filepath.Base(addFilename))
 		return nil
 	}
 
@@ -249,25 +247,21 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	return nil
 }
 
-func getFilesToAdd(file string, opts *EditOptions) (map[string]*shared.GistFile, error) {
-	cs := opts.IO.ColorScheme()
-
-	filesToAdd := map[string]*shared.GistFile{}
-
-	filename := filepath.Base(file)
-
+func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("%s failed to read file %s: %w", cs.FailureIcon(), file, err)
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
 	}
 
-	if string(content) == "" {
-		return nil, fmt.Errorf("%s Contents can't be empty", cs.FailureIcon())
+	if len(content) == 0 {
+		return nil, errors.New("file contents cannot be empty")
 	}
 
-	filesToAdd[filename] = &shared.GistFile{
-		Filename: filename,
-		Content:  string(content),
-	}
-	return filesToAdd, nil
+	filename := filepath.Base(file)
+	return map[string]*shared.GistFile{
+		filename: {
+			Filename: filename,
+			Content:  string(content),
+		},
+	}, nil
 }

@@ -16,25 +16,22 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-)
-
-const (
-	fixtureFile = "../fixture.txt"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_getFilesToAdd(t *testing.T) {
-	gf, err := getFilesToAdd(fixtureFile, &EditOptions{
-		AddFilename: fixtureFile,
-		IO:          &iostreams.IOStreams{},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error processing files: %s", err)
-	}
+	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
+	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	require.NoError(t, err)
 
+	gf, err := getFilesToAdd(fileToAdd)
+	require.NoError(t, err)
+
+	filename := filepath.Base(fileToAdd)
 	assert.Equal(t, map[string]*shared.GistFile{
-		filepath.Base(fixtureFile): {
-			Filename: filepath.Base(fixtureFile),
-			Content:  "{}",
+		filename: {
+			Filename: filename,
+			Content:  "hello",
 		},
 	}, gf)
 }
@@ -98,6 +95,10 @@ func TestNewCmdEdit(t *testing.T) {
 }
 
 func Test_editRun(t *testing.T) {
+	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
+	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name       string
 		opts       *EditOptions
@@ -260,7 +261,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"))
 			},
 			opts: &EditOptions{
-				AddFilename: fixtureFile,
+				AddFilename: fileToAdd,
 			},
 		},
 	}
