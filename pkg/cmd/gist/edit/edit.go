@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -28,8 +30,9 @@ type EditOptions struct {
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
 
-	Selector string
-	Filename string
+	Selector     string
+	EditFilename string
+	AddFilename  string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -60,7 +63,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			return editRun(&opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Select a file to edit")
+
+	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
+	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
 }
@@ -85,6 +90,9 @@ func editRun(opts *EditOptions) error {
 
 	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
 	if err != nil {
+		if errors.Is(err, shared.NotFoundErr) {
+			return fmt.Errorf("gist not found: %s", gistID)
+		}
 		return err
 	}
 
@@ -97,10 +105,20 @@ func editRun(opts *EditOptions) error {
 		return fmt.Errorf("You do not own this gist.")
 	}
 
+	if opts.AddFilename != "" {
+		files, err := getFilesToAdd(opts.AddFilename)
+		if err != nil {
+			return err
+		}
+
+		gist.Files = files
+		return updateGist(apiClient, ghinstance.OverridableDefault(), gist)
+	}
+
 	filesToUpdate := map[string]string{}
 
 	for {
-		filename := opts.Filename
+		filename := opts.EditFilename
 		candidates := []string{}
 		for filename := range gist.Files {
 			candidates = append(candidates, filename)
@@ -221,4 +239,23 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	}
 
 	return nil
+}
+
+func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
+	content, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+	}
+
+	if len(content) == 0 {
+		return nil, errors.New("file contents cannot be empty")
+	}
+
+	filename := filepath.Base(file)
+	return map[string]*shared.GistFile{
+		filename: {
+			Filename: filename,
+			Content:  string(content),
+		},
+	}, nil
 }

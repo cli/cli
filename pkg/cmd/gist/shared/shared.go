@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -31,6 +32,8 @@ type Gist struct {
 	Owner       *GistOwner           `json:"owner,omitempty"`
 }
 
+var NotFoundErr = errors.New("not found")
+
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	gist := Gist{}
 	path := fmt.Sprintf("gists/%s", gistID)
@@ -38,6 +41,10 @@ func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	err := apiClient.REST(hostname, "GET", path, nil, &gist)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
+			return nil, NotFoundErr
+		}
 		return nil, err
 	}
 
