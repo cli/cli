@@ -62,7 +62,7 @@ func TestRepoList_nontty(t *testing.T) {
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
 	)
 	httpReg.Register(
-		httpmock.GraphQL(`query RepoList\b`),
+		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.FileResponse("./fixtures/repoList.json"),
 	)
 
@@ -84,9 +84,9 @@ func TestRepoList_nontty(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 
 	assert.Equal(t, heredoc.Doc(`
-		octocat/hello-world	My first repository	Public	2021-02-19T06:34:58Z
-		octocat/cli	GitHub CLI	Public	2021-02-19T06:06:06Z
-		octocat/testing		Private	2021-02-11T22:32:05Z
+		octocat/hello-world	My first repository	public	2021-02-19T06:34:58Z
+		octocat/cli	GitHub CLI	public, fork	2021-02-19T06:06:06Z
+		octocat/testing		private	2021-02-11T22:32:05Z
 	`), stdout.String())
 }
 
@@ -104,7 +104,7 @@ func TestRepoList_tty(t *testing.T) {
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
 	)
 	httpReg.Register(
-		httpmock.GraphQL(`query RepoList\b`),
+		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.FileResponse("./fixtures/repoList.json"),
 	)
 
@@ -129,9 +129,9 @@ func TestRepoList_tty(t *testing.T) {
 
 		Showing 3 of 3 repositories in @octocat
 
-		octocat/hello-world  My first repository           8h
-		octocat/cli          GitHub CLI           Fork     8h
-		octocat/testing                           Private  7d
+		octocat/hello-world  My first repository  public        8h
+		octocat/cli          GitHub CLI           public, fork  8h
+		octocat/testing                           private       7d
 	`), stdout.String())
 }
 
@@ -144,10 +144,10 @@ func TestRepoList_filtering(t *testing.T) {
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
 	)
 	http.Register(
-		httpmock.GraphQL(`query RepoList\b`),
+		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
 			assert.Equal(t, "PRIVATE", params["privacy"])
-			assert.Equal(t, float64(2), params["per_page"])
+			assert.Equal(t, float64(2), params["perPage"])
 		}),
 	)
 

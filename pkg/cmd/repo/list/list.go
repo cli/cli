@@ -3,7 +3,6 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -45,14 +44,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	var (
 		flagPublic  bool
 		flagPrivate bool
-		flagSource  bool
-		flagFork    bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   "list [<owner>]",
 		Args:  cobra.MaximumNArgs(1),
-		Short: "List repositories from a user or organization",
+		Short: "List repositories owned by user or organization",
 		RunE: func(c *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
@@ -61,7 +58,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if flagPrivate && flagPublic {
 				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--public` or `--private`")}
 			}
-			if flagSource && flagFork {
+			if opts.Source && opts.Fork {
 				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--source` or `--fork`")}
 			}
 
@@ -70,9 +67,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			} else if flagPublic {
 				opts.Visibility = "public"
 			}
-
-			opts.Fork = flagFork
-			opts.Source = flagSource
 
 			if len(args) > 0 {
 				opts.Owner = args[0]
@@ -88,8 +82,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of repositories to list")
 	cmd.Flags().BoolVar(&flagPrivate, "private", false, "Show only private repositories")
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
-	cmd.Flags().BoolVar(&flagSource, "source", false, "Show only source repositories")
-	cmd.Flags().BoolVar(&flagFork, "fork", false, "Show only forks")
+	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
+	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 
 	return cmd
 }
@@ -118,58 +112,36 @@ func listRun(opts *ListOptions) error {
 		Source:     opts.Source,
 	}
 
-	listResult, err := listRepos(apiClient, ghinstance.OverridableDefault(), opts.Limit, owner, filter)
+	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, owner, filter)
 	if err != nil {
 		return err
 	}
 
 	cs := opts.IO.ColorScheme()
-
 	tp := utils.NewTablePrinter(opts.IO)
-
-	notArchived := filter.Fork || filter.Source
-
-	matchCount := len(listResult.Repositories)
 	now := opts.Now()
 
 	for _, repo := range listResult.Repositories {
-		if notArchived && repo.IsArchived {
-			matchCount--
-			listResult.TotalCount--
-			continue
-		}
-
-		nameWithOwner := repo.NameWithOwner
-
 		info := repo.Info()
 		infoColor := cs.Gray
-		visibility := "Public"
-
 		if repo.IsPrivate {
 			infoColor = cs.Yellow
-			visibility = "Private"
 		}
 
-		description := repo.Description
-		updatedAt := repo.UpdatedAt.Format(time.RFC3339)
-
+		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
+		tp.AddField(text.ReplaceExcessiveWhitespace(repo.Description), nil, nil)
+		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(nameWithOwner, nil, cs.Bold)
-			tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
-			tp.AddField(info, nil, infoColor)
-			tp.AddField(utils.FuzzyAgoAbbr(now, repo.UpdatedAt), nil, nil)
+			tp.AddField(utils.FuzzyAgoAbbr(now, repo.PushedAt), nil, cs.Gray)
 		} else {
-			tp.AddField(nameWithOwner, nil, nil)
-			tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
-			tp.AddField(visibility, nil, nil)
-			tp.AddField(updatedAt, nil, nil)
+			tp.AddField(repo.PushedAt.Format(time.RFC3339), nil, nil)
 		}
 		tp.EndRow()
 	}
 
 	if isTerminal {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source
-		title := listHeader(owner, matchCount, listResult.TotalCount, hasFilters)
+		title := listHeader(owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
@@ -185,35 +157,4 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 	}
 
 	return fmt.Sprintf("Showing %d of %d repositories in @%s", matchCount, totalMatchCount, owner)
-}
-
-type Repository struct {
-	NameWithOwner string
-	Description   string
-	IsFork        bool
-	IsPrivate     bool
-	IsArchived    bool
-	UpdatedAt     time.Time
-}
-
-func (r Repository) Info() string {
-	var info string
-	var tags []string
-
-	if r.IsPrivate {
-		tags = append(tags, "private")
-	}
-	if r.IsFork {
-		tags = append(tags, "fork")
-	}
-	if r.IsArchived {
-		tags = append(tags, "archived")
-	}
-
-	if len(tags) > 0 {
-		tags[0] = strings.Title(tags[0])
-		info = strings.Join(tags, ", ")
-	}
-
-	return info
 }
