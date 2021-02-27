@@ -52,6 +52,7 @@ func Test_listReposWithLanguage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 3, res.TotalCount)
+	assert.Equal(t, true, res.FromSearch)
 	assert.Equal(t, "octocat", res.Owner)
 	assert.Equal(t, "octocat/hello-world", res.Repositories[0].NameWithOwner)
 
@@ -129,6 +130,26 @@ func Test_searchQuery(t *testing.T) {
 				},
 			},
 			want: "sort:updated-desc user:@me fork:true language:\"ruby\"",
+		},
+		{
+			name: "only archived",
+			args: args{
+				owner: "",
+				filter: FilterOptions{
+					Archived: true,
+				},
+			},
+			want: "sort:updated-desc user:@me fork:true archived:true",
+		},
+		{
+			name: "only non-archived",
+			args: args{
+				owner: "",
+				filter: FilterOptions{
+					NonArchived: true,
+				},
+			},
+			want: "sort:updated-desc user:@me fork:true archived:false",
 		},
 	}
 	for _, tt := range tests {

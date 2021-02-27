@@ -20,10 +20,12 @@ type ListOptions struct {
 	Limit int
 	Owner string
 
-	Visibility string
-	Fork       bool
-	Source     bool
-	Language   string
+	Visibility  string
+	Fork        bool
+	Source      bool
+	Language    string
+	Archived    bool
+	NonArchived bool
 
 	Now func() time.Time
 }
@@ -55,6 +57,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if opts.Source && opts.Fork {
 				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--source` or `--fork`")}
 			}
+			if opts.Archived && opts.NonArchived {
+				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--archived` or `--no-archived`")}
+			}
 
 			if flagPrivate {
 				opts.Visibility = "private"
@@ -79,6 +84,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
+	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
+	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
 
 	return cmd
 }
@@ -90,10 +97,12 @@ func listRun(opts *ListOptions) error {
 	}
 
 	filter := FilterOptions{
-		Visibility: opts.Visibility,
-		Fork:       opts.Fork,
-		Source:     opts.Source,
-		Language:   opts.Language,
+		Visibility:  opts.Visibility,
+		Fork:        opts.Fork,
+		Source:      opts.Source,
+		Language:    opts.Language,
+		Archived:    opts.Archived,
+		NonArchived: opts.NonArchived,
 	}
 
 	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, opts.Owner, filter)
@@ -117,13 +126,18 @@ func listRun(opts *ListOptions) error {
 			infoColor = cs.Yellow
 		}
 
+		t := repo.PushedAt
+		// if listResult.FromSearch {
+		// 	t = repo.UpdatedAt
+		// }
+
 		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
 		tp.AddField(text.ReplaceExcessiveWhitespace(repo.Description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(now, repo.PushedAt), nil, cs.Gray)
+			tp.AddField(utils.FuzzyAgoAbbr(now, t), nil, cs.Gray)
 		} else {
-			tp.AddField(repo.PushedAt.Format(time.RFC3339), nil, nil)
+			tp.AddField(t.Format(time.RFC3339), nil, nil)
 		}
 		tp.EndRow()
 	}

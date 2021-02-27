@@ -44,17 +44,20 @@ type RepositoryList struct {
 	Owner        string
 	Repositories []Repository
 	TotalCount   int
+	FromSearch   bool
 }
 
 type FilterOptions struct {
-	Visibility string // private, public
-	Fork       bool
-	Source     bool
-	Language   string
+	Visibility  string // private, public
+	Fork        bool
+	Source      bool
+	Language    string
+	Archived    bool
+	NonArchived bool
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	if filter.Language != "" {
+	if filter.Language != "" || filter.Archived || filter.NonArchived {
 		return searchRepos(client, hostname, limit, owner, filter)
 	}
 
@@ -165,7 +168,7 @@ func searchRepos(client *http.Client, hostname string, limit int, owner string, 
 	}
 
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
-	listResult := RepositoryList{}
+	listResult := RepositoryList{FromSearch: true}
 pagination:
 	for {
 		var result query
@@ -220,6 +223,12 @@ func searchQuery(owner string, filter FilterOptions) string {
 		queryParts = append(queryParts, "is:public")
 	case "private":
 		queryParts = append(queryParts, "is:private")
+	}
+
+	if filter.Archived {
+		queryParts = append(queryParts, "archived:true")
+	} else if filter.NonArchived {
+		queryParts = append(queryParts, "archived:false")
 	}
 
 	return strings.Join(queryParts, " ")
