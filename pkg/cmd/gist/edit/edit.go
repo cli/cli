@@ -90,6 +90,9 @@ func editRun(opts *EditOptions) error {
 
 	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
 	if err != nil {
+		if errors.Is(err, shared.NotFoundErr) {
+			return fmt.Errorf("gist not found: %s", gistID)
+		}
 		return err
 	}
 
@@ -102,26 +105,17 @@ func editRun(opts *EditOptions) error {
 		return fmt.Errorf("You do not own this gist.")
 	}
 
-	filesToUpdate := map[string]string{}
-
-	addFilename := opts.AddFilename
-	cs := opts.IO.ColorScheme()
-
-	if addFilename != "" {
-		files, err := getFilesToAdd(addFilename)
+	if opts.AddFilename != "" {
+		files, err := getFilesToAdd(opts.AddFilename)
 		if err != nil {
 			return err
 		}
 
 		gist.Files = files
-		err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintf(opts.IO.Out, "%s %s added to gist\n", cs.SuccessIconWithColor(cs.Green), filepath.Base(addFilename))
-		return nil
+		return updateGist(apiClient, ghinstance.OverridableDefault(), gist)
 	}
+
+	filesToUpdate := map[string]string{}
 
 	for {
 		filename := opts.EditFilename

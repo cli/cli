@@ -106,13 +106,12 @@ func Test_editRun(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
 		nontty     bool
-		wantErr    bool
-		wantStderr string
+		wantErr    string
 		wantParams map[string]interface{}
 	}{
 		{
 			name:    "no such gist",
-			wantErr: true,
+			wantErr: "gist not found: 1234",
 		},
 		{
 			name: "one file",
@@ -195,7 +194,7 @@ func Test_editRun(t *testing.T) {
 				as.StubOne("unix.md")
 				as.StubOne("Cancel")
 			},
-			wantErr: true,
+			wantErr: "SilentError",
 			gist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
@@ -240,8 +239,7 @@ func Test_editRun(t *testing.T) {
 				},
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
-			wantErr:    true,
-			wantStderr: "You do not own this gist.",
+			wantErr: "You do not own this gist.",
 		},
 		{
 			name: "add file to existing gist",
@@ -299,7 +297,7 @@ func Test_editRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		io, _, _, _ := iostreams.Test()
+		io, _, stdout, stderr := iostreams.Test()
 		io.SetStdoutTTY(!tt.nontty)
 		io.SetStdinTTY(!tt.nontty)
 		tt.opts.IO = io
@@ -313,11 +311,8 @@ func Test_editRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := editRun(tt.opts)
 			reg.Verify(t)
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.wantStderr != "" {
-					assert.EqualError(t, err, tt.wantStderr)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
 			}
 			assert.NoError(t, err)
@@ -331,6 +326,9 @@ func Test_editRun(t *testing.T) {
 				}
 				assert.Equal(t, tt.wantParams, reqBody)
 			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
 		})
 	}
 }
