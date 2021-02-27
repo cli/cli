@@ -3,6 +3,7 @@ package list
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -39,31 +40,18 @@ func (r Repository) Info() string {
 }
 
 type RepositoryList struct {
+	Owner        string
 	Repositories []Repository
 	TotalCount   int
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	type query struct {
-		RepositoryOwner struct {
-			Repositories struct {
-				Nodes      []Repository
-				TotalCount int
-				PageInfo   struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			} `graphql:"repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC })"`
-		} `graphql:"repositoryOwner(login: $owner)"`
-	}
-
 	perPage := limit
 	if perPage > 100 {
 		perPage = 100
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(owner),
 		"perPage":   githubv4.Int(perPage),
 		"endCursor": (*githubv4.String)(nil),
 	}
@@ -82,28 +70,58 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 		variables["fork"] = (*githubv4.Boolean)(nil)
 	}
 
+	var ownerConnection string
+	if owner == "" {
+		ownerConnection = `graphql:"repositoryOwner: viewer"`
+	} else {
+		ownerConnection = `graphql:"repositoryOwner(login: $owner)"`
+		variables["owner"] = githubv4.String(owner)
+	}
+
+	type repositoryOwner struct {
+		Login        string
+		Repositories struct {
+			Nodes      []Repository
+			TotalCount int
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		} `graphql:"repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC })"`
+	}
+	query := reflect.StructOf([]reflect.StructField{
+		{
+			Name: "RepositoryOwner",
+			Type: reflect.TypeOf(repositoryOwner{}),
+			Tag:  reflect.StructTag(ownerConnection),
+		},
+	})
+
 	listResult := RepositoryList{}
 pagination:
 	for {
-		var result query
+		result := reflect.New(query)
 		gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
-		err := gql.QueryNamed(context.Background(), "RepositoryList", &result, variables)
+		err := gql.QueryNamed(context.Background(), "RepositoryList", result.Interface(), variables)
 		if err != nil {
 			return nil, err
 		}
 
-		listResult.TotalCount = result.RepositoryOwner.Repositories.TotalCount
-		for _, repo := range result.RepositoryOwner.Repositories.Nodes {
+		owner := result.Elem().FieldByName("RepositoryOwner").Interface().(repositoryOwner)
+		listResult.TotalCount = owner.Repositories.TotalCount
+		listResult.Owner = owner.Login
+
+		for _, repo := range owner.Repositories.Nodes {
 			listResult.Repositories = append(listResult.Repositories, repo)
 			if len(listResult.Repositories) >= limit {
 				break pagination
 			}
 		}
 
-		if !result.RepositoryOwner.Repositories.PageInfo.HasNextPage {
+		if !owner.Repositories.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = githubv4.String(result.RepositoryOwner.Repositories.PageInfo.EndCursor)
+		variables["endCursor"] = githubv4.String(owner.Repositories.PageInfo.EndCursor)
 	}
 
 	return &listResult, nil

@@ -1,6 +1,7 @@
 {
   "data": {
     "repositoryOwner": {
+      "login": "octocat",
       "repositories": {
         "totalCount": 3,
         "nodes": [

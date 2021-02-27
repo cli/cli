@@ -58,10 +58,6 @@ func TestRepoList_nontty(t *testing.T) {
 	defer httpReg.Verify(t)
 
 	httpReg.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
-	)
-	httpReg.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.FileResponse("./fixtures/repoList.json"),
 	)
@@ -100,10 +96,6 @@ func TestRepoList_tty(t *testing.T) {
 	defer httpReg.Verify(t)
 
 	httpReg.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
-	)
-	httpReg.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.FileResponse("./fixtures/repoList.json"),
 	)
@@ -139,10 +131,6 @@ func TestRepoList_filtering(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
-	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {

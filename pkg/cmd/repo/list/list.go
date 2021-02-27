@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -94,25 +93,13 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	isTerminal := opts.IO.IsStdoutTTY()
-
-	owner := opts.Owner
-	if owner == "" {
-		owner, err = api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
-		if err != nil {
-			return err
-		}
-	}
-
 	filter := FilterOptions{
 		Visibility: opts.Visibility,
 		Fork:       opts.Fork,
 		Source:     opts.Source,
 	}
 
-	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, owner, filter)
+	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, opts.Owner, filter)
 	if err != nil {
 		return err
 	}
@@ -139,9 +126,9 @@ func listRun(opts *ListOptions) error {
 		tp.EndRow()
 	}
 
-	if isTerminal {
+	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source
-		title := listHeader(owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
+		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
