@@ -1,3 +1,5 @@
+[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/cli/cli)
+
 # GitHub CLI
 
 `gh` is GitHub on the command line, and it's now available in beta. It brings pull requests, issues, and other GitHub concepts to
