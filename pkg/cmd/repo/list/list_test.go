@@ -14,7 +14,142 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdList(t *testing.T) {
+	tests := []struct {
+		name     string
+		cli      string
+		wants    ListOptions
+		wantsErr string
+	}{
+		{
+			name: "no arguments",
+			cli:  "",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "",
+				Fork:       false,
+				Source:     false,
+			},
+		},
+		{
+			name: "with owner",
+			cli:  "monalisa",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "monalisa",
+				Visibility: "",
+				Fork:       false,
+				Source:     false,
+			},
+		},
+		{
+			name: "with limit",
+			cli:  "-L 101",
+			wants: ListOptions{
+				Limit:      101,
+				Owner:      "",
+				Visibility: "",
+				Fork:       false,
+				Source:     false,
+			},
+		},
+		{
+			name: "only public",
+			cli:  "--public",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "public",
+				Fork:       false,
+				Source:     false,
+			},
+		},
+		{
+			name: "only private",
+			cli:  "--private",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "private",
+				Fork:       false,
+				Source:     false,
+			},
+		},
+		{
+			name: "only forks",
+			cli:  "--fork",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "",
+				Fork:       true,
+				Source:     false,
+			},
+		},
+		{
+			name: "only sources",
+			cli:  "--source",
+			wants: ListOptions{
+				Limit:      30,
+				Owner:      "",
+				Visibility: "",
+				Fork:       false,
+				Source:     true,
+			},
+		},
+		{
+			name:     "no public and private",
+			cli:      "--public --private",
+			wantsErr: "specify only one of `--public` or `--private`",
+		},
+		{
+			name:     "no forks with sources",
+			cli:      "--fork --source",
+			wantsErr: "specify only one of `--source` or `--fork`",
+		},
+		{
+			name:     "too many arguments",
+			cli:      "monalisa hubot",
+			wantsErr: "accepts at most 1 arg(s), received 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &cmdutil.Factory{}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts *ListOptions
+			cmd := NewCmdList(f, func(opts *ListOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr != "" {
+				assert.EqualError(t, err, tt.wantsErr)
+				return
+			}
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
+			assert.Equal(t, tt.wants.Owner, gotOpts.Owner)
+			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
+			assert.Equal(t, tt.wants.Fork, gotOpts.Fork)
+			assert.Equal(t, tt.wants.Source, gotOpts.Source)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -146,35 +281,4 @@ func TestRepoList_filtering(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, "\nNo results match your search\n\n", output.String())
-}
-
-func TestRepoList_withInvalidFlagCombinations(t *testing.T) {
-	tests := []struct {
-		name       string
-		cli        string
-		wantStderr string
-	}{
-		{
-			name:       "invalid limit",
-			cli:        "--limit 0",
-			wantStderr: "invalid limit: 0",
-		},
-		{
-			name:       "both private and public",
-			cli:        "--private --public",
-			wantStderr: "specify only one of `--public` or `--private`",
-		},
-		{
-			name:       "both source and fork",
-			cli:        "--source --fork",
-			wantStderr: "specify only one of `--source` or `--fork`",
-		},
-	}
-
-	for _, tt := range tests {
-		httpReg := &httpmock.Registry{}
-
-		_, err := runCommand(httpReg, true, tt.cli)
-		assert.EqualError(t, err, tt.wantStderr)
-	}
 }
