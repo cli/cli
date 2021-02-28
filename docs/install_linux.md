@@ -93,6 +93,8 @@ Arch Linux users can install from the [community repo][arch linux repo]:
 sudo pacman -S github-cli
 ```
 
+Or if you want to build it from source use the [unofficial AUR package](arch linux aur)
+
 ### Android
 
 Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page):
@@ -167,3 +169,4 @@ sudo snap install --edge gh && snap connect gh:ssh-keys
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
+[arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
