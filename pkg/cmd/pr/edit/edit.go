@@ -46,7 +46,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "edit {<number> | <url>}",
+		Use:   "edit [<number> | <url> | <branch>]",
 		Short: "Edit a pull request",
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
@@ -56,12 +56,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.SelectorArg = args[0]
+			if len(args) > 0 {
+				opts.SelectorArg = args[0]
+			}
 
 			flags := cmd.Flags()
 			if flags.Changed("title") {
