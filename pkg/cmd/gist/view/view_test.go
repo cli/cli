@@ -2,13 +2,16 @@ package view
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,6 +63,16 @@ func TestNewCmdView(t *testing.T) {
 				ListFiles: true,
 			},
 		},
+		{
+			name: "tty no ID supplied",
+			cli:  "",
+			tty:  true,
+			wants: ViewOptions{
+				Raw:       false,
+				Selector:  "",
+				ListFiles: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -96,11 +109,12 @@ func TestNewCmdView(t *testing.T) {
 
 func Test_viewRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *ViewOptions
-		wantOut string
-		gist    *shared.Gist
-		wantErr bool
+		name         string
+		opts         *ViewOptions
+		wantOut      string
+		gist         *shared.Gist
+		wantErr      bool
+		mockGistList bool
 	}{
 		{
 			name: "no such gist",
@@ -125,6 +139,23 @@ func Test_viewRun(t *testing.T) {
 				},
 			},
 			wantOut: "bwhiizzzbwhuiiizzzz\n",
+		},
+		{
+			name: "one file, no ID supplied",
+			opts: &ViewOptions{
+				Selector:  "",
+				ListFiles: false,
+			},
+			mockGistList: true,
+			gist: &shared.Gist{
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {
+						Content: "test interactive mode",
+						Type:    "text/plain",
+					},
+				},
+			},
+			wantOut: "test interactive mode\n",
 		},
 		{
 			name: "filename selected",
@@ -304,6 +335,30 @@ func Test_viewRun(t *testing.T) {
 				httpmock.JSONResponse(tt.gist))
 		}
 
+		if tt.mockGistList {
+			sixHours, _ := time.ParseDuration("6h")
+			sixHoursAgo := time.Now().Add(-sixHours)
+			reg.Register(
+				httpmock.GraphQL(`query GistList\b`),
+				httpmock.StringResponse(fmt.Sprintf(
+					`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [{ "name": "cool.txt" }],
+								"description": "",
+								"updatedAt": "%s",
+								"isPublic": true
+							}
+						] } } } }`,
+					sixHoursAgo.Format(time.RFC3339),
+				)),
+			)
+
+			as, surveyteardown := prompt.InitAskStubber()
+			defer surveyteardown()
+			as.StubOne(0)
+		}
+
 		if tt.opts == nil {
 			tt.opts = &ViewOptions{}
 		}
@@ -324,6 +379,95 @@ func Test_viewRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wantOut, stdout.String())
+			reg.Verify(t)
+		})
+	}
+}
+
+func Test_promptGists(t *testing.T) {
+	tests := []struct {
+		name      string
+		gistIndex int
+		response  string
+		wantOut   string
+		gist      *shared.Gist
+		wantErr   bool
+	}{
+		{
+			name:      "multiple files, select first gist",
+			gistIndex: 0,
+			response: `{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "gistid1",
+								"files": [{ "name": "cool.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "gistid2",
+								"files": [{ "name": "gistfile0.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+			wantOut: "gistid1",
+		},
+		{
+			name:      "multiple files, select second gist",
+			gistIndex: 1,
+			response: `{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "gistid1",
+								"files": [{ "name": "cool.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "gistid2",
+								"files": [{ "name": "gistfile0.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+			wantOut: "gistid2",
+		},
+		{
+			name:     "no files",
+			response: `{ "data": { "viewer": { "gists": { "nodes": [] } } } }`,
+			wantOut:  "",
+		},
+	}
+
+	io, _, _, _ := iostreams.Test()
+	cs := iostreams.NewColorScheme(io.ColorEnabled(), io.ColorSupport256())
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+
+		const query = `query GistList\b`
+		sixHours, _ := time.ParseDuration("6h")
+		sixHoursAgo := time.Now().Add(-sixHours)
+		reg.Register(
+			httpmock.GraphQL(query),
+			httpmock.StringResponse(fmt.Sprintf(
+				tt.response,
+				sixHoursAgo.Format(time.RFC3339),
+			)),
+		)
+		client := &http.Client{Transport: reg}
+
+		as, surveyteardown := prompt.InitAskStubber()
+		defer surveyteardown()
+		as.StubOne(tt.gistIndex)
+
+		t.Run(tt.name, func(t *testing.T) {
+			gistID, err := promptGists(client, cs)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)
 		})
 	}
