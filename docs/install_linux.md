@@ -93,7 +93,7 @@ Arch Linux users can install from the [community repo][arch linux repo]:
 sudo pacman -S github-cli
 ```
 
-Or if you want to build it from source use the [unofficial AUR package](arch linux aur)
+Or if you want to build it from source use the [unofficial AUR package][arch linux aur]
 
 ### Android
 
