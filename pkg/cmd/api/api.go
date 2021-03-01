@@ -55,8 +55,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		Branch:     f.Branch,
 	}
 
-	var cacheDuration string
-
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
 		Short: "Make an authenticated GitHub API request",
@@ -165,14 +163,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
 			}
 
-			if cacheDuration != "" {
-				cacheTTL, err := time.ParseDuration(cacheDuration)
-				if err != nil {
-					return fmt.Errorf("error parsing `--cache` value: %w", err)
-				}
-				opts.CacheTTL = cacheTTL
-			}
-
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -189,7 +179,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVar(&cacheDuration, "cache", "", "Cache the response for the specified duration")
+	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
 }
 
