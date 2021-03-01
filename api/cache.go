@@ -167,9 +167,13 @@ func (fs *fileStorage) store(key string, res *http.Response) error {
 	defer f.Close()
 
 	var origBody io.ReadCloser
-	origBody, res.Body = copyStream(res.Body)
-	defer res.Body.Close()
+	if res.Body != nil {
+		origBody, res.Body = copyStream(res.Body)
+		defer res.Body.Close()
+	}
 	err = res.Write(f)
-	res.Body = origBody
+	if origBody != nil {
+		res.Body = origBody
+	}
 	return err
 }
