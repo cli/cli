@@ -194,7 +194,7 @@ func promptGists(client *http.Client, cs *iostreams.ColorScheme) (gistID string,
 
 	for i, gist := range gists {
 		gistIDs[i] = gist.ID
-		description := "<no description>"
+		description := ""
 		gistName := ""
 
 		if gist.Description != "" {
