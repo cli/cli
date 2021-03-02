@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/internal/config"
@@ -15,7 +16,25 @@ import (
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func Test_getFilesToAdd(t *testing.T) {
+	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
+	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	require.NoError(t, err)
+
+	gf, err := getFilesToAdd(fileToAdd)
+	require.NoError(t, err)
+
+	filename := filepath.Base(fileToAdd)
+	assert.Equal(t, map[string]*shared.GistFile{
+		filename: {
+			Filename: filename,
+			Content:  "hello",
+		},
+	}, gf)
+}
 
 func TestNewCmdEdit(t *testing.T) {
 	tests := []struct {
@@ -34,8 +53,16 @@ func TestNewCmdEdit(t *testing.T) {
 			name: "filename",
 			cli:  "123 --filename cool.md",
 			wants: EditOptions{
-				Selector: "123",
-				Filename: "cool.md",
+				Selector:     "123",
+				EditFilename: "cool.md",
+			},
+		},
+		{
+			name: "add",
+			cli:  "123 --add cool.md",
+			wants: EditOptions{
+				Selector:    "123",
+				AddFilename: "cool.md",
 			},
 		},
 	}
@@ -60,13 +87,18 @@ func TestNewCmdEdit(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.Filename, gotOpts.Filename)
+			assert.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
+			assert.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
 			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
 		})
 	}
 }
 
 func Test_editRun(t *testing.T) {
+	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
+	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name       string
 		opts       *EditOptions
@@ -74,13 +106,12 @@ func Test_editRun(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
 		nontty     bool
-		wantErr    bool
-		wantStderr string
+		wantErr    string
 		wantParams map[string]interface{}
 	}{
 		{
 			name:    "no such gist",
-			wantErr: true,
+			wantErr: "gist not found: 1234",
 		},
 		{
 			name: "one file",
@@ -163,7 +194,7 @@ func Test_editRun(t *testing.T) {
 				as.StubOne("unix.md")
 				as.StubOne("Cancel")
 			},
-			wantErr: true,
+			wantErr: "CancelError",
 			gist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
@@ -208,8 +239,28 @@ func Test_editRun(t *testing.T) {
 				},
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
-			wantErr:    true,
-			wantStderr: "You do not own this gist.",
+			wantErr: "You do not own this gist.",
+		},
+		{
+			name: "add file to existing gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				AddFilename: fileToAdd,
+			},
 		},
 	}
 
@@ -246,7 +297,7 @@ func Test_editRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		io, _, _, _ := iostreams.Test()
+		io, _, stdout, stderr := iostreams.Test()
 		io.SetStdoutTTY(!tt.nontty)
 		io.SetStdinTTY(!tt.nontty)
 		tt.opts.IO = io
@@ -260,11 +311,8 @@ func Test_editRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := editRun(tt.opts)
 			reg.Verify(t)
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.wantStderr != "" {
-					assert.EqualError(t, err, tt.wantStderr)
-				}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
 			}
 			assert.NoError(t, err)
@@ -278,6 +326,9 @@ func Test_editRun(t *testing.T) {
 				}
 				assert.Equal(t, tt.wantParams, reqBody)
 			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
 		})
 	}
 }
