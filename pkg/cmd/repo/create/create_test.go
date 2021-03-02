@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -345,6 +346,7 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 
 func TestRepoCreate_template(t *testing.T) {
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	reg.Register(
 		httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
 		httpmock.StringResponse(`
@@ -370,42 +372,32 @@ func TestRepoCreate_template(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 1, "")
+	cs.Register(`git init REPO`, 0, "")
+	cs.Register(`git -C REPO remote add`, 0, "")
+	cs.Register(`git -C REPO fetch origin \+refs/heads/main:refs/remotes/origin/main`, 0, "")
+	cs.Register(`git -C REPO checkout main`, 0, "")
 
-	as, surveyTearDown := prompt.InitAskStubber()
+	_, surveyTearDown := prompt.InitAskStubber()
 	defer surveyTearDown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "repoVisibility",
-			Value: "PRIVATE",
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmSubmit",
-			Value: true,
-		},
-	})
-
-	output, err := runCommand(httpClient, "REPO --template='OWNER/REPO'", true)
+	output, err := runCommand(httpClient, "REPO -y --private --template='OWNER/REPO'", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
+		return
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Created repository OWNER/REPO on GitHub
+		✓ Initialized repository in "REPO"
+	`), output.Stderr())
 
 	var reqBody struct {
 		Query     string
 		Variables struct {
 			Input map[string]interface{}
 		}
-	}
-
-	if len(reg.Requests) != 3 {
-		t.Fatalf("expected 3 HTTP requests, got %d", len(reg.Requests))
 	}
 
 	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
