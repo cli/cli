@@ -61,6 +61,14 @@ func TestIsBinaryContents(t *testing.T) {
 			fileContent: []byte("package main"),
 		},
 		{
+			want:        false,
+			fileContent: []byte(""),
+		},
+		{
+			want:        false,
+			fileContent: []byte(nil),
+		},
+		{
 			want: true,
 			fileContent: []byte{239, 191, 189, 239, 191, 189, 239, 191, 189, 239,
 				191, 189, 239, 191, 189, 16, 74, 70, 73, 70, 239, 191, 189, 1, 1, 1,
@@ -74,10 +82,6 @@ func TestIsBinaryContents(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		isBinary, err := IsBinaryContents(tt.fileContent)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, tt.want, isBinary)
+		assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
 	}
 }

@@ -4,17 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
-
-	"github.com/cli/cli/api"
 )
 
 type GistFile struct {
@@ -156,26 +155,22 @@ func IsBinaryFile(file string) (bool, error) {
 	}
 
 	isBinary := true
-
 	for mime := detectedMime; mime != nil; mime = mime.Parent() {
 		if mime.Is("text/plain") {
 			isBinary = false
+			break
 		}
 	}
-
 	return isBinary, nil
 }
 
-func IsBinaryContents(contents []byte) (bool, error) {
-	detectedMime := mimetype.Detect(contents)
-
+func IsBinaryContents(contents []byte) bool {
 	isBinary := true
-
-	for mime := detectedMime; mime != nil; mime = mime.Parent() {
+	for mime := mimetype.Detect(contents); mime != nil; mime = mime.Parent() {
 		if mime.Is("text/plain") {
 			isBinary = false
+			break
 		}
 	}
-
-	return isBinary, nil
+	return isBinary
 }

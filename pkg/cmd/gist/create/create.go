@@ -163,7 +163,6 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 		var filename string
 		var content []byte
 		var err error
-		var isBinary bool
 
 		if f == "-" {
 			if filenameOverride != "" {
@@ -176,19 +175,22 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 				return fs, fmt.Errorf("failed to read from stdin: %w", err)
 			}
 			stdin.Close()
+
+			if shared.IsBinaryContents(content) {
+				return nil, fmt.Errorf("binary file contents not supported")
+			}
 		} else {
-			content, err = ioutil.ReadFile(f)
+			isBinary, err := shared.IsBinaryFile(f)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
-
-			isBinary, err = shared.IsBinaryContents(content)
-			if err != nil {
-				return nil, err
+			if isBinary {
+				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
 			}
 
-			if isBinary {
-				return nil, fmt.Errorf("binary file not supported")
+			content, err = ioutil.ReadFile(f)
+			if err != nil {
+				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 
 			filename = path.Base(f)
