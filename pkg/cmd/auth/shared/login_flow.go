@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/authflow"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 )
@@ -125,7 +126,7 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 			The minimum required scopes are %s.
-		`, hostname, scopesSentence(minimumScopes)))
+		`, hostname, scopesSentence(minimumScopes, ghinstance.IsEnterprise(hostname))))
 
 		err := prompt.SurveyAskOne(&survey.Password{
 			Message: "Paste your authentication token:",
@@ -193,11 +194,14 @@ func Login(opts *LoginOptions) error {
 	return nil
 }
 
-func scopesSentence(scopes []string) string {
+func scopesSentence(scopes []string, isEnterprise bool) string {
 	quoted := make([]string, len(scopes))
 	for i, s := range scopes {
 		quoted[i] = fmt.Sprintf("'%s'", s)
+		if s == "workflow" && isEnterprise {
+			// remove when GHE 2.x reaches EOL
+			quoted[i] += " (GHE 3.0+)"
+		}
 	}
-	// TODO: insert an "and" before the last element
 	return strings.Join(quoted, ", ")
 }

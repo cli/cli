@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
@@ -67,7 +68,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	gists, err := listGists(client, ghinstance.OverridableDefault(), opts.Limit, opts.Visibility)
+	gists, err := shared.ListGists(client, ghinstance.OverridableDefault(), opts.Limit, opts.Visibility)
 	if err != nil {
 		return err
 	}
