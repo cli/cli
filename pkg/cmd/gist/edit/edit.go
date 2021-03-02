@@ -177,7 +177,7 @@ func editRun(opts *EditOptions) error {
 		case "Submit":
 			stop = true
 		case "Cancel":
-			return cmdutil.SilentError
+			return cmdutil.CancelError
 		}
 
 		if stop {

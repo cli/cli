@@ -148,6 +148,12 @@ func main() {
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		if err == cmdutil.SilentError {
+			os.Exit(1)
+		} else if cmdutil.IsUserCancellation(err) {
+			os.Exit(2)
+		}
+
 		printError(stderr, err, cmd, hasDebug)
 
 		var httpErr api.HTTPError
@@ -177,10 +183,6 @@ func main() {
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
-	if err == cmdutil.SilentError {
-		return
-	}
-
 	var dnsError *net.DNSError
 	if errors.As(err, &dnsError) {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)

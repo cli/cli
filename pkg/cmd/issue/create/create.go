@@ -249,7 +249,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 		if action == prShared.CancelAction {
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-			err = cmdutil.SilentError
+			err = cmdutil.CancelError
 			return
 		}
 	} else {

@@ -262,7 +262,7 @@ func createRun(opts *CreateOptions) error {
 		case "Save as draft":
 			opts.Draft = true
 		case "Cancel":
-			return cmdutil.SilentError
+			return cmdutil.CancelError
 		default:
 			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}

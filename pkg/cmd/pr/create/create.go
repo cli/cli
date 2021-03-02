@@ -299,7 +299,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == shared.CancelAction {
 		fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-		err = cmdutil.SilentError
+		err = cmdutil.CancelError
 		return
 	}
 
@@ -542,7 +542,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		} else if pushOptions[selectedOption] == "Skip pushing the branch" {
 			isPushEnabled = false
 		} else if pushOptions[selectedOption] == "Cancel" {
-			return nil, cmdutil.SilentError
+			return nil, cmdutil.CancelError
 		} else {
 			// "Create a fork of ..."
 			if baseRepo.IsPrivate {

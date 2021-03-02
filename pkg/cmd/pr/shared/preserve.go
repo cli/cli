@@ -2,11 +2,9 @@ package shared
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -21,7 +19,7 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 			return
 		}
 
-		if errors.Is(*createErr, cmdutil.SilentError) || errors.Is(*createErr, terminal.InterruptErr) {
+		if cmdutil.IsUserCancellation(*createErr) {
 			// these errors are user-initiated cancellations
 			return
 		}
