@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,7 +23,117 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdCreate(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		tty       bool
+		stdin     string
+		cli       string
+		wantsErr  bool
+		wantsOpts CreateOptions
+	}{
+		{
+			name:     "empty non-tty",
+			tty:      false,
+			cli:      "",
+			wantsErr: true,
+		},
+		{
+			name:     "only title non-tty",
+			tty:      false,
+			cli:      "-t mytitle",
+			wantsErr: true,
+		},
+		{
+			name:     "empty tty",
+			tty:      true,
+			cli:      "",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: true,
+			},
+		},
+		{
+			name:     "body from stdin",
+			tty:      false,
+			stdin:    "this is on standard input",
+			cli:      "-t mytitle -F -",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "this is on standard input",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "body from file",
+			tty:      false,
+			cli:      fmt.Sprintf("-t mytitle -F '%s'", tmpFile),
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "a body from file",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, stdout, stderr := iostreams.Test()
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			} else if tt.tty {
+				io.SetStdinTTY(true)
+				io.SetStdoutTTY(true)
+			}
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *CreateOptions
+			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+				opts = o
+				return nil
+			})
+
+			args, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+			cmd.SetArgs(args)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
+
+			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
+			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
+			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
+			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
+		})
+	}
+}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
@@ -67,14 +178,6 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		OutBuf: stdout,
 		ErrBuf: stderr,
 	}, err
-}
-
-func TestIssueCreate_nontty_error(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, false, `-t hello`)
-	assert.EqualError(t, err, "must provide --title and --body when not running interactively")
 }
 
 func TestIssueCreate(t *testing.T) {
