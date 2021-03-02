@@ -245,6 +245,14 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 }
 
 func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
+	isBinary, err := shared.IsBinaryFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+	}
+	if isBinary {
+		return nil, fmt.Errorf("failed to upload %s: binary file not supported", file)
+	}
+
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
