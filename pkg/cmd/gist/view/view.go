@@ -164,7 +164,10 @@ func viewRun(opts *ViewOptions) error {
 		filenames = append(filenames, fn)
 	}
 
-	sort.Strings(filenames)
+	sort.Slice(filenames, func(i, j int) bool {
+		return strings.ToLower(filenames[i]) < strings.ToLower(filenames[j])
+	})
+
 	if opts.ListFiles {
 		for _, fn := range filenames {
 			fmt.Fprintln(opts.IO.Out, fn)
