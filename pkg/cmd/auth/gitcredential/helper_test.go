@@ -75,6 +75,32 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "gist host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                "/Users/monalisa/.config/gh/hosts.yml",
+						"github.com:user":        "monalisa",
+						"github.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=monalisa
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=monalisa
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
 			name: "url input",
 			opts: CredentialOptions{
 				Operation: "get",
