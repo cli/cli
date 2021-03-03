@@ -81,6 +81,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Branch:     f.Branch,
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a pull request",
@@ -110,7 +112,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.TitleProvided = cmd.Flags().Changed("title")
-			opts.BodyProvided = cmd.Flags().Changed("body")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
 			opts.MaintainerCanModify = !noMaintainerEdit
@@ -133,6 +134,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
 			}
 
+			opts.BodyProvided = cmd.Flags().Changed("body")
+			if bodyFile != "" {
+				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				if err != nil {
+					return err
+				}
+				opts.Body = string(b)
+				opts.BodyProvided = true
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -144,6 +155,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
 	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
+	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")

@@ -46,6 +46,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Config:     f.Config,
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
@@ -61,19 +63,27 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
-			opts.HasRepoOverride = cmd.Flags().Changed("repo")
+			if bodyFile != "" {
+				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				if err != nil {
+					return err
+				}
+				opts.Body = string(b)
+				bodyProvided = true
+			}
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
-				return &cmdutil.FlagError{Err: errors.New("--recover only supported when running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("`--recover` only supported when running interactively")}
 			}
 
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("must provide --title and --body when not running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("must provide title and body when not running interactively")}
 			}
 
 			if runF != nil {
@@ -85,6 +95,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
 	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
