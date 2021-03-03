@@ -33,6 +33,12 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "two arguments",
+			input:    "1 2",
+			output:   shared.CommentableOptions{},
+			wantsErr: true,
+		},
+		{
 			name:  "pr number",
 			input: "1",
 			output: shared.CommentableOptions{

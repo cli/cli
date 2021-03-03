@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"os"
 	"regexp"
@@ -26,7 +25,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
 	"github.com/itchyny/gojq"
-	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
 
@@ -60,8 +58,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		BaseRepo:   f.BaseRepo,
 		Branch:     f.Branch,
 	}
-
-	var cacheDuration string
 
 	cmd := &cobra.Command{
 		Use:   "api <endpoint>",
@@ -102,6 +98,17 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
+
+			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
+			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
+
+			The following functions are available in templates:
+			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
+			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -115,6 +122,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# set a custom HTTP header
 			$ gh api -H 'Accept: application/vnd.github.XYZ-preview+json' ...
+
+			# use a template for the output
+			$ gh api repos/:owner/:repo/issues --template \
+			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
 			# list releases with GraphQL
 			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
@@ -171,14 +182,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
 			}
 
-			if cacheDuration != "" {
-				cacheTTL, err := time.ParseDuration(cacheDuration)
-				if err != nil {
-					return fmt.Errorf("error parsing `--cache` value: %w", err)
-				}
-				opts.CacheTTL = cacheTTL
-			}
-
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -195,9 +198,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVarP(&opts.Template, "format", "t", "", "Format the response using a Go template")
-	cmd.Flags().StringVar(&cacheDuration, "cache", "", "Cache the response for the specified duration")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVar(&opts.FilterOutput, "filter", "", "Filter the response using jq syntax")
+	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
 }
 
@@ -358,31 +361,12 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 			fmt.Fprintf(opts.IO.Out, "%v\n", v)
 		}
 	} else if opts.Template != "" {
-		templateFuncs := map[string]interface{}{
-			"color": func(colorName string, input interface{}) (string, error) {
-				var text string
-				switch tt := input.(type) {
-				case string:
-					text = tt
-				case float64:
-					if math.Trunc(tt) == tt {
-						text = strconv.FormatFloat(tt, 'f', 0, 64)
-					} else {
-						text = strconv.FormatFloat(tt, 'f', 2, 64)
-					}
-				case nil:
-					text = ""
-				case bool:
-					text = fmt.Sprintf("%v", tt)
-				default:
-					return "", fmt.Errorf("cannot convert type to string: %v", tt)
-				}
-				return ansi.Color(text, colorName), nil
-			},
-		}
-
 		// TODO: reuse parsed template across pagination invocations
-		t := template.Must(template.New("").Funcs(templateFuncs).Parse(opts.Template))
+		var t *template.Template
+		t, err = parseTemplate(opts.Template, opts.IO.ColorEnabled())
+		if err != nil {
+			return
+		}
 
 		var jsonData []byte
 		jsonData, err = ioutil.ReadAll(responseBody)

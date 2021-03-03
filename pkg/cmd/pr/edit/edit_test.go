@@ -23,8 +23,17 @@ func TestNewCmdEdit(t *testing.T) {
 		wantsErr bool
 	}{
 		{
-			name:     "no argument",
-			input:    "",
+			name:  "no argument",
+			input: "",
+			output: EditOptions{
+				SelectorArg: "",
+				Interactive: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "two arguments",
+			input:    "1 2",
 			output:   EditOptions{},
 			wantsErr: true,
 		},
@@ -59,6 +68,20 @@ func TestNewCmdEdit(t *testing.T) {
 				Editable: shared.Editable{
 					Body: shared.EditableString{
 						Value:  "test",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "base flag",
+			input: "23 --base base-branch-name",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Base: shared.EditableString{
+						Value:  "base-branch-name",
 						Edited: true,
 					},
 				},
@@ -254,6 +277,10 @@ func Test_editRun(t *testing.T) {
 						Value:  "new body",
 						Edited: true,
 					},
+					Base: shared.EditableString{
+						Value:  "base-branch-name",
+						Edited: true,
+					},
 					Reviewers: shared.EditableSlice{
 						Add:    []string{"OWNER/core", "OWNER/external", "monalisa", "hubot"},
 						Remove: []string{"dependabot"},
@@ -301,6 +328,10 @@ func Test_editRun(t *testing.T) {
 					},
 					Body: shared.EditableString{
 						Value:  "new body",
+						Edited: true,
+					},
+					Base: shared.EditableString{
+						Value:  "base-branch-name",
 						Edited: true,
 					},
 					Assignees: shared.EditableSlice{
