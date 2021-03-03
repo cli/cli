@@ -24,7 +24,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
-	"github.com/itchyny/gojq"
 	"github.com/spf13/cobra"
 )
 
@@ -99,6 +98,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
 
+			The %[1]s--filter%[1]s option accepts a query in jq syntax and will print only the resulting
+			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s.
+			To learn more about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
+
 			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
 			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
 
@@ -122,6 +125,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# set a custom HTTP header
 			$ gh api -H 'Accept: application/vnd.github.XYZ-preview+json' ...
+
+			# print only specific fields from the response
+			$ gh api repos/:owner/:repo/issues --filter '.[].title'
 
 			# use a template for the output
 			$ gh api repos/:owner/:repo/issues --template \
@@ -199,7 +205,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
-	cmd.Flags().StringVar(&opts.FilterOutput, "filter", "", "Filter the response using jq syntax")
+	cmd.Flags().StringVar(&opts.FilterOutput, "filter", "", "Filter fields from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
 }
@@ -328,37 +334,10 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	}
 
 	if opts.FilterOutput != "" {
-		var query *gojq.Query
-		query, err = gojq.Parse(opts.FilterOutput)
+		// TODO: reuse parsed query across pagination invocations
+		err = filterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
-		}
-
-		var jsonData []byte
-		jsonData, err = ioutil.ReadAll(responseBody)
-		if err != nil {
-			return
-		}
-
-		var responseData interface{}
-		err = json.Unmarshal(jsonData, &responseData)
-		if err != nil {
-			return
-		}
-
-		iter := query.Run(responseData)
-		for {
-			var v interface{}
-			var ok bool
-			v, ok = iter.Next()
-			if !ok {
-				break
-			}
-			err, ok = v.(error)
-			if ok {
-				return
-			}
-			fmt.Fprintf(opts.IO.Out, "%v\n", v)
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
