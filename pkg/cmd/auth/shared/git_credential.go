@@ -15,6 +15,8 @@ import (
 )
 
 type GitCredentialFlow struct {
+	Executable string
+
 	shouldSetup bool
 	helper      string
 	scopes      []string
@@ -50,13 +52,26 @@ func (flow *GitCredentialFlow) ShouldSetup() bool {
 }
 
 func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error {
-	return GitCredentialSetup(hostname, username, authToken, flow.helper)
+	return flow.gitCredentialSetup(hostname, username, authToken)
 }
 
-func GitCredentialSetup(hostname, username, password, helper string) error {
-	if helper == "" {
+func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
+	if flow.helper == "" {
+		// first use a blank value to indicate to git we want to sever the chain of credential helpers
+		preConfigureCmd, err := git.GitCommand("config", "--global", gitCredentialHelperKey(hostname), "")
+		if err != nil {
+			return err
+		}
+		if err = run.PrepareCmd(preConfigureCmd).Run(); err != nil {
+			return err
+		}
+
 		// use GitHub CLI as a credential helper (for this host only)
-		configureCmd, err := git.GitCommand("config", "--global", gitCredentialHelperKey(hostname), "!gh auth git-credential")
+		configureCmd, err := git.GitCommand(
+			"config", "--global", "--add",
+			gitCredentialHelperKey(hostname),
+			fmt.Sprintf("!%s auth git-credential", shellQuote(flow.Executable)),
+		)
 		if err != nil {
 			return err
 		}
@@ -123,4 +138,11 @@ func isOurCredentialHelper(cmd string) bool {
 	}
 
 	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
+}
+
+func shellQuote(s string) string {
+	if strings.ContainsAny(s, " $") {
+		return "'" + s + "'"
+	}
+	return s
 }

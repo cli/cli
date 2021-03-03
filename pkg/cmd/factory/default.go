@@ -44,6 +44,11 @@ func New(appVersion string) *cmdutil.Factory {
 	}
 	remotesFunc := rr.Resolver(hostOverride)
 
+	ghExecutable := "gh"
+	if exe, err := os.Executable(); err == nil {
+		ghExecutable = exe
+	}
+
 	return &cmdutil.Factory{
 		IOStreams: io,
 		Config:    configFunc,
@@ -70,5 +75,6 @@ func New(appVersion string) *cmdutil.Factory {
 			}
 			return currentBranch, nil
 		},
+		Executable: ghExecutable,
 	}
 }

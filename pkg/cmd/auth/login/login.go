@@ -23,6 +23,8 @@ type LoginOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 
+	MainExecutable string
+
 	Interactive bool
 
 	Hostname string
@@ -36,6 +38,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+
+		MainExecutable: f.Executable,
 	}
 
 	var tokenStdin bool
@@ -189,6 +193,7 @@ func loginRun(opts *LoginOptions) error {
 		Interactive: opts.Interactive,
 		Web:         opts.Web,
 		Scopes:      opts.Scopes,
+		Executable:  opts.MainExecutable,
 	})
 }
 
