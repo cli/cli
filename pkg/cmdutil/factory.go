@@ -16,4 +16,7 @@ type Factory struct {
 	Remotes    func() (context.Remotes, error)
 	Config     func() (config.Config, error)
 	Branch     func() (string, error)
+
+	// Executable is the path to the currently invoked gh binary
+	Executable string
 }

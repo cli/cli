@@ -78,7 +78,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 
 		if !confirmed {
-			return cmdutil.SilentError
+			return cmdutil.CancelError
 		}
 	}
 

@@ -38,6 +38,7 @@ type ApiOptions struct {
 	MagicFields         []string
 	RawFields           []string
 	RequestHeaders      []string
+	Previews            []string
 	ShowResponseHeaders bool
 	Paginate            bool
 	Silent              bool
@@ -119,7 +120,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
 
 			# set a custom HTTP header
-			$ gh api -H 'Accept: application/vnd.github.XYZ-preview+json' ...
+			$ gh api -H 'Accept: application/vnd.github.v3.raw+json' ...
+
+			# opt into GitHub API previews
+			$ gh api --preview baptiste,nebula ...
 
 			# use a template for the output
 			$ gh api repos/:owner/:repo/issues --template \
@@ -192,6 +196,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
+	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
@@ -235,6 +240,10 @@ func apiRun(opts *ApiOptions) error {
 		if size >= 0 {
 			requestHeaders = append([]string{fmt.Sprintf("Content-Length: %d", size)}, requestHeaders...)
 		}
+	}
+
+	if len(opts.Previews) > 0 {
+		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -554,4 +563,12 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 	}
 
 	return bodyCopy, "", nil
+}
+
+func previewNamesToMIMETypes(names []string) string {
+	types := []string{fmt.Sprintf("application/vnd.github.%s-preview+json", names[0])}
+	for _, p := range names[1:] {
+		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
+	}
+	return strings.Join(types, ", ")
 }

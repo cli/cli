@@ -913,6 +913,32 @@ func Test_fillPlaceholders(t *testing.T) {
 	}
 }
 
+func Test_previewNamesToMIMETypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		previews []string
+		want     string
+	}{
+		{
+			name:     "single",
+			previews: []string{"nebula"},
+			want:     "application/vnd.github.nebula-preview+json",
+		},
+		{
+			name:     "multiple",
+			previews: []string{"nebula", "baptiste", "squirrel-girl"},
+			want:     "application/vnd.github.nebula-preview+json, application/vnd.github.baptiste-preview, application/vnd.github.squirrel-girl-preview",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := previewNamesToMIMETypes(tt.previews); got != tt.want {
+				t.Errorf("previewNamesToMIMETypes() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_processResponse_template(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 

@@ -227,7 +227,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 			if action == shared.CancelAction {
 				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-				return cmdutil.SilentError
+				return cmdutil.CancelError
 			}
 		}
 
