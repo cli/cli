@@ -28,6 +28,7 @@ type LoginOptions struct {
 	Interactive bool
 	Web         bool
 	Scopes      []string
+	Executable  string
 
 	sshContext sshContext
 }
@@ -56,7 +57,7 @@ func Login(opts *LoginOptions) error {
 
 	var additionalScopes []string
 
-	credentialFlow := &GitCredentialFlow{}
+	credentialFlow := &GitCredentialFlow{Executable: opts.Executable}
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
