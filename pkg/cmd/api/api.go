@@ -98,9 +98,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
 
-			The %[1]s--filter%[1]s option accepts a query in jq syntax and will print only the resulting
-			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s.
-			To learn more about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
+			The %[1]s--jq%[1]s option accepts a query in jq syntax and will print only the resulting
+			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s,
+			but does not require the jq utility to be installed on the system. To learn more
+			about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
 
 			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
 			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
@@ -209,7 +210,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
-	cmd.Flags().StringVar(&opts.FilterOutput, "filter", "", "Filter fields from the response using jq syntax")
+	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
 }
