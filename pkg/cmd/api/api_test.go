@@ -48,6 +48,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -68,6 +69,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -88,6 +90,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -108,6 +111,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -128,6 +132,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -148,6 +153,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              true,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -173,6 +179,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -198,6 +205,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -223,6 +231,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -243,6 +252,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            time.Minute * 5,
 				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -263,8 +273,45 @@ func Test_NewCmdApi(t *testing.T) {
 				Silent:              false,
 				CacheTTL:            0,
 				Template:            "hello {{.name}}",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
+		},
+		{
+			name: "with jq filter",
+			cli:  "user -q .name",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        ".name",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "--silent with --jq",
+			cli:      "user --silent -q .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "--silent with --template",
+			cli:      "user --silent -t '{{.foo}}'",
+			wantsErr: true,
+		},
+		{
+			name:     "--jq with --template",
+			cli:      "user --jq .foo -t '{{.foo}}'",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -301,6 +348,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.Silent, opts.Silent)
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
 			assert.Equal(t, tt.wants.Template, opts.Template)
+			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 		})
 	}
 }
@@ -438,6 +486,20 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    nil,
 			stdout: "not a cat",
+			stderr: ``,
+		},
+		{
+			name: "jq filter",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "Mona\nHubot\n",
 			stderr: ``,
 		},
 	}
