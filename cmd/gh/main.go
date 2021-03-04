@@ -236,7 +236,7 @@ func shouldCheckForUpdate() bool {
 	if os.Getenv("CODESPACES") != "" {
 		return false
 	}
-	return updaterEnabled != "" && !isCI() && !isCompletionCommand() && utils.IsTerminal(os.Stderr)
+	return updaterEnabled != "" && !isCI() && utils.IsTerminal(os.Stdout) && utils.IsTerminal(os.Stderr)
 }
 
 // based on https://github.com/watson/ci-info/blob/HEAD/index.js
@@ -244,10 +244,6 @@ func isCI() bool {
 	return os.Getenv("CI") != "" || // GitHub Actions, Travis CI, CircleCI, Cirrus CI, GitLab CI, AppVeyor, CodeShip, dsari
 		os.Getenv("BUILD_NUMBER") != "" || // Jenkins, TeamCity
 		os.Getenv("RUN_ID") != "" // TaskCluster, dsari
-}
-
-func isCompletionCommand() bool {
-	return len(os.Args) > 1 && os.Args[1] == "completion"
 }
 
 func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
