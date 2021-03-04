@@ -118,6 +118,14 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	render := func(gf *shared.GistFile) error {
+		if shared.IsBinaryContents([]byte(gf.Content)) {
+			if len(gist.Files) == 1 || opts.Filename != "" {
+				return fmt.Errorf("error: file is binary")
+			}
+			_, err = fmt.Fprintln(opts.IO.Out, cs.Gray("(skipping rendering binary content)"))
+			return nil
+		}
+
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
 			rendered, err := markdown.Render(gf.Content, markdownStyle, "")
 			if err != nil {
@@ -134,6 +142,7 @@ func viewRun(opts *ViewOptions) error {
 			_, err := fmt.Fprint(opts.IO.Out, "\n")
 			return err
 		}
+
 		return nil
 	}
 
@@ -154,7 +163,10 @@ func viewRun(opts *ViewOptions) error {
 	for fn := range gist.Files {
 		filenames = append(filenames, fn)
 	}
-	sort.Strings(filenames)
+
+	sort.Slice(filenames, func(i, j int) bool {
+		return strings.ToLower(filenames[i]) < strings.ToLower(filenames[j])
+	})
 
 	if opts.ListFiles {
 		for _, fn := range filenames {
