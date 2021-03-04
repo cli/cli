@@ -426,6 +426,20 @@ func Test_apiRun(t *testing.T) {
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
 			stderr: ``,
 		},
+		{
+			name: "output template",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "not a cat",
+			stderr: ``,
+		},
 	}
 
 	for _, tt := range tests {
