@@ -473,6 +473,20 @@ func Test_apiRun(t *testing.T) {
 			stdout: "not a cat",
 			stderr: ``,
 		},
+		{
+			name: "jq filter",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "Mona\nHubot\n",
+			stderr: ``,
+		},
 	}
 
 	for _, tt := range tests {
