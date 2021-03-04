@@ -298,6 +298,21 @@ func Test_NewCmdApi(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name:     "--silent with --jq",
+			cli:      "user --silent -q .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "--silent with --template",
+			cli:      "user --silent -t '{{.foo}}'",
+			wantsErr: true,
+		},
+		{
+			name:     "--jq with --template",
+			cli:      "user --jq .foo -t '{{.foo}}'",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

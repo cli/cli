@@ -181,15 +181,29 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
+					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing `--hostname`: %w", err)}
 				}
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported for non-GET requests`)}
+				return &cmdutil.FlagError{Err: errors.New("the `--paginate` option is not supported for non-GET requests")}
 			}
-			if opts.Paginate && opts.RequestInputFile != "" {
-				return &cmdutil.FlagError{Err: errors.New(`the '--paginate' option is not supported with '--input'`)}
+
+			if err := cmdutil.MutuallyExclusive(
+				"the `--paginate` option is not supported with `--input`",
+				opts.Paginate,
+				opts.RequestInputFile != "",
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--template`, `--jq`, or `--silent` may be used",
+				opts.Silent,
+				opts.FilterOutput != "",
+				opts.Template != "",
+			); err != nil {
+				return err
 			}
 
 			if runF != nil {
