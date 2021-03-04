@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"text/template"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -335,25 +334,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		var t *template.Template
-		t, err = parseTemplate(opts.Template, opts.IO.ColorEnabled())
-		if err != nil {
-			return
-		}
-
-		var jsonData []byte
-		jsonData, err = ioutil.ReadAll(responseBody)
-		if err != nil {
-			return
-		}
-
-		var m interface{}
-		err = json.Unmarshal(jsonData, &m)
-		if err != nil {
-			return
-		}
-
-		err = t.Execute(opts.IO.Out, m)
+		err = executeTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
 		if err != nil {
 			return
 		}

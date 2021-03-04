@@ -1,7 +1,10 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
@@ -31,7 +34,7 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 			if err != nil {
 				return "", err
 			}
-			return utils.FuzzyAgoAbbr(now, t), nil
+			return timeAgo(now.Sub(t)), nil
 		},
 
 		"pluck": templatePluck,
@@ -45,6 +48,25 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 	}
 
 	return template.New("").Funcs(templateFuncs).Parse(tpl)
+}
+
+func executeTemplate(w io.Writer, input io.Reader, templateStr string, colorEnabled bool) error {
+	t, err := parseTemplate(templateStr, colorEnabled)
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := ioutil.ReadAll(input)
+	if err != nil {
+		return err
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(jsonData, &data); err != nil {
+		return err
+	}
+
+	return t.Execute(w, data)
 }
 
 func jsonScalarToString(input interface{}) (string, error) {
@@ -93,4 +115,23 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 		results = append(results, text)
 	}
 	return strings.Join(results, sep), nil
+}
+
+func timeAgo(ago time.Duration) string {
+	if ago < time.Minute {
+		return "just now"
+	}
+	if ago < time.Hour {
+		return utils.Pluralize(int(ago.Minutes()), "minute") + " ago"
+	}
+	if ago < 24*time.Hour {
+		return utils.Pluralize(int(ago.Hours()), "hour") + " ago"
+	}
+	if ago < 30*24*time.Hour {
+		return utils.Pluralize(int(ago.Hours())/24, "day") + " ago"
+	}
+	if ago < 365*24*time.Hour {
+		return utils.Pluralize(int(ago.Hours())/24/30, "month") + " ago"
+	}
+	return utils.Pluralize(int(ago.Hours()/24/365), "year") + " ago"
 }
