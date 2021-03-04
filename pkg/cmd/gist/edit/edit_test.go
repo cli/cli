@@ -194,7 +194,7 @@ func Test_editRun(t *testing.T) {
 				as.StubOne("unix.md")
 				as.StubOne("Cancel")
 			},
-			wantErr: "SilentError",
+			wantErr: "CancelError",
 			gist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
