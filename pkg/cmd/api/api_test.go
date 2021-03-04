@@ -47,6 +47,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -66,6 +67,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -85,6 +87,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -104,6 +107,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -123,6 +127,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            true,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -142,6 +147,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              true,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -166,6 +172,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            true,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -190,6 +197,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -214,6 +222,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -233,6 +242,27 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            time.Minute * 5,
+				Template:            "",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with template",
+			cli:  "user -t 'hello {{.name}}'",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "hello {{.name}}",
 			},
 			wantsErr: false,
 		},
@@ -270,6 +300,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.Paginate, opts.Paginate)
 			assert.Equal(t, tt.wants.Silent, opts.Silent)
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
+			assert.Equal(t, tt.wants.Template, opts.Template)
 		})
 	}
 }
@@ -393,6 +424,20 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    nil,
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
+			stderr: ``,
+		},
+		{
+			name: "output template",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "not a cat",
 			stderr: ``,
 		},
 	}
@@ -908,6 +953,32 @@ func Test_fillPlaceholders(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("fillPlaceholders() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_previewNamesToMIMETypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		previews []string
+		want     string
+	}{
+		{
+			name:     "single",
+			previews: []string{"nebula"},
+			want:     "application/vnd.github.nebula-preview+json",
+		},
+		{
+			name:     "multiple",
+			previews: []string{"nebula", "baptiste", "squirrel-girl"},
+			want:     "application/vnd.github.nebula-preview+json, application/vnd.github.baptiste-preview, application/vnd.github.squirrel-girl-preview",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := previewNamesToMIMETypes(tt.previews); got != tt.want {
+				t.Errorf("previewNamesToMIMETypes() = %q, want %q", got, tt.want)
 			}
 		})
 	}

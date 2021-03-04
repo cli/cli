@@ -13,6 +13,7 @@ import (
 	"time"
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/build"
 	"github.com/cli/cli/internal/config"
@@ -32,7 +33,21 @@ import (
 
 var updaterEnabled = ""
 
+type exitCode int
+
+const (
+	exitOK     exitCode = 0
+	exitError  exitCode = 1
+	exitCancel exitCode = 2
+	exitAuth   exitCode = 4
+)
+
 func main() {
+	code := mainRun()
+	os.Exit(int(code))
+}
+
+func mainRun() exitCode {
 	buildDate := build.Date
 	buildVersion := build.Version
 
@@ -78,7 +93,7 @@ func main() {
 	cfg, err := cmdFactory.Config()
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
-		os.Exit(2)
+		return exitError
 	}
 
 	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
@@ -102,7 +117,7 @@ func main() {
 		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
-			os.Exit(2)
+			return exitError
 		}
 
 		if hasDebug {
@@ -113,7 +128,7 @@ func main() {
 			exe, err := safeexec.LookPath(expandedArgs[0])
 			if err != nil {
 				fmt.Fprintf(stderr, "failed to run external command: %s", err)
-				os.Exit(3)
+				return exitError
 			}
 
 			externalCmd := exec.Command(exe, expandedArgs[1:]...)
@@ -125,14 +140,14 @@ func main() {
 			err = preparedCmd.Run()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {
-					os.Exit(ee.ExitCode())
+					return exitCode(ee.ExitCode())
 				}
 
 				fmt.Fprintf(stderr, "failed to run external command: %s", err)
-				os.Exit(3)
+				return exitError
 			}
 
-			os.Exit(0)
+			return exitOK
 		}
 	}
 
@@ -142,34 +157,41 @@ func main() {
 		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-		os.Exit(4)
+		return exitAuth
 	}
 
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		if err == cmdutil.SilentError {
+			return exitError
+		} else if cmdutil.IsUserCancellation(err) {
+			if errors.Is(err, terminal.InterruptErr) {
+				// ensure the next shell prompt will start on its own line
+				fmt.Fprint(stderr, "\n")
+			}
+			return exitCancel
+		}
+
 		printError(stderr, err, cmd, hasDebug)
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			fmt.Println("hint: try authenticating with `gh auth login`")
+			fmt.Fprintln(stderr, "hint: try authenticating with `gh auth login`")
 		}
 
-		os.Exit(1)
+		return exitError
 	}
 	if root.HasFailed() {
-		os.Exit(1)
+		return exitError
 	}
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		isHomebrew := false
-		if ghExe, err := os.Executable(); err == nil {
-			isHomebrew = isUnderHomebrew(ghExe)
-		}
+		isHomebrew := isUnderHomebrew(cmdFactory.Executable)
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
-			return
+			return exitOK
 		}
 		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of gh is available:", "yellow"),
@@ -181,13 +203,11 @@ func main() {
 		fmt.Fprintf(stderr, "%s\n\n",
 			ansi.Color(newRelease.URL, "yellow"))
 	}
+
+	return exitOK
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
-	if err == cmdutil.SilentError {
-		return
-	}
-
 	var dnsError *net.DNSError
 	if errors.As(err, &dnsError) {
 		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)

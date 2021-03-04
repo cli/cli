@@ -895,7 +895,7 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 	as.StubOne("Cancel") // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
-	if !errors.Is(err, cmdutil.SilentError) {
+	if !errors.Is(err, cmdutil.CancelError) {
 		t.Fatalf("got error %v", err)
 	}
 
