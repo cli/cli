@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -45,6 +47,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -64,6 +67,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -83,6 +87,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -102,6 +107,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -121,6 +127,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            true,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -140,6 +147,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              true,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -164,6 +172,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            true,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -188,6 +197,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -212,6 +222,7 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            0,
+				Template:            "",
 			},
 			wantsErr: false,
 		},
@@ -231,6 +242,27 @@ func Test_NewCmdApi(t *testing.T) {
 				Paginate:            false,
 				Silent:              false,
 				CacheTTL:            time.Minute * 5,
+				Template:            "",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with template",
+			cli:  "user -t 'hello {{.name}}'",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "hello {{.name}}",
 			},
 			wantsErr: false,
 		},
@@ -268,6 +300,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.Paginate, opts.Paginate)
 			assert.Equal(t, tt.wants.Silent, opts.Silent)
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
+			assert.Equal(t, tt.wants.Template, opts.Template)
 		})
 	}
 }
@@ -391,6 +424,20 @@ func Test_apiRun(t *testing.T) {
 			},
 			err:    nil,
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
+			stderr: ``,
+		},
+		{
+			name: "output template",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "not a cat",
 			stderr: ``,
 		},
 	}
@@ -935,4 +982,41 @@ func Test_previewNamesToMIMETypes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_processResponse_template(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	resp := http.Response{
+		StatusCode: 200,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body: ioutil.NopCloser(strings.NewReader(`[
+			{
+				"title": "First title",
+				"labels": [{"name":"bug"}, {"name":"help wanted"}]
+			},
+			{
+				"title": "Second but not last"
+			},
+			{
+				"title": "Alas, tis' the end",
+				"labels": [{}, {"name":"feature"}]
+			}
+		]`)),
+	}
+
+	_, err := processResponse(&resp, &ApiOptions{
+		IO:       io,
+		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
+	}, ioutil.Discard)
+	require.NoError(t, err)
+
+	assert.Equal(t, heredoc.Doc(`
+		First title (bug, help wanted)
+		Second but not last ()
+		Alas, tis' the end (, feature)
+	`), stdout.String())
+	assert.Equal(t, "", stderr.String())
 }

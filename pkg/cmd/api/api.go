@@ -41,6 +41,7 @@ type ApiOptions struct {
 	ShowResponseHeaders bool
 	Paginate            bool
 	Silent              bool
+	Template            string
 	CacheTTL            time.Duration
 
 	HttpClient func() (*http.Client, error)
@@ -95,6 +96,17 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
+
+			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
+			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
+
+			The following functions are available in templates:
+			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
+			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -111,6 +123,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# opt into GitHub API previews
 			$ gh api --preview baptiste,nebula ...
+
+			# use a template for the output
+			$ gh api repos/:owner/:repo/issues --template \
+			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
 			# list releases with GraphQL
 			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
@@ -184,6 +200,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
 }
@@ -315,7 +332,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if isJSON && opts.IO.ColorEnabled() {
+	if opts.Template != "" {
+		// TODO: reuse parsed template across pagination invocations
+		err = executeTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
+		if err != nil {
+			return
+		}
+	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
 	} else {
 		_, err = io.Copy(opts.IO.Out, responseBody)
