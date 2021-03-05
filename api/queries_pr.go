@@ -39,6 +39,8 @@ type PullRequest struct {
 	HeadRefName      string
 	Body             string
 	Mergeable        string
+	Additions        int
+	Deletions        int
 	MergeStateStatus string
 
 	Author struct {
@@ -571,6 +573,8 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				closed
 				body
 				mergeable
+				additions
+				deletions
 				author {
 				  login
 				}
