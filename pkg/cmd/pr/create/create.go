@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +42,7 @@ type CreateOptions struct {
 	Autofill    bool
 	WebMode     bool
 	RecoverFile string
+	Open        bool
 
 	IsDraft    bool
 	Title      string
@@ -132,6 +134,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
 				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
 			}
+			if opts.WebMode && opts.Open {
+				return errors.New("--open and --web are incompatible")
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -155,6 +160,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+	fl.BoolVarP(&opts.Open, "open", "o", false, "Open created PR in a web browser.")
 
 	return cmd
 }
@@ -610,6 +616,13 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StopProgressIndicator()
 	if pr != nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
+		if opts.Open {
+			fmt.Printf("opening %s in your browser\n", pr.URL)
+			err := browser.OpenURL(pr.URL)
+			if err != nil {
+				return fmt.Errorf("unable to open PR URL in browser %w", err)
+			}
+		}
 	}
 	if err != nil {
 		if pr != nil {
