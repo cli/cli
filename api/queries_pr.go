@@ -676,6 +676,8 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					state
 					body
 					mergeable
+					additions
+					deletions
 					author {
 						login
 					}
