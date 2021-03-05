@@ -80,6 +80,10 @@ func listRun(opts *ListOptions) error {
 	out := opts.IO.Out
 
 	for _, workflow := range workflows {
+		// TODO format
+		// TODO more data
+		// TODO hide disabled
+		// TODO support show-disabled
 		fmt.Fprintf(out, "%s\n", workflow.Name)
 	}
 
