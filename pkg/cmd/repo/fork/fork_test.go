@@ -650,6 +650,8 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 		},
 	}
 
+	// defer prompt.StubAskOne("ssh")()
+
 	output, err := runCommand(httpClient, remotes, true, "--remote --remote-name=fork")
 	if err != nil {
 		t.Errorf("error running command `repo fork`: %v", err)

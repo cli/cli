@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
@@ -226,7 +227,21 @@ func forkRun(opts *ForkOptions) error {
 				scheme = remote.PushURL.Scheme
 			}
 			if scheme != "" {
-				protocol = scheme
+				if protocol != scheme {
+					// TODO: This is not true. `git_protocol` contains `https` by default when it is not explicitly configured.
+					fmt.Fprintf(stderr, "%s existing remote uses %s, but %s is configured to %s\n",
+						cs.WarningIcon(), cs.Bold(scheme), cs.Bold("git_protocol"), cs.Bold(protocol))
+					err := prompt.SurveyAskOne(&survey.Select{
+						Message: "What protocol should be used?",
+						Options: []string{
+							protocol,
+							scheme,
+						},
+					}, &protocol)
+					if err != nil {
+						return fmt.Errorf("failed to prompt: %w", err)
+					}
+				}
 			}
 		}
 
