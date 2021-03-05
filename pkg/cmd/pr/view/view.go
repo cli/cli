@@ -154,16 +154,14 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s • %s%s %s%s \n",
+		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
-		cs.Green("+"),
-		cs.Green(strconv.Itoa(pr.Additions)),
-		cs.Red("-"),
-		cs.Red(strconv.Itoa(pr.Deletions)),
+		cs.Green("+"+strconv.Itoa(pr.Additions)),
+		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
 
 	// Reactions
