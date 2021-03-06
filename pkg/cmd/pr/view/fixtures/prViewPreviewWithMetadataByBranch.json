@@ -12,6 +12,8 @@
             "url": "https://github.com/OWNER/REPO/pull/12",
             "headRefName": "blueberries",
             "baseRefName": "master",
+            "additions": 100,
+            "deletions": 10,
             "headRepositoryOwner": {
               "login": "hubot"
             },
@@ -49,6 +51,8 @@
             "author": {
               "login": "nobody"
             },
+            "additions": 100,
+            "deletions": 10,
             "assignees": {
               "nodes": [
                 {

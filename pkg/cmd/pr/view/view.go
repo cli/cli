@@ -138,8 +138,8 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
 	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
-	fmt.Fprintf(out, "additions:\t+%s\n", cs.Green(strconv.Itoa(pr.Additions)))
-	fmt.Fprintf(out, "deletions:\t-%s\n", cs.Red(strconv.Itoa(pr.Deletions)))
+	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
+	fmt.Fprintf(out, "deletions:\t%s\n", cs.Red(strconv.Itoa(pr.Deletions)))
 
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, pr.Body)
