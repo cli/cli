@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -137,6 +138,8 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
 	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
+	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
+	fmt.Fprintf(out, "deletions:\t%s\n", cs.Red(strconv.Itoa(pr.Deletions)))
 
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, pr.Body)
@@ -151,12 +154,14 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s\n",
+		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
+		cs.Green("+"+strconv.Itoa(pr.Additions)),
+		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
 
 	// Reactions

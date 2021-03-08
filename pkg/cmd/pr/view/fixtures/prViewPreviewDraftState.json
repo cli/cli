@@ -13,6 +13,8 @@
         "commits": {
           "totalCount": 12
         },
+        "additions": 100,
+        "deletions": 10,
         "baseRefName": "master",
         "headRefName": "blueberries",
         "headRepositoryOwner": {
