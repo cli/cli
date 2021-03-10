@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [ready_for_review, opened, reopened]
 jobs:
-  bash-redux:
+  pr-auto:
     runs-on: ubuntu-latest
     steps:
       - name: lint pr
