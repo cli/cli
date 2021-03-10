@@ -1,0 +1,65 @@
+name: PR Automation
+on:
+  pull_request:
+    types: [ready_for_review, opened, reopened]
+jobs:
+  bash-redux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: lint pr
+        env:
+          REPO: "cli/cli"
+          NEEDSREVIEWCOL: "MDEzOlByb2plY3RDb2x1bW43MTEwMTI4"
+          PRID: ${{ github.event.pull_request.node_id }}
+          PRBODY: ${{ github.event.pull_request.body }}
+          STAFF: "vilmibm,mislav,samcoe,billygriffin,ampinsk"
+          PRNUM: ${{ github.event.pull_request.number }}
+          PRBASE: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          # Testing data:
+          #REPO: "vilmibm/testing"
+          #NEEDSREVIEWCOL: "MDEzOlByb2plY3RDb2x1bW4xMTAzNTA3Ng==" # vilmibm/testing "good" column
+        run: |
+          commentPR () {
+            gh -R$REPO pr comment $PRNUM -b "${1}"
+          }
+
+          closePR () {
+            gh -R$REPO pr close $PRNUM
+          }
+
+          addToBoard () {
+            # this exec is an attempt to fix some quote highlighting issues i was having in my editor.
+            bash -c 'gh api graphql -f query="mutation { addProjectCard(input: { projectColumnId: \"$NEEDSREVIEWCOL\", contentId: \"$PRID\" }) { clientMutationId } }"'
+          }
+
+          if echo $STAFF | grep $PRAUTHOR
+          then
+            addToBoard
+            exit 0
+          fi
+
+          if echo $PRBODY | wc -w | grep '^[0-9]$'
+          then
+            commentPR "Thanks for the PR! We're a small team and it's helpful to have context around community submissions in order to review them appropriately. Our automation has closed this PR since the body appears to be lacking much content; please add a more descriptive PR body as well as any issues it closes and reopen. Thanks again!"
+            closePR
+            exit 0
+          fi
+
+          if echo $PRBASE | grep -Ev "^trunk$"
+          then
+            commentPR "This pull request should probably be targeting trunk; since it isn't, our automation has closed it. Please reopen with an appropriate base branch if this was in error."
+            closePR
+            exit 0
+          fi
+
+          if echo $PRBODY | grep -Ev " \#\d+ "
+          then
+            commentPR "Hi! Thanks for the PR. Please ensure that this PR is related to an issue by mentioning its issue number in the PR body. If this PR would close the issue, please put 'Fixes #<issue number>' somewhere in the PR body. If this is a tiny change like fixing a typo, feel free to ignore this message."
+            # TODO should this be close-worthy? I feel like sometimes it's ok
+            # to not have an issue (like a tiny typo fix) so we should have
+            # this be a warning.
+          fi
+
+          addToBoard
+          exit 0
