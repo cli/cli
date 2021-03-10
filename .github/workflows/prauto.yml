@@ -39,23 +39,23 @@ jobs:
             exit 0
           fi
 
-          if echo $PRBODY | wc -w | grep '^[0-9]$'
+          if echo "${PRBODY}" | wc -w | grep -E '^[0-9]$'
           then
             commentPR "Thanks for the PR! We're a small team and it's helpful to have context around community submissions in order to review them appropriately. Our automation has closed this PR since the body appears to be lacking much content; please add a more descriptive PR body as well as any issues it closes and reopen. Thanks again!"
             closePR
             exit 0
           fi
 
-          if echo $PRBASE | grep -Ev "^trunk$"
+          if echo "${PRBASE}" | grep -Ev "^trunk$"
           then
             commentPR "This pull request should probably be targeting trunk; since it isn't, our automation has closed it. Please reopen with an appropriate base branch if this was in error."
             closePR
             exit 0
           fi
 
-          if echo $PRBODY | grep -Ev " \#\d+ "
+          if echo "${PRBODY}" | grep -Ev " \#\d+ "
           then
-            commentPR "Hi! Thanks for the PR. Please ensure that this PR is related to an issue by mentioning its issue number in the PR body. If this PR would close the issue, please put 'Fixes #<issue number>' somewhere in the PR body. If this is a tiny change like fixing a typo, feel free to ignore this message."
+            commentPR "Hi! Thanks for the PR. Please ensure that this PR is related to an issue by mentioning its issue number in the PR body. If this PR would close the issue, please put the word 'Fixes' before the issue number somewhere in the PR body. If this is a tiny change like fixing a typo, feel free to ignore this message."
             # TODO should this be close-worthy? I feel like sometimes it's ok
             # to not have an issue (like a tiny typo fix) so we should have
             # this be a warning.
