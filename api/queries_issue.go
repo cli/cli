@@ -453,6 +453,113 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	return &resp.Repository.Issue, nil
 }
 
+func IssueSearch(client *Client, repo ghrepo.Interface, searchQuery string, limit int) (*IssuesAndTotalCount, error) {
+	query :=
+		`query IssueSearch($repoName: String!, $owner: String!, $type: SearchType!, $first: Int, $after: String, $searchQuery: String!) {
+			repository(name: $repoName, owner: $owner) {
+				hasIssuesEnabled
+			}
+			search(type: $type, first: $first, after: $after, query: $searchQuery) {
+				issueCount
+				edges {
+					node {
+					... on Issue {
+						repository {
+            				hasIssuesEnabled
+          				}
+						number
+					  	title
+					  	updatedAt
+						state
+					  	labels(first: 100) {
+							nodes {
+						  		name
+							}
+						}
+					}
+				}
+			}
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+		}
+	}`
+
+	type response struct {
+		Repository struct {
+			HasIssuesEnabled bool
+		}
+		Search struct {
+			IssueCount int
+			Edges      []struct {
+				Node struct {
+					Number    int
+					Title     string
+					State     string
+					UpdatedAt time.Time
+					Labels    Labels
+				}
+			}
+			PageInfo struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+
+	searchQuery = fmt.Sprintf("is:issue repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
+
+	perPage := min(limit, 100)
+
+	variables := map[string]interface{}{
+		"repoName":    repo.RepoName(),
+		"owner":       repo.RepoOwner(),
+		"type":        "ISSUE",
+		"first":       perPage,
+		"searchQuery": searchQuery,
+	}
+
+	ic := IssuesAndTotalCount{}
+
+loop:
+	for {
+		var resp response
+		err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return nil, err
+		}
+
+		if !resp.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+
+		ic.TotalCount = resp.Search.IssueCount
+
+		for _, i := range resp.Search.Edges {
+			ic.Issues = append(ic.Issues, Issue{
+				Number:    i.Node.Number,
+				Title:     i.Node.Title,
+				State:     i.Node.State,
+				UpdatedAt: i.Node.UpdatedAt,
+				Labels:    i.Node.Labels,
+			})
+			if len(ic.Issues) == limit {
+				break loop
+			}
+		}
+
+		if resp.Search.PageInfo.HasNextPage {
+			variables["after"] = resp.Search.PageInfo.EndCursor
+			variables["first"] = min(perPage, limit-len(resp.Search.Edges))
+		} else {
+			break
+		}
+	}
+
+	return &ic, nil
+}
+
 func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 	var mutation struct {
 		CloseIssue struct {

@@ -1,11 +1,13 @@
 {
   "data": {
     "repository": {
-      "hasIssuesEnabled": true,
-      "issues": {
-        "totalCount": 3,
-        "nodes": [
-          {
+      "hasIssuesEnabled": true
+    },
+    "search": {
+      "issueCount": 3,
+      "edges": [
+        {
+          "node": {
             "number": 1,
             "title": "number won",
             "url": "https://wow.com",
@@ -18,8 +20,10 @@
               ],
               "totalCount": 1
             }
-          },
-          {
+          }
+        },
+        {
+          "node": {
             "number": 2,
             "title": "number too",
             "url": "https://wow.com",
@@ -32,8 +36,10 @@
               ],
               "totalCount": 1
             }
-          },
-          {
+          }
+        },
+        {
+          "node": {
             "number": 4,
             "title": "number fore",
             "url": "https://wow.com",
@@ -47,8 +53,8 @@
               "totalCount": 1
             }
           }
-        ]
-      }
+        }
+      ]
     }
   }
 }

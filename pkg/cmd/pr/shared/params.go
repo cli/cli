@@ -149,6 +149,7 @@ type FilterOptions struct {
 	BaseBranch string
 	Mention    string
 	Milestone  string
+	Search     string
 }
 
 func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
@@ -156,6 +157,16 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	query := IssueSearchBuild(options)
+
+	q := u.Query()
+	q.Set("q", strings.TrimSuffix(query, " "))
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func IssueSearchBuild(options FilterOptions) string {
+
 	query := fmt.Sprintf("is:%s ", options.Entity)
 	if options.State != "all" {
 		query += fmt.Sprintf("is:%s ", options.State)
@@ -178,10 +189,11 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	if options.Milestone != "" {
 		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.Milestone))
 	}
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
-	return u.String(), nil
+	if options.Search != "" {
+		query += options.Search
+	}
+
+	return query
 }
 
 func quoteValueForQuery(v string) string {

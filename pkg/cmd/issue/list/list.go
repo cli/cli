@@ -32,6 +32,7 @@ type ListOptions struct {
 	Author       string
 	Mention      string
 	Milestone    string
+	Search       string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -50,6 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			$ gh issue list -a @me
 			$ gh issue list --web
 			$ gh issue list --milestone 'MVP'
+			$ gh issue list --search "error no:assignee sort:created-asc"
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +77,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
-
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with filter")
 	return cmd
 }
 
@@ -107,29 +109,44 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	filterOptions := prShared.FilterOptions{
+		Entity:    "issue",
+		State:     opts.State,
+		Assignee:  filterAssignee,
+		Labels:    opts.Labels,
+		Author:    filterAuthor,
+		Mention:   filterMention,
+		Milestone: opts.Milestone,
+		Search:    opts.Search,
+	}
+
 	if opts.WebMode {
 		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
-		openURL, err := prShared.ListURLWithQuery(issueListURL, prShared.FilterOptions{
-			Entity:    "issue",
-			State:     opts.State,
-			Assignee:  filterAssignee,
-			Labels:    opts.Labels,
-			Author:    filterAuthor,
-			Mention:   filterMention,
-			Milestone: opts.Milestone,
-		})
+		openURL, err := prShared.ListURLWithQuery(issueListURL, filterOptions)
 		if err != nil {
 			return err
 		}
+
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return utils.OpenInBrowser(openURL)
 	}
 
-	listResult, err := api.IssueList(apiClient, baseRepo, opts.State, opts.Labels, filterAssignee, opts.LimitResults, filterAuthor, filterMention, opts.Milestone)
-	if err != nil {
-		return err
+	searchQuery := prShared.IssueSearchBuild(filterOptions)
+
+	var listResult *api.IssuesAndTotalCount
+
+	if opts.Search != "" {
+		listResult, err = api.IssueSearch(apiClient, baseRepo, searchQuery, opts.LimitResults)
+		if err != nil {
+			return err
+		}
+	} else {
+		listResult, err = api.IssueList(apiClient, baseRepo, opts.State, opts.Labels, filterAssignee, opts.LimitResults, filterAuthor, filterMention, opts.Milestone)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = opts.IO.StartPager()

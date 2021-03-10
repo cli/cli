@@ -58,6 +58,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		ErrBuf: stderr,
 	}, err
 }
+
 func TestIssueList_nontty(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
@@ -295,4 +296,53 @@ func TestIssueList_milestoneByNumber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error running issue list: %v", err)
 	}
+}
+
+func TestIssueList_Search_tty(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.FileResponse("./fixtures/issueSearch.json"))
+
+	output, err := runCommand(http, true, "--search \"auth bug\"")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	out := output.String()
+	timeRE := regexp.MustCompile(`\d+ years`)
+	out = timeRE.ReplaceAllString(out, "X years")
+
+	assert.Equal(t, heredoc.Doc(`
+
+		Showing 3 of 3 open issues in OWNER/REPO
+
+		#1  number won   (label)  about X years ago
+		#2  number too   (label)  about X years ago
+		#4  number fore  (label)  about X years ago
+	`), out)
+}
+
+func TestIssueList_Search_web(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`https://github\.com`, 0, "", func(args []string) {
+		url := strings.ReplaceAll(args[len(args)-1], "^", "")
+		assert.Equal(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1+transfer", url)
+	})
+
+	output, err := runCommand(http, true, "--web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1 --search transfer")
+	if err != nil {
+		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", output.Stderr())
+
 }
