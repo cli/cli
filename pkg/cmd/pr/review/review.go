@@ -49,6 +49,8 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		flagComment        bool
 	)
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "review [<number> | <url> | <branch>]",
 		Short: "Add a review to a pull request",
@@ -81,6 +83,24 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			}
+
+			bodyProvided := cmd.Flags().Changed("body")
+			bodyFileProvided := bodyFile != ""
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--body` or `--body-file`",
+				bodyProvided,
+				bodyFileProvided,
+			); err != nil {
+				return err
+			}
+			if bodyFileProvided {
+				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				if err != nil {
+					return err
+				}
+				opts.Body = string(b)
 			}
 
 			found := 0
@@ -125,6 +145,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&flagRequestChanges, "request-changes", "r", false, "Request changes on a pull request")
 	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 
 	return cmd
 }
