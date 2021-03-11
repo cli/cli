@@ -25,8 +25,7 @@ type ViewOptions struct {
 	Verbose    bool
 	ExitStatus bool
 
-	Prompt       bool
-	ShowProgress bool
+	Prompt bool
 
 	Now func() time.Time
 }
@@ -57,12 +56,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-			opts.ShowProgress = terminal
 
 			if len(args) > 0 {
 				opts.RunID = args[0]
 			} else if !terminal {
-				return &cmdutil.FlagError{Err: errors.New("expected a run ID")}
+				return &cmdutil.FlagError{Err: errors.New("run ID required when not running interactively")}
 			} else {
 				opts.Prompt = true
 			}
@@ -102,9 +100,7 @@ func runView(opts *ViewOptions) error {
 		}
 	}
 
-	if opts.ShowProgress {
-		opts.IO.StartProgressIndicator()
-	}
+	opts.IO.StartProgressIndicator()
 
 	run, err := shared.GetRun(client, repo, runID)
 	if err != nil {
@@ -138,9 +134,7 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	if opts.ShowProgress {
-		opts.IO.StopProgressIndicator()
-	}
+	opts.IO.StopProgressIndicator()
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
@@ -166,7 +160,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 		fmt.Fprintf(out, "For more information, see: %s\n", cs.Bold(run.URL))
 
-		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
+		if opts.ExitStatus {
 			return cmdutil.SilentError
 		}
 		return nil

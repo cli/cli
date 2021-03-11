@@ -33,8 +33,7 @@ func TestNewCmdView(t *testing.T) {
 			name: "blank tty",
 			tty:  true,
 			wants: ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
+				Prompt: true,
 			},
 		},
 		{
@@ -50,9 +49,8 @@ func TestNewCmdView(t *testing.T) {
 			cli:  "-v",
 			tty:  true,
 			wants: ViewOptions{
-				Verbose:      true,
-				Prompt:       true,
-				ShowProgress: true,
+				Verbose: true,
+				Prompt:  true,
 			},
 		},
 		{
@@ -96,7 +94,6 @@ func TestNewCmdView(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.RunID, gotOpts.RunID)
-			assert.Equal(t, tt.wants.ShowProgress, gotOpts.ShowProgress)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.ExitStatus, gotOpts.ExitStatus)
 			assert.Equal(t, tt.wants.Verbose, gotOpts.Verbose)
@@ -119,9 +116,8 @@ func TestViewRun(t *testing.T) {
 			name: "associate with PR",
 			tty:  true,
 			opts: &ViewOptions{
-				RunID:        "3",
-				Prompt:       false,
-				ShowProgress: true,
+				RunID:  "3",
+				Prompt: false,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -205,10 +201,9 @@ func TestViewRun(t *testing.T) {
 			name: "verbose",
 			tty:  true,
 			opts: &ViewOptions{
-				RunID:        "1234",
-				Prompt:       false,
-				ShowProgress: true,
-				Verbose:      true,
+				RunID:   "1234",
+				Prompt:  false,
+				Verbose: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -264,8 +259,7 @@ func TestViewRun(t *testing.T) {
 				as.StubOne(2)
 			},
 			opts: &ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
+				Prompt: true,
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job (ID 10)\n\nFor more information about a job, try: gh job view <job-id>\nview this run on GitHub: runs/3\n",
 		},

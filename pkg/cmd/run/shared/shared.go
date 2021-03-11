@@ -97,7 +97,7 @@ func (a Annotation) Symbol(cs *iostreams.ColorScheme) string {
 	case "failure":
 		return cs.FailureIcon()
 	case "warning":
-		return cs.Yellow("!")
+		return cs.WarningIcon()
 	default:
 		return "TODO"
 	}

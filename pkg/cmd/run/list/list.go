@@ -22,8 +22,7 @@ type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	ShowProgress bool
-	PlainOutput  bool
+	PlainOutput bool
 
 	Limit int
 }
@@ -44,7 +43,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-			opts.ShowProgress = terminal
 			opts.PlainOutput = !terminal
 
 			if opts.Limit < 1 {
@@ -65,9 +63,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(opts *ListOptions) error {
-	if opts.ShowProgress {
-		opts.IO.StartProgressIndicator()
-	}
+	opts.IO.StartProgressIndicator()
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
@@ -89,9 +85,7 @@ func listRun(opts *ListOptions) error {
 	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
 
-	if opts.ShowProgress {
-		opts.IO.StopProgressIndicator()
-	}
+	opts.IO.StopProgressIndicator()
 
 	if len(runs) == 0 {
 		if !opts.PlainOutput {
