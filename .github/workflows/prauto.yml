@@ -16,6 +16,7 @@ jobs:
           PRNUM: ${{ github.event.pull_request.number }}
           PRBASE: ${{ github.event.pull_request.base.ref }}
           GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          PRAUTHOR: ${{ github.event.pull_request.user.login }}
           # Testing data:
           #REPO: "vilmibm/testing"
           #NEEDSREVIEWCOL: "MDEzOlByb2plY3RDb2x1bW4xMTAzNTA3Ng==" # vilmibm/testing "good" column
@@ -35,6 +36,7 @@ jobs:
 
           if echo $STAFF | grep $PRAUTHOR
           then
+            # TODO this errors if it's already on the board...
             addToBoard
             exit 0
           fi
