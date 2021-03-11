@@ -63,11 +63,19 @@ func (c *ColorScheme) Bold(t string) string {
 	return bold(t)
 }
 
+func (c *ColorScheme) Boldf(t string, args ...interface{}) string {
+	return c.Bold(fmt.Sprintf(t, args...))
+}
+
 func (c *ColorScheme) Red(t string) string {
 	if !c.enabled {
 		return t
 	}
 	return red(t)
+}
+
+func (c *ColorScheme) Redf(t string, args ...interface{}) string {
+	return c.Red(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) Yellow(t string) string {
@@ -77,11 +85,19 @@ func (c *ColorScheme) Yellow(t string) string {
 	return yellow(t)
 }
 
+func (c *ColorScheme) Yellowf(t string, args ...interface{}) string {
+	return c.Yellow(fmt.Sprintf(t, args...))
+}
+
 func (c *ColorScheme) Green(t string) string {
 	if !c.enabled {
 		return t
 	}
 	return green(t)
+}
+
+func (c *ColorScheme) Greenf(t string, args ...interface{}) string {
+	return c.Green(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) Gray(t string) string {
@@ -103,6 +119,10 @@ func (c *ColorScheme) Magenta(t string) string {
 		return t
 	}
 	return magenta(t)
+}
+
+func (c *ColorScheme) Magentaf(t string, args ...interface{}) string {
+	return c.Magenta(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) Cyan(t string) string {
@@ -128,6 +148,10 @@ func (c *ColorScheme) Blue(t string) string {
 		return t
 	}
 	return blue(t)
+}
+
+func (c *ColorScheme) Bluef(t string, args ...interface{}) string {
+	return c.Blue(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) SuccessIcon() string {
