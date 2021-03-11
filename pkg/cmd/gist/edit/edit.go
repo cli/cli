@@ -144,22 +144,25 @@ func editRun(opts *EditOptions) error {
 			}
 		}
 
-		if _, ok := gist.Files[filename]; !ok {
+		gistFile, found := gist.Files[filename]
+		if !found {
 			return fmt.Errorf("gist has no file %q", filename)
+		}
+		if shared.IsBinaryContents([]byte(gistFile.Content)) {
+			return fmt.Errorf("editing binary files not supported")
 		}
 
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-		text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
+		text, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
 
 		if err != nil {
 			return err
 		}
 
-		if text != gist.Files[filename].Content {
-			gistFile := gist.Files[filename]
+		if text != gistFile.Content {
 			gistFile.Content = text // so it appears if they re-edit
 			filesToUpdate[filename] = text
 		}
@@ -242,6 +245,14 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 }
 
 func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
+	isBinary, err := shared.IsBinaryFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+	}
+	if isBinary {
+		return nil, fmt.Errorf("failed to upload %s: binary file not supported", file)
+	}
+
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", file, err)

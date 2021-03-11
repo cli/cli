@@ -131,7 +131,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			$ gh api --preview baptiste,nebula ...
 
 			# print only specific fields from the response
-			$ gh api repos/:owner/:repo/issues --filter '.[].title'
+			$ gh api repos/:owner/:repo/issues --jq '.[].title'
 
 			# use a template for the output
 			$ gh api repos/:owner/:repo/issues --template \

@@ -10,6 +10,8 @@
         "author": {
           "login": "nobody"
         },
+        "additions": 100,
+        "deletions": 10,
         "assignees": {
           "nodes": [],
           "totalcount": 0

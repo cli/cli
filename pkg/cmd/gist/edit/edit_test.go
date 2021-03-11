@@ -301,7 +301,6 @@ func Test_editRun(t *testing.T) {
 		io.SetStdoutTTY(!tt.nontty)
 		io.SetStdinTTY(!tt.nontty)
 		tt.opts.IO = io
-
 		tt.opts.Selector = "1234"
 
 		tt.opts.Config = func() (config.Config, error) {

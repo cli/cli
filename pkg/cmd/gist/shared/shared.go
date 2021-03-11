@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
-
-	"github.com/cli/cli/api"
 )
 
 type GistFile struct {
@@ -146,4 +146,31 @@ pagination:
 	}
 
 	return gists, nil
+}
+
+func IsBinaryFile(file string) (bool, error) {
+	detectedMime, err := mimetype.DetectFile(file)
+	if err != nil {
+		return false, err
+	}
+
+	isBinary := true
+	for mime := detectedMime; mime != nil; mime = mime.Parent() {
+		if mime.Is("text/plain") {
+			isBinary = false
+			break
+		}
+	}
+	return isBinary, nil
+}
+
+func IsBinaryContents(contents []byte) bool {
+	isBinary := true
+	for mime := mimetype.Detect(contents); mime != nil; mime = mime.Parent() {
+		if mime.Is("text/plain") {
+			isBinary = false
+			break
+		}
+	}
+	return isBinary
 }
