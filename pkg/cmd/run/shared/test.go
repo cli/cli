@@ -32,6 +32,10 @@ func TestRun(name string, id int, s Status, c Conclusion) Run {
 		},
 		HeadSha: "1234567890",
 		URL:     fmt.Sprintf("runs/%d", id),
+		HeadRepository: Repo{
+			Owner: struct{ Login string }{Login: "OWNER"},
+			Name:  "REPO",
+		},
 	}
 }
 

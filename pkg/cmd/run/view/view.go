@@ -205,7 +205,13 @@ func prForRun(client *api.Client, repo ghrepo.Interface, run shared.Run) (int, e
 		Repository struct {
 			PullRequests struct {
 				Nodes []struct {
-					Number int
+					Number         int
+					HeadRepository struct {
+						Owner struct {
+							Login string
+						}
+						Name string
+					}
 				}
 			}
 		}
@@ -224,6 +230,12 @@ func prForRun(client *api.Client, repo ghrepo.Interface, run shared.Run) (int, e
 				pullRequests(headRefName: $headRefName, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) {
 					nodes {
 						number
+						headRepository {
+							owner {
+								login
+							}
+							name
+						}
 					}
 				}
 			}
@@ -241,5 +253,17 @@ func prForRun(client *api.Client, repo ghrepo.Interface, run shared.Run) (int, e
 		return -1, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
 	}
 
-	return prs[0].Number, nil
+	number := -1
+
+	for _, pr := range prs {
+		if pr.HeadRepository.Owner.Login == run.HeadRepository.Owner.Login && pr.HeadRepository.Name == run.HeadRepository.Name {
+			number = pr.Number
+		}
+	}
+
+	if number == -1 {
+		return number, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
+	}
+
+	return number, nil
 }

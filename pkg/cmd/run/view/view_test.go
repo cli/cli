@@ -129,7 +129,12 @@ func TestViewRun(t *testing.T) {
             "repository": {
                 "pullRequests": {
                     "nodes": [
-                        {"number": 2898}
+                        {"number": 2898,
+                         "headRepository": {
+                          "owner": {
+                           "login": "OWNER"
+                          },
+													"name": "REPO"}}
                     ]}}}}`))
 				reg.Register(
 					httpmock.REST("GET", "runs/3/jobs"),

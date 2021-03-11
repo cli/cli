@@ -15,41 +15,48 @@ import (
 
 const (
 	// Run statuses
-	Queued     = "queued"
-	Completed  = "completed"
-	InProgress = "in_progress"
-	Requested  = "requested"
-	Waiting    = "waiting"
+	Queued     Status = "queued"
+	Completed  Status = "completed"
+	InProgress Status = "in_progress"
+	Requested  Status = "requested"
+	Waiting    Status = "waiting"
 
 	// Run conclusions
-	ActionRequired = "action_required"
-	Cancelled      = "cancelled"
-	Failure        = "failure"
-	Neutral        = "neutral"
-	Skipped        = "skipped"
-	Stale          = "stale"
-	StartupFailure = "startup_failure"
-	Success        = "success"
-	TimedOut       = "timed_out"
+	ActionRequired Conclusion = "action_required"
+	Cancelled      Conclusion = "cancelled"
+	Failure        Conclusion = "failure"
+	Neutral        Conclusion = "neutral"
+	Skipped        Conclusion = "skipped"
+	Stale          Conclusion = "stale"
+	StartupFailure Conclusion = "startup_failure"
+	Success        Conclusion = "success"
+	TimedOut       Conclusion = "timed_out"
 )
 
 type Status string
 type Conclusion string
-type RunEvent string
 
 type Run struct {
-	Name       string
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Status     Status
-	Conclusion Conclusion
-	Event      RunEvent
-	ID         int
-	HeadBranch string `json:"head_branch"`
-	JobsURL    string `json:"jobs_url"`
-	HeadCommit Commit `json:"head_commit"`
-	HeadSha    string `json:"head_sha"`
-	URL        string `json:"html_url"`
+	Name           string
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Status         Status
+	Conclusion     Conclusion
+	Event          string
+	ID             int
+	HeadBranch     string `json:"head_branch"`
+	JobsURL        string `json:"jobs_url"`
+	HeadCommit     Commit `json:"head_commit"`
+	HeadSha        string `json:"head_sha"`
+	URL            string `json:"html_url"`
+	HeadRepository Repo   `json:"head_repository"`
+}
+
+type Repo struct {
+	Owner struct {
+		Login string
+	}
+	Name string
 }
 
 type Commit struct {
