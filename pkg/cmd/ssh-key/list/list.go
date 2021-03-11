@@ -90,5 +90,6 @@ func truncateMiddle(maxWidth int, t string) string {
 	}
 
 	halfWidth := (maxWidth - len(ellipsis)) / 2
-	return t[0:halfWidth] + ellipsis + t[len(t)-halfWidth:]
+	remainder := (maxWidth - len(ellipsis)) % 2
+	return t[0:halfWidth+remainder] + ellipsis + t[len(t)-halfWidth:]
 }
