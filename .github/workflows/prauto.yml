@@ -46,14 +46,14 @@ jobs:
             exit 0
           fi
 
-          if echo "${PRBASE}" | grep -Ev "^trunk$"
+          if echo "${PRBASE}" | grep -Ev '^trunk$'
           then
             commentPR "This pull request should probably be targeting trunk; since it isn't, our automation has closed it. Please reopen with an appropriate base branch if this was in error."
             closePR
             exit 0
           fi
 
-          if echo "${PRBODY}" | grep -Ev " \#\d+ "
+          if echo "${PRBODY}" | grep -Ev '#[0-9]+'
           then
             commentPR "Hi! Thanks for the PR. Please ensure that this PR is related to an issue by mentioning its issue number in the PR body. If this PR would close the issue, please put the word 'Fixes' before the issue number somewhere in the PR body. If this is a tiny change like fixing a typo, feel free to ignore this message."
             # TODO should this be close-worthy? I feel like sometimes it's ok
