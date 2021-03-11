@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -32,6 +33,10 @@ type tableField struct {
 	Text         string
 	TruncateFunc func(int, string) string
 	ColorFunc    func(string) string
+}
+
+func (f *tableField) DisplayWidth() int {
+	return text.DisplayWidth(f.Text)
 }
 
 type ttyTablePrinter struct {
@@ -69,35 +74,9 @@ func (t *ttyTablePrinter) Render() error {
 		return nil
 	}
 
-	numCols := len(t.rows[0])
-	colWidths := make([]int, numCols)
-	// measure maximum content width per column
-	for _, row := range t.rows {
-		for col, field := range row {
-			textLen := text.DisplayWidth(field.Text)
-			if textLen > colWidths[col] {
-				colWidths[col] = textLen
-			}
-		}
-	}
-
 	delim := "  "
-	availWidth := t.maxWidth - colWidths[0] - ((numCols - 1) * len(delim))
-	// add extra space from columns that are already narrower than threshold
-	for col := 1; col < numCols; col++ {
-		availColWidth := availWidth / (numCols - 1)
-		if extra := availColWidth - colWidths[col]; extra > 0 {
-			availWidth += extra
-		}
-	}
-	// cap all but first column to fit available terminal width
-	// TODO: support weighted instead of even redistribution
-	for col := 1; col < numCols; col++ {
-		availColWidth := availWidth / (numCols - 1)
-		if colWidths[col] > availColWidth {
-			colWidths[col] = availColWidth
-		}
-	}
+	numCols := len(t.rows[0])
+	colWidths := t.calculateColumnWidths(len(delim))
 
 	for _, row := range t.rows {
 		for col, field := range row {
@@ -110,7 +89,7 @@ func (t *ttyTablePrinter) Render() error {
 			truncVal := field.TruncateFunc(colWidths[col], field.Text)
 			if col < numCols-1 {
 				// pad value with spaces on the right
-				if padWidth := colWidths[col] - text.DisplayWidth(field.Text); padWidth > 0 {
+				if padWidth := colWidths[col] - field.DisplayWidth(); padWidth > 0 {
 					truncVal += strings.Repeat(" ", padWidth)
 				}
 			}
@@ -130,6 +109,91 @@ func (t *ttyTablePrinter) Render() error {
 		}
 	}
 	return nil
+}
+
+func (t *ttyTablePrinter) calculateColumnWidths(delimSize int) []int {
+	numCols := len(t.rows[0])
+	allColWidths := make([][]int, numCols)
+	for _, row := range t.rows {
+		for col, field := range row {
+			allColWidths[col] = append(allColWidths[col], field.DisplayWidth())
+		}
+	}
+
+	// calculate max & median content width per column
+	maxColWidths := make([]int, numCols)
+	// medianColWidth := make([]int, numCols)
+	for col := 0; col < numCols; col++ {
+		widths := allColWidths[col]
+		sort.Ints(widths)
+		maxColWidths[col] = widths[len(widths)-1]
+		// medianColWidth[col] = widths[(len(widths)+1)/2]
+	}
+
+	colWidths := make([]int, numCols)
+	// never truncate the first column
+	colWidths[0] = maxColWidths[0]
+	// never truncate the last column if it contains URLs
+	if strings.HasPrefix(t.rows[0][numCols-1].Text, "https://") {
+		colWidths[numCols-1] = maxColWidths[numCols-1]
+	}
+
+	availWidth := func() int {
+		setWidths := 0
+		for col := 0; col < numCols; col++ {
+			setWidths += colWidths[col]
+		}
+		return t.maxWidth - delimSize*(numCols-1) - setWidths
+	}
+	numFixedCols := func() int {
+		fixedCols := 0
+		for col := 0; col < numCols; col++ {
+			if colWidths[col] > 0 {
+				fixedCols++
+			}
+		}
+		return fixedCols
+	}
+
+	// set the widths of short columns
+	if w := availWidth(); w > 0 {
+		if numFlexColumns := numCols - numFixedCols(); numFlexColumns > 0 {
+			perColumn := w / numFlexColumns
+			for col := 0; col < numCols; col++ {
+				if max := maxColWidths[col]; max < perColumn {
+					colWidths[col] = max
+				}
+			}
+		}
+	}
+
+	firstFlexCol := -1
+	// truncate long columns to the remaining available width
+	if numFlexColumns := numCols - numFixedCols(); numFlexColumns > 0 {
+		perColumn := availWidth() / numFlexColumns
+		for col := 0; col < numCols; col++ {
+			if colWidths[col] == 0 {
+				if firstFlexCol == -1 {
+					firstFlexCol = col
+				}
+				if max := maxColWidths[col]; max < perColumn {
+					colWidths[col] = max
+				} else {
+					colWidths[col] = perColumn
+				}
+			}
+		}
+	}
+
+	// add remainder to the first flex column
+	if w := availWidth(); w > 0 && firstFlexCol > -1 {
+		colWidths[firstFlexCol] += w
+		if max := maxColWidths[firstFlexCol]; max < colWidths[firstFlexCol] {
+			colWidths[firstFlexCol] = max
+		}
+	}
+
+	return colWidths
 }
 
 type tsvTablePrinter struct {
