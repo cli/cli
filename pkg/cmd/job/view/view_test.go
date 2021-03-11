@@ -29,8 +29,7 @@ func TestNewCmdView(t *testing.T) {
 			name: "blank tty",
 			tty:  true,
 			wants: ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
+				Prompt: true,
 			},
 		},
 		{
@@ -49,9 +48,8 @@ func TestNewCmdView(t *testing.T) {
 			tty:  true,
 			cli:  "--log",
 			wants: ViewOptions{
-				Prompt:       true,
-				Log:          true,
-				ShowProgress: true,
+				Prompt: true,
+				Log:    true,
 			},
 		},
 		{
@@ -107,7 +105,6 @@ func TestNewCmdView(t *testing.T) {
 			assert.Equal(t, tt.wants.Log, gotOpts.Log)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.ExitStatus, gotOpts.ExitStatus)
-			assert.Equal(t, tt.wants.ShowProgress, gotOpts.ShowProgress)
 		})
 	}
 }
@@ -126,8 +123,7 @@ func TestRunView(t *testing.T) {
 			name: "interactive flow, multi-job",
 			tty:  true,
 			opts: &ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
+				Prompt: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -157,14 +153,13 @@ func TestRunView(t *testing.T) {
 				as.StubOne(2)
 				as.StubOne(0)
 			},
-			wantOut: "\n\ncool job (ID 10)\n✓ about 59 minutes ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
+			wantOut: "\n\ncool job (ID 10)\n✓ 59m ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
 		},
 		{
 			name: "interactive, run has only one job",
 			tty:  true,
 			opts: &ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
+				Prompt: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -192,15 +187,14 @@ func TestRunView(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(2)
 			},
-			wantOut: "\n\ncool job (ID 10)\n✓ about 59 minutes ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
+			wantOut: "\n\ncool job (ID 10)\n✓ 59m ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
 		},
 		{
 			name: "interactive with log",
 			tty:  true,
 			opts: &ViewOptions{
-				Prompt:       true,
-				ShowProgress: true,
-				Log:          true,
+				Prompt: true,
+				Log:    true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -233,10 +227,9 @@ func TestRunView(t *testing.T) {
 		{
 			name: "noninteractive with log",
 			opts: &ViewOptions{
-				JobID:        "10",
-				Prompt:       false,
-				ShowProgress: false,
-				Log:          true,
+				JobID:  "10",
+				Prompt: false,
+				Log:    true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -261,7 +254,7 @@ func TestRunView(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "cool job (ID 10)\n✓ about 59 minutes ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
+			wantOut: "cool job (ID 10)\n✓ 59m ago in 4m34s\n\n✓ fob the barz\n✓ barz the fob\n\nTo see the full logs for this job, try: gh job view 10 --log\nView this job on GitHub: jobs/10\n",
 		},
 		{
 			name: "shows annotations for failed job",
@@ -276,7 +269,7 @@ func TestRunView(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
 					httpmock.JSONResponse(shared.FailedJobAnnotations))
 			},
-			wantOut: "sad job (ID 20)\nX about 59 minutes ago in 4m34s\n\n✓ barf the quux\nX quux the barf\n\nANNOTATIONS\nX the job is sad\nblaze.py#420\n\n\nTo see the full logs for this job, try: gh job view 20 --log\nView this job on GitHub: jobs/20\n",
+			wantOut: "sad job (ID 20)\nX 59m ago in 4m34s\n\n✓ barf the quux\nX quux the barf\n\nANNOTATIONS\nX the job is sad\nblaze.py#420\n\n\nTo see the full logs for this job, try: gh job view 20 --log\nView this job on GitHub: jobs/20\n",
 		},
 	}
 

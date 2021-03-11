@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -27,8 +28,7 @@ type ViewOptions struct {
 	Log        bool
 	ExitStatus bool
 
-	Prompt       bool
-	ShowProgress bool
+	Prompt bool
 
 	Now func() time.Time
 }
@@ -59,12 +59,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-			opts.ShowProgress = terminal
 
 			if len(args) > 0 {
 				opts.JobID = args[0]
 			} else if !terminal {
-				return &cmdutil.FlagError{Err: errors.New("expected a job ID")}
+				return &cmdutil.FlagError{Err: errors.New("job ID required when not running interactively")}
 			} else {
 				opts.Prompt = true
 			}
@@ -107,18 +106,14 @@ func runView(opts *ViewOptions) error {
 		// the cleanest way to do that.
 		fmt.Fprintln(out)
 
-		if opts.ShowProgress {
-			opts.IO.StartProgressIndicator()
-		}
+		opts.IO.StartProgressIndicator()
 
 		run, err := shared.GetRun(client, repo, runID)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
 
-		if opts.ShowProgress {
-			opts.IO.StopProgressIndicator()
-		}
+		opts.IO.StopProgressIndicator()
 
 		jobID, err = promptForJob(*opts, client, repo, *run)
 		if err != nil {
@@ -128,31 +123,25 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 	}
 
-	if opts.ShowProgress {
-		opts.IO.StartProgressIndicator()
-	}
+	opts.IO.StartProgressIndicator()
 
 	job, err := getJob(client, repo, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to get job: %w", err)
 	}
 
+	opts.IO.StopProgressIndicator()
+
 	if opts.Log {
+		opts.IO.StartProgressIndicator()
 		r, err := client.JobLog(repo, jobID)
 		if err != nil {
 			return err
 		}
+		opts.IO.StopProgressIndicator()
 
-		for {
-			buff := make([]byte, 64)
-			n, err := r.Read(buff)
-			if n <= 0 {
-				break
-			}
-			fmt.Fprint(out, string(buff[0:n]))
-			if err != nil {
-				break
-			}
+		if _, err := io.Copy(out, r); err != nil {
+			return fmt.Errorf("failed to read log: %w", err)
 		}
 
 		if opts.ExitStatus && shared.IsFailureState(job.Conclusion) {
@@ -167,23 +156,18 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get annotations: %w", err)
 	}
 
-	if opts.ShowProgress {
-		opts.IO.StopProgressIndicator()
-	}
+	opts.IO.StopProgressIndicator()
 
-	ago := opts.Now().Sub(job.StartedAt)
 	elapsed := job.CompletedAt.Sub(job.StartedAt)
-
 	elapsedStr := fmt.Sprintf(" in %s", elapsed)
-
 	if elapsed < 0 {
 		elapsedStr = ""
 	}
 
 	fmt.Fprintf(out, "%s (ID %s)\n", cs.Bold(job.Name), cs.Cyanf("%d", job.ID))
-	fmt.Fprintf(out, "%s %s%s\n",
+	fmt.Fprintf(out, "%s %s ago%s\n",
 		shared.Symbol(cs, job.Status, job.Conclusion),
-		utils.FuzzyAgo(ago),
+		utils.FuzzyAgoAbbr(opts.Now(), job.StartedAt),
 		elapsedStr)
 
 	fmt.Fprintln(out)
