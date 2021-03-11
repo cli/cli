@@ -133,7 +133,16 @@ func runView(opts *ViewOptions) error {
 			return err
 		}
 
-		if _, err := io.Copy(out, r); err != nil {
+		opts.IO.StopProgressIndicator()
+
+		opts.IO.DetectTerminalTheme()
+		err = opts.IO.StartPager()
+		if err != nil {
+			return err
+		}
+		defer opts.IO.StopPager()
+
+		if _, err := io.Copy(opts.IO.Out, r); err != nil {
 			return fmt.Errorf("failed to read log: %w", err)
 		}
 
