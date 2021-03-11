@@ -63,7 +63,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(opts *ListOptions) error {
-	opts.IO.StartProgressIndicator()
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
@@ -75,7 +74,9 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	opts.IO.StartProgressIndicator()
 	runs, err := shared.GetRuns(client, baseRepo, opts.Limit)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
@@ -83,23 +84,23 @@ func listRun(opts *ListOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	cs := opts.IO.ColorScheme()
-	out := opts.IO.Out
-
-	opts.IO.StopProgressIndicator()
 
 	if len(runs) == 0 {
 		if !opts.PlainOutput {
-			fmt.Fprintln(out, "No runs found")
+			fmt.Fprintln(opts.IO.ErrOut, "No runs found")
 		}
 		return nil
 	}
+
+	out := opts.IO.Out
 
 	for _, run := range runs {
 		if opts.PlainOutput {
 			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
 		} else {
-			tp.AddField(shared.Symbol(cs, run.Status, run.Conclusion), nil, nil)
+			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
+			tp.AddField(symbol, nil, symbolColor)
 		}
 
 		tp.AddField(run.CommitMsg(), nil, cs.Bold)

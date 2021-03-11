@@ -58,11 +58,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-
 			if len(args) > 0 {
 				opts.JobID = args[0]
-			} else if !terminal {
+			} else if !opts.IO.CanPrompt() {
 				return &cmdutil.FlagError{Err: errors.New("job ID required when not running interactively")}
 			} else {
 				opts.Prompt = true
@@ -76,7 +74,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 	cmd.Flags().BoolVarP(&opts.Log, "log", "l", false, "Print full logs for job")
 	// TODO should we try and expose pending via another exit code?
-	cmd.Flags().BoolVarP(&opts.ExitStatus, "exit-status", "e", false, "Exit with non-zero status if job failed")
+	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if job failed")
 
 	return cmd
 }
@@ -107,6 +105,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 
 		opts.IO.StartProgressIndicator()
+		defer opts.IO.StopProgressIndicator()
 
 		run, err := shared.GetRun(client, repo, runID)
 		if err != nil {
@@ -114,7 +113,6 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StopProgressIndicator()
-
 		jobID, err = promptForJob(*opts, client, repo, *run)
 		if err != nil {
 			return err
@@ -124,21 +122,16 @@ func runView(opts *ViewOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-
 	job, err := getJob(client, repo, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to get job: %w", err)
 	}
 
-	opts.IO.StopProgressIndicator()
-
 	if opts.Log {
-		opts.IO.StartProgressIndicator()
 		r, err := client.JobLog(repo, jobID)
 		if err != nil {
 			return err
 		}
-		opts.IO.StopProgressIndicator()
 
 		if _, err := io.Copy(out, r); err != nil {
 			return fmt.Errorf("failed to read log: %w", err)
@@ -152,11 +145,10 @@ func runView(opts *ViewOptions) error {
 	}
 
 	annotations, err := shared.GetAnnotations(client, repo, *job)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get annotations: %w", err)
 	}
-
-	opts.IO.StopProgressIndicator()
 
 	elapsed := job.CompletedAt.Sub(job.StartedAt)
 	elapsedStr := fmt.Sprintf(" in %s", elapsed)
@@ -164,17 +156,20 @@ func runView(opts *ViewOptions) error {
 		elapsedStr = ""
 	}
 
+	symbol, symColor := shared.Symbol(cs, job.Status, job.Conclusion)
+
 	fmt.Fprintf(out, "%s (ID %s)\n", cs.Bold(job.Name), cs.Cyanf("%d", job.ID))
 	fmt.Fprintf(out, "%s %s ago%s\n",
-		shared.Symbol(cs, job.Status, job.Conclusion),
+		symColor(symbol),
 		utils.FuzzyAgoAbbr(opts.Now(), job.StartedAt),
 		elapsedStr)
 
 	fmt.Fprintln(out)
 
 	for _, step := range job.Steps {
+		stepSym, stepSymColor := shared.Symbol(cs, step.Status, step.Conclusion)
 		fmt.Fprintf(out, "%s %s\n",
-			shared.Symbol(cs, step.Status, step.Conclusion),
+			stepSymColor(stepSym),
 			step.Name)
 	}
 
@@ -227,8 +222,8 @@ func promptForJob(opts ViewOptions, client *api.Client, repo ghrepo.Interface, r
 	candidates := []string{}
 
 	for _, job := range jobs {
-		symbol := shared.Symbol(cs, job.Status, job.Conclusion)
-		candidates = append(candidates, fmt.Sprintf("%s %s", symbol, job.Name))
+		symbol, symColor := shared.Symbol(cs, job.Status, job.Conclusion)
+		candidates = append(candidates, fmt.Sprintf("%s %s", symColor(symbol), job.Name))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but

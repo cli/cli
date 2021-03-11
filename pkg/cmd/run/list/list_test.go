@@ -80,11 +80,12 @@ func TestNewCmdList(t *testing.T) {
 
 func TestListRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *ListOptions
-		wantOut string
-		stubs   func(*httpmock.Registry)
-		nontty  bool
+		name       string
+		opts       *ListOptions
+		wantOut    string
+		wantErrOut string
+		stubs      func(*httpmock.Registry)
+		nontty     bool
 	}{
 		{
 			name: "blank tty",
@@ -167,7 +168,8 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantOut: "No runs found\n",
+			wantOut:    "",
+			wantErrOut: "No runs found\n",
 		},
 	}
 
@@ -180,7 +182,7 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			io, _, stdout, _ := iostreams.Test()
+			io, _, stdout, stderr := iostreams.Test()
 			io.SetStdoutTTY(!tt.nontty)
 			tt.opts.IO = io
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
@@ -191,6 +193,7 @@ func TestListRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, tt.wantErrOut, stderr.String())
 			reg.Verify(t)
 		})
 	}

@@ -55,11 +55,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-
 			if len(args) > 0 {
 				opts.RunID = args[0]
-			} else if !terminal {
+			} else if !opts.IO.CanPrompt() {
 				return &cmdutil.FlagError{Err: errors.New("run ID required when not running interactively")}
 			} else {
 				opts.Prompt = true
@@ -73,7 +71,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "Show job steps")
 	// TODO should we try and expose pending via another exit code?
-	cmd.Flags().BoolVarP(&opts.ExitStatus, "exit-status", "e", false, "Exit with non-zero status if run failed")
+	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run failed")
 
 	return cmd
 }
@@ -101,6 +99,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
+	defer opts.IO.StopProgressIndicator()
 
 	run, err := shared.GetRun(client, repo, runID)
 	if err != nil {
@@ -130,22 +129,21 @@ func runView(opts *ViewOptions) error {
 		annotations = append(annotations, as...)
 	}
 
+	opts.IO.StopProgressIndicator()
 	if annotationErr != nil {
 		return fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
-
-	opts.IO.StopProgressIndicator()
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	title := fmt.Sprintf("%s %s%s",
 		cs.Bold(run.HeadBranch), run.Name, prNumber)
-	symbol := shared.Symbol(cs, run.Status, run.Conclusion)
+	symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
 	id := cs.Cyanf("%d", run.ID)
 
 	fmt.Fprintln(out)
-	fmt.Fprintf(out, "%s %s · %s\n", symbol, title, id)
+	fmt.Fprintf(out, "%s %s · %s\n", symbolColor(symbol), title, id)
 
 	ago := opts.Now().Sub(run.CreatedAt)
 
@@ -169,14 +167,13 @@ func runView(opts *ViewOptions) error {
 	fmt.Fprintln(out, cs.Bold("JOBS"))
 
 	for _, job := range jobs {
-		symbol := shared.Symbol(cs, job.Status, job.Conclusion)
+		symbol, symbolColor := shared.Symbol(cs, job.Status, job.Conclusion)
 		id := cs.Cyanf("%d", job.ID)
-		fmt.Fprintf(out, "%s %s (ID %s)\n", symbol, job.Name, id)
+		fmt.Fprintf(out, "%s %s (ID %s)\n", symbolColor(symbol), job.Name, id)
 		if opts.Verbose || shared.IsFailureState(job.Conclusion) {
 			for _, step := range job.Steps {
-				fmt.Fprintf(out, "  %s %s\n",
-					shared.Symbol(cs, step.Status, step.Conclusion),
-					step.Name)
+				stepSymbol, stepSymColor := shared.Symbol(cs, step.Status, step.Conclusion)
+				fmt.Fprintf(out, "  %s %s\n", stepSymColor(stepSymbol), step.Name)
 			}
 		}
 	}

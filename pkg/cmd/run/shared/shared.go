@@ -210,7 +210,7 @@ func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Int
 	candidates := []string{}
 
 	for _, run := range runs {
-		symbol := Symbol(cs, run.Status, run.Conclusion)
+		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
 	}
@@ -243,17 +243,20 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, erro
 	return &result, nil
 }
 
-func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) string {
+type colorFunc func(string) string
+
+func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (string, colorFunc) {
+	noColor := func(s string) string { return s }
 	if status == Completed {
 		switch conclusion {
 		case Success:
-			return cs.SuccessIcon()
+			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(cs.Gray)
+			return cs.SuccessIconWithColor(noColor), cs.Gray
 		default:
-			return cs.FailureIcon()
+			return cs.FailureIconWithColor(noColor), cs.Red
 		}
 	}
 
-	return cs.Yellow("-")
+	return "-", cs.Yellow
 }

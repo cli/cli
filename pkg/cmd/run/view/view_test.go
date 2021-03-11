@@ -38,7 +38,7 @@ func TestNewCmdView(t *testing.T) {
 		},
 		{
 			name: "exit status",
-			cli:  "-e 1234",
+			cli:  "--exit-status 1234",
 			wants: ViewOptions{
 				RunID:      "1234",
 				ExitStatus: true,

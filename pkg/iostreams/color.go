@@ -143,7 +143,11 @@ func (c *ColorScheme) WarningIcon() string {
 }
 
 func (c *ColorScheme) FailureIcon() string {
-	return c.Red("X")
+	return c.FailureIconWithColor(c.Red)
+}
+
+func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
+	return colo("X")
 }
 
 func (c *ColorScheme) ColorFromString(s string) func(string) string {
