@@ -120,6 +120,41 @@ func TestRunView(t *testing.T) {
 		wantOut   string
 	}{
 		{
+			name: "exit status respected with --log",
+			opts: &ViewOptions{
+				JobID:      "20",
+				ExitStatus: true,
+				Log:        true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.FailedJob))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20/logs"),
+					httpmock.StringResponse("it's a log\nfor this job\nbeautiful log\n"))
+			},
+			wantErr: true,
+			wantOut: "it's a log\nfor this job\nbeautiful log\n",
+		},
+		{
+			name: "exit status respected",
+			opts: &ViewOptions{
+				JobID:      "20",
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.FailedJob))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
+					httpmock.JSONResponse(shared.FailedJobAnnotations))
+			},
+			wantErr: true,
+			wantOut: "sad job (ID 20)\nX 59m ago in 4m34s\n\n✓ barf the quux\nX quux the barf\n\nANNOTATIONS\nX the job is sad\nblaze.py#420\n\n\nTo see the full logs for this job, try: gh job view 20 --log\nView this job on GitHub: jobs/20\n",
+		},
+		{
 			name: "interactive flow, multi-job",
 			tty:  true,
 			opts: &ViewOptions{
