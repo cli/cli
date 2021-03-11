@@ -183,7 +183,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 
 		for _, a := range annotations {
-			fmt.Fprintf(out, "%s %s\n", a.Symbol(cs), a.Message)
+			fmt.Fprintf(out, "%s %s\n", shared.AnnotationSymbol(cs, a), a.Message)
 			fmt.Fprintln(out, cs.Grayf("%s: %s#%d\n",
 				a.JobName, a.Path, a.StartLine))
 		}

@@ -31,10 +31,14 @@ const (
 	StartupFailure Conclusion = "startup_failure"
 	Success        Conclusion = "success"
 	TimedOut       Conclusion = "timed_out"
+
+	AnnotationFailure Level = "failure"
+	AnnotationWarning Level = "warning"
 )
 
 type Status string
 type Conclusion string
+type Level string
 
 type Run struct {
 	Name           string
@@ -94,19 +98,18 @@ type Annotation struct {
 	JobName   string
 	Message   string
 	Path      string
-	Level     string `json:"annotation_level"`
-	StartLine int    `json:"start_line"`
+	Level     Level `json:"annotation_level"`
+	StartLine int   `json:"start_line"`
 }
 
-func (a Annotation) Symbol(cs *iostreams.ColorScheme) string {
-	// TODO types for levels
+func AnnotationSymbol(cs *iostreams.ColorScheme, a Annotation) string {
 	switch a.Level {
-	case "failure":
+	case AnnotationFailure:
 		return cs.FailureIcon()
-	case "warning":
+	case AnnotationWarning:
 		return cs.WarningIcon()
 	default:
-		return "TODO"
+		return "-"
 	}
 }
 
