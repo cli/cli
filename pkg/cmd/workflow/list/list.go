@@ -8,19 +8,24 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
-const defaultLimit = 10
+const (
+	defaultLimit = 10
+
+	Active WorkflowState = "active"
+)
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	ShowProgress bool
-	PlainOutput  bool
+	PlainOutput bool
 
+	All   bool
 	Limit int
 }
 
@@ -40,7 +45,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-			opts.ShowProgress = terminal
 			opts.PlainOutput = !terminal
 
 			if opts.Limit < 1 {
@@ -56,6 +60,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of workflows to fetch")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all workflows, including disabled workflows")
 
 	return cmd
 }
@@ -72,26 +77,46 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
+	opts.IO.StartProgressIndicator()
 	workflows, err := getWorkflows(client, repo, opts.Limit)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not get workflows: %w", err)
 	}
 
-	out := opts.IO.Out
-
-	for _, workflow := range workflows {
-		// TODO format
-		// TODO more data
-		// TODO hide disabled
-		// TODO support show-disabled
-		fmt.Fprintf(out, "%s\n", workflow.Name)
+	if len(workflows) == 0 {
+		if !opts.PlainOutput {
+			fmt.Fprintln(opts.IO.ErrOut, "No workflows found")
+		}
+		return nil
 	}
 
-	return nil
+	tp := utils.NewTablePrinter(opts.IO)
+	cs := opts.IO.ColorScheme()
+
+	for _, workflow := range workflows {
+		if workflow.Disabled() && !opts.All {
+			continue
+		}
+		tp.AddField(workflow.Name, nil, cs.Bold)
+		tp.AddField(string(workflow.State), nil, nil)
+		tp.AddField(fmt.Sprintf("%d", workflow.ID), nil, cs.Cyan)
+		tp.EndRow()
+	}
+
+	return tp.Render()
 }
 
+type WorkflowState string
+
 type Workflow struct {
-	Name string
+	Name  string
+	ID    int
+	State WorkflowState
+}
+
+func (w *Workflow) Disabled() bool {
+	return w.State != Active
 }
 
 type WorkflowsPayload struct {
