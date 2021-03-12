@@ -15,7 +15,8 @@ import (
 const (
 	defaultLimit = 10
 
-	Active WorkflowState = "active"
+	Active           WorkflowState = "active"
+	DisabledManually WorkflowState = "disabled_manually"
 )
 
 type ListOptions struct {
