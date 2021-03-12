@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -97,24 +98,24 @@ func Test_NewCmdList(t *testing.T) {
 }
 
 func TestListRun(t *testing.T) {
-	workflows := []Workflow{
+	workflows := []shared.Workflow{
 		{
 			Name:  "Go",
-			State: Active,
+			State: shared.Active,
 			ID:    707,
 		},
 		{
 			Name:  "Linter",
-			State: Active,
+			State: shared.Active,
 			ID:    666,
 		},
 		{
 			Name:  "Release",
-			State: DisabledManually,
+			State: shared.DisabledManually,
 			ID:    451,
 		},
 	}
-	payload := WorkflowsPayload{Workflows: workflows}
+	payload := shared.WorkflowsPayload{Workflows: workflows}
 
 	tests := []struct {
 		name       string
@@ -146,22 +147,22 @@ func TestListRun(t *testing.T) {
 				Limit: 101,
 			},
 			stubs: func(reg *httpmock.Registry) {
-				workflows := []Workflow{}
+				workflows := []shared.Workflow{}
 				for flowID := 0; flowID < 103; flowID++ {
-					workflows = append(workflows, Workflow{
+					workflows = append(workflows, shared.Workflow{
 						ID:    flowID,
 						Name:  fmt.Sprintf("flow %d", flowID),
-						State: Active,
+						State: shared.Active,
 					})
 				}
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(WorkflowsPayload{
+					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: workflows[0:100],
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(WorkflowsPayload{
+					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: workflows[100:],
 					}))
 			},
@@ -176,7 +177,7 @@ func TestListRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(WorkflowsPayload{}),
+					httpmock.JSONResponse(shared.WorkflowsPayload{}),
 				)
 			},
 			wantOut: "",
@@ -190,7 +191,7 @@ func TestListRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(WorkflowsPayload{}),
+					httpmock.JSONResponse(shared.WorkflowsPayload{}),
 				)
 			},
 			wantOut:    "",
