@@ -8,9 +8,10 @@ import (
 
 func NewCmdJob(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "job <command>",
-		Short: "Interact with the individual jobs of a workflow run",
-		Long:  "List and view the jobs of a workflow run including full logs",
+		Use:    "job <command>",
+		Short:  "Interact with the individual jobs of a workflow run",
+		Hidden: true,
+		Long:   "List and view the jobs of a workflow run including full logs",
 		// TODO action annotation
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
