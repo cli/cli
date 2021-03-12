@@ -32,9 +32,12 @@ type ForkOptions struct {
 	GitArgs      []string
 	Repository   string
 	Clone        bool
+	Update       bool
 	Remote       bool
 	PromptClone  bool
+	PromptUpdate bool
 	PromptRemote bool
+	UpdateName   string
 	RemoteName   string
 	Rename       bool
 }
@@ -77,6 +80,10 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 				opts.Repository = args[0]
 				opts.GitArgs = args[1:]
 			}
+			
+			if opts.RemoteName == "" {
+				return &cmdutil.FlagError{Err: errors:New("--update cannot be blank")}	
+			}
 
 			if opts.RemoteName == "" {
 				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
@@ -84,6 +91,14 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 
 			if promptOk && !cmd.Flags().Changed("clone") {
 				opts.PromptClone = true
+			}
+			
+			if promptOk && !cmd.Flags().Changed("update") {
+				opts.PromptUpdate = true
+			}
+			
+			if !cmd.Flags().Changed("update-name") {
+				opts.Update = true
 			}
 
 			if promptOk && !cmd.Flags().Changed("remote") {
@@ -108,6 +123,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 	})
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
+	cmd.Flags().BoolVar(&opts.Update, "update", false "Update a fork to the default branch of its source.")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
 
