@@ -2,8 +2,10 @@ package review
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -22,9 +24,14 @@ import (
 )
 
 func Test_NewCmdReview(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name    string
 		args    string
+		stdin   string
 		isTTY   bool
 		want    ReviewOptions
 		wantErr string
@@ -47,6 +54,27 @@ func Test_NewCmdReview(t *testing.T) {
 				SelectorArg: "",
 				ReviewType:  0,
 				Body:        "",
+			},
+		},
+		{
+			name:  "body from stdin",
+			args:  "123 --request-changes --body-file -",
+			stdin: "this is on standard input",
+			isTTY: true,
+			want: ReviewOptions{
+				SelectorArg: "123",
+				ReviewType:  1,
+				Body:        "this is on standard input",
+			},
+		},
+		{
+			name:  "body from file",
+			args:  fmt.Sprintf("123 --request-changes --body-file '%s'", tmpFile),
+			isTTY: true,
+			want: ReviewOptions{
+				SelectorArg: "123",
+				ReviewType:  1,
+				Body:        "a body from file",
 			},
 		},
 		{
@@ -85,13 +113,23 @@ func Test_NewCmdReview(t *testing.T) {
 			isTTY:   true,
 			wantErr: "--body unsupported without --approve, --request-changes, or --comment",
 		},
+		{
+			name:    "body and body-file flags",
+			args:    "--body 'test' --body-file 'test-file.txt'",
+			isTTY:   true,
+			wantErr: "specify only one of `--body` or `--body-file`",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			io, stdin, _, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.isTTY)
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
+
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			}
 
 			f := &cmdutil.Factory{
 				IOStreams: io,

@@ -42,6 +42,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		FetchOptions:       prShared.FetchOptions,
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "edit {<number> | <url>}",
 		Short: "Edit an issue",
@@ -51,6 +53,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --add-assignee @me --remove-assignee monalisa,hubot
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
+			$ gh issue edit 23 --body-file body.txt
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,11 +63,30 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			opts.SelectorArg = args[0]
 
 			flags := cmd.Flags()
+
+			bodyProvided := flags.Changed("body")
+			bodyFileProvided := bodyFile != ""
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--body` or `--body-file`",
+				bodyProvided,
+				bodyFileProvided,
+			); err != nil {
+				return err
+			}
+			if bodyProvided || bodyFileProvided {
+				opts.Editable.Body.Edited = true
+				if bodyFileProvided {
+					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					if err != nil {
+						return err
+					}
+					opts.Editable.Body.Value = string(b)
+				}
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
-			}
-			if flags.Changed("body") {
-				opts.Editable.Body.Edited = true
 			}
 			if flags.Changed("add-assignee") || flags.Changed("remove-assignee") {
 				opts.Editable.Assignees.Edited = true
@@ -97,6 +119,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Add, "add-label", nil, "Add labels by `name`")
