@@ -23,6 +23,8 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		OpenInBrowser:         utils.OpenInBrowser,
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "comment {<number> | <url>}",
 		Short: "Create a new issue comment",
@@ -35,8 +37,8 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 			return prShared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
-			if opts.BodyFile != "" {
-				b, err := cmdutil.ReadFile(opts.BodyFile, opts.IO.In)
+			if bodyFile != "" {
+				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
@@ -51,7 +53,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	}
 
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
-	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().BoolP("editor", "e", false, "Add body using editor")
 	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
 

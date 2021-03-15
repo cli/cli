@@ -42,7 +42,6 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
-	BodyFile              string
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
