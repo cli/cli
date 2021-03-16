@@ -63,6 +63,8 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		flagRebase bool
 	)
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
 		Use:   "merge [<number> | <url> | <branch>]",
 		Short: "Merge a pull request",
@@ -106,7 +108,28 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
-			opts.BodySet = cmd.Flags().Changed("body")
+
+			bodyProvided := cmd.Flags().Changed("body")
+			bodyFileProvided := bodyFile != ""
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--body` or `--body-file`",
+				bodyProvided,
+				bodyFileProvided,
+			); err != nil {
+				return err
+			}
+			if bodyProvided || bodyFileProvided {
+				opts.BodySet = true
+				if bodyFileProvided {
+					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					if err != nil {
+						return err
+					}
+					opts.Body = string(b)
+				}
+
+			}
 
 			opts.Editor = &userEditor{
 				io:     opts.IO,
@@ -122,6 +145,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")

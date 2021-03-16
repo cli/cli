@@ -50,6 +50,10 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		opts.InputType = InputTypeInline
 		inputFlags++
 	}
+	if cmd.Flags().Changed("body-file") {
+		opts.InputType = InputTypeInline
+		inputFlags++
+	}
 	if web, _ := cmd.Flags().GetBool("web"); web {
 		opts.InputType = InputTypeWeb
 		inputFlags++
@@ -61,15 +65,15 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 
 	if inputFlags == 0 {
 		if !opts.IO.CanPrompt() {
-			return &cmdutil.FlagError{Err: errors.New("--body or --web required when not running interactively")}
+			return &cmdutil.FlagError{Err: errors.New("`--body`, `--body-file` or `--web` required when not running interactively")}
 		}
 		opts.Interactive = true
 	} else if inputFlags == 1 {
 		if !opts.IO.CanPrompt() && opts.InputType == InputTypeEditor {
-			return &cmdutil.FlagError{Err: errors.New("--body or --web required when not running interactively")}
+			return &cmdutil.FlagError{Err: errors.New("`--body`, `--body-file` or `--web` required when not running interactively")}
 		}
 	} else if inputFlags > 1 {
-		return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of --body, --editor, or --web")}
+		return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--body`, `--body-file`, `--editor`, or `--web`")}
 	}
 
 	return nil
