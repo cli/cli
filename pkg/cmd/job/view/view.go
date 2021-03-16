@@ -80,11 +80,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 func runView(opts *ViewOptions) error {
-	c, err := opts.HttpClient()
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
 	}
-	client := api.NewClientFromHTTP(c)
+	client := api.NewClientFromHTTP(httpClient)
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
@@ -128,7 +128,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Log {
-		r, err := client.JobLog(repo, jobID)
+		r, err := jobLog(httpClient, repo, jobID)
 		if err != nil {
 			return err
 		}
@@ -201,18 +201,6 @@ func runView(opts *ViewOptions) error {
 	}
 
 	return nil
-}
-
-func getJob(client *api.Client, repo ghrepo.Interface, jobID string) (*shared.Job, error) {
-	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
-
-	var result shared.Job
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
 }
 
 func promptForJob(opts ViewOptions, client *api.Client, repo ghrepo.Interface, run shared.Run) (string, error) {
