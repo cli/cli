@@ -205,7 +205,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 					if checks.Failing == checks.Total {
 						summary = cs.Red("× All checks failing")
 					} else {
-						summary = cs.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
+						summary = cs.Redf("× %d/%d checks failing", checks.Failing, checks.Total)
 					}
 				} else if checks.Pending > 0 {
 					summary = cs.Yellow("- Checks pending")
