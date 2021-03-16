@@ -119,8 +119,8 @@ func Test_viewRun(t *testing.T) {
 				v1.2.3
 				MonaLisa released this about 1 day ago
 				
-				                                                                              
-				  • Fixed bugs                                                                
+				                                                                                
+				• Fixed bugs                                                                    
 				
 				
 				Assets
@@ -142,8 +142,8 @@ func Test_viewRun(t *testing.T) {
 				v1.2.3
 				MonaLisa released this about 1 day ago
 				
-				                                                                              
-				  • Fixed bugs                                                                
+				                                                                                
+				• Fixed bugs                                                                    
 				
 				
 				Assets

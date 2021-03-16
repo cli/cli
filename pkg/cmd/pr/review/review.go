@@ -276,7 +276,7 @@ func reviewSurvey(io *iostreams.IOStreams, editorCommand string) (*api.PullReque
 
 	if len(bodyAnswers.Body) > 0 {
 		style := markdown.GetStyle(io.DetectTerminalTheme())
-		renderedBody, err := markdown.Render(bodyAnswers.Body, style, "")
+		renderedBody, err := markdown.Render(bodyAnswers.Body, style)
 		if err != nil {
 			return nil, err
 		}

@@ -218,7 +218,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n  # foo                                                                       \n\n",
+			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n# foo                                                                           \n\n",
 		},
 		{
 			name: "multiple files, trailing newlines",
@@ -259,7 +259,7 @@ func Test_viewRun(t *testing.T) {
 					},
 				},
 			},
-			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                              \n  • foo                                                                       \n\n",
+			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                                \n• foo                                                                           \n\n",
 		},
 		{
 			name: "multiple files, raw",
