@@ -143,10 +143,6 @@ func getWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 			return nil, err
 		}
 
-		if len(result.Workflows) == 0 {
-			break
-		}
-
 		for _, workflow := range result.Workflows {
 			workflows = append(workflows, workflow)
 			if len(workflows) == limit {
