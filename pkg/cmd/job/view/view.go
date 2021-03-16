@@ -135,7 +135,6 @@ func runView(opts *ViewOptions) error {
 
 		opts.IO.StopProgressIndicator()
 
-		opts.IO.DetectTerminalTheme()
 		err = opts.IO.StartPager()
 		if err != nil {
 			return err
