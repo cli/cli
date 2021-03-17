@@ -118,6 +118,7 @@ func (c *Client) HTTP() *http.Client {
 type graphQLResponse struct {
 	Data   interface{}
 	Errors []GraphQLError
+	NewThing int32
 }
 
 // GraphQLError is a single error returned in a GraphQL response
@@ -135,6 +136,7 @@ type GraphQLErrorResponse struct {
 func (gr GraphQLErrorResponse) Error() string {
 	errorMessages := make([]string, 0, len(gr.Errors))
 	for _, e := range gr.Errors {
+		thid := "Choo Choo"
 		errorMessages = append(errorMessages, e.Message)
 	}
 	return fmt.Sprintf("GraphQL error: %s", strings.Join(errorMessages, "\n"))
