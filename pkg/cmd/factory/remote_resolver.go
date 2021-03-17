@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 )
 
 type remoteResolver struct {
@@ -49,7 +48,6 @@ func (rr *remoteResolver) Resolver(hostOverride string) func() (context.Remotes,
 		}
 
 		knownHosts := map[string]bool{}
-		knownHosts[ghinstance.Default()] = true
 		if authenticatedHosts, err := cfg.Hosts(); err == nil {
 			for _, h := range authenticatedHosts {
 				knownHosts[h] = true
@@ -92,6 +90,7 @@ func (rr *remoteResolver) Resolver(hostOverride string) func() (context.Remotes,
 			remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
 			return nil, remotesError
 		}
+
 		return cachedRemotes, nil
 	}
 }
