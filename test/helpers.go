@@ -7,7 +7,9 @@ import (
 
 // TODO copypasta from command package
 type CmdOut struct {
-	OutBuf, ErrBuf *bytes.Buffer
+	OutBuf     *bytes.Buffer
+	ErrBuf     *bytes.Buffer
+	BrowsedURL string
 }
 
 func (c CmdOut) String() string {

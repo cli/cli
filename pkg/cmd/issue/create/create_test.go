@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -145,6 +144,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
@@ -156,6 +156,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
+		Browser: browser,
 	}
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
@@ -175,8 +176,9 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -355,6 +357,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	}
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+	assert.Equal(t, "", output.BrowsedURL)
 }
 
 func TestIssueCreate_continueInBrowser(t *testing.T) {
@@ -388,13 +391,8 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 		},
 	})
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
-	})
 
 	output, err := runCommand(http, true, `-b body`)
 	if err != nil {
@@ -408,6 +406,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 		Opening github.com/OWNER/REPO/issues/new in your browser.
 	`), output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", output.BrowsedURL)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {
@@ -520,13 +519,8 @@ func TestIssueCreate_web(t *testing.T) {
 		`),
 	)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", url)
-	})
 
 	output, err := runCommand(http, true, `--web -a @me`)
 	if err != nil {
@@ -535,19 +529,15 @@ func TestIssueCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", output.BrowsedURL)
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
-	})
 
 	output, err := runCommand(http, true, `-w -t mytitle -b mybody`)
 	if err != nil {
@@ -556,6 +546,7 @@ func TestIssueCreate_webTitleBody(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", output.BrowsedURL)
 }
 
 func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
@@ -571,13 +562,8 @@ func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
 		`),
 	)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", url)
-	})
 
 	output, err := runCommand(http, true, `-w -t mytitle -b mybody -a @me`)
 	if err != nil {
@@ -586,6 +572,7 @@ func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", output.BrowsedURL)
 }
 
 func TestIssueCreate_AtMeAssignee(t *testing.T) {
@@ -666,13 +653,8 @@ func TestIssueCreate_webProject(t *testing.T) {
 			} } } }
 			`))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", url)
-	})
 
 	output, err := runCommand(http, true, `-w -t Title -p Cleanup`)
 	if err != nil {
@@ -681,4 +663,5 @@ func TestIssueCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", output.BrowsedURL)
 }

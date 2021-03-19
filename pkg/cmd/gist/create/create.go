@@ -23,6 +23,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type CreateOptions struct {
 	IO *iostreams.IOStreams
 
@@ -33,12 +37,14 @@ type CreateOptions struct {
 	WebMode          bool
 
 	HttpClient func() (*http.Client, error)
+	Browser    browser
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -144,7 +150,7 @@ func createRun(opts *CreateOptions) error {
 	if opts.WebMode {
 		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
 
-		return utils.OpenInBrowser(gist.HTMLURL)
+		return opts.Browser.Browse(gist.HTMLURL)
 	}
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)

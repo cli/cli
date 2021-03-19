@@ -24,6 +24,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
@@ -31,6 +35,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
+	Browser    browser
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -79,6 +84,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
+		Browser:    f.Browser,
 	}
 
 	var bodyFile string
@@ -650,7 +656,7 @@ func previewPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadata
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 	}
-	return utils.OpenInBrowser(openURL)
+	return opts.Browser.Browse(openURL)
 
 }
 

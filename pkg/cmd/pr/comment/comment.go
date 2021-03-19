@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +20,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 		EditSurvey:            shared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: shared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:   shared.CommentableConfirmSubmitSurvey,
-		OpenInBrowser:         utils.OpenInBrowser,
+		OpenInBrowser:         f.Browser.Browse,
 	}
 
 	var bodyFile string

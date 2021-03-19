@@ -76,5 +76,6 @@ func New(appVersion string) *cmdutil.Factory {
 			return currentBranch, nil
 		},
 		Executable: ghExecutable,
+		Browser:    cmdutil.NewBrowser(os.Getenv("BROWSER"), io.Out, io.ErrOut),
 	}
 }

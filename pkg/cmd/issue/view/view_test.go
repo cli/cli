@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -59,65 +58,45 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 }
 
 func TestIssueView_web(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+	browser := &cmdutil.TestBrowser{}
 
-	http.Register(
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 				"number": 123,
 				"url": "https://github.com/OWNER/REPO/issues/123"
 			} } } }
-			`),
-	)
+		`))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
+	err := viewRun(&ViewOptions{
+		IO:      io,
+		Browser: browser,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		WebMode:     true,
+		SelectorArg: "123",
 	})
-
-	output, err := runCommand(http, true, "-w 123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-}
-
-func TestIssueView_web_numberArgWithHash(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issues/123"
-			} } } }
-			`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
-	})
-
-	output, err := runCommand(http, true, "-w \"#123\"")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -316,36 +295,6 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
-}
-
-func TestIssueView_web_urlArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issues/123"
-			} } } }
-			`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
-	})
-
-	output, err := runCommand(http, true, "-w https://github.com/OWNER/REPO/issues/123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
 }
 
 func TestIssueView_tty_Comments(t *testing.T) {

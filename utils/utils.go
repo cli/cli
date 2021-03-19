@@ -5,26 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/browser"
 )
-
-// OpenInBrowser opens the url in a web browser based on OS and $BROWSER environment variable
-func OpenInBrowser(url string) error {
-	browseCmd, err := browser.Command(url)
-	if err != nil {
-		return err
-	}
-	err = run.PrepareCmd(browseCmd).Run()
-	if err != nil {
-		browserEnv := browser.FromEnv()
-		if browserEnv != "" {
-			return fmt.Errorf("%w\nNote: check your BROWSER environment variable", err)
-		}
-	}
-	return err
-}
 
 func Pluralize(num int, thing string) string {
 	if num == 1 {

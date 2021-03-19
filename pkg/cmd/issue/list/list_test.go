@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -232,24 +231,42 @@ func TestIssueList_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList_web(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+	browser := &cmdutil.TestBrowser{}
 
-	cs, cmdTeardown := run.Stub()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1", url)
+	err := listRun(&ListOptions{
+		IO:      io,
+		Browser: browser,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		WebMode:      true,
+		State:        "all",
+		Assignee:     "peter",
+		Author:       "john",
+		Labels:       []string{"bug", "docs"},
+		Mention:      "frank",
+		Milestone:    "v1.1",
+		LimitResults: 10,
 	})
-
-	output, err := runCommand(http, true, "--web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1")
 	if err != nil {
 		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", output.Stderr())
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
 }
 
 func TestIssueList_milestoneNotFound(t *testing.T) {

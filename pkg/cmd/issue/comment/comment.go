@@ -9,7 +9,6 @@ import (
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +19,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		EditSurvey:            prShared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: prShared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:   prShared.CommentableConfirmSubmitSurvey,
-		OpenInBrowser:         utils.OpenInBrowser,
+		OpenInBrowser:         f.Browser.Browse,
 	}
 
 	var bodyFile string

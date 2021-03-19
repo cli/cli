@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
@@ -118,8 +117,10 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
+		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -156,8 +157,9 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -585,10 +587,6 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", url)
-	})
 
 	output, err := runCommand(http, "blueberries", true, "-w")
 	if err != nil {
@@ -597,6 +595,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", output.BrowsedURL)
 }
 
 func TestPRView_web_noResultsForBranch(t *testing.T) {
@@ -627,13 +626,8 @@ func TestPRView_web_numberArg(t *testing.T) {
 			} } } }`),
 	)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
 
 	output, err := runCommand(http, "master", true, "-w 23")
 	if err != nil {
@@ -641,123 +635,7 @@ func TestPRView_web_numberArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_numberArgWithHash(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"url": "https://github.com/OWNER/REPO/pull/23"
-			} } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, `-w "#23"`)
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_urlArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"url": "https://github.com/OWNER/REPO/pull/23"
-			} } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w https://github.com/OWNER/REPO/pull/23/files")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_branchArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "headRefName": "blueberries",
-				  "isCrossRepository": false,
-				  "url": "https://github.com/OWNER/REPO/pull/23" }
-			] } } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w blueberries")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_branchWithOwnerArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "headRefName": "blueberries",
-				  "isCrossRepository": true,
-				  "headRepositoryOwner": { "login": "hubot" },
-				  "url": "https://github.com/hubot/REPO/pull/23" }
-			] } } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/hubot/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w hubot:blueberries")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", output.BrowsedURL)
 }
 
 func TestPRView_tty_Comments(t *testing.T) {
