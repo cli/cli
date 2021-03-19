@@ -170,6 +170,7 @@ func uploadAsset(httpClient *http.Client, uploadURL string, asset AssetForUpload
 	}
 	req.ContentLength = asset.Size
 	req.Header.Set("Content-Type", asset.MIMEType)
+	req.GetBody = asset.Open
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
