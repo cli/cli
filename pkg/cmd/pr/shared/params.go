@@ -157,17 +157,17 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	query := IssueSearchBuild(options)
 
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
+	params := u.Query()
+	params.Set("q", IssueSearchBuild(options))
+	u.RawQuery = params.Encode()
+
 	return u.String(), nil
 }
 
 func IssueSearchBuild(options FilterOptions) string {
-
 	query := fmt.Sprintf("is:%s ", options.Entity)
+
 	if options.State != "all" {
 		query += fmt.Sprintf("is:%s ", options.State)
 	}
@@ -181,7 +181,7 @@ func IssueSearchBuild(options FilterOptions) string {
 		query += fmt.Sprintf("author:%s ", options.Author)
 	}
 	if options.BaseBranch != "" {
-		query += fmt.Sprintf("base:%s ", options.BaseBranch)
+		query += fmt.Sprintf("base:%s ", quoteValueForQuery(options.BaseBranch))
 	}
 	if options.Mention != "" {
 		query += fmt.Sprintf("mentions:%s ", options.Mention)
@@ -193,7 +193,7 @@ func IssueSearchBuild(options FilterOptions) string {
 		query += options.Search
 	}
 
-	return query
+	return strings.TrimSpace(query)
 }
 
 func quoteValueForQuery(v string) string {

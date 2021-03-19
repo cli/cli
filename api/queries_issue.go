@@ -454,37 +454,20 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 }
 
 func IssueSearch(client *Client, repo ghrepo.Interface, searchQuery string, limit int) (*IssuesAndTotalCount, error) {
-	query :=
-		`query IssueSearch($repoName: String!, $owner: String!, $type: SearchType!, $first: Int, $after: String, $searchQuery: String!) {
-			repository(name: $repoName, owner: $owner) {
+	query := fragments +
+		`query IssueSearch($repo: String!, $owner: String!, $type: SearchType!, $limit: Int, $after: String, $query: String!) {
+			repository(name: $repo, owner: $owner) {
 				hasIssuesEnabled
 			}
-			search(type: $type, first: $first, after: $after, query: $searchQuery) {
+			search(type: $type, last: $limit, after: $after, query: $query) {
 				issueCount
-				edges {
-					node {
-					... on Issue {
-						repository {
-            				hasIssuesEnabled
-          				}
-						number
-					  	title
-					  	updatedAt
-						state
-					  	labels(first: 100) {
-							nodes {
-						  		name
-							}
-						}
-					}
+				nodes { ...issue }
+				pageInfo {
+					hasNextPage
+					endCursor
 				}
 			}
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-		}
-	}`
+		}`
 
 	type response struct {
 		Repository struct {
@@ -492,32 +475,23 @@ func IssueSearch(client *Client, repo ghrepo.Interface, searchQuery string, limi
 		}
 		Search struct {
 			IssueCount int
-			Edges      []struct {
-				Node struct {
-					Number    int
-					Title     string
-					State     string
-					UpdatedAt time.Time
-					Labels    Labels
-				}
-			}
-			PageInfo struct {
+			Nodes      []Issue
+			PageInfo   struct {
 				HasNextPage bool
 				EndCursor   string
 			}
 		}
 	}
 
-	searchQuery = fmt.Sprintf("is:issue repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
-
 	perPage := min(limit, 100)
+	searchQuery = fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
 
 	variables := map[string]interface{}{
-		"repoName":    repo.RepoName(),
-		"owner":       repo.RepoOwner(),
-		"type":        "ISSUE",
-		"first":       perPage,
-		"searchQuery": searchQuery,
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+		"type":  "ISSUE",
+		"limit": perPage,
+		"query": searchQuery,
 	}
 
 	ic := IssuesAndTotalCount{}
@@ -536,25 +510,18 @@ loop:
 
 		ic.TotalCount = resp.Search.IssueCount
 
-		for _, i := range resp.Search.Edges {
-			ic.Issues = append(ic.Issues, Issue{
-				Number:    i.Node.Number,
-				Title:     i.Node.Title,
-				State:     i.Node.State,
-				UpdatedAt: i.Node.UpdatedAt,
-				Labels:    i.Node.Labels,
-			})
+		for _, issue := range resp.Search.Nodes {
+			ic.Issues = append(ic.Issues, issue)
 			if len(ic.Issues) == limit {
 				break loop
 			}
 		}
 
-		if resp.Search.PageInfo.HasNextPage {
-			variables["after"] = resp.Search.PageInfo.EndCursor
-			variables["first"] = min(perPage, limit-len(resp.Search.Edges))
-		} else {
+		if !resp.Search.PageInfo.HasNextPage {
 			break
 		}
+		variables["after"] = resp.Search.PageInfo.EndCursor
+		variables["perPage"] = min(perPage, limit-len(ic.Issues))
 	}
 
 	return &ic, nil
