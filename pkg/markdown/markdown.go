@@ -14,18 +14,6 @@ func render(text string, opts RenderOpts) (string, error) {
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
-	overrides := []byte(`
-	  {
-			"document": {
-				"margin": 0
-			},
-			"code_block": {
-				"margin": 0
-			}
-	  }`)
-
-	opts = append(opts, glamour.WithStylesFromJSONBytes(overrides))
-
 	tr, err := glamour.NewTermRenderer(opts...)
 	if err != nil {
 		return "", err
@@ -38,6 +26,15 @@ func Render(text, style string) (string, error) {
 	opts := RenderOpts{
 		glamour.WithStylePath(style),
 	}
+
+	return render(text, opts)
+}
+
+func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
+	defaultOpts := RenderOpts{
+		glamour.WithStylePath(style),
+	}
+	opts = append(defaultOpts, opts...)
 
 	return render(text, opts)
 }
