@@ -74,6 +74,10 @@ type PullRequest struct {
 				Oid               string
 				StatusCheckRollup struct {
 					Contexts struct {
+						pageInfo struct {
+							endCursor   string
+							hasNextPage bool
+						}
 						Nodes []struct {
 							Name        string
 							Context     string
@@ -98,6 +102,34 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type PullRequestStatusChecks struct {
+	Commits struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup struct {
+					Contexts struct {
+						pageInfo struct {
+							endCursor   string
+							hasNextPage bool
+						}
+						Nodes []struct {
+							Name        string
+							Context     string
+							State       string
+							Status      string
+							Conclusion  string
+							StartedAt   time.Time
+							CompletedAt time.Time
+							DetailsURL  string
+							TargetURL   string
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 type ReviewRequests struct {
@@ -525,7 +557,11 @@ func prCommitsFragment(httpClient *http.Client, hostname string) (string, error)
 			commit {
 				oid
 				statusCheckRollup {
-					contexts(last: 100) {
+					contexts(first: 100) {
+						pageInfo {
+							endCursor
+							hasNextPage
+						}
 						nodes {
 							...on StatusContext {
 								context
@@ -647,6 +683,8 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println(resp.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.pageInfo)
 
 	return &resp.Repository.PullRequest, nil
 }
