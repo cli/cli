@@ -532,6 +532,15 @@ func TestIssueCreate_web(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", output.BrowsedURL)
 }
 
+func TestIssueCreate_webLongURL(t *testing.T) {
+	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
+	err := ioutil.WriteFile(longBodyFile, make([]byte, 9216), 0600)
+	require.NoError(t, err)
+
+	_, err = runCommand(nil, true, fmt.Sprintf("-F '%s' --web", longBodyFile))
+	require.EqualError(t, err, "Failed to create URL: maximum URL length exceeded")
+}
+
 func TestIssueCreate_webTitleBody(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
