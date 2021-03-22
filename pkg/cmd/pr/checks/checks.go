@@ -88,6 +88,10 @@ func checksRun(opts *ChecksOptions) error {
 		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
+	if err := api.PullRequestPrefetchStatusChecks(apiClient, baseRepo, pr); err != nil {
+		return err
+	}
+
 	isTerminal := opts.IO.IsStdoutTTY()
 
 	if opts.WebMode {

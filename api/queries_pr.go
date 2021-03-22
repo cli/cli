@@ -74,21 +74,11 @@ type PullRequest struct {
 				Oid               string
 				StatusCheckRollup struct {
 					Contexts struct {
-						pageInfo struct {
-							endCursor   string
-							hasNextPage bool
+						PageInfo struct {
+							EndCursor   string
+							HasNextPage bool
 						}
-						Nodes []struct {
-							Name        string
-							Context     string
-							State       string
-							Status      string
-							Conclusion  string
-							StartedAt   time.Time
-							CompletedAt time.Time
-							DetailsURL  string
-							TargetURL   string
-						}
+						Nodes []StatusCheckRollupContext
 					}
 				}
 			}
@@ -104,32 +94,16 @@ type PullRequest struct {
 	ReviewRequests ReviewRequests
 }
 
-type PullRequestStatusChecks struct {
-	Commits struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup struct {
-					Contexts struct {
-						pageInfo struct {
-							endCursor   string
-							hasNextPage bool
-						}
-						Nodes []struct {
-							Name        string
-							Context     string
-							State       string
-							Status      string
-							Conclusion  string
-							StartedAt   time.Time
-							CompletedAt time.Time
-							DetailsURL  string
-							TargetURL   string
-						}
-					}
-				}
-			}
-		}
-	}
+type StatusCheckRollupContext struct {
+	Name        string
+	Context     string
+	State       string
+	Status      string
+	Conclusion  string
+	StartedAt   time.Time
+	CompletedAt time.Time
+	DetailsURL  string
+	TargetURL   string
 }
 
 type ReviewRequests struct {
@@ -550,14 +524,22 @@ func prCommitsFragment(httpClient *http.Client, hostname string) (string, error)
 		return "", nil
 	}
 
-	return `
+	return prCommitsFragmentWithPagination(""), nil
+}
+
+func prCommitsFragmentWithPagination(name string) string {
+	var pagination string
+	if name != "" {
+		pagination = ", after: " + name
+	}
+	return fmt.Sprintf(`
 	commits(last: 1) {
 		totalCount
 		nodes {
 			commit {
 				oid
 				statusCheckRollup {
-					contexts(first: 100) {
+					contexts(first: 100%s) {
 						pageInfo {
 							endCursor
 							hasNextPage
@@ -581,8 +563,7 @@ func prCommitsFragment(httpClient *http.Client, hostname string) (string, error)
 				}
 			}
 		}
-	}
-	`, nil
+	}`, pagination)
 }
 
 func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*PullRequest, error) {
@@ -684,9 +665,57 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 		return nil, err
 	}
 
-	fmt.Println(resp.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.pageInfo)
-
 	return &resp.Repository.PullRequest, nil
+}
+
+func PullRequestPrefetchStatusChecks(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	if !pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
+		return nil
+	}
+
+	endCursor := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor
+
+	type response struct {
+		Repository struct {
+			PullRequest PullRequest
+		}
+	}
+
+	query := fmt.Sprintf(`
+	query PullRequestStatusChecks($owner: String!, $repo: String!, $pr_number: Int!, $endCursor: String!) {
+		repository(owner: $owner, name: $repo) {
+			pullRequest(number: $pr_number) {
+				%s
+			}
+		}
+	}`, prCommitsFragmentWithPagination("$endCursor"))
+
+	variables := map[string]interface{}{
+		"owner":     repo.RepoOwner(),
+		"repo":      repo.RepoName(),
+		"pr_number": pr.Number,
+	}
+
+	for {
+		variables["endCursor"] = endCursor
+		var resp response
+		err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return err
+		}
+
+		result := resp.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
+		contexts := result.Nodes
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes = append(
+			pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
+			contexts...,
+		)
+
+		if !result.PageInfo.HasNextPage {
+			return nil
+		}
+		endCursor = result.PageInfo.EndCursor
+	}
 }
 
 func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, stateFilters []string) (*PullRequest, error) {
