@@ -36,11 +36,19 @@ func IsEnterprise(h string) bool {
 
 // NormalizeHostname returns the canonical host name of a GitHub instance
 func NormalizeHostname(h string) string {
-	hostname := strings.ToLower(h)
+	hostname := ExtractHostname(strings.ToLower(h))
 	if strings.HasSuffix(hostname, "."+defaultHostname) {
 		return defaultHostname
 	}
 	return hostname
+}
+
+func ExtractHostname(hostname string) string {
+	extractedHostname := hostname
+	if idx := strings.IndexByte(hostname, '/'); idx >= 0 {
+		extractedHostname = hostname[:idx]
+	}
+	return extractedHostname
 }
 
 func HostnameValidator(v interface{}) error {
@@ -60,21 +68,21 @@ func HostnameValidator(v interface{}) error {
 
 func GraphQLEndpoint(hostname string) string {
 	if IsEnterprise(hostname) {
-		return fmt.Sprintf("https://%s/api/graphql", hostname)
+		return fmt.Sprintf("https://%s/api/graphql", ExtractHostname(hostname))
 	}
 	return "https://api.github.com/graphql"
 }
 
 func RESTPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
-		return fmt.Sprintf("https://%s/api/v3/", hostname)
+		return fmt.Sprintf("https://%s/api/v3/", ExtractHostname(hostname))
 	}
 	return "https://api.github.com/"
 }
 
 func GistPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
-		return fmt.Sprintf("https://%s/gist/", hostname)
+		return fmt.Sprintf("https://%s/gist/", ExtractHostname(hostname))
 	}
-	return fmt.Sprintf("https://gist.%s/", hostname)
+	return fmt.Sprintf("https://gist.%s/", ExtractHostname(hostname))
 }

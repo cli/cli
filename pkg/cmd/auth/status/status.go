@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -35,7 +36,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Args:  cobra.ExactArgs(0),
 		Short: "View authentication status",
 		Long: heredoc.Doc(`Verifies and displays information about your authentication state.
-			
+
 			This command will test your authentication state for each GitHub host that gh knows about and
 			report on any issues.
 		`),
@@ -97,7 +98,8 @@ func statusRun(opts *StatusOptions) error {
 			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
 		}
 
-		if err := shared.HasMinimumScopes(httpClient, hostname, token); err != nil {
+		extractedHostname := ghinstance.ExtractHostname(hostname)
+		if err := shared.HasMinimumScopes(httpClient, extractedHostname, token); err != nil {
 			var missingScopes *shared.MissingScopesError
 			if errors.As(err, &missingScopes) {
 				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)

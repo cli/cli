@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	actionsCmd "github.com/cli/cli/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
@@ -122,7 +123,12 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		return factory.NewHTTPClient(f.IOStreams, cfg, version, false), nil
+		token, err := cfg.Get(ghinstance.OverridableDefault(), "oauth_token")
+		if err != nil {
+			return nil, err
+		}
+
+		return factory.NewHTTPClient(f.IOStreams, token, version, false), nil
 	}
 }
 

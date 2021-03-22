@@ -62,8 +62,9 @@ func (rr *remoteResolver) Resolver(hostOverride string) func() (context.Remotes,
 		sort.Sort(resolvedRemotes)
 
 		if hostOverride != "" {
+			extractedHost := ghinstance.ExtractHostname(hostOverride)
 			for _, r := range resolvedRemotes {
-				if strings.EqualFold(r.RepoHost(), hostOverride) {
+				if strings.EqualFold(r.RepoHost(), extractedHost) {
 					cachedRemotes = append(cachedRemotes, r)
 				}
 			}

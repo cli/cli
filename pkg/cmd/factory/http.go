@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -54,7 +53,7 @@ var timezoneNames = map[int]string{
 }
 
 // generic authenticated HTTP client for commands
-func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
+func NewHTTPClient(io *iostreams.IOStreams, token string, appVersion string, setAccept bool) *http.Client {
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		logTraffic := strings.Contains(verbose, "api")
@@ -63,13 +62,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 
 	opts = append(opts,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
-		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
-			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
-			if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
-				return fmt.Sprintf("token %s", token), nil
-			}
-			return "", nil
-		}),
+		api.AddHeader("Authorization", fmt.Sprintf("token %s", token)),
 		api.AddHeaderFunc("Time-Zone", func(req *http.Request) (string, error) {
 			if req.Method != "GET" && req.Method != "HEAD" {
 				if time.Local.String() != "Local" {
