@@ -120,7 +120,11 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	username, err := api.CurrentLoginName(apiClient, hostname)
+	var username string
+	token, err := cfg.Get(hostname, "token")
+	if err == nil {
+		username, err = api.CurrentLoginNameFor(apiClient, hostname, token)
+	}
 	if err != nil {
 		// suppressing; the user is trying to delete this token and it might be bad.
 		// we'll see if the username is in the config and fall back to that.

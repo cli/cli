@@ -121,7 +121,7 @@ func statusRun(opts *StatusOptions) error {
 			failed = true
 		} else {
 			apiClient := api.NewClientFromHTTP(httpClient)
-			username, err := api.CurrentLoginName(apiClient, hostname)
+			username, err := api.CurrentLoginNameFor(apiClient, hostname, token)
 			if err != nil {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}

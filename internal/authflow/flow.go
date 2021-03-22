@@ -129,7 +129,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 
 func getViewer(hostname, token string) (string, error) {
 	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-	return api.CurrentLoginName(http, hostname)
+	return api.CurrentLoginNameFor(http, hostname, token)
 }
 
 func waitForEnter(r io.Reader) error {
