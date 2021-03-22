@@ -111,9 +111,9 @@ func TestHostnameValidator(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:     "hostname with slashes",
+			name:     "valid hostname with slashes",
 			input:    "//internal.instance",
-			wantsErr: true,
+			wantsErr: false,
 		},
 		{
 			name:     "empty hostname",
