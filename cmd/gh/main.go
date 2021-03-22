@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -61,6 +63,24 @@ func mainRun() exitCode {
 
 	if hostFromEnv := os.Getenv("GH_HOST"); hostFromEnv != "" {
 		ghinstance.OverrideDefault(hostFromEnv)
+	}
+
+	if ghinstance.OverridableDefault() == ghinstance.Default() {
+		if url, err := cmdOutput("git", "config", "remote.origin.url"); err == nil {
+			if domainUserOrg, err := extractDomainUserOrg(url); err == nil {
+				if c, err := config.ParseDefaultConfig(); err == nil {
+					if hosts, err := c.Hosts(); err == nil {
+						for _, host := range hosts {
+							if host == domainUserOrg {
+								ghinstance.OverrideDefault(host)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			fmt.Printf("%v", err)
+		}
 	}
 
 	cmdFactory := factory.New(buildVersion)
@@ -306,4 +326,29 @@ func isUnderHomebrew(ghBinary string) bool {
 
 	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
 	return strings.HasPrefix(ghBinary, brewBinPrefix)
+}
+
+func cmdOutput(args ...string) (string, error) {
+	exe, err := safeexec.LookPath(args[0])
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command(exe, args[1:]...)
+	cmd.Stderr = ioutil.Discard
+	out, err := cmd.Output()
+	return strings.TrimSuffix(string(out), "\n"), err
+}
+
+func extractDomainUserOrg(url string) (string, error) {
+	var gitRe = regexp.MustCompile(`^(?:[^@]+@)?([^:]+):([^/]+)/.*$`)
+	if groups := gitRe.FindStringSubmatch(url); len(groups) > 0 {
+		return fmt.Sprintf("%s/%s", groups[1], groups[2]), nil
+	}
+
+	var httpsRe = regexp.MustCompile(`^https://([^/]+)/([^/]+)/.*$`)
+	if groups := httpsRe.FindStringSubmatch(url); len(groups) > 0 {
+		return fmt.Sprintf("%s/%s", groups[1], groups[2]), nil
+	}
+
+	return "", errors.New("remote.origin.url can't be matched")
 }

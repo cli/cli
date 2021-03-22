@@ -58,8 +58,12 @@ func New(appVersion string) *cmdutil.Factory {
 			if err != nil {
 				return nil, err
 			}
+			token, err := cfg.Get(ghinstance.OverridableDefault(), "oauth_token")
+			if err != nil {
+				return nil, err
+			}
 
-			return NewHTTPClient(io, cfg, appVersion, true), nil
+			return NewHTTPClient(io, token, appVersion, true), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			remotes, err := remotesFunc()
