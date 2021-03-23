@@ -453,6 +453,80 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	return &resp.Repository.Issue, nil
 }
 
+func IssueSearch(client *Client, repo ghrepo.Interface, searchQuery string, limit int) (*IssuesAndTotalCount, error) {
+	query := fragments +
+		`query IssueSearch($repo: String!, $owner: String!, $type: SearchType!, $limit: Int, $after: String, $query: String!) {
+			repository(name: $repo, owner: $owner) {
+				hasIssuesEnabled
+			}
+			search(type: $type, last: $limit, after: $after, query: $query) {
+				issueCount
+				nodes { ...issue }
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}`
+
+	type response struct {
+		Repository struct {
+			HasIssuesEnabled bool
+		}
+		Search struct {
+			IssueCount int
+			Nodes      []Issue
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+
+	perPage := min(limit, 100)
+	searchQuery = fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+		"type":  "ISSUE",
+		"limit": perPage,
+		"query": searchQuery,
+	}
+
+	ic := IssuesAndTotalCount{}
+
+loop:
+	for {
+		var resp response
+		err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return nil, err
+		}
+
+		if !resp.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+
+		ic.TotalCount = resp.Search.IssueCount
+
+		for _, issue := range resp.Search.Nodes {
+			ic.Issues = append(ic.Issues, issue)
+			if len(ic.Issues) == limit {
+				break loop
+			}
+		}
+
+		if !resp.Search.PageInfo.HasNextPage {
+			break
+		}
+		variables["after"] = resp.Search.PageInfo.EndCursor
+		variables["perPage"] = min(perPage, limit-len(ic.Issues))
+	}
+
+	return &ic, nil
+}
+
 func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 	var mutation struct {
 		CloseIssue struct {
