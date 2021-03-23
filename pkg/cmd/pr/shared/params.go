@@ -159,13 +159,13 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	}
 
 	params := u.Query()
-	params.Set("q", IssueSearchBuild(options))
+	params.Set("q", SearchQueryBuild(options))
 	u.RawQuery = params.Encode()
 
 	return u.String(), nil
 }
 
-func IssueSearchBuild(options FilterOptions) string {
+func SearchQueryBuild(options FilterOptions) string {
 	query := fmt.Sprintf("is:%s ", options.Entity)
 
 	if options.State != "all" {

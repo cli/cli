@@ -153,7 +153,7 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 			filters.Milestone = milestone.Title
 		}
 
-		searchQuery := prShared.IssueSearchBuild(filters)
+		searchQuery := prShared.SearchQueryBuild(filters)
 		return api.IssueSearch(apiClient, repo, searchQuery, limit)
 	}
 
