@@ -237,6 +237,19 @@ func (c *fileConfig) Hosts() ([]string, error) {
 	return hostnames, nil
 }
 
+func (c *fileConfig) DefaultHost() (string, error) {
+	hosts, err := c.Hosts()
+	if err != nil {
+		return ghinstance.Default(), nil
+	}
+
+	if len(hosts) == 1 {
+		return hosts[0], nil
+	}
+
+	return ghinstance.Default(), nil
+}
+
 func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {
 	hostRoot := &yaml.Node{Kind: yaml.MappingNode}
 	hostCfg := &HostConfig{

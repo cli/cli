@@ -13,6 +13,7 @@ type Config interface {
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)
+	DefaultHost() (string, error)
 	Aliases() (*AliasConfig, error)
 	CheckWriteable(string, string) error
 	Write() error

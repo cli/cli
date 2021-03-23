@@ -49,3 +49,7 @@ func (c ConfigStub) Write() error {
 	c["_written"] = "true"
 	return nil
 }
+
+func (c ConfigStub) DefaultHost() (string, error) {
+	return "", nil
+}
