@@ -24,7 +24,7 @@ import (
 )
 
 type CreateOptions struct {
-	IO     *iostreams.IOStreams
+	IO *iostreams.IOStreams
 
 	Description      string
 	Public           bool
@@ -32,7 +32,7 @@ type CreateOptions struct {
 	FilenameOverride string
 	WebMode          bool
 
-	Config func() (config.Config, error)
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 }
 
