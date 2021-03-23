@@ -14,6 +14,7 @@ type Config interface {
 	UnsetHost(string)
 	Hosts() ([]string, error)
 	DefaultHost() (string, error)
+	DefaultHostWithSource() (string, string, error)
 	Aliases() (*AliasConfig, error)
 	CheckWriteable(string, string) error
 	Write() error

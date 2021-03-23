@@ -48,10 +48,15 @@ func (c *envConfig) Hosts() ([]string, error) {
 }
 
 func (c *envConfig) DefaultHost() (string, error) {
+	val, _, err := c.DefaultHostWithSource()
+	return val, err
+}
+
+func (c *envConfig) DefaultHostWithSource() (string, string, error) {
 	if host := os.Getenv(GH_HOST); host != "" {
-		return host, nil
+		return host, GH_HOST, nil
 	}
-	return c.DefaultHost()
+	return c.Config.DefaultHostWithSource()
 }
 
 func (c *envConfig) Get(hostname, key string) (string, error) {

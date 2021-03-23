@@ -238,16 +238,21 @@ func (c *fileConfig) Hosts() ([]string, error) {
 }
 
 func (c *fileConfig) DefaultHost() (string, error) {
+	val, _, err := c.DefaultHostWithSource()
+	return val, err
+}
+
+func (c *fileConfig) DefaultHostWithSource() (string, string, error) {
 	hosts, err := c.Hosts()
 	if err != nil {
-		return ghinstance.Default(), nil
+		return ghinstance.Default(), "", nil
 	}
 
 	if len(hosts) == 1 {
-		return hosts[0], nil
+		return hosts[0], HostsConfigFile(), nil
 	}
 
-	return ghinstance.Default(), nil
+	return ghinstance.Default(), "", nil
 }
 
 func (c *fileConfig) makeConfigForHost(hostname string) *HostConfig {

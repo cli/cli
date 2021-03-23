@@ -53,3 +53,7 @@ func (c ConfigStub) Write() error {
 func (c ConfigStub) DefaultHost() (string, error) {
 	return "", nil
 }
+
+func (c ConfigStub) DefaultHostWithSource() (string, string, error) {
+	return "", "", nil
+}
