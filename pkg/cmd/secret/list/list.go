@@ -76,12 +76,15 @@ func listRun(opts *ListOptions) error {
 	if orgName == "" {
 		secrets, err = getRepoSecrets(client, baseRepo)
 	} else {
-		cfg, err := opts.Config()
+		var cfg config.Config
+		var host string
+
+		cfg, err = opts.Config()
 		if err != nil {
 			return err
 		}
 
-		host, err := cfg.DefaultHost()
+		host, err = cfg.DefaultHost()
 		if err != nil {
 			return err
 		}

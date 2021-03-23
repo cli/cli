@@ -60,7 +60,7 @@ func (r Remotes) FilterByHosts(hosts []string) Remotes {
 	for _, rr := range r {
 		for _, host := range hosts {
 			if strings.EqualFold(rr.RepoHost(), host) {
-				filtered = append(filtered)
+				filtered = append(filtered, rr)
 				break
 			}
 		}
