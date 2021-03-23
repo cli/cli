@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -75,22 +76,23 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
+	filters := shared.FilterOptions{
+		Entity:     "pr",
+		State:      strings.ToLower(opts.State),
+		Assignee:   opts.Assignee,
+		Labels:     opts.Labels,
+		BaseBranch: opts.BaseBranch,
+	}
+
 	if opts.WebMode {
 		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
-		openURL, err := shared.ListURLWithQuery(prListURL, shared.FilterOptions{
-			Entity:     "pr",
-			State:      opts.State,
-			Assignee:   opts.Assignee,
-			Labels:     opts.Labels,
-			BaseBranch: opts.BaseBranch,
-		})
+		openURL, err := shared.ListURLWithQuery(prListURL, filters)
 		if err != nil {
 			return err
 		}
@@ -101,34 +103,7 @@ func listRun(opts *ListOptions) error {
 		return utils.OpenInBrowser(openURL)
 	}
 
-	var graphqlState []string
-	switch opts.State {
-	case "open":
-		graphqlState = []string{"OPEN"}
-	case "closed":
-		graphqlState = []string{"CLOSED", "MERGED"}
-	case "merged":
-		graphqlState = []string{"MERGED"}
-	case "all":
-		graphqlState = []string{"OPEN", "CLOSED", "MERGED"}
-	default:
-		return fmt.Errorf("invalid state: %s", opts.State)
-	}
-
-	params := map[string]interface{}{
-		"state": graphqlState,
-	}
-	if len(opts.Labels) > 0 {
-		params["labels"] = opts.Labels
-	}
-	if opts.BaseBranch != "" {
-		params["baseBranch"] = opts.BaseBranch
-	}
-	if opts.Assignee != "" {
-		params["assignee"] = opts.Assignee
-	}
-
-	listResult, err := api.PullRequestList(apiClient, baseRepo, params, opts.LimitResults)
+	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
 	if err != nil {
 		return err
 	}
