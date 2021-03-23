@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/githubsearch"
 )
 
 func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string, error) {
@@ -166,41 +167,46 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 }
 
 func SearchQueryBuild(options FilterOptions) string {
-	query := fmt.Sprintf("is:%s ", options.Entity)
-
-	if options.State != "all" {
-		query += fmt.Sprintf("is:%s ", options.State)
+	q := githubsearch.NewQuery()
+	switch options.Entity {
+	case "issue":
+		q.SetType(githubsearch.Issue)
+	case "pr":
+		q.SetType(githubsearch.PullRequest)
 	}
+
+	switch options.State {
+	case "open":
+		q.SetState(githubsearch.Open)
+	case "closed":
+		q.SetState(githubsearch.Closed)
+	case "merged":
+		q.SetState(githubsearch.Merged)
+	}
+
 	if options.Assignee != "" {
-		query += fmt.Sprintf("assignee:%s ", options.Assignee)
+		q.AssignedTo(options.Assignee)
 	}
 	for _, label := range options.Labels {
-		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
+		q.AddLabel(label)
 	}
 	if options.Author != "" {
-		query += fmt.Sprintf("author:%s ", options.Author)
+		q.AuthoredBy(options.Author)
 	}
 	if options.BaseBranch != "" {
-		query += fmt.Sprintf("base:%s ", quoteValueForQuery(options.BaseBranch))
+		q.SetBaseBranch(options.BaseBranch)
 	}
 	if options.Mention != "" {
-		query += fmt.Sprintf("mentions:%s ", options.Mention)
+		q.Mentions(options.Mention)
 	}
 	if options.Milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.Milestone))
+		q.InMilestone(options.Milestone)
 	}
 	if options.Search != "" {
-		query += options.Search
+		q.AddQuery(options.Search)
 	}
 
-	return strings.TrimSpace(query)
-}
-
-func quoteValueForQuery(v string) string {
-	if strings.ContainsAny(v, " \"\t\r\n") {
-		return fmt.Sprintf("%q", v)
-	}
-	return v
+	return q.String()
 }
 
 // MeReplacer resolves usages of `@me` to the handle of the currently logged in user.
