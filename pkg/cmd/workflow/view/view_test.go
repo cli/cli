@@ -41,15 +41,15 @@ func TestNewCmdView(t *testing.T) {
 			cli:  "123",
 			tty:  true,
 			wants: ViewOptions{
-				WorkflowID: "123",
+				WorkflowSelector: "123",
 			},
 		},
 		{
 			name: "arg nontty",
 			cli:  "123",
 			wants: ViewOptions{
-				WorkflowID: "123",
-				Raw:        true,
+				WorkflowSelector: "123",
+				Raw:              true,
 			},
 		},
 		{
@@ -65,9 +65,9 @@ func TestNewCmdView(t *testing.T) {
 			name: "web nontty",
 			cli:  "-w 123",
 			wants: ViewOptions{
-				Raw:        true,
-				Web:        true,
-				WorkflowID: "123",
+				Raw:              true,
+				Web:              true,
+				WorkflowSelector: "123",
 			},
 		},
 	}
@@ -103,7 +103,7 @@ func TestNewCmdView(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.WorkflowID, gotOpts.WorkflowID)
+			assert.Equal(t, tt.wants.WorkflowSelector, gotOpts.WorkflowSelector)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.Raw, gotOpts.Raw)
 			assert.Equal(t, tt.wants.Web, gotOpts.Web)
@@ -192,7 +192,7 @@ func TestViewRun(t *testing.T) {
 			name: "tty, name, nonunique workflow",
 			tty:  true,
 			opts: &ViewOptions{
-				WorkflowID: "another workflow",
+				WorkflowSelector: "another workflow",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -218,7 +218,7 @@ func TestViewRun(t *testing.T) {
 			name: "tty, name, unique workflow",
 			tty:  true,
 			opts: &ViewOptions{
-				WorkflowID: "a workflow",
+				WorkflowSelector: "a workflow",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -240,8 +240,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "nontty, name, unique workflow",
 			opts: &ViewOptions{
-				WorkflowID: "a workflow",
-				Raw:        true,
+				WorkflowSelector: "a workflow",
+				Raw:              true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -263,8 +263,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "nontty, name, nonunique workflow",
 			opts: &ViewOptions{
-				WorkflowID: "another workflow",
-				Raw:        true,
+				WorkflowSelector: "another workflow",
+				Raw:              true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -281,14 +281,14 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/another.yml"),
 					httpmock.StringResponse(anotherWorkflowContent))
 			},
-			wantErrOut: "could not resolve to a unique workflow; found: .github/workflows/another.yml (ID: 789) .github/workflows/yetanother.yml (ID: 1011)",
+			wantErrOut: "could not resolve to a unique workflow; found: another.yml yetanother.yml",
 			wantErr:    true,
 		},
 		{
 			name: "nontty ID",
 			opts: &ViewOptions{
-				WorkflowID: "123",
-				Raw:        true,
+				WorkflowSelector: "123",
+				Raw:              true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -304,7 +304,7 @@ func TestViewRun(t *testing.T) {
 			name: "tty ID",
 			tty:  true,
 			opts: &ViewOptions{
-				WorkflowID: "123",
+				WorkflowSelector: "123",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -320,8 +320,8 @@ func TestViewRun(t *testing.T) {
 			name: "web ID",
 			tty:  true,
 			opts: &ViewOptions{
-				WorkflowID: "123",
-				Web:        true,
+				WorkflowSelector: "123",
+				Web:              true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -333,9 +333,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "web ID",
 			opts: &ViewOptions{
-				Raw:        true,
-				WorkflowID: "123",
-				Web:        true,
+				Raw:              true,
+				WorkflowSelector: "123",
+				Web:              true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

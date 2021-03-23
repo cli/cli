@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -16,7 +14,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -26,8 +23,8 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	WorkflowID string
-	Web        bool
+	WorkflowSelector string
+	Web              bool
 
 	Prompt bool
 	Raw    bool
@@ -57,9 +54,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			opts.Raw = !opts.IO.CanPrompt()
 
 			if len(args) > 0 {
-				opts.WorkflowID = args[0]
+				opts.WorkflowSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID required when not running interactively")}
+				return &cmdutil.FlagError{Err: errors.New("workflow argument required when not running interactively")}
 			} else {
 				opts.Prompt = true
 			}
@@ -94,12 +91,30 @@ func runView(opts *ViewOptions) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if workflow == nil {
-		workflow, err = resolveWorkflow(opts.IO, client, repo, opts.WorkflowID)
+	} else {
+		workflows, err := shared.ResolveWorkflow(client, repo, opts.WorkflowSelector)
 		if err != nil {
 			return err
+		}
+		if len(workflows) == 0 {
+			return fmt.Errorf("could not find any workflows named %s", opts.WorkflowSelector)
+		}
+
+		if len(workflows) == 1 {
+			workflow = &workflows[0]
+		} else {
+			if !opts.IO.CanPrompt() {
+				errMsg := "could not resolve to a unique workflow; found:"
+				for _, workflow := range workflows {
+					errMsg += fmt.Sprintf(" %s", workflow.Base())
+				}
+				return errors.New(errMsg)
+			}
+			states := []shared.WorkflowState{shared.Active}
+			workflow, err = shared.SelectWorkflow(workflows, "Which workflow do you mean?", states)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -175,79 +190,6 @@ func promptWorkflows(client *api.Client, repo ghrepo.Interface) (*shared.Workflo
 		return nil, fmt.Errorf("could not fetch workflows for %s: %w", ghrepo.FullName(repo), err)
 	}
 
-	filtered := []shared.Workflow{}
-	candidates := []string{}
-	for _, workflow := range workflows {
-		if !workflow.Disabled() {
-			filtered = append(filtered, workflow)
-			candidates = append(candidates, workflow.Name)
-		}
-	}
-
-	var selected int
-
-	err = prompt.SurveyAskOne(&survey.Select{
-		Message:  "Select a workflow",
-		Options:  candidates,
-		PageSize: 10,
-	}, &selected)
-	if err != nil {
-		return nil, err
-	}
-
-	return &filtered[selected], nil
-}
-
-func resolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.Interface, workflowSelector string) (*shared.Workflow, error) {
-	if workflowSelector == "" {
-		return nil, errors.New("empty workflow selector")
-	}
-
-	idRE := regexp.MustCompile(`^\d+$`)
-
-	if idRE.MatchString(workflowSelector) {
-		workflow, err := getWorkflowByID(client, repo, workflowSelector)
-		if err != nil {
-			return nil, err
-		}
-		return workflow, nil
-	}
-
-	workflows, err := getWorkflowsByName(client, repo, workflowSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(workflows) == 0 {
-		return nil, fmt.Errorf("could not find any workflows named %s", workflowSelector)
-	}
-
-	if len(workflows) == 1 {
-		return &workflows[0], nil
-	}
-
-	if !io.CanPrompt() {
-		errMsg := "could not resolve to a unique workflow; found:"
-		for _, workflow := range workflows {
-			errMsg += fmt.Sprintf(" %s (ID: %d)", workflow.Path, workflow.ID)
-		}
-		return nil, errors.New(errMsg)
-	}
-
-	candidates := []string{}
-	for _, workflow := range workflows {
-		candidates = append(candidates, fmt.Sprintf("%s (ID: %d, path: %s)", workflow.Name, workflow.ID, workflow.Path))
-	}
-
-	var selected int
-	err = prompt.SurveyAskOne(&survey.Select{
-		Message:  "Which workflow do you mean?",
-		Options:  candidates,
-		PageSize: 10,
-	}, &selected)
-	if err != nil {
-		return nil, err
-	}
-
-	return &workflows[selected], nil
+	states := []shared.WorkflowState{shared.Active}
+	return shared.SelectWorkflow(workflows, "Select a workflow", states)
 }

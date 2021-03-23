@@ -3,46 +3,11 @@ package view
 import (
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/workflow/shared"
 )
-
-func getWorkflowByID(client *api.Client, repo ghrepo.Interface, workflowID string) (*shared.Workflow, error) {
-	var workflow shared.Workflow
-
-	err := client.REST(repo.RepoHost(), "GET",
-		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), workflowID),
-		nil, &workflow)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &workflow, nil
-}
-
-func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, workflowName string) ([]shared.Workflow, error) {
-	workflows, err := shared.GetWorkflows(client, repo, 100)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't fetch workflows for %s: %w", ghrepo.FullName(repo), err)
-	}
-	filtered := []shared.Workflow{}
-
-	for _, workflow := range workflows {
-		if workflow.Disabled() {
-			continue
-		}
-		// TODO consider fuzzy or prefix match
-		if strings.EqualFold(workflow.Name, workflowName) {
-			filtered = append(filtered, workflow)
-		}
-	}
-
-	return filtered, nil
-}
 
 func getWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) (string, error) {
 	path := fmt.Sprintf("repos/%s/contents/%s", ghrepo.FullName(repo), workflow.Path)

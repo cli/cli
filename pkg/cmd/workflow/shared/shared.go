@@ -1,10 +1,16 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
+	"path"
+	"regexp"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/prompt"
 )
 
 const (
@@ -29,7 +35,12 @@ func (w *Workflow) Disabled() bool {
 	return w.State != Active
 }
 
+func (w *Workflow) Base() string {
+	return path.Base(w.Path)
+}
+
 func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
+	// TODO support getting all for 0 limit
 	perPage := limit
 	page := 1
 	if limit > 100 {
@@ -63,4 +74,84 @@ func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 	}
 
 	return workflows, nil
+}
+
+func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowState) (*Workflow, error) {
+	filtered := []Workflow{}
+	candidates := []string{}
+	for _, workflow := range workflows {
+		for _, state := range states {
+			if workflow.State == state {
+				filtered = append(filtered, workflow)
+				candidates = append(candidates, fmt.Sprintf("%s (%s)", workflow.Name, workflow.Base()))
+				break
+			}
+		}
+	}
+
+	var selected int
+
+	err := prompt.SurveyAskOne(&survey.Select{
+		Message:  promptMsg,
+		Options:  candidates,
+		PageSize: 15,
+	}, &selected)
+	if err != nil {
+		return nil, err
+	}
+
+	return &filtered[selected], nil
+}
+
+func ResolveWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector string) ([]Workflow, error) {
+	if workflowSelector == "" {
+		return nil, errors.New("empty workflow selector")
+	}
+
+	idRE := regexp.MustCompile(`^\d+$`)
+
+	if idRE.MatchString(workflowSelector) {
+		workflow, err := getWorkflowByID(client, repo, workflowSelector)
+		if err != nil {
+			return nil, err
+		}
+		return []Workflow{*workflow}, nil
+	}
+
+	return getWorkflowsByName(client, repo, workflowSelector)
+}
+
+func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
+	var workflow Workflow
+
+	err := client.REST(repo.RepoHost(), "GET",
+		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), ID),
+		nil, &workflow)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
+func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string) ([]Workflow, error) {
+	// TODO fix limit
+	workflows, err := GetWorkflows(client, repo, 100)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't fetch workflows for %s: %w", ghrepo.FullName(repo), err)
+	}
+	filtered := []Workflow{}
+
+	for _, workflow := range workflows {
+		if workflow.Disabled() {
+			continue
+		}
+		// TODO consider fuzzy or prefix match
+		if strings.EqualFold(workflow.Name, name) {
+			filtered = append(filtered, workflow)
+		}
+	}
+
+	return filtered, nil
 }
