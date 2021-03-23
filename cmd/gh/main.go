@@ -59,10 +59,6 @@ func mainRun() exitCode {
 
 	hasDebug := os.Getenv("DEBUG") != ""
 
-	if hostFromEnv := os.Getenv("GH_HOST"); hostFromEnv != "" {
-		ghinstance.OverrideDefault(hostFromEnv)
-	}
-
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
 	if !cmdFactory.IOStreams.ColorEnabled() {
