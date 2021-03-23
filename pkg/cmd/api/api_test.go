@@ -14,6 +14,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -509,6 +510,7 @@ func Test_apiRun(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
 
 			tt.options.IO = io
+			tt.options.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			tt.options.HttpClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
@@ -570,6 +572,9 @@ func Test_apiRun_paginationREST(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 
 		RequestPath: "issues",
 		Paginate:    true,
@@ -629,6 +634,9 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 				return resp, nil
 			}
 			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		},
 
 		RequestMethod: "POST",
@@ -722,6 +730,9 @@ func Test_apiRun_inputFile(t *testing.T) {
 					}
 					return &http.Client{Transport: tr}, nil
 				},
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			err := apiRun(&options)
@@ -753,6 +764,9 @@ func Test_apiRun_cache(t *testing.T) {
 				}, nil
 			}
 			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		},
 
 		RequestPath: "issues",

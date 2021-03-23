@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -237,6 +238,9 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 	}
 
 	cmd := NewCmdList(factory, nil)
@@ -277,6 +281,9 @@ func TestRepoList_nontty(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
 			return t
@@ -314,6 +321,9 @@ func TestRepoList_tty(t *testing.T) {
 		IO: io,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")

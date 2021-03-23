@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -288,6 +289,10 @@ func Test_createRun(t *testing.T) {
 		}
 		tt.opts.HttpClient = mockClient
 
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+
 		io, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
 
@@ -339,7 +344,10 @@ func Test_CreateRun_reauth(t *testing.T) {
 	opts := &CreateOptions{
 		IO:         io,
 		HttpClient: mockClient,
-		Filenames:  []string{fixtureFile},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		Filenames: []string{fixtureFile},
 	}
 
 	err := createRun(opts)
