@@ -24,7 +24,7 @@ const fragment = `fragment pr on PullRequest {
 }`
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
-	if filters.Assignee != "" {
+	if filters.Assignee != "" || filters.Search != "" {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
 
@@ -171,6 +171,7 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 	q := githubsearch.NewQuery()
 	q.SetType(githubsearch.PullRequest)
 	q.InRepository(ghrepo.FullName(repo))
+	q.AddQuery(filters.Search)
 	q.SortBy(githubsearch.CreatedAt, githubsearch.Desc)
 
 	switch filters.State {

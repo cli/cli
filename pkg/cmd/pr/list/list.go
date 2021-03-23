@@ -28,6 +28,7 @@ type ListOptions struct {
 	BaseBranch   string
 	Labels       []string
 	Assignee     string
+	Search       string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -40,9 +41,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
-			$ gh pr list --limit 999
-			$ gh pr list --state closed
-			$ gh pr list --label "priority 1" --label "bug"
+			$ gh pr list --label bug --label "priority 1"
+			$ gh pr list --search "status:success review:required"
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -67,6 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 
 	return cmd
 }
@@ -88,6 +89,7 @@ func listRun(opts *ListOptions) error {
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
+		Search:     opts.Search,
 	}
 
 	if opts.WebMode {

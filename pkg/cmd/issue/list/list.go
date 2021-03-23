@@ -78,7 +78,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
-	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with filter")
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
+
 	return cmd
 }
 
