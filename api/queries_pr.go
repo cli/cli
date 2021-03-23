@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/githubsearch"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 )
@@ -1006,32 +1007,31 @@ func PullRequestList(client *Client, repo ghrepo.Interface, vars map[string]inte
 				}
 			}
 		}`
-		search := []string{
-			fmt.Sprintf("repo:%s/%s", repo.RepoOwner(), repo.RepoName()),
-			fmt.Sprintf("assignee:%s", assignee),
-			"is:pr",
-			"sort:created-desc",
-		}
+		q := githubsearch.NewQuery()
+		q.SetType(githubsearch.PullRequest)
+		q.InRepository(ghrepo.FullName(repo))
+		q.AssignedTo(assignee)
+		q.SortBy(githubsearch.CreatedAt, githubsearch.Desc)
 		if states, ok := vars["state"].([]string); ok && len(states) == 1 {
 			switch states[0] {
 			case "OPEN":
-				search = append(search, "state:open")
+				q.SetState(githubsearch.Open)
 			case "CLOSED":
-				search = append(search, "state:closed")
+				q.SetState(githubsearch.Closed)
 			case "MERGED":
-				search = append(search, "is:merged")
+				q.SetState(githubsearch.Merged)
 			}
 		}
 		if labels, ok := vars["labels"].([]string); ok && len(labels) > 0 {
 			if len(labels) > 1 {
 				return nil, fmt.Errorf("multiple labels with --assignee are not supported")
 			}
-			search = append(search, fmt.Sprintf(`label:"%s"`, labels[0]))
+			q.AddLabel(labels[0])
 		}
 		if baseBranch, ok := vars["baseBranch"].(string); ok {
-			search = append(search, fmt.Sprintf(`base:"%s"`, baseBranch))
+			q.SetBaseBranch(baseBranch)
 		}
-		variables["q"] = strings.Join(search, " ")
+		variables["q"] = q.String()
 	} else {
 		variables["owner"] = repo.RepoOwner()
 		variables["repo"] = repo.RepoName()
