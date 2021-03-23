@@ -176,7 +176,7 @@ func runView(opts *ViewOptions) error {
 }
 
 func promptWorkflows(client *api.Client, repo ghrepo.Interface) (*shared.Workflow, error) {
-	workflows, err := shared.GetWorkflows(client, repo, 10)
+	workflows, err := shared.GetWorkflows(client, repo, 0)
 	if len(workflows) == 0 {
 		err = errors.New("no workflows are enabled")
 	}

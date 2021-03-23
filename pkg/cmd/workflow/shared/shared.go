@@ -40,16 +40,18 @@ func (w *Workflow) Base() string {
 }
 
 func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
-	// TODO support getting all for 0 limit
 	perPage := limit
 	page := 1
-	if limit > 100 {
+	if limit > 100 || limit == 0 {
 		perPage = 100
 	}
 
 	workflows := []Workflow{}
 
-	for len(workflows) < limit {
+	for {
+		if limit > 0 && len(workflows) == limit {
+			break
+		}
 		var result WorkflowsPayload
 
 		path := fmt.Sprintf("repos/%s/actions/workflows?per_page=%d&page=%d", ghrepo.FullName(repo), perPage, page)
@@ -61,7 +63,7 @@ func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workf
 
 		for _, workflow := range result.Workflows {
 			workflows = append(workflows, workflow)
-			if len(workflows) == limit {
+			if limit > 0 && len(workflows) == limit {
 				break
 			}
 		}
@@ -136,8 +138,7 @@ func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Wor
 }
 
 func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string) ([]Workflow, error) {
-	// TODO fix limit
-	workflows, err := GetWorkflows(client, repo, 100)
+	workflows, err := GetWorkflows(client, repo, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch workflows for %s: %w", ghrepo.FullName(repo), err)
 	}
