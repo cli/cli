@@ -18,7 +18,7 @@ type Interface interface {
 
 // New instantiates a GitHub repository from owner and name arguments
 func New(owner, repo string) Interface {
-	return NewWithHost(owner, repo, ghinstance.OverridableDefault())
+	return NewWithHost(owner, repo, ghinstance.Default())
 }
 
 // NewWithHost is like New with an explicit host name
