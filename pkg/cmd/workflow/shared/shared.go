@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -110,14 +109,14 @@ func ResolveWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector
 		return nil, errors.New("empty workflow selector")
 	}
 
-	idRE := regexp.MustCompile(`^\d+$`)
-
-	if idRE.MatchString(workflowSelector) {
-		workflow, err := getWorkflowByID(client, repo, workflowSelector)
-		if err != nil {
+	workflow, err := getWorkflowByID(client, repo, workflowSelector)
+	if err == nil {
+		return []Workflow{*workflow}, nil
+	} else {
+		var httpErr api.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
 			return nil, err
 		}
-		return []Workflow{*workflow}, nil
 	}
 
 	return getWorkflowsByName(client, repo, workflowSelector)
