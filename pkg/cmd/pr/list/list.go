@@ -120,8 +120,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.BaseBranch != "" || opts.Author != "" || opts.Assignee != "" || opts.Search != ""
-		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
+		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 

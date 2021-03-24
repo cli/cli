@@ -153,6 +153,34 @@ type FilterOptions struct {
 	Search     string
 }
 
+func (opts *FilterOptions) IsDefault() bool {
+	if opts.State != "open" {
+		return false
+	}
+	if len(opts.Labels) > 0 {
+		return false
+	}
+	if opts.Assignee != "" {
+		return false
+	}
+	if opts.Author != "" {
+		return false
+	}
+	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.Mention != "" {
+		return false
+	}
+	if opts.Milestone != "" {
+		return false
+	}
+	if opts.Search != "" {
+		return false
+	}
+	return true
+}
+
 func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	u, err := url.Parse(listURL)
 	if err != nil {
