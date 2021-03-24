@@ -36,11 +36,10 @@ func Test_listPullRequests(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestList\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"owner":  "OWNER",
-							"repo":   "REPO",
-							"state":  []interface{}{"OPEN"},
-							"labels": nil,
-							"limit":  float64(30),
+							"owner": "OWNER",
+							"repo":  "REPO",
+							"state": []interface{}{"OPEN"},
+							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {
 							t.Errorf("got GraphQL variables %#v, want %#v", vars, want)
@@ -62,11 +61,10 @@ func Test_listPullRequests(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestList\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"owner":  "OWNER",
-							"repo":   "REPO",
-							"state":  []interface{}{"CLOSED", "MERGED"},
-							"labels": nil,
-							"limit":  float64(30),
+							"owner": "OWNER",
+							"repo":  "REPO",
+							"state": []interface{}{"CLOSED", "MERGED"},
+							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {
 							t.Errorf("got GraphQL variables %#v, want %#v", vars, want)
@@ -86,14 +84,11 @@ func Test_listPullRequests(t *testing.T) {
 			},
 			httpStub: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query PullRequestList\b`),
+					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"owner":  "OWNER",
-							"repo":   "REPO",
-							"state":  []interface{}{"OPEN"},
-							"labels": []interface{}{"hello", "one world"},
-							"limit":  float64(30),
+							"q":     `repo:OWNER/REPO is:pr is:open label:hello label:"one world" sort:created-desc`,
+							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {
 							t.Errorf("got GraphQL variables %#v, want %#v", vars, want)

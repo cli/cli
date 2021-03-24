@@ -123,7 +123,6 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
 			assert.Equal(t, "12345", params["milestone"].(string))
-			assert.Equal(t, []interface{}{"web", "bug"}, params["labels"].([]interface{}))
 			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
 		}))
 
@@ -136,7 +135,7 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		} } } }
 		`))
 
-	output, err := runCommand(http, true, "-a probablyCher -l web,bug -s open -A foo --mention me --milestone 1.x")
+	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me --milestone 1.x")
 	if err != nil {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
@@ -471,6 +470,38 @@ func Test_issueList(t *testing.T) {
 							"repo":  "REPO",
 							"limit": float64(30),
 							"query": "repo:OWNER/REPO is:issue is:open assignee:@me author:@me mentions:@me auth bug",
+							"type":  "ISSUE",
+						}, params)
+					}))
+			},
+		},
+		{
+			name: "with labels",
+			args: args{
+				limit: 30,
+				repo:  ghrepo.New("OWNER", "REPO"),
+				filters: prShared.FilterOptions{
+					Entity: "issue",
+					State:  "open",
+					Labels: []string{"hello", "one world"},
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueSearch\b`),
+					httpmock.GraphQLQuery(`
+					{ "data": {
+						"repository": { "hasIssuesEnabled": true },
+						"search": {
+							"issueCount": 0,
+							"nodes": []
+						}
+					} }`, func(_ string, params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"owner": "OWNER",
+							"repo":  "REPO",
+							"limit": float64(30),
+							"query": `repo:OWNER/REPO is:issue is:open label:hello label:"one world"`,
 							"type":  "ISSUE",
 						}, params)
 					}))

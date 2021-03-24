@@ -106,10 +106,9 @@ func TestPRList_filtering(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
 			assert.Equal(t, []interface{}{"OPEN", "CLOSED", "MERGED"}, params["state"].([]interface{}))
-			assert.Equal(t, []interface{}{"one", "two", "three"}, params["labels"].([]interface{}))
 		}))
 
-	output, err := runCommand(http, true, `-s all -l one,two -l three`)
+	output, err := runCommand(http, true, `-s all`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +128,7 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.FileResponse("./fixtures/prListWithDuplicates.json"))
 
-	output, err := runCommand(http, true, "-l one,two")
+	output, err := runCommand(http, true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
