@@ -27,6 +27,7 @@ type ListOptions struct {
 	State        string
 	BaseBranch   string
 	Labels       []string
+	Author       string
 	Assignee     string
 	Search       string
 }
@@ -66,6 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
+	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 
@@ -86,6 +88,7 @@ func listRun(opts *ListOptions) error {
 	filters := shared.FilterOptions{
 		Entity:     "pr",
 		State:      strings.ToLower(opts.State),
+		Author:     opts.Author,
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
@@ -117,7 +120,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.BaseBranch != "" || opts.Assignee != ""
+		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.BaseBranch != "" || opts.Author != "" || opts.Assignee != ""
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
