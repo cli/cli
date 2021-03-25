@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -78,7 +79,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
-	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with filter")
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
+
 	return cmd
 }
 
@@ -95,7 +97,7 @@ func listRun(opts *ListOptions) error {
 
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
-		State:     opts.State,
+		State:     strings.ToLower(opts.State),
 		Assignee:  opts.Assignee,
 		Labels:    opts.Labels,
 		Author:    opts.Author,
@@ -131,8 +133,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if isTerminal {
-		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.Assignee != "" || opts.Author != "" || opts.Mention != "" || opts.Milestone != "" || opts.Search != ""
-		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
