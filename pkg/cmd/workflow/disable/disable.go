@@ -86,7 +86,7 @@ func runDisable(opts *DisableOptions) error {
 
 	if opts.IO.CanPrompt() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Disabled %s\n", cs.SuccessIcon(), cs.Bold(workflow.Name))
+		fmt.Fprintf(opts.IO.Out, "%s Disabled %s\n", cs.SuccessIconWithColor(cs.Red), cs.Bold(workflow.Name))
 	}
 
 	return nil
