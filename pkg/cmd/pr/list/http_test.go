@@ -116,7 +116,7 @@ func Test_listPullRequests(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"q":     "repo:OWNER/REPO is:pr is:open author:monalisa sort:created-desc",
+							"q":     "repo:OWNER/REPO is:pr is:open author:monalisa",
 							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {
@@ -140,7 +140,7 @@ func Test_listPullRequests(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"q":     "repo:OWNER/REPO is:pr is:open sort:created-desc one world in:title",
+							"q":     "repo:OWNER/REPO is:pr is:open one world in:title",
 							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {

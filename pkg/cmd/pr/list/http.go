@@ -172,7 +172,6 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 	q.SetType(githubsearch.PullRequest)
 	q.InRepository(ghrepo.FullName(repo))
 	q.AddQuery(filters.Search)
-	q.SortBy(githubsearch.CreatedAt, githubsearch.Desc)
 
 	switch filters.State {
 	case "open":
