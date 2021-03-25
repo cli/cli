@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultLimit = 10
+const defaultLimit = 50
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
