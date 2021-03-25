@@ -2,7 +2,10 @@ package edit
 
 import (
 	"bytes"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -12,12 +15,18 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdEdit(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name     string
 		input    string
+		stdin    string
 		output   EditOptions
 		wantsErr bool
 	}{
@@ -58,6 +67,35 @@ func TestNewCmdEdit(t *testing.T) {
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "test",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "body from stdin",
+			input: "23 --body-file -",
+			stdin: "this is on standard input",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "this is on standard input",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "body from file",
+			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "a body from file",
 						Edited: true,
 					},
 				},
@@ -165,10 +203,14 @@ func TestNewCmdEdit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			io, stdin, _, _ := iostreams.Test()
 			io.SetStdoutTTY(true)
 			io.SetStdinTTY(true)
 			io.SetStderrTTY(true)
+
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			}
 
 			f := &cmdutil.Factory{
 				IOStreams: io,

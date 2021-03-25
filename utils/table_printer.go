@@ -44,6 +44,7 @@ func (t ttyTablePrinter) IsTTY() bool {
 	return true
 }
 
+// Never pass pre-colorized text to AddField; always specify colorFunc. Otherwise, the table printer can't correctly compute the width of its columns.
 func (t *ttyTablePrinter) AddField(s string, truncateFunc func(int, string) string, colorFunc func(string) string) {
 	if truncateFunc == nil {
 		truncateFunc = text.Truncate

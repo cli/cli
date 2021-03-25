@@ -186,7 +186,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(issue.Body, style, "")
+		md, err = markdown.Render(issue.Body, style)
 		if err != nil {
 			return err
 		}

@@ -127,7 +127,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			rendered, err := markdown.Render(gf.Content, markdownStyle, "")
+			rendered, err := markdown.Render(gf.Content, markdownStyle)
 			if err != nil {
 				return err
 			}

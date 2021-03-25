@@ -3,8 +3,10 @@ package merge
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -27,9 +29,14 @@ import (
 )
 
 func Test_NewCmdMerge(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name    string
 		args    string
+		stdin   string
 		isTTY   bool
 		want    MergeOptions
 		wantErr string
@@ -65,6 +72,37 @@ func Test_NewCmdMerge(t *testing.T) {
 			},
 		},
 		{
+			name:  "body from file",
+			args:  fmt.Sprintf("123 --body-file '%s'", tmpFile),
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "a body from file",
+				BodySet:                 true,
+			},
+		},
+		{
+			name:  "body from stdin",
+			args:  "123 --body-file -",
+			stdin: "this is on standard input",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "this is on standard input",
+				BodySet:                 true,
+			},
+		},
+		{
 			name:  "body",
 			args:  "123 -bcool",
 			isTTY: true,
@@ -78,6 +116,12 @@ func Test_NewCmdMerge(t *testing.T) {
 				Body:                    "cool",
 				BodySet:                 true,
 			},
+		},
+		{
+			name:    "body and body-file flags",
+			args:    "123 --body 'test' --body-file 'test-file.txt'",
+			isTTY:   true,
+			wantErr: "specify only one of `--body` or `--body-file`",
 		},
 		{
 			name:    "no argument with --repo override",
@@ -106,10 +150,14 @@ func Test_NewCmdMerge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			io, stdin, _, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.isTTY)
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
+
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			}
 
 			f := &cmdutil.Factory{
 				IOStreams: io,

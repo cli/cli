@@ -2,13 +2,13 @@ package list
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/pkg/githubsearch"
 	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
 )
@@ -199,37 +199,37 @@ pagination:
 }
 
 func searchQuery(owner string, filter FilterOptions) string {
-	queryParts := []string{"sort:updated-desc"}
+	q := githubsearch.NewQuery()
+	q.SortBy(githubsearch.UpdatedAt, githubsearch.Desc)
+
 	if owner == "" {
-		queryParts = append(queryParts, "user:@me")
+		q.OwnedBy("@me")
 	} else {
-		queryParts = append(queryParts, "user:"+owner)
+		q.OwnedBy(owner)
 	}
 
 	if filter.Fork {
-		queryParts = append(queryParts, "fork:only")
-	} else if filter.Source {
-		queryParts = append(queryParts, "fork:false")
+		q.OnlyForks()
 	} else {
-		queryParts = append(queryParts, "fork:true")
+		q.IncludeForks(!filter.Source)
 	}
 
 	if filter.Language != "" {
-		queryParts = append(queryParts, fmt.Sprintf("language:%q", filter.Language))
+		q.SetLanguage(filter.Language)
 	}
 
 	switch filter.Visibility {
 	case "public":
-		queryParts = append(queryParts, "is:public")
+		q.SetVisibility(githubsearch.Public)
 	case "private":
-		queryParts = append(queryParts, "is:private")
+		q.SetVisibility(githubsearch.Private)
 	}
 
 	if filter.Archived {
-		queryParts = append(queryParts, "archived:true")
+		q.SetArchived(true)
 	} else if filter.NonArchived {
-		queryParts = append(queryParts, "archived:false")
+		q.SetArchived(false)
 	}
 
-	return strings.Join(queryParts, " ")
+	return q.String()
 }
