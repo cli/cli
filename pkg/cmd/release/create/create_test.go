@@ -341,7 +341,7 @@ func Test_createRun(t *testing.T) {
 			}`))
 
 			tt.opts.IO = io
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {

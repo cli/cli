@@ -25,7 +25,7 @@ import (
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	TagName      string
@@ -53,7 +53,7 @@ type CreateOptions struct {
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 	}
 
@@ -131,7 +131,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

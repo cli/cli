@@ -26,7 +26,7 @@ import (
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (context.Remotes, error)
@@ -75,7 +75,7 @@ type CreateContext struct {
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -435,7 +435,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 }
 
 func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return nil, err
 	}

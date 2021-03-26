@@ -13,7 +13,7 @@ import (
 )
 
 type RemoveOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -24,7 +24,7 @@ type RemoveOptions struct {
 func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Command {
 	opts := &RemoveOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -50,7 +50,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 }
 
 func removeRun(opts *RemoveOptions) error {
-	c, err := opts.HttpClient()
+	c, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
 	}

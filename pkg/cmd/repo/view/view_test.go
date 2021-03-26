@@ -117,7 +117,7 @@ func Test_RepoView_Web(t *testing.T) {
 
 		opts := &ViewOptions{
 			Web: true,
-			HttpClient: func() (*http.Client, error) {
+			HTTPClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
 			BaseRepo: func() (ghrepo.Interface, error) {
@@ -265,7 +265,7 @@ func Test_ViewRun(t *testing.T) {
 		{ "name": "readme.md",
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 
@@ -330,7 +330,7 @@ func Test_ViewRun_NonMarkdownReadme(t *testing.T) {
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
 		opts := &ViewOptions{
-			HttpClient: func() (*http.Client, error) {
+			HTTPClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
 			BaseRepo: func() (ghrepo.Interface, error) {
@@ -396,7 +396,7 @@ func Test_ViewRun_NoReadme(t *testing.T) {
 			httpmock.StatusStringResponse(404, `{}`))
 
 		opts := &ViewOptions{
-			HttpClient: func() (*http.Client, error) {
+			HTTPClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
 			BaseRepo: func() (ghrepo.Interface, error) {
@@ -466,7 +466,7 @@ func Test_ViewRun_NoDescription(t *testing.T) {
 		"content": "IyB0cnVseSBjb29sIHJlYWRtZSBjaGVjayBpdCBvdXQ="}`))
 
 		opts := &ViewOptions{
-			HttpClient: func() (*http.Client, error) {
+			HTTPClient: func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			},
 			BaseRepo: func() (ghrepo.Interface, error) {
@@ -517,7 +517,7 @@ func Test_ViewRun_WithoutUsername(t *testing.T) {
 
 	opts := &ViewOptions{
 		RepoArg: "REPO",
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
 		IO: io,
@@ -600,7 +600,7 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
 		{ "name": "readme.md",
 		"content": "IyA8IGlzIGFsd2F5cyA+IHRoYW4gJiAnIGFuZCAi"}`))
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 

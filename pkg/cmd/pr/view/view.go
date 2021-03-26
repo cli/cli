@@ -23,7 +23,7 @@ import (
 )
 
 type ViewOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -38,7 +38,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -401,7 +401,7 @@ func prStateWithDraft(pr *api.PullRequest) string {
 }
 
 func retrievePullRequest(opts *ViewOptions) (*api.PullRequest, error) {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return nil, err
 	}

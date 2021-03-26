@@ -152,7 +152,7 @@ func runCommand(httpClient *http.Client, remotes []*context.Remote, isTTY bool, 
 	io.SetStderrTTY(isTTY)
 	fac := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},
 		Config: func() (config.Config, error) {

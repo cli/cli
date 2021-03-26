@@ -344,7 +344,7 @@ func Test_editRun(t *testing.T) {
 		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 		tt.input.IO = io
-		tt.input.HttpClient = httpClient
+		tt.input.HTTPClient = httpClient
 		tt.input.BaseRepo = baseRepo
 
 		t.Run(tt.name, func(t *testing.T) {

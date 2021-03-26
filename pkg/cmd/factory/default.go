@@ -53,7 +53,7 @@ func New(appVersion string) *cmdutil.Factory {
 		IOStreams: io,
 		Config:    configFunc,
 		Remotes:   remotesFunc,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			cfg, err := configFunc()
 			if err != nil {
 				return nil, err

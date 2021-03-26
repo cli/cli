@@ -363,7 +363,7 @@ func Test_viewRun(t *testing.T) {
 			tt.opts = &ViewOptions{}
 		}
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 		io, _, stdout, _ := iostreams.Test()

@@ -14,7 +14,7 @@ import (
 )
 
 type ReopenOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -25,7 +25,7 @@ type ReopenOptions struct {
 func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Command {
 	opts := &ReopenOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 	}
 
@@ -54,7 +54,7 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 func reopenRun(opts *ReopenOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

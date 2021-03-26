@@ -509,7 +509,7 @@ func Test_apiRun(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
 
 			tt.options.IO = io
-			tt.options.HttpClient = func() (*http.Client, error) {
+			tt.options.HTTPClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
 					resp.Request = req
@@ -561,7 +561,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 
 	options := ApiOptions{
 		IO: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -621,7 +621,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 
 	options := ApiOptions{
 		IO: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
 				resp.Request = req
@@ -711,7 +711,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 				RawFields:        []string{"a=b", "c=d"},
 
 				IO: io,
-				HttpClient: func() (*http.Client, error) {
+				HTTPClient: func() (*http.Client, error) {
 					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 						var err error
 						if bodyBytes, err = ioutil.ReadAll(req.Body); err != nil {
@@ -744,7 +744,7 @@ func Test_apiRun_cache(t *testing.T) {
 	requestCount := 0
 	options := ApiOptions{
 		IO: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				requestCount++
 				return &http.Response{

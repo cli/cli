@@ -19,7 +19,7 @@ type ListOptions struct {
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		HTTPClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		IO:         f.IOStreams,
 	}
 

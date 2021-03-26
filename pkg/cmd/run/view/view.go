@@ -17,7 +17,7 @@ import (
 )
 
 type ViewOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -33,7 +33,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Now:        time.Now,
 	}
 	cmd := &cobra.Command{
@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 func runView(opts *ViewOptions) error {
-	c, err := opts.HttpClient()
+	c, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
 	}

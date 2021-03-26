@@ -87,7 +87,7 @@ func (p *Player) move(direction Direction) bool {
 }
 
 type GardenOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -97,7 +97,7 @@ type GardenOptions struct {
 func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Command {
 	opts := GardenOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		BaseRepo:   f.BaseRepo,
 	}
 
@@ -132,7 +132,7 @@ func gardenRun(opts *GardenOptions) error {
 		return errors.New("must be connected to a terminal")
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

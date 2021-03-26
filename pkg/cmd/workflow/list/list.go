@@ -17,7 +17,7 @@ const defaultLimit = 50
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	PlainOutput bool
@@ -29,7 +29,7 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -68,7 +68,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("could not determine base repo: %w", err)
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
 	}

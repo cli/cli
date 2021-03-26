@@ -17,7 +17,7 @@ import (
 )
 
 type EditOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -35,7 +35,7 @@ type EditOptions struct {
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO:                 f.IOStreams,
-		HttpClient:         f.HttpClient,
+		HTTPClient:         f.HTTPClient,
 		DetermineEditor:    func() (string, error) { return cmdutil.DetermineEditor(f.Config) },
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
@@ -132,7 +132,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 }
 
 func editRun(opts *EditOptions) error {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

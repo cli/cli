@@ -25,7 +25,7 @@ type editor interface {
 }
 
 type MergeOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -51,7 +51,7 @@ type MergeOptions struct {
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -157,7 +157,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 func mergeRun(opts *MergeOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

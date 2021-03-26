@@ -17,7 +17,7 @@ import (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 
 	Limit      int
 	Visibility string // all, secret, public
@@ -26,7 +26,7 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	var flagPublic bool
@@ -63,7 +63,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(opts *ListOptions) error {
-	client, err := opts.HttpClient()
+	client, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

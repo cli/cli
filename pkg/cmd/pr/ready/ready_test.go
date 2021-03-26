@@ -98,7 +98,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {

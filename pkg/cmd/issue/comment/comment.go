@@ -16,7 +16,7 @@ import (
 func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) error) *cobra.Command {
 	opts := &prShared.CommentableOptions{
 		IO:                    f.IOStreams,
-		HttpClient:            f.HttpClient,
+		HTTPClient:            f.HTTPClient,
 		EditSurvey:            prShared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: prShared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:   prShared.CommentableConfirmSubmitSurvey,
@@ -33,7 +33,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		`),
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.RetrieveCommentable = retrieveIssue(f.HttpClient, f.BaseRepo, args[0])
+			opts.RetrieveCommentable = retrieveIssue(f.HTTPClient, f.BaseRepo, args[0])
 			return prShared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(_ *cobra.Command, args []string) error {

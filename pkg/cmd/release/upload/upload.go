@@ -15,7 +15,7 @@ import (
 )
 
 type UploadOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -30,7 +30,7 @@ type UploadOptions struct {
 func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Command {
 	opts := &UploadOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -70,7 +70,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 }
 
 func uploadRun(opts *UploadOptions) error {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

@@ -131,7 +131,7 @@ func Test_deleteRun(t *testing.T) {
 			tt.opts = &DeleteOptions{}
 		}
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 		io, _, _, _ := iostreams.Test()

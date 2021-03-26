@@ -25,7 +25,7 @@ import (
 
 type EditOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
@@ -38,7 +38,7 @@ type EditOptions struct {
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
 	opts := EditOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		Edit: func(editorCmd, filename, defaultContent string, io *iostreams.IOStreams) (string, error) {
 			return surveyext.Edit(
@@ -81,7 +81,7 @@ func editRun(opts *EditOptions) error {
 		gistID = id
 	}
 
-	client, err := opts.HttpClient()
+	client, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

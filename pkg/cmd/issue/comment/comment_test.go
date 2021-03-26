@@ -264,8 +264,8 @@ func Test_commentRun(t *testing.T) {
 		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 		tt.input.IO = io
-		tt.input.HttpClient = httpClient
-		tt.input.RetrieveCommentable = retrieveIssue(tt.input.HttpClient, baseRepo, "123")
+		tt.input.HTTPClient = httpClient
+		tt.input.RetrieveCommentable = retrieveIssue(tt.input.HTTPClient, baseRepo, "123")
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)

@@ -226,7 +226,7 @@ func Test_statusRun(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 			if tt.httpStubs != nil {

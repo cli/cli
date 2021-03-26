@@ -15,7 +15,7 @@ import (
 )
 
 type StatusOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 
@@ -25,7 +25,7 @@ type StatusOptions struct {
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		IO:         f.IOStreams,
 		Config:     f.Config,
 	}
@@ -75,7 +75,7 @@ func statusRun(opts *StatusOptions) error {
 		return cmdutil.SilentError
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

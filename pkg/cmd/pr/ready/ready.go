@@ -16,7 +16,7 @@ import (
 )
 
 type ReadyOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -29,7 +29,7 @@ type ReadyOptions struct {
 func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Command {
 	opts := &ReadyOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -64,7 +64,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 func readyRun(opts *ReadyOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,7 @@ type Commentable interface {
 
 type CommentableOptions struct {
 	IO                    *iostreams.IOStreams
-	HttpClient            func() (*http.Client, error)
+	HTTPClient            func() (*http.Client, error)
 	RetrieveCommentable   func() (Commentable, ghrepo.Interface, error)
 	EditSurvey            func() (string, error)
 	InteractiveEditSurvey func() (string, error)
@@ -115,7 +115,7 @@ func CommentableRun(opts *CommentableOptions) error {
 		}
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

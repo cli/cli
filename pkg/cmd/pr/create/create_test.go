@@ -168,7 +168,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {

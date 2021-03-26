@@ -15,7 +15,7 @@ import (
 
 type DeleteOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 
 	Selector string
 }
@@ -23,7 +23,7 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := DeleteOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -51,7 +51,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 		gistID = id
 	}
-	client, err := opts.HttpClient()
+	client, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

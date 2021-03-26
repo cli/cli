@@ -21,7 +21,7 @@ import (
 type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 
 	MainExecutable string
 
@@ -37,7 +37,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	opts := &LoginOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 
 		MainExecutable: f.Executable,
 	}
@@ -148,7 +148,7 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

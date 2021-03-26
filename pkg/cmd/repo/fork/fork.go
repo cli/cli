@@ -23,7 +23,7 @@ import (
 )
 
 type ForkOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -46,7 +46,7 @@ var Since = func(t time.Time) time.Duration {
 func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Command {
 	opts := &ForkOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
@@ -161,7 +161,7 @@ func forkRun(opts *ForkOptions) error {
 	cs := opts.IO.ColorScheme()
 	stderr := opts.IO.ErrOut
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("unable to create client: %w", err)
 	}

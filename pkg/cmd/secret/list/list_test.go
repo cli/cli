@@ -182,7 +182,7 @@ func Test_listRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 

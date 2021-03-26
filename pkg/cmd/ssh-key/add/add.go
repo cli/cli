@@ -23,7 +23,7 @@ type AddOptions struct {
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
 	opts := &AddOptions{
-		HTTPClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		IO:         f.IOStreams,
 	}
 

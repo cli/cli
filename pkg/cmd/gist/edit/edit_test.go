@@ -294,7 +294,7 @@ func Test_editRun(t *testing.T) {
 			return "new file content", nil
 		}
 
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 		io, _, stdout, stderr := iostreams.Test()

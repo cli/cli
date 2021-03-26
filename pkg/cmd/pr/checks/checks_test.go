@@ -190,7 +190,7 @@ func Test_checksRun(t *testing.T) {
 				reg.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse(tt.fixture))
 			}
 
-			opts.HttpClient = func() (*http.Client, error) {
+			opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 
@@ -231,7 +231,7 @@ func TestChecksRun_web(t *testing.T) {
 
 	opts := &ChecksOptions{
 		WebMode: true,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {

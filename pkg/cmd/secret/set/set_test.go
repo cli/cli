@@ -180,7 +180,7 @@ func Test_setRun_repo(t *testing.T) {
 	io, _, _, _ := iostreams.Test()
 
 	opts := &SetOptions{
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
@@ -256,7 +256,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.IO = io

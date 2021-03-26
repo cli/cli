@@ -138,7 +138,7 @@ func Test_deleteRun(t *testing.T) {
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
 
 			tt.opts.IO = io
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {

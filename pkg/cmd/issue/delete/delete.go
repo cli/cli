@@ -2,6 +2,9 @@ package delete
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -11,12 +14,10 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
-	"net/http"
-	"strconv"
 )
 
 type DeleteOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -27,7 +28,7 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 	}
 
@@ -56,7 +57,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 func deleteRun(opts *DeleteOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

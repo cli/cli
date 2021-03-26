@@ -299,7 +299,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 
@@ -507,7 +507,7 @@ func Test_loginRun_Survey(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 			if tt.httpStubs != nil {

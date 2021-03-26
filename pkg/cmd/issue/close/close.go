@@ -14,7 +14,7 @@ import (
 )
 
 type CloseOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -25,7 +25,7 @@ type CloseOptions struct {
 func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Command {
 	opts := &CloseOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 	}
 
@@ -54,7 +54,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 func closeRun(opts *CloseOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

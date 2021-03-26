@@ -32,13 +32,13 @@ type CreateOptions struct {
 	FilenameOverride string
 	WebMode          bool
 
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := CreateOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -123,7 +123,7 @@ func createRun(opts *CreateOptions) error {
 	errOut := opts.IO.ErrOut
 	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {
@@ -256,7 +256,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 					t, _ := time.Parse(time.RFC822, "03 Nov 20 15:04 UTC")
 					return t
 				},
-				HttpClient: func() (*http.Client, error) {
+				HTTPClient: func() (*http.Client, error) {
 					return &http.Client{Transport: httpReg}, nil
 				},
 				BaseRepo: func() (ghrepo.Interface, error) {

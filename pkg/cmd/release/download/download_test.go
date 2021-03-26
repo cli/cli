@@ -211,7 +211,7 @@ func Test_downloadRun(t *testing.T) {
 			fakeHTTP.Register(httpmock.REST("GET", "assets/5678"), httpmock.StringResponse(`5678`))
 
 			tt.opts.IO = io
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {

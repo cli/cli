@@ -286,7 +286,7 @@ func Test_createRun(t *testing.T) {
 		mockClient := func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		tt.opts.HttpClient = mockClient
+		tt.opts.HTTPClient = mockClient
 
 		io, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
@@ -338,7 +338,7 @@ func Test_CreateRun_reauth(t *testing.T) {
 
 	opts := &CreateOptions{
 		IO:         io,
-		HttpClient: mockClient,
+		HTTPClient: mockClient,
 		Filenames:  []string{fixtureFile},
 	}
 

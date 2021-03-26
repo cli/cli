@@ -22,7 +22,7 @@ import (
 )
 
 type CreditsOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
 
@@ -32,7 +32,7 @@ type CreditsOptions struct {
 
 func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Repository: "cli/cli",
@@ -70,7 +70,7 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 
 func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		BaseRepo:   f.BaseRepo,
 		IO:         f.IOStreams,
 	}
@@ -113,7 +113,7 @@ func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *co
 
 func creditsRun(opts *CreditsOptions) error {
 	isWindows := runtime.GOOS == "windows"
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

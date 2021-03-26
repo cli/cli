@@ -161,7 +161,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				httpmock.GraphQL(`query UserCurrent\b`),
 				httpmock.StringResponse(`{"data":{"viewer":{"login":"cybilb"}}}`))
 
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 
@@ -246,7 +246,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 

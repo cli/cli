@@ -18,7 +18,7 @@ import (
 )
 
 type ChecksOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
@@ -32,7 +32,7 @@ type ChecksOptions struct {
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	opts := &ChecksOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 		BaseRepo:   f.BaseRepo,
@@ -68,7 +68,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 }
 
 func checksRun(opts *ChecksOptions) error {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

@@ -273,7 +273,7 @@ func TestViewRun(t *testing.T) {
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
 		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
+		tt.opts.HTTPClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 

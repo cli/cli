@@ -19,7 +19,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 	io, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},
 		Config: func() (config.Config, error) {

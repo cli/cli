@@ -45,7 +45,7 @@ type ApiOptions struct {
 	CacheTTL            time.Duration
 	FilterOutput        string
 
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
 }
@@ -53,7 +53,7 @@ type ApiOptions struct {
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		BaseRepo:   f.BaseRepo,
 		Branch:     f.Branch,
 	}
@@ -269,7 +269,7 @@ func apiRun(opts *ApiOptions) error {
 		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
 
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

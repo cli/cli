@@ -205,7 +205,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {
@@ -897,7 +897,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 	err := mergeRun(&MergeOptions{
 		IO:     io,
 		Editor: testEditor{},
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
 		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
@@ -995,7 +995,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
 		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
@@ -1036,7 +1036,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
 		SelectorArg:      "https://github.com/OWNER/REPO/pull/123",

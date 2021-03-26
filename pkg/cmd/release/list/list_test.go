@@ -167,7 +167,7 @@ func Test_listRun(t *testing.T) {
 			} } } }`, createdAt.Format(time.RFC3339))))
 
 			tt.opts.IO = io
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {

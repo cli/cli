@@ -21,7 +21,7 @@ import (
 
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 
 	Selector  string
 	Filename  string
@@ -33,7 +33,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -67,7 +67,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 func viewRun(opts *ViewOptions) error {
 	gistID := opts.Selector
-	client, err := opts.HttpClient()
+	client, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

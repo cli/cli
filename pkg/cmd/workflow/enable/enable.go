@@ -14,7 +14,7 @@ import (
 )
 
 type EnableOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -25,7 +25,7 @@ type EnableOptions struct {
 func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Command {
 	opts := &EnableOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -56,7 +56,7 @@ func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Co
 }
 
 func runEnable(opts *EnableOptions) error {
-	c, err := opts.HttpClient()
+	c, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("could not build http client: %w", err)
 	}

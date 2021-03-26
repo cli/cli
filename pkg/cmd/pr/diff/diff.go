@@ -19,7 +19,7 @@ import (
 )
 
 type DiffOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
@@ -32,7 +32,7 @@ type DiffOptions struct {
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
 	opts := &DiffOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
@@ -74,7 +74,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 }
 
 func diffRun(opts *DiffOptions) error {
-	httpClient, err := opts.HttpClient()
+	httpClient, err := opts.HTTPClient()
 	if err != nil {
 		return err
 	}

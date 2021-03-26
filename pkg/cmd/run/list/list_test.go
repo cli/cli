@@ -178,7 +178,7 @@ func TestListRun(t *testing.T) {
 			reg := &httpmock.Registry{}
 			tt.stubs(reg)
 
-			tt.opts.HttpClient = func() (*http.Client, error) {
+			tt.opts.HTTPClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
 

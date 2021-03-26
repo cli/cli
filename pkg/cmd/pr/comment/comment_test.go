@@ -287,7 +287,7 @@ func Test_commentRun(t *testing.T) {
 		remotes := func() (context.Remotes, error) { return nil, nil }
 
 		tt.input.IO = io
-		tt.input.HttpClient = httpClient
+		tt.input.HTTPClient = httpClient
 		tt.input.RetrieveCommentable = retrievePR(httpClient, baseRepo, branch, remotes, "123")
 
 		t.Run(tt.name, func(t *testing.T) {

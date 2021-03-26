@@ -11,7 +11,7 @@ import (
 
 type Factory struct {
 	IOStreams  *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Config     func() (config.Config, error)

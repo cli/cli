@@ -27,7 +27,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
+		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {

@@ -14,7 +14,7 @@ import (
 )
 
 type DisableOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -25,7 +25,7 @@ type DisableOptions struct {
 func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.Command {
 	opts := &DisableOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 	}
 
 	cmd := &cobra.Command{
@@ -56,7 +56,7 @@ func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.
 }
 
 func runDisable(opts *DisableOptions) error {
-	c, err := opts.HttpClient()
+	c, err := opts.HTTPClient()
 	if err != nil {
 		return fmt.Errorf("could not build http client: %w", err)
 	}

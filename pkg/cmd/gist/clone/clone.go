@@ -15,7 +15,7 @@ import (
 )
 
 type CloneOptions struct {
-	HttpClient func() (*http.Client, error)
+	HTTPClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
@@ -27,7 +27,7 @@ type CloneOptions struct {
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
 	opts := &CloneOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HTTPClient: f.HTTPClient,
 		Config:     f.Config,
 	}
 
