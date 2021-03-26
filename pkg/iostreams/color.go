@@ -44,16 +44,18 @@ func Is256ColorSupported() bool {
 		strings.Contains(colorterm, "truecolor")
 }
 
-func NewColorScheme(enabled, is256enabled bool) *ColorScheme {
+func NewColorScheme(enabled, is256enabled, isLinkEnabled bool) *ColorScheme {
 	return &ColorScheme{
 		enabled:      enabled,
 		is256enabled: is256enabled,
+		linkEnabled:  isLinkEnabled,
 	}
 }
 
 type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
+	linkEnabled  bool
 }
 
 func (c *ColorScheme) Bold(t string) string {
@@ -201,4 +203,12 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	}
 
 	return fn
+}
+
+func (c *ColorScheme) Hyperlink(text, url string) string {
+	if !c.linkEnabled {
+		return text
+	}
+	// https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
 }

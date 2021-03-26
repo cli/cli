@@ -190,9 +190,18 @@ func checksRun(opts *ChecksOptions) error {
 	for _, o := range outputs {
 		if isTerminal {
 			tp.AddField(o.mark, nil, o.markColor)
-			tp.AddField(o.name, nil, nil)
+			var linkFunc func(string) string
+			if opts.IO.IsLinkEnabled() {
+				url := o.link
+				linkFunc = func(t string) string {
+					return cs.Hyperlink(t, url)
+				}
+			}
+			tp.AddField(o.name, nil, linkFunc)
 			tp.AddField(o.elapsed, nil, nil)
-			tp.AddField(o.link, nil, nil)
+			if !opts.IO.IsLinkEnabled() {
+				tp.AddField(o.link, nil, nil)
+			}
 		} else {
 			tp.AddField(o.name, nil, nil)
 			tp.AddField(o.bucket, nil, nil)

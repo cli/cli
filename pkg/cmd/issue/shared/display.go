@@ -28,7 +28,11 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 		}
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForState(issue.State)))
+		colorFunc := cs.ColorFromString(prShared.ColorForState(issue.State))
+		issueURL := issue.URL
+		table.AddField(issueNum, nil, func(t string) string {
+			return colorFunc(cs.Hyperlink(t, issueURL))
+		})
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}

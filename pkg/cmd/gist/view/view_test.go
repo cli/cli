@@ -443,7 +443,7 @@ func Test_promptGists(t *testing.T) {
 	}
 
 	io, _, _, _ := iostreams.Test()
-	cs := iostreams.NewColorScheme(io.ColorEnabled(), io.ColorSupport256())
+	cs := io.ColorScheme()
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}

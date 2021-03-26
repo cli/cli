@@ -109,14 +109,14 @@ func (t *ttyTablePrinter) Render() error {
 				}
 			}
 			truncVal := field.TruncateFunc(colWidths[col], field.Text)
+			if field.ColorFunc != nil {
+				truncVal = field.ColorFunc(truncVal)
+			}
 			if col < numCols-1 {
 				// pad value with spaces on the right
 				if padWidth := colWidths[col] - text.DisplayWidth(field.Text); padWidth > 0 {
 					truncVal += strings.Repeat(" ", padWidth)
 				}
-			}
-			if field.ColorFunc != nil {
-				truncVal = field.ColorFunc(truncVal)
 			}
 			_, err := fmt.Fprint(t.out, truncVal)
 			if err != nil {

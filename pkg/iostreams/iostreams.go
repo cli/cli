@@ -30,6 +30,7 @@ type IOStreams struct {
 	colorEnabled  bool
 	is256enabled  bool
 	terminalTheme string
+	linkEnabled   bool
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -89,6 +90,10 @@ func (s *IOStreams) TerminalTheme() string {
 	}
 
 	return s.terminalTheme
+}
+
+func (s *IOStreams) IsLinkEnabled() bool {
+	return s.linkEnabled
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -252,7 +257,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.IsLinkEnabled())
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
@@ -295,6 +300,7 @@ func System() *IOStreams {
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
+		linkEnabled:  os.Getenv("GH_HYPERLINK") != "",
 		pagerCommand: pagerCommand,
 	}
 

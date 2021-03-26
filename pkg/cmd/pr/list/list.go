@@ -131,7 +131,11 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPR(pr)))
+		prURL := pr.URL
+		colorFunc := cs.ColorFromString(shared.ColorForPR(pr))
+		table.AddField(prNum, nil, func(t string) string {
+			return colorFunc(cs.Hyperlink(t, prURL))
+		})
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
