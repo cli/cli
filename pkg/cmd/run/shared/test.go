@@ -55,6 +55,12 @@ var TestRuns []Run = []Run{
 	TestRun("stale", 10, Completed, Stale),
 }
 
+var WorkflowRuns []Run = []Run{
+	TestRun("in progress", 2, InProgress, ""),
+	SuccessfulRun,
+	FailedRun,
+}
+
 var SuccessfulJob Job = Job{
 	ID:          10,
 	Status:      Completed,

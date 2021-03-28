@@ -150,7 +150,17 @@ type RunsPayload struct {
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit, workflowID int) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
+	return getRuns(client, repo, path, limit)
+}
+
 func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
+	return getRuns(client, repo, path, limit)
+}
+
+func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) ([]Run, error) {
 	perPage := limit
 	page := 1
 	if limit > 100 {
@@ -162,9 +172,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error
 	for len(runs) < limit {
 		var result RunsPayload
 
-		path := fmt.Sprintf("repos/%s/actions/runs?per_page=%d&page=%d", ghrepo.FullName(repo), perPage, page)
+		pagedPath := fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page)
 
-		err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+		err := client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
 		if err != nil {
 			return nil, err
 		}
