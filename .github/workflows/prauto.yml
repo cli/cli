@@ -10,7 +10,6 @@ jobs:
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEEDSREVIEWCOL: "MDEzOlByb2plY3RDb2x1bW43MTEwMTI4"
           PRID: ${{ github.event.pull_request.node_id }}
           PRBODY: ${{ github.event.pull_request.body }}
           PRNUM: ${{ github.event.pull_request.number }}
@@ -26,10 +25,21 @@ jobs:
             gh pr close $PRNUM
           }
 
+          colID () {
+            gh api graphql -f query='query($owner:String!, $repo:String!) {
+              repository(owner:$owner, name:$repo) {
+                project(number:1) {
+                  columns(first:10) { nodes {id,name} }
+                }
+              }
+            }' -F owner=:owner -F repo=:repo \
+              -q ".data.repository.project.columns.nodes[] | select(.name | startswith(\"$1\")) | .id"
+          }
+
           addToBoard () {
             gh api graphql --silent -f query='
               mutation($colID:ID!, $pr:ID!) { addProjectCard(input: { projectColumnId: $colID, contentId: $prID }) { clientMutationId } }
-            ' -f colID="$NEEDSREVIEWCOL" -f prID="$PRID"
+            ' -f colID="$(colID "Needs review")" -f prID="$PRID"
           }
 
           if gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
