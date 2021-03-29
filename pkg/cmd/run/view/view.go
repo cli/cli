@@ -164,12 +164,8 @@ func runView(opts *ViewOptions) error {
 	if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
 
-		for _, a := range annotations {
-			fmt.Fprintf(out, "%s %s\n", shared.AnnotationSymbol(cs, a), a.Message)
-			fmt.Fprintln(out, cs.Grayf("%s: %s#%d\n",
-				a.JobName, a.Path, a.StartLine))
-		}
 	}
 
 	fmt.Fprintln(out)

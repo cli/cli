@@ -36,3 +36,14 @@ func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose bool) string {
 
 	return strings.Join(lines, "\n")
 }
+
+func RenderAnnotations(cs *iostreams.ColorScheme, annotations []Annotation) string {
+	lines := []string{}
+
+	for _, a := range annotations {
+		lines = append(lines, fmt.Sprintf("%s %s", AnnotationSymbol(cs, a), a.Message))
+		lines = append(lines, cs.Grayf("%s: %s#%d\n", a.JobName, a.Path, a.StartLine))
+	}
+
+	return strings.Join(lines, "\n")
+}
