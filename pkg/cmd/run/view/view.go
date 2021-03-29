@@ -137,17 +137,10 @@ func runView(opts *ViewOptions) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	title := fmt.Sprintf("%s %s%s",
-		cs.Bold(run.HeadBranch), run.Name, prNumber)
-	symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
-	id := cs.Cyanf("%d", run.ID)
-
-	fmt.Fprintln(out)
-	fmt.Fprintf(out, "%s %s · %s\n", symbolColor(symbol), title, id)
-
 	ago := opts.Now().Sub(run.CreatedAt)
 
-	fmt.Fprintf(out, "Triggered via %s %s\n", run.Event, utils.FuzzyAgo(ago))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 && run.Conclusion == shared.Failure {
