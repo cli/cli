@@ -244,11 +244,7 @@ func (c *fileConfig) DefaultHost() (string, error) {
 
 func (c *fileConfig) DefaultHostWithSource() (string, string, error) {
 	hosts, err := c.Hosts()
-	if err != nil {
-		return ghinstance.Default(), "", nil
-	}
-
-	if len(hosts) == 1 {
+	if err == nil && len(hosts) == 1 {
 		return hosts[0], HostsConfigFile(), nil
 	}
 
