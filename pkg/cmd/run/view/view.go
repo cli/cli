@@ -159,17 +159,7 @@ func runView(opts *ViewOptions) error {
 
 	fmt.Fprintln(out, cs.Bold("JOBS"))
 
-	for _, job := range jobs {
-		symbol, symbolColor := shared.Symbol(cs, job.Status, job.Conclusion)
-		id := cs.Cyanf("%d", job.ID)
-		fmt.Fprintf(out, "%s %s (ID %s)\n", symbolColor(symbol), job.Name, id)
-		if opts.Verbose || shared.IsFailureState(job.Conclusion) {
-			for _, step := range job.Steps {
-				stepSymbol, stepSymColor := shared.Symbol(cs, step.Status, step.Conclusion)
-				fmt.Fprintf(out, "  %s %s\n", stepSymColor(stepSymbol), step.Name)
-			}
-		}
-	}
+	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, opts.Verbose))
 
 	if len(annotations) > 0 {
 		fmt.Fprintln(out)
