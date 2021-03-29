@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
+	workflowShared "github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -24,7 +25,8 @@ type ListOptions struct {
 
 	PlainOutput bool
 
-	Limit int
+	Limit            int
+	WorkflowSelector string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -58,6 +60,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
+	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
 
 	return cmd
 }
@@ -74,8 +77,20 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	var runs []shared.Run
+	var workflow *workflowShared.Workflow
+
 	opts.IO.StartProgressIndicator()
-	runs, err := shared.GetRuns(client, baseRepo, opts.Limit)
+	if opts.WorkflowSelector != "" {
+		states := []workflowShared.WorkflowState{workflowShared.Active}
+		workflow, err = workflowShared.ResolveWorkflow(
+			opts.IO, client, baseRepo, false, opts.WorkflowSelector, states)
+		if err == nil {
+			runs, err = shared.GetRunsByWorkflow(client, baseRepo, opts.Limit, workflow.ID)
+		}
+	} else {
+		runs, err = shared.GetRuns(client, baseRepo, opts.Limit)
+	}
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
