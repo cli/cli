@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/pkg/githubsearch"
 )
 
-func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string, error) {
+func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
@@ -29,7 +29,11 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
 	if len(state.Projects) > 0 {
-		q.Set("projects", strings.Join(state.Projects, ","))
+		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects)
+		if err != nil {
+			return "", fmt.Errorf("could not add to project: %w", err)
+		}
+		q.Set("projects", strings.Join(projectPaths, ","))
 	}
 	if len(state.Milestones) > 0 {
 		q.Set("milestone", state.Milestones[0])

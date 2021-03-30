@@ -78,3 +78,8 @@ func DisplayURL(urlStr string) string {
 	}
 	return u.Hostname() + u.Path
 }
+
+// Maximum length of a URL: 8192 bytes
+func ValidURL(urlStr string) bool {
+	return len(urlStr) < 8192
+}

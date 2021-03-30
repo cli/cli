@@ -190,6 +190,8 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
+	var openURL string
+
 	if opts.WebMode {
 		if !opts.Autofill {
 			state.Title = opts.Title
@@ -199,7 +201,15 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		return previewPR(*opts, *ctx, *state)
+		openURL, err = generateCompareURL(*ctx, *state)
+		if err != nil {
+			return
+		}
+		if !utils.ValidURL(openURL) {
+			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
+			return
+		}
+		return previewPR(*opts, openURL)
 	}
 
 	if opts.TitleProvided {
@@ -291,8 +301,14 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
+	openURL, err = generateCompareURL(*ctx, *state)
+	if err != nil {
+		return
+	}
+
+	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmSubmission(!state.HasMetadata(), allowMetadata)
+	action, err := shared.ConfirmSubmission(allowPreview, allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -327,7 +343,7 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == shared.PreviewAction {
-		return previewPR(*opts, *ctx, *state)
+		return previewPR(*opts, openURL)
 	}
 
 	if action == shared.SubmitAction {
@@ -639,20 +655,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	return nil
 }
 
-func previewPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
-	if len(state.Projects) > 0 {
-		var err error
-		state.Projects, err = api.ProjectNamesToPaths(ctx.Client, ctx.BaseRepo, state.Projects)
-		if err != nil {
-			return fmt.Errorf("could not add to project: %w", err)
-		}
-	}
-
-	openURL, err := generateCompareURL(ctx, state)
-	if err != nil {
-		return err
-	}
-
+func previewPR(opts CreateOptions, openURL string) error {
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 	}
@@ -750,7 +753,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
 		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranchLabel))
-	url, err := shared.WithPrAndIssueQueryParams(u, state)
+	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state)
 	if err != nil {
 		return "", err
 	}

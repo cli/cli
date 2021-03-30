@@ -835,6 +835,26 @@ func TestPRCreate_web(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
 }
 
+func TestPRCreate_webLongURL(t *testing.T) {
+	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
+	err := ioutil.WriteFile(longBodyFile, make([]byte, 9216), 0600)
+	require.NoError(t, err)
+
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+
+	_, err = runCommand(http, nil, "feature", false, fmt.Sprintf("--body-file '%s' --web --head=feature", longBodyFile))
+	require.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
+}
+
 func TestPRCreate_webProject(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
