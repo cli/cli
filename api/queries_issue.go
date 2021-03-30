@@ -233,7 +233,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	return &payload, nil
 }
 
-func IssueList(client *Client, repo ghrepo.Interface, state string, labels []string, assigneeString string, limit int, authorString string, mentionString string, milestoneString string) (*IssuesAndTotalCount, error) {
+func IssueList(client *Client, repo ghrepo.Interface, state string, assigneeString string, limit int, authorString string, mentionString string, milestoneString string) (*IssuesAndTotalCount, error) {
 	var states []string
 	switch state {
 	case "open", "":
@@ -247,10 +247,10 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 	}
 
 	query := fragments + `
-	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $labels: [String!], $assignee: String, $author: String, $mention: String, $milestone: String) {
+	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $assignee: String, $author: String, $mention: String, $milestone: String) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
-			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, labels: $labels, filterBy: {assignee: $assignee, createdBy: $author, mentioned: $mention, milestone: $milestone}) {
+			issues(first: $limit, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC}, states: $states, filterBy: {assignee: $assignee, createdBy: $author, mentioned: $mention, milestone: $milestone}) {
 				totalCount
 				nodes {
 					...issue
@@ -268,9 +268,6 @@ func IssueList(client *Client, repo ghrepo.Interface, state string, labels []str
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
 		"states": states,
-	}
-	if len(labels) > 0 {
-		variables["labels"] = labels
 	}
 	if assigneeString != "" {
 		variables["assignee"] = assigneeString
@@ -451,6 +448,80 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	return &resp.Repository.Issue, nil
+}
+
+func IssueSearch(client *Client, repo ghrepo.Interface, searchQuery string, limit int) (*IssuesAndTotalCount, error) {
+	query := fragments +
+		`query IssueSearch($repo: String!, $owner: String!, $type: SearchType!, $limit: Int, $after: String, $query: String!) {
+			repository(name: $repo, owner: $owner) {
+				hasIssuesEnabled
+			}
+			search(type: $type, last: $limit, after: $after, query: $query) {
+				issueCount
+				nodes { ...issue }
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+			}
+		}`
+
+	type response struct {
+		Repository struct {
+			HasIssuesEnabled bool
+		}
+		Search struct {
+			IssueCount int
+			Nodes      []Issue
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+
+	perPage := min(limit, 100)
+	searchQuery = fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
+		"type":  "ISSUE",
+		"limit": perPage,
+		"query": searchQuery,
+	}
+
+	ic := IssuesAndTotalCount{}
+
+loop:
+	for {
+		var resp response
+		err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return nil, err
+		}
+
+		if !resp.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+
+		ic.TotalCount = resp.Search.IssueCount
+
+		for _, issue := range resp.Search.Nodes {
+			ic.Issues = append(ic.Issues, issue)
+			if len(ic.Issues) == limit {
+				break loop
+			}
+		}
+
+		if !resp.Search.PageInfo.HasNextPage {
+			break
+		}
+		variables["after"] = resp.Search.PageInfo.EndCursor
+		variables["perPage"] = min(perPage, limit-len(ic.Issues))
+	}
+
+	return &ic, nil
 }
 
 func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {

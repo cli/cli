@@ -150,7 +150,17 @@ type RunsPayload struct {
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit, workflowID int) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
+	return getRuns(client, repo, path, limit)
+}
+
 func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
+	return getRuns(client, repo, path, limit)
+}
+
+func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) ([]Run, error) {
 	perPage := limit
 	page := 1
 	if limit > 100 {
@@ -162,9 +172,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error
 	for len(runs) < limit {
 		var result RunsPayload
 
-		path := fmt.Sprintf("repos/%s/actions/runs?per_page=%d&page=%d", ghrepo.FullName(repo), perPage, page)
+		pagedPath := fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page)
 
-		err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+		err := client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -269,4 +279,72 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 	}
 
 	return "-", cs.Yellow
+}
+
+func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int, error) {
+	type response struct {
+		Repository struct {
+			PullRequests struct {
+				Nodes []struct {
+					Number         int
+					HeadRepository struct {
+						Owner struct {
+							Login string
+						}
+						Name string
+					}
+				}
+			}
+		}
+		Number int
+	}
+
+	variables := map[string]interface{}{
+		"owner":       repo.RepoOwner(),
+		"repo":        repo.RepoName(),
+		"headRefName": run.HeadBranch,
+	}
+
+	query := `
+		query PullRequestForRun($owner: String!, $repo: String!, $headRefName: String!) {
+			repository(owner: $owner, name: $repo) {
+				pullRequests(headRefName: $headRefName, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) {
+					nodes {
+						number
+						headRepository {
+							owner {
+								login
+							}
+							name
+						}
+					}
+				}
+			}
+		}`
+
+	var resp response
+
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	if err != nil {
+		return -1, err
+	}
+
+	prs := resp.Repository.PullRequests.Nodes
+	if len(prs) == 0 {
+		return -1, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
+	}
+
+	number := -1
+
+	for _, pr := range prs {
+		if pr.HeadRepository.Owner.Login == run.HeadRepository.Owner.Login && pr.HeadRepository.Name == run.HeadRepository.Name {
+			number = pr.Number
+		}
+	}
+
+	if number == -1 {
+		return number, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
+	}
+
+	return number, nil
 }

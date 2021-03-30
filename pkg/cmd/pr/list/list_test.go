@@ -24,8 +24,10 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
+		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -48,8 +50,9 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -106,10 +109,9 @@ func TestPRList_filtering(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
 			assert.Equal(t, []interface{}{"OPEN", "CLOSED", "MERGED"}, params["state"].([]interface{}))
-			assert.Equal(t, []interface{}{"one", "two", "three"}, params["labels"].([]interface{}))
 		}))
 
-	output, err := runCommand(http, true, `-s all -l one,two -l three`)
+	output, err := runCommand(http, true, `-s all`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +131,7 @@ func TestPRList_filteringRemoveDuplicate(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestList\b`),
 		httpmock.FileResponse("./fixtures/prListWithDuplicates.json"))
 
-	output, err := runCommand(http, true, "-l one,two")
+	output, err := runCommand(http, true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,9 +165,9 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query PullRequestList\b`),
+		httpmock.GraphQL(`query PullRequestSearch\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, `repo:OWNER/REPO assignee:hubot is:pr sort:created-desc is:merged label:"needs tests" base:"develop"`, params["q"].(string))
+			assert.Equal(t, `repo:OWNER/REPO is:pr is:merged assignee:hubot label:"needs tests" base:develop`, params["q"].(string))
 		}))
 
 	_, err := runCommand(http, true, `-s merged -l "needs tests" -a hubot -B develop`)
@@ -198,13 +200,8 @@ func TestPRList_web(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", url)
-	})
 
 	output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
 	if err != nil {
@@ -213,4 +210,5 @@ func TestPRList_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", output.BrowsedURL)
 }

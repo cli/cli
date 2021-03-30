@@ -37,7 +37,10 @@ func main() {
 	}
 
 	io, _, _, _ := iostreams.Test()
-	rootCmd := root.NewCmdRoot(&cmdutil.Factory{IOStreams: io}, "", "")
+	rootCmd := root.NewCmdRoot(&cmdutil.Factory{
+		IOStreams: io,
+		Browser:   &browser{},
+	}, "", "")
 	rootCmd.InitDefaultHelpCmd()
 
 	err := os.MkdirAll(*dir, 0755)
@@ -82,4 +85,10 @@ func linkHandler(name string) string {
 func fatal(msg interface{}) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
+}
+
+type browser struct{}
+
+func (b *browser) Browse(url string) error {
+	return nil
 }

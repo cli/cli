@@ -47,7 +47,7 @@ func TestIssueList(t *testing.T) {
 	)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
-	_, err := IssueList(client, repo, "open", []string{}, "", 251, "", "", "")
+	_, err := IssueList(client, repo, "open", "", 251, "", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestIssueList_pagination(t *testing.T) {
 	)
 
 	repo := ghrepo.New("OWNER", "REPO")
-	res, err := IssueList(client, repo, "", nil, "", 0, "", "", "")
+	res, err := IssueList(client, repo, "", "", 0, "", "", "")
 	if err != nil {
 		t.Fatalf("IssueList() error = %v", err)
 	}

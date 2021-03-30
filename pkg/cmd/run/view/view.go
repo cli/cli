@@ -107,7 +107,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	prNumber := ""
-	number, err := prForRun(client, repo, *run)
+	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
@@ -137,17 +137,10 @@ func runView(opts *ViewOptions) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	title := fmt.Sprintf("%s %s%s",
-		cs.Bold(run.HeadBranch), run.Name, prNumber)
-	symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
-	id := cs.Cyanf("%d", run.ID)
-
-	fmt.Fprintln(out)
-	fmt.Fprintf(out, "%s %s · %s\n", symbolColor(symbol), title, id)
-
 	ago := opts.Now().Sub(run.CreatedAt)
 
-	fmt.Fprintf(out, "Triggered via %s %s\n", run.Event, utils.FuzzyAgo(ago))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 && run.Conclusion == shared.Failure {
@@ -166,27 +159,12 @@ func runView(opts *ViewOptions) error {
 
 	fmt.Fprintln(out, cs.Bold("JOBS"))
 
-	for _, job := range jobs {
-		symbol, symbolColor := shared.Symbol(cs, job.Status, job.Conclusion)
-		id := cs.Cyanf("%d", job.ID)
-		fmt.Fprintf(out, "%s %s (ID %s)\n", symbolColor(symbol), job.Name, id)
-		if opts.Verbose || shared.IsFailureState(job.Conclusion) {
-			for _, step := range job.Steps {
-				stepSymbol, stepSymColor := shared.Symbol(cs, step.Status, step.Conclusion)
-				fmt.Fprintf(out, "  %s %s\n", stepSymColor(stepSymbol), step.Name)
-			}
-		}
-	}
+	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, opts.Verbose))
 
 	if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
-
-		for _, a := range annotations {
-			fmt.Fprintf(out, "%s %s\n", shared.AnnotationSymbol(cs, a), a.Message)
-			fmt.Fprintln(out, cs.Grayf("%s: %s#%d\n",
-				a.JobName, a.Path, a.StartLine))
-		}
+		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
 	}
 
 	fmt.Fprintln(out)
@@ -198,72 +176,4 @@ func runView(opts *ViewOptions) error {
 	}
 
 	return nil
-}
-
-func prForRun(client *api.Client, repo ghrepo.Interface, run shared.Run) (int, error) {
-	type response struct {
-		Repository struct {
-			PullRequests struct {
-				Nodes []struct {
-					Number         int
-					HeadRepository struct {
-						Owner struct {
-							Login string
-						}
-						Name string
-					}
-				}
-			}
-		}
-		Number int
-	}
-
-	variables := map[string]interface{}{
-		"owner":       repo.RepoOwner(),
-		"repo":        repo.RepoName(),
-		"headRefName": run.HeadBranch,
-	}
-
-	query := `
-		query PullRequestForRun($owner: String!, $repo: String!, $headRefName: String!) {
-			repository(owner: $owner, name: $repo) {
-				pullRequests(headRefName: $headRefName, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) {
-					nodes {
-						number
-						headRepository {
-							owner {
-								login
-							}
-							name
-						}
-					}
-				}
-			}
-		}`
-
-	var resp response
-
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return -1, err
-	}
-
-	prs := resp.Repository.PullRequests.Nodes
-	if len(prs) == 0 {
-		return -1, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
-	}
-
-	number := -1
-
-	for _, pr := range prs {
-		if pr.HeadRepository.Owner.Login == run.HeadRepository.Owner.Login && pr.HeadRepository.Name == run.HeadRepository.Name {
-			number = pr.Number
-		}
-	}
-
-	if number == -1 {
-		return number, fmt.Errorf("no matching PR found for %s", run.HeadBranch)
-	}
-
-	return number, nil
 }

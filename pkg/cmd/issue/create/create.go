@@ -17,11 +17,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	RootDirOverride string
 
@@ -44,6 +49,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Browser:    f.Browser,
 	}
 
 	var bodyFile string
@@ -151,27 +157,25 @@ func createRun(opts *CreateOptions) (err error) {
 
 	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
+	var openURL string
+
 	if opts.WebMode {
-		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
-			if len(opts.Projects) > 0 {
-				var err error
-				tb.Projects, err = api.ProjectNamesToPaths(apiClient, baseRepo, tb.Projects)
-				if err != nil {
-					return fmt.Errorf("could not add to project: %w", err)
-				}
-			}
-			openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
+			openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
 			if err != nil {
 				return
 			}
+			if !utils.ValidURL(openURL) {
+				err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
+				return
+			}
 		} else if ok, _ := tpl.HasTemplates(); ok {
-			openURL += "/choose"
+			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new/choose")
 		}
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	if isTerminal {
@@ -234,7 +238,13 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), repo.ViewerCanTriage())
+		openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
+		if err != nil {
+			return
+		}
+
+		allowPreview := !tb.HasMetadata() && utils.ValidURL(openURL)
+		action, err = prShared.ConfirmSubmission(allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
 			return
@@ -271,22 +281,10 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if action == prShared.PreviewAction {
-		if len(tb.Projects) > 0 {
-			var err error
-			tb.Projects, err = api.ProjectNamesToPaths(apiClient, repo, tb.Projects)
-			if err != nil {
-				return fmt.Errorf("could not add to project: %w", err)
-			}
-		}
-		openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-		openURL, err = prShared.WithPrAndIssueQueryParams(openURL, tb)
-		if err != nil {
-			return
-		}
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	} else if action == prShared.SubmitAction {
 		params := map[string]interface{}{
 			"title": tb.Title,
@@ -313,4 +311,9 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	return
+}
+
+func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb shared.IssueMetadataState) (string, error) {
+	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
+	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
 }

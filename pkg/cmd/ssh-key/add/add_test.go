@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,9 @@ func Test_runAdd(t *testing.T) {
 
 	err := runAdd(&AddOptions{
 		IO: io,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: &tr}, nil
 		},

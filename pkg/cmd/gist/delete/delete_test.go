@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -133,6 +134,9 @@ func Test_deleteRun(t *testing.T) {
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
+		}
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		}
 		io, _, _, _ := iostreams.Test()
 		io.SetStdoutTTY(!tt.nontty)

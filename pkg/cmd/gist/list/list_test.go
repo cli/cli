@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -177,7 +178,12 @@ func Test_listRun(t *testing.T) {
 					)),
 				)
 			},
-			wantOut: "1234567890  cool.txt              1 file    public  about 6 hours ago\n4567890123                        1 file    public  about 6 hours ago\n2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
+			wantOut: heredoc.Doc(`
+				1234567890  cool.txt                         1 file    public  about 6 hours ago
+				4567890123                                   1 file    public  about 6 hours ago
+				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
+				3456789012  short desc                       11 files  secret  about 6 hours ago
+			`),
 		},
 		{
 			name: "with public filter",
@@ -206,7 +212,10 @@ func Test_listRun(t *testing.T) {
 					)),
 				)
 			},
-			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n4567890123            1 file  public  about 6 hours ago\n",
+			wantOut: heredoc.Doc(`
+				1234567890  cool.txt  1 file  public  about 6 hours ago
+				4567890123            1 file  public  about 6 hours ago
+			`),
 		},
 		{
 			name: "with secret filter",
@@ -250,7 +259,10 @@ func Test_listRun(t *testing.T) {
 					)),
 				)
 			},
-			wantOut: "2345678901  tea leaves thwart...  2 files   secret  about 6 hours ago\n3456789012  short desc            11 files  secret  about 6 hours ago\n",
+			wantOut: heredoc.Doc(`
+				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
+				3456789012  short desc                       11 files  secret  about 6 hours ago
+			`),
 		},
 		{
 			name: "with limit",
@@ -346,6 +358,10 @@ func Test_listRun(t *testing.T) {
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
+		}
+
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		}
 
 		io, _, stdout, _ := iostreams.Test()

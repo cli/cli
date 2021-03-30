@@ -190,6 +190,11 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
 	var repoToCreate ghrepo.Interface
 
 	if strings.Contains(opts.Name, "/") {
@@ -199,7 +204,11 @@ func createRun(opts *CreateOptions) error {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	} else {
-		repoToCreate = ghrepo.New("", opts.Name)
+		host, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
 	var templateRepoMainBranch string
@@ -276,11 +285,6 @@ func createRun(opts *CreateOptions) error {
 			fmt.Fprintln(stdout, repo.URL)
 		}
 
-		// TODO This is overly wordy and I'd like to streamline this.
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
 		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err

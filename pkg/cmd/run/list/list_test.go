@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
+	workflowShared "github.com/cli/cli/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -41,6 +42,14 @@ func TestNewCmdList(t *testing.T) {
 			name:     "bad limit",
 			cli:      "--limit hi",
 			wantsErr: true,
+		},
+		{
+			name: "workflow",
+			cli:  "--workflow foo.yml",
+			wants: ListOptions{
+				Limit:            defaultLimit,
+				WorkflowSelector: "foo.yml",
+			},
 		},
 	}
 
@@ -170,6 +179,24 @@ func TestListRun(t *testing.T) {
 			},
 			wantOut:    "",
 			wantErrOut: "No runs found\n",
+		},
+		{
+			name: "workflow selector",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				WorkflowSelector: "flow.yml",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/flow.yml"),
+					httpmock.JSONResponse(workflowShared.AWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.WorkflowRuns,
+					}))
+			},
+			wantOut: "-  cool commit  in progress  trunk  push  2\n✓  cool commit  successful   trunk  push  3\nX  cool commit  failed       trunk  push  1234\n\nFor details on a run, try: gh run view <run-id>\n",
 		},
 	}
 

@@ -212,36 +212,28 @@ func TestChecksRun_web(t *testing.T) {
 		isTTY      bool
 		wantStderr string
 		wantStdout string
+		wantBrowse string
 	}{
 		{
 			name:       "tty",
 			isTTY:      true,
 			wantStderr: "Opening github.com/OWNER/REPO/pull/123/checks in your browser.\n",
 			wantStdout: "",
+			wantBrowse: "https://github.com/OWNER/REPO/pull/123/checks",
 		},
 		{
 			name:       "nontty",
 			isTTY:      false,
 			wantStderr: "",
 			wantStdout: "",
+			wantBrowse: "https://github.com/OWNER/REPO/pull/123/checks",
 		},
 	}
-
-	reg := &httpmock.Registry{}
-
-	opts := &ChecksOptions{
-		WebMode: true,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		},
-		SelectorArg: "123",
-	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			browser := &cmdutil.TestBrowser{}
+			reg := &httpmock.Registry{}
+
 			reg.Register(
 				httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse("./fixtures/allPassing.json"))
 
@@ -250,17 +242,26 @@ func TestChecksRun_web(t *testing.T) {
 			io.SetStdinTTY(tc.isTTY)
 			io.SetStderrTTY(tc.isTTY)
 
-			opts.IO = io
-
-			cs, teardown := run.Stub()
+			_, teardown := run.Stub()
 			defer teardown(t)
-			cs.Register(`https://github\.com/OWNER/REPO/pull/123/checks$`, 0, "")
 
-			err := checksRun(opts)
+			err := checksRun(&ChecksOptions{
+				IO:      io,
+				Browser: browser,
+				WebMode: true,
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.New("OWNER", "REPO"), nil
+				},
+				SelectorArg: "123",
+			})
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantStdout, stdout.String())
 			assert.Equal(t, tc.wantStderr, stderr.String())
 			reg.Verify(t)
+			browser.Verify(t, tc.wantBrowse)
 		})
 	}
 }

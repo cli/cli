@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -15,6 +15,7 @@ import (
 type RemoveOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SecretName string
@@ -24,6 +25,7 @@ type RemoveOptions struct {
 func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Command {
 	opts := &RemoveOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
@@ -73,7 +75,16 @@ func removeRun(opts *RemoveOptions) error {
 		path = fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, opts.SecretName)
 	}
 
-	host := ghinstance.OverridableDefault()
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	err = client.REST(host, "DELETE", path, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete secret %s: %w", opts.SecretName, err)
