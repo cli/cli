@@ -173,6 +173,7 @@ func TestNewCmdComment(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: io,
+				Browser:   &cmdutil.TestBrowser{},
 			}
 
 			argv, err := shlex.Split(tt.input)

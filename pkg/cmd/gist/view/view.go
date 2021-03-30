@@ -20,10 +20,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	Browser    browser
 
 	Selector  string
 	Filename  string
@@ -37,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -106,7 +112,7 @@ func viewRun(opts *ViewOptions) error {
 		if opts.IO.IsStderrTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(gistURL))
 		}
-		return utils.OpenInBrowser(gistURL)
+		return opts.Browser.Browse(gistURL)
 	}
 
 	if strings.Contains(gistID, "/") {

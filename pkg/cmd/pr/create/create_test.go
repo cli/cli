@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -166,8 +165,10 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
+		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -211,8 +212,9 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -231,16 +233,13 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
-	})
 
 	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_recover(t *testing.T) {
@@ -823,10 +822,6 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
-	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -837,6 +832,7 @@ func TestPRCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_webProject(t *testing.T) {
@@ -877,10 +873,6 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
-	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -891,6 +883,7 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", output.BrowsedURL)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {

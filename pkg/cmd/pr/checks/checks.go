@@ -17,9 +17,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ChecksOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Browser    browser
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
 	Remotes    func() (context.Remotes, error)
@@ -36,6 +41,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 		BaseRepo:   f.BaseRepo,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -95,7 +101,7 @@ func checksRun(opts *ChecksOptions) error {
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	passing := 0

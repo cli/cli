@@ -99,15 +99,19 @@ func Test_RepoView_Web(t *testing.T) {
 		name       string
 		stdoutTTY  bool
 		wantStderr string
+		wantBrowse string
 	}{
 		{
 			name:       "tty",
 			stdoutTTY:  true,
 			wantStderr: "Opening github.com/OWNER/REPO in your browser.\n",
+			wantBrowse: "https://github.com/OWNER/REPO",
 		},
 		{
 			name:       "nontty",
+			stdoutTTY:  false,
 			wantStderr: "",
+			wantBrowse: "https://github.com/OWNER/REPO",
 		},
 	}
 
@@ -115,6 +119,7 @@ func Test_RepoView_Web(t *testing.T) {
 		reg := &httpmock.Registry{}
 		reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 
+		browser := &cmdutil.TestBrowser{}
 		opts := &ViewOptions{
 			Web: true,
 			HttpClient: func() (*http.Client, error) {
@@ -123,6 +128,7 @@ func Test_RepoView_Web(t *testing.T) {
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			},
+			Browser: browser,
 		}
 
 		io, _, stdout, stderr := iostreams.Test()
@@ -132,9 +138,8 @@ func Test_RepoView_Web(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			cs, teardown := run.Stub()
+			_, teardown := run.Stub()
 			defer teardown(t)
-			cs.Register(`https://github\.com/OWNER/REPO$`, 0, "")
 
 			if err := viewRun(opts); err != nil {
 				t.Errorf("viewRun() error = %v", err)
@@ -142,6 +147,7 @@ func Test_RepoView_Web(t *testing.T) {
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			reg.Verify(t)
+			browser.Verify(t, tt.wantBrowse)
 		})
 	}
 }
