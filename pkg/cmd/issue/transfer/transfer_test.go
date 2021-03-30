@@ -109,62 +109,6 @@ func Test_transferRun_noflags(t *testing.T) {
 	assert.Equal(t, "", output.String())
 }
 
-func Test_transferRun_destRepoNoPermission(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"hasIssuesEnabled": true,
-				"issue": { "id": "THE-ID", "number": 1234, "closed": true, "title": "The title of the issue"}
-			} } }`))
-
-	// destination repo info
-	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`
-				{ "data": { "repository": { 
-						"name": "REPO1",
-						"id": "dest-id",
-						"owner": { "login": "OWNER1" }, 
-						"hasIssuesEnabled": true,
-						"viewerPermission": "READ"
-				}}}`))
-
-	http.Register(
-		httpmock.GraphQL(`mutation transferIssue\b`),
-		httpmock.GraphQLMutation("{\"data\":{\"transferIssue\":null}, \"errors\":[{\"message\":\"OWNER does not have the correct permissions to execute `TransferIssue`\"}]}", func(input map[string]interface{}) {
-			assert.Equal(t, input["issueId"], "THE-ID")
-			assert.Equal(t, input["repositoryId"], "dest-id")
-		}))
-
-	_, err := runCommand(http, "1234 OWNER1/REPO1")
-	if err != nil {
-		assert.Equal(t, "GraphQL error: OWNER does not have the correct permissions to execute `TransferIssue`", err.Error())
-	}
-}
-
-func Test_transferRun_noSuchIssue(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "errors": [
-				{ "message": "Could not resolve to an Issue with the number of 1234." }
-			] }
-			`),
-	)
-
-	_, err := runCommand(http, "1234 OWNER1/REPO1")
-	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 1234." {
-		t.Errorf("error running command `issue transfer`: %v", err)
-	}
-}
-
 func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
@@ -189,7 +133,7 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 				}}}`))
 
 	http.Register(
-		httpmock.GraphQL(`mutation transferIssue\b`),
+		httpmock.GraphQL(`mutation IssueTransfer\b`),
 		httpmock.GraphQLMutation(`{"data":{"transferIssue":{"issue":{"url":"https://github.com/OWNER1/REPO1/issues/1"}}}}`, func(input map[string]interface{}) {
 			assert.Equal(t, input["issueId"], "THE-ID")
 			assert.Equal(t, input["repositoryId"], "dest-id")
@@ -199,5 +143,5 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running command `issue transfer`: %v", err)
 	}
-	assert.Equal(t, "✓ Issue transferred to https://github.com/OWNER1/REPO1/issues/1\n", output.String())
+	assert.Equal(t, "https://github.com/OWNER1/REPO1/issues/1\n", output.String())
 }

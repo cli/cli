@@ -1,15 +1,20 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
-	"net/http"
 )
 
 type TransferOptions struct {
@@ -31,7 +36,7 @@ func NewCmdTransfer(f *cmdutil.Factory, runF func(*TransferOptions) error) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "transfer {<number> | <url>} <destination-repo>",
-		Short: "Transfer issue",
+		Short: "Transfer issue to another repository",
 		Args:  cmdutil.ExactArgs(2, "issue and destination repository are required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
@@ -50,76 +55,60 @@ func NewCmdTransfer(f *cmdutil.Factory, runF func(*TransferOptions) error) *cobr
 }
 
 func transferRun(opts *TransferOptions) error {
-	client, err := opts.HttpClient()
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(client)
-
+	apiClient := api.NewClientFromHTTP(httpClient)
 	issue, _, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.IssueSelector)
 	if err != nil {
 		return err
 	}
 
-	var destRepo *api.Repository
-
-	dRepo, err := ghrepo.FromFullName(opts.DestRepoSelector)
+	destRepo, err := ghrepo.FromFullName(opts.DestRepoSelector)
 	if err != nil {
 		return err
 	}
 
-	destRepo, err = api.GitHubRepo(apiClient, dRepo)
+	url, err := issueTransfer(httpClient, issue.ID, destRepo)
 	if err != nil {
 		return err
 	}
 
-	url, err := issueTransfer(apiClient, destRepo, *issue)
-	if err != nil {
-		return err
-	}
-
-	completionMessage := fmt.Sprintf("Issue transferred to %s", url)
-
-	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
-	}
-
-	return nil
+	_, err = fmt.Fprintln(opts.IO.Out, url)
+	return err
 }
 
-func issueTransfer(client *api.Client, destRepo *api.Repository, issue api.Issue) (string, error) {
-	mutation := `
-	mutation transferIssue($input:TransferIssueInput!){
-		transferIssue(input: $input){
-			issue {
-				url
-			}
+func issueTransfer(httpClient *http.Client, issueID string, destRepo ghrepo.Interface) (string, error) {
+	var destinationRepoID string
+	if r, ok := destRepo.(*api.Repository); ok {
+		destinationRepoID = r.ID
+	} else {
+		apiClient := api.NewClientFromHTTP(httpClient)
+		r, err := api.GitHubRepo(apiClient, destRepo)
+		if err != nil {
+			return "", err
 		}
+		destinationRepoID = r.ID
 	}
-	`
 
-	type response struct {
+	var mutation struct {
 		TransferIssue struct {
 			Issue struct {
 				URL string
 			}
-		}
+		} `graphql:"transferIssue(input: $input)"`
 	}
 
 	variables := map[string]interface{}{
-		"input": map[string]interface{}{
-			"issueId":      issue.ID,
-			"repositoryId": destRepo.ID,
+		"input": githubv4.TransferIssueInput{
+			IssueID:      issueID,
+			RepositoryID: destinationRepoID,
 		},
 	}
 
-	var resp response
-
-	err := client.GraphQL(destRepo.RepoHost(), mutation, variables, &resp)
-	if err != nil {
-		return "", err
-	}
-	return resp.TransferIssue.Issue.URL, nil
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(destRepo.RepoHost()), httpClient)
+	err := gql.MutateNamed(context.Background(), "IssueTransfer", &mutation, variables)
+	return mutation.TransferIssue.Issue.URL, err
 }
