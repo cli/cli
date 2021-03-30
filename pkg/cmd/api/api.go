@@ -18,6 +18,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -45,6 +46,7 @@ type ApiOptions struct {
 	CacheTTL            time.Duration
 	FilterOutput        string
 
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
@@ -53,6 +55,7 @@ type ApiOptions struct {
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
 		Branch:     f.Branch,
@@ -288,7 +291,16 @@ func apiRun(opts *ApiOptions) error {
 		defer opts.IO.StopPager()
 	}
 
-	host := ghinstance.OverridableDefault()
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	if opts.Hostname != "" {
 		host = opts.Hostname
 	}

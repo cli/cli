@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
@@ -15,6 +15,7 @@ import (
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
 	Limit int
@@ -33,6 +34,7 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := ListOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 		Now:        time.Now,
 	}
@@ -105,7 +107,17 @@ func listRun(opts *ListOptions) error {
 		NonArchived: opts.NonArchived,
 	}
 
-	listResult, err := listRepos(httpClient, ghinstance.OverridableDefault(), opts.Limit, opts.Owner, filter)
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	listResult, err := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
 	if err != nil {
 		return err
 	}

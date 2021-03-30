@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -366,6 +368,11 @@ func Test_viewRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
+
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(true)
 		tt.opts.IO = io
@@ -465,7 +472,7 @@ func Test_promptGists(t *testing.T) {
 		as.StubOne(tt.gistIndex)
 
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, cs)
+			gistID, err := promptGists(client, ghinstance.Default(), cs)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -113,6 +114,7 @@ func TestListRun(t *testing.T) {
 
 			opts := tt.opts
 			opts.IO = io
+			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 
 			err := listRun(&opts)
 			if (err != nil) != tt.wantErr {

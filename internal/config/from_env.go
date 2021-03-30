@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	GH_HOST                 = "GH_HOST"
 	GH_TOKEN                = "GH_TOKEN"
 	GITHUB_TOKEN            = "GITHUB_TOKEN"
 	GH_ENTERPRISE_TOKEN     = "GH_ENTERPRISE_TOKEN"
@@ -44,6 +45,18 @@ func (c *envConfig) Hosts() ([]string, error) {
 		return hosts, nil
 	}
 	return hosts, err
+}
+
+func (c *envConfig) DefaultHost() (string, error) {
+	val, _, err := c.DefaultHostWithSource()
+	return val, err
+}
+
+func (c *envConfig) DefaultHostWithSource() (string, string, error) {
+	if host := os.Getenv(GH_HOST); host != "" {
+		return host, GH_HOST, nil
+	}
+	return c.Config.DefaultHostWithSource()
 }
 
 func (c *envConfig) Get(hostname, key string) (string, error) {

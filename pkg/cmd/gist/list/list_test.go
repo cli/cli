@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -346,6 +347,10 @@ func Test_listRun(t *testing.T) {
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
+		}
+
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		}
 
 		io, _, stdout, _ := iostreams.Test()

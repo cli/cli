@@ -15,7 +15,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -32,12 +32,14 @@ type CreateOptions struct {
 	FilenameOverride string
 	WebMode          bool
 
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := CreateOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
@@ -49,22 +51,22 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Gists can be created from one or multiple files. Alternatively, pass "-" as
 			file name to read from standard input.
-			
+
 			By default, gists are private; use '--public' to make publicly listed ones.
 		`),
 		Example: heredoc.Doc(`
 			# publish file 'hello.py' as a public gist
 			$ gh gist create --public hello.py
-			
+
 			# create a gist with a description
 			$ gh gist create hello.py -d "my Hello-World program in Python"
 
 			# create a gist containing several files
 			$ gh gist create hello.py world.py cool.txt
-			
+
 			# read from standard input to create a gist
 			$ gh gist create -
-			
+
 			# create a gist from output piped from another command
 			$ cat cool.txt | gh gist create
 		`),
@@ -128,7 +130,17 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	gist, err := createGist(httpClient, ghinstance.OverridableDefault(), opts.Description, opts.Public, files)
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {

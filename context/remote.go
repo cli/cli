@@ -54,6 +54,20 @@ func (r Remotes) Less(i, j int) bool {
 	return remoteNameSortScore(r[i].Name) > remoteNameSortScore(r[j].Name)
 }
 
+// Filter remotes by given hostnames, maintains original order
+func (r Remotes) FilterByHosts(hosts []string) Remotes {
+	filtered := make(Remotes, 0)
+	for _, rr := range r {
+		for _, host := range hosts {
+			if strings.EqualFold(rr.RepoHost(), host) {
+				filtered = append(filtered, rr)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 // Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
 	*git.Remote

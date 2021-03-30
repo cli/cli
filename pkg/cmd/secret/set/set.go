@@ -12,6 +12,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -23,6 +24,7 @@ import (
 type SetOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	RandomOverride io.Reader
@@ -37,6 +39,7 @@ type SetOptions struct {
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
 	opts := &SetOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
@@ -134,9 +137,19 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	var pk *PubKey
 	if orgName != "" {
-		pk, err = getOrgPublicKey(client, orgName)
+		pk, err = getOrgPublicKey(client, host, orgName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -152,7 +165,7 @@ func setRun(opts *SetOptions) error {
 	encoded := base64.StdEncoding.EncodeToString(eBody)
 
 	if orgName != "" {
-		err = putOrgSecret(client, pk, *opts, encoded)
+		err = putOrgSecret(client, host, pk, *opts, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}

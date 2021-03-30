@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -90,6 +91,9 @@ func Test_removeRun_repo(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
@@ -137,6 +141,9 @@ func Test_removeRun_org(t *testing.T) {
 
 			io, _, _, _ := iostreams.Test()
 
+			tt.opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}

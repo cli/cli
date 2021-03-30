@@ -14,7 +14,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -88,7 +87,17 @@ func editRun(opts *EditOptions) error {
 
 	apiClient := api.NewClientFromHTTP(client)
 
-	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	gist, err := shared.GetGist(client, host, gistID)
 	if err != nil {
 		if errors.Is(err, shared.NotFoundErr) {
 			return fmt.Errorf("gist not found: %s", gistID)
@@ -96,7 +105,7 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	username, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
+	username, err := api.CurrentLoginName(apiClient, host)
 	if err != nil {
 		return err
 	}
@@ -112,7 +121,7 @@ func editRun(opts *EditOptions) error {
 		}
 
 		gist.Files = files
-		return updateGist(apiClient, ghinstance.OverridableDefault(), gist)
+		return updateGist(apiClient, host, gist)
 	}
 
 	filesToUpdate := map[string]string{}
@@ -210,7 +219,7 @@ func editRun(opts *EditOptions) error {
 		return nil
 	}
 
-	err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
+	err = updateGist(apiClient, host, gist)
 	if err != nil {
 		return err
 	}

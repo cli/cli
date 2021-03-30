@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -21,6 +22,7 @@ import (
 
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 
 	Selector  string
@@ -33,6 +35,7 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
@@ -72,9 +75,19 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	hostname, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
-		gistID, err = promptGists(client, cs)
+		gistID, err = promptGists(client, hostname, cs)
 		if err != nil {
 			return err
 		}
@@ -88,7 +101,6 @@ func viewRun(opts *ViewOptions) error {
 	if opts.Web {
 		gistURL := gistID
 		if !strings.Contains(gistURL, "/") {
-			hostname := ghinstance.OverridableDefault()
 			gistURL = ghinstance.GistPrefix(hostname) + gistID
 		}
 		if opts.IO.IsStderrTTY() {
@@ -105,7 +117,7 @@ func viewRun(opts *ViewOptions) error {
 		gistID = id
 	}
 
-	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
+	gist, err := shared.GetGist(client, hostname, gistID)
 	if err != nil {
 		return err
 	}
@@ -190,8 +202,8 @@ func viewRun(opts *ViewOptions) error {
 	return nil
 }
 
-func promptGists(client *http.Client, cs *iostreams.ColorScheme) (gistID string, err error) {
-	gists, err := shared.ListGists(client, ghinstance.OverridableDefault(), 10, "all")
+func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
+	gists, err := shared.ListGists(client, host, 10, "all")
 	if err != nil {
 		return "", err
 	}
