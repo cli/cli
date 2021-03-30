@@ -145,7 +145,7 @@ func listRun(opts *ListOptions) error {
 func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
-	if filters.Search != "" {
+	if filters.Search != "" || len(filters.Labels) > 0 {
 		if milestoneNumber, err := strconv.ParseInt(filters.Milestone, 10, 32); err == nil {
 			milestone, err := api.MilestoneByNumber(apiClient, repo, int32(milestoneNumber))
 			if err != nil {
@@ -176,7 +176,6 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 		apiClient,
 		repo,
 		filters.State,
-		filters.Labels,
 		filterAssignee,
 		limit,
 		filterAuthor,

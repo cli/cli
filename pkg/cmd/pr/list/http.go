@@ -24,7 +24,7 @@ const fragment = `fragment pr on PullRequest {
 }`
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
-	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" {
+	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0 {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
 
@@ -48,14 +48,12 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 			$limit: Int!,
 			$endCursor: String,
 			$baseBranch: String,
-			$labels: [String!],
 			$state: [PullRequestState!] = OPEN
 		) {
 			repository(owner: $owner, name: $repo) {
 				pullRequests(
 					states: $state,
 					baseRefName: $baseBranch,
-					labels: $labels,
 					first: $limit,
 					after: $endCursor,
 					orderBy: {field: CREATED_AT, direction: DESC}
@@ -74,9 +72,8 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{
-		"owner":  repo.RepoOwner(),
-		"repo":   repo.RepoName(),
-		"labels": filters.Labels,
+		"owner": repo.RepoOwner(),
+		"repo":  repo.RepoName(),
 	}
 
 	switch filters.State {
@@ -135,10 +132,6 @@ loop:
 }
 
 func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
-	if len(filters.Labels) > 1 {
-		return nil, fmt.Errorf("multiple labels with --assignee are not supported")
-	}
-
 	type response struct {
 		Search struct {
 			Nodes    []api.PullRequest
@@ -188,8 +181,8 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 	if filters.Assignee != "" {
 		q.AssignedTo(filters.Assignee)
 	}
-	if len(filters.Labels) > 0 {
-		q.AddLabel(filters.Labels[0])
+	for _, label := range filters.Labels {
+		q.AddLabel(label)
 	}
 	if filters.BaseBranch != "" {
 		q.SetBaseBranch(filters.BaseBranch)
