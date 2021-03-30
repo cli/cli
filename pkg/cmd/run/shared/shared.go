@@ -218,13 +218,7 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) 
 	return result.Jobs, nil
 }
 
-func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Interface) (string, error) {
-	// TODO arbitrary limit
-	runs, err := GetRuns(client, repo, 10)
-	if err != nil {
-		return "", err
-	}
-
+func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
 
 	candidates := []string{}
@@ -237,7 +231,7 @@ func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Int
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
 	// become contiguous
-	err = prompt.SurveyAskOne(&survey.Select{
+	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "Select a workflow run",
 		Options:  candidates,
 		PageSize: 10,
