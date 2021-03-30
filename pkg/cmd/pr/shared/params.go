@@ -29,12 +29,11 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
 	if len(state.Projects) > 0 {
-		var err error
-		state.Projects, err = api.ProjectNamesToPaths(client, baseRepo, state.Projects)
+		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects)
 		if err != nil {
 			return "", fmt.Errorf("could not add to project: %w", err)
 		}
-		q.Set("projects", strings.Join(state.Projects, ","))
+		q.Set("projects", strings.Join(projectPaths, ","))
 	}
 	if len(state.Milestones) > 0 {
 		q.Set("milestone", state.Milestones[0])

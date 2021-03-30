@@ -538,7 +538,7 @@ func TestIssueCreate_webLongURL(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = runCommand(nil, true, fmt.Sprintf("-F '%s' --web", longBodyFile))
-	require.EqualError(t, err, "Failed to create URL: maximum URL length exceeded")
+	require.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
 }
 
 func TestIssueCreate_webTitleBody(t *testing.T) {

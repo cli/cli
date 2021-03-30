@@ -852,7 +852,7 @@ func TestPRCreate_webLongURL(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
 	_, err = runCommand(http, nil, "feature", false, fmt.Sprintf("--body-file '%s' --web --head=feature", longBodyFile))
-	require.EqualError(t, err, "Failed to create URL: maximum URL length exceeded")
+	require.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
 }
 
 func TestPRCreate_webProject(t *testing.T) {

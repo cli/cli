@@ -201,12 +201,12 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		openURL, err = generatePreviewURL(*ctx, *state)
+		openURL, err = generateCompareURL(*ctx, *state)
 		if err != nil {
 			return
 		}
 		if !utils.ValidURL(openURL) {
-			err = fmt.Errorf("Failed to create URL: maximum URL length exceeded")
+			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 			return
 		}
 		return previewPR(*opts, openURL)
@@ -301,14 +301,13 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	openURL, err = generatePreviewURL(*ctx, *state)
+	openURL, err = generateCompareURL(*ctx, *state)
 	if err != nil {
 		return
 	}
 
-	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
-
+	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmSubmission(allowPreview, allowMetadata)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
@@ -762,12 +761,3 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
-
-func generatePreviewURL(ctx CreateContext, state shared.IssueMetadataState) (string, error) {
-	openURL, err := generateCompareURL(ctx, state)
-	if err != nil {
-		return "", err
-	}
-
-	return openURL, nil
-}

@@ -166,14 +166,11 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 			if !utils.ValidURL(openURL) {
-				err = fmt.Errorf("Failed to create URL: maximum URL length exceeded")
+				err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 				return
 			}
 		} else if ok, _ := tpl.HasTemplates(); ok {
 			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new/choose")
-			if err != nil {
-				return
-			}
 		}
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
@@ -247,7 +244,6 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 
 		allowPreview := !tb.HasMetadata() && utils.ValidURL(openURL)
-
 		action, err = prShared.ConfirmSubmission(allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
@@ -319,10 +315,5 @@ func createRun(opts *CreateOptions) (err error) {
 
 func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb shared.IssueMetadataState) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-	openURL, err := prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
-	if err != nil {
-		return "", err
-	}
-
-	return openURL, nil
+	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
 }
