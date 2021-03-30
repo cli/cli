@@ -214,27 +214,6 @@ func TestIssueList_web(t *testing.T) {
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
 }
 
-func TestIssueList_Search_web(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1+transfer", url)
-	})
-
-	output, err := runCommand(http, true, "--web -a peter -A john -l bug -l docs -L 10 -s all --mention frank --milestone v1.1 --search transfer")
-	if err != nil {
-		t.Errorf("error running command `issue list` with `--web` flag: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", output.Stderr())
-}
-
 func Test_issueList(t *testing.T) {
 	type args struct {
 		repo    ghrepo.Interface

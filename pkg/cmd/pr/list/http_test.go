@@ -19,7 +19,7 @@ func Test_listPullRequests(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     args
-		httpStub func(*httpmock.Registry)
+		httpStub func(*testing.T, *httpmock.Registry)
 		wantErr  bool
 	}{
 		{
@@ -31,7 +31,7 @@ func Test_listPullRequests(t *testing.T) {
 					State: "open",
 				},
 			},
-			httpStub: func(r *httpmock.Registry) {
+			httpStub: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query PullRequestList\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
@@ -56,7 +56,7 @@ func Test_listPullRequests(t *testing.T) {
 					State: "closed",
 				},
 			},
-			httpStub: func(r *httpmock.Registry) {
+			httpStub: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query PullRequestList\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
@@ -82,12 +82,12 @@ func Test_listPullRequests(t *testing.T) {
 					Labels: []string{"hello", "one world"},
 				},
 			},
-			httpStub: func(r *httpmock.Registry) {
+			httpStub: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"q":     `repo:OWNER/REPO is:pr is:open label:hello label:"one world" sort:created-desc`,
+							"q":     `repo:OWNER/REPO is:pr is:open label:hello label:"one world"`,
 							"limit": float64(30),
 						}
 						if !reflect.DeepEqual(vars, want) {
@@ -106,7 +106,7 @@ func Test_listPullRequests(t *testing.T) {
 					Author: "monalisa",
 				},
 			},
-			httpStub: func(r *httpmock.Registry) {
+			httpStub: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
@@ -130,7 +130,7 @@ func Test_listPullRequests(t *testing.T) {
 					Search: "one world in:title",
 				},
 			},
-			httpStub: func(r *httpmock.Registry) {
+			httpStub: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
@@ -149,7 +149,7 @@ func Test_listPullRequests(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			if tt.httpStub != nil {
-				tt.httpStub(reg)
+				tt.httpStub(t, reg)
 			}
 			httpClient := &http.Client{Transport: reg}
 
