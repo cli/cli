@@ -92,7 +92,12 @@ func runView(opts *ViewOptions) error {
 
 	if opts.Prompt {
 		cs := opts.IO.ColorScheme()
-		runID, err = shared.PromptForRun(cs, client, repo)
+		// TODO arbitrary limit
+		runs, err := shared.GetRuns(client, repo, 10)
+		if err != nil {
+			return fmt.Errorf("failed to get runs: %w", err)
+		}
+		runID, err = shared.PromptForRun(cs, runs)
 		if err != nil {
 			return err
 		}
