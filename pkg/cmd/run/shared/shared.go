@@ -192,6 +192,9 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) 
 		var result RunsPayload
 
 		parsed, err := url.Parse(path)
+		if err != nil {
+			return nil, err
+		}
 		query := parsed.Query()
 		query.Set("per_page", fmt.Sprintf("%d", perPage))
 		query.Set("page", fmt.Sprintf("%d", page))
