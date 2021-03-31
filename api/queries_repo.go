@@ -312,9 +312,14 @@ type repositoryV3 struct {
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+func ForkRepo(client *Client, repo ghrepo.Interface, toOrg string) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
 	body := bytes.NewBufferString(`{}`)
+	if toOrg != "" {
+		orgBody := fmt.Sprintf(`{ "organization": "%s" }`, toOrg)
+		body = bytes.NewBufferString(orgBody)
+	}
+
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
