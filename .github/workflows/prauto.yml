@@ -32,13 +32,13 @@ jobs:
                   columns(first:10) { nodes {id,name} }
                 }
               }
-            }' -F owner=:owner -F repo=:repo \
+            }' -f owner="${GH_REPO%/*}" -f repo="${GH_REPO#*/}" \
               -q ".data.repository.project.columns.nodes[] | select(.name | startswith(\"$1\")) | .id"
           }
 
           addToBoard () {
             gh api graphql --silent -f query='
-              mutation($colID:ID!, $pr:ID!) { addProjectCard(input: { projectColumnId: $colID, contentId: $prID }) { clientMutationId } }
+              mutation($colID:ID!, $prID:ID!) { addProjectCard(input: { projectColumnId: $colID, contentId: $prID }) { clientMutationId } }
             ' -f colID="$(colID "Needs review")" -f prID="$PRID"
           }
 
