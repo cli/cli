@@ -11,8 +11,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
@@ -28,6 +29,7 @@ type browser interface {
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
 
@@ -40,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Browser:    f.Browser,
 	}
@@ -81,22 +84,12 @@ func viewRun(opts *ViewOptions) error {
 	var toView ghrepo.Interface
 	apiClient := api.NewClientFromHTTP(httpClient)
 	if opts.RepoArg == "" {
-		var err error
 		toView, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
 	} else {
-		var err error
-		viewURL := opts.RepoArg
-		if !strings.Contains(viewURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-			if err != nil {
-				return err
-			}
-			viewURL = currentUser + "/" + viewURL
-		}
-		toView, err = ghrepo.FromFullName(viewURL)
+		toView, err = shared.NewRepo(opts.RepoArg, opts.Config, apiClient)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
@@ -147,9 +140,9 @@ func viewRun(opts *ViewOptions) error {
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
 		{{.Description}}
-		
+
 		{{.Readme}}
-		
+
 		{{.View}}
 	`)
 

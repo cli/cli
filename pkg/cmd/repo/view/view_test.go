@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -63,6 +64,7 @@ func TestNewCmdView(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: io,
+				Config:    func() (config.Config, error) { return config.NewBlankConfig(), nil },
 			}
 
 			// THOUGHT: this seems ripe for cmdutil. It's almost identical to the set up for the same test
@@ -127,6 +129,9 @@ func Test_RepoView_Web(t *testing.T) {
 			},
 			BaseRepo: func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Config: func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
 			},
 			Browser: browser,
 		}
@@ -255,6 +260,10 @@ func Test_ViewRun(t *testing.T) {
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			repo, _ := ghrepo.FromFullName(tt.repoName)
 			return repo, nil
+		}
+
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		}
 
 		reg := &httpmock.Registry{}
@@ -527,6 +536,9 @@ func Test_ViewRun_WithoutUsername(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		IO: io,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 	}
 
 	if err := viewRun(opts); err != nil {

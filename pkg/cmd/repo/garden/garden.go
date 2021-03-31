@@ -15,8 +15,9 @@ import (
 	"syscall"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -89,6 +90,7 @@ func (p *Player) move(direction Direction) bool {
 type GardenOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	RepoArg string
@@ -98,6 +100,7 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 	opts := GardenOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 	}
 
@@ -136,9 +139,9 @@ func gardenRun(opts *GardenOptions) error {
 	if err != nil {
 		return err
 	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var toView ghrepo.Interface
-	apiClient := api.NewClientFromHTTP(httpClient)
 	if opts.RepoArg == "" {
 		var err error
 		toView, err = opts.BaseRepo()
@@ -147,15 +150,7 @@ func gardenRun(opts *GardenOptions) error {
 		}
 	} else {
 		var err error
-		viewURL := opts.RepoArg
-		if !strings.Contains(viewURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-			if err != nil {
-				return err
-			}
-			viewURL = currentUser + "/" + viewURL
-		}
-		toView, err = ghrepo.FromFullName(viewURL)
+		toView, err = shared.NewRepo(opts.RepoArg, opts.Config, apiClient)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}

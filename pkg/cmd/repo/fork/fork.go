@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -14,10 +12,10 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -118,6 +116,13 @@ func forkRun(opts *ForkOptions) error {
 	var repoToFork ghrepo.Interface
 	var err error
 	inParent := false // whether or not we're forking the repo we're currently "in"
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return fmt.Errorf("unable to create client: %w", err)
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
 	if opts.Repository == "" {
 		baseRepo, err := opts.BaseRepo()
 		if err != nil {
@@ -126,33 +131,9 @@ func forkRun(opts *ForkOptions) error {
 		inParent = true
 		repoToFork = baseRepo
 	} else {
-		repoArg := opts.Repository
-
-		if utils.IsURL(repoArg) {
-			parsedURL, err := url.Parse(repoArg)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-
-			repoToFork, err = ghrepo.FromURL(parsedURL)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-
-		} else if strings.HasPrefix(repoArg, "git@") {
-			parsedURL, err := git.ParseURL(repoArg)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-			repoToFork, err = ghrepo.FromURL(parsedURL)
-			if err != nil {
-				return fmt.Errorf("did not understand argument: %w", err)
-			}
-		} else {
-			repoToFork, err = ghrepo.FromFullName(repoArg)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
+		repoToFork, err = shared.NewRepo(opts.Repository, opts.Config, apiClient)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
 		}
 	}
 
@@ -160,13 +141,6 @@ func forkRun(opts *ForkOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	stderr := opts.IO.ErrOut
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("unable to create client: %w", err)
-	}
-
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
 	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)

@@ -14,7 +14,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
@@ -23,6 +25,7 @@ import (
 
 type CreditsOptions struct {
 	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
 
@@ -33,6 +36,7 @@ type CreditsOptions struct {
 func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Repository: "cli/cli",
@@ -71,6 +75,7 @@ func NewCmdCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.
 func NewCmdRepoCredits(f *cmdutil.Factory, runF func(*CreditsOptions) error) *cobra.Command {
 	opts := &CreditsOptions{
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		IO:         f.IOStreams,
 	}
@@ -127,7 +132,7 @@ func creditsRun(opts *CreditsOptions) error {
 			return err
 		}
 	} else {
-		baseRepo, err = ghrepo.FromFullName(opts.Repository)
+		baseRepo, err = shared.NewRepo(opts.Repository, opts.Config, client)
 		if err != nil {
 			return err
 		}

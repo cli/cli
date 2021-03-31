@@ -12,9 +12,9 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -190,47 +190,21 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	cfg, err := opts.Config()
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var repoToCreate ghrepo.Interface
-
-	if strings.Contains(opts.Name, "/") {
-		var err error
-		repoToCreate, err = ghrepo.FromFullName(opts.Name)
-		if err != nil {
-			return fmt.Errorf("argument error: %w", err)
-		}
-	} else {
-		host, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
-		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
+	repoToCreate, err := shared.NewRepo(opts.Name, opts.Config, nil)
+	if err != nil {
+		return fmt.Errorf("argument error: %w", err)
 	}
 
 	var templateRepoMainBranch string
 	// Find template repo ID
 	if opts.Template != "" {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return err
-		}
-
-		var toClone ghrepo.Interface
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		cloneURL := opts.Template
-		if !strings.Contains(cloneURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-			if err != nil {
-				return err
-			}
-			cloneURL = currentUser + "/" + cloneURL
-		}
-		toClone, err = ghrepo.FromFullName(cloneURL)
+		toClone, err := shared.NewRepo(opts.Template, opts.Config, apiClient)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
@@ -253,11 +227,6 @@ func createRun(opts *CreateOptions) error {
 		HomepageURL:      opts.Homepage,
 		HasIssuesEnabled: opts.EnableIssues,
 		HasWikiEnabled:   opts.EnableWiki,
-	}
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
 	}
 
 	createLocalDirectory := opts.ConfirmSubmit
@@ -285,6 +254,10 @@ func createRun(opts *CreateOptions) error {
 			fmt.Fprintln(stdout, repo.URL)
 		}
 
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
 		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err

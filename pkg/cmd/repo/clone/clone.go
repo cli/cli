@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -82,7 +83,6 @@ func cloneRun(opts *CloneOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	repositoryIsURL := strings.Contains(opts.Repository, ":")
-	repositoryIsFullName := !repositoryIsURL && strings.Contains(opts.Repository, "/")
 
 	var repo ghrepo.Interface
 	var protocol string
@@ -101,22 +101,7 @@ func cloneRun(opts *CloneOptions) error {
 		}
 		protocol = repoURL.Scheme
 	} else {
-		var fullName string
-		if repositoryIsFullName {
-			fullName = opts.Repository
-		} else {
-			host, err := cfg.DefaultHost()
-			if err != nil {
-				return err
-			}
-			currentUser, err := api.CurrentLoginName(apiClient, host)
-			if err != nil {
-				return err
-			}
-			fullName = currentUser + "/" + opts.Repository
-		}
-
-		repo, err = ghrepo.FromFullName(fullName)
+		repo, err = shared.NewRepo(opts.Repository, opts.Config, apiClient)
 		if err != nil {
 			return err
 		}

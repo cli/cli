@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/issue/shared"
+	repoShared "github.com/cli/cli/pkg/cmd/repo/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
@@ -66,7 +67,7 @@ func transferRun(opts *TransferOptions) error {
 		return err
 	}
 
-	destRepo, err := ghrepo.FromFullName(opts.DestRepoSelector)
+	destRepo, err := repoShared.NewRepo(opts.DestRepoSelector, opts.Config, apiClient)
 	if err != nil {
 		return err
 	}
