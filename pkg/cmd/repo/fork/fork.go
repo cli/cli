@@ -189,7 +189,6 @@ func forkRun(opts *ForkOptions) error {
 				"already exists")
 		} else {
 			fmt.Fprintf(stderr, "%s already exists", ghrepo.FullName(forkedRepo))
-			return nil
 		}
 	} else {
 		if connectedToTerminal {
