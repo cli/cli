@@ -26,6 +26,9 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			actionsRun(opts)
 		},
+		Annotations: map[string]string{
+			"IsActions": "true",
+		},
 	}
 
 	return cmd
