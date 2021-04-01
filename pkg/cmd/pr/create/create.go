@@ -468,9 +468,24 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, client)
 	if err != nil {
 		return nil, err
+	}
+
+	if opts.RepoOverride != "" {
+		fb := func() (string, error) {
+			cfg, err := opts.Config()
+			if err != nil {
+				return "", err
+			}
+			return cfg.DefaultHost()
+		}
+		base, err := cmdutil.NewRepo(opts.RepoOverride, fb, nil)
+		if err != nil {
+			return nil, err
+		}
+		repoContext.SetBaseOverride(base)
 	}
 
 	var baseRepo *api.Repository
