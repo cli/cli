@@ -25,7 +25,7 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 					}
 					return cfg.DefaultHost()
 				}
-				return NewRepo(repoOverride, fb, nil)
+				return ghrepo.FromName(repoOverride, fb, nil)
 			}
 		}
 	}

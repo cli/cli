@@ -4,10 +4,9 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
 )
 
-// shared.NewRepo is a small wrapper around cmdutil.NewRepo
+// shared.NewRepo is a small wrapper around ghrepo.FromName
 // providing sane fallback functions that are commonly needed in the repo commands
 func NewRepo(nwo string, config func() (config.Config, error), client *api.Client) (ghrepo.Interface, error) {
 	cfg, err := config()
@@ -31,5 +30,5 @@ func NewRepo(nwo string, config func() (config.Config, error), client *api.Clien
 		return "", nil
 	}
 
-	return cmdutil.NewRepo(nwo, hostFallbackFunc, ownerFallbackFunc)
+	return ghrepo.FromName(nwo, hostFallbackFunc, ownerFallbackFunc)
 }

@@ -63,11 +63,8 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		if r.Resolved == "base" {
 			return r, nil
 		} else if r.Resolved != "" {
-			repo, err := ghrepo.FromFullName(r.Resolved)
-			if err != nil {
-				return nil, err
-			}
-			return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), r.RepoHost()), nil
+			fb := func() (string, error) { return r.RepoHost(), nil }
+			return ghrepo.FromName(r.Resolved, fb, nil)
 		}
 	}
 

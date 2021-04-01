@@ -481,7 +481,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 			return cfg.DefaultHost()
 		}
-		base, err := cmdutil.NewRepo(opts.RepoOverride, fb, nil)
+		base, err := ghrepo.FromName(opts.RepoOverride, fb, nil)
 		if err != nil {
 			return nil, err
 		}

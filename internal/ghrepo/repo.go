@@ -30,11 +30,73 @@ func NewWithHost(owner, repo, hostname string) Interface {
 	}
 }
 
-// FullName serializes a GitHub repository into an "OWNER/REPO" string
-func FullName(r Interface) string {
-	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
+type fallbackFunc func() (string, error)
+
+// NOTE: This is a replacement for FromFullName, and will completly replace it in the near future
+// NewRepo extracts the GitHub repsoitory information from the following formated strings:
+// * NAME
+// * OWNER/NAME
+// * HOST/OWNER/NAME
+// * Full URL
+// NewRepo falls back to provided fall back functions when HOST or OWNER are not specified in the string
+// If HOST is not specified and hostFallbackFunc is nil then use "" as HOST
+// If OWNER is not specified and ownerFallbackFunc is nil then use "" as OWNER
+func FromName(nwo string, hostFallbackFunc fallbackFunc, ownerFallbackFunc fallbackFunc) (Interface, error) {
+	if git.IsURL(nwo) {
+		u, err := git.ParseURL(nwo)
+		if err != nil {
+			return nil, err
+		}
+		return FromURL(u)
+	}
+
+	parts := strings.SplitN(nwo, "/", 4)
+	for _, p := range parts {
+		if len(p) == 0 {
+			return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
+		}
+	}
+	l := len(parts)
+
+	if l == 0 || l == 4 {
+		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
+	}
+
+	if l == 3 {
+		return NewWithHost(parts[1], parts[2], parts[0]), nil
+	}
+
+	var err error
+	var host string
+	if hostFallbackFunc != nil {
+		host, err = hostFallbackFunc()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var owner string
+	var name string
+	if l == 1 {
+		name = parts[0]
+		if ownerFallbackFunc != nil {
+			owner, err = ownerFallbackFunc()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if l == 2 {
+		owner = parts[0]
+		name = parts[1]
+	}
+
+	return NewWithHost(owner, name, host), nil
 }
 
+// NOTE: This function is deprecated, and will removed in the near future.
+// Please use FromName instead.
 // FromFullName extracts the GitHub repository information from the following
 // formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
@@ -78,6 +140,11 @@ func FromURL(u *url.URL) (Interface, error) {
 
 func normalizeHostname(h string) string {
 	return strings.ToLower(strings.TrimPrefix(h, "www."))
+}
+
+// FullName serializes a GitHub repository into an "OWNER/REPO" string
+func FullName(r Interface) string {
+	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
 // IsSame compares two GitHub repositories
