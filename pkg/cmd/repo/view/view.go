@@ -140,9 +140,9 @@ func viewRun(opts *ViewOptions) error {
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
 		{{.Description}}
-
+		
 		{{.Readme}}
-
+		
 		{{.View}}
 	`)
 
