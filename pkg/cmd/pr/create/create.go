@@ -468,11 +468,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client)
-	if err != nil {
-		return nil, err
-	}
-
+	var base ghrepo.Interface
 	if opts.RepoOverride != "" {
 		fb := func() (string, error) {
 			cfg, err := opts.Config()
@@ -481,11 +477,15 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 			return cfg.DefaultHost()
 		}
-		base, err := ghrepo.FromName(opts.RepoOverride, fb, nil)
+		base, err = ghrepo.FromName(opts.RepoOverride, fb, nil)
 		if err != nil {
 			return nil, err
 		}
-		repoContext.SetBaseOverride(base)
+	}
+
+	repoContext, err := context.ResolveRemotesToRepos(remotes, client, base)
+	if err != nil {
+		return nil, err
 	}
 
 	var baseRepo *api.Repository

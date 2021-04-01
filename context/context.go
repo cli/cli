@@ -17,12 +17,13 @@ import (
 // unusually large number of git remotes
 const maxRemotesForLookup = 5
 
-func ResolveRemotesToRepos(remotes Remotes, client *api.Client) (*ResolvedRemotes, error) {
+func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base ghrepo.Interface) (*ResolvedRemotes, error) {
 	sort.Stable(remotes)
 
 	result := &ResolvedRemotes{
-		remotes:   remotes,
-		apiClient: client,
+		remotes:      remotes,
+		apiClient:    client,
+		baseOverride: base,
 	}
 
 	return result, nil
@@ -47,10 +48,6 @@ type ResolvedRemotes struct {
 	remotes      Remotes
 	network      *api.RepoNetworkResult
 	apiClient    *api.Client
-}
-
-func (r *ResolvedRemotes) SetBaseOverride(b ghrepo.Interface) {
-	r.baseOverride = b
 }
 
 func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
