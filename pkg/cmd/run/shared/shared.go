@@ -85,6 +85,7 @@ type Job struct {
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
+	RunID       int       `json:"run_id"`
 }
 
 type Step struct {
@@ -226,6 +227,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	for _, run := range runs {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
+			// TODO truncate commit message, long ones look terrible
 			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
 	}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
-	jobCmd "github.com/cli/cli/pkg/cmd/job"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
@@ -85,7 +84,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(runCmd.NewCmdRun(f))
-	cmd.AddCommand(jobCmd.NewCmdJob(f))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(f))
 
 	// the `api` command should not inherit any extra HTTP headers
