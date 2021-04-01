@@ -1,7 +1,9 @@
 package markdown
 
 import (
+	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -45,7 +47,7 @@ func Render(text, style string) (string, error) {
 		glamour.WithStylePath(style),
 	}
 
-	return render(text, opts)
+	return render(FormatImgTags(text), opts)
 }
 
 func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
@@ -86,6 +88,20 @@ func GetStyle(defaultStyle string) string {
 	}
 
 	return "notty"
+}
+
+func FormatImgTags(content string) string {
+	lines := strings.Split(content, "\n")
+	re := regexp.MustCompile(`<img[^>]+\bsrc=["']([^"']+)["']`)
+	for i, line := range lines {
+		submatchall := re.FindAllStringSubmatch(line, -1)
+		fmt.Println(len(submatchall))
+		for _, element := range submatchall {
+			lines[i] = fmt.Sprintf("![Image](%s)", element[1])
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 var fromEnv = func() string {
