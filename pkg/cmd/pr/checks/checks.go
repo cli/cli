@@ -141,13 +141,11 @@ func checksRun(opts *ChecksOptions) error {
 			markColor = cs.Red
 			failing++
 			bucket = "fail"
-		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
+		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 			mark = "-"
 			markColor = cs.Yellow
 			pending++
 			bucket = "pending"
-		default:
-			panic(fmt.Errorf("unsupported status: %q", state))
 		}
 
 		elapsed := ""
