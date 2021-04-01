@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_repoFromURL(t *testing.T) {
@@ -111,6 +113,119 @@ func Test_repoFromURL(t *testing.T) {
 			if tt.host != repo.RepoHost() {
 				t.Errorf("expected %q, got %q", tt.host, repo.RepoHost())
 			}
+		})
+	}
+}
+
+func TestFromName(t *testing.T) {
+	type input struct {
+		s   string
+		hFb func() (string, error)
+		oFb func() (string, error)
+	}
+
+	tests := []struct {
+		name      string
+		input     input
+		wantName  string
+		wantOwner string
+		wantHost  string
+		wantErr   bool
+	}{
+		{
+			name:     "REPO no fallbacks",
+			input:    input{s: "REPO"},
+			wantName: "REPO",
+		},
+		{
+			name:     "REPO host fallback",
+			input:    input{s: "REPO", hFb: func() (string, error) { return "host.com", nil }},
+			wantName: "REPO",
+			wantHost: "host.com",
+		},
+		{
+			name:      "REPO owner fallback",
+			input:     input{s: "REPO", oFb: func() (string, error) { return "OWNER", nil }},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+		},
+		{
+			name:      "OWNER/REPO no fallbacks",
+			input:     input{s: "OWNER/REPO"},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+		},
+		{
+			name:      "OWNER/REPO host fallback",
+			input:     input{s: "OWNER/REPO", hFb: func() (string, error) { return "host.com", nil }},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "host.com",
+		},
+		{
+			name:      "OWNER/REPO owner fallback",
+			input:     input{s: "OWNER/REPO", oFb: func() (string, error) { return "NEWOWNER", nil }},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+		},
+		{
+			name:      "HOST/OWNER/REPO no fallbacks",
+			input:     input{s: "HOST/OWNER/REPO"},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "host",
+		},
+		{
+			name:      "HOST/OWNER/REPO host fallback",
+			input:     input{s: "HOST/OWNER/REPO", hFb: func() (string, error) { return "host.com", nil }},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "host",
+		},
+		{
+			name:      "HOST/OWNER/REPO owner fallback",
+			input:     input{s: "HOST/OWNER/REPO", oFb: func() (string, error) { return "NEWOWNER", nil }},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "host",
+		},
+		{
+			name:      "URL",
+			input:     input{s: "https://example.org/OWNER/REPO.git"},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "example.org",
+		},
+		{
+			name:      "SSH URL",
+			input:     input{s: "git@example.org:OWNER/REPO.git"},
+			wantName:  "REPO",
+			wantOwner: "OWNER",
+			wantHost:  "example.org",
+		},
+		{
+			name:    "Invalid format to many values",
+			input:   input{s: "HOST/OWNER/REPO/OTHER"},
+			wantErr: true,
+		},
+		{
+			name:    "Invalid format blank value",
+			input:   input{s: "OWNER/"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := FromName(tt.input.s, tt.input.hFb, tt.input.oFb)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantName, r.RepoName())
+			assert.Equal(t, tt.wantOwner, r.RepoOwner())
+			assert.Equal(t, tt.wantHost, r.RepoHost())
 		})
 	}
 }
