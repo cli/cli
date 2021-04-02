@@ -2,6 +2,7 @@ package run
 
 import (
 	cmdList "github.com/cli/cli/pkg/cmd/run/list"
+	cmdRerun "github.com/cli/cli/pkg/cmd/run/rerun"
 	cmdView "github.com/cli/cli/pkg/cmd/run/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -21,6 +22,7 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
+	cmd.AddCommand(cmdRerun.NewCmdRerun(f, nil))
 
 	return cmd
 }
