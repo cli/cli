@@ -26,14 +26,14 @@ type apiPlatform struct {
 }
 
 func (p *apiPlatform) List(runID string) ([]Artifact, error) {
-	return listArtifacts(p.client, p.repo, runID)
+	return ListArtifacts(p.client, p.repo, runID)
 }
 
 func (p *apiPlatform) Download(url string, dir string) error {
 	return downloadArtifact(p.client, url, dir)
 }
 
-func listArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string) ([]Artifact, error) {
+func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string) ([]Artifact, error) {
 	perPage := 100
 	path := fmt.Sprintf("repos/%s/%s/actions/artifacts?per_page=%d", repo.RepoOwner(), repo.RepoName(), perPage)
 	if runID != "" {

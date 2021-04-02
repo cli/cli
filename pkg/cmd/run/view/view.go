@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/run/download"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -122,6 +124,11 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get jobs: %w", err)
 	}
 
+	artifacts, err := download.ListArtifacts(c, repo, strconv.Itoa(run.ID))
+	if err != nil {
+		return fmt.Errorf("failed to get artifacts: %w", err)
+	}
+
 	var annotations []shared.Annotation
 
 	var annotationErr error
@@ -170,6 +177,20 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
+	}
+
+	var validArtifacts []download.Artifact
+	for _, a := range artifacts {
+		if !a.Expired {
+			validArtifacts = append(validArtifacts, a)
+		}
+	}
+	if len(validArtifacts) > 0 {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ARTIFACTS"))
+		for _, a := range validArtifacts {
+			fmt.Fprintln(out, a.Name)
+		}
 	}
 
 	fmt.Fprintln(out)

@@ -124,6 +124,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(`{"data": {
             "repository": {
@@ -160,6 +163,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
@@ -186,6 +192,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
@@ -214,6 +223,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
@@ -246,6 +258,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
