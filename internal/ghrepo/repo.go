@@ -35,6 +35,21 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
+var defaultHostOverride string
+
+func defaultHost() string {
+	if defaultHostOverride != "" {
+		return defaultHostOverride
+	}
+	return ghinstance.Default()
+}
+
+// SetDefaultHost overrides the default GitHub hostname for FromFullName.
+// TODO: remove after FromFullName approach is revisited
+func SetDefaultHost(host string) {
+	defaultHostOverride = host
+}
+
 // FromFullName extracts the GitHub repository information from the following
 // formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
@@ -54,9 +69,9 @@ func FromFullName(nwo string) (Interface, error) {
 	}
 	switch len(parts) {
 	case 3:
-		return NewWithHost(parts[1], parts[2], normalizeHostname(parts[0])), nil
+		return NewWithHost(parts[1], parts[2], parts[0]), nil
 	case 2:
-		return New(parts[0], parts[1]), nil
+		return NewWithHost(parts[0], parts[1], defaultHost()), nil
 	default:
 		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
 	}
