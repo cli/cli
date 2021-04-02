@@ -77,7 +77,7 @@ func TestNewCmdView(t *testing.T) {
 			tty:  true,
 			wants: ViewOptions{
 				Prompt: true,
-				Yaml:   true,
+				YAML:   true,
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TestNewCmdView(t *testing.T) {
 			cli:  "-y 123",
 			wants: ViewOptions{
 				Raw:      true,
-				Yaml:     true,
+				YAML:     true,
 				Selector: "123",
 			},
 		},
@@ -144,7 +144,7 @@ func TestNewCmdView(t *testing.T) {
 			assert.Equal(t, tt.wants.Web, gotOpts.Web)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.Raw, gotOpts.Raw)
-			assert.Equal(t, tt.wants.Yaml, gotOpts.Yaml)
+			assert.Equal(t, tt.wants.YAML, gotOpts.YAML)
 		})
 	}
 }
@@ -231,7 +231,7 @@ func TestViewRun(t *testing.T) {
 			tty:  true,
 			opts: &ViewOptions{
 				Selector: "123",
-				Yaml:     true,
+				YAML:     true,
 				Web:      true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -252,7 +252,7 @@ func TestViewRun(t *testing.T) {
 			opts: &ViewOptions{
 				Selector: "123",
 				Ref:      "base",
-				Yaml:     true,
+				YAML:     true,
 				Web:      true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -268,7 +268,7 @@ func TestViewRun(t *testing.T) {
 			tty:  true,
 			opts: &ViewOptions{
 				Selector: "123",
-				Yaml:     true,
+				YAML:     true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -287,7 +287,7 @@ func TestViewRun(t *testing.T) {
 			tty:  false,
 			opts: &ViewOptions{
 				Selector: "123",
-				Yaml:     true,
+				YAML:     true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -306,7 +306,7 @@ func TestViewRun(t *testing.T) {
 			tty:  true,
 			opts: &ViewOptions{
 				Selector: "123",
-				Yaml:     true,
+				YAML:     true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -327,7 +327,7 @@ func TestViewRun(t *testing.T) {
 			opts: &ViewOptions{
 				Selector: "123",
 				Ref:      "456",
-				Yaml:     true,
+				YAML:     true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

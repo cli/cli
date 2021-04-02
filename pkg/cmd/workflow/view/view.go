@@ -30,7 +30,7 @@ type ViewOptions struct {
 	Web      bool
 	Prompt   bool
 	Raw      bool
-	Yaml     bool
+	YAML     bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -74,7 +74,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open workflow in the browser")
-	cmd.Flags().BoolVarP(&opts.Yaml, "yaml", "y", false, "View the workflow yaml file")
+	cmd.Flags().BoolVarP(&opts.YAML, "yaml", "y", false, "View the workflow yaml file")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to view")
 
 	return cmd
@@ -102,7 +102,7 @@ func runView(opts *ViewOptions) error {
 	if opts.Web {
 		var url string
 		hostname := repo.RepoHost()
-		if opts.Yaml {
+		if opts.YAML {
 			ref := opts.Ref
 			if ref == "" {
 				opts.IO.StartProgressIndicator()
@@ -123,7 +123,7 @@ func runView(opts *ViewOptions) error {
 		return opts.Browser.Browse(url)
 	}
 
-	if opts.Yaml {
+	if opts.YAML {
 		err = viewWorkflowContent(opts, client, workflow)
 	} else {
 		err = viewWorkflowInfo(opts, client, workflow)
