@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -41,7 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:    "view [<run-id> | <file name>]",
+		Use:    "view [<workflow-id> | <workflow name> | <file name>]",
 		Short:  "View the summary of a workflow",
 		Args:   cobra.MaximumNArgs(1),
 		Hidden: true,
@@ -56,7 +55,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.Raw = !opts.IO.CanPrompt()
+			opts.Raw = !opts.IO.IsStdoutTTY()
 
 			if len(args) > 0 {
 				opts.Selector = args[0]
@@ -64,6 +63,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: errors.New("workflow argument required when not running interactively")}
 			} else {
 				opts.Prompt = true
+			}
+
+			if !opts.YAML && opts.Ref != "" {
+				return &cmdutil.FlagError{Err: errors.New("`--yaml` required when specifying `--ref`")}
 			}
 
 			if runF != nil {
@@ -101,7 +104,6 @@ func runView(opts *ViewOptions) error {
 
 	if opts.Web {
 		var url string
-		hostname := repo.RepoHost()
 		if opts.YAML {
 			ref := opts.Ref
 			if ref == "" {
@@ -112,10 +114,9 @@ func runView(opts *ViewOptions) error {
 					return err
 				}
 			}
-			url = fmt.Sprintf("https://%s/%s/blob/%s/%s", hostname, ghrepo.FullName(repo), ref, workflow.Path)
+			url = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", ref, workflow.Path)
 		} else {
-			baseName := filepath.Base(workflow.Path)
-			url = fmt.Sprintf("https://%s/%s/actions/workflows/%s", hostname, ghrepo.FullName(repo), baseName)
+			url = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", workflow.Base())
 		}
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
@@ -145,14 +146,11 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	yaml, err := getWorkflowContent(client, repo, opts.Ref, workflow)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		if s, ok := err.(api.HTTPError); ok {
-			if s.StatusCode == 404 {
-				base := filepath.Base(workflow.Path)
-				if opts.Ref != "" {
-					return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", base, opts.Ref)
-				}
-				return fmt.Errorf("could not find workflow file %s, try specifying a branch or tag using --ref", base)
+		if s, ok := err.(api.HTTPError); ok && s.StatusCode == 404 {
+			if opts.Ref != "" {
+				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), opts.Ref)
 			}
+			return fmt.Errorf("could not find workflow file %s, try specifying a branch or tag using `--ref`", workflow.Base())
 		}
 		return fmt.Errorf("could not get workflow file content: %w", err)
 	}
@@ -168,7 +166,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 		cs := opts.IO.ColorScheme()
 		out := opts.IO.Out
 
-		fileName := filepath.Base(workflow.Path)
+		fileName := workflow.Base()
 		fmt.Fprintf(out, "%s - %s\n", cs.Bold(workflow.Name), cs.Gray(fileName))
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
@@ -215,7 +213,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Wo
 	tp := utils.NewTablePrinter(opts.IO)
 
 	// Header
-	filename := filepath.Base(workflow.Path)
+	filename := workflow.Base()
 	fmt.Fprintf(out, "%s - %s\n", cs.Bold(workflow.Name), cs.Cyan(filename))
 	fmt.Fprintf(out, "ID: %s\n\n", cs.Cyanf("%d", workflow.ID))
 

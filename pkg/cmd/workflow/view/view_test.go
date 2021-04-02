@@ -90,19 +90,32 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name: "ref tty",
-			cli:  "--ref 456",
+			name:     "ref tty",
+			cli:      "--ref 456",
+			tty:      true,
+			wantsErr: true,
+		},
+		{
+			name:     "ref nontty",
+			cli:      "123 -r 456",
+			wantsErr: true,
+		},
+		{
+			name: "yaml ref tty",
+			cli:  "--yaml --ref 456",
 			tty:  true,
 			wants: ViewOptions{
 				Prompt: true,
+				YAML:   true,
 				Ref:    "456",
 			},
 		},
 		{
-			name: "ref nontty",
-			cli:  "123 -r 456",
+			name: "yaml ref nontty",
+			cli:  "123 -y -r 456",
 			wants: ViewOptions{
 				Raw:      true,
+				YAML:     true,
 				Ref:      "456",
 				Selector: "123",
 			},
@@ -319,7 +332,7 @@ func TestViewRun(t *testing.T) {
 				)
 			},
 			wantErr:    true,
-			wantErrOut: "could not find workflow file flow.yml, try specifying a branch or tag using --ref",
+			wantErrOut: "could not find workflow file flow.yml, try specifying a branch or tag using `--ref`",
 		},
 		{
 			name: "workflow with yaml and ref",
