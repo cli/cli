@@ -494,6 +494,30 @@ func TestRepoFork_outside_yes(t *testing.T) {
 	reg.Verify(t)
 }
 
+func TestRepoFork_ForkAlreadyExistsAndCloneNonTty(t *testing.T) {
+	defer stubSince(2 * time.Minute)()
+	reg := &httpmock.Registry{}
+	defer reg.StubWithFixturePath(200, "./forkResult.json")()
+	httpClient := &http.Client{Transport: reg}
+
+	cs, restore := run.Stub()
+	defer restore(t)
+
+	cs.Register(`git clone https://github\.com/someone/REPO\.git`, 0, "")
+	cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+
+	output, err := runCommand(httpClient, nil, false, "--clone OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `repo fork`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
+	test.ExpectLines(t, output.Stderr(),
+		"someone/REPO.*already exists")
+	reg.Verify(t)
+}
+
 func TestRepoFork_outside_survey_yes(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
