@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -56,6 +55,6 @@ func extractZipFile(zf *zip.File, dest string) error {
 	return err
 }
 
-func isBinary(m fs.FileMode) bool {
+func isBinary(m os.FileMode) bool {
 	return m&0111 != 0
 }
