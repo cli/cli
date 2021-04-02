@@ -69,6 +69,7 @@ var SuccessfulJob Job = Job{
 	StartedAt:   created(),
 	CompletedAt: updated(),
 	URL:         "jobs/10",
+	RunID:       3,
 	Steps: []Step{
 		{
 			Name:       "fob the barz",
@@ -93,6 +94,7 @@ var FailedJob Job = Job{
 	StartedAt:   created(),
 	CompletedAt: updated(),
 	URL:         "jobs/20",
+	RunID:       1234,
 	Steps: []Step{
 		{
 			Name:       "barf the quux",

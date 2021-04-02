@@ -85,6 +85,7 @@ type Job struct {
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
+	RunID       int       `json:"run_id"`
 }
 
 type Step struct {
@@ -150,6 +151,25 @@ type RunsPayload struct {
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
+func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f func(Run) bool) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
+	runs, err := getRuns(client, repo, path, 50)
+	if err != nil {
+		return nil, err
+	}
+	filtered := []Run{}
+	for _, run := range runs {
+		if f(run) {
+			filtered = append(filtered, run)
+		}
+		if len(filtered) == limit {
+			break
+		}
+	}
+
+	return filtered, nil
+}
+
 func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit, workflowID int) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
 	return getRuns(client, repo, path, limit)
@@ -172,9 +192,17 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) 
 	for len(runs) < limit {
 		var result RunsPayload
 
-		pagedPath := fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page)
+		parsed, err := url.Parse(path)
+		if err != nil {
+			return nil, err
+		}
+		query := parsed.Query()
+		query.Set("per_page", fmt.Sprintf("%d", perPage))
+		query.Set("page", fmt.Sprintf("%d", page))
+		parsed.RawQuery = query.Encode()
+		pagedPath := parsed.String()
 
-		err := client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
+		err = client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -226,6 +254,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	for _, run := range runs {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
+			// TODO truncate commit message, long ones look terrible
 			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
 	}
 

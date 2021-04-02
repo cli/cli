@@ -26,6 +26,9 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			actionsRun(opts)
 		},
+		Annotations: map[string]string{
+			"IsActions": "true",
+		},
 	}
 
 	return cmd
@@ -43,34 +46,16 @@ func actionsRun(opts ActionsOptions) {
 
 			%s
 			gh run list:    List recent workflow runs
-			gh run view:    View details for a given workflow run
+			gh run view:    View details for a workflow run or one of its jobs
+			gh run watch:   Watch a workflow run while it executes
+			gh run rerun:   Rerun a failed workflow run
 
 			%s
-			gh job view:   View details for a given job
+			gh workflow list:      List all the workflow files in your repository
+			gh workflow enable:    Enable a workflow file
+			gh workflow disable:   Disable a workflow file
+			gh workflow run:       Trigger a workflow_dispatch run for a workflow file
 		`,
-		cs.Bold("Working with runs"),
-		cs.Bold("Working with jobs within runs")))
-	/*
-		fmt.Fprint(opts.IO.Out, heredoc.Docf(`
-			Welcome to GitHub Actions on the command line.
-
-			%s
-			gh workflow list:    List workflows in the current repository
-			gh workflow run:     Kick off a workflow run
-			gh workflow init:    Create a new workflow
-			gh workflow check:   Check a workflow file for correctness
-
-			%s
-			gh run list:    List recent workflow runs
-			gh run view:    View details for a given workflow run
-			gh run watch:   Watch a streaming log for a workflow run
-
-			%s
-			gh job view:   View details for a given job
-			gh job run:    Run a given job within a workflow
-		`,
-			cs.Bold("Working with workflows"),
-			cs.Bold("Working with runs"),
-			cs.Bold("Working with jobs within runs")))
-	*/
+		cs.Bold("Interacting with workflow runs"),
+		cs.Bold("Interacting with workflow files")))
 }
