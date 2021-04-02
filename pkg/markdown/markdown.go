@@ -94,9 +94,8 @@ func FormatImgTags(content string) string {
 	lines := strings.Split(content, "\n")
 	re := regexp.MustCompile(`<img[^>]+\bsrc=["']([^"']+)["']`)
 	for i, line := range lines {
-		submatchall := re.FindAllStringSubmatch(line, -1)
-		fmt.Println(len(submatchall))
-		for _, element := range submatchall {
+		images := re.FindAllStringSubmatch(line, -1)
+		for _, element := range images {
 			lines[i] = fmt.Sprintf("![Image](%s)", element[1])
 		}
 	}
