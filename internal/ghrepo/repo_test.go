@@ -117,12 +117,13 @@ func Test_repoFromURL(t *testing.T) {
 
 func TestFromFullName(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		wantOwner string
-		wantName  string
-		wantHost  string
-		wantErr   error
+		name         string
+		input        string
+		hostOverride string
+		wantOwner    string
+		wantName     string
+		wantHost     string
+		wantErr      error
 	}{
 		{
 			name:      "OWNER/REPO combo",
@@ -171,9 +172,30 @@ func TestFromFullName(t *testing.T) {
 			wantName:  "REPO",
 			wantErr:   nil,
 		},
+		{
+			name:         "OWNER/REPO with default host override",
+			input:        "OWNER/REPO",
+			hostOverride: "override.com",
+			wantHost:     "override.com",
+			wantOwner:    "OWNER",
+			wantName:     "REPO",
+			wantErr:      nil,
+		},
+		{
+			name:         "HOST/OWNER/REPO with default host override",
+			input:        "example.com/OWNER/REPO",
+			hostOverride: "override.com",
+			wantHost:     "example.com",
+			wantOwner:    "OWNER",
+			wantName:     "REPO",
+			wantErr:      nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.hostOverride != "" {
+				SetDefaultHost(tt.hostOverride)
+			}
 			r, err := FromFullName(tt.input)
 			if tt.wantErr != nil {
 				if err == nil {

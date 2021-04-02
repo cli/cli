@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/internal/build"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/internal/update"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
@@ -98,6 +99,11 @@ func mainRun() exitCode {
 
 	if pager, _ := cfg.Get("", "pager"); pager != "" {
 		cmdFactory.IOStreams.SetPager(pager)
+	}
+
+	// TODO: remove after FromFullName has been revisited
+	if host, err := cfg.DefaultHost(); err == nil {
+		ghrepo.SetDefaultHost(host)
 	}
 
 	expandedArgs := []string{}
