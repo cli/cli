@@ -88,6 +88,7 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 	}
 
 	coreCommands := []string{}
+	actionsCommands := []string{}
 	additionalCommands := []string{}
 	for _, c := range command.Commands() {
 		if c.Short == "" {
@@ -100,6 +101,8 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 		s := rpad(c.Name()+":", c.NamePadding()) + c.Short
 		if _, ok := c.Annotations["IsCore"]; ok {
 			coreCommands = append(coreCommands, s)
+		} else if _, ok := c.Annotations["IsActions"]; ok {
+			actionsCommands = append(actionsCommands, s)
 		} else {
 			additionalCommands = append(additionalCommands, s)
 		}
@@ -125,6 +128,9 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 	if len(coreCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"CORE COMMANDS", strings.Join(coreCommands, "\n")})
+	}
+	if len(actionsCommands) > 0 {
+		helpEntries = append(helpEntries, helpEntry{"ACTIONS COMMANDS", strings.Join(actionsCommands, "\n")})
 	}
 	if len(additionalCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})

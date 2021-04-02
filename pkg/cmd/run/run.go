@@ -11,10 +11,11 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "run <command>",
 		Short:  "View details about workflow runs",
-		Hidden: true,
 		Long:   "List, view, and watch recent workflow runs from GitHub Actions.",
-		// TODO i'd like to have all the actions commands sorted into their own zone which i think will
-		// require a new annotation
+		Hidden: true,
+		Annotations: map[string]string{
+			"IsActions": "true",
+		},
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
 
