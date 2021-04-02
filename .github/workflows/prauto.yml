@@ -9,7 +9,7 @@ jobs:
       - name: lint pr
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
           PRID: ${{ github.event.pull_request.node_id }}
           PRBODY: ${{ github.event.pull_request.body }}
           PRNUM: ${{ github.event.pull_request.number }}
@@ -44,8 +44,14 @@ jobs:
 
           if gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
           then
-            # TODO this errors if it's already on the board...
-            addToBoard
+            if ! errtext="$(addToBoard 2>&1)"
+            then
+              cat <<<"$errtext" >&2
+              if ! grep -iq 'project already has the associated issue' <<<"$errtext"
+              then
+                exit 1
+              fi
+            fi
             exit 0
           fi
 
