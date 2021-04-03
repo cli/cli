@@ -672,6 +672,7 @@ func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, hea
 					number
 					title
 					state
+					closed
 					body
 					mergeable
 					additions
