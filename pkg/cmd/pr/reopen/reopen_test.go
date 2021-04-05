@@ -86,6 +86,39 @@ func TestPRReopen(t *testing.T) {
 	}
 }
 
+func TestPRReopen_BranchArg(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequests": {
+				"nodes": [
+					{ "id": "THE-ID", "number": 666, "title": "The title of the PR", "headRefName": "fix-bug", "closed": true }
+				]
+			} } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestReopen\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+
+	output, err := runCommand(http, true, "fix-bug")
+	if err != nil {
+		t.Fatalf("error running command `pr reopen`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Reopened pull request #666 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestPRReopen_alreadyOpen(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
