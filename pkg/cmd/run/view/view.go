@@ -70,7 +70,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		  # Exit non-zero if a run failed
 		  $ gh run view 0451 -e && echo "run pending or passed"
 		`),
-		// TODO should exit status respect only a selected job if --job is passed?
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -213,7 +212,7 @@ func runView(opts *ViewOptions) error {
 			return fmt.Errorf("failed to read log: %w", err)
 		}
 
-		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
+		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
 			return cmdutil.SilentError
 		}
 
@@ -296,15 +295,18 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
 		// TODO note about run view --log when that exists
 		fmt.Fprintf(out, cs.Gray("view this run on GitHub: %s\n"), run.URL)
+		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
+			return cmdutil.SilentError
+		}
 	} else {
 		fmt.Fprintln(out)
 		// TODO this does not exist yet
 		fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
 		fmt.Fprintf(out, cs.Gray("view this run on GitHub: %s\n"), run.URL)
-	}
 
-	if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
-		return cmdutil.SilentError
+		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
+			return cmdutil.SilentError
+		}
 	}
 
 	return nil
