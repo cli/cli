@@ -20,16 +20,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	RunID      string
 	JobID      string
 	Verbose    bool
 	ExitStatus bool
 	Log        bool
+	Web        bool
 
 	Prompt bool
 
@@ -41,6 +47,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Now:        time.Now,
+		Browser:    f.Browser,
 	}
 	cmd := &cobra.Command{
 		Use:    "view [<run-id>]",
@@ -86,6 +93,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 				}
 			}
 
+			if opts.Web && opts.Log {
+				return &cmdutil.FlagError{Err: errors.New("only one of --web or --log can be passed at a time")}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -97,6 +108,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run failed")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "View a specific job ID from a run")
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
+	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
 
 	return cmd
 }
@@ -153,6 +165,14 @@ func runView(opts *ViewOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get run: %w", err)
+	}
+
+	if opts.Web {
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(run.URL))
+		}
+
+		return opts.Browser.Browse(run.URL)
 	}
 
 	if opts.Prompt {

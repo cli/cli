@@ -37,6 +37,29 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
+			name: "web tty",
+			tty:  true,
+			cli:  "--web",
+			wants: ViewOptions{
+				Prompt: true,
+				Web:    true,
+			},
+		},
+		{
+			name: "web nontty",
+			cli:  "1234 --web",
+			wants: ViewOptions{
+				Web:   true,
+				RunID: "1234",
+			},
+		},
+		{
+			name:     "disallow web and log",
+			tty:      true,
+			cli:      "-w --log",
+			wantsErr: true,
+		},
+		{
 			name: "exit status",
 			cli:  "--exit-status 1234",
 			wants: ViewOptions{
@@ -127,13 +150,14 @@ func TestNewCmdView(t *testing.T) {
 func TestViewRun(t *testing.T) {
 
 	tests := []struct {
-		name      string
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
-		opts      *ViewOptions
-		tty       bool
-		wantErr   bool
-		wantOut   string
+		name       string
+		httpStubs  func(*httpmock.Registry)
+		askStubs   func(*prompt.AskStubber)
+		opts       *ViewOptions
+		tty        bool
+		wantErr    bool
+		wantOut    string
+		browsedURL string
 	}{
 		{
 			name: "associate with PR",
@@ -431,6 +455,21 @@ func TestViewRun(t *testing.T) {
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nview this run on GitHub: runs/3\n",
 		},
+		{
+			name: "web",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "3",
+				Web:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+			},
+			browsedURL: "runs/3",
+			wantOut:    "Opening runs/3 in your browser.\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -458,6 +497,9 @@ func TestViewRun(t *testing.T) {
 			tt.askStubs(as)
 		}
 
+		browser := &cmdutil.TestBrowser{}
+		tt.opts.Browser = browser
+
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
 			if tt.wantErr {
@@ -470,6 +512,9 @@ func TestViewRun(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
+			if tt.browsedURL != "" {
+				assert.Equal(t, tt.browsedURL, browser.BrowsedURL())
+			}
 			reg.Verify(t)
 		})
 	}
