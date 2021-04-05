@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -403,7 +405,7 @@ func TestViewRun(t *testing.T) {
 				as.StubOne(2)
 				as.StubOne(0)
 			},
-			wantOut:   "✓ Downloaded logs to /tmp/gh-run-log-3.zip\n",
+			wantOut:   "✓ Downloaded logs to " + path.Join(os.TempDir(), "gh-run-log-3.zip") + "\n",
 			wantWrite: "pretend these bytes constitute a zip file",
 		},
 		{
