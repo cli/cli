@@ -423,7 +423,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
 					httpmock.StringResponse("pretend these bytes constitute a zip file"))
 			},
-			wantOut:   "✓ Downloaded logs to /tmp/gh-run-log-3.zip\n",
+			wantOut:   "✓ Downloaded logs to " + path.Join(os.TempDir(), "gh-run-log-3.zip") + "\n",
 			wantWrite: "pretend these bytes constitute a zip file",
 		},
 		{
