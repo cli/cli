@@ -456,7 +456,7 @@ func TestViewRun(t *testing.T) {
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nview this run on GitHub: runs/3\n",
 		},
 		{
-			name: "web",
+			name: "web run",
 			tty:  true,
 			opts: &ViewOptions{
 				RunID: "3",
@@ -469,6 +469,24 @@ func TestViewRun(t *testing.T) {
 			},
 			browsedURL: "runs/3",
 			wantOut:    "Opening runs/3 in your browser.\n",
+		},
+		{
+			name: "web job",
+			tty:  true,
+			opts: &ViewOptions{
+				JobID: "10",
+				Web:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/10"),
+					httpmock.JSONResponse(shared.SuccessfulJob))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+			},
+			browsedURL: "jobs/10?check_suite_focus=true",
+			wantOut:    "Opening jobs/10 in your browser.\n",
 		},
 	}
 

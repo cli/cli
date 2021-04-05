@@ -167,14 +167,6 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
-	if opts.Web {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(run.URL))
-		}
-
-		return opts.Browser.Browse(run.URL)
-	}
-
 	if opts.Prompt {
 		opts.IO.StartProgressIndicator()
 		jobs, err = shared.GetJobs(client, repo, *run)
@@ -188,6 +180,18 @@ func runView(opts *ViewOptions) error {
 				return err
 			}
 		}
+	}
+
+	if opts.Web {
+		url := run.URL
+		if selectedJob != nil {
+			url = selectedJob.URL + "?check_suite_focus=true"
+		}
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+		}
+
+		return opts.Browser.Browse(url)
 	}
 
 	opts.IO.StartProgressIndicator()
