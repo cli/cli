@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -158,6 +159,8 @@ func TestViewRun(t *testing.T) {
 		wantErr    bool
 		wantOut    string
 		browsedURL string
+		wantWrite  string
+		errMsg     string
 	}{
 		{
 			name: "associate with PR",
@@ -369,6 +372,96 @@ func TestViewRun(t *testing.T) {
 			wantOut: "it's a log\nfor this job\nbeautiful log\n",
 		},
 		{
+			name: "interactive with run log",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt: true,
+				Log:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.StringResponse("pretend these bytes constitute a zip file"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(2)
+				as.StubOne(0)
+			},
+			wantOut:   "✓ Downloaded logs to /tmp/gh-run-log-3.zip\n",
+			wantWrite: "pretend these bytes constitute a zip file",
+		},
+		{
+			name: "noninteractive with run log",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "3",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.StringResponse("pretend these bytes constitute a zip file"))
+			},
+			wantOut:   "✓ Downloaded logs to /tmp/gh-run-log-3.zip\n",
+			wantWrite: "pretend these bytes constitute a zip file",
+		},
+		{
+			name: "run log but run is not done",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "2",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun("in progress", 2, shared.InProgress, "")))
+			},
+			wantErr: true,
+			errMsg:  "run 2 is still in progress; logs will be available when it is complete",
+		},
+		{
+			name: "job log but job is not done",
+			tty:  true,
+			opts: &ViewOptions{
+				JobID: "20",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.Job{
+						ID:     20,
+						Status: shared.InProgress,
+						RunID:  2,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(shared.TestRun("in progress", 2, shared.InProgress, "")))
+			},
+			wantErr: true,
+			errMsg:  "job 20 is still in progress; logs will be available when it is complete",
+		},
+		{
 			name: "noninteractive with job",
 			opts: &ViewOptions{
 				JobID: "10",
@@ -502,6 +595,11 @@ func TestViewRun(t *testing.T) {
 			return notnow
 		}
 
+		fileBuff := bytes.Buffer{}
+		tt.opts.CreateFile = func(fullPath string) (io.Writer, error) {
+			return &fileBuff, nil
+		}
+
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(tt.tty)
 		tt.opts.IO = io
@@ -522,6 +620,9 @@ func TestViewRun(t *testing.T) {
 			err := runView(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
 				if !tt.opts.ExitStatus {
 					return
 				}
@@ -532,6 +633,9 @@ func TestViewRun(t *testing.T) {
 			assert.Equal(t, tt.wantOut, stdout.String())
 			if tt.browsedURL != "" {
 				assert.Equal(t, tt.browsedURL, browser.BrowsedURL())
+			}
+			if tt.wantWrite != "" {
+				assert.Equal(t, tt.wantWrite, fileBuff.String())
 			}
 			reg.Verify(t)
 		})

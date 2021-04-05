@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -39,7 +41,8 @@ type ViewOptions struct {
 
 	Prompt bool
 
-	Now func() time.Time
+	Now        func() time.Time
+	CreateFile func(string) (io.Writer, error)
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -48,6 +51,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Now:        time.Now,
 		Browser:    f.Browser,
+		CreateFile: func(fullPath string) (io.Writer, error) {
+			return os.Create(fullPath)
+		},
 	}
 	cmd := &cobra.Command{
 		Use:    "view [<run-id>]",
@@ -196,6 +202,10 @@ func runView(opts *ViewOptions) error {
 	opts.IO.StartProgressIndicator()
 
 	if opts.Log && selectedJob != nil {
+		if selectedJob.Status != shared.Completed {
+			return fmt.Errorf("job %d is still in progress; logs will be available when it is complete", selectedJob.ID)
+		}
+
 		r, err := jobLog(httpClient, repo, selectedJob.ID)
 		if err != nil {
 			return err
@@ -219,7 +229,40 @@ func runView(opts *ViewOptions) error {
 		return nil
 	}
 
-	// TODO support --log without selectedJob
+	if opts.Log {
+		if run.Status != shared.Completed {
+			return fmt.Errorf("run %d is still in progress; logs will be available when it is complete", run.ID)
+		}
+
+		filename := fmt.Sprintf("gh-run-log-%d.zip", run.ID)
+		dir := os.TempDir()
+		fullpath := path.Join(dir, filename)
+		f, err := opts.CreateFile(fullpath)
+		if err != nil {
+			return fmt.Errorf("failed to open %s: %w", fullpath, err)
+		}
+
+		r, err := runLog(httpClient, repo, run.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get run log: %w", err)
+		}
+
+		if _, err := io.Copy(f, r); err != nil {
+			return fmt.Errorf("failed to download log: %w", err)
+		}
+
+		opts.IO.StopProgressIndicator()
+		if opts.IO.IsStdoutTTY() {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.Out, "%s Downloaded logs to %s\n", cs.SuccessIcon(), fullpath)
+		}
+
+		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
+			return cmdutil.SilentError
+		}
+
+		return nil
+	}
 
 	if selectedJob == nil && len(jobs) == 0 {
 		jobs, err = shared.GetJobs(client, repo, *run)
@@ -324,10 +367,8 @@ func getJob(client *api.Client, repo ghrepo.Interface, jobID string) (*shared.Jo
 	return &result, nil
 }
 
-func jobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%srepos/%s/actions/jobs/%d/logs",
-		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), jobID)
-	req, err := http.NewRequest("GET", url, nil)
+func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
+	req, err := http.NewRequest("GET", logURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -338,12 +379,24 @@ func jobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadC
 	}
 
 	if resp.StatusCode == 404 {
-		return nil, errors.New("job not found")
+		return nil, errors.New("log not found")
 	} else if resp.StatusCode != 200 {
 		return nil, api.HandleHTTPError(resp)
 	}
 
 	return resp.Body, nil
+}
+
+func runLog(httpClient *http.Client, repo ghrepo.Interface, runID int) (io.ReadCloser, error) {
+	logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
+		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
+	return getLog(httpClient, logURL)
+}
+
+func jobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadCloser, error) {
+	logURL := fmt.Sprintf("%srepos/%s/actions/jobs/%d/logs",
+		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), jobID)
+	return getLog(httpClient, logURL)
 }
 
 func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
