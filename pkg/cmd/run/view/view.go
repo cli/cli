@@ -94,7 +94,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			}
 
 			if opts.Web && opts.Log {
-				return &cmdutil.FlagError{Err: errors.New("only one of --web or --log can be passed at a time")}
+				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --log")}
 			}
 
 			if runF != nil {
