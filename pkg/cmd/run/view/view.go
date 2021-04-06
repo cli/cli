@@ -1,12 +1,18 @@
 package view
 
 import (
+	"archive/zip"
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -26,6 +32,19 @@ type browser interface {
 	Browse(string) error
 }
 
+type logs map[string]*job
+
+type job struct {
+	name  string
+	steps []step
+}
+
+type step struct {
+	order int
+	name  string
+	logs  string
+}
+
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
@@ -41,8 +60,7 @@ type ViewOptions struct {
 
 	Prompt bool
 
-	Now        func() time.Time
-	CreateFile func(string) (io.Writer, error)
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -51,10 +69,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Now:        time.Now,
 		Browser:    f.Browser,
-		CreateFile: func(fullPath string) (io.Writer, error) {
-			return os.Create(fullPath)
-		},
 	}
+
 	cmd := &cobra.Command{
 		Use:    "view [<run-id>]",
 		Short:  "View a summary of a workflow run",
@@ -234,34 +250,19 @@ func runView(opts *ViewOptions) error {
 			return fmt.Errorf("run %d is still in progress; logs will be available when it is complete", run.ID)
 		}
 
-		filename := fmt.Sprintf("gh-run-log-%d.zip", run.ID)
-		dir := os.TempDir()
-		fullpath := path.Join(dir, filename)
-		f, err := opts.CreateFile(fullpath)
-		if err != nil {
-			return fmt.Errorf("failed to open %s: %w", fullpath, err)
-		}
-
-		r, err := runLog(httpClient, repo, run.ID)
+		runLogZip, err := runLog(httpClient, repo, run.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
 		}
-
-		if _, err := io.Copy(f, r); err != nil {
-			return fmt.Errorf("failed to download log: %w", err)
-		}
-
 		opts.IO.StopProgressIndicator()
-		if opts.IO.IsStdoutTTY() {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprintf(opts.IO.Out, "%s Downloaded logs to %s\n", cs.SuccessIcon(), fullpath)
+
+		logs, err := readLogsFromZip(runLogZip)
+		if err != nil {
+			return err
 		}
 
-		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
-			return cmdutil.SilentError
-		}
-
-		return nil
+		err = displayLogs(opts.IO, logs)
+		return err
 	}
 
 	if selectedJob == nil && len(jobs) == 0 {
@@ -422,4 +423,107 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 
 	// User wants to see all jobs
 	return nil, nil
+}
+
+// Structure of log zip file
+// zip/
+// ├── jobname1/
+// │   ├── 1_stepname.txt
+// │   ├── 2_anotherstepname.txt
+// │   ├── 3_stepstepname.txt
+// │   └── 4_laststepname.txt
+// └── jobname2/
+//     ├── 1_stepname.txt
+//     └── 2_somestepname.txt
+func readLogsFromZip(lz io.ReadCloser) (logs, error) {
+	ls := make(logs)
+	defer lz.Close()
+	z, err := ioutil.ReadAll(lz)
+	if err != nil {
+		return ls, err
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(z), int64(len(z)))
+	if err != nil {
+		return ls, err
+	}
+
+	for _, zipFile := range zipReader.File {
+		dir, file := filepath.Split(zipFile.Name)
+		ext := filepath.Ext(zipFile.Name)
+
+		// Skip all top level files and non-text files
+		if dir != "" && ext == ".txt" {
+			split := strings.Split(file, "_")
+			if len(split) != 2 {
+				return ls, errors.New("invalid step log filename")
+			}
+
+			jobName := strings.TrimSuffix(dir, "/")
+			stepName := strings.TrimSuffix(split[1], ".txt")
+			stepOrder, err := strconv.Atoi(split[0])
+			if err != nil {
+				return ls, errors.New("invalid step log filename")
+			}
+
+			stepLogs, err := readZipFile(zipFile)
+			if err != nil {
+				return ls, err
+			}
+
+			st := step{
+				order: stepOrder,
+				name:  stepName,
+				logs:  string(stepLogs),
+			}
+
+			if j, ok := ls[jobName]; !ok {
+				ls[jobName] = &job{name: jobName, steps: []step{st}}
+			} else {
+				j.steps = append(j.steps, st)
+			}
+		}
+	}
+
+	return ls, nil
+}
+
+func readZipFile(zf *zip.File) ([]byte, error) {
+	f, err := zf.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ioutil.ReadAll(f)
+}
+
+func displayLogs(io *iostreams.IOStreams, ls logs) error {
+	err := io.StartPager()
+	if err != nil {
+		return err
+	}
+	defer io.StopPager()
+
+	var jobNames []string
+	for name := range ls {
+		jobNames = append(jobNames, name)
+	}
+	sort.Strings(jobNames)
+
+	for _, name := range jobNames {
+		job := ls[name]
+		steps := job.steps
+		sort.Slice(steps, func(i, j int) bool {
+			return steps[i].order < steps[j].order
+		})
+		for _, step := range steps {
+			prefix := fmt.Sprintf("%s\t%s\t", job.name, step.name)
+			scanner := bufio.NewScanner(strings.NewReader(step.logs))
+			for scanner.Scan() {
+				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
+			}
+		}
+	}
+
+	return nil
 }

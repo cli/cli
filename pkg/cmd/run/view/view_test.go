@@ -2,14 +2,12 @@ package view
 
 import (
 	"bytes"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -151,7 +149,6 @@ func TestNewCmdView(t *testing.T) {
 }
 
 func TestViewRun(t *testing.T) {
-
 	tests := []struct {
 		name       string
 		httpStubs  func(*httpmock.Registry)
@@ -161,7 +158,6 @@ func TestViewRun(t *testing.T) {
 		wantErr    bool
 		wantOut    string
 		browsedURL string
-		wantWrite  string
 		errMsg     string
 	}{
 		{
@@ -399,14 +395,13 @@ func TestViewRun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
-					httpmock.StringResponse("pretend these bytes constitute a zip file"))
+					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(2)
 				as.StubOne(0)
 			},
-			wantOut:   "✓ Downloaded logs to " + path.Join(os.TempDir(), "gh-run-log-3.zip") + "\n",
-			wantWrite: "pretend these bytes constitute a zip file",
+			wantOut: runLogOutput(),
 		},
 		{
 			name: "noninteractive with run log",
@@ -421,10 +416,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
-					httpmock.StringResponse("pretend these bytes constitute a zip file"))
+					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
-			wantOut:   "✓ Downloaded logs to " + path.Join(os.TempDir(), "gh-run-log-3.zip") + "\n",
-			wantWrite: "pretend these bytes constitute a zip file",
+			wantOut: runLogOutput(),
 		},
 		{
 			name: "run log but run is not done",
@@ -597,11 +591,6 @@ func TestViewRun(t *testing.T) {
 			return notnow
 		}
 
-		fileBuff := bytes.Buffer{}
-		tt.opts.CreateFile = func(fullPath string) (io.Writer, error) {
-			return &fileBuff, nil
-		}
-
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(tt.tty)
 		tt.opts.IO = io
@@ -636,10 +625,24 @@ func TestViewRun(t *testing.T) {
 			if tt.browsedURL != "" {
 				assert.Equal(t, tt.browsedURL, browser.BrowsedURL())
 			}
-			if tt.wantWrite != "" {
-				assert.Equal(t, tt.wantWrite, fileBuff.String())
-			}
 			reg.Verify(t)
 		})
 	}
+}
+
+func runLogOutput() string {
+	return heredoc.Doc(`
+job1	step1	log line 1
+job1	step1	log line 2
+job1	step1	log line 3
+job1	step2	log line 1
+job1	step2	log line 2
+job1	step2	log line 3
+job2	step1	log line 1
+job2	step1	log line 2
+job2	step1	log line 3
+job2	step2	log line 1
+job2	step2	log line 2
+job2	step2	log line 3
+`)
 }
