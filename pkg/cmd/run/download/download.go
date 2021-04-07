@@ -59,6 +59,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 		  # Download specific artifacts across all runs in a repository
 		  $ gh run download -n <name1> -n <name2>
+
+		  # Select artifacts to download interactively
+		  $ gh run download
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
