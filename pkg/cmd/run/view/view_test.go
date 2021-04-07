@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -171,6 +172,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(`{"data": {
             "repository": {
@@ -207,6 +211,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
@@ -224,6 +231,48 @@ func TestViewRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "with artifacts",
+			opts: &ViewOptions{
+				RunID: "3",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.JSONResponse(map[string][]shared.Artifact{
+						"artifacts": {
+							shared.Artifact{Name: "artifact-1", Expired: false},
+							shared.Artifact{Name: "artifact-2", Expired: true},
+							shared.Artifact{Name: "artifact-3", Expired: false},
+						},
+					}))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{}))
+			},
+			wantOut: heredoc.Doc(`
+				
+				✓ trunk successful · 3
+				Triggered via push about 59 minutes ago
+				
+				JOBS
+				
+				
+				ARTIFACTS
+				artifact-1
+				artifact-2 (expired)
+				artifact-3
+				
+				For more information about a job, try: gh run view --job=<job-id>
+				view this run on GitHub: runs/3
+			`),
+		},
+		{
 			name: "exit status, successful run",
 			opts: &ViewOptions{
 				RunID:      "3",
@@ -233,6 +282,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
@@ -261,6 +313,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
@@ -293,6 +348,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
@@ -401,6 +459,9 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.StringResponse(`{}`))
 				reg.Register(
 					httpmock.REST("GET", "runs/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
