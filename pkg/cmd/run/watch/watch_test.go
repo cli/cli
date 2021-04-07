@@ -178,7 +178,6 @@ func TestWatchRun(t *testing.T) {
 		onlyWindows bool
 		skipWindows bool
 	}{
-		// TODO exit status respected
 		{
 			name: "run ID provided run already completed",
 			opts: &WatchOptions{
@@ -189,10 +188,11 @@ func TestWatchRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
 			},
-			wantOut: "",
+			wantOut: "Run failed (1234) has already completed with 'failure'\n",
 		},
 		{
 			name: "prompt, no in progress runs",
+			tty:  true,
 			opts: &WatchOptions{
 				Prompt: true,
 			},
@@ -212,6 +212,7 @@ func TestWatchRun(t *testing.T) {
 		{
 			name:        "interval respected",
 			skipWindows: true,
+			tty:         true,
 			opts: &WatchOptions{
 				Interval: 0,
 				Prompt:   true,
@@ -220,7 +221,7 @@ func TestWatchRun(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(1)
 			},
-			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n",
+			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run more runs (2) completed with 'success'\n",
 		},
 		{
 			name:        "interval respected, windows",
@@ -237,6 +238,7 @@ func TestWatchRun(t *testing.T) {
 		},
 		{
 			name:        "exit status respected",
+			tty:         true,
 			skipWindows: true,
 			opts: &WatchOptions{
 				Interval:   0,
@@ -247,7 +249,7 @@ func TestWatchRun(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(1)
 			},
-			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n",
+			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run more runs (2) completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},
@@ -263,7 +265,7 @@ func TestWatchRun(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(1)
 			},
-			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n",
+			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},

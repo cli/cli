@@ -41,7 +41,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "watch <run-selector>",
-		Short: "Runs until a run completes, showing its progress",
+		Short: "Watch a run until it completes, showing its progress",
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},
@@ -82,11 +82,13 @@ func watchRun(opts *WatchOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
+
 	runID := opts.RunID
 	var run *shared.Run
 
 	if opts.Prompt {
-		cs := opts.IO.ColorScheme()
 		runs, err := shared.GetRunsWithFilter(client, repo, 10, func(run shared.Run) bool {
 			return run.Status != shared.Completed
 		})
@@ -115,6 +117,7 @@ func watchRun(opts *WatchOptions) error {
 	}
 
 	if run.Status == shared.Completed {
+		fmt.Fprintf(out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
 		return nil
 	}
 
@@ -124,11 +127,9 @@ func watchRun(opts *WatchOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
-	if runtime.GOOS == "windows" {
-		opts.IO.EnableVirtualTerminalProcessing()
-	}
+	opts.IO.EnableVirtualTerminalProcessing()
 	// clear entire screen
-	fmt.Fprintf(opts.IO.Out, "\x1b[2J")
+	fmt.Fprintf(out, "\x1b[2J")
 
 	annotationCache := map[int][]shared.Annotation{}
 
@@ -143,6 +144,14 @@ func watchRun(opts *WatchOptions) error {
 			return err
 		}
 		time.Sleep(duration)
+	}
+
+	symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
+	id := cs.Cyanf("%d", run.ID)
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.Name), id, run.Conclusion)
 	}
 
 	if opts.ExitStatus && run.Conclusion != shared.Success {
@@ -160,14 +169,14 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 
 	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID))
 	if err != nil {
-		return run, fmt.Errorf("failed to get run: %w", err)
+		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
 	ago := opts.Now().Sub(run.CreatedAt)
 
 	jobs, err := shared.GetJobs(client, repo, *run)
 	if err != nil {
-		return run, fmt.Errorf("failed to get jobs: %w", err)
+		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
 
 	var annotations []shared.Annotation
@@ -192,7 +201,7 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 	}
 
 	if annotationErr != nil {
-		return run, fmt.Errorf("failed to get annotations: %w", annotationErr)
+		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
 	if runtime.GOOS == "windows" {
@@ -210,7 +219,7 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
 	fmt.Fprintln(out)
 
-	if len(jobs) == 0 && run.Conclusion == shared.Failure {
+	if len(jobs) == 0 {
 		return run, nil
 	}
 
