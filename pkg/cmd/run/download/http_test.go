@@ -75,14 +75,14 @@ func Test_Download(t *testing.T) {
 
 	var paths []string
 	parentPrefix := tmpDir + string(filepath.Separator)
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(tmpDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == tmpDir {
+		if p == tmpDir {
 			return nil
 		}
-		entry := strings.TrimPrefix(path, parentPrefix)
+		entry := strings.TrimPrefix(p, parentPrefix)
 		if info.IsDir() {
 			entry += "/"
 		} else if info.Mode()&0111 != 0 {
@@ -96,11 +96,11 @@ func Test_Download(t *testing.T) {
 	sort.Strings(paths)
 	assert.Equal(t, []string{
 		"artifact/",
-		"artifact/bin/",
-		"artifact/bin/myexe",
-		"artifact/readme.md",
-		"artifact/src/",
-		"artifact/src/main.go",
-		"artifact/src/util.go",
+		filepath.Join("artifact", "bin") + "/",
+		filepath.Join("artifact", "bin", "myexe"),
+		filepath.Join("artifact", "readme.md"),
+		filepath.Join("artifact", "src") + "/",
+		filepath.Join("artifact", "src", "main.go"),
+		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
 }
