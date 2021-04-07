@@ -401,7 +401,7 @@ func TestViewRun(t *testing.T) {
 				as.StubOne(2)
 				as.StubOne(0)
 			},
-			wantOut: runLogOutput(),
+			wantOut: expectedRunLogOutput,
 		},
 		{
 			name: "noninteractive with run log",
@@ -418,7 +418,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
-			wantOut: runLogOutput(),
+			wantOut: expectedRunLogOutput,
 		},
 		{
 			name: "run log but run is not done",
@@ -630,8 +630,7 @@ func TestViewRun(t *testing.T) {
 	}
 }
 
-func runLogOutput() string {
-	return heredoc.Doc(`
+var expectedRunLogOutput = heredoc.Doc(`
 job1	step1	log line 1
 job1	step1	log line 2
 job1	step1	log line 3
@@ -645,4 +644,3 @@ job2	step2	log line 1
 job2	step2	log line 2
 job2	step2	log line 3
 `)
-}

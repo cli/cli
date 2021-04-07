@@ -32,7 +32,7 @@ type browser interface {
 	Browse(string) error
 }
 
-type logs map[string]*job
+type runLog map[string]*job
 
 type job struct {
 	name  string
@@ -222,7 +222,7 @@ func runView(opts *ViewOptions) error {
 			return fmt.Errorf("job %d is still in progress; logs will be available when it is complete", selectedJob.ID)
 		}
 
-		r, err := jobLog(httpClient, repo, selectedJob.ID)
+		r, err := getJobLog(httpClient, repo, selectedJob.ID)
 		if err != nil {
 			return err
 		}
@@ -250,18 +250,18 @@ func runView(opts *ViewOptions) error {
 			return fmt.Errorf("run %d is still in progress; logs will be available when it is complete", run.ID)
 		}
 
-		runLogZip, err := runLog(httpClient, repo, run.ID)
+		runLogZip, err := getRunLog(httpClient, repo, run.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
 		}
 		opts.IO.StopProgressIndicator()
 
-		logs, err := readLogsFromZip(runLogZip)
+		runLog, err := readRunLog(runLogZip)
 		if err != nil {
 			return err
 		}
 
-		err = displayLogs(opts.IO, logs)
+		err = displayRunLog(opts.IO, runLog)
 		return err
 	}
 
@@ -388,13 +388,13 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func runLog(httpClient *http.Client, repo ghrepo.Interface, runID int) (io.ReadCloser, error) {
+func getRunLog(httpClient *http.Client, repo ghrepo.Interface, runID int) (io.ReadCloser, error) {
 	logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
 		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
 	return getLog(httpClient, logURL)
 }
 
-func jobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadCloser, error) {
+func getJobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadCloser, error) {
 	logURL := fmt.Sprintf("%srepos/%s/actions/jobs/%d/logs",
 		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), jobID)
 	return getLog(httpClient, logURL)
@@ -435,17 +435,17 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 // └── jobname2/
 //     ├── 1_stepname.txt
 //     └── 2_somestepname.txt
-func readLogsFromZip(lz io.ReadCloser) (logs, error) {
-	ls := make(logs)
-	defer lz.Close()
-	z, err := ioutil.ReadAll(lz)
+func readRunLog(rlz io.ReadCloser) (runLog, error) {
+	rl := make(runLog)
+	defer rlz.Close()
+	z, err := ioutil.ReadAll(rlz)
 	if err != nil {
-		return ls, err
+		return rl, err
 	}
 
 	zipReader, err := zip.NewReader(bytes.NewReader(z), int64(len(z)))
 	if err != nil {
-		return ls, err
+		return rl, err
 	}
 
 	for _, zipFile := range zipReader.File {
@@ -456,19 +456,19 @@ func readLogsFromZip(lz io.ReadCloser) (logs, error) {
 		if dir != "" && ext == ".txt" {
 			split := strings.Split(file, "_")
 			if len(split) != 2 {
-				return ls, errors.New("invalid step log filename")
+				return rl, errors.New("invalid step log filename")
 			}
 
 			jobName := strings.TrimSuffix(dir, "/")
 			stepName := strings.TrimSuffix(split[1], ".txt")
 			stepOrder, err := strconv.Atoi(split[0])
 			if err != nil {
-				return ls, errors.New("invalid step log filename")
+				return rl, errors.New("invalid step log filename")
 			}
 
 			stepLogs, err := readZipFile(zipFile)
 			if err != nil {
-				return ls, err
+				return rl, err
 			}
 
 			st := step{
@@ -477,15 +477,15 @@ func readLogsFromZip(lz io.ReadCloser) (logs, error) {
 				logs:  string(stepLogs),
 			}
 
-			if j, ok := ls[jobName]; !ok {
-				ls[jobName] = &job{name: jobName, steps: []step{st}}
+			if j, ok := rl[jobName]; !ok {
+				rl[jobName] = &job{name: jobName, steps: []step{st}}
 			} else {
 				j.steps = append(j.steps, st)
 			}
 		}
 	}
 
-	return ls, nil
+	return rl, nil
 }
 
 func readZipFile(zf *zip.File) ([]byte, error) {
@@ -497,7 +497,7 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	return ioutil.ReadAll(f)
 }
 
-func displayLogs(io *iostreams.IOStreams, ls logs) error {
+func displayRunLog(io *iostreams.IOStreams, rl runLog) error {
 	err := io.StartPager()
 	if err != nil {
 		return err
@@ -505,13 +505,13 @@ func displayLogs(io *iostreams.IOStreams, ls logs) error {
 	defer io.StopPager()
 
 	var jobNames []string
-	for name := range ls {
+	for name := range rl {
 		jobNames = append(jobNames, name)
 	}
 	sort.Strings(jobNames)
 
 	for _, name := range jobNames {
-		job := ls[name]
+		job := rl[name]
 		steps := job.steps
 		sort.Slice(steps, func(i, j int) bool {
 			return steps[i].order < steps[j].order
