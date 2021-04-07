@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/run/download"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -216,9 +215,9 @@ func runView(opts *ViewOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
-	var artifacts []download.Artifact
+	var artifacts []shared.Artifact
 	if selectedJob == nil {
-		artifacts, err = download.ListArtifacts(httpClient, repo, strconv.Itoa(run.ID))
+		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.Itoa(run.ID))
 		if err != nil {
 			return fmt.Errorf("failed to get artifacts: %w", err)
 		}
@@ -278,7 +277,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if selectedJob == nil {
-		var validArtifacts []download.Artifact
+		var validArtifacts []shared.Artifact
 		for _, a := range artifacts {
 			if !a.Expired {
 				validArtifacts = append(validArtifacts, a)

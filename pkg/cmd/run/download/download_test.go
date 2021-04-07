@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
@@ -133,7 +134,7 @@ func Test_runDownload(t *testing.T) {
 				Names:          []string(nil),
 			},
 			mockAPI: func(p *mockPlatform) {
-				p.On("List", "2345").Return([]Artifact{
+				p.On("List", "2345").Return([]shared.Artifact{
 					{
 						Name:        "artifact-1",
 						DownloadURL: "http://download.com/artifact1.zip",
@@ -162,7 +163,7 @@ func Test_runDownload(t *testing.T) {
 				Names:          []string(nil),
 			},
 			mockAPI: func(p *mockPlatform) {
-				p.On("List", "2345").Return([]Artifact{
+				p.On("List", "2345").Return([]shared.Artifact{
 					{
 						Name:        "artifact-1",
 						DownloadURL: "http://download.com/artifact1.zip",
@@ -185,7 +186,7 @@ func Test_runDownload(t *testing.T) {
 				Names:          []string{"artifact-3"},
 			},
 			mockAPI: func(p *mockPlatform) {
-				p.On("List", "2345").Return([]Artifact{
+				p.On("List", "2345").Return([]shared.Artifact{
 					{
 						Name:        "artifact-1",
 						DownloadURL: "http://download.com/artifact1.zip",
@@ -209,7 +210,7 @@ func Test_runDownload(t *testing.T) {
 				Names:          []string(nil),
 			},
 			mockAPI: func(p *mockPlatform) {
-				p.On("List", "").Return([]Artifact{
+				p.On("List", "").Return([]shared.Artifact{
 					{
 						Name:        "artifact-1",
 						DownloadURL: "http://download.com/artifact1.zip",
@@ -280,9 +281,9 @@ func newMockPlatform(t *testing.T, config func(*mockPlatform)) *mockPlatform {
 	return m
 }
 
-func (p *mockPlatform) List(runID string) ([]Artifact, error) {
+func (p *mockPlatform) List(runID string) ([]shared.Artifact, error) {
 	args := p.Called(runID)
-	return args.Get(0).([]Artifact), args.Error(1)
+	return args.Get(0).([]shared.Artifact), args.Error(1)
 }
 
 func (p *mockPlatform) Download(url string, dir string) error {

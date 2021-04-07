@@ -7,6 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -26,7 +27,7 @@ type DownloadOptions struct {
 }
 
 type platform interface {
-	List(runID string) ([]Artifact, error)
+	List(runID string) ([]shared.Artifact, error)
 	Download(url string, dir string) error
 }
 type prompter interface {
