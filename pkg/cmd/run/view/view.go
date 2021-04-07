@@ -277,17 +277,15 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if selectedJob == nil {
-		var validArtifacts []shared.Artifact
-		for _, a := range artifacts {
-			if !a.Expired {
-				validArtifacts = append(validArtifacts, a)
-			}
-		}
-		if len(validArtifacts) > 0 {
+		if len(artifacts) > 0 {
 			fmt.Fprintln(out)
 			fmt.Fprintln(out, cs.Bold("ARTIFACTS"))
-			for _, a := range validArtifacts {
-				fmt.Fprintln(out, a.Name)
+			for _, a := range artifacts {
+				expiredBadge := ""
+				if a.Expired {
+					expiredBadge = cs.Gray(" (expired)")
+				}
+				fmt.Fprintf(out, "%s%s\n", a.Name, expiredBadge)
 			}
 		}
 

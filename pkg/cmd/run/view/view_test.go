@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -204,6 +205,48 @@ func TestViewRun(t *testing.T) {
 			},
 			wantOut: "\nX trunk failed · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/1234\n",
 			wantErr: true,
+		},
+		{
+			name: "with artifacts",
+			opts: &ViewOptions{
+				RunID: "3",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/artifacts"),
+					httpmock.JSONResponse(map[string][]shared.Artifact{
+						"artifacts": {
+							shared.Artifact{Name: "artifact-1", Expired: false},
+							shared.Artifact{Name: "artifact-2", Expired: true},
+							shared.Artifact{Name: "artifact-3", Expired: false},
+						},
+					}))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{}))
+			},
+			wantOut: heredoc.Doc(`
+				
+				✓ trunk successful · 3
+				Triggered via push about 59 minutes ago
+				
+				JOBS
+				
+				
+				ARTIFACTS
+				artifact-1
+				artifact-2 (expired)
+				artifact-3
+				
+				For more information about a job, try: gh run view --job=<job-id>
+				view this run on GitHub: runs/3
+			`),
 		},
 		{
 			name: "exit status, successful run",
