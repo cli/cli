@@ -45,7 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	)
 
 	cmd := &cobra.Command{
-		Use:   "list [<owner>]",
+		Use:   "list [<owner (user or organization)>]",
 		Args:  cobra.MaximumNArgs(1),
 		Short: "List repositories owned by user or organization",
 		RunE: func(c *cobra.Command, args []string) error {
