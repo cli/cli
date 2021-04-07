@@ -1,6 +1,7 @@
 package download
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,7 +63,7 @@ func ListArtifacts(httpClient *http.Client, repo ghrepo.Interface, runID string)
 
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&response); err != nil {
-		return response.Artifacts, fmt.Errorf("error reading JSON: %w", err)
+		return response.Artifacts, fmt.Errorf("error parsing JSON: %w", err)
 	}
 
 	return response.Artifacts, nil
@@ -73,8 +74,8 @@ func downloadArtifact(httpClient *http.Client, url, destDir string) error {
 	if err != nil {
 		return err
 	}
-	// The API rejects requesting the "application/octet-stream" type :(
-	req.Header.Set("Accept", "application/json")
+	// The server rejects this :(
+	//req.Header.Set("Accept", "application/zip")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -90,19 +91,22 @@ func downloadArtifact(httpClient *http.Client, url, destDir string) error {
 	if err != nil {
 		return fmt.Errorf("error initializing temporary file: %w", err)
 	}
-	defer tmpfile.Close()
+	defer func() {
+		_ = tmpfile.Close()
+		_ = os.Remove(tmpfile.Name())
+	}()
 
-	_, err = io.Copy(tmpfile, resp.Body)
+	size, err := io.Copy(tmpfile, resp.Body)
 	if err != nil {
 		return fmt.Errorf("error writing zip archive: %w", err)
 	}
 
-	tmpfile.Close()
-	if err := extractZip(tmpfile, destDir); err != nil {
+	zipfile, err := zip.NewReader(tmpfile, size)
+	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
-	if err := os.Remove(tmpfile.Name()); err != nil {
-		return err
+	if err := extractZip(zipfile, destDir); err != nil {
+		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
 
 	return nil

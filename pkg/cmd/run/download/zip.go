@@ -6,29 +6,33 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-func extractZip(zipfile *os.File, destDir string) error {
-	zr, err := zip.OpenReader(zipfile.Name())
-	if err != nil {
-		return err
-	}
-	defer zr.Close()
+const (
+	dirMode  os.FileMode = 0755
+	fileMode os.FileMode = 0644
+	execMode os.FileMode = 0755
+)
 
+func extractZip(zr *zip.Reader, destDir string) error {
+	pathPrefix := filepath.Clean(destDir) + string(filepath.Separator)
 	for _, zf := range zr.File {
-		fpath := filepath.Join(destDir, zf.Name)
+		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
+		if !strings.HasPrefix(fpath, pathPrefix) {
+			continue
+		}
 		if err := extractZipFile(zf, fpath); err != nil {
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)
 		}
 	}
-
 	return nil
 }
 
 func extractZipFile(zf *zip.File, dest string) error {
 	zm := zf.Mode()
 	if zm.IsDir() {
-		return os.MkdirAll(dest, 0755)
+		return os.MkdirAll(dest, dirMode)
 	}
 
 	f, err := zf.Open()
@@ -37,15 +41,13 @@ func extractZipFile(zf *zip.File, dest string) error {
 	}
 	defer f.Close()
 
-	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return err
+	if dir := filepath.Dir(dest); dir != "." {
+		if err := os.MkdirAll(dir, dirMode); err != nil {
+			return err
+		}
 	}
 
-	var mode os.FileMode = 0644
-	if isBinary(zm) {
-		mode = 0755
-	}
-	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm))
 	if err != nil {
 		return err
 	}
@@ -55,6 +57,9 @@ func extractZipFile(zf *zip.File, dest string) error {
 	return err
 }
 
-func isBinary(m os.FileMode) bool {
-	return m&0111 != 0
+func getPerm(m os.FileMode) os.FileMode {
+	if m&0111 == 0 {
+		return fileMode
+	}
+	return execMode
 }
