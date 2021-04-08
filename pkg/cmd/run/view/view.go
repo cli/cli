@@ -261,8 +261,7 @@ func runView(opts *ViewOptions) error {
 			return err
 		}
 
-		err = displayRunLog(opts.IO, runLog)
-		return err
+		return displayRunLog(opts.IO, runLog)
 	}
 
 	if selectedJob == nil && len(jobs) == 0 {
