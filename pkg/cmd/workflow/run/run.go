@@ -2,13 +2,11 @@ package run
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -285,7 +283,7 @@ func runRun(opts *RunOptions) error {
 	}
 
 	if opts.Prompt {
-		yamlContent, err := getWorkflowContent(client, repo, workflow, ref)
+		yamlContent, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
 		if err != nil {
 			return fmt.Errorf("unable to fetch workflow file content: %w", err)
 		}
@@ -407,25 +405,4 @@ func findInputs(yamlContent []byte) (map[string]WorkflowInput, error) {
 	}
 
 	return out, nil
-}
-
-func getWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) ([]byte, error) {
-	path := fmt.Sprintf("repos/%s/contents/%s?ref=%s", ghrepo.FullName(repo), workflow.Path, url.QueryEscape(ref))
-
-	type Result struct {
-		Content string
-	}
-
-	var result Result
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(result.Content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode workflow file: %w", err)
-	}
-
-	return decoded, nil
 }

@@ -143,7 +143,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	}
 
 	opts.IO.StartProgressIndicator()
-	yaml, err := getWorkflowContent(client, repo, opts.Ref, workflow)
+	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, opts.Ref)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if s, ok := err.(api.HTTPError); ok && s.StatusCode == 404 {
@@ -154,6 +154,8 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 		}
 		return fmt.Errorf("could not get workflow file content: %w", err)
 	}
+
+	yaml := string(yamlBytes)
 
 	theme := opts.IO.DetectTerminalTheme()
 	markdownStyle := markdown.GetStyle(theme)
