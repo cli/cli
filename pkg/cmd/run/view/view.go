@@ -31,8 +31,6 @@ type browser interface {
 	Browse(string) error
 }
 
-type runLog map[string]*shared.Job
-
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
