@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/api"
@@ -51,42 +53,38 @@ func TestNewCmdRun(t *testing.T) {
 			},
 		},
 		{
-			name: "extra args",
+			name:     "both STDIN and input fields",
+			stdin:    "some json",
+			cli:      "workflow.yml -fhey=there",
+			errMsg:   "only one of STDIN or -f/-F can be passed",
+			wantsErr: true,
+		},
+		{
+			name: "-f args",
 			tty:  true,
-			cli:  `workflow.yml -- --cool=nah --foo bar`,
+			cli:  `workflow.yml -fhey=there -fname="dana scully"`,
 			wants: RunOptions{
-				InputArgs: []string{"--cool=nah", "--foo", "bar"},
 				Selector:  "workflow.yml",
+				RawFields: []string{"hey=there", "name=dana scully"},
 			},
 		},
 		{
-			name:     "both json on STDIN and json arg",
-			cli:      `workflow.yml --json '{"cool":"yeah"}'`,
-			stdin:    `{"cool":"yeah"}`,
-			wantsErr: true,
-			errMsg:   "JSON can only be passed on one of STDIN or --json at a time",
-		},
-		{
-			name:     "both json on STDIN and extra args",
-			cli:      `workflow.yml -- --cool=nah`,
-			stdin:    `{"cool":"yeah"}`,
-			errMsg:   "only one of JSON or input arguments can be passed at a time",
-			wantsErr: true,
-		},
-		{
-			name:     "both json arg and extra args",
-			tty:      true,
-			cli:      `workflow.yml --json '{"cool":"yeah"}' -- --cool=nah`,
-			errMsg:   "only one of JSON or input arguments can be passed at a time",
-			wantsErr: true,
-		},
-		{
-			name: "json via argument",
-			cli:  `workflow.yml --json '{"cool":"yeah"}'`,
+			name: "-F args",
 			tty:  true,
+			cli:  `workflow.yml -Fhey=there -Fname="dana scully" -Ffile=@cool.txt`,
 			wants: RunOptions{
-				JSON:     `{"cool":"yeah"}`,
-				Selector: "workflow.yml",
+				Selector:    "workflow.yml",
+				MagicFields: []string{"hey=there", "name=dana scully", "file=@cool.txt"},
+			},
+		},
+		{
+			name: "-F/-f arg mix",
+			tty:  true,
+			cli:  `workflow.yml -fhey=there -Fname="dana scully" -Ffile=@cool.txt`,
+			wants: RunOptions{
+				Selector:    "workflow.yml",
+				RawFields:   []string{"hey=there"},
+				MagicFields: []string{`name=dana scully`, "file=@cool.txt"},
 			},
 		},
 		{
@@ -142,12 +140,86 @@ func TestNewCmdRun(t *testing.T) {
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 			assert.Equal(t, tt.wants.JSON, gotOpts.JSON)
 			assert.Equal(t, tt.wants.Ref, gotOpts.Ref)
-			assert.ElementsMatch(t, tt.wants.InputArgs, gotOpts.InputArgs)
+			assert.ElementsMatch(t, tt.wants.RawFields, gotOpts.RawFields)
+			assert.ElementsMatch(t, tt.wants.MagicFields, gotOpts.MagicFields)
+		})
+	}
+}
+
+func Test_magicFieldValue(t *testing.T) {
+	f, err := ioutil.TempFile("", "gh-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprint(f, "file contents")
+	f.Close()
+	t.Cleanup(func() { os.Remove(f.Name()) })
+
+	io, _, _, _ := iostreams.Test()
+
+	type args struct {
+		v    string
+		opts RunOptions
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{
+			name:    "string",
+			args:    args{v: "hello"},
+			want:    "hello",
+			wantErr: false,
+		},
+		{
+			name: "file",
+			args: args{
+				v:    "@" + f.Name(),
+				opts: RunOptions{IO: io},
+			},
+			want:    "file contents",
+			wantErr: false,
+		},
+		{
+			name: "file error",
+			args: args{
+				v:    "@",
+				opts: RunOptions{IO: io},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := magicFieldValue(tt.args.v, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestRun(t *testing.T) {
+	minimalYAMLContent := []byte(`
+name: minimal workflow
+on: workflow_dispatch
+jobs:
+  yell:
+    runs-on: ubuntu-latest
+    steps:
+      - name: do a yell
+        run: |
+          echo "AUUUGH!"
+`)
+	encodedMinimalYAMLContent := base64.StdEncoding.EncodeToString(minimalYAMLContent)
 	yamlContent := []byte(`
 name: a workflow
 on:
@@ -167,7 +239,7 @@ jobs:
         run: |
           echo "${{ github.event.inputs.greeting}}, ${{ github.events.inputs.name }}!"`)
 
-	encodedYamlContent := base64.StdEncoding.EncodeToString(yamlContent)
+	encodedYAMLContent := base64.StdEncoding.EncodeToString(yamlContent)
 
 	stubs := func(reg *httpmock.Registry) {
 		reg.Register(
@@ -175,11 +247,6 @@ jobs:
 			httpmock.JSONResponse(shared.Workflow{
 				Path: ".github/workflows/workflow.yml",
 				ID:   12345,
-			}))
-		reg.Register(
-			httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
-			httpmock.JSONResponse(struct{ Content string }{
-				Content: encodedYamlContent,
 			}))
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
@@ -208,11 +275,6 @@ jobs:
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
 					httpmock.JSONResponse(shared.Workflow{
 						Path: ".github/workflows/workflow.yml",
-					}))
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
-					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedYamlContent,
 					}))
 			},
 			wantErr: true,
@@ -249,6 +311,22 @@ jobs:
 			httpStubs: stubs,
 		},
 		{
+			name: "nontty good input fields",
+			opts: &RunOptions{
+				Selector:    "workflow.yml",
+				RawFields:   []string{`name=scully`},
+				MagicFields: []string{`greeting=hey`},
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name":     "scully",
+					"greeting": "hey",
+				},
+				"ref": "trunk",
+			},
+			httpStubs: stubs,
+		},
+		{
 			name: "respects ref",
 			tty:  true,
 			opts: &RunOptions{
@@ -266,6 +344,7 @@ jobs:
 			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at good-branch\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
 		},
 		{
+			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
 			name: "good JSON, missing required input",
 			tty:  true,
 			opts: &RunOptions{
@@ -277,76 +356,35 @@ jobs:
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
 					httpmock.JSONResponse(shared.Workflow{
 						Path: ".github/workflows/workflow.yml",
+						ID:   12345,
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
-					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedYamlContent,
-					}))
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(422, "missing something"))
 			},
 			wantErr: true,
-			errOut:  "missing required input 'name'",
+			errOut:  "could not create workflow dispatch event: HTTP 422 (https://api.github.com/repos/OWNER/REPO/actions/workflows/12345/dispatches)",
 		},
 		{
-			name:      "input arguments",
-			httpStubs: stubs,
-			tty:       true,
+			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
+			name: "input fields, missing required",
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
-				InputArgs: []string{"--name", "scully"},
-			},
-			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{
-					"name":     "scully",
-					"greeting": "hi",
-				},
-				"ref": "trunk",
-			},
-			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
-		},
-		{
-			name: "good JSON, missing required input",
-			tty:  true,
-			opts: &RunOptions{
-				Selector:  "workflow.yml",
-				InputArgs: []string{"--greeting=hey"},
+				RawFields: []string{`greeting="hello there"`},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
 					httpmock.JSONResponse(shared.Workflow{
 						Path: ".github/workflows/workflow.yml",
+						ID:   12345,
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
-					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedYamlContent,
-					}))
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(422, "missing something"))
 			},
 			wantErr: true,
-			errOut:  "missing required input 'name'",
-		},
-		{
-			name: "good JSON, missing required input",
-			tty:  true,
-			opts: &RunOptions{
-				Selector:  "workflow.yml",
-				InputArgs: []string{"--name=scully", "--bad=corrupt"},
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
-					httpmock.JSONResponse(shared.Workflow{
-						Path: ".github/workflows/workflow.yml",
-					}))
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
-					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedYamlContent,
-					}))
-			},
-			wantErr: true,
-			errOut:  "could not parse input args: unknown flag: --bad",
+			errOut:  "could not create workflow dispatch event: HTTP 422 (https://api.github.com/repos/OWNER/REPO/actions/workflows/12345/dispatches)",
 		},
 		{
 			name: "prompt, no workflows enabled",
@@ -387,6 +425,43 @@ jobs:
 			errOut:  "could not fetch workflows for OWNER/REPO: no workflows are enabled",
 		},
 		{
+			name: "prompt, minimal yaml",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "minimal workflow",
+								ID:    1,
+								State: shared.Active,
+								Path:  ".github/workflows/minimal.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedMinimalYAMLContent,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/1/dispatches"),
+					httpmock.StatusStringResponse(204, "cool"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(0)
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{},
+				"ref":    "trunk",
+			},
+			wantOut: "✓ Created workflow_dispatch event for minimal.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=minimal.yml\n",
+		},
+		{
 			name: "prompt",
 			tty:  true,
 			opts: &RunOptions{
@@ -408,7 +483,7 @@ jobs:
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedYamlContent,
+						Content: encodedYAMLContent,
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),

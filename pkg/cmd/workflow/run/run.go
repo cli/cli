@@ -22,7 +22,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,7 +34,8 @@ type RunOptions struct {
 	Ref      string
 	JSON     string
 
-	InputArgs []string
+	MagicFields []string
+	RawFields   []string
 
 	Prompt bool
 }
@@ -58,9 +58,8 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			If the workflow file supports inputs, they can be specified in a few ways:
 
 			- Interactively
-			- As command line arguments specified after --
+			- via -f or -F flags
 			- As JSON, via STDIN
-			- As JSON, via --json
     `),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run
@@ -73,17 +72,14 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			$ gh workflow run triage.yml --ref=myBranch
 
 			# Run the workflow file 'triage.yml' with command line inputs
-			$ gh workflow run triage.yml -- --name=scully --greeting=hello
+			$ gh workflow run triage.yml -fname=scully -fgreeting=hello
 
 			# Run the workflow file 'triage.yml' with JSON via STDIN
 			$ echo '{"name":"scully", "greeting":"hello"}' | gh workflow run triage.yml
-
-			# Run the workflow file 'triage.yml' with JSON via --json
-			$ gh workflow run triage.yml --json='{"name":"scully", "greeting":"hello"}'
 		`),
 		Args: func(cmd *cobra.Command, args []string) error {
-			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
-				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing input flags")}
+			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
+				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
 			}
 			return nil
 		},
@@ -91,9 +87,10 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			inputFieldsPassed := len(opts.MagicFields)+len(opts.RawFields) > 0
+
 			if len(args) > 0 {
 				opts.Selector = args[0]
-				opts.InputArgs = args[1:]
 			} else if !opts.IO.CanPrompt() {
 				return &cmdutil.FlagError{Err: errors.New("workflow ID, name, or filename required when not running interactively")}
 			} else {
@@ -101,9 +98,6 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			}
 
 			if !opts.IO.IsStdinTTY() {
-				if opts.JSON != "" {
-					return errors.New("JSON can only be passed on one of STDIN or --json at a time")
-				}
 				jsonIn, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
 					return errors.New("failed to read from STDIN")
@@ -116,21 +110,69 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 					return &cmdutil.FlagError{Err: errors.New("workflow argument required when passing JSON")}
 				}
 			} else {
-				if opts.JSON != "" && len(opts.InputArgs) > 0 {
-					return &cmdutil.FlagError{Err: errors.New("only one of JSON or input arguments can be passed at a time")}
+				if opts.JSON != "" && inputFieldsPassed {
+					return &cmdutil.FlagError{Err: errors.New("only one of STDIN or -f/-F can be passed")}
 				}
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return runRun(opts)
 		},
 	}
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to run")
-	cmd.Flags().StringVar(&opts.JSON, "json", "", "Provide workflow inputs as JSON")
+	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
+	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 
 	return cmd
+}
+
+// TODO copypasta from gh api
+func parseField(f string) (string, string, error) {
+	idx := strings.IndexRune(f, '=')
+	if idx == -1 {
+		return f, "", fmt.Errorf("field %q requires a value separated by an '=' sign", f)
+	}
+	return f[0:idx], f[idx+1:], nil
+}
+
+// TODO MODIFIED copypasta from gh api
+func magicFieldValue(v string, opts RunOptions) (string, error) {
+	if strings.HasPrefix(v, "@") {
+		fileBytes, err := opts.IO.ReadUserFile(v[1:])
+		if err != nil {
+			return "", err
+		}
+		return string(fileBytes), nil
+	}
+
+	return v, nil
+}
+
+// TODO copypasta from gh api
+func parseFields(opts RunOptions) (map[string]string, error) {
+	params := make(map[string]string)
+	for _, f := range opts.RawFields {
+		key, value, err := parseField(f)
+		if err != nil {
+			return params, err
+		}
+		params[key] = value
+	}
+	for _, f := range opts.MagicFields {
+		key, strValue, err := parseField(f)
+		if err != nil {
+			return params, err
+		}
+		value, err := magicFieldValue(strValue, opts)
+		if err != nil {
+			return params, fmt.Errorf("error parsing %q value: %w", key, err)
+		}
+		params[key] = value
+	}
+	return params, nil
 }
 
 type InputAnswer struct {
@@ -152,6 +194,48 @@ func (ia *InputAnswer) WriteAnswer(name string, value interface{}) error {
 	return fmt.Errorf("unexpected value type: %v", value)
 }
 
+func collectInputs(yamlContent []byte) (map[string]string, error) {
+	inputs, err := findInputs(yamlContent)
+	if err != nil {
+		return nil, err
+	}
+
+	providedInputs := map[string]string{}
+
+	if len(inputs) == 0 {
+		return providedInputs, nil
+	}
+
+	qs := []*survey.Question{}
+	for inputName, input := range inputs {
+		q := &survey.Question{
+			Name: inputName,
+			Prompt: &survey.Input{
+				Message: inputName,
+				Default: input.Default,
+			},
+		}
+		if input.Required {
+			q.Validate = survey.Required
+		}
+		qs = append(qs, q)
+	}
+
+	sort.Slice(qs, func(i, j int) bool {
+		return qs[i].Name < qs[j].Name
+	})
+
+	inputAnswer := InputAnswer{
+		providedInputs: providedInputs,
+	}
+	err = prompt.SurveyAsk(qs, &inputAnswer)
+	if err != nil {
+		return nil, err
+	}
+
+	return providedInputs, nil
+}
+
 func runRun(opts *RunOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
@@ -162,6 +246,15 @@ func runRun(opts *RunOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("could not determine base repo: %w", err)
+	}
+
+	ref := opts.Ref
+
+	if ref == "" {
+		ref, err = api.RepoDefaultBranch(client, repo)
+		if err != nil {
+			return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(repo), err)
+		}
 	}
 
 	states := []shared.WorkflowState{shared.Active}
@@ -175,81 +268,30 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
-	ref := opts.Ref
-
-	if ref == "" {
-		ref, err = api.RepoDefaultBranch(client, repo)
-		if err != nil {
-			return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(repo), err)
-		}
-	}
-
-	yamlContent, err := getWorkflowContent(client, repo, workflow, ref)
-	if err != nil {
-		return fmt.Errorf("unable to fetch workflow file content: %w", err)
-	}
-
-	inputs, err := findInputs(yamlContent)
-	if err != nil {
-		return err
-	}
-
 	providedInputs := map[string]string{}
 
-	if opts.Prompt {
-		qs := []*survey.Question{}
-		for inputName, input := range inputs {
-			q := &survey.Question{
-				Name: inputName,
-				Prompt: &survey.Input{
-					Message: inputName,
-					Default: input.Default,
-				},
-			}
-			if input.Required {
-				q.Validate = survey.Required
-			}
-			qs = append(qs, q)
-		}
-
-		sort.Slice(qs, func(i, j int) bool {
-			return qs[i].Name < qs[j].Name
-		})
-
-		inputAnswer := InputAnswer{
-			providedInputs: providedInputs,
-		}
-		err = prompt.SurveyAsk(qs, &inputAnswer)
+	if len(opts.MagicFields)+len(opts.RawFields) > 0 {
+		providedInputs, err = parseFields(*opts)
 		if err != nil {
 			return err
 		}
-	} else {
-		if opts.JSON != "" {
-			err := json.Unmarshal([]byte(opts.JSON), &providedInputs)
-			if err != nil {
-				return fmt.Errorf("could not parse provided JSON: %w", err)
-			}
-		}
+	}
 
-		if len(opts.InputArgs) > 0 {
-			fs := pflag.FlagSet{}
-			for inputName, input := range inputs {
-				fs.String(inputName, input.Default, input.Description)
-			}
-			err = fs.Parse(opts.InputArgs)
-			if err != nil {
-				return fmt.Errorf("could not parse input args: %w", err)
-			}
-			for inputName := range inputs {
-				providedValue, _ := fs.GetString(inputName)
-				providedInputs[inputName] = providedValue
-			}
+	if opts.JSON != "" {
+		err := json.Unmarshal([]byte(opts.JSON), &providedInputs)
+		if err != nil {
+			return fmt.Errorf("could not parse provided JSON: %w", err)
 		}
 	}
 
-	for inputName, inputValue := range inputs {
-		if inputValue.Required && providedInputs[inputName] == "" {
-			return fmt.Errorf("missing required input '%s'", inputName)
+	if opts.Prompt {
+		yamlContent, err := getWorkflowContent(client, repo, workflow, ref)
+		if err != nil {
+			return fmt.Errorf("unable to fetch workflow file content: %w", err)
+		}
+		providedInputs, err = collectInputs(yamlContent)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -274,7 +316,7 @@ func runRun(opts *RunOptions) error {
 		return fmt.Errorf("could not create workflow dispatch event: %w", err)
 	}
 
-	if opts.IO.CanPrompt() {
+	if opts.IO.IsStdoutTTY() {
 		out := opts.IO.Out
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(out, "%s Created workflow_dispatch event for %s at %s\n",
@@ -314,21 +356,28 @@ func findInputs(yamlContent []byte) (map[string]WorkflowInput, error) {
 	// TODO this is pretty hideous
 	for _, node := range rootNode.Content[0].Content {
 		if onKeyNode != nil {
-			for _, node := range node.Content {
-				if dispatchKeyNode != nil {
-					for _, node := range node.Content {
-						if inputsKeyNode != nil {
-							inputsMapNode = node
-							break
+			if node.Kind == yaml.MappingNode {
+				for _, node := range node.Content {
+					if dispatchKeyNode != nil {
+						for _, node := range node.Content {
+							if inputsKeyNode != nil {
+								inputsMapNode = node
+								break
+							}
+							if node.Value == "inputs" {
+								inputsKeyNode = node
+							}
 						}
-						if node.Value == "inputs" {
-							inputsKeyNode = node
-						}
+						break
 					}
-					break
+					if node.Value == "workflow_dispatch" {
+						dispatchKeyNode = node
+					}
 				}
+			} else if node.Kind == yaml.ScalarNode {
 				if node.Value == "workflow_dispatch" {
 					dispatchKeyNode = node
+					break
 				}
 			}
 			break
