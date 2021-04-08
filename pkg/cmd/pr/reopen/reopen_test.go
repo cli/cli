@@ -63,7 +63,7 @@ func TestPRReopen(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "id": "THE-ID", "number": 666, "title": "The title of the PR", "closed": true}
+				"pullRequest": { "id": "THE-ID", "number": 666, "title": "The title of the PR", "state": "CLOSED" }
 			} } }`),
 	)
 	http.Register(
@@ -95,7 +95,7 @@ func TestPRReopen_BranchArg(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": { "pullRequests": {
 				"nodes": [
-					{ "id": "THE-ID", "number": 666, "title": "The title of the PR", "headRefName": "fix-bug", "closed": true }
+					{ "id": "THE-ID", "number": 666, "title": "The title of the PR", "headRefName": "fix-bug", "state": "CLOSED" }
 				]
 			} } } }`),
 	)
@@ -127,7 +127,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "number": 666,  "title": "The title of the PR", "closed": false}
+				"pullRequest": { "number": 666,  "title": "The title of the PR", "state": "OPEN" }
 			} } }`),
 	)
 
@@ -151,7 +151,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "number": 666, "title": "The title of the PR", "closed": true, "state": "MERGED"}
+				"pullRequest": { "number": 666, "title": "The title of the PR", "state": "MERGED"}
 			} } }`),
 	)
 
