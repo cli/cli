@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,18 +31,7 @@ type browser interface {
 	Browse(string) error
 }
 
-type runLog map[string]*job
-
-type job struct {
-	name  string
-	steps []step
-}
-
-type step struct {
-	order int
-	name  string
-	logs  string
-}
+type runLog map[string]*shared.Job
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
@@ -56,6 +44,7 @@ type ViewOptions struct {
 	Verbose    bool
 	ExitStatus bool
 	Log        bool
+	LogFailed  bool
 	Web        bool
 
 	Prompt bool
@@ -118,6 +107,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --log")}
 			}
 
+			if opts.Log && opts.LogFailed {
+				return &cmdutil.FlagError{Err: errors.New("specify only one of --log or --log-failed")}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -129,6 +122,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run failed")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "View a specific job ID from a run")
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
+	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View log of failed steps for either a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
 
 	return cmd
@@ -215,56 +209,8 @@ func runView(opts *ViewOptions) error {
 		return opts.Browser.Browse(url)
 	}
 
-	opts.IO.StartProgressIndicator()
-
-	if opts.Log && selectedJob != nil {
-		if selectedJob.Status != shared.Completed {
-			return fmt.Errorf("job %d is still in progress; logs will be available when it is complete", selectedJob.ID)
-		}
-
-		r, err := getJobLog(httpClient, repo, selectedJob.ID)
-		if err != nil {
-			return err
-		}
-		opts.IO.StopProgressIndicator()
-
-		err = opts.IO.StartPager()
-		if err != nil {
-			return err
-		}
-		defer opts.IO.StopPager()
-
-		if _, err := io.Copy(opts.IO.Out, r); err != nil {
-			return fmt.Errorf("failed to read log: %w", err)
-		}
-
-		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
-			return cmdutil.SilentError
-		}
-
-		return nil
-	}
-
-	if opts.Log {
-		if run.Status != shared.Completed {
-			return fmt.Errorf("run %d is still in progress; logs will be available when it is complete", run.ID)
-		}
-
-		runLogZip, err := getRunLog(httpClient, repo, run.ID)
-		if err != nil {
-			return fmt.Errorf("failed to get run log: %w", err)
-		}
-		opts.IO.StopProgressIndicator()
-
-		runLog, err := readRunLog(runLogZip)
-		if err != nil {
-			return err
-		}
-
-		return displayRunLog(opts.IO, runLog)
-	}
-
 	if selectedJob == nil && len(jobs) == 0 {
+		opts.IO.StartProgressIndicator()
 		jobs, err = shared.GetJobs(client, repo, *run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
@@ -272,6 +218,30 @@ func runView(opts *ViewOptions) error {
 		}
 	} else if selectedJob != nil {
 		jobs = []shared.Job{*selectedJob}
+	}
+
+	if opts.Log || opts.LogFailed {
+		if selectedJob != nil && selectedJob.Status != shared.Completed {
+			return fmt.Errorf("job %d is still in progress; logs will be available when it is complete", selectedJob.ID)
+		}
+
+		if run.Status != shared.Completed {
+			return fmt.Errorf("run %d is still in progress; logs will be available when it is complete", run.ID)
+		}
+
+		opts.IO.StartProgressIndicator()
+		runLogZip, err := getRunLog(httpClient, repo, run.ID)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return fmt.Errorf("failed to get run log: %w", err)
+		}
+
+		err = readRunLog(runLogZip, jobs)
+		if err != nil {
+			return err
+		}
+
+		return displayRunLog(opts.IO, jobs, opts.LogFailed)
 	}
 
 	prNumber := ""
@@ -355,16 +325,24 @@ func runView(opts *ViewOptions) error {
 		}
 
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
-		// TODO note about run view --log when that exists
-		fmt.Fprintf(out, cs.Gray("view this run on GitHub: %s\n"), run.URL)
+		if shared.IsFailureState(run.Conclusion) {
+			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
+		} else {
+			fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
+		}
+		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
+
 		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
 			return cmdutil.SilentError
 		}
 	} else {
 		fmt.Fprintln(out)
-		fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
-		fmt.Fprintf(out, cs.Gray("view this run on GitHub: %s\n"), run.URL)
+		if shared.IsFailureState(selectedJob.Conclusion) {
+			fmt.Fprintf(out, "To see the log of steps that failed, try: gh run view --log-failed --job=%d\n", selectedJob.ID)
+		} else {
+			fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
+		}
+		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
 
 		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
 			return cmdutil.SilentError
@@ -412,12 +390,6 @@ func getRunLog(httpClient *http.Client, repo ghrepo.Interface, runID int) (io.Re
 	return getLog(httpClient, logURL)
 }
 
-func getJobLog(httpClient *http.Client, repo ghrepo.Interface, jobID int) (io.ReadCloser, error) {
-	logURL := fmt.Sprintf("%srepos/%s/actions/jobs/%d/logs",
-		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), jobID)
-	return getLog(httpClient, logURL)
-}
-
 func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
 	candidates := []string{"View all jobs in this run"}
 	for _, job := range jobs {
@@ -443,7 +415,8 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	return nil, nil
 }
 
-// Structure of log zip file
+// This function takes a zip file of logs and a list of jobs.
+// Structure of zip file
 // zip/
 // ├── jobname1/
 // │   ├── 1_stepname.txt
@@ -453,57 +426,38 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 // └── jobname2/
 //     ├── 1_stepname.txt
 //     └── 2_somestepname.txt
-func readRunLog(rlz io.ReadCloser) (runLog, error) {
-	rl := make(runLog)
+// It iterates through the list of jobs and trys to find the matching
+// log in the zip file. If the matching log is found it is attached
+// to the job.
+func readRunLog(rlz io.ReadCloser, jobs []shared.Job) error {
 	defer rlz.Close()
 	z, err := ioutil.ReadAll(rlz)
 	if err != nil {
-		return rl, err
+		return err
 	}
 
 	zipReader, err := zip.NewReader(bytes.NewReader(z), int64(len(z)))
 	if err != nil {
-		return rl, err
+		return err
 	}
 
-	for _, zipFile := range zipReader.File {
-		dir, file := filepath.Split(zipFile.Name)
-		ext := filepath.Ext(zipFile.Name)
-
-		// Skip all top level files and non-text files
-		if dir != "" && ext == ".txt" {
-			split := strings.Split(file, "_")
-			if len(split) != 2 {
-				return rl, errors.New("invalid step log filename")
-			}
-
-			jobName := strings.TrimSuffix(dir, "/")
-			stepName := strings.TrimSuffix(split[1], ".txt")
-			stepOrder, err := strconv.Atoi(split[0])
-			if err != nil {
-				return rl, errors.New("invalid step log filename")
-			}
-
-			stepLogs, err := readZipFile(zipFile)
-			if err != nil {
-				return rl, err
-			}
-
-			st := step{
-				order: stepOrder,
-				name:  stepName,
-				logs:  string(stepLogs),
-			}
-
-			if j, ok := rl[jobName]; !ok {
-				rl[jobName] = &job{name: jobName, steps: []step{st}}
-			} else {
-				j.steps = append(j.steps, st)
+	for i, job := range jobs {
+		for j, step := range job.Steps {
+			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number, step.Name)
+			for _, file := range zipReader.File {
+				if file.Name == filename {
+					log, err := readZipFile(file)
+					if err != nil {
+						return err
+					}
+					jobs[i].Steps[j].Log = string(log)
+					break
+				}
 			}
 		}
 	}
 
-	return rl, nil
+	return nil
 }
 
 func readZipFile(zf *zip.File) ([]byte, error) {
@@ -515,28 +469,22 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	return ioutil.ReadAll(f)
 }
 
-func displayRunLog(io *iostreams.IOStreams, rl runLog) error {
+func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) error {
 	err := io.StartPager()
 	if err != nil {
 		return err
 	}
 	defer io.StopPager()
 
-	var jobNames []string
-	for name := range rl {
-		jobNames = append(jobNames, name)
-	}
-	sort.Strings(jobNames)
-
-	for _, name := range jobNames {
-		job := rl[name]
-		steps := job.steps
-		sort.Slice(steps, func(i, j int) bool {
-			return steps[i].order < steps[j].order
-		})
+	for _, job := range jobs {
+		steps := job.Steps
+		sort.Sort(steps)
 		for _, step := range steps {
-			prefix := fmt.Sprintf("%s\t%s\t", job.name, step.name)
-			scanner := bufio.NewScanner(strings.NewReader(step.logs))
+			if failed && !shared.IsFailureState(step.Conclusion) {
+				continue
+			}
+			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
+			scanner := bufio.NewScanner(strings.NewReader(step.Log))
 			for scanner.Scan() {
 				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
 			}

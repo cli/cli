@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -58,6 +59,12 @@ func TestNewCmdView(t *testing.T) {
 			name:     "disallow web and log",
 			tty:      true,
 			cli:      "-w --log",
+			wantsErr: true,
+		},
+		{
+			name:     "disallow log and log-failed",
+			tty:      true,
+			cli:      "--log --log-failed",
 			wantsErr: true,
 		},
 		{
@@ -198,7 +205,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk successful #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "exit status, failed run",
@@ -227,7 +234,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
 					httpmock.JSONResponse(shared.FailedJobAnnotations))
 			},
-			wantOut: "\nX trunk failed · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/1234\n",
+			wantOut: "\nX trunk failed · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: runs/1234\n",
 			wantErr: true,
 		},
 		{
@@ -256,20 +263,20 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.JobsPayload{}))
 			},
 			wantOut: heredoc.Doc(`
-				
+
 				✓ trunk successful · 3
 				Triggered via push about 59 minutes ago
-				
+
 				JOBS
-				
-				
+
+
 				ARTIFACTS
 				artifact-1
 				artifact-2 (expired)
 				artifact-3
-				
+
 				For more information about a job, try: gh run view --job=<job-id>
-				view this run on GitHub: runs/3
+				View this run on GitHub: runs/3
 			`),
 		},
 		{
@@ -299,7 +306,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "verbose",
@@ -334,7 +341,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
 					httpmock.JSONResponse(shared.FailedJobAnnotations))
 			},
-			wantOut: "\nX trunk failed · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/1234\n",
+			wantOut: "\nX trunk failed · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: runs/1234\n",
 		},
 		{
 			name: "prompts for choice, one job",
@@ -371,7 +378,7 @@ func TestViewRun(t *testing.T) {
 			opts: &ViewOptions{
 				Prompt: true,
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "interactive with log",
@@ -398,14 +405,14 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/10/logs"),
-					httpmock.StringResponse("it's a log\nfor this job\nbeautiful log\n"))
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(2)
 				as.StubOne(1)
 			},
-			wantOut: "it's a log\nfor this job\nbeautiful log\n",
+			wantOut: coolJobRunLogOutput,
 		},
 		{
 			name: "noninteractive with log",
@@ -421,10 +428,10 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/10/logs"),
-					httpmock.StringResponse("it's a log\nfor this job\nbeautiful log\n"))
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
-			wantOut: "it's a log\nfor this job\nbeautiful log\n",
+			wantOut: coolJobRunLogOutput,
 		},
 		{
 			name: "interactive with run log",
@@ -472,10 +479,130 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			wantOut: expectedRunLogOutput,
+		},
+		{
+			name: "interactive with log-failed",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(4)
+				as.StubOne(2)
+			},
+			wantOut: quuxTheBarfLogOutput,
+		},
+		{
+			name: "noninteractive with log-failed",
+			opts: &ViewOptions{
+				JobID:     "20",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.FailedJob))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+			},
+			wantOut: quuxTheBarfLogOutput,
+		},
+		{
+			name: "interactive with run log-failed",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(4)
+				as.StubOne(0)
+			},
+			wantOut: quuxTheBarfLogOutput,
+		},
+		{
+			name: "noninteractive with run log-failed",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID:     "1234",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+			},
+			wantOut: quuxTheBarfLogOutput,
 		},
 		{
 			name: "run log but run is not done",
@@ -488,6 +615,11 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
 					httpmock.JSONResponse(shared.TestRun("in progress", 2, shared.InProgress, "")))
+				reg.Register(
+					httpmock.REST("GET", "runs/2/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{},
+					}))
 			},
 			wantErr: true,
 			errMsg:  "run 2 is still in progress; logs will be available when it is complete",
@@ -530,7 +662,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "interactive, multiple jobs, choose all jobs",
@@ -569,7 +701,7 @@ func TestViewRun(t *testing.T) {
 				as.StubOne(2)
 				as.StubOne(0)
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "interactive, multiple jobs, choose specific jobs",
@@ -602,7 +734,7 @@ func TestViewRun(t *testing.T) {
 				as.StubOne(2)
 				as.StubOne(1)
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nview this run on GitHub: runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nView this run on GitHub: runs/3\n",
 		},
 		{
 			name: "web run",
@@ -690,17 +822,30 @@ func TestViewRun(t *testing.T) {
 	}
 }
 
-var expectedRunLogOutput = heredoc.Doc(`
-job1	step1	log line 1
-job1	step1	log line 2
-job1	step1	log line 3
-job1	step2	log line 1
-job1	step2	log line 2
-job1	step2	log line 3
-job2	step1	log line 1
-job2	step1	log line 2
-job2	step1	log line 3
-job2	step2	log line 1
-job2	step2	log line 2
-job2	step2	log line 3
+var barfTheFobLogOutput = heredoc.Doc(`
+cool job	barz the fob	log line 1
+cool job	barz the fob	log line 2
+cool job	barz the fob	log line 3
 `)
+
+var fobTheBarzLogOutput = heredoc.Doc(`
+cool job	fob the barz	log line 1
+cool job	fob the barz	log line 2
+cool job	fob the barz	log line 3
+`)
+
+var barfTheQuuxLogOutput = heredoc.Doc(`
+sad job	barf the quux	log line 1
+sad job	barf the quux	log line 2
+sad job	barf the quux	log line 3
+`)
+
+var quuxTheBarfLogOutput = heredoc.Doc(`
+sad job	quux the barf	log line 1
+sad job	quux the barf	log line 2
+sad job	quux the barf	log line 3
+`)
+
+var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
+var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLogOutput)
+var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
