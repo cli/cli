@@ -33,10 +33,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:    "list",
-		Short:  "List GitHub Actions workflows",
-		Args:   cobra.NoArgs,
-		Hidden: true,
+		Use:   "list",
+		Short: "List GitHub Actions workflows",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
