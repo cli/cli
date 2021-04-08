@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -280,6 +281,14 @@ func runView(opts *ViewOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
+	var artifacts []shared.Artifact
+	if selectedJob == nil {
+		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.Itoa(run.ID))
+		if err != nil {
+			return fmt.Errorf("failed to get artifacts: %w", err)
+		}
+	}
+
 	var annotations []shared.Annotation
 
 	var annotationErr error
@@ -334,6 +343,18 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if selectedJob == nil {
+		if len(artifacts) > 0 {
+			fmt.Fprintln(out)
+			fmt.Fprintln(out, cs.Bold("ARTIFACTS"))
+			for _, a := range artifacts {
+				expiredBadge := ""
+				if a.Expired {
+					expiredBadge = cs.Gray(" (expired)")
+				}
+				fmt.Fprintf(out, "%s%s\n", a.Name, expiredBadge)
+			}
+		}
+
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
 		// TODO note about run view --log when that exists
