@@ -343,7 +343,6 @@ func runView(opts *ViewOptions) error {
 		}
 	} else {
 		fmt.Fprintln(out)
-		// TODO this does not exist yet
 		fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
 		fmt.Fprintf(out, cs.Gray("view this run on GitHub: %s\n"), run.URL)
 
