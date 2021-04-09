@@ -1,8 +1,10 @@
 package shared
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
 	"strings"
 
@@ -215,4 +217,29 @@ func ResolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.In
 	}
 
 	return SelectWorkflow(workflows, "Which workflow do you mean?", states)
+}
+
+func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
+	path := fmt.Sprintf("repos/%s/contents/%s", ghrepo.FullName(repo), workflow.Path)
+	if ref != "" {
+		q := fmt.Sprintf("?ref=%s", url.QueryEscape(ref))
+		path = path + q
+	}
+
+	type Result struct {
+		Content string
+	}
+
+	var result Result
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(result.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode workflow file: %w", err)
+	}
+
+	return decoded, nil
 }

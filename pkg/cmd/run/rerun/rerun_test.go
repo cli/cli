@@ -98,7 +98,7 @@ func TestRerun(t *testing.T) {
 		opts      *RerunOptions
 		tty       bool
 		wantErr   bool
-		ErrOut    string
+		errOut    string
 		wantOut   string
 	}{
 		{
@@ -157,7 +157,7 @@ func TestRerun(t *testing.T) {
 						}}))
 			},
 			wantErr: true,
-			ErrOut:  "no recent runs have failed; please specify a specific run ID",
+			errOut:  "no recent runs have failed; please specify a specific run ID",
 		},
 		{
 			name: "unrerunnable",
@@ -174,7 +174,7 @@ func TestRerun(t *testing.T) {
 					httpmock.StatusStringResponse(403, "no"))
 			},
 			wantErr: true,
-			ErrOut:  "run 3 cannot be rerun; its workflow file may be broken.",
+			errOut:  "run 3 cannot be rerun; its workflow file may be broken.",
 		},
 	}
 
@@ -203,7 +203,7 @@ func TestRerun(t *testing.T) {
 			err := runRerun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Equal(t, tt.ErrOut, err.Error())
+				assert.Equal(t, tt.errOut, err.Error())
 				return
 			}
 			assert.NoError(t, err)
