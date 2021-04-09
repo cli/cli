@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -258,11 +257,11 @@ func runView(opts *ViewOptions) error {
 
 		opts.IO.StartProgressIndicator()
 		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run.ID)
-		defer runLogZip.Close()
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
 		}
+		defer runLogZip.Close()
 
 		attachRunLog(runLogZip, jobs)
 
@@ -483,15 +482,6 @@ func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 			}
 		}
 	}
-}
-
-func readZipFile(zf *zip.File) ([]byte, error) {
-	f, err := zf.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return ioutil.ReadAll(f)
 }
 
 func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) error {
