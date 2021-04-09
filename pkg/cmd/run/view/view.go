@@ -120,7 +120,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run failed")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "View a specific job ID from a run")
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
-	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View log of failed steps for either a run or specific job")
+	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
 
 	return cmd
@@ -336,7 +336,7 @@ func runView(opts *ViewOptions) error {
 	} else {
 		fmt.Fprintln(out)
 		if shared.IsFailureState(selectedJob.Conclusion) {
-			fmt.Fprintf(out, "To see the log of steps that failed, try: gh run view --log-failed --job=%d\n", selectedJob.ID)
+			fmt.Fprintf(out, "To see the logs for the failed steps, try: gh run view --log-failed --job=%d\n", selectedJob.ID)
 		} else {
 			fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
 		}
