@@ -55,7 +55,7 @@ func TestNewCmdRun(t *testing.T) {
 		{
 			name:     "both STDIN and input fields",
 			stdin:    "some json",
-			cli:      "workflow.yml -fhey=there",
+			cli:      "workflow.yml -fhey=there --json",
 			errMsg:   "only one of STDIN or -f/-F can be passed",
 			wantsErr: true,
 		},
@@ -89,11 +89,12 @@ func TestNewCmdRun(t *testing.T) {
 		},
 		{
 			name:  "json on STDIN",
-			cli:   "workflow.yml",
+			cli:   "workflow.yml --json",
 			stdin: `{"cool":"yeah"}`,
 			wants: RunOptions{
-				JSON:     `{"cool":"yeah"}`,
-				Selector: "workflow.yml",
+				JSON:      true,
+				JSONInput: `{"cool":"yeah"}`,
+				Selector:  "workflow.yml",
 			},
 		},
 	}
@@ -138,6 +139,7 @@ func TestNewCmdRun(t *testing.T) {
 
 			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
+			assert.Equal(t, tt.wants.JSONInput, gotOpts.JSONInput)
 			assert.Equal(t, tt.wants.JSON, gotOpts.JSON)
 			assert.Equal(t, tt.wants.Ref, gotOpts.Ref)
 			assert.ElementsMatch(t, tt.wants.RawFields, gotOpts.RawFields)
@@ -267,8 +269,8 @@ jobs:
 		{
 			name: "bad JSON",
 			opts: &RunOptions{
-				Selector: "workflow.yml",
-				JSON:     `{"bad":"corrupt"`,
+				Selector:  "workflow.yml",
+				JSONInput: `{"bad":"corrupt"`,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -284,8 +286,8 @@ jobs:
 			name: "good JSON",
 			tty:  true,
 			opts: &RunOptions{
-				Selector: "workflow.yml",
-				JSON:     `{"name":"scully"}`,
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -299,8 +301,8 @@ jobs:
 		{
 			name: "nontty good JSON",
 			opts: &RunOptions{
-				Selector: "workflow.yml",
-				JSON:     `{"name":"scully"}`,
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -330,9 +332,9 @@ jobs:
 			name: "respects ref",
 			tty:  true,
 			opts: &RunOptions{
-				Selector: "workflow.yml",
-				JSON:     `{"name":"scully"}`,
-				Ref:      "good-branch",
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
+				Ref:       "good-branch",
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -348,8 +350,8 @@ jobs:
 			name: "good JSON, missing required input",
 			tty:  true,
 			opts: &RunOptions{
-				Selector: "workflow.yml",
-				JSON:     `{"greeting":"hello there"}`,
+				Selector:  "workflow.yml",
+				JSONInput: `{"greeting":"hello there"}`,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

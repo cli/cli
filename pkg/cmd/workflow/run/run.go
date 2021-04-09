@@ -28,9 +28,10 @@ type RunOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	Selector string
-	Ref      string
-	JSON     string
+	Selector  string
+	Ref       string
+	JSONInput string
+	JSON      bool
 
 	MagicFields []string
 	RawFields   []string
@@ -67,14 +68,15 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			$ gh workflow run triage.yml
 
 			# Run the workflow file 'triage.yml' at a specified ref, interactively providing inputs
-			$ gh workflow run triage.yml --ref=myBranch
+			$ gh workflow run triage.yml --ref my-branch
 
 			# Run the workflow file 'triage.yml' with command line inputs
-			$ gh workflow run triage.yml -fname=scully -fgreeting=hello
+			$ gh workflow run triage.yml -f name=scully -f greeting=hello
 
-			# Run the workflow file 'triage.yml' with JSON via STDIN
-			$ echo '{"name":"scully", "greeting":"hello"}' | gh workflow run triage.yml
+			# Run the workflow file 'triage.yml' with JSON via standard input
+			$ echo '{"name":"scully", "greeting":"hello"}' | gh workflow run triage.yml --json
 		`),
+		// TODO if selector is supplied we don't go interactive. is that what we actually want? correct docs if it is
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
 				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
@@ -95,20 +97,22 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 				opts.Prompt = true
 			}
 
-			if !opts.IO.IsStdinTTY() {
+			if opts.JSON && !opts.IO.IsStdinTTY() {
 				jsonIn, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
 					return errors.New("failed to read from STDIN")
 				}
-				opts.JSON = string(jsonIn)
+				opts.JSONInput = string(jsonIn)
+			} else if opts.JSON {
+				return cmdutil.FlagError{Err: errors.New("--json specified but nothing on STDIN")}
 			}
 
 			if opts.Selector == "" {
-				if opts.JSON != "" {
+				if opts.JSONInput != "" {
 					return &cmdutil.FlagError{Err: errors.New("workflow argument required when passing JSON")}
 				}
 			} else {
-				if opts.JSON != "" && inputFieldsPassed {
+				if opts.JSON && inputFieldsPassed {
 					return &cmdutil.FlagError{Err: errors.New("only one of STDIN or -f/-F can be passed")}
 				}
 			}
@@ -123,6 +127,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to run")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
+	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
 
 	return cmd
 }
@@ -273,16 +278,12 @@ func runRun(opts *RunOptions) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if opts.JSON != "" {
-		err := json.Unmarshal([]byte(opts.JSON), &providedInputs)
+	} else if opts.JSONInput != "" {
+		err := json.Unmarshal([]byte(opts.JSONInput), &providedInputs)
 		if err != nil {
 			return fmt.Errorf("could not parse provided JSON: %w", err)
 		}
-	}
-
-	if opts.Prompt {
+	} else if opts.Prompt {
 		yamlContent, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
 		if err != nil {
 			return fmt.Errorf("unable to fetch workflow file content: %w", err)
@@ -296,12 +297,9 @@ func runRun(opts *RunOptions) error {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/dispatches",
 		ghrepo.FullName(repo), workflow.ID)
 
-	requestByte, err := json.Marshal(struct {
-		Ref    string            `json:"ref"`
-		Inputs map[string]string `json:"inputs"`
-	}{
-		Ref:    ref,
-		Inputs: providedInputs,
+	requestByte, err := json.Marshal(map[string]interface{}{
+		"ref":    ref,
+		"inputs": providedInputs,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to serialize workflow inputs: %w", err)
