@@ -209,8 +209,106 @@ func Test_magicFieldValue(t *testing.T) {
 	}
 }
 
+func Test_findInputs(t *testing.T) {
+	tests := []struct {
+		name    string
+		YAML    []byte
+		wantErr bool
+		errMsg  string
+		wantOut map[string]WorkflowInput
+	}{
+		{
+			name:    "blank",
+			YAML:    []byte{},
+			wantErr: true,
+			errMsg:  "invalid YAML file",
+		},
+		{
+			name:    "no event specified",
+			YAML:    []byte("name: workflow"),
+			wantErr: true,
+			errMsg:  "invalid workflow: no 'on' key",
+		},
+		{
+			name:    "not workflow_dispatch",
+			YAML:    []byte("name: workflow\non: pull_request"),
+			wantErr: true,
+			errMsg:  "unable to manually run a workflow without a workflow_dispatch event",
+		},
+		{
+			name:    "bad inputs",
+			YAML:    []byte("name: workflow\non:\n workflow_dispatch:\n  inputs: lol  "),
+			wantErr: true,
+			errMsg:  "could not decode workflow inputs: yaml: unmarshal errors:\n  line 4: cannot unmarshal !!str `lol` into map[string]run.WorkflowInput",
+		},
+		{
+			name:    "short syntax",
+			YAML:    []byte("name: workflow\non: workflow_dispatch"),
+			wantOut: map[string]WorkflowInput{},
+		},
+		{
+			name: "inputs",
+			YAML: []byte(`name: workflow
+on:
+  workflow_dispatch:
+    inputs:
+      foo:
+        required: true
+        description: good foo
+      bar:
+        default: boo
+      baz:
+        description: it's baz
+      quux:
+        required: true
+        default: "cool"
+jobs:
+  yell:
+    runs-on: ubuntu-latest
+    steps:
+      - name: echo
+        run: |
+          echo "echo"`),
+			wantOut: map[string]WorkflowInput{
+				"foo": {
+					Required:    true,
+					Description: "good foo",
+				},
+				"bar": {
+					Default: "boo",
+				},
+				"baz": {
+					Description: "it's baz",
+				},
+				"quux": {
+					Required: true,
+					Default:  "cool",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := findInputs(tt.YAML)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if err != nil {
+					assert.Equal(t, tt.errMsg, err.Error())
+				}
+				return
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantOut, result)
+		})
+	}
+
+}
+
 func TestRun(t *testing.T) {
-	minimalYAMLContent := []byte(`
+	noInputsYAMLContent := []byte(`
 name: minimal workflow
 on: workflow_dispatch
 jobs:
@@ -221,7 +319,7 @@ jobs:
         run: |
           echo "AUUUGH!"
 `)
-	encodedMinimalYAMLContent := base64.StdEncoding.EncodeToString(minimalYAMLContent)
+	encodedNoInputsYAMLContent := base64.StdEncoding.EncodeToString(noInputsYAMLContent)
 	yamlContent := []byte(`
 name: a workflow
 on:
@@ -448,7 +546,7 @@ jobs:
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
 					httpmock.JSONResponse(struct{ Content string }{
-						Content: encodedMinimalYAMLContent,
+						Content: encodedNoInputsYAMLContent,
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/1/dispatches"),

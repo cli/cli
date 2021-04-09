@@ -341,7 +341,7 @@ func findInputs(yamlContent []byte) (map[string]WorkflowInput, error) {
 	}
 
 	if len(rootNode.Content) != 1 {
-		return nil, errors.New("invalid yaml file")
+		return nil, errors.New("invalid YAML file")
 	}
 
 	var onKeyNode *yaml.Node
