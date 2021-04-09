@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"archive/zip"
 	"fmt"
 	"net/url"
 	"strings"
@@ -81,7 +82,7 @@ type Job struct {
 	Status      Status
 	Conclusion  Conclusion
 	Name        string
-	Steps       []Step
+	Steps       Steps
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
@@ -93,7 +94,14 @@ type Step struct {
 	Status     Status
 	Conclusion Conclusion
 	Number     int
+	Log        *zip.File
 }
+
+type Steps []Step
+
+func (s Steps) Len() int           { return len(s) }
+func (s Steps) Less(i, j int) bool { return s[i].Number < s[j].Number }
+func (s Steps) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 type Annotation struct {
 	JobName   string
