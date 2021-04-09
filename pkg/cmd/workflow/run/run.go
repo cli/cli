@@ -61,13 +61,13 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			- As JSON, via STDIN
     `),
 		Example: heredoc.Doc(`
-			# Have gh prompt you for what workflow you'd like to run
+			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
 			$ gh workflow run
 
-			# Run the workflow file 'triage.yml' at the remote's default branch, interactively providing inputs
+			# Run the workflow file 'triage.yml' at the remote's default branch
 			$ gh workflow run triage.yml
 
-			# Run the workflow file 'triage.yml' at a specified ref, interactively providing inputs
+			# Run the workflow file 'triage.yml' at a specified ref
 			$ gh workflow run triage.yml --ref my-branch
 
 			# Run the workflow file 'triage.yml' with command line inputs
@@ -76,7 +76,6 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			# Run the workflow file 'triage.yml' with JSON via standard input
 			$ echo '{"name":"scully", "greeting":"hello"}' | gh workflow run triage.yml --json
 		`),
-		// TODO if selector is supplied we don't go interactive. is that what we actually want? correct docs if it is
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
 				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
