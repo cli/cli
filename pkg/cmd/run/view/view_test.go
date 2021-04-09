@@ -1,8 +1,10 @@
 package view
 
 import (
+	"archive/zip"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -798,6 +800,8 @@ func TestViewRun(t *testing.T) {
 
 		browser := &cmdutil.TestBrowser{}
 		tt.opts.Browser = browser
+		rlc := testRunLogCache{}
+		tt.opts.RunLogCache = rlc
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
@@ -820,6 +824,18 @@ func TestViewRun(t *testing.T) {
 			reg.Verify(t)
 		})
 	}
+}
+
+type testRunLogCache struct{}
+
+func (testRunLogCache) Exists(path string) bool {
+	return false
+}
+func (testRunLogCache) Create(path string, content io.ReadCloser) error {
+	return nil
+}
+func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
+	return zip.OpenReader("./fixtures/run_log.zip")
 }
 
 var barfTheFobLogOutput = heredoc.Doc(`

@@ -3,15 +3,15 @@ package view
 import (
 	"archive/zip"
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -31,11 +31,39 @@ type browser interface {
 	Browse(string) error
 }
 
+type runLogCache interface {
+	Exists(string) bool
+	Create(string, io.ReadCloser) error
+	Open(string) (*zip.ReadCloser, error)
+}
+
+type rlc struct{}
+
+func (rlc) Exists(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		return false
+	}
+	return true
+}
+func (rlc) Create(path string, content io.ReadCloser) error {
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, content)
+	return err
+}
+func (rlc) Open(path string) (*zip.ReadCloser, error) {
+	return zip.OpenReader(path)
+}
+
 type ViewOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	HttpClient  func() (*http.Client, error)
+	IO          *iostreams.IOStreams
+	BaseRepo    func() (ghrepo.Interface, error)
+	Browser     browser
+	RunLogCache runLogCache
 
 	RunID      string
 	JobID      string
@@ -52,10 +80,11 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Now:        time.Now,
-		Browser:    f.Browser,
+		IO:          f.IOStreams,
+		HttpClient:  f.HttpClient,
+		Now:         time.Now,
+		Browser:     f.Browser,
+		RunLogCache: rlc{},
 	}
 
 	cmd := &cobra.Command{
@@ -228,16 +257,14 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		runLogZip, err := getRunLog(httpClient, repo, run.ID)
+		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run.ID)
+		defer runLogZip.Close()
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
 		}
 
-		err = readRunLog(runLogZip, jobs)
-		if err != nil {
-			return err
-		}
+		attachRunLog(runLogZip, jobs)
 
 		return displayRunLog(opts.IO, jobs, opts.LogFailed)
 	}
@@ -382,10 +409,27 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(httpClient *http.Client, repo ghrepo.Interface, runID int) (io.ReadCloser, error) {
-	logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
-		ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
-	return getLog(httpClient, logURL)
+func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, runID int) (*zip.ReadCloser, error) {
+	filename := fmt.Sprintf("run-log-%d.zip", runID)
+	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
+	if !cache.Exists(filepath) {
+		// Run log does not exist in cache so retrieve and store it
+		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
+			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
+
+		resp, err := getLog(httpClient, logURL)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Close()
+
+		err = cache.Create(filepath, resp)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cache.Open(filepath)
 }
 
 func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
@@ -427,35 +471,18 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 // It iterates through the list of jobs and trys to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
-func readRunLog(rlz io.ReadCloser, jobs []shared.Job) error {
-	defer rlz.Close()
-	z, err := ioutil.ReadAll(rlz)
-	if err != nil {
-		return err
-	}
-
-	zipReader, err := zip.NewReader(bytes.NewReader(z), int64(len(z)))
-	if err != nil {
-		return err
-	}
-
+func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
 			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number, step.Name)
-			for _, file := range zipReader.File {
+			for _, file := range rlz.File {
 				if file.Name == filename {
-					log, err := readZipFile(file)
-					if err != nil {
-						return err
-					}
-					jobs[i].Steps[j].Log = string(log)
+					jobs[i].Steps[j].Log = file
 					break
 				}
 			}
 		}
 	}
-
-	return nil
 }
 
 func readZipFile(zf *zip.File) ([]byte, error) {
@@ -482,10 +509,15 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 				continue
 			}
 			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
-			scanner := bufio.NewScanner(strings.NewReader(step.Log))
+			f, err := step.Log.Open()
+			if err != nil {
+				return err
+			}
+			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
 				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
 			}
+			f.Close()
 		}
 	}
 

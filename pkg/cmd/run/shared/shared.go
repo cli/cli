@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"archive/zip"
 	"fmt"
 	"net/url"
 	"strings"
@@ -93,7 +94,7 @@ type Step struct {
 	Status     Status
 	Conclusion Conclusion
 	Number     int
-	Log        string
+	Log        *zip.File
 }
 
 type Steps []Step
