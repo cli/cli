@@ -1,3 +1,4 @@
+Program:;
 # Installation from source
 
 0. Verify that you have Go 1.13+ installed
@@ -37,3 +38,5 @@
 
    #### Windows
    Run `bin\gh version` to check if it worked.
+Begin
+End.
