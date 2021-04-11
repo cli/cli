@@ -1,3 +1,6 @@
+Program ;
+Begin
+End.
 package api
 
 import (
