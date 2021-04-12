@@ -105,7 +105,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			$ gh run view --log --job 456789
 
 		  # Exit non-zero if a run failed
-		  $ gh run view 0451 -e && echo "run pending or passed"
+		  $ gh run view 0451 --exit-status && echo "run pending or passed"
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
