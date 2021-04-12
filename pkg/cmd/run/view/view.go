@@ -256,7 +256,7 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run.ID)
+		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
@@ -408,13 +408,13 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, runID int) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d.zip", runID)
+func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run) (*zip.ReadCloser, error) {
+	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.CreatedAt.Unix())
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
-			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
+			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
 
 		resp, err := getLog(httpClient, logURL)
 		if err != nil {
