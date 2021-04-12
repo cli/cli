@@ -247,6 +247,11 @@ func Test_findInputs(t *testing.T) {
 			wantOut: map[string]WorkflowInput{},
 		},
 		{
+			name:    "array of events",
+			YAML:    []byte("name: workflow\non: [pull_request, workflow_dispatch]\n"),
+			wantOut: map[string]WorkflowInput{},
+		},
+		{
 			name: "inputs",
 			YAML: []byte(`name: workflow
 on:
