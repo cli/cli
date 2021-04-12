@@ -44,7 +44,7 @@ func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
 		workflowHeader = cs.Bold(workflowHeader)
 	}
 
-	return fmt.Sprintf(heredoc.Docf(`
+	return heredoc.Docf(`
 			%s
 
 			gh integrates with Actions to help you manage runs and workflows.
@@ -67,11 +67,10 @@ func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
 
 			For more in depth help including examples, see online documentation at:
 			https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli
-		`,
-		header, runHeader, workflowHeader))
+		`, header, runHeader, workflowHeader)
 }
 
 func actionsRun(opts ActionsOptions) {
 	cs := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.Out, actionsExplainer(cs, true))
+	fmt.Fprintln(opts.IO.Out, actionsExplainer(cs, true))
 }
