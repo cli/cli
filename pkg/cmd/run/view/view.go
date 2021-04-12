@@ -498,6 +498,9 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 			if failed && !shared.IsFailureState(step.Conclusion) {
 				continue
 			}
+			if step.Log == nil {
+				continue
+			}
 			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
 			f, err := step.Log.Open()
 			if err != nil {
