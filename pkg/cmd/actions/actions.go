@@ -60,6 +60,7 @@ func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
 
 			%s
 			gh workflow list:     List all the workflow files in your repository
+			gh workflow view:     View details for a workflow file
 			gh workflow enable:   Enable a workflow file
 			gh workflow disable:  Disable a workflow file
 			gh workflow run:      Trigger a workflow_dispatch run for a workflow file
