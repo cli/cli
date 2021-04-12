@@ -369,6 +369,13 @@ func findInputs(yamlContent []byte) (map[string]WorkflowInput, error) {
 						dispatchKeyNode = node
 					}
 				}
+			} else if node.Kind == yaml.SequenceNode {
+				for _, node := range node.Content {
+					if node.Value == "workflow_dispatch" {
+						dispatchKeyNode = node
+						break
+					}
+				}
 			} else if node.Kind == yaml.ScalarNode {
 				if node.Value == "workflow_dispatch" {
 					dispatchKeyNode = node
