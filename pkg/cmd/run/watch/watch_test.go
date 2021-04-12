@@ -237,6 +237,11 @@ func TestWatchRun(t *testing.T) {
 			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n",
 		},
 		{
+			name:        "intentionally failing test",
+			skipWindows: true,
+			opts:        &WatchOptions{},
+		},
+		{
 			name:        "exit status respected",
 			tty:         true,
 			skipWindows: true,
