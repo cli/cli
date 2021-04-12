@@ -21,7 +21,7 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "actions",
 		Short:  "Learn about working with GitHub actions",
-		Args:   cobra.ExactArgs(0),
+		Long:   actionsExplainer(nil, false),
 		Hidden: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			actionsRun(opts)
@@ -34,15 +34,20 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func actionsRun(opts ActionsOptions) {
-	cs := opts.IO.ColorScheme()
-	fmt.Fprint(opts.IO.Out, heredoc.Docf(`
-			Welcome to GitHub Actions on the command line.
+func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
+	header := "Welcome to GitHub Actions on the command line."
+	runHeader := "Interacting with workflow runs"
+	workflowHeader := "Interacting with workflow files"
+	if color {
+		header = cs.Bold(header)
+		runHeader = cs.Bold(runHeader)
+		workflowHeader = cs.Bold(workflowHeader)
+	}
 
-			This part of gh is in beta and subject to change!
+	return fmt.Sprintf(heredoc.Docf(`
+			%s
 
-			To follow along while we get to GA, please see this
-			tracking issue: https://github.com/cli/cli/issues/2889
+			gh integrates with Actions to help you manage runs and workflows.
 
 			%s
 			gh run list:    List recent workflow runs
@@ -50,12 +55,23 @@ func actionsRun(opts ActionsOptions) {
 			gh run watch:   Watch a workflow run while it executes
 			gh run rerun:   Rerun a failed workflow run
 
+			To see more help, run 'gh help run <subcommand>'
+
 			%s
 			gh workflow list:      List all the workflow files in your repository
 			gh workflow enable:    Enable a workflow file
 			gh workflow disable:   Disable a workflow file
 			gh workflow run:       Trigger a workflow_dispatch run for a workflow file
+
+			To see more help, run 'gh help workflow <subcommand>'
+
+			For more in depth help including examples, see online documentation at:
+			https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli
 		`,
-		cs.Bold("Interacting with workflow runs"),
-		cs.Bold("Interacting with workflow files")))
+		header, runHeader, workflowHeader))
+}
+
+func actionsRun(opts ActionsOptions) {
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.Out, actionsExplainer(cs, true))
 }
