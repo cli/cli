@@ -21,7 +21,7 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "actions",
 		Short:  "Learn about working with GitHub actions",
-		Long:   actionsExplainer(nil, false),
+		Long:   actionsExplainer(nil),
 		Hidden: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			actionsRun(opts)
@@ -34,11 +34,11 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
+func actionsExplainer(cs *iostreams.ColorScheme) string {
 	header := "Welcome to GitHub Actions on the command line."
 	runHeader := "Interacting with workflow runs"
 	workflowHeader := "Interacting with workflow files"
-	if color {
+	if cs != nil {
 		header = cs.Bold(header)
 		runHeader = cs.Bold(runHeader)
 		workflowHeader = cs.Bold(workflowHeader)
@@ -74,5 +74,5 @@ func actionsExplainer(cs *iostreams.ColorScheme, color bool) string {
 
 func actionsRun(opts ActionsOptions) {
 	cs := opts.IO.ColorScheme()
-	fmt.Fprintln(opts.IO.Out, actionsExplainer(cs, true))
+	fmt.Fprintln(opts.IO.Out, actionsExplainer(cs))
 }
