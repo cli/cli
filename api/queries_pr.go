@@ -50,10 +50,7 @@ type PullRequest struct {
 		Login string
 	}
 	HeadRepository struct {
-		Name             string
-		DefaultBranchRef struct {
-			Name string
-		}
+		Name string
 	}
 	IsCrossRepository   bool
 	IsDraft             bool
