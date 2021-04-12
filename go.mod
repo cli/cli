@@ -14,7 +14,6 @@ require (
 	github.com/enescakir/emoji v1.0.0
 	github.com/gabriel-vasile/mimetype v1.1.2
 	github.com/google/go-cmp v0.5.2
-	github.com/google/goterm v0.0.0-20190703233501-fc88cf888a3f // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.1
 	github.com/henvic/httpretty v0.0.6
