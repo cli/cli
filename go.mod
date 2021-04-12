@@ -11,7 +11,6 @@ require (
 	github.com/cli/oauth v0.8.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
-	github.com/enescakir/emoji v1.0.0
 	github.com/gabriel-vasile/mimetype v1.1.2
 	github.com/google/go-cmp v0.5.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
