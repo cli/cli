@@ -238,8 +238,20 @@ func TestWatchRun(t *testing.T) {
 		},
 		{
 			name:        "intentionally failing test",
+			tty:         true,
 			skipWindows: true,
-			opts:        &WatchOptions{},
+			opts: &WatchOptions{
+				Interval:   0,
+				Prompt:     true,
+				ExitStatus: true,
+			},
+			httpStubs: failedRunStubs,
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(1)
+			},
+			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run more runs (2) completed with 'failure'\n",
+			wantErr: true,
+			errMsg:  "Error",
 		},
 		{
 			name:        "exit status respected",
