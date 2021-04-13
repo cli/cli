@@ -16,9 +16,13 @@ const (
 )
 
 func extractZip(zr *zip.Reader, destDir string) error {
-	pathPrefix := filepath.Clean(destDir) + string(filepath.Separator)
+	destDirAbs, err := filepath.Abs(destDir)
+	if err != nil {
+		return err
+	}
+	pathPrefix := destDirAbs + string(filepath.Separator)
 	for _, zf := range zr.File {
-		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
+		fpath := filepath.Join(destDirAbs, filepath.FromSlash(zf.Name))
 		if !strings.HasPrefix(fpath, pathPrefix) {
 			continue
 		}
