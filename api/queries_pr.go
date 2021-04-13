@@ -307,7 +307,13 @@ func determinePullRequestFeatures(httpClient *http.Client, hostname string) (prF
 	return
 }
 
-func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, currentPRHeadRef, currentUsername string) (*PullRequestsPayload, error) {
+type StatusOptions struct {
+	CurrentPR int
+	HeadRef   string
+	Username  string
+}
+
+func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOptions) (*PullRequestsPayload, error) {
 	type edges struct {
 		TotalCount int
 		Edges      []struct {
@@ -327,10 +333,135 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		ReviewRequested edges
 	}
 
-	cachedClient := NewCachedClient(client.http, time.Hour*24)
-	prFeatures, err := determinePullRequestFeatures(cachedClient, repo.RepoHost())
+	fragments, err := pullRequestFragment(client.http, repo.RepoHost())
 	if err != nil {
 		return nil, err
+	}
+
+	queryPrefix := `
+	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+		repository(owner: $owner, name: $repo) {
+			defaultBranchRef { 
+				name 
+			}
+			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
+				totalCount
+				edges {
+					node {
+						...prWithReviews
+					}
+				}
+			}
+		}
+	`
+	if options.CurrentPR > 0 {
+		queryPrefix = `
+		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
+			repository(owner: $owner, name: $repo) {
+				defaultBranchRef { 
+					name 
+				}
+				pullRequest(number: $number) {
+					...prWithReviews
+				}
+			}
+		`
+	}
+
+	query := fragments + queryPrefix + `
+      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+       totalCount: issueCount
+        edges {
+          node {
+            ...prWithReviews
+          }
+        }
+      }
+      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+        totalCount: issueCount
+        edges {
+          node {
+            ...pr
+          }
+        }
+      }
+    }
+	`
+
+	currentUsername := options.Username
+	if currentUsername == "@me" && ghinstance.IsEnterprise(repo.RepoHost()) {
+		var err error
+		currentUsername, err = CurrentLoginName(client, repo.RepoHost())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
+	reviewerQuery := fmt.Sprintf("repo:%s state:open review-requested:%s", ghrepo.FullName(repo), currentUsername)
+
+	currentPRHeadRef := options.HeadRef
+	branchWithoutOwner := currentPRHeadRef
+	if idx := strings.Index(currentPRHeadRef, ":"); idx >= 0 {
+		branchWithoutOwner = currentPRHeadRef[idx+1:]
+	}
+
+	variables := map[string]interface{}{
+		"viewerQuery":   viewerQuery,
+		"reviewerQuery": reviewerQuery,
+		"owner":         repo.RepoOwner(),
+		"repo":          repo.RepoName(),
+		"headRefName":   branchWithoutOwner,
+		"number":        options.CurrentPR,
+	}
+
+	var resp response
+	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var viewerCreated []PullRequest
+	for _, edge := range resp.ViewerCreated.Edges {
+		viewerCreated = append(viewerCreated, edge.Node)
+	}
+
+	var reviewRequested []PullRequest
+	for _, edge := range resp.ReviewRequested.Edges {
+		reviewRequested = append(reviewRequested, edge.Node)
+	}
+
+	var currentPR = resp.Repository.PullRequest
+	if currentPR == nil {
+		for _, edge := range resp.Repository.PullRequests.Edges {
+			if edge.Node.HeadLabel() == currentPRHeadRef {
+				currentPR = &edge.Node
+				break // Take the most recent PR for the current branch
+			}
+		}
+	}
+
+	payload := PullRequestsPayload{
+		ViewerCreated: PullRequestAndTotalCount{
+			PullRequests: viewerCreated,
+			TotalCount:   resp.ViewerCreated.TotalCount,
+		},
+		ReviewRequested: PullRequestAndTotalCount{
+			PullRequests: reviewRequested,
+			TotalCount:   resp.ReviewRequested.TotalCount,
+		},
+		CurrentPR:     currentPR,
+		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
+	}
+
+	return &payload, nil
+}
+
+func pullRequestFragment(httpClient *http.Client, hostname string) (string, error) {
+	cachedClient := NewCachedClient(httpClient, time.Hour*24)
+	prFeatures, err := determinePullRequestFeatures(cachedClient, hostname)
+	if err != nil {
+		return "", err
 	}
 
 	var reviewsFragment string
@@ -394,121 +525,7 @@ func PullRequests(client *Client, repo ghrepo.Interface, currentPRNumber int, cu
 		%s
 	}
 	`, requiresStrictStatusChecks, statusesFragment, reviewsFragment)
-
-	queryPrefix := `
-	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { 
-				name 
-			}
-			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
-				totalCount
-				edges {
-					node {
-						...prWithReviews
-					}
-				}
-			}
-		}
-	`
-	if currentPRNumber > 0 {
-		queryPrefix = `
-		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
-			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { 
-					name 
-				}
-				pullRequest(number: $number) {
-					...prWithReviews
-				}
-			}
-		`
-	}
-
-	query := fragments + queryPrefix + `
-      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-       totalCount: issueCount
-        edges {
-          node {
-            ...prWithReviews
-          }
-        }
-      }
-      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-        totalCount: issueCount
-        edges {
-          node {
-            ...pr
-          }
-        }
-      }
-    }
-	`
-
-	if currentUsername == "@me" && ghinstance.IsEnterprise(repo.RepoHost()) {
-		currentUsername, err = CurrentLoginName(client, repo.RepoHost())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
-	reviewerQuery := fmt.Sprintf("repo:%s state:open review-requested:%s", ghrepo.FullName(repo), currentUsername)
-
-	branchWithoutOwner := currentPRHeadRef
-	if idx := strings.Index(currentPRHeadRef, ":"); idx >= 0 {
-		branchWithoutOwner = currentPRHeadRef[idx+1:]
-	}
-
-	variables := map[string]interface{}{
-		"viewerQuery":   viewerQuery,
-		"reviewerQuery": reviewerQuery,
-		"owner":         repo.RepoOwner(),
-		"repo":          repo.RepoName(),
-		"headRefName":   branchWithoutOwner,
-		"number":        currentPRNumber,
-	}
-
-	var resp response
-	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	var viewerCreated []PullRequest
-	for _, edge := range resp.ViewerCreated.Edges {
-		viewerCreated = append(viewerCreated, edge.Node)
-	}
-
-	var reviewRequested []PullRequest
-	for _, edge := range resp.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, edge.Node)
-	}
-
-	var currentPR = resp.Repository.PullRequest
-	if currentPR == nil {
-		for _, edge := range resp.Repository.PullRequests.Edges {
-			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = &edge.Node
-				break // Take the most recent PR for the current branch
-			}
-		}
-	}
-
-	payload := PullRequestsPayload{
-		ViewerCreated: PullRequestAndTotalCount{
-			PullRequests: viewerCreated,
-			TotalCount:   resp.ViewerCreated.TotalCount,
-		},
-		ReviewRequested: PullRequestAndTotalCount{
-			PullRequests: reviewRequested,
-			TotalCount:   resp.ReviewRequested.TotalCount,
-		},
-		CurrentPR:     currentPR,
-		DefaultBranch: resp.Repository.DefaultBranchRef.Name,
-	}
-
-	return &payload, nil
+	return fragments, nil
 }
 
 func prCommitsFragment(httpClient *http.Client, hostname string) (string, error) {

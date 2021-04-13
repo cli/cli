@@ -88,9 +88,12 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	// the `@me` macro is available because the API lookup is ElasticSearch-based
-	currentUser := "@me"
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	options := api.StatusOptions{
+		Username:  "@me",
+		CurrentPR: currentPRNumber,
+		HeadRef:   currentPRHeadRef,
+	}
+	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
