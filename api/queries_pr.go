@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/set"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 )
@@ -311,6 +312,7 @@ type StatusOptions struct {
 	CurrentPR int
 	HeadRef   string
 	Username  string
+	Fields    []string
 }
 
 func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOptions) (*PullRequestsPayload, error) {
@@ -333,9 +335,20 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		ReviewRequested edges
 	}
 
-	fragments, err := pullRequestFragment(client.http, repo.RepoHost())
-	if err != nil {
-		return nil, err
+	var fragments string
+	if len(options.Fields) > 0 {
+		fields := set.NewStringSet()
+		fields.AddValues(options.Fields)
+		// these are always necessary to find the PR for the current branch
+		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
+		gr := PullRequestGraphQL(fields.ToSlice())
+		fragments = fmt.Sprintf("fragment pr on PullRequest{%[1]s}fragment prWithReviews on PullRequest{%[1]s}", gr)
+	} else {
+		var err error
+		fragments, err = pullRequestFragment(client.http, repo.RepoHost())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	queryPrefix := `
@@ -416,7 +429,7 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 	}
 
 	var resp response
-	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}

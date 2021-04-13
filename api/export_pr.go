@@ -82,6 +82,14 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 	return &data
 }
 
+func ExportPRs(prs []PullRequest, fields []string) *[]interface{} {
+	data := make([]interface{}, len(prs))
+	for i, pr := range prs {
+		data[i] = pr.ExportData(fields)
+	}
+	return &data
+}
+
 func fieldByName(v reflect.Value, field string) reflect.Value {
 	return v.FieldByNameFunc(func(s string) bool {
 		return strings.EqualFold(field, s)

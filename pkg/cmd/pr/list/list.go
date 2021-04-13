@@ -139,16 +139,12 @@ func listRun(opts *ListOptions) error {
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v", err)
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 
 	if opts.Export != nil {
-		data := make([]interface{}, len(listResult.PullRequests))
-		for i, pr := range listResult.PullRequests {
-			data[i] = pr.ExportData(opts.Export.Fields)
-		}
-		return opts.Export.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+		return opts.Export.Write(opts.IO.Out, api.ExportPRs(listResult.PullRequests, opts.Export.Fields), opts.IO.ColorEnabled())
 	}
 
 	if opts.IO.IsStdoutTTY() {
