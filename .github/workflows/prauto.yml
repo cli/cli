@@ -1,6 +1,6 @@
 name: PR Automation
 on:
-  pull_request:
+  pull_request_target:
     types: [ready_for_review, opened, reopened]
 jobs:
   pr-auto:

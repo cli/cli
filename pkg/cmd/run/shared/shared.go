@@ -257,6 +257,7 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) 
 
 func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
+	now := time.Now()
 
 	candidates := []string{}
 
@@ -264,7 +265,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
@@ -379,4 +380,15 @@ func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int,
 	}
 
 	return number, nil
+}
+
+func preciseAgo(now time.Time, createdAt time.Time) string {
+	ago := now.Sub(createdAt)
+
+	if ago < 30*24*time.Hour {
+		s := ago.Truncate(time.Second).String()
+		return fmt.Sprintf("%s ago", s)
+	}
+
+	return createdAt.Format("Jan _2, 2006")
 }

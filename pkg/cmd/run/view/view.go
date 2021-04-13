@@ -105,7 +105,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			$ gh run view --log --job 456789
 
 		  # Exit non-zero if a run failed
-		  $ gh run view 0451 -e && echo "run pending or passed"
+		  $ gh run view 0451 --exit-status && echo "run pending or passed"
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -256,7 +256,7 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run.ID)
+		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
@@ -408,13 +408,13 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, runID int) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d.zip", runID)
+func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run) (*zip.ReadCloser, error) {
+	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.CreatedAt.Unix())
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
-			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), runID)
+			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
 
 		resp, err := getLog(httpClient, logURL)
 		if err != nil {
@@ -496,6 +496,9 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 		sort.Sort(steps)
 		for _, step := range steps {
 			if failed && !shared.IsFailureState(step.Conclusion) {
+				continue
+			}
+			if step.Log == nil {
 				continue
 			}
 			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
