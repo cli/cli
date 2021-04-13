@@ -1,4 +1,4 @@
-package api
+package export
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/itchyny/gojq"
 )
 
-func filterJSON(w io.Writer, input io.Reader, queryStr string) error {
+func FilterJSON(w io.Writer, input io.Reader, queryStr string) error {
 	query, err := gojq.Parse(queryStr)
 	if err != nil {
 		return err

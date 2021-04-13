@@ -1,4 +1,4 @@
-package api
+package export
 
 import (
 	"bytes"
@@ -73,7 +73,7 @@ func Test_filterJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := filterJSON(w, tt.args.json, tt.args.query); (err != nil) != tt.wantErr {
+			if err := FilterJSON(w, tt.args.json, tt.args.query); (err != nil) != tt.wantErr {
 				t.Errorf("filterJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

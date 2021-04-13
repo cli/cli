@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/export"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
 	"github.com/spf13/cobra"
@@ -370,13 +371,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.FilterOutput != "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = filterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = executeTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
+		err = export.ExecuteTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
 		if err != nil {
 			return
 		}
