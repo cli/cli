@@ -82,6 +82,14 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 	return &data
 }
 
+func ExportIssues(issues []Issue, fields []string) *[]interface{} {
+	data := make([]interface{}, len(issues))
+	for i, issue := range issues {
+		data[i] = issue.ExportData(fields)
+	}
+	return &data
+}
+
 func ExportPRs(prs []PullRequest, fields []string) *[]interface{} {
 	data := make([]interface{}, len(prs))
 	for i, pr := range prs {

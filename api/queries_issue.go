@@ -102,22 +102,6 @@ type Author struct {
 	Login string `json:"login"`
 }
 
-const fragments = `
-	fragment issue on Issue {
-		number
-		title
-		url
-		state
-		updatedAt
-		labels(first: 100) {
-			nodes {
-				name
-			}
-			totalCount
-		}
-	}
-`
-
 // IssueCreate creates an issue in a GitHub repository
 func IssueCreate(client *Client, repo *Repository, params map[string]interface{}) (*Issue, error) {
 	query := `
@@ -153,7 +137,12 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	return &result.CreateIssue.Issue, nil
 }
 
-func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) (*IssuesPayload, error) {
+type IssueStatusOptions struct {
+	Username string
+	Fields   []string
+}
+
+func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptions) (*IssuesPayload, error) {
 	type response struct {
 		Repository struct {
 			Assigned struct {
@@ -172,6 +161,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 		}
 	}
 
+	fragments := fmt.Sprintf("fragment issue on Issue{%s}", PullRequestGraphQL(options.Fields))
 	query := fragments + `
 	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
@@ -200,7 +190,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, currentUsername string) 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),
 		"repo":   repo.RepoName(),
-		"viewer": currentUsername,
+		"viewer": options.Username,
 	}
 
 	var resp response
