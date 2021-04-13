@@ -161,7 +161,7 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 		}
 
 		searchQuery := prShared.SearchQueryBuild(filters)
-		return api.IssueSearch(apiClient, repo, searchQuery, limit)
+		return IssueSearch(apiClient, repo, searchQuery, limit)
 	}
 
 	meReplacer := shared.NewMeReplacer(apiClient, repo.RepoHost())
@@ -178,7 +178,7 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 		return nil, err
 	}
 
-	return api.IssueList(
+	return IssueList(
 		apiClient,
 		repo,
 		filters.State,

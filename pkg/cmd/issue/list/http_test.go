@@ -1,4 +1,4 @@
-package api
+package list
 
 import (
 	"encoding/json"
@@ -7,13 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 )
 
 func TestIssueList(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := api.NewClient(api.ReplaceTripper(http))
 
 	http.Register(
 		httpmock.GraphQL(`query IssueList\b`),
@@ -78,7 +79,7 @@ func TestIssueList(t *testing.T) {
 
 func TestIssueList_pagination(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := api.NewClient(api.ReplaceTripper(http))
 
 	http.Register(
 		httpmock.GraphQL(`query IssueList\b`),
@@ -135,14 +136,14 @@ func TestIssueList_pagination(t *testing.T) {
 	assert.Equal(t, 2, res.TotalCount)
 	assert.Equal(t, 2, len(res.Issues))
 
-	getLabels := func(i Issue) []string {
+	getLabels := func(i api.Issue) []string {
 		var labels []string
 		for _, l := range i.Labels.Nodes {
 			labels = append(labels, l.Name)
 		}
 		return labels
 	}
-	getAssignees := func(i Issue) []string {
+	getAssignees := func(i api.Issue) []string {
 		var logins []string
 		for _, u := range i.Assignees.Nodes {
 			logins = append(logins, u.Login)
