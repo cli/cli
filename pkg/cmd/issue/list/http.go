@@ -8,27 +8,12 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 )
 
-const fragments = `
-	fragment issue on Issue {
-		number
-		title
-		url
-		state
-		updatedAt
-		labels(first: 100) {
-			nodes {
-				name
-			}
-			totalCount
-		}
-	}
-`
-
-func IssueList(client *api.Client, repo ghrepo.Interface, state string, assigneeString string, limit int, authorString string, mentionString string, milestoneString string) (*api.IssuesAndTotalCount, error) {
+func listIssues(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
 	var states []string
-	switch state {
+	switch filters.State {
 	case "open", "":
 		states = []string{"OPEN"}
 	case "closed":
@@ -36,9 +21,10 @@ func IssueList(client *api.Client, repo ghrepo.Interface, state string, assignee
 	case "all":
 		states = []string{"OPEN", "CLOSED"}
 	default:
-		return nil, fmt.Errorf("invalid state: %s", state)
+		return nil, fmt.Errorf("invalid state: %s", filters.State)
 	}
 
+	fragments := fmt.Sprintf("fragment issue on Issue {%s}", api.PullRequestGraphQL(filters.Fields))
 	query := fragments + `
 	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $assignee: String, $author: String, $mention: String, $milestone: String) {
 		repository(owner: $owner, name: $repo) {
@@ -62,25 +48,25 @@ func IssueList(client *api.Client, repo ghrepo.Interface, state string, assignee
 		"repo":   repo.RepoName(),
 		"states": states,
 	}
-	if assigneeString != "" {
-		variables["assignee"] = assigneeString
+	if filters.Assignee != "" {
+		variables["assignee"] = filters.Assignee
 	}
-	if authorString != "" {
-		variables["author"] = authorString
+	if filters.Author != "" {
+		variables["author"] = filters.Author
 	}
-	if mentionString != "" {
-		variables["mention"] = mentionString
+	if filters.Mention != "" {
+		variables["mention"] = filters.Mention
 	}
 
-	if milestoneString != "" {
+	if filters.Milestone != "" {
 		var milestone *api.RepoMilestone
-		if milestoneNumber, err := strconv.ParseInt(milestoneString, 10, 32); err == nil {
+		if milestoneNumber, err := strconv.ParseInt(filters.Milestone, 10, 32); err == nil {
 			milestone, err = api.MilestoneByNumber(client, repo, int32(milestoneNumber))
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			milestone, err = api.MilestoneByTitle(client, repo, "all", milestoneString)
+			milestone, err = api.MilestoneByTitle(client, repo, "all", filters.Milestone)
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +129,8 @@ loop:
 	return &res, nil
 }
 
-func IssueSearch(client *api.Client, repo ghrepo.Interface, searchQuery string, limit int) (*api.IssuesAndTotalCount, error) {
+func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
+	fragments := fmt.Sprintf("fragment issue on Issue {%s}", api.PullRequestGraphQL(filters.Fields))
 	query := fragments +
 		`query IssueSearch($repo: String!, $owner: String!, $type: SearchType!, $limit: Int, $after: String, $query: String!) {
 			repository(name: $repo, owner: $owner) {
@@ -174,7 +161,7 @@ func IssueSearch(client *api.Client, repo ghrepo.Interface, searchQuery string, 
 	}
 
 	perPage := min(limit, 100)
-	searchQuery = fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), searchQuery)
+	searchQuery := fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), prShared.SearchQueryBuild(filters))
 
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),

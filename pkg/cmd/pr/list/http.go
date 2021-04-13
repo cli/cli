@@ -10,19 +10,6 @@ import (
 	"github.com/cli/cli/pkg/githubsearch"
 )
 
-const fragment = `fragment pr on PullRequest {
-	number
-	title
-	state
-	url
-	headRefName
-	headRepositoryOwner {
-		login
-	}
-	isCrossRepository
-	isDraft
-}`
-
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
 	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0 {
 		return searchPullRequests(httpClient, repo, filters, limit)
@@ -41,6 +28,7 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 		}
 	}
 
+	fragment := fmt.Sprintf("fragment pr on PullRequest{%s}", api.PullRequestGraphQL(filters.Fields))
 	query := fragment + `
 		query PullRequestList(
 			$owner: String!,
@@ -109,7 +97,7 @@ loop:
 		res.TotalCount = prData.TotalCount
 
 		for _, pr := range prData.Nodes {
-			if _, exists := check[pr.Number]; exists {
+			if _, exists := check[pr.Number]; exists && pr.Number > 0 {
 				continue
 			}
 			check[pr.Number] = struct{}{}
@@ -143,6 +131,7 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 		}
 	}
 
+	fragment := fmt.Sprintf("fragment pr on PullRequest{%s}", api.PullRequestGraphQL(filters.Fields))
 	query := fragment + `
 		query PullRequestSearch(
 			$q: String!,
@@ -209,7 +198,7 @@ loop:
 		res.TotalCount = prData.IssueCount
 
 		for _, pr := range prData.Nodes {
-			if _, exists := check[pr.Number]; exists {
+			if _, exists := check[pr.Number]; exists && pr.Number > 0 {
 				continue
 			}
 			check[pr.Number] = struct{}{}

@@ -30,6 +30,7 @@ type Issue struct {
 	Body           string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	ClosedAt       *time.Time
 	Comments       Comments
 	Author         Author
 	Assignees      Assignees
@@ -41,7 +42,7 @@ type Issue struct {
 
 type Assignees struct {
 	Nodes []struct {
-		Login string
+		Login string `json:"login"`
 	}
 	TotalCount int
 }
@@ -56,7 +57,7 @@ func (a Assignees) Logins() []string {
 
 type Labels struct {
 	Nodes []struct {
-		Name string
+		Name string `json:"name"`
 	}
 	TotalCount int
 }
@@ -72,11 +73,11 @@ func (l Labels) Names() []string {
 type ProjectCards struct {
 	Nodes []struct {
 		Project struct {
-			Name string
-		}
+			Name string `json:"name"`
+		} `json:"project"`
 		Column struct {
-			Name string
-		}
+			Name string `json:"name"`
+		} `json:"column"`
 	}
 	TotalCount int
 }
@@ -90,7 +91,7 @@ func (p ProjectCards) ProjectNames() []string {
 }
 
 type Milestone struct {
-	Title string
+	Title string `json:"title"`
 }
 
 type IssuesDisabledError struct {
@@ -98,7 +99,7 @@ type IssuesDisabledError struct {
 }
 
 type Author struct {
-	Login string
+	Login string `json:"login"`
 }
 
 const fragments = `

@@ -31,6 +31,7 @@ type ListOptions struct {
 	Browser    browser
 
 	WebMode bool
+	Export  *cmdutil.ExportFormat
 
 	Assignee     string
 	Labels       []string
@@ -86,8 +87,18 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
+	cmdutil.AddJSONFlags(cmd, &opts.Export, api.IssueFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"url",
+	"state",
+	"updatedAt",
+	"labels",
 }
 
 func listRun(opts *ListOptions) error {
@@ -110,6 +121,7 @@ func listRun(opts *ListOptions) error {
 		Mention:   opts.Mention,
 		Milestone: opts.Milestone,
 		Search:    opts.Search,
+		Fields:    defaultFields,
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -127,6 +139,10 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
+	if opts.Export != nil {
+		filterOptions.Fields = opts.Export.Fields
+	}
+
 	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
 	if err != nil {
 		return err
@@ -137,6 +153,14 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Export != nil {
+		data := make([]interface{}, len(listResult.Issues))
+		for i, issue := range listResult.Issues {
+			data[i] = issue.ExportData(opts.Export.Fields)
+		}
+		return opts.Export.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+	}
 
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
@@ -160,32 +184,23 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 			filters.Milestone = milestone.Title
 		}
 
-		searchQuery := prShared.SearchQueryBuild(filters)
-		return IssueSearch(apiClient, repo, searchQuery, limit)
+		return searchIssues(apiClient, repo, filters, limit)
 	}
 
+	var err error
 	meReplacer := shared.NewMeReplacer(apiClient, repo.RepoHost())
-	filterAssignee, err := meReplacer.Replace(filters.Assignee)
+	filters.Assignee, err = meReplacer.Replace(filters.Assignee)
 	if err != nil {
 		return nil, err
 	}
-	filterAuthor, err := meReplacer.Replace(filters.Author)
+	filters.Author, err = meReplacer.Replace(filters.Author)
 	if err != nil {
 		return nil, err
 	}
-	filterMention, err := meReplacer.Replace(filters.Mention)
+	filters.Mention, err = meReplacer.Replace(filters.Mention)
 	if err != nil {
 		return nil, err
 	}
 
-	return IssueList(
-		apiClient,
-		repo,
-		filters.State,
-		filterAssignee,
-		limit,
-		filterAuthor,
-		filterMention,
-		filters.Milestone,
-	)
+	return listIssues(apiClient, repo, filters, limit)
 }

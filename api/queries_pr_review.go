@@ -28,14 +28,14 @@ type PullRequestReviews struct {
 }
 
 type PullRequestReview struct {
-	Author              Author
-	AuthorAssociation   string
-	Body                string
-	CreatedAt           time.Time
-	IncludesCreatedEdit bool
-	ReactionGroups      ReactionGroups
-	State               string
-	URL                 string
+	Author              Author         `json:"author"`
+	AuthorAssociation   string         `json:"authorAssociation"`
+	Body                string         `json:"body"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	IncludesCreatedEdit bool           `json:"includesCreatedEdit"`
+	ReactionGroups      ReactionGroups `json:"reactionGroups"`
+	State               string         `json:"state"`
+	URL                 string         `json:"url"`
 }
 
 func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {

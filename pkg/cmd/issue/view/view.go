@@ -33,6 +33,7 @@ type ViewOptions struct {
 	SelectorArg string
 	WebMode     bool
 	Comments    bool
+	Export      *cmdutil.ExportFormat
 
 	Now func() time.Time
 }
@@ -71,6 +72,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Export, api.IssueFields)
 
 	return cmd
 }
@@ -112,6 +114,11 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Export != nil {
+		exportIssue := issue.ExportData(opts.Export.Fields)
+		return opts.Export.Write(opts.IO.Out, exportIssue, opts.IO.ColorEnabled())
+	}
 
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts, issue)

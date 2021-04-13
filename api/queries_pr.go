@@ -42,12 +42,14 @@ type PullRequest struct {
 	Additions        int
 	Deletions        int
 	MergeStateStatus string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	MergedAt         *time.Time
 
-	Author struct {
-		Login string
-	}
+	Author              Author
 	HeadRepositoryOwner struct {
-		Login string
+		Login string `json:"login"`
 	}
 	HeadRepository struct {
 		Name             string
@@ -75,15 +77,16 @@ type PullRequest struct {
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
-							Name        string
-							Context     string
-							State       string
-							Status      string
-							Conclusion  string
-							StartedAt   time.Time
-							CompletedAt time.Time
-							DetailsURL  string
-							TargetURL   string
+							TypeName    string    `json:"__typename"`
+							Name        string    `json:"name"`
+							Context     string    `json:"context,omitempty"`
+							State       string    `json:"state,omitempty"`
+							Status      string    `json:"status"`
+							Conclusion  string    `json:"conclusion"`
+							StartedAt   time.Time `json:"startedAt"`
+							CompletedAt time.Time `json:"completedAt"`
+							DetailsURL  string    `json:"detailsUrl"`
+							TargetURL   string    `json:"targetUrl,omitempty"`
 						}
 					}
 				}
@@ -104,8 +107,8 @@ type ReviewRequests struct {
 	Nodes []struct {
 		RequestedReviewer struct {
 			TypeName string `json:"__typename"`
-			Login    string
-			Name     string
+			Login    string `json:"login"`
+			Name     string `json:"name"`
 		}
 	}
 	TotalCount int
@@ -971,11 +974,4 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/httpmock"
 )
 
@@ -48,7 +49,11 @@ func TestIssueList(t *testing.T) {
 	)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
-	_, err := IssueList(client, repo, "open", "", 251, "", "", "")
+	filters := prShared.FilterOptions{
+		Entity: "issue",
+		State:  "open",
+	}
+	_, err := listIssues(client, repo, filters, 251)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +133,7 @@ func TestIssueList_pagination(t *testing.T) {
 	)
 
 	repo := ghrepo.New("OWNER", "REPO")
-	res, err := IssueList(client, repo, "", "", 0, "", "", "")
+	res, err := listIssues(client, repo, prShared.FilterOptions{}, 0)
 	if err != nil {
 		t.Fatalf("IssueList() error = %v", err)
 	}
