@@ -20,7 +20,7 @@ type StatusOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	Export *cmdutil.ExportFormat
+	Exporter cmdutil.Exporter
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -45,7 +45,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmdutil.AddJSONFlags(cmd, &opts.Export, api.IssueFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
 }
@@ -80,8 +80,8 @@ func statusRun(opts *StatusOptions) error {
 		Username: currentUser,
 		Fields:   defaultFields,
 	}
-	if opts.Export != nil {
-		options.Fields = opts.Export.Fields
+	if opts.Exporter != nil {
+		options.Fields = opts.Exporter.Fields()
 	}
 	issuePayload, err := api.IssueStatus(apiClient, baseRepo, options)
 	if err != nil {
@@ -94,13 +94,13 @@ func statusRun(opts *StatusOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.Export != nil {
+	if opts.Exporter != nil {
 		data := map[string]interface{}{
-			"createdBy": api.ExportIssues(issuePayload.Authored.Issues, opts.Export.Fields),
-			"assigned":  api.ExportIssues(issuePayload.Assigned.Issues, opts.Export.Fields),
-			"mentioned": api.ExportIssues(issuePayload.Mentioned.Issues, opts.Export.Fields),
+			"createdBy": api.ExportIssues(issuePayload.Authored.Issues, opts.Exporter.Fields()),
+			"assigned":  api.ExportIssues(issuePayload.Assigned.Issues, opts.Exporter.Fields()),
+			"mentioned": api.ExportIssues(issuePayload.Mentioned.Issues, opts.Exporter.Fields()),
 		}
-		return opts.Export.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
 	}
 
 	out := opts.IO.Out

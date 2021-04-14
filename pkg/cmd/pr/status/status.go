@@ -29,7 +29,7 @@ type StatusOptions struct {
 	Branch     func() (string, error)
 
 	HasRepoOverride bool
-	Export          *cmdutil.ExportFormat
+	Exporter        cmdutil.Exporter
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -57,7 +57,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmdutil.AddJSONFlags(cmd, &opts.Export, api.PullRequestFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -96,8 +96,8 @@ func statusRun(opts *StatusOptions) error {
 		CurrentPR: currentPRNumber,
 		HeadRef:   currentPRHeadRef,
 	}
-	if opts.Export != nil {
-		options.Fields = opts.Export.Fields
+	if opts.Exporter != nil {
+		options.Fields = opts.Exporter.Fields()
 	}
 	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
 	if err != nil {
@@ -110,16 +110,16 @@ func statusRun(opts *StatusOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.Export != nil {
+	if opts.Exporter != nil {
 		data := map[string]interface{}{
 			"currentBranch": nil,
-			"createdBy":     api.ExportPRs(prPayload.ViewerCreated.PullRequests, opts.Export.Fields),
-			"needsReview":   api.ExportPRs(prPayload.ReviewRequested.PullRequests, opts.Export.Fields),
+			"createdBy":     api.ExportPRs(prPayload.ViewerCreated.PullRequests, opts.Exporter.Fields()),
+			"needsReview":   api.ExportPRs(prPayload.ReviewRequested.PullRequests, opts.Exporter.Fields()),
 		}
 		if prPayload.CurrentPR != nil {
-			data["currentBranch"] = prPayload.CurrentPR.ExportData(opts.Export.Fields)
+			data["currentBranch"] = prPayload.CurrentPR.ExportData(opts.Exporter.Fields())
 		}
-		return opts.Export.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
 	}
 
 	out := opts.IO.Out

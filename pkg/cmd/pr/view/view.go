@@ -35,7 +35,7 @@ type ViewOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
-	Export *cmdutil.ExportFormat
+	Exporter cmdutil.Exporter
 
 	SelectorArg string
 	BrowserMode bool
@@ -85,7 +85,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
-	cmdutil.AddJSONFlags(cmd, &opts.Export, api.PullRequestFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -116,9 +116,9 @@ func viewRun(opts *ViewOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.Export != nil {
-		exportPR := pr.ExportData(opts.Export.Fields)
-		return opts.Export.Write(opts.IO.Out, exportPR, opts.IO.ColorEnabled())
+	if opts.Exporter != nil {
+		exportPR := pr.ExportData(opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, exportPR, opts.IO.ColorEnabled())
 	}
 
 	if connectedToTerminal {

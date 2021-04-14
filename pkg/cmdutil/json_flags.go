@@ -19,7 +19,7 @@ type JSONFlagError struct {
 	error
 }
 
-func AddJSONFlags(cmd *cobra.Command, exportTarget **ExportFormat, fields []string) {
+func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
@@ -62,9 +62,9 @@ func checkJSONFlags(cmd *cobra.Command) (*ExportFormat, error) {
 		}
 		jv := jsonFlag.Value.(pflag.SliceValue)
 		return &ExportFormat{
-			Fields:   jv.GetSlice(),
-			Filter:   jqFlag.Value.String(),
-			Template: tplFlag.Value.String(),
+			fields:   jv.GetSlice(),
+			filter:   jqFlag.Value.String(),
+			template: tplFlag.Value.String(),
 		}, nil
 	} else if jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
@@ -74,10 +74,19 @@ func checkJSONFlags(cmd *cobra.Command) (*ExportFormat, error) {
 	return nil, nil
 }
 
+type Exporter interface {
+	Fields() []string
+	Write(w io.Writer, data interface{}, colorEnabled bool) error
+}
+
 type ExportFormat struct {
-	Fields   []string
-	Filter   string
-	Template string
+	fields   []string
+	filter   string
+	template string
+}
+
+func (e *ExportFormat) Fields() []string {
+	return e.fields
 }
 
 func (e *ExportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
@@ -88,10 +97,10 @@ func (e *ExportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) e
 		return err
 	}
 
-	if e.Filter != "" {
-		return export.FilterJSON(w, &buf, e.Filter)
-	} else if e.Template != "" {
-		return export.ExecuteTemplate(w, &buf, e.Template, colorEnabled)
+	if e.filter != "" {
+		return export.FilterJSON(w, &buf, e.filter)
+	} else if e.template != "" {
+		return export.ExecuteTemplate(w, &buf, e.template, colorEnabled)
 	} else if colorEnabled {
 		return jsoncolor.Write(w, &buf, "  ")
 	}

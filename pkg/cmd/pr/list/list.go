@@ -29,7 +29,7 @@ type ListOptions struct {
 
 	WebMode      bool
 	LimitResults int
-	Export       *cmdutil.ExportFormat
+	Exporter     cmdutil.Exporter
 
 	State      string
 	BaseBranch string
@@ -78,7 +78,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmdutil.AddJSONFlags(cmd, &opts.Export, api.PullRequestFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -115,8 +115,8 @@ func listRun(opts *ListOptions) error {
 		Search:     opts.Search,
 		Fields:     defaultFields,
 	}
-	if opts.Export != nil {
-		filters.Fields = opts.Export.Fields
+	if opts.Exporter != nil {
+		filters.Fields = opts.Exporter.Fields()
 	}
 
 	if opts.WebMode {
@@ -143,8 +143,9 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.Export != nil {
-		return opts.Export.Write(opts.IO.Out, api.ExportPRs(listResult.PullRequests, opts.Export.Fields), opts.IO.ColorEnabled())
+	if opts.Exporter != nil {
+		data := api.ExportPRs(listResult.PullRequests, opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
 	}
 
 	if opts.IO.IsStdoutTTY() {

@@ -30,8 +30,8 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
 
-	WebMode bool
-	Export  *cmdutil.ExportFormat
+	WebMode  bool
+	Exporter cmdutil.Exporter
 
 	Assignee     string
 	Labels       []string
@@ -87,7 +87,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
-	cmdutil.AddJSONFlags(cmd, &opts.Export, api.IssueFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
 }
@@ -139,8 +139,8 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	if opts.Export != nil {
-		filterOptions.Fields = opts.Export.Fields
+	if opts.Exporter != nil {
+		filterOptions.Fields = opts.Exporter.Fields()
 	}
 
 	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
@@ -154,8 +154,9 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.Export != nil {
-		return opts.Export.Write(opts.IO.Out, api.ExportIssues(listResult.Issues, opts.Export.Fields), opts.IO.ColorEnabled())
+	if opts.Exporter != nil {
+		data := api.ExportIssues(listResult.Issues, opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
 	}
 
 	if isTerminal {
