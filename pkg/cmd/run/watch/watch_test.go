@@ -323,6 +323,6 @@ func TestWatchRun(t *testing.T) {
 }
 
 func Test_demo(t *testing.T) {
-	//assert.Equal(t, 1, 0)
-	assert.Equal(t, 1, 1)
+	assert.Equal(t, 1, 0)
+	//assert.Equal(t, 1, 1)
 }

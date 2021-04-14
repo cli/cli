@@ -180,9 +180,9 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 	ago := opts.Now().Sub(run.CreatedAt)
 
 	jobs, err := shared.GetJobs(client, repo, *run)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to get jobs: %w", err)
-	//}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs: %w", err)
+	}
 
 	var annotations []shared.Annotation
 
