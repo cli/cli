@@ -87,10 +87,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:    "view [<run-id>]",
-		Short:  "View a summary of a workflow run",
-		Args:   cobra.MaximumNArgs(1),
-		Hidden: true,
+		Use:   "view [<run-id>]",
+		Short: "View a summary of a workflow run",
+		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 		  # Interactively select a run to view, optionally drilling down to a job
 		  $ gh run view

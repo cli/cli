@@ -42,9 +42,6 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "watch <run-selector>",
 		Short: "Watch a run until it completes, showing its progress",
-		Annotations: map[string]string{
-			"IsActions": "true",
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
