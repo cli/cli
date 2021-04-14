@@ -31,7 +31,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "rerun [<run-id>]",
-		Short: "Rerun a given run",
+		Short: "Rerun a failed run",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override

@@ -29,8 +29,9 @@ func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "enable [<workflow ID> | <workflow name>]",
+		Use:   "enable [<workflow-id> | <workflow-name>]",
 		Short: "Enable a workflow",
+		Long:  "Enable a workflow, allowing it to be run and show up when listing workflows.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
