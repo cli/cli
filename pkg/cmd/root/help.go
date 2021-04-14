@@ -119,11 +119,18 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 		Body  string
 	}
 
+	longText := command.Long
+	if longText == "" {
+		longText = command.Short
+	}
+	if longText != "" && command.LocalFlags().Lookup("jq") != nil {
+		longText = strings.TrimRight(longText, "\n") +
+			"\n\nFor more information about output formatting flags, see `gh help formatting`."
+	}
+
 	helpEntries := []helpEntry{}
-	if command.Long != "" {
-		helpEntries = append(helpEntries, helpEntry{"", command.Long})
-	} else if command.Short != "" {
-		helpEntries = append(helpEntries, helpEntry{"", command.Short})
+	if longText != "" {
+		helpEntries = append(helpEntries, helpEntry{"", longText})
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 	if len(coreCommands) > 0 {

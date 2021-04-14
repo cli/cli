@@ -155,6 +155,8 @@ type FilterOptions struct {
 	Mention    string
 	Milestone  string
 	Search     string
+
+	Fields []string
 }
 
 func (opts *FilterOptions) IsDefault() bool {

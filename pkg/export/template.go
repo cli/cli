@@ -1,4 +1,4 @@
-package api
+package export
 
 import (
 	"encoding/json"
@@ -50,7 +50,7 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 	return template.New("").Funcs(templateFuncs).Parse(tpl)
 }
 
-func executeTemplate(w io.Writer, input io.Reader, templateStr string, colorEnabled bool) error {
+func ExecuteTemplate(w io.Writer, input io.Reader, templateStr string, colorEnabled bool) error {
 	t, err := parseTemplate(templateStr, colorEnabled)
 	if err != nil {
 		return err

@@ -16,14 +16,14 @@ type Comments struct {
 }
 
 type Comment struct {
-	Author              Author
-	AuthorAssociation   string
-	Body                string
-	CreatedAt           time.Time
-	IncludesCreatedEdit bool
-	IsMinimized         bool
-	MinimizedReason     string
-	ReactionGroups      ReactionGroups
+	Author              Author         `json:"author"`
+	AuthorAssociation   string         `json:"authorAssociation"`
+	Body                string         `json:"body"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	IncludesCreatedEdit bool           `json:"includesCreatedEdit"`
+	IsMinimized         bool           `json:"isMinimized"`
+	MinimizedReason     string         `json:"minimizedReason"`
+	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 }
 
 type PageInfo struct {
