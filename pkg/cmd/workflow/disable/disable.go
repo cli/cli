@@ -31,6 +31,7 @@ func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "disable [<workflow ID> | <workflow name>]",
 		Short: "Disable a workflow",
+		Long:  "Disable a workflow, preventing it from running or showing up when listing workflows.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
