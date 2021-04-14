@@ -40,7 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view [<workflow-id> | <workflow name> | <file name>]",
+		Use:   "view [<workflow-id> | <workflow-name> | <filename>]",
 		Short: "View the summary of a workflow",
 		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
