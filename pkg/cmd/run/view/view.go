@@ -308,7 +308,7 @@ func runView(opts *ViewOptions) error {
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
 	fmt.Fprintln(out)
 
-	if len(jobs) == 0 && run.Conclusion == shared.Failure {
+	if len(jobs) == 0 && run.Conclusion == shared.Failure || run.Conclusion == shared.StartupFailure {
 		fmt.Fprintf(out, "%s %s\n",
 			cs.FailureIcon(),
 			cs.Bold("This run likely failed because of a workflow file issue."))

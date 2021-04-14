@@ -771,6 +771,44 @@ func TestViewRun(t *testing.T) {
 			browsedURL: "jobs/10?check_suite_focus=true",
 			wantOut:    "Opening jobs/10 in your browser.\n",
 		},
+		{
+			name: "hide job header, failure",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "123",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/123"),
+					httpmock.JSONResponse(shared.TestRun("failed no job", 123, shared.Completed, shared.Failure)))
+				reg.Register(
+					httpmock.REST("GET", "runs/123/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{Jobs: []shared.Job{}}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/123/artifacts"),
+					httpmock.StringResponse(`{}`))
+			},
+			wantOut: "\nX trunk failed no job · 123\nTriggered via push about 59 minutes ago\n\nX This run likely failed because of a workflow file issue.\n\nFor more information, see: runs/123\n",
+		},
+		{
+			name: "hide job header, startup_failure",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "123",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/123"),
+					httpmock.JSONResponse(shared.TestRun("failed no job", 123, shared.Completed, shared.StartupFailure)))
+				reg.Register(
+					httpmock.REST("GET", "runs/123/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{Jobs: []shared.Job{}}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/123/artifacts"),
+					httpmock.StringResponse(`{}`))
+			},
+			wantOut: "\nX trunk failed no job · 123\nTriggered via push about 59 minutes ago\n\nX This run likely failed because of a workflow file issue.\n\nFor more information, see: runs/123\n",
+		},
 	}
 
 	for _, tt := range tests {
