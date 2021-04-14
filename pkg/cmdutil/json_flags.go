@@ -11,6 +11,7 @@ import (
 
 	"github.com/cli/cli/pkg/export"
 	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/cli/cli/pkg/set"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -36,6 +37,14 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 			if export == nil {
 				*exportTarget = nil
 			} else {
+				allowedFields := set.NewStringSet()
+				allowedFields.AddValues(fields)
+				for _, f := range export.fields {
+					if !allowedFields.Contains(f) {
+						sort.Strings(fields)
+						return JSONFlagError{fmt.Errorf("Unknown JSON field: %q\nAvailable fields:\n  %s", f, strings.Join(fields, "\n  "))}
+					}
+				}
 				*exportTarget = export
 			}
 		} else {
