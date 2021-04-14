@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultLimit = 10
+	defaultLimit = 20
 )
 
 type ListOptions struct {
