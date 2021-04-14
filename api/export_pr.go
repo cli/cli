@@ -64,6 +64,8 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 			data[f] = pr.ProjectCards.Nodes
 		case "reviews":
 			data[f] = pr.Reviews.Nodes
+		case "files":
+			data[f] = pr.Files.Nodes
 		case "reviewRequests":
 			requests := make([]interface{}, 0, len(pr.ReviewRequests.Nodes))
 			for _, req := range pr.ReviewRequests.Nodes {

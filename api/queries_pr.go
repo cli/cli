@@ -42,13 +42,22 @@ type PullRequest struct {
 	Mergeable        string
 	Additions        int
 	Deletions        int
+	ChangedFiles     int
 	MergeStateStatus string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ClosedAt         *time.Time
 	MergedAt         *time.Time
 
+	MergeCommit          *Commit
+	PotentialMergeCommit *Commit
+
+	Files struct {
+		Nodes []PullRequestFile
+	}
+
 	Author              Author
+	MergedBy            *Author
 	HeadRepositoryOwner struct {
 		Login string `json:"login"`
 	}
@@ -102,6 +111,16 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type Commit struct {
+	OID string `json:"oid"`
+}
+
+type PullRequestFile struct {
+	Path      string `json:"path"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
 }
 
 type ReviewRequests struct {

@@ -31,11 +31,11 @@ type PullRequestReview struct {
 	Author              Author         `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
-	CreatedAt           time.Time      `json:"createdAt"`
+	SubmittedAt         *time.Time     `json:"submittedAt"`
 	IncludesCreatedEdit bool           `json:"includesCreatedEdit"`
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 	State               string         `json:"state"`
-	URL                 string         `json:"url"`
+	URL                 string         `json:"url,omitempty"`
 }
 
 func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {
@@ -115,7 +115,10 @@ func (prr PullRequestReview) Content() string {
 }
 
 func (prr PullRequestReview) Created() time.Time {
-	return prr.CreatedAt
+	if prr.SubmittedAt == nil {
+		return time.Time{}
+	}
+	return *prr.SubmittedAt
 }
 
 func (prr PullRequestReview) HiddenReason() string {

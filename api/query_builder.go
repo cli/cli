@@ -46,6 +46,29 @@ var prReviewRequests = shortenQuery(`
 	}
 `)
 
+var prReviews = shortenQuery(`
+	reviews(last: 100) {
+		nodes {
+			author{login},
+			authorAssociation,
+			submittedAt,
+			body,
+			state,
+			reactionGroups{content,users{totalCount}}
+		}
+	}
+`)
+
+var prFiles = shortenQuery(`
+	files(first: 100) {
+		nodes {
+			additions,
+			deletions,
+			path
+		}
+	}
+`)
+
 var prStatusCheckRollup = shortenQuery(`
 	commits(last: 1) {
 		totalCount,
@@ -100,7 +123,9 @@ var IssueFields = []string{
 var PullRequestFields = append(IssueFields,
 	"additions",
 	"baseRefName",
+	"changedFiles",
 	"deletions",
+	"files",
 	"headRefName",
 	"headRepository",
 	"headRepositoryOwner",
@@ -108,10 +133,14 @@ var PullRequestFields = append(IssueFields,
 	"isDraft",
 	"maintainerCanModify",
 	"mergeable",
+	"mergeCommit",
 	"mergedAt",
+	"mergedBy",
 	"mergeStateStatus",
+	"potentialMergeCommit",
 	"reviewDecision",
 	"reviewRequests",
+	"reviews",
 	"statusCheckRollup",
 )
 
@@ -121,6 +150,8 @@ func PullRequestGraphQL(fields []string) string {
 		switch field {
 		case "author":
 			q = append(q, `author{login}`)
+		case "mergedBy":
+			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":
 			q = append(q, `headRepositoryOwner{login}`)
 		case "headRepository":
@@ -135,10 +166,18 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, `milestone{title}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
+		case "mergeCommit":
+			q = append(q, `mergeCommit{oid}`)
+		case "potentialMergeCommit":
+			q = append(q, `potentialMergeCommit{oid}`)
 		case "comments":
 			q = append(q, issueComments)
 		case "reviewRequests":
 			q = append(q, prReviewRequests)
+		case "reviews":
+			q = append(q, prReviews)
+		case "files":
+			q = append(q, prFiles)
 		case "statusCheckRollup":
 			q = append(q, prStatusCheckRollup)
 		default:
