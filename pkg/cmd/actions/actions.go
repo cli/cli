@@ -47,7 +47,7 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 	return heredoc.Docf(`
 			%s
 
-			gh integrates with Actions to help you manage runs and workflows.
+			GitHub CLI integrates with Actions to help you manage runs and workflows.
 
 			%s
 			gh run list:      List recent workflow runs
