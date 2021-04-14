@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
@@ -40,7 +41,13 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "diff [<number> | <url> | <branch>]",
 		Short: "View changes in a pull request",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			View changes in a pull request. 
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

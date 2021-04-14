@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
@@ -38,7 +39,13 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "ready [<number> | <url> | <branch>]",
 		Short: "Mark a pull request as ready for review",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			Mark a pull request as ready for review
+
+			Without an argument, the pull request that belongs to the current branch
+			is displayed.
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

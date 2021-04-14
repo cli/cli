@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
@@ -47,7 +48,13 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			Show CI status for a single pull request.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

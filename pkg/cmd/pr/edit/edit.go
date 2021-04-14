@@ -50,6 +50,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit [<number> | <url> | <branch>]",
 		Short: "Edit a pull request",
+		Long: heredoc.Doc(`
+			Edit a pull request.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.
+		`),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"

@@ -70,6 +70,9 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		Short: "Merge a pull request",
 		Long: heredoc.Doc(`
 			Merge a pull request on GitHub.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
