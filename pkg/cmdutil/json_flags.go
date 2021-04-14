@@ -33,7 +33,11 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 			}
 		}
 		if export, err := checkJSONFlags(c); err == nil {
-			*exportTarget = export
+			if export == nil {
+				*exportTarget = nil
+			} else {
+				*exportTarget = export
+			}
 		} else {
 			return err
 		}
@@ -49,7 +53,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	})
 }
 
-func checkJSONFlags(cmd *cobra.Command) (*ExportFormat, error) {
+func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 	f := cmd.Flags()
 	jsonFlag := f.Lookup("json")
 	jqFlag := f.Lookup("jq")
@@ -61,7 +65,7 @@ func checkJSONFlags(cmd *cobra.Command) (*ExportFormat, error) {
 			return nil, errors.New("cannot use `--web` with `--json`")
 		}
 		jv := jsonFlag.Value.(pflag.SliceValue)
-		return &ExportFormat{
+		return &exportFormat{
 			fields:   jv.GetSlice(),
 			filter:   jqFlag.Value.String(),
 			template: tplFlag.Value.String(),
@@ -79,17 +83,17 @@ type Exporter interface {
 	Write(w io.Writer, data interface{}, colorEnabled bool) error
 }
 
-type ExportFormat struct {
+type exportFormat struct {
 	fields   []string
 	filter   string
 	template string
 }
 
-func (e *ExportFormat) Fields() []string {
+func (e *exportFormat) Fields() []string {
 	return e.fields
 }
 
-func (e *ExportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
+func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
