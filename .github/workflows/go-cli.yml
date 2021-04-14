@@ -16,7 +16,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v21
       with:
-        go-version: 1.15
+        go-version: 21.0
 
     - name: Build
       run: go build vm ./...
