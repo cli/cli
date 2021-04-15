@@ -12,9 +12,10 @@ import (
 
 func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <command>",
-		Short: "View details about workflow runs",
-		Long:  "List, view, and watch recent workflow runs from GitHub Actions.",
+		Use:    "run <command>",
+		Short:  "View details about workflow runs",
+		Long:   "List, view, and watch recent workflow runs from GitHub Actions.",
+		Hidden: true,
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},

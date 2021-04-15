@@ -87,24 +87,25 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view [<run-id>]",
-		Short: "View a summary of a workflow run",
-		Args:  cobra.MaximumNArgs(1),
+		Use:    "view [<run-id>]",
+		Short:  "View a summary of a workflow run",
+		Args:   cobra.MaximumNArgs(1),
+		Hidden: true,
 		Example: heredoc.Doc(`
-			# Interactively select a run to view, optionally selecting a single job
-			$ gh run view
-			
-			# View a specific run
-			$ gh run view 12345
-			
+		  # Interactively select a run to view, optionally drilling down to a job
+		  $ gh run view
+
+		  # View a specific run
+		  $ gh run view 12345
+
 			# View a specific job within a run
 			$ gh run view --job 456789
-			
+
 			# View the full log for a specific job
 			$ gh run view --log --job 456789
-			
-			# Exit non-zero if a run failed
-			$ gh run view 0451 --exit-status && echo "run pending or passed"
+
+		  # Exit non-zero if a run failed
+		  $ gh run view 0451 --exit-status && echo "run pending or passed"
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -307,7 +308,7 @@ func runView(opts *ViewOptions) error {
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
 	fmt.Fprintln(out)
 
-	if len(jobs) == 0 && run.Conclusion == shared.Failure || run.Conclusion == shared.StartupFailure {
+	if len(jobs) == 0 && run.Conclusion == shared.Failure {
 		fmt.Fprintf(out, "%s %s\n",
 			cs.FailureIcon(),
 			cs.Bold("This run likely failed because of a workflow file issue."))

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultLimit = 20
+	defaultLimit = 10
 )
 
 type ListOptions struct {
@@ -36,9 +36,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List recent workflow runs",
-		Args:  cobra.NoArgs,
+		Use:    "list",
+		Short:  "List recent workflow runs",
+		Args:   cobra.NoArgs,
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

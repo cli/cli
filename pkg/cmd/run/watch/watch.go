@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/run/shared"
@@ -41,15 +40,11 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "watch <run-id>",
+		Use:   "watch <run-selector>",
 		Short: "Watch a run until it completes, showing its progress",
-		Example: heredoc.Doc(`
-			# Watch a run until it's done
-			gh run watch
-
-			# Run some other command when the run is finished
-			gh run watch && notify-send "run is done!"
-		`),
+		Annotations: map[string]string{
+			"IsActions": "true",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

@@ -19,9 +19,10 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "actions",
-		Short: "Learn about working with GitHub actions",
-		Long:  actionsExplainer(nil),
+		Use:    "actions",
+		Short:  "Learn about working with GitHub actions",
+		Long:   actionsExplainer(nil),
+		Hidden: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			actionsRun(opts)
 		},
@@ -46,7 +47,7 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 	return heredoc.Docf(`
 			%s
 
-			GitHub CLI integrates with Actions to help you manage runs and workflows.
+			gh integrates with Actions to help you manage runs and workflows.
 
 			%s
 			gh run list:      List recent workflow runs
