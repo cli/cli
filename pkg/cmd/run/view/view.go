@@ -45,6 +45,11 @@ func (rlc) Exists(path string) bool {
 	return true
 }
 func (rlc) Create(path string, content io.ReadCloser) error {
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return fmt.Errorf("could not create cache: %w", err)
+	}
+
 	out, err := os.Create(path)
 	if err != nil {
 		return err
