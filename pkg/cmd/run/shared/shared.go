@@ -48,7 +48,7 @@ type Run struct {
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
-	ID             int
+	ID             int64
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -78,7 +78,7 @@ func (r Run) CommitMsg() string {
 }
 
 type Job struct {
-	ID          int
+	ID          int64
 	Status      Status
 	Conclusion  Conclusion
 	Name        string
@@ -86,7 +86,7 @@ type Job struct {
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
-	RunID       int       `json:"run_id"`
+	RunID       int64     `json:"run_id"`
 }
 
 type Step struct {
@@ -123,7 +123,7 @@ func AnnotationSymbol(cs *iostreams.ColorScheme, a Annotation) string {
 }
 
 type CheckRun struct {
-	ID int
+	ID int64
 }
 
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
@@ -179,7 +179,7 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f f
 	return filtered, nil
 }
 
-func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit, workflowID int) ([]Run, error) {
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit int, workflowID int64) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
 	return getRuns(client, repo, path, limit)
 }

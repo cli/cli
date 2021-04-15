@@ -148,7 +148,8 @@ func TestListRun(t *testing.T) {
 			},
 			stubs: func(reg *httpmock.Registry) {
 				workflows := []shared.Workflow{}
-				for flowID := 0; flowID < 103; flowID++ {
+				var flowID int64
+				for flowID = 0; flowID < 103; flowID++ {
 					workflows = append(workflows, shared.Workflow{
 						ID:    flowID,
 						Name:  fmt.Sprintf("flow %d", flowID),

@@ -24,7 +24,7 @@ type WorkflowState string
 
 type Workflow struct {
 	Name  string
-	ID    int
+	ID    int64
 	Path  string
 	State WorkflowState
 }
