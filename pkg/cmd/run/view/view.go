@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -477,7 +478,8 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
-			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number, step.Name)
+			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number,
+				strings.ReplaceAll(step.Name, "/", ""))
 			for _, file := range rlz.File {
 				if file.Name == filename {
 					jobs[i].Steps[j].Log = file
