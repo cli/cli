@@ -280,7 +280,7 @@ func runView(opts *ViewOptions) error {
 
 	var artifacts []shared.Artifact
 	if selectedJob == nil {
-		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.Itoa(run.ID))
+		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.FormatInt(int64(run.ID), 10))
 		if err != nil {
 			return fmt.Errorf("failed to get artifacts: %w", err)
 		}

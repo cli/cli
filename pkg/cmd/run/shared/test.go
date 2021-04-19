@@ -16,7 +16,7 @@ func updated() time.Time {
 	return updated
 }
 
-func TestRun(name string, id int, s Status, c Conclusion) Run {
+func TestRun(name string, id int64, s Status, c Conclusion) Run {
 	return Run{
 		Name:       name,
 		ID:         id,

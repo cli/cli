@@ -132,7 +132,7 @@ func TestListRun(t *testing.T) {
 				Limit: 101,
 			},
 			stubs: func(reg *httpmock.Registry) {
-				runID := 0
+				var runID int64
 				runs := []shared.Run{}
 				for runID < 103 {
 					runs = append(runs, shared.TestRun(fmt.Sprintf("%d", runID), runID, shared.InProgress, ""))

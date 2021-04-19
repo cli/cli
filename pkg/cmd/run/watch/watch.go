@@ -136,7 +136,7 @@ func watchRun(opts *WatchOptions) error {
 	// clear entire screen
 	fmt.Fprintf(out, "\x1b[2J")
 
-	annotationCache := map[int][]shared.Annotation{}
+	annotationCache := map[int64][]shared.Annotation{}
 
 	duration, err := time.ParseDuration(fmt.Sprintf("%ds", opts.Interval))
 	if err != nil {
@@ -166,7 +166,7 @@ func watchRun(opts *WatchOptions) error {
 	return nil
 }
 
-func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int][]shared.Annotation) (*shared.Run, error) {
+func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
