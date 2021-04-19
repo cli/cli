@@ -80,6 +80,26 @@ func TestRESTGetDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRESTWithFullURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	http.Register(
+		httpmock.REST("GET", "api/v3/user/repos"),
+		httpmock.StatusStringResponse(200, "{}"))
+	http.Register(
+		httpmock.REST("GET", "user/repos"),
+		httpmock.StatusStringResponse(200, "{}"))
+
+	err := client.REST("example.com", "GET", "user/repos", nil, nil)
+	assert.NoError(t, err)
+	err = client.REST("example.com", "GET", "https://another.net/user/repos", nil, nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "example.com", http.Requests[0].URL.Hostname())
+	assert.Equal(t, "another.net", http.Requests[1].URL.Hostname())
+}
+
 func TestRESTError(t *testing.T) {
 	fakehttp := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(fakehttp))

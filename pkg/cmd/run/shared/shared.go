@@ -243,13 +243,7 @@ type JobsPayload struct {
 
 func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) {
 	var result JobsPayload
-	parsed, err := url.Parse(run.JobsURL)
-	if err != nil {
-		return nil, err
-	}
-
-	err = client.REST(repo.RepoHost(), "GET", parsed.Path[1:], nil, &result)
-	if err != nil {
+	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
 		return nil, err
 	}
 	return result.Jobs, nil

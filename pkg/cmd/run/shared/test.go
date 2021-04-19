@@ -26,12 +26,12 @@ func TestRun(name string, id int, s Status, c Conclusion) Run {
 		Conclusion: c,
 		Event:      "push",
 		HeadBranch: "trunk",
-		JobsURL:    fmt.Sprintf("/runs/%d/jobs", id),
+		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", id),
 		HeadCommit: Commit{
 			Message: "cool commit",
 		},
 		HeadSha: "1234567890",
-		URL:     fmt.Sprintf("runs/%d", id),
+		URL:     fmt.Sprintf("https://github.com/runs/%d", id),
 		HeadRepository: Repo{
 			Owner: struct{ Login string }{Login: "OWNER"},
 			Name:  "REPO",
@@ -68,7 +68,7 @@ var SuccessfulJob Job = Job{
 	Name:        "cool job",
 	StartedAt:   created(),
 	CompletedAt: updated(),
-	URL:         "jobs/10",
+	URL:         "https://github.com/jobs/10",
 	RunID:       3,
 	Steps: []Step{
 		{
@@ -93,7 +93,7 @@ var FailedJob Job = Job{
 	Name:        "sad job",
 	StartedAt:   created(),
 	CompletedAt: updated(),
-	URL:         "jobs/20",
+	URL:         "https://github.com/jobs/20",
 	RunID:       1234,
 	Steps: []Step{
 		{
