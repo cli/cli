@@ -461,6 +461,11 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	return nil, nil
 }
 
+func createLogFilename(job shared.Job, step shared.Step) string {
+	return fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number,
+		strings.ReplaceAll(step.Name, "/", ""))
+}
+
 // This function takes a zip file of logs and a list of jobs.
 // Structure of zip file
 // zip/
@@ -478,8 +483,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
-			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number,
-				strings.ReplaceAll(step.Name, "/", ""))
+			filename := createLogFilename(job, step)
 			for _, file := range rlz.File {
 				if file.Name == filename {
 					jobs[i].Steps[j].Log = file
