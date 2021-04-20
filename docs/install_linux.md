@@ -103,6 +103,13 @@ Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page
 pkg install gh
 ```
 
+### Homebrew (Linuxbrew)
+
+Linuxbrew users can install it as a [brew package](https://formulae.brew.sh/formula/gh#default):
+```bash
+brew install gh
+```
+
 ### FreeBSD
 
 FreeBSD users can install from the [ports collection](https://www.freshports.org/devel/gh/):
