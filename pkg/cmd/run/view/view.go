@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -98,16 +99,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			# Interactively select a run to view, optionally selecting a single job
 			$ gh run view
-			
+
 			# View a specific run
 			$ gh run view 12345
-			
+
 			# View a specific job within a run
 			$ gh run view --job 456789
-			
+
 			# View the full log for a specific job
 			$ gh run view --log --job 456789
-			
+
 			# Exit non-zero if a run failed
 			$ gh run view 0451 --exit-status && echo "run pending or passed"
 		`),
@@ -460,6 +461,11 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	return nil, nil
 }
 
+func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
+	re := fmt.Sprintf(`%s\/%d_.*\.txt`, job.Name, step.Number)
+	return regexp.MustCompile(re)
+}
+
 // This function takes a zip file of logs and a list of jobs.
 // Structure of zip file
 // zip/
@@ -477,9 +483,9 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
-			filename := fmt.Sprintf("%s/%d_%s.txt", job.Name, step.Number, step.Name)
+			re := logFilenameRegexp(job, step)
 			for _, file := range rlz.File {
-				if file.Name == filename {
+				if re.MatchString(file.Name) {
 					jobs[i].Steps[j].Log = file
 					break
 				}

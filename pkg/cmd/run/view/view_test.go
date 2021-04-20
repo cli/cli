@@ -864,6 +864,97 @@ func TestViewRun(t *testing.T) {
 	}
 }
 
+// Structure of fixture zip file
+// run log/
+// ├── cool job/
+// │   ├── 1_fob the barz.txt
+// │   └── 2_barz the fob.txt
+// └── sad job/
+//     ├── 1_barf the quux.txt
+//     └── 2_quux the barf.txt
+func Test_attachRunLog(t *testing.T) {
+	tests := []struct {
+		name         string
+		job          shared.Job
+		wantMatch    bool
+		wantFilename string
+	}{
+		{
+			name: "matching job name and step number 1",
+			job: shared.Job{
+				Name: "cool job",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job/1_fob the barz.txt",
+		},
+		{
+			name: "matching job name and step number 2",
+			job: shared.Job{
+				Name: "cool job",
+				Steps: []shared.Step{{
+					Name:   "barz the fob",
+					Number: 2,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job/2_barz the fob.txt",
+		},
+		{
+			name: "matching job name and step number and mismatch step name",
+			job: shared.Job{
+				Name: "cool job",
+				Steps: []shared.Step{{
+					Name:   "mismatch",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job/1_fob the barz.txt",
+		},
+		{
+			name: "matching job name and mismatch step number",
+			job: shared.Job{
+				Name: "cool job",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 3,
+				}},
+			},
+			wantMatch: false,
+		},
+		{
+			name: "mismatching job name",
+			job: shared.Job{
+				Name: "mismatch",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch: false,
+		},
+	}
+	rlz, _ := zip.OpenReader("./fixtures/run_log.zip")
+	defer rlz.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attachRunLog(rlz, []shared.Job{tt.job})
+			for _, step := range tt.job.Steps {
+				log := step.Log
+				logPresent := log != nil
+				assert.Equal(t, tt.wantMatch, logPresent)
+				if logPresent {
+					assert.Equal(t, tt.wantFilename, log.Name)
+				}
+			}
+		})
+	}
+}
+
 type testRunLogCache struct{}
 
 func (testRunLogCache) Exists(path string) bool {
