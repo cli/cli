@@ -883,7 +883,7 @@ func Test_attachRunLog(t *testing.T) {
 			name: "matching job name and step number 1",
 			job: shared.Job{
 				Name: "cool job",
-				Steps: []shared.Step{shared.Step{
+				Steps: []shared.Step{{
 					Name:   "fob the barz",
 					Number: 1,
 				}},
@@ -895,7 +895,7 @@ func Test_attachRunLog(t *testing.T) {
 			name: "matching job name and step number 2",
 			job: shared.Job{
 				Name: "cool job",
-				Steps: []shared.Step{shared.Step{
+				Steps: []shared.Step{{
 					Name:   "barz the fob",
 					Number: 2,
 				}},
@@ -907,7 +907,7 @@ func Test_attachRunLog(t *testing.T) {
 			name: "matching job name and step number and mismatch step name",
 			job: shared.Job{
 				Name: "cool job",
-				Steps: []shared.Step{shared.Step{
+				Steps: []shared.Step{{
 					Name:   "mismatch",
 					Number: 1,
 				}},
@@ -919,7 +919,7 @@ func Test_attachRunLog(t *testing.T) {
 			name: "matching job name and mismatch step number",
 			job: shared.Job{
 				Name: "cool job",
-				Steps: []shared.Step{shared.Step{
+				Steps: []shared.Step{{
 					Name:   "fob the barz",
 					Number: 3,
 				}},
@@ -930,7 +930,7 @@ func Test_attachRunLog(t *testing.T) {
 			name: "mismatching job name",
 			job: shared.Job{
 				Name: "mismatch",
-				Steps: []shared.Step{shared.Step{
+				Steps: []shared.Step{{
 					Name:   "fob the barz",
 					Number: 1,
 				}},
