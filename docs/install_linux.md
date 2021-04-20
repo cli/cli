@@ -105,7 +105,7 @@ pkg install gh
 
 ### Homebrew (Linuxbrew)
 
-Linuxbrew user can install it as a [brew package](https://formulae.brew.sh/formula/gh#default):
+Linuxbrew users can install it as a [brew package](https://formulae.brew.sh/formula/gh#default):
 ```bash
 brew install gh
 ```
