@@ -61,10 +61,7 @@ type PullRequest struct {
 		Login string `json:"login"`
 	}
 	HeadRepository struct {
-		Name             string
-		DefaultBranchRef struct {
-			Name string
-		}
+		Name string
 	}
 	IsCrossRepository   bool
 	IsDraft             bool
