@@ -34,7 +34,6 @@ type PullRequest struct {
 	Number           int
 	Title            string
 	State            string
-	Closed           bool
 	URL              string
 	BaseRefName      string
 	HeadRefName      string
@@ -163,6 +162,10 @@ func (pr PullRequest) Link() string {
 
 func (pr PullRequest) Identifier() string {
 	return pr.ID
+}
+
+func (pr PullRequest) IsOpen() bool {
+	return pr.State == "OPEN"
 }
 
 type PullRequestReviewStatus struct {

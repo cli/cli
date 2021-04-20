@@ -147,7 +147,7 @@ func TestPRReady(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "id": "THE-ID", "number": 444, "closed": false, "isDraft": true}
+				"pullRequest": { "id": "THE-ID", "number": 444, "state": "OPEN", "isDraft": true}
 			} } }`),
 	)
 	http.Register(
@@ -178,7 +178,7 @@ func TestPRReady_alreadyReady(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "number": 445, "closed": false, "isDraft": false}
+				"pullRequest": { "number": 445, "state": "OPEN", "isDraft": false}
 			} } }`),
 	)
 
@@ -202,7 +202,7 @@ func TestPRReady_closed(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "number": 446, "closed": true, "isDraft": true}
+				"pullRequest": { "number": 446, "state": "CLOSED", "isDraft": true}
 			} } }`),
 	)
 

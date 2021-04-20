@@ -70,7 +70,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return cmdutil.SilentError
 	}
 
-	if !pr.Closed {
+	if pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", cs.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}

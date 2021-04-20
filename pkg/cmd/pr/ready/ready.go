@@ -82,7 +82,7 @@ func readyRun(opts *ReadyOptions) error {
 		return err
 	}
 
-	if pr.Closed {
+	if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", cs.Red("!"), pr.Number)
 		return cmdutil.SilentError
 	} else if !pr.IsDraft {
