@@ -157,9 +157,8 @@ func createRun(opts *CreateOptions) (err error) {
 
 	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
-	var openURL string
-
 	if opts.WebMode {
+		var openURL string
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
 			openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
 			if err != nil {
@@ -171,6 +170,8 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		} else if ok, _ := tpl.HasTemplates(); ok {
 			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new/choose")
+		} else {
+			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		}
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
@@ -193,6 +194,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	action := prShared.SubmitAction
 	templateNameForSubmit := ""
+	var openURL string
 
 	if opts.Interactive {
 		var editorCommand string
