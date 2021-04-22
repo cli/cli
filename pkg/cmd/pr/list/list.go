@@ -50,8 +50,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
+			List PRs authored by you
+			$ gh pr list --author @me
+
+			List PRs assigned to you
+			$ gh pr list --assignee @me
+
+			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
+
+			List PRs using search syntax
 			$ gh pr list --search "status:success review:required"
+
+			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
