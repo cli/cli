@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -259,7 +258,7 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	}
 
 	repo := updaterEnabled
-	stateFilePath := path.Join(config.ConfigDir(), "state.yml")
+	stateFilePath := filepath.Join(config.ConfigDir(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
 }
 
