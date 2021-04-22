@@ -11,7 +11,7 @@ import (
 )
 
 func Test_parseConfig(t *testing.T) {
-	defer StubConfig(`---
+	defer stubConfig(`---
 hosts:
   github.com:
     user: monalisa
@@ -28,7 +28,7 @@ hosts:
 }
 
 func Test_parseConfig_multipleHosts(t *testing.T) {
-	defer StubConfig(`---
+	defer stubConfig(`---
 hosts:
   example.com:
     user: wronguser
@@ -48,7 +48,7 @@ hosts:
 }
 
 func Test_parseConfig_hostsFile(t *testing.T) {
-	defer StubConfig("", `---
+	defer stubConfig("", `---
 github.com:
   user: monalisa
   oauth_token: OTOKEN
@@ -64,7 +64,7 @@ github.com:
 }
 
 func Test_parseConfig_hostFallback(t *testing.T) {
-	defer StubConfig(`---
+	defer stubConfig(`---
 git_protocol: ssh
 `, `---
 github.com:
@@ -89,7 +89,7 @@ example.com:
 }
 
 func Test_parseConfig_migrateConfig(t *testing.T) {
-	defer StubConfig(`---
+	defer stubConfig(`---
 github.com:
   - user: keiyuri
     oauth_token: 123456
@@ -134,7 +134,7 @@ func Test_parseConfigFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("contents: %q", tt.contents), func(t *testing.T) {
-			defer StubConfig(tt.contents, "")()
+			defer stubConfig(tt.contents, "")()
 			_, yamlRoot, err := parseConfigFile("config.yml")
 			if tt.wantsErr != (err != nil) {
 				t.Fatalf("got error: %v", err)

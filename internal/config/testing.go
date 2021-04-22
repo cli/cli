@@ -37,7 +37,7 @@ func StubWriteConfig(wc io.Writer, wh io.Writer) func() {
 	}
 }
 
-func StubConfig(main, hosts string) func() {
+func stubConfig(main, hosts string) func() {
 	orig := ReadConfigFile
 	ReadConfigFile = func(fn string) ([]byte, error) {
 		switch path.Base(fn) {
