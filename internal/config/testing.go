@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 )
 
 func StubBackupConfig() func() {
@@ -21,7 +21,7 @@ func StubBackupConfig() func() {
 func StubWriteConfig(wc io.Writer, wh io.Writer) func() {
 	orig := WriteConfigFile
 	WriteConfigFile = func(fn string, data []byte) error {
-		switch path.Base(fn) {
+		switch filepath.Base(fn) {
 		case "config.yml":
 			_, err := wc.Write(data)
 			return err
@@ -40,7 +40,7 @@ func StubWriteConfig(wc io.Writer, wh io.Writer) func() {
 func stubConfig(main, hosts string) func() {
 	orig := ReadConfigFile
 	ReadConfigFile = func(fn string) ([]byte, error) {
-		switch path.Base(fn) {
+		switch filepath.Base(fn) {
 		case "config.yml":
 			if main == "" {
 				return []byte(nil), os.ErrNotExist
