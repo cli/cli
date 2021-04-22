@@ -16,11 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func runCommand(cfg config.Config, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
+func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.CmdOut, error) {
+	io, stdin, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
+	stdin.WriteString(in)
 
 	factory := &cmdutil.Factory{
 		IOStreams: io,
@@ -41,6 +42,9 @@ func runCommand(cfg config.Config, isTTY bool, cli string) (*test.CmdOut, error)
 	issueCmd := &cobra.Command{Use: "issue"}
 	issueCmd.AddCommand(&cobra.Command{Use: "list"})
 	rootCmd.AddCommand(issueCmd)
+	apiCmd := &cobra.Command{Use: "api"}
+	apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
+	rootCmd.AddCommand(apiCmd)
 
 	argv, err := shlex.Split("set " + cli)
 	if err != nil {
@@ -48,7 +52,7 @@ func runCommand(cfg config.Config, isTTY bool, cli string) (*test.CmdOut, error)
 	}
 	rootCmd.SetArgs(argv)
 
-	rootCmd.SetIn(&bytes.Buffer{})
+	rootCmd.SetIn(stdin)
 	rootCmd.SetOut(ioutil.Discard)
 	rootCmd.SetErr(ioutil.Discard)
 
@@ -64,7 +68,7 @@ func TestAliasSet_gh_command(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	_, err := runCommand(cfg, true, "pr 'pr status'")
+	_, err := runCommand(cfg, true, "pr 'pr status'", "")
 	assert.EqualError(t, err, `could not create alias: "pr" is already a gh command`)
 }
 
@@ -77,7 +81,7 @@ func TestAliasSet_empty_aliases(t *testing.T) {
 		editor: vim
 	`))
 
-	output, err := runCommand(cfg, true, "co 'pr checkout'")
+	output, err := runCommand(cfg, true, "co 'pr checkout'", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -104,7 +108,7 @@ func TestAliasSet_existing_alias(t *testing.T) {
 		  co: pr checkout
 	`))
 
-	output, err := runCommand(cfg, true, "co 'pr checkout -Rcool/repo'")
+	output, err := runCommand(cfg, true, "co 'pr checkout -Rcool/repo'", "")
 	require.NoError(t, err)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
@@ -117,7 +121,7 @@ func TestAliasSet_space_args(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	output, err := runCommand(cfg, true, `il 'issue list -l "cool story"'`)
+	output, err := runCommand(cfg, true, `il 'issue list -l "cool story"'`, "")
 	require.NoError(t, err)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
@@ -153,7 +157,7 @@ func TestAliasSet_arg_processing(t *testing.T) {
 
 			cfg := config.NewFromString(``)
 
-			output, err := runCommand(cfg, true, c.Cmd)
+			output, err := runCommand(cfg, true, c.Cmd, "")
 			if err != nil {
 				t.Fatalf("got unexpected error running %s: %s", c.Cmd, err)
 			}
@@ -174,7 +178,7 @@ func TestAliasSet_init_alias_cfg(t *testing.T) {
 		editor: vim
 	`))
 
-	output, err := runCommand(cfg, true, "diff 'pr diff'")
+	output, err := runCommand(cfg, true, "diff 'pr diff'", "")
 	require.NoError(t, err)
 
 	expected := `editor: vim
@@ -196,7 +200,7 @@ func TestAliasSet_existing_aliases(t *testing.T) {
 		  foo: bar
 	`))
 
-	output, err := runCommand(cfg, true, "view 'pr view'")
+	output, err := runCommand(cfg, true, "view 'pr view'", "")
 	require.NoError(t, err)
 
 	expected := `aliases:
@@ -215,7 +219,7 @@ func TestAliasSet_invalid_command(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	_, err := runCommand(cfg, true, "co 'pe checkout'")
+	_, err := runCommand(cfg, true, "co 'pe checkout'", "")
 	assert.EqualError(t, err, "could not create alias: pe checkout does not correspond to a gh command")
 }
 
@@ -225,7 +229,7 @@ func TestShellAlias_flag(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	output, err := runCommand(cfg, true, "--shell igrep 'gh issue list | grep'")
+	output, err := runCommand(cfg, true, "--shell igrep 'gh issue list | grep'", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -245,7 +249,7 @@ func TestShellAlias_bang(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	output, err := runCommand(cfg, true, "igrep '!gh issue list | grep'")
+	output, err := runCommand(cfg, true, "igrep '!gh issue list | grep'", "")
 	require.NoError(t, err)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
@@ -255,4 +259,80 @@ func TestShellAlias_bang(t *testing.T) {
     igrep: '!gh issue list | grep'
 `
 	assert.Equal(t, expected, mainBuf.String())
+}
+
+func TestShellAlias_from_stdin(t *testing.T) {
+	mainBuf := bytes.Buffer{}
+	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+
+	cfg := config.NewFromString(``)
+
+	output, err := runCommand(cfg, true, "users", `api graphql -F name="$1" -f query='
+    query ($name: String!) {
+        user(login: $name) {
+            name
+        }
+    }'`)
+
+	require.NoError(t, err)
+
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
+	test.ExpectLines(t, output.Stderr(), "Adding alias for.*users")
+
+	expected := `aliases:
+    users: |-
+        api graphql -F name="$1" -f query='
+            query ($name: String!) {
+                user(login: $name) {
+                    name
+                }
+            }'
+`
+
+	assert.Equal(t, expected, mainBuf.String())
+}
+
+func TestShellAlias_getExpansion(t *testing.T) {
+	tests := []struct {
+		name         string
+		want         string
+		expansionArg string
+		stdin        string
+	}{
+		{
+			name:         "co",
+			want:         "pr checkout",
+			expansionArg: "pr checkout",
+		},
+		{
+			name:         "co",
+			want:         "pr checkout",
+			expansionArg: "pr checkout",
+			stdin:        "api graphql -F name=\"$1\"",
+		},
+		{
+			name:  "stdin",
+			want:  "api graphql -F name=\"$1\"",
+			stdin: "api graphql -F name=\"$1\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, _, _ := iostreams.Test()
+
+			io.SetStdinTTY(false)
+
+			_, err := stdin.WriteString(tt.stdin)
+			assert.NoError(t, err)
+
+			expansion, err := getExpansion(&SetOptions{
+				Expansion: tt.expansionArg,
+				IO:        io,
+			})
+			assert.NoError(t, err)
+
+			assert.Equal(t, expansion, tt.want)
+		})
+	}
 }
