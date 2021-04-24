@@ -267,7 +267,7 @@ func TestShellAlias_from_stdin(t *testing.T) {
 
 	cfg := config.NewFromString(``)
 
-	output, err := runCommand(cfg, true, "users", `api graphql -F name="$1" -f query='
+	output, err := runCommand(cfg, true, "users -", `api graphql -F name="$1" -f query='
     query ($name: String!) {
         user(login: $name) {
             name
@@ -311,9 +311,10 @@ func TestShellAlias_getExpansion(t *testing.T) {
 			stdin:        "api graphql -F name=\"$1\"",
 		},
 		{
-			name:  "stdin",
-			want:  "api graphql -F name=\"$1\"",
-			stdin: "api graphql -F name=\"$1\"",
+			name:         "stdin",
+			expansionArg: "-",
+			want:         "api graphql -F name=\"$1\"",
+			stdin:        "api graphql -F name=\"$1\"",
 		},
 	}
 

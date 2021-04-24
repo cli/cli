@@ -38,7 +38,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			The expansion may specify additional arguments and flags. If the expansion
 			includes positional placeholders such as '$1', '$2', etc., any extra arguments
 			that follow the invocation of an alias will be inserted appropriately.
-			Reads from STDIN if not specified.
+			Reads from STDIN if '-' is specified as the expansion parameter. This can be useful
+			for commands with mixed quotes or multiple lines.
 
 			If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
 			to compose commands with "|" or redirect with ">". Note that extra arguments following the alias
@@ -48,7 +49,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			Platform note: on Windows, shell aliases are executed via "sh" as installed by Git For Windows. If
 			you have installed git on Windows in some other way, shell aliases may not work for you.
 
-			Quotes must always be used when defining a command as in the examples.
+			Quotes must always be used when defining a command as in the examples unless you pass '-'
+			as the expansion parameter and pipe your command to 'gh alias set'.
 		`),
 		Example: heredoc.Doc(`
 			$ gh alias set pv 'pr view'
@@ -70,19 +72,16 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			#=> gh issue list --label="epic" | grep "foo"
 
 			# users.txt contains multiline 'api graphql -F name="$1" ...' with mixed quotes
-			$ gh alias set users < users.txt
+			$ gh alias set users - < users.txt
 			$ gh users octocat
 			#=> gh api graphql -F name="octocat" ...
 		`),
-		Args: cobra.RangeArgs(1, 2),
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RootCmd = cmd.Root()
 
 			opts.Name = args[0]
-
-			if len(args) > 1 {
-				opts.Expansion = args[1]
-			}
+			opts.Expansion = args[1]
 
 			if runF != nil {
 				return runF(opts)
@@ -165,7 +164,7 @@ func validCommand(rootCmd *cobra.Command, expansion string) bool {
 }
 
 func getExpansion(opts *SetOptions) (string, error) {
-	if opts.Expansion == "" {
+	if opts.Expansion == "-" {
 		stdin, err := ioutil.ReadAll(opts.IO.In)
 		if err != nil {
 			return "", fmt.Errorf("failed to read from STDIN: %w", err)
