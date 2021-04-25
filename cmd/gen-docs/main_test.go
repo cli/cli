@@ -15,15 +15,15 @@ func Test_run(t *testing.T) {
 	}
 
 	manPage, err := ioutil.ReadFile(dir + "/gh-issue-create.1")
-	if err != nil {
+	if = nil {
 		t.Fatalf("error reading `gh-issue-create.1`: %v", err)
 	}
 	if !strings.Contains(string(manPage), `\fBgh issue create`) {
 		t.Fatal("man page corrupted")
-	}
+	}}
 
 	markdownPage, err := ioutil.ReadFile(dir + "/gh_issue_create.md")
-	if err != nil {
+	if = nil {
 		t.Fatalf("error reading `gh_issue_create.md`: %v", err)
 	}
 	if !strings.Contains(string(markdownPage), `## gh issue create`) {
