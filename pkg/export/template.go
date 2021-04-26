@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cli/cli/utils"
 	"github.com/mgutz/ansi"
@@ -37,8 +38,9 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 			return timeAgo(now.Sub(t)), nil
 		},
 
-		"pluck": templatePluck,
-		"join":  templateJoin,
+		"ellipsis": templateEllipsis,
+		"join":     templateJoin,
+		"pluck":    templatePluck,
 	}
 
 	if !colorEnabled {
@@ -94,6 +96,20 @@ func templateColor(colorName string, input interface{}) (string, error) {
 		return "", err
 	}
 	return ansi.Color(text, colorName), nil
+}
+
+func templateEllipsis(length int, input string) (string, error) {
+	const (
+		ellipsis    string = "..."
+		ellipsisLen int    = 3
+	)
+	if length < ellipsisLen {
+		return "", fmt.Errorf("length %d is less than ellipsis length %d", length, ellipsisLen)
+	}
+	if utf8.RuneCountInString(input) > length {
+		return input[:length-ellipsisLen] + ellipsis, nil
+	}
+	return input, nil
 }
 
 func templatePluck(field string, input []interface{}) []interface{} {
