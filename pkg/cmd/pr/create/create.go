@@ -106,7 +106,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
 			will automatically get closed when the pull request gets merged.
 
-			By default, users with write access to the base respository can push new commits to the
+			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
