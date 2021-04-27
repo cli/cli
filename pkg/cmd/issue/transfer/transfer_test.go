@@ -118,7 +118,7 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"hasIssuesEnabled": true,
-				"issue": { "id": "THE-ID", "number": 1234, "closed": true, "title": "The title of the issue"}
+				"issue": { "id": "THE-ID", "number": 1234, "title": "The title of the issue"}
 			} } }`))
 
 	http.Register(

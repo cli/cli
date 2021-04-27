@@ -26,7 +26,6 @@ type Issue struct {
 	Title          string
 	URL            string
 	State          string
-	Closed         bool
 	Body           string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -237,7 +236,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				id
 				title
 				state
-				closed
 				body
 				author {
 					login
