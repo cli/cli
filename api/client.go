@@ -194,8 +194,7 @@ func graphQLClient(h *http.Client, hostname string) *graphql.Client {
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
-	url := ghinstance.RESTPrefix(hostname) + p
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequest(method, restURL(hostname, p), body)
 	if err != nil {
 		return err
 	}
@@ -228,6 +227,13 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 	}
 
 	return nil
+}
+
+func restURL(hostname string, pathOrURL string) string {
+	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {
+		return pathOrURL
+	}
+	return ghinstance.RESTPrefix(hostname) + pathOrURL
 }
 
 func handleResponse(resp *http.Response, data interface{}) error {

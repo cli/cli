@@ -1,4 +1,4 @@
-package api
+package export
 
 import (
 	"bytes"
@@ -151,7 +151,7 @@ func Test_executeTemplate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := executeTemplate(w, tt.args.json, tt.args.template, tt.args.colorize); (err != nil) != tt.wantErr {
+			if err := ExecuteTemplate(w, tt.args.json, tt.args.template, tt.args.colorize); (err != nil) != tt.wantErr {
 				t.Errorf("executeTemplate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

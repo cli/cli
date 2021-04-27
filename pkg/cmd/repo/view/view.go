@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
-	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
 )
 
@@ -147,9 +146,9 @@ func viewRun(opts *ViewOptions) error {
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
 		{{.Description}}
-		
+
 		{{.Readme}}
-		
+
 		{{.View}}
 	`)
 
@@ -170,9 +169,8 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
-		readmeContent = emoji.Parse(readmeContent)
 	} else {
-		readmeContent = emoji.Parse(readme.Content)
+		readmeContent = readme.Content
 	}
 
 	description := repo.Description

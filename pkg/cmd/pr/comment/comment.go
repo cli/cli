@@ -28,6 +28,14 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd := &cobra.Command{
 		Use:   "comment [<number> | <url> | <branch>]",
 		Short: "Create a new pr comment",
+		Long: heredoc.Doc(`
+			Create a new pr comment.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
+
+			With '--web', comment on the pull request in a web browser instead.
+		`),
 		Example: heredoc.Doc(`
 			$ gh pr comment 22 --body "This looks great, lets get it deployed."
 		`),

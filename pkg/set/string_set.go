@@ -3,6 +3,7 @@ package set
 var exists = struct{}{}
 
 type stringSet struct {
+	v []string
 	m map[string]struct{}
 }
 
@@ -13,7 +14,11 @@ func NewStringSet() *stringSet {
 }
 
 func (s *stringSet) Add(value string) {
+	if s.Contains(value) {
+		return
+	}
 	s.m[value] = exists
+	s.v = append(s.v, value)
 }
 
 func (s *stringSet) AddValues(values []string) {
@@ -23,7 +28,25 @@ func (s *stringSet) AddValues(values []string) {
 }
 
 func (s *stringSet) Remove(value string) {
+	if !s.Contains(value) {
+		return
+	}
 	delete(s.m, value)
+	s.v = sliceWithout(s.v, value)
+}
+
+func sliceWithout(s []string, v string) []string {
+	idx := -1
+	for i, item := range s {
+		if item == v {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return s
+	}
+	return append(s[:idx], s[idx+1:]...)
 }
 
 func (s *stringSet) RemoveValues(values []string) {
@@ -37,10 +60,10 @@ func (s *stringSet) Contains(value string) bool {
 	return c
 }
 
+func (s *stringSet) Len() int {
+	return len(s.m)
+}
+
 func (s *stringSet) ToSlice() []string {
-	r := make([]string, 0, len(s.m))
-	for k := range s.m {
-		r = append(r, k)
-	}
-	return r
+	return s.v
 }

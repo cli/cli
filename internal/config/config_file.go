@@ -28,11 +28,11 @@ func ConfigDir() string {
 }
 
 func ConfigFile() string {
-	return path.Join(ConfigDir(), "config.yml")
+	return filepath.Join(ConfigDir(), "config.yml")
 }
 
 func HostsConfigFile() string {
-	return path.Join(ConfigDir(), "hosts.yml")
+	return filepath.Join(ConfigDir(), "hosts.yml")
 }
 
 func ParseDefaultConfig() (Config, error) {

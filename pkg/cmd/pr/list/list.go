@@ -29,12 +29,14 @@ type ListOptions struct {
 
 	WebMode      bool
 	LimitResults int
-	State        string
-	BaseBranch   string
-	Labels       []string
-	Author       string
-	Assignee     string
-	Search       string
+	Exporter     cmdutil.Exporter
+
+	State      string
+	BaseBranch string
+	Labels     []string
+	Author     string
+	Assignee   string
+	Search     string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -48,8 +50,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
+			List PRs authored by you
+			$ gh pr list --author @me
+
+			List PRs assigned to you
+			$ gh pr list --assignee @me
+
+			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
+
+			List PRs using search syntax
 			$ gh pr list --search "status:success review:required"
+
+			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -76,8 +89,20 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"state",
+	"url",
+	"headRefName",
+	"headRepositoryOwner",
+	"isCrossRepository",
+	"isDraft",
 }
 
 func listRun(opts *ListOptions) error {
@@ -99,6 +124,10 @@ func listRun(opts *ListOptions) error {
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
 		Search:     opts.Search,
+		Fields:     defaultFields,
+	}
+	if opts.Exporter != nil {
+		filters.Fields = opts.Exporter.Fields()
 	}
 
 	if opts.WebMode {
@@ -121,9 +150,14 @@ func listRun(opts *ListOptions) error {
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		data := api.ExportPRs(listResult.PullRequests, opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+	}
 
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())

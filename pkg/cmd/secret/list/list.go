@@ -3,7 +3,6 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -160,14 +159,8 @@ func getOrgSecrets(client *api.Client, host, orgName string) ([]*Secret, error) 
 		if secret.SelectedReposURL == "" {
 			continue
 		}
-		u, err := url.Parse(secret.SelectedReposURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
-		}
-
 		var result responseData
-		err = client.REST(u.Host, "GET", u.Path[1:], nil, &result)
-		if err != nil {
+		if err := client.REST(host, "GET", secret.SelectedReposURL, nil, &result); err != nil {
 			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
 		}
 		secret.NumSelectedRepos = result.TotalCount

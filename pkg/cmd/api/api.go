@@ -22,6 +22,7 @@ import (
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/export"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/jsoncolor"
 	"github.com/spf13/cobra"
@@ -76,8 +77,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s--raw-field%[1]s values in "key=value" format to add
-			JSON-encoded string parameters to the POST body.
+			Pass one or more %[1]s--raw-field%[1]s values in "key=value" format to add string 
+			parameters to the request payload. To add non-string parameters, see %[1]s--field%[1]s below. 
+			Note that adding request parameters will automatically switch the request method to POST. 
+			To send the parameters as a GET query string instead, use %[1]s--method%[1]s GET.
 
 			The %[1]s--field%[1]s flag behaves like %[1]s--raw-field%[1]s with magic type conversion based
 			on the format of the value:
@@ -100,22 +103,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
-
-			The %[1]s--jq%[1]s option accepts a query in jq syntax and will print only the resulting
-			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s,
-			but does not require the jq utility to be installed on the system. To learn more
-			about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
-
-			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
-			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
-
-			The following functions are available in templates:
-			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
-			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
-			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -370,13 +357,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.FilterOutput != "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = filterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = executeTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
+		err = export.ExecuteTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
 		if err != nil {
 			return
 		}
