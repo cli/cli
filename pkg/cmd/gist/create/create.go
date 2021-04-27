@@ -214,6 +214,10 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 			filename = path.Base(f)
 		}
 
+		if strings.TrimSpace(string(content)) == "" {
+			return nil, fmt.Errorf("Gist contents can't be empty")
+		}
+
 		fs[filename] = &shared.GistFile{
 			Content: string(content),
 		}
