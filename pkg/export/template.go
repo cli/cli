@@ -16,9 +16,13 @@ import (
 	"github.com/mgutz/ansi"
 )
 
-func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
+func parseTemplate(w io.Writer, tpl string, colorEnabled bool) (*template.Template, error) {
 	now := time.Now()
 
+	tableFormatter := &tableFormatter{
+		current: nil,
+		writer:  w,
+	}
 	templateFuncs := map[string]interface{}{
 		"color":     templateColor,
 		"autocolor": templateColor,
@@ -41,6 +45,10 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 		"ellipsis": templateEllipsis,
 		"join":     templateJoin,
 		"pluck":    templatePluck,
+
+		"table":    tableFormatter.Table,
+		"row":      tableFormatter.Row,
+		"endTable": tableFormatter.EndTable,
 	}
 
 	if !colorEnabled {
@@ -53,7 +61,7 @@ func parseTemplate(tpl string, colorEnabled bool) (*template.Template, error) {
 }
 
 func ExecuteTemplate(w io.Writer, input io.Reader, templateStr string, colorEnabled bool) error {
-	t, err := parseTemplate(templateStr, colorEnabled)
+	t, err := parseTemplate(w, templateStr, colorEnabled)
 	if err != nil {
 		return err
 	}

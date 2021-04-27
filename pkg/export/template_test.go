@@ -156,6 +156,19 @@ func Test_executeTemplate(t *testing.T) {
 			},
 			wantW: "bug\nfe...\nchore\n",
 		},
+		{
+			name: "table",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{"number": 1, "title": "One"},
+					{"number": 20, "title": "Twenty"},
+					{"number": 3000, "title": "Three thousand"}
+				]`)),
+				template: `{{table}}{{range .}}{{row (.number | printf "#%v") .title}}{{end}}{{endTable}}`,
+				colorize: false,
+			},
+			wantW: "#1    One\n#20   Twenty\n#3000 Three thousand\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
