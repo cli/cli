@@ -148,10 +148,10 @@ func Test_executeTemplate(t *testing.T) {
 			wantW: "bug\tfeature request\tchore",
 		},
 		{
-			name: "ellipsis",
+			name: "truncate",
 			args: args{
 				json:     strings.NewReader(`[ "bug", "feature request", "chore" ]`),
-				template: `{{range .}}{{. | ellipsis 5 | printf "%s\n"}}{{end}}`,
+				template: `{{range .}}{{. | truncate 5 | printf "%s\n"}}{{end}}`,
 				colorize: false,
 			},
 			wantW: "bug\nfe...\nchore\n",
@@ -169,6 +169,32 @@ func Test_executeTemplate(t *testing.T) {
 			},
 			wantW: "#1    One\n#20   Twenty\n#3000 Three thousand\n",
 		},
+		{
+			name: "table args with int padchar",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{"number": 1, "title": "One"},
+					{"number": 20, "title": "Twenty"},
+					{"number": 3000, "title": "Three thousand"}
+				]`)),
+				template: `{{table 8 2 2 '.'}}{{range .}}{{row (.number | printf "#%v") .title}}{{end}}{{endTable}}`,
+				colorize: false,
+			},
+			wantW: "#1......One\n#20.....Twenty\n#3000...Three thousand\n",
+		},
+		{
+			name: "table args with string padchar",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{"number": 1, "title": "One"},
+					{"number": 20, "title": "Twenty"},
+					{"number": 3000, "title": "Three thousand"}
+				]`)),
+				template: `{{table 8 2 2 "."}}{{range .}}{{row (.number | printf "#%v") .title}}{{end}}{{endTable}}`,
+				colorize: false,
+			},
+			wantW: "#1......One\n#20.....Twenty\n#3000...Three thousand\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -179,64 +205,6 @@ func Test_executeTemplate(t *testing.T) {
 			}
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("executeTemplate() = %q, want %q", gotW, tt.wantW)
-			}
-		})
-	}
-}
-
-func Test_templateEllipsis(t *testing.T) {
-	tests := []struct {
-		name    string
-		length  int
-		input   string
-		want    string
-		wantErr bool
-	}{
-		{
-			name:    "short",
-			length:  10,
-			input:   "ellipsis",
-			want:    "ellipsis",
-			wantErr: false,
-		},
-		{
-			name:    "exact",
-			length:  8,
-			input:   "ellipsis",
-			want:    "ellipsis",
-			wantErr: false,
-		},
-		{
-			name:    "long",
-			length:  7,
-			input:   "ellipsis",
-			want:    "elli...",
-			wantErr: false,
-		},
-		{
-			name:    "error",
-			length:  1,
-			input:   "ellipsis",
-			want:    "",
-			wantErr: true,
-		},
-		{
-			name:    "negative",
-			length:  -1,
-			input:   "ellipsis",
-			want:    "",
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := templateEllipsis(tt.length, tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ellipsis() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("ellipsis() = %v, want %v", got, tt.want)
 			}
 		})
 	}
