@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -497,7 +496,7 @@ func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 			return m.ID, nil
 		}
 	}
-	return "", errors.New("not found")
+	return "", fmt.Errorf("'%s' not found", title)
 }
 
 func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {

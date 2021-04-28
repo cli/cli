@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/context"
@@ -118,8 +117,10 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
+		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -156,8 +157,9 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -185,6 +187,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`projects:\t\n`,
 				`milestone:\t\n`,
 				`url:\thttps://github.com/OWNER/REPO/pull/12\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`number:\t12\n`,
 				`blueberries taste good`,
 			},
@@ -221,6 +225,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`assignees:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`reviewers:\tDEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
@@ -241,6 +247,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`labels:\tone, two, three, four, five\n`,
 				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
 				`milestone:\tuluru\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`blueberries taste good`,
 			},
 		},
@@ -260,6 +268,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`labels:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -279,6 +289,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`labels:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 			},
 		},
 		"Closed PR": {
@@ -296,6 +308,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -314,6 +328,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:\t\n`,
 				`projects:\t\n`,
 				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -333,6 +349,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:`,
 				`projects:`,
 				`milestone:`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -352,6 +370,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`reviewers:`,
 				`projects:`,
 				`milestone:`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -395,7 +415,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -409,7 +429,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
 				`Reviewers:.*1 \(.*Requested.*\)\n`,
 				`Assignees:.*marseilles, monaco\n`,
 				`Labels:.*one, two, three, four, five\n`,
@@ -442,7 +462,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open.*nobody wants to merge 8 commits into master from blueberries`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries.+100.-10`,
 				`Assignees:.*marseilles, monaco\n`,
 				`Labels:.*one, two, three, four, five\n`,
 				`Projects:.*Project 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\)\n`,
@@ -460,7 +480,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open.*nobody wants to merge 8 commits into master from blueberries`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
@@ -474,7 +494,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Open.*nobody wants to merge 8 commits into master from blueberries`,
+				`Open.*nobody wants to merge 8 commits into master from blueberries.+100.-10`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
 		},
@@ -487,7 +507,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Closed.*nobody wants to merge 12 commits into master from blueberries`,
+				`Closed.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -501,7 +521,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Merged.*nobody wants to merge 12 commits into master from blueberries`,
+				`Merged.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -515,7 +535,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork`,
-				`Draft.*nobody wants to merge 12 commits into master from blueberries`,
+				`Draft.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -529,7 +549,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are a good fruit`,
-				`Draft.*nobody wants to merge 8 commits into master from blueberries`,
+				`Draft.*nobody wants to merge 8 commits into master from blueberries.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/10`,
 			},
@@ -567,10 +587,6 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git config --get-regexp.+branch\\\.blueberries\\\.`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", url)
-	})
 
 	output, err := runCommand(http, "blueberries", true, "-w")
 	if err != nil {
@@ -579,6 +595,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", output.BrowsedURL)
 }
 
 func TestPRView_web_noResultsForBranch(t *testing.T) {
@@ -609,13 +626,8 @@ func TestPRView_web_numberArg(t *testing.T) {
 			} } } }`),
 	)
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
 
 	output, err := runCommand(http, "master", true, "-w 23")
 	if err != nil {
@@ -623,123 +635,7 @@ func TestPRView_web_numberArg(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_numberArgWithHash(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"url": "https://github.com/OWNER/REPO/pull/23"
-			} } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, `-w "#23"`)
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_urlArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"url": "https://github.com/OWNER/REPO/pull/23"
-			} } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w https://github.com/OWNER/REPO/pull/23/files")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_branchArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "headRefName": "blueberries",
-				  "isCrossRepository": false,
-				  "url": "https://github.com/OWNER/REPO/pull/23" }
-			] } } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w blueberries")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRView_web_branchWithOwnerArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "headRefName": "blueberries",
-				  "isCrossRepository": true,
-				  "headRepositoryOwner": { "login": "hubot" },
-				  "url": "https://github.com/hubot/REPO/pull/23" }
-			] } } } }`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/hubot/REPO/pull/23", url)
-	})
-
-	output, err := runCommand(http, "master", true, "-w hubot:blueberries")
-	if err != nil {
-		t.Errorf("error running command `pr view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/23", output.BrowsedURL)
 }
 
 func TestPRView_tty_Comments(t *testing.T) {

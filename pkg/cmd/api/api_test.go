@@ -7,9 +7,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -42,6 +47,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -60,6 +68,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -78,6 +89,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -96,6 +110,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: true,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -114,6 +131,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            true,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -132,6 +152,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              true,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -155,6 +178,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            true,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -178,6 +204,9 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
 		},
@@ -201,22 +230,96 @@ func Test_NewCmdApi(t *testing.T) {
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
 			},
 			wantsErr: false,
+		},
+		{
+			name: "with cache",
+			cli:  "user --cache 5m",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            time.Minute * 5,
+				Template:            "",
+				FilterOutput:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with template",
+			cli:  "user -t 'hello {{.name}}'",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "hello {{.name}}",
+				FilterOutput:        "",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with jq filter",
+			cli:  "user -q .name",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        ".name",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "--silent with --jq",
+			cli:      "user --silent -q .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "--silent with --template",
+			cli:      "user --silent -t '{{.foo}}'",
+			wantsErr: true,
+		},
+		{
+			name:     "--jq with --template",
+			cli:      "user --jq .foo -t '{{.foo}}'",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var opts *ApiOptions
 			cmd := NewCmdApi(f, func(o *ApiOptions) error {
-				assert.Equal(t, tt.wants.Hostname, o.Hostname)
-				assert.Equal(t, tt.wants.RequestMethod, o.RequestMethod)
-				assert.Equal(t, tt.wants.RequestMethodPassed, o.RequestMethodPassed)
-				assert.Equal(t, tt.wants.RequestPath, o.RequestPath)
-				assert.Equal(t, tt.wants.RequestInputFile, o.RequestInputFile)
-				assert.Equal(t, tt.wants.RawFields, o.RawFields)
-				assert.Equal(t, tt.wants.MagicFields, o.MagicFields)
-				assert.Equal(t, tt.wants.RequestHeaders, o.RequestHeaders)
-				assert.Equal(t, tt.wants.ShowResponseHeaders, o.ShowResponseHeaders)
+				opts = o
 				return nil
 			})
 
@@ -232,6 +335,21 @@ func Test_NewCmdApi(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.Hostname, opts.Hostname)
+			assert.Equal(t, tt.wants.RequestMethod, opts.RequestMethod)
+			assert.Equal(t, tt.wants.RequestMethodPassed, opts.RequestMethodPassed)
+			assert.Equal(t, tt.wants.RequestPath, opts.RequestPath)
+			assert.Equal(t, tt.wants.RequestInputFile, opts.RequestInputFile)
+			assert.Equal(t, tt.wants.RawFields, opts.RawFields)
+			assert.Equal(t, tt.wants.MagicFields, opts.MagicFields)
+			assert.Equal(t, tt.wants.RequestHeaders, opts.RequestHeaders)
+			assert.Equal(t, tt.wants.ShowResponseHeaders, opts.ShowResponseHeaders)
+			assert.Equal(t, tt.wants.Paginate, opts.Paginate)
+			assert.Equal(t, tt.wants.Silent, opts.Silent)
+			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
+			assert.Equal(t, tt.wants.Template, opts.Template)
+			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 		})
 	}
 }
@@ -357,6 +475,34 @@ func Test_apiRun(t *testing.T) {
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
 			stderr: ``,
 		},
+		{
+			name: "output template",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "not a cat",
+			stderr: ``,
+		},
+		{
+			name: "jq filter",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "Mona\nHubot\n",
+			stderr: ``,
+		},
 	}
 
 	for _, tt := range tests {
@@ -364,6 +510,7 @@ func Test_apiRun(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
 
 			tt.options.IO = io
+			tt.options.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			tt.options.HttpClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
@@ -425,6 +572,9 @@ func Test_apiRun_paginationREST(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 
 		RequestPath: "issues",
 		Paginate:    true,
@@ -484,6 +634,9 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 				return resp, nil
 			}
 			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
 		},
 
 		RequestMethod: "POST",
@@ -577,6 +730,9 @@ func Test_apiRun_inputFile(t *testing.T) {
 					}
 					return &http.Client{Transport: tr}, nil
 				},
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			err := apiRun(&options)
@@ -591,6 +747,45 @@ func Test_apiRun_inputFile(t *testing.T) {
 			assert.Equal(t, tt.inputContents, bodyBytes)
 		})
 	}
+}
+
+func Test_apiRun_cache(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	options := ApiOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				requestCount++
+				return &http.Response{
+					Request:    req,
+					StatusCode: 204,
+				}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestPath: "issues",
+		CacheTTL:    time.Minute,
+	}
+
+	t.Cleanup(func() {
+		cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
+		os.RemoveAll(cacheDir)
+	})
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+	err = apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, requestCount)
+	assert.Equal(t, "", stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
 }
 
 func Test_parseFields(t *testing.T) {
@@ -837,4 +1032,67 @@ func Test_fillPlaceholders(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_previewNamesToMIMETypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		previews []string
+		want     string
+	}{
+		{
+			name:     "single",
+			previews: []string{"nebula"},
+			want:     "application/vnd.github.nebula-preview+json",
+		},
+		{
+			name:     "multiple",
+			previews: []string{"nebula", "baptiste", "squirrel-girl"},
+			want:     "application/vnd.github.nebula-preview+json, application/vnd.github.baptiste-preview, application/vnd.github.squirrel-girl-preview",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := previewNamesToMIMETypes(tt.previews); got != tt.want {
+				t.Errorf("previewNamesToMIMETypes() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_processResponse_template(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	resp := http.Response{
+		StatusCode: 200,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body: ioutil.NopCloser(strings.NewReader(`[
+			{
+				"title": "First title",
+				"labels": [{"name":"bug"}, {"name":"help wanted"}]
+			},
+			{
+				"title": "Second but not last"
+			},
+			{
+				"title": "Alas, tis' the end",
+				"labels": [{}, {"name":"feature"}]
+			}
+		]`)),
+	}
+
+	_, err := processResponse(&resp, &ApiOptions{
+		IO:       io,
+		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
+	}, ioutil.Discard)
+	require.NoError(t, err)
+
+	assert.Equal(t, heredoc.Doc(`
+		First title (bug, help wanted)
+		Second but not last ()
+		Alas, tis' the end (, feature)
+	`), stdout.String())
+	assert.Equal(t, "", stderr.String())
 }

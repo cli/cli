@@ -17,14 +17,18 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
-	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
 )
+
+type browser interface {
+	Browse(string) error
+}
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	RepoArg string
 	Web     bool
@@ -36,6 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -106,7 +111,7 @@ func viewRun(opts *ViewOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	fullName := ghrepo.FullName(toView)
@@ -141,9 +146,9 @@ func viewRun(opts *ViewOptions) error {
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
 		{{.Description}}
-		
+
 		{{.Readme}}
-		
+
 		{{.View}}
 	`)
 
@@ -160,13 +165,12 @@ func viewRun(opts *ViewOptions) error {
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		readmeContent, err = markdown.Render(readme.Content, style, readme.BaseURL)
+		readmeContent, err = markdown.RenderWithBaseURL(readme.Content, style, readme.BaseURL)
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
-		readmeContent = emoji.Parse(readmeContent)
 	} else {
-		readmeContent = emoji.Parse(readme.Content)
+		readmeContent = readme.Content
 	}
 
 	description := repo.Description

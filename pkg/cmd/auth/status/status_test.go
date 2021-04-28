@@ -6,9 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -228,14 +226,6 @@ func Test_statusRun(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
-			origClientFromCfg := shared.ClientFromCfg
-			defer func() {
-				shared.ClientFromCfg = origClientFromCfg
-			}()
-			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
-				httpClient := &http.Client{Transport: reg}
-				return api.NewClientFromHTTP(httpClient), nil
-			}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}

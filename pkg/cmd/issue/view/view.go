@@ -20,14 +20,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	SelectorArg string
 	WebMode     bool
 	Comments    bool
+	Exporter    cmdutil.Exporter
 
 	Now func() time.Time
 }
@@ -36,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 		Now:        time.Now,
 	}
 
@@ -46,7 +53,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Display the title, body, and other information about an issue.
 
 			With '--web', open the issue in a web browser instead.
-    `),
+		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -65,6 +72,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
 }
@@ -86,7 +94,7 @@ func viewRun(opts *ViewOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	if opts.Comments {
@@ -106,6 +114,11 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		exportIssue := issue.ExportData(opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, exportIssue, opts.IO.ColorEnabled())
+	}
 
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts, issue)
@@ -186,7 +199,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(issue.Body, style, "")
+		md, err = markdown.Render(issue.Body, style)
 		if err != nil {
 			return err
 		}

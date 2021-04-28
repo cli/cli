@@ -8,9 +8,8 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/shared"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -300,13 +299,8 @@ func Test_loginRun_nontty(t *testing.T) {
 		tt.opts.IO = io
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := shared.ClientFromCfg
-			defer func() {
-				shared.ClientFromCfg = origClientFromCfg
-			}()
-			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
-				httpClient := &http.Client{Transport: reg}
-				return api.NewClientFromHTTP(httpClient), nil
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
 			}
 
 			old_GH_TOKEN := os.Getenv("GH_TOKEN")
@@ -327,6 +321,9 @@ func Test_loginRun_nontty(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
+
+			_, restoreRun := run.Stub()
+			defer restoreRun(t)
 
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
@@ -353,6 +350,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		opts       *LoginOptions
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
+		runStubs   func(*run.CommandStubber)
 		wantHosts  string
 		wantErrOut *regexp.Regexp
 		cfg        func(config.Config)
@@ -367,9 +365,9 @@ func Test_loginRun_Survey(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
+				// reg.Register(
+				// 	httpmock.GraphQL(`query UserCurrent\b`),
+				// 	httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(0)     // host type github.com
@@ -384,12 +382,21 @@ func Test_loginRun_Survey(t *testing.T) {
 				Hostname:    "rebecca.chambers",
 				Interactive: true,
 			},
-			wantHosts: "rebecca.chambers:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
+			wantHosts: heredoc.Doc(`
+				rebecca.chambers:
+				    oauth_token: def456
+				    user: jillv
+				    git_protocol: https
+			`),
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)        // auth mode: token
-				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
 				as.StubOne(false)    // cache credentials
+				as.StubOne(1)        // auth mode: token
+				as.StubOne("def456") // auth token
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -400,18 +407,27 @@ func Test_loginRun_Survey(t *testing.T) {
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://rebecca.chambers/settings/tokens"),
 		},
 		{
-			name:      "choose enterprise",
-			wantHosts: "brad.vickers:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
+			name: "choose enterprise",
+			wantHosts: heredoc.Doc(`
+				brad.vickers:
+				    oauth_token: def456
+				    user: jillv
+				    git_protocol: https
+			`),
 			opts: &LoginOptions{
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(1)              // host type enterprise
 				as.StubOne("brad.vickers") // hostname
-				as.StubOne(1)              // auth mode: token
-				as.StubOne("def456")       // auth token
 				as.StubOne("HTTPS")        // git_protocol
 				as.StubOne(false)          // cache credentials
+				as.StubOne(1)              // auth mode: token
+				as.StubOne("def456")       // auth token
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org,read:public_key"))
@@ -422,31 +438,46 @@ func Test_loginRun_Survey(t *testing.T) {
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://brad.vickers/settings/tokens"),
 		},
 		{
-			name:      "choose github.com",
-			wantHosts: "github.com:\n    oauth_token: def456\n    git_protocol: https\n    user: jillv\n",
+			name: "choose github.com",
+			wantHosts: heredoc.Doc(`
+				github.com:
+				    oauth_token: def456
+				    user: jillv
+				    git_protocol: https
+			`),
 			opts: &LoginOptions{
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(0)        // host type github.com
-				as.StubOne(1)        // auth mode: token
-				as.StubOne("def456") // auth token
 				as.StubOne("HTTPS")  // git_protocol
 				as.StubOne(false)    // cache credentials
+				as.StubOne(1)        // auth mode: token
+				as.StubOne("def456") // auth token
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
 		{
-			name:      "sets git_protocol",
-			wantHosts: "github.com:\n    oauth_token: def456\n    git_protocol: ssh\n    user: jillv\n",
+			name: "sets git_protocol",
+			wantHosts: heredoc.Doc(`
+				github.com:
+				    oauth_token: def456
+				    user: jillv
+				    git_protocol: ssh
+			`),
 			opts: &LoginOptions{
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(0)        // host type github.com
+				as.StubOne("SSH")    // git_protocol
+				as.StubOne(10)       // TODO: SSH key selection
 				as.StubOne(1)        // auth mode: token
 				as.StubOne("def456") // auth token
-				as.StubOne("SSH")    // git_protocol
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
@@ -476,13 +507,8 @@ func Test_loginRun_Survey(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			origClientFromCfg := shared.ClientFromCfg
-			defer func() {
-				shared.ClientFromCfg = origClientFromCfg
-			}()
-			shared.ClientFromCfg = func(_ string, _ config.Config) (*api.Client, error) {
-				httpClient := &http.Client{Transport: reg}
-				return api.NewClientFromHTTP(httpClient), nil
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
 			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
@@ -501,6 +527,12 @@ func Test_loginRun_Survey(t *testing.T) {
 			defer teardown()
 			if tt.askStubs != nil {
 				tt.askStubs(as)
+			}
+
+			rs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.runStubs != nil {
+				tt.runStubs(rs)
 			}
 
 			err := loginRun(tt.opts)

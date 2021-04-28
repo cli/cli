@@ -46,7 +46,7 @@ func Test_listURLWithQuery(t *testing.T) {
 					Mention:    "nu",
 				},
 			},
-			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+base%3Atrunk+mentions%3Anu",
+			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+mentions%3Anu+base%3Atrunk",
 			wantErr: false,
 		},
 		{

@@ -9,7 +9,6 @@ import (
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +19,10 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		EditSurvey:            prShared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: prShared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:   prShared.CommentableConfirmSubmitSurvey,
-		OpenInBrowser:         utils.OpenInBrowser,
+		OpenInBrowser:         f.Browser.Browse,
 	}
+
+	var bodyFile string
 
 	cmd := &cobra.Command{
 		Use:   "comment {<number> | <url>}",
@@ -35,6 +36,14 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 			return prShared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
+			if bodyFile != "" {
+				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+				if err != nil {
+					return err
+				}
+				opts.Body = string(b)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -43,6 +52,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	}
 
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().BoolP("editor", "e", false, "Add body using editor")
 	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
 

@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -48,12 +50,6 @@ func TestNewCmdSet(t *testing.T) {
 		{
 			name:     "multiple names",
 			cli:      "cool_secret good_secret",
-			wantsErr: true,
-		},
-		{
-			name:     "no body, stdin is terminal",
-			cli:      "cool_secret",
-			stdinTTY: true,
 			wantsErr: true,
 		},
 		{
@@ -183,6 +179,7 @@ func Test_setRun_repo(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
+		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
@@ -259,6 +256,9 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+			tt.opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
 			tt.opts.IO = io
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
@@ -320,4 +320,22 @@ func Test_getBody(t *testing.T) {
 			assert.Equal(t, string(body), tt.want)
 		})
 	}
+}
+
+func Test_getBodyPrompt(t *testing.T) {
+	io, _, _, _ := iostreams.Test()
+
+	io.SetStdinTTY(true)
+	io.SetStdoutTTY(true)
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	as.StubOne("cool secret")
+
+	body, err := getBody(&SetOptions{
+		IO: io,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, string(body), "cool secret")
 }

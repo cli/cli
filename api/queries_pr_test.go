@@ -52,7 +52,7 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 	tests := []struct {
 		name           string
 		hostname       string
-		queryResponse  string
+		queryResponse  map[string]string
 		wantPrFeatures pullRequestFeature
 		wantErr        bool
 	}{
@@ -60,58 +60,80 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    true,
-				HasStatusCheckRollup: true,
+				HasReviewDecision:       true,
+				HasStatusCheckRollup:    true,
+				HasBranchProtectionRule: true,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE empty response",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {}}
-			`),
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`:  `{"data": {}}`,
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    false,
-				HasStatusCheckRollup: false,
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE has reviewDecision",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {
-				"PullRequest": {
-					"fields": [
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
 						{"name": "foo"},
 						{"name": "reviewDecision"}
-					]
-				}
-			} }
-			`),
+					] } } }
+				`),
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    true,
-				HasStatusCheckRollup: false,
+				HasReviewDecision:       true,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE has statusCheckRollup",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {
-				"Commit": {
-					"fields": [
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "Commit": { "fields": [
 						{"name": "foo"},
 						{"name": "statusCheckRollup"}
-					]
-				}
-			} }
-			`),
+					] } } }
+				`),
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    false,
-				HasStatusCheckRollup: true,
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    true,
+				HasBranchProtectionRule: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has branchProtectionRule",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: `{"data": {}}`,
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+					{ "data": { "Ref": { "fields": [
+						{"name": "foo"},
+						{"name": "branchProtectionRule"}
+					] } } }
+				`),
+			},
+			wantPrFeatures: pullRequestFeature{
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: true,
 			},
 			wantErr: false,
 		},
@@ -121,10 +143,8 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 			fakeHTTP := &httpmock.Registry{}
 			httpClient := NewHTTPClient(ReplaceTripper(fakeHTTP))
 
-			if tt.queryResponse != "" {
-				fakeHTTP.Register(
-					httpmock.GraphQL(`query PullRequest_fields\b`),
-					httpmock.StringResponse(tt.queryResponse))
+			for query, resp := range tt.queryResponse {
+				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 
 			gotPrFeatures, err := determinePullRequestFeatures(httpClient, tt.hostname)

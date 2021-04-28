@@ -50,3 +50,38 @@ func Test_GetGistIDFromURL(t *testing.T) {
 		})
 	}
 }
+
+func TestIsBinaryContents(t *testing.T) {
+	tests := []struct {
+		fileContent []byte
+		want        bool
+	}{
+		{
+			want:        false,
+			fileContent: []byte("package main"),
+		},
+		{
+			want:        false,
+			fileContent: []byte(""),
+		},
+		{
+			want:        false,
+			fileContent: []byte(nil),
+		},
+		{
+			want: true,
+			fileContent: []byte{239, 191, 189, 239, 191, 189, 239, 191, 189, 239,
+				191, 189, 239, 191, 189, 16, 74, 70, 73, 70, 239, 191, 189, 1, 1, 1,
+				1, 44, 1, 44, 239, 191, 189, 239, 191, 189, 239, 191, 189, 239, 191,
+				189, 239, 191, 189, 67, 239, 191, 189, 8, 6, 6, 7, 6, 5, 8, 7, 7, 7,
+				9, 9, 8, 10, 12, 20, 10, 12, 11, 11, 12, 25, 18, 19, 15, 20, 29, 26,
+				31, 30, 29, 26, 28, 28, 32, 36, 46, 39, 32, 34, 44, 35, 28, 28, 40,
+				55, 41, 44, 48, 49, 52, 52, 52, 31, 39, 57, 61, 56, 50, 60, 46, 51,
+				52, 50, 239, 191, 189, 239, 191, 189, 239, 191, 189, 67, 1, 9, 9, 9, 12},
+		},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+	}
+}

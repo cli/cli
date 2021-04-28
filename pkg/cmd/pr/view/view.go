@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -21,13 +22,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
+	Browser    browser
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
+
+	Exporter cmdutil.Exporter
 
 	SelectorArg string
 	BrowserMode bool
@@ -41,6 +49,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -53,7 +62,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			is displayed.
 
 			With '--web', open the pull request in a web browser instead.
-    	`),
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -76,6 +85,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -95,7 +105,7 @@ func viewRun(opts *ViewOptions) error {
 		if connectedToTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -105,6 +115,11 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		exportPR := pr.ExportData(opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, exportPR, opts.IO.ColorEnabled())
+	}
 
 	if connectedToTerminal {
 		return printHumanPrPreview(opts, pr)
@@ -137,6 +152,8 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
 	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
+	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
+	fmt.Fprintf(out, "deletions:\t%s\n", cs.Red(strconv.Itoa(pr.Deletions)))
 
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, pr.Body)
@@ -151,12 +168,14 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintln(out, cs.Bold(pr.Title))
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s\n",
+		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
+		cs.Green("+"+strconv.Itoa(pr.Additions)),
+		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
 
 	// Reactions
@@ -194,7 +213,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(pr.Body, style, "")
+		md, err = markdown.Render(pr.Body, style)
 		if err != nil {
 			return err
 		}

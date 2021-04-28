@@ -3,6 +3,8 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -17,13 +19,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
-	WebMode bool
+	WebMode  bool
+	Exporter cmdutil.Exporter
 
 	Assignee     string
 	Labels       []string
@@ -32,6 +40,7 @@ type ListOptions struct {
 	Author       string
 	Mention      string
 	Milestone    string
+	Search       string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -39,17 +48,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter issues in this repository",
 		Example: heredoc.Doc(`
-			$ gh issue list -l "help wanted"
+			$ gh issue list -l "bug" -l "help wanted"
 			$ gh issue list -A monalisa
 			$ gh issue list -a @me
 			$ gh issue list --web
-			$ gh issue list --milestone 'MVP'
+			$ gh issue list --milestone "The big 1.0"
+			$ gh issue list --search "error no:assignee sort:created-asc"
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,8 +86,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"url",
+	"state",
+	"updatedAt",
+	"labels",
 }
 
 func listRun(opts *ListOptions) error {
@@ -84,50 +106,44 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	isTerminal := opts.IO.IsStdoutTTY()
+	filterOptions := prShared.FilterOptions{
+		Entity:    "issue",
+		State:     strings.ToLower(opts.State),
+		Assignee:  opts.Assignee,
+		Labels:    opts.Labels,
+		Author:    opts.Author,
+		Mention:   opts.Mention,
+		Milestone: opts.Milestone,
+		Search:    opts.Search,
+		Fields:    defaultFields,
+	}
 
-	meReplacer := shared.NewMeReplacer(apiClient, baseRepo.RepoHost())
-	filterAssignee, err := meReplacer.Replace(opts.Assignee)
-	if err != nil {
-		return err
-	}
-	filterAuthor, err := meReplacer.Replace(opts.Author)
-	if err != nil {
-		return err
-	}
-	filterMention, err := meReplacer.Replace(opts.Mention)
-	if err != nil {
-		return err
-	}
+	isTerminal := opts.IO.IsStdoutTTY()
 
 	if opts.WebMode {
 		issueListURL := ghrepo.GenerateRepoURL(baseRepo, "issues")
-		openURL, err := prShared.ListURLWithQuery(issueListURL, prShared.FilterOptions{
-			Entity:    "issue",
-			State:     opts.State,
-			Assignee:  filterAssignee,
-			Labels:    opts.Labels,
-			Author:    filterAuthor,
-			Mention:   filterMention,
-			Milestone: opts.Milestone,
-		})
+		openURL, err := prShared.ListURLWithQuery(issueListURL, filterOptions)
 		if err != nil {
 			return err
 		}
+
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
-	listResult, err := api.IssueList(apiClient, baseRepo, opts.State, opts.Labels, filterAssignee, opts.LimitResults, filterAuthor, filterMention, opts.Milestone)
+	if opts.Exporter != nil {
+		filterOptions.Fields = opts.Exporter.Fields()
+	}
+
+	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
 	if err != nil {
 		return err
 	}
@@ -138,13 +154,50 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		data := api.ExportIssues(listResult.Issues, opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+	}
+
 	if isTerminal {
-		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.Assignee != "" || opts.Author != "" || opts.Mention != "" || opts.Milestone != ""
-		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, hasFilters)
+		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)
 
 	return nil
+}
+
+func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
+	apiClient := api.NewClientFromHTTP(client)
+
+	if filters.Search != "" || len(filters.Labels) > 0 {
+		if milestoneNumber, err := strconv.ParseInt(filters.Milestone, 10, 32); err == nil {
+			milestone, err := api.MilestoneByNumber(apiClient, repo, int32(milestoneNumber))
+			if err != nil {
+				return nil, err
+			}
+			filters.Milestone = milestone.Title
+		}
+
+		return searchIssues(apiClient, repo, filters, limit)
+	}
+
+	var err error
+	meReplacer := shared.NewMeReplacer(apiClient, repo.RepoHost())
+	filters.Assignee, err = meReplacer.Replace(filters.Assignee)
+	if err != nil {
+		return nil, err
+	}
+	filters.Author, err = meReplacer.Replace(filters.Author)
+	if err != nil {
+		return nil, err
+	}
+	filters.Mention, err = meReplacer.Replace(filters.Mention)
+	if err != nil {
+		return nil, err
+	}
+
+	return listIssues(apiClient, repo, filters, limit)
 }

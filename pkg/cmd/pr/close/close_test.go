@@ -67,7 +67,7 @@ func TestPrClose(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "id": "THE-ID", "number": 96, "title": "The title of the PR" }
+				"pullRequest": { "id": "THE-ID", "number": 96, "title": "The title of the PR", "state": "OPEN" }
 			} } }`),
 	)
 	http.Register(
@@ -98,7 +98,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
-				"pullRequest": { "number": 101, "title": "The title of the PR", "closed": true }
+				"pullRequest": { "number": 101, "title": "The title of the PR", "state": "CLOSED" }
 			} } }`),
 	)
 
@@ -121,8 +121,13 @@ func TestPrClose_deleteBranch(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query PullRequestByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"pullRequest": { "id": "THE-ID", "number": 96, "title": "The title of the PR", "headRefName":"blueberries", "headRepositoryOwner": {"login": "OWNER"}}
+			{ "data": { "repository": { "pullRequest": {
+				"id": "THE-ID",
+				"number": 96, 
+				"title": "The title of the PR", 
+				"headRefName":"blueberries", 
+				"headRepositoryOwner": {"login": "OWNER"},
+				"state": "OPEN" }
 			} } }`),
 	)
 	http.Register(

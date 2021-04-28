@@ -15,13 +15,17 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
+
+type browser interface {
+	Browse(string) error
+}
 
 type CreateOptions struct {
 	IO *iostreams.IOStreams
@@ -30,16 +34,19 @@ type CreateOptions struct {
 	Public           bool
 	Filenames        []string
 	FilenameOverride string
+	WebMode          bool
 
-	WebMode bool
-
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	Browser    browser
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := CreateOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -50,22 +57,22 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Gists can be created from one or multiple files. Alternatively, pass "-" as
 			file name to read from standard input.
-			
+
 			By default, gists are private; use '--public' to make publicly listed ones.
 		`),
 		Example: heredoc.Doc(`
 			# publish file 'hello.py' as a public gist
 			$ gh gist create --public hello.py
-			
+
 			# create a gist with a description
 			$ gh gist create hello.py -d "my Hello-World program in Python"
 
 			# create a gist containing several files
 			$ gh gist create hello.py world.py cool.txt
-			
+
 			# read from standard input to create a gist
 			$ gh gist create -
-			
+
 			# create a gist from output piped from another command
 			$ cat cool.txt | gh gist create
 		`),
@@ -129,7 +136,17 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	gist, err := createGist(httpClient, ghinstance.OverridableDefault(), opts.Description, opts.Public, files)
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
@@ -145,7 +162,7 @@ func createRun(opts *CreateOptions) error {
 	if opts.WebMode {
 		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
 
-		return utils.OpenInBrowser(gist.HTMLURL)
+		return opts.Browser.Browse(gist.HTMLURL)
 	}
 
 	fmt.Fprintln(opts.IO.Out, gist.HTMLURL)
@@ -164,6 +181,7 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 		var filename string
 		var content []byte
 		var err error
+
 		if f == "-" {
 			if filenameOverride != "" {
 				filename = filenameOverride
@@ -175,11 +193,24 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 				return fs, fmt.Errorf("failed to read from stdin: %w", err)
 			}
 			stdin.Close()
+
+			if shared.IsBinaryContents(content) {
+				return nil, fmt.Errorf("binary file contents not supported")
+			}
 		} else {
+			isBinary, err := shared.IsBinaryFile(f)
+			if err != nil {
+				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
+			}
+			if isBinary {
+				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
+			}
+
 			content, err = ioutil.ReadFile(f)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
+
 			filename = path.Base(f)
 		}
 

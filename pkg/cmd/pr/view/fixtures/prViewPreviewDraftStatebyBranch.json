@@ -14,6 +14,8 @@
             "headRepositoryOwner": {
               "login": "hubot"
             },
+            "additions": 100,
+            "deletions": 10,
             "commits": {
               "totalCount": 12
             },
@@ -37,6 +39,8 @@
             "headRepositoryOwner": {
               "login": "OWNER"
             },
+            "additions": 100,
+            "deletions": 10,
             "commits": {
               "totalCount": 8
             },

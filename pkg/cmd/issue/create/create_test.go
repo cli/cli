@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,7 +23,267 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdCreate(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		tty       bool
+		stdin     string
+		cli       string
+		wantsErr  bool
+		wantsOpts CreateOptions
+	}{
+		{
+			name:     "empty non-tty",
+			tty:      false,
+			cli:      "",
+			wantsErr: true,
+		},
+		{
+			name:     "only title non-tty",
+			tty:      false,
+			cli:      "-t mytitle",
+			wantsErr: true,
+		},
+		{
+			name:     "empty tty",
+			tty:      true,
+			cli:      "",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: true,
+			},
+		},
+		{
+			name:     "body from stdin",
+			tty:      false,
+			stdin:    "this is on standard input",
+			cli:      "-t mytitle -F -",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "this is on standard input",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "body from file",
+			tty:      false,
+			cli:      fmt.Sprintf("-t mytitle -F '%s'", tmpFile),
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "a body from file",
+				RecoverFile: "",
+				WebMode:     false,
+				Interactive: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, stdout, stderr := iostreams.Test()
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			} else if tt.tty {
+				io.SetStdinTTY(true)
+				io.SetStdoutTTY(true)
+			}
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *CreateOptions
+			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+				opts = o
+				return nil
+			})
+
+			args, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+			cmd.SetArgs(args)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
+
+			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
+			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
+			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
+			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
+		})
+	}
+}
+
+func Test_createRun(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        CreateOptions
+		httpStubs   func(*httpmock.Registry)
+		wantsStdout string
+		wantsStderr string
+		wantsBrowse string
+		wantsErr    string
+	}{
+		{
+			name: "no args",
+			opts: CreateOptions{
+				WebMode: true,
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+		},
+		{
+			name: "title and body",
+			opts: CreateOptions{
+				WebMode: true,
+				Title:   "myissue",
+				Body:    "hello cli",
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=hello+cli&title=myissue",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+		},
+		{
+			name: "assignee",
+			opts: CreateOptions{
+				WebMode:   true,
+				Assignees: []string{"monalisa"},
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+		},
+		{
+			name: "@me",
+			opts: CreateOptions{
+				WebMode:   true,
+				Assignees: []string{"@me"},
+			},
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`
+					{ "data": {
+						"viewer": { "login": "MonaLisa" }
+					} }`))
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+		},
+		{
+			name: "project",
+			opts: CreateOptions{
+				WebMode:  true,
+				Projects: []string{"cleanup"},
+			},
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "projects": {
+						"nodes": [
+							{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "projects": {
+						"nodes": [
+							{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+		},
+		{
+			name: "has templates",
+			opts: CreateOptions{
+				WebMode: true,
+			},
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueTemplates\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTemplates": [
+						{ "name": "Bug report",
+							"body": "Does not work :((" },
+						{ "name": "Submit a request",
+							"body": "I have a suggestion for an enhancement" }
+					] } } }`),
+				)
+			},
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new/choose",
+			wantsStderr: "Opening github.com/OWNER/REPO/issues/new/choose in your browser.\n",
+		},
+		{
+			name: "too long body",
+			opts: CreateOptions{
+				WebMode: true,
+				Body:    strings.Repeat("A", 9216),
+			},
+			wantsErr: "cannot open in browser: maximum URL length exceeded",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(httpReg)
+			}
+
+			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdoutTTY(true)
+			opts := &tt.opts
+			opts.IO = io
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: httpReg}, nil
+			}
+			opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+			browser := &cmdutil.TestBrowser{}
+			opts.Browser = browser
+
+			err := createRun(opts)
+			if tt.wantsErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsErr)
+				return
+			}
+
+			assert.Equal(t, tt.wantsStdout, stdout.String())
+			assert.Equal(t, tt.wantsStderr, stderr.String())
+			browser.Verify(t, tt.wantsBrowse)
+		})
+	}
+}
+
+/*** LEGACY TESTS ***/
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
@@ -34,6 +295,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
@@ -45,6 +307,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
+		Browser: browser,
 	}
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
@@ -64,17 +327,10 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
-}
-
-func TestIssueCreate_nontty_error(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, false, `-t hello`)
-	assert.EqualError(t, err, "must provide --title and --body when not running interactively")
 }
 
 func TestIssueCreate(t *testing.T) {
@@ -204,6 +460,16 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			} } }`),
 	)
 	http.Register(
+		httpmock.GraphQL(`query IssueTemplates\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "issueTemplates": [
+				{ "name": "Bug report",
+				  "body": "Does not work :((" },
+				{ "name": "Submit a request",
+				  "body": "I have a suggestion for an enhancement" }
+			] } } }`),
+	)
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 			{ "data": { "createIssue": { "issue": {
@@ -220,12 +486,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	defer teardown()
 
 	// template
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "index",
-			Value: 1,
-		},
-	})
+	as.StubOne(1)
 	// body
 	as.Stub([]*prompt.QuestionStub{
 		{
@@ -247,6 +508,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	}
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+	assert.Equal(t, "", output.BrowsedURL)
 }
 
 func TestIssueCreate_continueInBrowser(t *testing.T) {
@@ -280,14 +542,8 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 		},
 	})
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", url)
-	})
 
 	output, err := runCommand(http, true, `-b body`)
 	if err != nil {
@@ -301,6 +557,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 		Opening github.com/OWNER/REPO/issues/new in your browser.
 	`), output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", output.BrowsedURL)
 }
 
 func TestIssueCreate_metadata(t *testing.T) {
@@ -400,90 +657,6 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 	}
 }
 
-func TestIssueCreate_web(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`
-		{ "data": {
-			"viewer": { "login": "MonaLisa" }
-		} }
-		`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa", url)
-	})
-
-	output, err := runCommand(http, true, `--web -a @me`)
-	if err != nil {
-		t.Errorf("error running command `issue create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
-}
-
-func TestIssueCreate_webTitleBody(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=mybody&title=mytitle", url)
-	})
-
-	output, err := runCommand(http, true, `-w -t mytitle -b mybody`)
-	if err != nil {
-		t.Errorf("error running command `issue create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
-}
-
-func TestIssueCreate_webTitleBodyAtMeAssignee(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`
-		{ "data": {
-			"viewer": { "login": "MonaLisa" }
-		} }
-		`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=mybody&title=mytitle", url)
-	})
-
-	output, err := runCommand(http, true, `-w -t mytitle -b mybody -a @me`)
-	if err != nil {
-		t.Errorf("error running command `issue create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
-}
-
 func TestIssueCreate_AtMeAssignee(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
@@ -535,47 +708,4 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 	}
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
-}
-
-func TestIssueCreate_webProject(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query RepositoryProjectList\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "projects": {
-				"nodes": [
-					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
-	http.Register(
-		httpmock.GraphQL(`query OrganizationProjectList\b`),
-		httpmock.StringResponse(`
-			{ "data": { "organization": { "projects": {
-				"nodes": [
-					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1&title=Title", url)
-	})
-
-	output, err := runCommand(http, true, `-w -t Title -p Cleanup`)
-	if err != nil {
-		t.Errorf("error running command `issue create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/new in your browser.\n", output.Stderr())
 }

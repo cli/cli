@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -171,6 +172,7 @@ func Test_createRun(t *testing.T) {
 		wantStderr string
 		wantParams map[string]interface{}
 		wantErr    bool
+		wantBrowse string
 	}{
 		{
 			name: "public",
@@ -264,6 +266,7 @@ func Test_createRun(t *testing.T) {
 			wantOut:    "Opening gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
 			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
 			wantErr:    false,
+			wantBrowse: "https://gist.github.com/aa5a315d61ae9438b18d",
 			wantParams: map[string]interface{}{
 				"description": "",
 				"updated_at":  "0001-01-01T00:00:00Z",
@@ -288,14 +291,18 @@ func Test_createRun(t *testing.T) {
 		}
 		tt.opts.HttpClient = mockClient
 
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+
 		io, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
 
-		cs, teardown := run.Stub()
+		browser := &cmdutil.TestBrowser{}
+		tt.opts.Browser = browser
+
+		_, teardown := run.Stub()
 		defer teardown(t)
-		if tt.opts.WebMode {
-			cs.Register(`https://gist\.github\.com/aa5a315d61ae9438b18d$`, 0, "")
-		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			stdin.WriteString(tt.stdin)
@@ -313,6 +320,7 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantParams, reqBody)
 			reg.Verify(t)
+			browser.Verify(t, tt.wantBrowse)
 		})
 	}
 }
@@ -339,7 +347,10 @@ func Test_CreateRun_reauth(t *testing.T) {
 	opts := &CreateOptions{
 		IO:         io,
 		HttpClient: mockClient,
-		Filenames:  []string{fixtureFile},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		Filenames: []string{fixtureFile},
 	}
 
 	err := createRun(opts)
