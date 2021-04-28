@@ -6,6 +6,12 @@ import (
 )
 
 var HelpTopics = map[string]map[string]string{
+	"mintty": {
+		"short": "Information about using gh with MinTTY",
+		"long": heredoc.Doc(`
+			TODO
+		`),
+	},
 	"environment": {
 		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
