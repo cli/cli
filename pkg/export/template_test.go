@@ -170,6 +170,19 @@ func Test_executeTemplate(t *testing.T) {
 			wantW: "#1    One\n#20   Twenty\n#3000 Three thousand\n",
 		},
 		{
+			name: "table with mixed value types",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{"number": 1, "title": null},
+					{"number": 20.1, "title": "Twenty-ish", "float": true},
+					{"number": 3000, "title": "Three thousand", "float": false}
+				]`)),
+				template: `{{table}}{{range .}}{{row .number .title .float}}{{end}}{{endTable}}`,
+				colorize: false,
+			},
+			wantW: "1                    \n20.10 Twenty-ish     true\n3000  Three thousand false\n",
+		},
+		{
 			name: "table args with int padchar",
 			args: args{
 				json: strings.NewReader(heredoc.Doc(`[

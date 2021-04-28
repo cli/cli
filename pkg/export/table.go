@@ -56,12 +56,20 @@ func (f *tableFormatter) Table(args ...interface{}) (string, error) {
 	return "", nil
 }
 
-// Write a row of string fields. Formatting must be performed before passing to Row.
-func (f *tableFormatter) Row(fields ...string) (string, error) {
+// Write a row of string fields.
+func (f *tableFormatter) Row(fields ...interface{}) (string, error) {
 	if f.current == nil {
 		return "", fmt.Errorf("no current table. use '{{table}}' to start a table")
 	}
-	row := strings.Join(fields, "\t")
+	stringFields := make([]string, len(fields))
+	for i, e := range fields {
+		s, err := jsonScalarToString(e)
+		if err != nil {
+			return "", fmt.Errorf("failed to write row: %v", err)
+		}
+		stringFields[i] = s
+	}
+	row := strings.Join(stringFields, "\t")
 	if _, err := f.current.tabwriter.Write([]byte(row + "\n")); err != nil {
 		return "", fmt.Errorf("failed to write row: %v", err)
 	}
