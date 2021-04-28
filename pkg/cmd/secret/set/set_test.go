@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,12 +50,6 @@ func TestNewCmdSet(t *testing.T) {
 		{
 			name:     "multiple names",
 			cli:      "cool_secret good_secret",
-			wantsErr: true,
-		},
-		{
-			name:     "no body, stdin is terminal",
-			cli:      "cool_secret",
-			stdinTTY: true,
 			wantsErr: true,
 		},
 		{
@@ -325,4 +320,22 @@ func Test_getBody(t *testing.T) {
 			assert.Equal(t, string(body), tt.want)
 		})
 	}
+}
+
+func Test_getBodyPrompt(t *testing.T) {
+	io, _, _, _ := iostreams.Test()
+
+	io.SetStdinTTY(true)
+	io.SetStdoutTTY(true)
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	as.StubOne("cool secret")
+
+	body, err := getBody(&SetOptions{
+		IO: io,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, string(body), "cool secret")
 }
