@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -15,9 +13,9 @@ import (
 
 type ReopenOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
+
+	Finder shared.PRFinder
 
 	SelectorArg string
 }
@@ -26,7 +24,6 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 	opts := &ReopenOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -34,8 +31,7 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 		Short: "Reopen a pull request",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
@@ -54,13 +50,10 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 func reopenRun(opts *ReopenOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, nil, nil, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -74,6 +67,12 @@ func reopenRun(opts *ReopenOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", cs.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	err = api.PullRequestReopen(apiClient, baseRepo, pr)
 	if err != nil {

@@ -24,6 +24,8 @@ type ReadyOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
+	Finder shared.PRFinder
+
 	SelectorArg string
 }
 
@@ -47,8 +49,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
@@ -71,13 +72,10 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 func readyRun(opts *ReadyOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -89,6 +87,12 @@ func readyRun(opts *ReadyOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.Yellow("!"), pr.Number)
 		return nil
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	err = api.PullRequestReady(apiClient, baseRepo, pr)
 	if err != nil {

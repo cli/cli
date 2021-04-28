@@ -4,13 +4,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
 )
 
-func TestPRFromArgs(t *testing.T) {
+func TestFind(t *testing.T) {
 	type args struct {
 		baseRepoFn func() (ghrepo.Interface, error)
 		branchFn   func() (string, error)
@@ -69,12 +68,6 @@ func TestPRFromArgs(t *testing.T) {
 			},
 			httpStub: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query PullRequest_fields\b`),
-					httpmock.StringResponse(`{"data":{}}`))
-				r.Register(
-					httpmock.GraphQL(`query PullRequest_fields2\b`),
-					httpmock.StringResponse(`{"data":{}}`))
-				r.Register(
 					httpmock.GraphQL(`query PullRequestByNumber\b`),
 					httpmock.StringResponse(`{"data":{"repository":{
 						"pullRequest":{"number":13}
@@ -87,17 +80,30 @@ func TestPRFromArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			if tt.httpStub != nil {
 				tt.httpStub(reg)
 			}
-			httpClient := &http.Client{Transport: reg}
-			pr, repo, err := PRFromArgs(api.NewClientFromHTTP(httpClient), tt.args.baseRepoFn, tt.args.branchFn, tt.args.remotesFn, tt.args.selector)
+
+			f := finder{
+				httpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				baseRepoFn: tt.args.baseRepoFn,
+				branchFn:   tt.args.branchFn,
+				remotesFn:  tt.args.remotesFn,
+			}
+
+			pr, repo, err := f.Find(FindOptions{
+				Selector: tt.args.selector,
+			})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("IssueFromArg() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Find() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if pr.Number != tt.wantPR {
-				t.Errorf("want issue #%d, got #%d", tt.wantPR, pr.Number)
+				t.Errorf("want pr #%d, got #%d", tt.wantPR, pr.Number)
 			}
 			repoURL := ghrepo.GenerateRepoURL(repo, "")
 			if repoURL != tt.wantRepo {

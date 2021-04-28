@@ -98,6 +98,10 @@ type IssuesDisabledError struct {
 	error
 }
 
+type Owner struct {
+	Login string `json:"login"`
+}
+
 type Author struct {
 	Login string `json:"login"`
 }

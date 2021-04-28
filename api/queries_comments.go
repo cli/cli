@@ -135,24 +135,6 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 	return mutation.AddComment.CommentEdge.Node.URL, nil
 }
 
-func commentsFragment() string {
-	return `comments(last: 1) {
-						nodes {
-							author {
-								login
-							}
-							authorAssociation
-							body
-							createdAt
-							includesCreatedEdit
-							isMinimized
-							minimizedReason
-							` + reactionGroupsFragment() + `
-						}
-						totalCount
-					}`
-}
-
 func (c Comment) AuthorLogin() string {
 	return c.Author.Login
 }

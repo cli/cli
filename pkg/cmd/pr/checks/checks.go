@@ -3,13 +3,10 @@ package checks
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -23,26 +20,19 @@ type browser interface {
 }
 
 type ChecksOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Browser    browser
-	BaseRepo   func() (ghrepo.Interface, error)
-	Branch     func() (string, error)
-	Remotes    func() (context.Remotes, error)
+	IO      *iostreams.IOStreams
+	Browser browser
 
-	WebMode bool
+	Finder shared.PRFinder
 
 	SelectorArg string
+	WebMode     bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	opts := &ChecksOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Branch:     f.Branch,
-		Remotes:    f.Remotes,
-		BaseRepo:   f.BaseRepo,
-		Browser:    f.Browser,
+		IO:      f.IOStreams,
+		Browser: f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -56,8 +46,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
@@ -81,13 +70,10 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 }
 
 func checksRun(opts *ChecksOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}

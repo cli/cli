@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	shared "github.com/cli/cli/pkg/cmd/pr/shared"
@@ -20,10 +19,8 @@ import (
 type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Branch     func() (string, error)
 
+	Finder          shared.PRFinder
 	Surveyor        Surveyor
 	Fetcher         EditableOptionsFetcher
 	EditorRetriever EditorRetriever
@@ -38,8 +35,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
-		Remotes:         f.Remotes,
-		Branch:          f.Branch,
 		Surveyor:        surveyor{},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
@@ -66,8 +61,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
@@ -155,13 +149,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 }
 
 func editRun(opts *EditOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -183,6 +174,12 @@ func editRun(opts *EditOptions) error {
 			return err
 		}
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
 	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable)

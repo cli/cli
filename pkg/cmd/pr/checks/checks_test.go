@@ -2,10 +2,8 @@ package checks
 
 import (
 	"bytes"
-	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -174,10 +172,7 @@ func Test_checksRun(t *testing.T) {
 			io.SetStdoutTTY(!tt.nontty)
 
 			opts := &ChecksOptions{
-				IO: io,
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.New("OWNER", "REPO"), nil
-				},
+				IO:          io,
 				SelectorArg: "123",
 			}
 
@@ -188,10 +183,6 @@ func Test_checksRun(t *testing.T) {
 				tt.stubs(reg)
 			} else if tt.fixture != "" {
 				reg.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse(tt.fixture))
-			}
-
-			opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
 			}
 
 			err := checksRun(opts)
@@ -246,15 +237,9 @@ func TestChecksRun_web(t *testing.T) {
 			defer teardown(t)
 
 			err := checksRun(&ChecksOptions{
-				IO:      io,
-				Browser: browser,
-				WebMode: true,
-				HttpClient: func() (*http.Client, error) {
-					return &http.Client{Transport: reg}, nil
-				},
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.New("OWNER", "REPO"), nil
-				},
+				IO:          io,
+				Browser:     browser,
+				WebMode:     true,
 				SelectorArg: "123",
 			})
 			assert.NoError(t, err)

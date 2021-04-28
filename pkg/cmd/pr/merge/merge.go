@@ -8,10 +8,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -26,11 +24,10 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
+
+	Finder shared.PRFinder
 
 	SelectorArg  string
 	DeleteBranch bool
@@ -52,8 +49,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 	}
 
@@ -76,8 +71,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
@@ -136,7 +130,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			opts.Editor = &userEditor{
 				io:     opts.IO,
-				config: opts.Config,
+				config: f.Config,
 			}
 
 			if runF != nil {
@@ -160,18 +154,22 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 func mergeRun(opts *MergeOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "number", "state", "title", "commits", "mergeable", "headRepositoryOwner", "headRefName"},
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	if opts.AutoMergeDisable {
 		err := disableAutoMerge(httpClient, baseRepo, pr.ID)

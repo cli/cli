@@ -24,9 +24,10 @@ type CheckoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
+
+	Finder shared.PRFinder
 
 	SelectorArg       string
 	RecurseSubmodules bool
@@ -48,8 +49,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 		Short: "Check out a pull request in git",
 		Args:  cmdutil.ExactArgs(1, "argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
@@ -70,18 +70,10 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	remotes, err := opts.Remotes()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
 	}
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -90,8 +82,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if err != nil {
 		return err
 	}
-
 	protocol, _ := cfg.Get(baseRepo.RepoHost(), "git_protocol")
+
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
 	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
 	if baseRemote != nil {
@@ -112,6 +108,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if headRemote != nil {
 		cmdQueue = append(cmdQueue, cmdsForExistingRemote(headRemote, pr, opts)...)
 	} else {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+		apiClient := api.NewClientFromHTTP(httpClient)
+
 		defaultBranch, err := api.RepoDefaultBranch(apiClient, baseRepo)
 		if err != nil {
 			return err

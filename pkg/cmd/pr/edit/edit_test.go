@@ -450,11 +450,9 @@ func Test_editRun(t *testing.T) {
 		tt.httpStubs(t, reg)
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 		tt.input.IO = io
 		tt.input.HttpClient = httpClient
-		tt.input.BaseRepo = baseRepo
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := editRun(tt.input)

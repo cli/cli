@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -34,6 +33,7 @@ type PullRequest struct {
 	Number           int
 	Title            string
 	State            string
+	Closed           bool
 	URL              string
 	BaseRefName      string
 	HeadRefName      string
@@ -57,10 +57,8 @@ type PullRequest struct {
 
 	Author              Author
 	MergedBy            *Author
-	HeadRepositoryOwner struct {
-		Login string `json:"login"`
-	}
-	HeadRepository struct {
+	HeadRepositoryOwner Owner
+	HeadRepository      struct {
 		Name string
 	}
 	IsCrossRepository   bool
@@ -77,27 +75,7 @@ type PullRequest struct {
 
 	Commits struct {
 		TotalCount int
-		Nodes      []struct {
-			Commit struct {
-				Oid               string
-				StatusCheckRollup struct {
-					Contexts struct {
-						Nodes []struct {
-							TypeName    string    `json:"__typename"`
-							Name        string    `json:"name"`
-							Context     string    `json:"context,omitempty"`
-							State       string    `json:"state,omitempty"`
-							Status      string    `json:"status"`
-							Conclusion  string    `json:"conclusion"`
-							StartedAt   time.Time `json:"startedAt"`
-							CompletedAt time.Time `json:"completedAt"`
-							DetailsURL  string    `json:"detailsUrl"`
-							TargetURL   string    `json:"targetUrl,omitempty"`
-						}
-					}
-				}
-			}
-		}
+		Nodes      []PullRequestCommit
 	}
 	Assignees      Assignees
 	Labels         Labels
@@ -111,6 +89,37 @@ type PullRequest struct {
 
 type Commit struct {
 	OID string `json:"oid"`
+}
+
+type PullRequestCommit struct {
+	Commit PullRequestCommitCommit
+}
+
+// PullRequestCommitCommit is like "Commit" but with StatusCheckRollup
+type PullRequestCommitCommit struct {
+	Oid               string
+	StatusCheckRollup struct {
+		Contexts struct {
+			Nodes []struct {
+				TypeName    string    `json:"__typename"`
+				Name        string    `json:"name"`
+				Context     string    `json:"context,omitempty"`
+				State       string    `json:"state,omitempty"`
+				Status      string    `json:"status"`
+				Conclusion  string    `json:"conclusion"`
+				StartedAt   time.Time `json:"startedAt"`
+				CompletedAt time.Time `json:"completedAt"`
+				DetailsURL  string    `json:"detailsUrl"`
+				TargetURL   string    `json:"targetUrl,omitempty"`
+			}
+		}
+	}
+}
+
+func (pr *PullRequest) StubCommit(oid string) {
+	pr.Commits.Nodes = append(pr.Commits.Nodes, PullRequestCommit{
+		Commit: PullRequestCommitCommit{Oid: oid},
+	})
 }
 
 type PullRequestFile struct {
@@ -136,14 +145,6 @@ func (r ReviewRequests) Logins() []string {
 		logins[i] = a.RequestedReviewer.Login
 	}
 	return logins
-}
-
-type NotFoundError struct {
-	error
-}
-
-func (err *NotFoundError) Unwrap() error {
-	return err.error
 }
 
 func (pr PullRequest) HeadLabel() string {
@@ -247,7 +248,7 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 	}
 
 	if resp.StatusCode == 404 {
-		return nil, &NotFoundError{errors.New("pull request not found")}
+		return nil, errors.New("pull request not found")
 	} else if resp.StatusCode != 200 {
 		return nil, HandleHTTPError(resp)
 	}
@@ -558,274 +559,6 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 	}
 	`, requiresStrictStatusChecks, statusesFragment, reviewsFragment)
 	return fragments, nil
-}
-
-func prCommitsFragment(httpClient *http.Client, hostname string) (string, error) {
-	cachedClient := NewCachedClient(httpClient, time.Hour*24)
-	if prFeatures, err := determinePullRequestFeatures(cachedClient, hostname); err != nil {
-		return "", err
-	} else if !prFeatures.HasStatusCheckRollup {
-		return "", nil
-	}
-
-	return `
-	commits(last: 1) {
-		totalCount
-		nodes {
-			commit {
-				oid
-				statusCheckRollup {
-					contexts(last: 100) {
-						nodes {
-							...on StatusContext {
-								context
-								state
-								targetUrl
-							}
-							...on CheckRun {
-								name
-								status
-								conclusion
-								startedAt
-								completedAt
-								detailsUrl
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	`, nil
-}
-
-func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*PullRequest, error) {
-	type response struct {
-		Repository struct {
-			PullRequest PullRequest
-		}
-	}
-
-	statusesFragment, err := prCommitsFragment(client.http, repo.RepoHost())
-	if err != nil {
-		return nil, err
-	}
-
-	query := `
-	query PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {
-		repository(owner: $owner, name: $repo) {
-			pullRequest(number: $pr_number) {
-				id
-				url
-				number
-				title
-				state
-				closed
-				body
-				mergeable
-				additions
-				deletions
-				author {
-				  login
-				}
-				` + statusesFragment + `
-				baseRefName
-				headRefName
-				headRepositoryOwner {
-					login
-				}
-				headRepository {
-					name
-				}
-				isCrossRepository
-				isDraft
-				maintainerCanModify
-				reviewRequests(first: 100) {
-					nodes {
-						requestedReviewer {
-							__typename
-							...on User {
-								login
-							}
-							...on Team {
-								name
-							}
-						}
-					}
-					totalCount
-				}
-				assignees(first: 100) {
-					nodes {
-						login
-					}
-					totalCount
-				}
-				labels(first: 100) {
-					nodes {
-						name
-					}
-					totalCount
-				}
-				projectCards(first: 100) {
-					nodes {
-						project {
-							name
-						}
-						column {
-							name
-						}
-					}
-					totalCount
-				}
-				milestone{
-					title
-				}
-				` + commentsFragment() + `
-				` + reactionGroupsFragment() + `
-			}
-		}
-	}`
-
-	variables := map[string]interface{}{
-		"owner":     repo.RepoOwner(),
-		"repo":      repo.RepoName(),
-		"pr_number": number,
-	}
-
-	var resp response
-	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &resp.Repository.PullRequest, nil
-}
-
-func PullRequestForBranch(client *Client, repo ghrepo.Interface, baseBranch, headBranch string, stateFilters []string) (*PullRequest, error) {
-	type response struct {
-		Repository struct {
-			PullRequests struct {
-				Nodes []PullRequest
-			}
-		}
-	}
-
-	statusesFragment, err := prCommitsFragment(client.http, repo.RepoHost())
-	if err != nil {
-		return nil, err
-	}
-
-	query := `
-	query PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {
-		repository(owner: $owner, name: $repo) {
-			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
-				nodes {
-					id
-					number
-					title
-					state
-					body
-					mergeable
-					additions
-					deletions
-					author {
-						login
-					}
-					` + statusesFragment + `
-					url
-					baseRefName
-					headRefName
-					headRepositoryOwner {
-						login
-					}
-					headRepository {
-						name
-					}
-					isCrossRepository
-					isDraft
-					maintainerCanModify
-					reviewRequests(first: 100) {
-						nodes {
-							requestedReviewer {
-								__typename
-								...on User {
-									login
-								}
-								...on Team {
-									name
-								}
-							}
-						}
-						totalCount
-					}
-					assignees(first: 100) {
-						nodes {
-							login
-						}
-						totalCount
-					}
-					labels(first: 100) {
-						nodes {
-							name
-						}
-						totalCount
-					}
-					projectCards(first: 100) {
-						nodes {
-							project {
-								name
-							}
-							column {
-								name
-							}
-						}
-						totalCount
-					}
-					milestone{
-						title
-					}
-					` + commentsFragment() + `
-					` + reactionGroupsFragment() + `
-				}
-			}
-		}
-	}`
-
-	branchWithoutOwner := headBranch
-	if idx := strings.Index(headBranch, ":"); idx >= 0 {
-		branchWithoutOwner = headBranch[idx+1:]
-	}
-
-	variables := map[string]interface{}{
-		"owner":       repo.RepoOwner(),
-		"repo":        repo.RepoName(),
-		"headRefName": branchWithoutOwner,
-		"states":      stateFilters,
-	}
-
-	var resp response
-	err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	prs := resp.Repository.PullRequests.Nodes
-	sortPullRequestsByState(prs)
-
-	for _, pr := range prs {
-		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
-			return &pr, nil
-		}
-	}
-
-	return nil, &NotFoundError{fmt.Errorf("no pull requests found for branch %q", headBranch)}
-}
-
-// sortPullRequestsByState sorts a PullRequest slice by open-first
-func sortPullRequestsByState(prs []PullRequest) {
-	sort.SliceStable(prs, func(a, b int) bool {
-		return prs[a].State == "OPEN"
-	})
 }
 
 // CreatePullRequest creates a pull request in a GitHub repository
