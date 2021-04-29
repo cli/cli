@@ -870,9 +870,23 @@ func Test_magicFieldValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "placeholder",
+			name: "placeholder colon",
 			args: args{
 				v: ":owner",
+				opts: &ApiOptions{
+					IO: io,
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "hubot",
+			wantErr: false,
+		},
+		{
+			name: "placeholder braces",
+			args: args{
+				v: "{owner}",
 				opts: &ApiOptions{
 					IO: io,
 					BaseRepo: func() (ghrepo.Interface, error) {
@@ -1006,6 +1020,51 @@ func Test_fillPlaceholders(t *testing.T) {
 				},
 			},
 			want:    "repos/:owner/:repo/branches/:branch",
+			wantErr: true,
+		},
+		{
+			name: "has substitutes (braces)",
+			args: args{
+				value: "repos/{owner}/{repo}/releases",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/releases",
+			wantErr: false,
+		},
+		{
+			name: "has branch placeholder (braces)",
+			args: args{
+				value: "repos/cli/cli/branches/{branch}/protection/required_status_checks",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("cli", "cli"), nil
+					},
+					Branch: func() (string, error) {
+						return "trunk", nil
+					},
+				},
+			},
+			want:    "repos/cli/cli/branches/trunk/protection/required_status_checks",
+			wantErr: false,
+		},
+		{
+			name: "has branch placeholder and git is in detached head (braces)",
+			args: args{
+				value: "repos/{owner}/{repo}/branches/{branch}",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("cli", "cli"), nil
+					},
+					Branch: func() (string, error) {
+						return "", git.ErrNotOnAnyBranch
+					},
+				},
+			},
+			want:    "repos/{owner}/{repo}/branches/{branch}",
 			wantErr: true,
 		},
 		{
