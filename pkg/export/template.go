@@ -122,10 +122,7 @@ func (t *Template) color(colorName string, input interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if t.io.ColorEnabled() {
-		return ansi.Color(text, colorName), nil
-	}
-	return text, nil
+	return ansi.Color(text, colorName), nil
 }
 
 func templatePluck(field string, input []interface{}) []interface{} {

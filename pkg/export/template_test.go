@@ -85,7 +85,6 @@ func Test_executeTemplate(t *testing.T) {
 			args: args{
 				json:     strings.NewReader(`{}`),
 				template: `{{color "blue+h" "songs are like tattoos"}}`,
-				colorize: true,
 			},
 			wantW: "\x1b[0;94msongs are like tattoos\x1b[0m",
 		},
@@ -173,7 +172,6 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 1, "title": "One"}
 				]`)),
 				template: `{{range .}}{{row (.number | color "green") .title}}{{end}}`,
-				colorize: true,
 			},
 			wantW: "\x1b[0;32m1\x1b[0m\tOne\n",
 		},

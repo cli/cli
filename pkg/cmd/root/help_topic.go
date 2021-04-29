@@ -100,8 +100,8 @@ var HelpTopics = map[string]map[string]string{
 
 			EXAMPLES
 			  # format issues as table
-			  $ gh issue list --json number,title,createdAt --template \
-			    '{{range .}}{{row (printf "#%%v" .number | color "green") .title (timeago .createdAt)}}{{end}}'
+			  $ gh issue list --json number,title --template \
+			    '{{range .}}{{row (printf "#%%v" .number | autocolor "green") .title}}{{end}}'
 		`, "`"),
 	},
 }
