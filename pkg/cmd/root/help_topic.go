@@ -15,11 +15,11 @@ var HelpTopics = map[string]map[string]string{
 
 			There are a few workarounds to make gh work with MinTTY:
 
-			- Reinstall Git for Windows. 
-			  Be sure to check the box "Enable experimental support for pseudo consoles".
+			- Reinstall Git for Windows, checking "Enable experimental support for pseudo consoles".
 
-			- Use a different terminal emulator with Git for Windows like Windows Terminal or cmd.exe.
-			  Try running "C:\Program Files\Git\bin\bash.exe" in one of those other terminal emulators.
+			- Use a different terminal emulator with Git for Windows like Windows Terminal.
+			  You can run "C:\Program Files\Git\bin\bash.exe" from any terminal emulator to continue
+			  using all of the tooling in Git For Windows without MinTTY.
 
 			- Prefix invocations of gh with winpty, eg: "winpty gh auth login".
 			  NOTE: this can lead to some UI bugs.
