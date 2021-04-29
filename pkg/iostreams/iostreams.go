@@ -91,6 +91,10 @@ func (s *IOStreams) TerminalTheme() string {
 	return s.terminalTheme
 }
 
+func (s *IOStreams) SetColorEnabled(colorEnabled bool) {
+	s.colorEnabled = colorEnabled
+}
+
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
 	s.stdinTTYOverride = true
 	s.stdinIsTTY = isTTY

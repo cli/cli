@@ -11,21 +11,30 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/cli/cli/pkg/text"
+	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/mgutz/ansi"
 )
 
-func parseTemplate(w io.Writer, tpl string, colorEnabled bool) (*template.Template, error) {
+type Template struct {
+	io           *iostreams.IOStreams
+	tablePrinter utils.TablePrinter
+	template     *template.Template
+}
+
+func NewTemplate(io *iostreams.IOStreams) Template {
+	return Template{
+		io:           io,
+		tablePrinter: utils.NewTablePrinter(io),
+	}
+}
+
+func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 	now := time.Now()
 
-	tableFormatter := &tableFormatter{
-		current: nil,
-		writer:  w,
-	}
 	templateFuncs := map[string]interface{}{
-		"color":     templateColor,
-		"autocolor": templateColor,
+		"color":     t.color,
+		"autocolor": t.color,
 
 		"timefmt": func(format, input string) (string, error) {
 			t, err := time.Parse(time.RFC3339, input)
@@ -42,16 +51,12 @@ func parseTemplate(w io.Writer, tpl string, colorEnabled bool) (*template.Templa
 			return timeAgo(now.Sub(t)), nil
 		},
 
-		"pluck":    templatePluck,
-		"join":     templateJoin,
-		"truncate": text.Truncate,
-
-		"table":    tableFormatter.Table,
-		"row":      tableFormatter.Row,
-		"endTable": tableFormatter.EndTable,
+		"pluck": templatePluck,
+		"join":  templateJoin,
+		"row":   t.row,
 	}
 
-	if !colorEnabled {
+	if !t.io.ColorEnabled() {
 		templateFuncs["autocolor"] = func(colorName string, input interface{}) (string, error) {
 			return jsonScalarToString(input)
 		}
@@ -60,10 +65,16 @@ func parseTemplate(w io.Writer, tpl string, colorEnabled bool) (*template.Templa
 	return template.New("").Funcs(templateFuncs).Parse(tpl)
 }
 
-func ExecuteTemplate(w io.Writer, input io.Reader, templateStr string, colorEnabled bool) error {
-	t, err := parseTemplate(w, templateStr, colorEnabled)
-	if err != nil {
-		return err
+func (t *Template) Execute(input io.Reader, templateStr string) error {
+	w := t.io.Out
+
+	if t.template == nil {
+		template, err := t.parseTemplate(templateStr)
+		if err != nil {
+			return err
+		}
+
+		t.template = template
 	}
 
 	jsonData, err := ioutil.ReadAll(input)
@@ -76,7 +87,14 @@ func ExecuteTemplate(w io.Writer, input io.Reader, templateStr string, colorEnab
 		return err
 	}
 
-	return t.Execute(w, data)
+	return t.template.Execute(w, data)
+}
+
+func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, templateStr string) error {
+	t := NewTemplate(io)
+	defer t.End()
+
+	return t.Execute(input, templateStr)
 }
 
 func jsonScalarToString(input interface{}) (string, error) {
@@ -98,12 +116,15 @@ func jsonScalarToString(input interface{}) (string, error) {
 	}
 }
 
-func templateColor(colorName string, input interface{}) (string, error) {
+func (t *Template) color(colorName string, input interface{}) (string, error) {
 	text, err := jsonScalarToString(input)
 	if err != nil {
 		return "", err
 	}
-	return ansi.Color(text, colorName), nil
+	if t.io.ColorEnabled() {
+		return ansi.Color(text, colorName), nil
+	}
+	return text, nil
 }
 
 func templatePluck(field string, input []interface{}) []interface{} {
@@ -125,6 +146,24 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 		results = append(results, text)
 	}
 	return strings.Join(results, sep), nil
+}
+
+func (t *Template) row(fields ...interface{}) (string, error) {
+	for _, e := range fields {
+		s, err := jsonScalarToString(e)
+		if err != nil {
+			return "", fmt.Errorf("failed to write row: %v", err)
+		}
+		t.tablePrinter.AddField(s, nil, nil)
+	}
+	t.tablePrinter.EndRow()
+	return "", nil
+}
+
+func (t *Template) End() {
+	if t.tablePrinter != nil {
+		t.tablePrinter.Render()
+	}
 }
 
 func timeAgo(ago time.Duration) string {

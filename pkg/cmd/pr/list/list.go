@@ -163,7 +163,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, listResult.PullRequests, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
 	}
 
 	if opts.IO.IsStdoutTTY() {

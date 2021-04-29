@@ -15,6 +15,22 @@ func TestTruncate(t *testing.T) {
 		want string
 	}{
 		{
+			name: "Short enough",
+			args: args{
+				max: 5,
+				s:   "short",
+			},
+			want: "short",
+		},
+		{
+			name: "Too short",
+			args: args{
+				max: 4,
+				s:   "short",
+			},
+			want: "shor",
+		},
+		{
 			name: "Japanese",
 			args: args{
 				max: 11,
@@ -77,6 +93,15 @@ func TestTruncate(t *testing.T) {
 				s:   "é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́",
 			},
 			want: "é́́é́́é́́é́́é́́é́́é́́é́́...",
+		},
+		{
+			name: "Red accented characters",
+			args: args{
+				max: 11,
+				s:   "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́\x1b[0m",
+			},
+			// TODO: Move ellipsis within CSI-enclosed text once https://github.com/muesli/reflow/issues/35 is resolved.
+			want: "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́\x1b[0m...",
 		},
 	}
 	for _, tt := range tests {
@@ -148,6 +173,11 @@ func TestDisplayWidth(t *testing.T) {
 			name: "accent character",
 			text: `é́́`,
 			want: 1,
+		},
+		{
+			name: "color codes",
+			text: "\x1b[0;31mred\x1b[0m",
+			want: 3,
 		},
 	}
 	for _, tt := range tests {

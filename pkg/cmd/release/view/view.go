@@ -109,7 +109,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, release, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, release)
 	}
 
 	if opts.IO.IsStdoutTTY() {

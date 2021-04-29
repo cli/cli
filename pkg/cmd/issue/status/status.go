@@ -100,7 +100,7 @@ func statusRun(opts *StatusOptions) error {
 			"assigned":  issuePayload.Assigned.Issues,
 			"mentioned": issuePayload.Mentioned.Issues,
 		}
-		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, data)
 	}
 
 	out := opts.IO.Out
