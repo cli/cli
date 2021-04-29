@@ -295,7 +295,6 @@ func apiRun(opts *ApiOptions) error {
 	}
 
 	template := export.NewTemplate(opts.IO)
-	defer template.End()
 
 	hasNextPage := true
 	for hasNextPage {
@@ -327,7 +326,7 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return nil
+	return template.End()
 }
 
 func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {

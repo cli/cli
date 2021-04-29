@@ -7,7 +7,6 @@ import (
 
 const (
 	ellipsis            = "..."
-	ellipsisWidth       = 3
 	minWidthForEllipsis = 5
 )
 

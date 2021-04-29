@@ -1188,9 +1188,11 @@ func Test_processResponse_template(t *testing.T) {
 		IO:       io,
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
 	}, ioutil.Discard, &template)
-	template.End()
-
 	require.NoError(t, err)
+
+	err = template.End()
+	require.NoError(t, err)
+
 	assert.Equal(t, heredoc.Doc(`
 		First title (bug, help wanted)
 		Second but not last ()

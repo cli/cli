@@ -92,9 +92,10 @@ func (t *Template) Execute(input io.Reader, templateStr string) error {
 
 func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, templateStr string) error {
 	t := NewTemplate(io)
-	defer t.End()
-
-	return t.Execute(input, templateStr)
+	if err := t.Execute(input, templateStr); err != nil {
+		return err
+	}
+	return t.End()
 }
 
 func jsonScalarToString(input interface{}) (string, error) {
@@ -160,10 +161,11 @@ func (t *Template) row(fields ...interface{}) (string, error) {
 	return "", nil
 }
 
-func (t *Template) End() {
-	if t.tablePrinter != nil {
-		t.tablePrinter.Render()
+func (t *Template) End() error {
+	if err := t.tablePrinter.Render(); err != nil {
+		return fmt.Errorf("failed to render template table: %v", err)
 	}
+	return nil
 }
 
 func timeAgo(ago time.Duration) string {
