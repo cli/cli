@@ -96,19 +96,12 @@ var HelpTopics = map[string]map[string]string{
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
 			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
 			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
-			- %[1]struncate <length> <input>%[1]s: truncates input longer than length and adds "..."
-			- %[1]stable: starts a table. optional arguments match text/tabwriter.NewWriter after first argument
-			- %[1]srow <fields>: writes fields using elastic tabstops
-			- %[1]sendTable: ends a table and adjusts elastic tabstops based on all fields' lengths
+			- %[1]srow <fields>: writes fields in table columns like built-in commands
 
 			EXAMPLES
 			  # format issues as table
-			  $ gh issue list --json number,title --template \
-			    '{{table}}{{range .}}{{row (.number | printf "#%%v" | color "green") .title}}{{end}}{{endTable}}'
-			  
-			  # format recent PRs as table using "." for padding
-			  $ gh pr list --json title,createdAt --template \
-			    '{{table 0 1 1 "."}}{{range .}}{{row (truncate 40 .title) (timeago .createdAt)}}{{end}}{{endTable}}'
+			  $ gh issue list --json number,title,createdAt --template \
+			    '{{range .}}{{row (printf "#%%v" .number | color "green") .title (timeago .createdAt)}}{{end}}'
 		`, "`"),
 	},
 }
