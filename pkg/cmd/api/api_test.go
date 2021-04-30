@@ -870,9 +870,23 @@ func Test_magicFieldValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "placeholder",
+			name: "placeholder colon",
 			args: args{
 				v: ":owner",
+				opts: &ApiOptions{
+					IO: io,
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "hubot",
+			wantErr: false,
+		},
+		{
+			name: "placeholder braces",
+			args: args{
+				v: "{owner}",
 				opts: &ApiOptions{
 					IO: io,
 					BaseRepo: func() (ghrepo.Interface, error) {
@@ -964,7 +978,7 @@ func Test_fillPlaceholders(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "has substitutes",
+			name: "has substitutes (colon)",
 			args: args{
 				value: "repos/:owner/:repo/releases",
 				opts: &ApiOptions{
@@ -977,39 +991,96 @@ func Test_fillPlaceholders(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "has branch placeholder",
+			name: "has branch placeholder (colon)",
 			args: args{
-				value: "repos/cli/cli/branches/:branch/protection/required_status_checks",
+				value: "repos/owner/repo/branches/:branch/protection/required_status_checks",
 				opts: &ApiOptions{
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("cli", "cli"), nil
-					},
+					BaseRepo: nil,
 					Branch: func() (string, error) {
 						return "trunk", nil
 					},
 				},
 			},
-			want:    "repos/cli/cli/branches/trunk/protection/required_status_checks",
+			want:    "repos/owner/repo/branches/trunk/protection/required_status_checks",
 			wantErr: false,
 		},
 		{
-			name: "has branch placeholder and git is in detached head",
+			name: "has branch placeholder and git is in detached head (colon)",
 			args: args{
 				value: "repos/:owner/:repo/branches/:branch",
 				opts: &ApiOptions{
 					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("cli", "cli"), nil
+						return ghrepo.New("hubot", "robot-uprising"), nil
 					},
 					Branch: func() (string, error) {
 						return "", git.ErrNotOnAnyBranch
 					},
 				},
 			},
-			want:    "repos/:owner/:repo/branches/:branch",
+			want:    "repos/hubot/robot-uprising/branches/:branch",
 			wantErr: true,
 		},
 		{
-			name: "no greedy substitutes",
+			name: "has substitutes",
+			args: args{
+				value: "repos/{owner}/{repo}/releases",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/releases",
+			wantErr: false,
+		},
+		{
+			name: "has branch placeholder",
+			args: args{
+				value: "repos/owner/repo/branches/{branch}/protection/required_status_checks",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+					Branch: func() (string, error) {
+						return "trunk", nil
+					},
+				},
+			},
+			want:    "repos/owner/repo/branches/trunk/protection/required_status_checks",
+			wantErr: false,
+		},
+		{
+			name: "has branch placeholder and git is in detached head",
+			args: args{
+				value: "repos/{owner}/{repo}/branches/{branch}",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+					Branch: func() (string, error) {
+						return "", git.ErrNotOnAnyBranch
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/branches/{branch}",
+			wantErr: true,
+		},
+		{
+			name: "surfaces errors in earlier placeholders",
+			args: args{
+				value: "{branch}-{owner}",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+					Branch: func() (string, error) {
+						return "", git.ErrNotOnAnyBranch
+					},
+				},
+			},
+			want:    "{branch}-hubot",
+			wantErr: true,
+		},
+		{
+			name: "no greedy substitutes (colon)",
 			args: args{
 				value: ":ownership/:repository",
 				opts: &ApiOptions{
@@ -1017,6 +1088,17 @@ func Test_fillPlaceholders(t *testing.T) {
 				},
 			},
 			want:    ":ownership/:repository",
+			wantErr: false,
+		},
+		{
+			name: "non-placeholders are left intact",
+			args: args{
+				value: "{}{ownership}/{repository}",
+				opts: &ApiOptions{
+					BaseRepo: nil,
+				},
+			},
+			want:    "{}{ownership}/{repository}",
 			wantErr: false,
 		},
 	}
