@@ -72,7 +72,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			"graphql" to access the GitHub API v4.
 
 			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint argument will
-			get replaced with values from the repository of the current directory.
+			get replaced with values from the repository of the current directory. Note that in
+			some shells, for example PowerShell, you may need to enclose any value that contains
+			"{...}" in quotes to prevent the shell from applying special meaning to curly braces.
 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
@@ -397,41 +399,41 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	return
 }
 
-var placeholderRE = regexp.MustCompile(`(\:(owner|repo|branch)\b|\{(owner|repo|branch)\})`)
+var placeholderRE = regexp.MustCompile(`(\:(owner|repo|branch)\b|\{[a-z]+\})`)
 
-// fillPlaceholders populates `{owner}` and `{repo}` placeholders with values from the current repository
+// fillPlaceholders replaces placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
-	if !placeholderRE.MatchString(value) {
-		return value, nil
-	}
+	var err error
+	return placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+		var name string
+		if m[0] == ':' {
+			name = m[1:]
+		} else {
+			name = m[1 : len(m)-1]
+		}
 
-	baseRepo, err := opts.BaseRepo()
-	if err != nil {
-		return value, err
-	}
-
-	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
-		switch m {
-		case ":owner", "{owner}":
-			return baseRepo.RepoOwner()
-		case ":repo", "{repo}":
-			return baseRepo.RepoName()
-		case ":branch", "{branch}":
-			branch, e := opts.Branch()
-			if e != nil {
+		switch name {
+		case "owner":
+			if baseRepo, e := opts.BaseRepo(); e == nil {
+				return baseRepo.RepoOwner()
+			} else {
 				err = e
 			}
-			return branch
-		default:
-			panic(fmt.Sprintf("invalid placeholder: %q", m))
+		case "repo":
+			if baseRepo, e := opts.BaseRepo(); e == nil {
+				return baseRepo.RepoName()
+			} else {
+				err = e
+			}
+		case "branch":
+			if branch, e := opts.Branch(); e == nil {
+				return branch
+			} else {
+				err = e
+			}
 		}
-	})
-
-	if err != nil {
-		return value, err
-	}
-
-	return filled, nil
+		return m
+	}), err
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
