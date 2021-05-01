@@ -35,8 +35,8 @@ var HelpTopics = map[string]map[string]string{
 			GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication
 			token for API requests to GitHub Enterprise.
 
-			GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
-			that otherwise operate on a local repository.
+			GH_REPO, GITHUB_REPOSITORY (in order of precedence): specify the GitHub repository in the
+			"[HOST/]OWNER/REPO" format for commands that otherwise operate on a local repository.
 
 			GH_HOST: specify the GitHub hostname for commands that would otherwise assume
 			the "github.com" host when not in a context of an existing repository.

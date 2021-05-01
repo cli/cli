@@ -14,6 +14,8 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 		repoOverride, _ := cmd.Flags().GetString("repo")
 		if repoFromEnv := os.Getenv("GH_REPO"); repoOverride == "" && repoFromEnv != "" {
 			repoOverride = repoFromEnv
+		} else if repoFromEnv := os.Getenv("GITHUB_REPOSITORY"); repoOverride == "" && repoFromEnv != "" {
+			repoOverride = repoFromEnv
 		}
 		if repoOverride != "" {
 			// NOTE: this mutates the factory
