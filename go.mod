@@ -22,7 +22,7 @@ require (
 	github.com/mattn/go-colorable v0.1.8
 	github.com/mattn/go-isatty v0.0.13
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
-	github.com/muesli/reflow v0.2.1-0.20210406211535-db37f10f24dd
+	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
 	github.com/muesli/termenv v0.8.1
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f

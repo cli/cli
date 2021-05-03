@@ -100,8 +100,7 @@ func TestTruncate(t *testing.T) {
 				max: 11,
 				s:   "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́\x1b[0m",
 			},
-			// TODO: Move ellipsis within CSI-enclosed text once https://github.com/muesli/reflow/issues/35 is resolved.
-			want: "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́\x1b[0m...",
+			want: "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́...\x1b[0m",
 		},
 	}
 	for _, tt := range tests {
