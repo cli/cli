@@ -96,7 +96,7 @@ func TestIssueClose_alreadyClosed(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"hasIssuesEnabled": true,
-				"issue": { "number": 13, "title": "The title of the issue", "closed": true}
+				"issue": { "number": 13, "title": "The title of the issue", "state": "CLOSED"}
 			} } }`),
 	)
 

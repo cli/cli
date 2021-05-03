@@ -237,7 +237,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				id
 				title
 				state
-				closed
 				body
 				author {
 					login
