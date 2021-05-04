@@ -1,8 +1,14 @@
 package shared
 
 import (
+	"net/http"
 	"testing"
 	"time"
+
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPreciseAgo(t *testing.T) {
@@ -28,4 +34,21 @@ func TestPreciseAgo(t *testing.T) {
 			t.Errorf("expected %s but got %s for %s", expected, got, createdAt)
 		}
 	}
+}
+
+func TestGetAnnotations404(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/check-runs/123456/annotations"),
+		httpmock.StatusStringResponse(404, "not found"))
+
+	httpClient := &http.Client{Transport: reg}
+	apiClient := api.NewClientFromHTTP(httpClient)
+	repo := ghrepo.New("OWNER", "REPO")
+
+	result, err := GetAnnotations(apiClient, repo, Job{ID: 123456, Name: "a job"})
+	assert.NoError(t, err)
+	assert.Equal(t, result, []Annotation{})
 }

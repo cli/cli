@@ -65,7 +65,7 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	if issue.Closed {
+	if issue.State == "CLOSED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}

@@ -176,6 +176,12 @@ func mainRun() exitCode {
 
 		printError(stderr, err, cmd, hasDebug)
 
+		if strings.Contains(err.Error(), "Incorrect function") {
+			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
+			fmt.Fprintln(stderr, "To learn about workarounds for this error, run: gh help mintty")
+			return exitError
+		}
+
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
 			fmt.Fprintln(stderr, "hint: try authenticating with `gh auth login`")

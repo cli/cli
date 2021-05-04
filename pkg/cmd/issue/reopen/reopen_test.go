@@ -64,7 +64,7 @@ func TestIssueReopen(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"hasIssuesEnabled": true,
-				"issue": { "id": "THE-ID", "number": 2, "closed": true, "title": "The title of the issue"}
+				"issue": { "id": "THE-ID", "number": 2, "state": "CLOSED", "title": "The title of the issue"}
 			} } }`),
 	)
 	http.Register(
@@ -96,7 +96,7 @@ func TestIssueReopen_alreadyOpen(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"hasIssuesEnabled": true,
-				"issue": { "number": 2, "closed": false, "title": "The title of the issue"}
+				"issue": { "number": 2, "state": "OPEN", "title": "The title of the issue"}
 			} } }`),
 	)
 
