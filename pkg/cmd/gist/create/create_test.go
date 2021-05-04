@@ -24,20 +24,20 @@ const (
 )
 
 func Test_processFiles(t *testing.T) {
-	tests := []struct{
-		content string
-		err error
+	tests := []struct {
+		content   string
+		err       error
 		fileCount int
-	} {
+	}{
 		{
-			content: "hey cool how is it going",
-			err: nil,
+			content:   "hey cool how is it going",
+			err:       nil,
 			fileCount: 1,
 		},
 		{
-			content: "\n\t",
+			content:   "\n\t",
 			fileCount: 0,
-			err: errors.New("Gist contents can't be empty"),
+			err:       errors.New("Gist contents can't be empty"),
 		},
 	}
 
