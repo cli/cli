@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/cli/cli/api"
@@ -149,13 +148,12 @@ func TestNewCmdRun(t *testing.T) {
 }
 
 func Test_magicFieldValue(t *testing.T) {
-	f, err := ioutil.TempFile("", "gh-test")
+	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Fprint(f, "file contents")
 	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
 
 	io, _, _, _ := iostreams.Test()
 

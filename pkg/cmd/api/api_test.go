@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -702,13 +700,12 @@ func Test_apiRun_inputFile(t *testing.T) {
 			if tt.inputFile == "-" {
 				_, _ = stdin.Write(tt.inputContents)
 			} else {
-				f, err := ioutil.TempFile("", tt.inputFile)
+				f, err := ioutil.TempFile(t.TempDir(), tt.inputFile)
 				if err != nil {
 					t.Fatal(err)
 				}
 				_, _ = f.Write(tt.inputContents)
 				f.Close()
-				t.Cleanup(func() { os.Remove(f.Name()) })
 				inputFile = f.Name()
 			}
 
@@ -773,11 +770,6 @@ func Test_apiRun_cache(t *testing.T) {
 		CacheTTL:    time.Minute,
 	}
 
-	t.Cleanup(func() {
-		cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
-		os.RemoveAll(cacheDir)
-	})
-
 	err := apiRun(&options)
 	assert.NoError(t, err)
 	err = apiRun(&options)
@@ -825,13 +817,12 @@ func Test_parseFields(t *testing.T) {
 }
 
 func Test_magicFieldValue(t *testing.T) {
-	f, err := ioutil.TempFile("", "gh-test")
+	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Fprint(f, "file contents")
 	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
 
 	io, _, _, _ := iostreams.Test()
 
@@ -932,13 +923,12 @@ func Test_magicFieldValue(t *testing.T) {
 }
 
 func Test_openUserFile(t *testing.T) {
-	f, err := ioutil.TempFile("", "gh-test")
+	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Fprint(f, "file contents")
 	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
 
 	file, length, err := openUserFile(f.Name(), nil)
 	if err != nil {
