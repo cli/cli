@@ -20,6 +20,7 @@ import (
 
 const (
 	fixtureFile = "../fixture.txt"
+	emptyFile   = "../empty.txt"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -165,14 +166,15 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *CreateOptions
-		stdin      string
-		wantOut    string
-		wantStderr string
-		wantParams map[string]interface{}
-		wantErr    bool
-		wantBrowse string
+		name           string
+		opts           *CreateOptions
+		stdin          string
+		wantOut        string
+		wantStderr     string
+		wantParams     map[string]interface{}
+		wantErr        bool
+		wantBrowse     string
+		responseStatus int
 	}{
 		{
 			name: "public",
@@ -193,6 +195,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "with description",
@@ -213,6 +216,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "multiple files",
@@ -236,6 +240,25 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
+		},
+		{
+			name: "file with empty content",
+			opts: &CreateOptions{
+				Filenames: []string{emptyFile},
+			},
+			wantOut:    "",
+			wantStderr: "- Creating gist empty.txt\nX Failed to create gist: a gist file cannot be blank",
+			wantErr:    true,
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"empty.txt": map[string]interface{}{},
+				},
+			},
+			responseStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name: "stdin arg",
@@ -256,6 +279,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "web arg",
@@ -277,14 +301,20 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		reg.Register(httpmock.REST("POST", "gists"),
-			httpmock.JSONResponse(struct {
-				Html_url string
-			}{"https://gist.github.com/aa5a315d61ae9438b18d"}))
+		if tt.responseStatus == http.StatusUnprocessableEntity {
+			reg.Register(httpmock.REST("POST", "gists"),
+				httpmock.StatusStringResponse(http.StatusUnprocessableEntity, ""))
+		} else {
+			reg.Register(httpmock.REST("POST", "gists"),
+				httpmock.JSONResponse(struct {
+					Html_url string
+				}{"https://gist.github.com/aa5a315d61ae9438b18d"}))
+		}
 
 		mockClient := func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -322,6 +352,32 @@ func Test_createRun(t *testing.T) {
 			reg.Verify(t)
 			browser.Verify(t, tt.wantBrowse)
 		})
+	}
+}
+
+func Test_detectEmptyFiles(t *testing.T) {
+	tests := []struct {
+		content     string
+		isEmptyFile bool
+	}{
+		{
+			content:     "{}",
+			isEmptyFile: false,
+		},
+		{
+			content:     "\n\t",
+			isEmptyFile: true,
+		},
+	}
+
+	for _, tt := range tests {
+		files := map[string]*shared.GistFile{}
+		files["file"] = &shared.GistFile{
+			Content: tt.content,
+		}
+
+		isEmptyFile := detectEmptyFiles(files)
+		assert.Equal(t, tt.isEmptyFile, isEmptyFile)
 	}
 }
 
