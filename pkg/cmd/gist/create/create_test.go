@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -43,16 +42,12 @@ func Test_processFiles(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fmt.Println(tt.content,"===========")
 		fakeStdin := strings.NewReader(tt.content)
 		files, err := processFiles(ioutil.NopCloser(fakeStdin), "", []string{"-"})
-		fmt.Println(err)
-		if err != nil && err != errors.New("Gist contents can't be empty") {
-			t.Fatalf("unexpected error processing files: %s", err)
-		}
-
 		assert.Equal(t, tt.fileCount, len(files))
-		assert.Equal(t, tt.content, files["gistfile0.txt"].Content)
+		if files["gistfile0.txt"] != nil {
+			assert.Equal(t, tt.content, files["gistfile0.txt"].Content)
+		}
 		assert.Equal(t, tt.err, err)
 	}
 }
