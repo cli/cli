@@ -152,8 +152,9 @@ func Test_magicFieldValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	fmt.Fprint(f, "file contents")
-	f.Close()
 
 	io, _, _, _ := iostreams.Test()
 

@@ -265,7 +265,7 @@ func TestExtractName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	defer tmpfile.Close()
 
 	type args struct {
 		filePath string
@@ -325,7 +325,7 @@ func TestExtractContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	defer tmpfile.Close()
 
 	type args struct {
 		filePath string

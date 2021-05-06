@@ -310,6 +310,7 @@ func TestPRCreate_recover(t *testing.T) {
 
 	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
+	defer tmpfile.Close()
 
 	state := prShared.IssueMetadataState{
 		Title:     "recovered title",
@@ -322,8 +323,6 @@ func TestPRCreate_recover(t *testing.T) {
 
 	_, err = tmpfile.Write(data)
 	assert.NoError(t, err)
-
-	tmpfile.Close()
 
 	args := fmt.Sprintf("--recover '%s' -Hfeature", tmpfile.Name())
 

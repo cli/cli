@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -708,7 +710,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, _ = f.Write(tt.inputContents)
-				f.Close()
+				defer f.Close()
 				inputFile = f.Name()
 			}
 
@@ -773,6 +775,11 @@ func Test_apiRun_cache(t *testing.T) {
 		CacheTTL:    time.Minute,
 	}
 
+	t.Cleanup(func() {
+		cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
+		os.RemoveAll(cacheDir)
+	})
+
 	err := apiRun(&options)
 	assert.NoError(t, err)
 	err = apiRun(&options)
@@ -824,8 +831,9 @@ func Test_magicFieldValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	fmt.Fprint(f, "file contents")
-	f.Close()
 
 	io, _, _, _ := iostreams.Test()
 
@@ -930,8 +938,9 @@ func Test_openUserFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	fmt.Fprint(f, "file contents")
-	f.Close()
 
 	file, length, err := openUserFile(f.Name(), nil)
 	if err != nil {
