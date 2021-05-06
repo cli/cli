@@ -691,6 +691,9 @@ func Test_apiRun_inputFile(t *testing.T) {
 			contentLength: 10,
 		},
 	}
+
+	tempDir := t.TempDir()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, stdin, _, _ := iostreams.Test()
@@ -700,7 +703,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 			if tt.inputFile == "-" {
 				_, _ = stdin.Write(tt.inputContents)
 			} else {
-				f, err := ioutil.TempFile(t.TempDir(), tt.inputFile)
+				f, err := ioutil.TempFile(tempDir, tt.inputFile)
 				if err != nil {
 					t.Fatal(err)
 				}
