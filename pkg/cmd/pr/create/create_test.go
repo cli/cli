@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -309,8 +308,9 @@ func TestPRCreate_recover(t *testing.T) {
 		},
 	})
 
-	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
+	defer tmpfile.Close()
 
 	state := prShared.IssueMetadataState{
 		Title:     "recovered title",

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
@@ -17,6 +18,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -48,18 +50,24 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Create or update secrets",
 		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
-			$ gh secret set FROM_FLAG  -b"some literal value"
-			$ gh secret set FROM_ENV  -b"${ENV_VALUE}"
-			$ gh secret set FROM_FILE < file.json
-			$ gh secret set ORG_SECRET -bval --org=anOrg --visibility=all
-			$ gh secret set ORG_SECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
+			Paste secret in prompt
+			$ gh secret set MYSECRET
+
+			Use environment variable as secret value
+			$ gh secret set MYSECRET  -b"${ENV_VALUE}"
+
+			Use file as secret value
+			$ gh secret set MYSECRET < file.json
+
+			Set organization level secret visible to entire organization
+			$ gh secret set MYSECRET -bval --org=anOrg --visibility=all
+
+			Set organization level secret visible only to certain repositories
+			$ gh secret set MYSECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return &cmdutil.FlagError{Err: errors.New("must pass single secret name")}
-			}
-			if !cmd.Flags().Changed("body") && opts.IO.IsStdinTTY() {
-				return &cmdutil.FlagError{Err: errors.New("no --body specified but nothing on STIDN")}
 			}
 			return nil
 		},
@@ -209,12 +217,22 @@ func validSecretName(name string) error {
 
 func getBody(opts *SetOptions) ([]byte, error) {
 	if opts.Body == "" {
-		body, err := ioutil.ReadAll(opts.IO.In)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read from STDIN: %w", err)
-		}
+		if opts.IO.CanPrompt() {
+			err := prompt.SurveyAskOne(&survey.Password{
+				Message: "Paste your secret",
+			}, &opts.Body)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Fprintln(opts.IO.Out)
+		} else {
+			body, err := ioutil.ReadAll(opts.IO.In)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read from STDIN: %w", err)
+			}
 
-		return body, nil
+			return body, nil
+		}
 	}
 
 	return []byte(opts.Body), nil

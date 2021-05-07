@@ -6,7 +6,6 @@ import (
 )
 
 func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
-	v := reflect.ValueOf(issue).Elem()
 	data := map[string]interface{}{}
 
 	for _, f := range fields {
@@ -26,6 +25,7 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
 		default:
+			v := reflect.ValueOf(issue).Elem()
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
 		}
@@ -35,7 +35,6 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 }
 
 func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
-	v := reflect.ValueOf(pr).Elem()
 	data := map[string]interface{}{}
 
 	for _, f := range fields {
@@ -76,6 +75,7 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 			}
 			data[f] = &requests
 		default:
+			v := reflect.ValueOf(pr).Elem()
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
 		}
@@ -86,16 +86,16 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 
 func ExportIssues(issues []Issue, fields []string) *[]interface{} {
 	data := make([]interface{}, len(issues))
-	for i, issue := range issues {
-		data[i] = issue.ExportData(fields)
+	for i := range issues {
+		data[i] = issues[i].ExportData(fields)
 	}
 	return &data
 }
 
 func ExportPRs(prs []PullRequest, fields []string) *[]interface{} {
 	data := make([]interface{}, len(prs))
-	for i, pr := range prs {
-		data[i] = pr.ExportData(fields)
+	for i := range prs {
+		data[i] = prs[i].ExportData(fields)
 	}
 	return &data
 }
