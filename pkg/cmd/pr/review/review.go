@@ -147,6 +147,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 func reviewRun(opts *ReviewOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "number"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {

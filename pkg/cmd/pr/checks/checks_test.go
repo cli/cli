@@ -2,14 +2,20 @@ package checks
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"os"
 	"testing"
 
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdChecks(t *testing.T) {
@@ -64,36 +70,20 @@ func Test_checksRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		fixture string
-		stubs   func(*httpmock.Registry)
+		prJSON  string
 		nontty  bool
 		wantOut string
 		wantErr string
 	}{
 		{
-			name: "no commits",
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query PullRequestByNumber\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"pullRequest": { "number": 123 }
-						} } }
-					`))
-			},
+			name:    "no commits",
+			prJSON:  `{ "number": 123 }`,
 			wantOut: "",
 			wantErr: "no commit found on the pull request",
 		},
 		{
-			name: "no checks",
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query PullRequestByNumber\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-						} } }
-					`))
-			},
+			name:    "no checks",
+			prJSON:  `{ "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
@@ -122,17 +112,9 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "SilentError",
 		},
 		{
-			name:   "no checks",
-			nontty: true,
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query PullRequestByNumber\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"pullRequest": { "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }
-						} } }
-				`))
-			},
+			name:    "no checks",
+			nontty:  true,
+			prJSON:  `{ "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
@@ -168,21 +150,26 @@ func Test_checksRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, _ := iostreams.Test()
-			io.SetStdoutTTY(!tt.nontty)
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(!tt.nontty)
+
+			var response *api.PullRequest
+			var jsonReader io.Reader
+			if tt.fixture != "" {
+				ff, err := os.Open(tt.fixture)
+				require.NoError(t, err)
+				defer ff.Close()
+				jsonReader = ff
+			} else {
+				jsonReader = bytes.NewBufferString(tt.prJSON)
+			}
+			dec := json.NewDecoder(jsonReader)
+			require.NoError(t, dec.Decode(&response))
 
 			opts := &ChecksOptions{
-				IO:          io,
+				IO:          ios,
 				SelectorArg: "123",
-			}
-
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
-
-			if tt.stubs != nil {
-				tt.stubs(reg)
-			} else if tt.fixture != "" {
-				reg.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse(tt.fixture))
+				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
 			}
 
 			err := checksRun(opts)
@@ -223,10 +210,6 @@ func TestChecksRun_web(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			browser := &cmdutil.TestBrowser{}
-			reg := &httpmock.Registry{}
-
-			reg.Register(
-				httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.FileResponse("./fixtures/allPassing.json"))
 
 			io, _, stdout, stderr := iostreams.Test()
 			io.SetStdoutTTY(tc.isTTY)
@@ -241,11 +224,11 @@ func TestChecksRun_web(t *testing.T) {
 				Browser:     browser,
 				WebMode:     true,
 				SelectorArg: "123",
+				Finder:      shared.NewMockFinder("123", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO")),
 			})
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantStdout, stdout.String())
 			assert.Equal(t, tc.wantStderr, stderr.String())
-			reg.Verify(t)
 			browser.Verify(t, tc.wantBrowse)
 		})
 	}

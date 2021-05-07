@@ -309,6 +309,9 @@ func Test_editRun(t *testing.T) {
 			name: "non-interactive",
 			input: &EditOptions{
 				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
 					Title: shared.EditableString{
@@ -351,7 +354,6 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestGet(t, reg)
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
@@ -362,6 +364,9 @@ func Test_editRun(t *testing.T) {
 			name: "non-interactive skip reviewers",
 			input: &EditOptions{
 				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
 					Title: shared.EditableString{
@@ -399,7 +404,6 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestGet(t, reg)
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 			},
@@ -408,14 +412,16 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive",
 			input: &EditOptions{
-				SelectorArg:     "123",
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestGet(t, reg)
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
@@ -425,14 +431,16 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive skip reviewers",
 			input: &EditOptions{
-				SelectorArg:     "123",
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{skipReviewers: true},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestGet(t, reg)
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 			},
@@ -461,18 +469,6 @@ func Test_editRun(t *testing.T) {
 			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
-}
-
-func mockPullRequestGet(_ *testing.T, reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"id": "456",
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/pull/123"
-			} } } }`),
-	)
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) {
@@ -549,23 +545,13 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 func mockPullRequestUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdate\b`),
-		httpmock.GraphQLMutation(`
-				{ "data": { "updatePullRequest": { "pullRequest": {
-					"id": "456"
-				} } } }`,
-			func(inputs map[string]interface{}) {}),
-	)
+		httpmock.StringResponse(`{}`))
 }
 
 func mockPullRequestReviewersUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
-		httpmock.GraphQLMutation(`
-				{ "data": { "requestReviews": { "pullRequest": {
-					"id": "456"
-				} } } }`,
-			func(inputs map[string]interface{}) {}),
-	)
+		httpmock.StringResponse(`{}`))
 }
 
 type testFetcher struct{}

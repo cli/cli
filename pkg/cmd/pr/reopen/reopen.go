@@ -52,6 +52,7 @@ func reopenRun(opts *ReopenOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "number", "state", "title"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -59,12 +60,12 @@ func reopenRun(opts *ReopenOptions) error {
 	}
 
 	if pr.State == "MERGED" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be reopened because it was already merged", cs.Red("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be reopened because it was already merged\n", cs.FailureIcon(), pr.Number, pr.Title)
 		return cmdutil.SilentError
 	}
 
 	if pr.IsOpen() {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", cs.Yellow("!"), pr.Number, pr.Title)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already open\n", cs.WarningIcon(), pr.Number, pr.Title)
 		return nil
 	}
 

@@ -292,10 +292,15 @@ func (err *NotFoundError) Unwrap() error {
 }
 
 func NewMockFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) PRFinder {
+	var err error
+	if pr == nil {
+		err = &NotFoundError{errors.New("no pull requests found")}
+	}
 	return &mockFinder{
 		expectSelector: selector,
 		pr:             pr,
 		repo:           repo,
+		err:            err,
 	}
 }
 

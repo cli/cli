@@ -15,6 +15,7 @@ func TestFind(t *testing.T) {
 		branchFn   func() (string, error)
 		remotesFn  func() (context.Remotes, error)
 		selector   string
+		fields     []string
 	}
 	tests := []struct {
 		name     string
@@ -28,6 +29,7 @@ func TestFind(t *testing.T) {
 			name: "number argument",
 			args: args{
 				selector: "13",
+				fields:   []string{"id", "number"},
 				baseRepoFn: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("OWNER/REPO")
 				},
@@ -43,9 +45,23 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
 		{
+			name: "number only",
+			args: args{
+				selector: "13",
+				fields:   []string{"number"},
+				baseRepoFn: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("OWNER/REPO")
+				},
+			},
+			httpStub: nil,
+			wantPR:   13,
+			wantRepo: "https://github.com/OWNER/REPO",
+		},
+		{
 			name: "number with hash argument",
 			args: args{
 				selector: "#13",
+				fields:   []string{"id", "number"},
 				baseRepoFn: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("OWNER/REPO")
 				},
@@ -64,6 +80,7 @@ func TestFind(t *testing.T) {
 			name: "URL argument",
 			args: args{
 				selector:   "https://example.org/OWNER/REPO/pull/13/files",
+				fields:     []string{"id", "number"},
 				baseRepoFn: nil,
 			},
 			httpStub: func(r *httpmock.Registry) {
@@ -96,6 +113,7 @@ func TestFind(t *testing.T) {
 
 			pr, repo, err := f.Find(FindOptions{
 				Selector: tt.args.selector,
+				Fields:   tt.args.fields,
 			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Find() error = %v, wantErr %v", err, tt.wantErr)

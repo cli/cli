@@ -58,9 +58,7 @@ type PullRequest struct {
 	Author              Author
 	MergedBy            *Author
 	HeadRepositoryOwner Owner
-	HeadRepository      struct {
-		Name string
-	}
+	HeadRepository      PRRepository
 	IsCrossRepository   bool
 	IsDraft             bool
 	MaintainerCanModify bool
@@ -85,6 +83,10 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type PRRepository struct {
+	Name string
 }
 
 type Commit struct {

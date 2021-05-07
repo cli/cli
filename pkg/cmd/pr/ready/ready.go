@@ -7,9 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -18,11 +15,7 @@ import (
 
 type ReadyOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Branch     func() (string, error)
 
 	Finder shared.PRFinder
 
@@ -33,9 +26,6 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 	opts := &ReadyOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
-		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -74,6 +64,7 @@ func readyRun(opts *ReadyOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "number", "state", "isDraft"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -81,10 +72,10 @@ func readyRun(opts *ReadyOptions) error {
 	}
 
 	if !pr.IsOpen() {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"", cs.Red("!"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"\n", cs.FailureIcon(), pr.Number)
 		return cmdutil.SilentError
 	} else if !pr.IsDraft {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.Yellow("!"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
 		return nil
 	}
 

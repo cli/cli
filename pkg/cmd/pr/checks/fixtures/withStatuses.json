@@ -1,4 +1,4 @@
-{ "data": { "repository": { "pullRequest": { 
+{ 
   "number": 123, 
   "commits": { 
     "nodes": [
@@ -34,5 +34,6 @@
           }
         }
       }
-    ]} 
-} } } }
+    ]
+  }
+}

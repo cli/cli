@@ -668,12 +668,9 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	as.StubOne(true)
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4")
-	if err != nil {
-		t.Fatalf("Got unexpected error running `pr merge` %s", err)
-	}
-
-	//nolint:staticcheck // prefer exact matchers over ExpectLines
-	test.ExpectLines(t, output.Stderr(), "✓ Deleted branch blueberries and switched to branch master")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch master\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
