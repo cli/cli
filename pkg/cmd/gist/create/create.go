@@ -151,11 +151,11 @@ func createRun(opts *CreateOptions) error {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
 			if httpError.OAuthScopes != "" && !strings.Contains(httpError.OAuthScopes, "gist") {
-				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate by doing `gh config set -h github.com oauth_token ''` and running the command again.")
+				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate with:  gh auth refresh -h %s -s gist", host)
 			}
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {
-					fmt.Fprintf(errOut, "%s Failed to create gist: %s", cs.FailureIcon(), "a gist file cannot be blank")
+					fmt.Fprintf(errOut, "%s Failed to create gist: %s\n", cs.FailureIcon(), "a gist file cannot be blank")
 					return cmdutil.SilentError
 				}
 			}
