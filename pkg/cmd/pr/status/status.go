@@ -270,8 +270,15 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.ReviewRequired {
 				fmt.Fprint(w, cs.Yellow("- Review required"))
 			} else if reviews.Approved {
-				totalApprovals := effectiveApprovals(&pr)
-				fmt.Fprint(w, cs.Green("✓ "+strconv.Itoa(totalApprovals)+" Approved"))
+				reqApprovals := pr.BaseRef.BranchProtectionRule.RequiredApprovingReviewCount
+				approvals := effectiveApprovals(&pr)
+				s := cs.Green(fmt.Sprintf("✓ %d", approvals))
+
+				if reqApprovals > 0 {
+					s = cs.Green(fmt.Sprintf("✓ %d/%d", approvals, reqApprovals))
+				}
+
+				fmt.Fprint(w, s+" Approved")
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {

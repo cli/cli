@@ -69,7 +69,8 @@ type PullRequest struct {
 
 	BaseRef struct {
 		BranchProtectionRule struct {
-			RequiresStrictStatusChecks bool
+			RequiresStrictStatusChecks   bool
+			RequiredApprovingReviewCount int
 		}
 	}
 
@@ -395,6 +396,11 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 				}
 				pullRequest(number: $number) {
 					...prWithReviews
+					baseRef {
+						branchProtectionRule {
+							requiredApprovingReviewCount
+						}
+					}
 				}
 			}
 		`
