@@ -121,7 +121,7 @@ func listRun(opts *ListOptions) error {
 
 	for _, run := range runs {
 		if opts.PlainOutput {
-			tp.AddField(""+string(run.Status), nil, nil)
+			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
 		} else {
 			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
