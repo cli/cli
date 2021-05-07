@@ -83,11 +83,10 @@ func TestGenMdTree(t *testing.T) {
 }
 
 func BenchmarkGenMarkdownToFile(b *testing.B) {
-	file, err := ioutil.TempFile("", "")
+	file, err := ioutil.TempFile(b.TempDir(), "")
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.Remove(file.Name())
 	defer file.Close()
 
 	b.ResetTimer()
