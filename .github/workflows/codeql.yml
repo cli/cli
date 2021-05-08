@@ -1,8 +1,8 @@
 name: Code Scanning
 
 on:
-  push:
-  pull_request:
+  push:BigGuy573/atom-doc-update-template
+  pull_request:BigGuy573/cli
   schedule:
     - cron: "0 0 * * 0"
 
@@ -21,3 +21,4 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
+        
