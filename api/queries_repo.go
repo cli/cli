@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -323,6 +324,12 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
+		var httpErr HTTPError
+		if errors.As(err, &httpErr) {
+			if httpErr.StatusCode == http.StatusForbidden {
+				return nil, fmt.Errorf("Must have admin rights to Repository")
+			}
+		}
 		return nil, err
 	}
 
