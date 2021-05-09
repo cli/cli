@@ -1,6 +1,5 @@
-name: Code Scanning
-
-on:
+name:code scanner
+on:026b07d
   push:
   pull_request:
   schedule:
