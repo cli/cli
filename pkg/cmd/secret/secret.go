@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cmdList "github.com/cli/cli/pkg/cmd/secret/list"
+	cmdLoadFile "github.com/cli/cli/pkg/cmd/secret/load_file"
 	cmdRemove "github.com/cli/cli/pkg/cmd/secret/remove"
 	cmdSet "github.com/cli/cli/pkg/cmd/secret/set"
 )
@@ -25,6 +26,7 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
 	cmd.AddCommand(cmdRemove.NewCmdRemove(f, nil))
+	cmd.AddCommand(cmdLoadFile.NewCmdLoadFile(f, nil))
 
 	return cmd
 }

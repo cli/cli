@@ -2,7 +2,6 @@ package set
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -20,41 +19,6 @@ type SecretPayload struct {
 	KeyID          string `json:"key_id"`
 }
 
-type PubKey struct {
-	Raw [32]byte
-	ID  string `json:"key_id"`
-	Key string
-}
-
-func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
-	pk := PubKey{}
-	err := client.REST(host, "GET", path, nil, &pk)
-	if err != nil {
-		return nil, err
-	}
-
-	if pk.Key == "" {
-		return nil, fmt.Errorf("failed to find public key at %s/%s", host, path)
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(pk.Key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode public key: %w", err)
-	}
-
-	copy(pk.Raw[:], decoded[0:32])
-	return &pk, nil
-}
-
-func getOrgPublicKey(client *api.Client, host, orgName string) (*PubKey, error) {
-	return getPubKey(client, host, fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName))
-}
-
-func getRepoPubKey(client *api.Client, repo ghrepo.Interface) (*PubKey, error) {
-	return getPubKey(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/secrets/public-key",
-		ghrepo.FullName(repo)))
-}
-
 func putSecret(client *api.Client, host, path string, payload SecretPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -65,7 +29,7 @@ func putSecret(client *api.Client, host, path string, payload SecretPayload) err
 	return client.REST(host, "PUT", path, requestBody, nil)
 }
 
-func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, eValue string) error {
+func putOrgSecret(client *api.Client, host string, pk *shared.PubKey, opts SetOptions, eValue string) error {
 	secretName := opts.SecretName
 	orgName := opts.OrgName
 	visibility := opts.Visibility
@@ -90,7 +54,7 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	return putSecret(client, host, path, payload)
 }
 
-func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string) error {
+func putRepoSecret(client *api.Client, pk *shared.PubKey, repo ghrepo.Interface, secretName, eValue string) error {
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,

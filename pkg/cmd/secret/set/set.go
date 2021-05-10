@@ -7,8 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -77,7 +75,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			opts.SecretName = args[0]
 
-			err := validSecretName(opts.SecretName)
+			err := shared.ValidSecretName(opts.SecretName)
 			if err != nil {
 				return err
 			}
@@ -155,11 +153,11 @@ func setRun(opts *SetOptions) error {
 		return err
 	}
 
-	var pk *PubKey
+	var pk *shared.PubKey
 	if orgName != "" {
-		pk, err = getOrgPublicKey(client, host, orgName)
+		pk, err = shared.GetOrgPublicKey(client, host, orgName)
 	} else {
-		pk, err = getRepoPubKey(client, baseRepo)
+		pk, err = shared.GetRepoPubKey(client, baseRepo)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch public key: %w", err)
@@ -188,28 +186,6 @@ func setRun(opts *SetOptions) error {
 		}
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), opts.SecretName, target)
-	}
-
-	return nil
-}
-
-func validSecretName(name string) error {
-	if name == "" {
-		return errors.New("secret name cannot be blank")
-	}
-
-	if strings.HasPrefix(name, "GITHUB_") {
-		return errors.New("secret name cannot begin with GITHUB_")
-	}
-
-	leadingNumber := regexp.MustCompile(`^[0-9]`)
-	if leadingNumber.MatchString(name) {
-		return errors.New("secret name cannot start with a number")
-	}
-
-	validChars := regexp.MustCompile(`^([0-9]|[a-z]|[A-Z]|_)+$`)
-	if !validChars.MatchString(name) {
-		return errors.New("secret name can only contain letters, numbers, and _")
 	}
 
 	return nil
