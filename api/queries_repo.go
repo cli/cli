@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -315,21 +314,21 @@ type repositoryV3 struct {
 // ForkRepo forks the repository on GitHub and returns the new repository
 func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
-	body := bytes.NewBufferString(`{}`)
+
+	params := map[string]interface{}{}
 	if org != "" {
-		orgBody := fmt.Sprintf(`{ "organization": "%s" }`, org)
-		body = bytes.NewBufferString(orgBody)
+		params["organization"] = org
+	}
+
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(params); err != nil {
+		return nil, err
 	}
 
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
-		var httpErr HTTPError
-		if errors.As(err, &httpErr) {
-			if httpErr.StatusCode == http.StatusForbidden {
-				return nil, fmt.Errorf("Must have admin rights to Repository")
-			}
-		}
 		return nil, err
 	}
 
