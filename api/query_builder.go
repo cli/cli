@@ -186,3 +186,133 @@ func PullRequestGraphQL(fields []string) string {
 	}
 	return strings.Join(q, ",")
 }
+
+var RepositoryFields = []string{
+	"id",
+	"name",
+	"nameWithOwner",
+	"owner",
+	"parent",
+	"templateRepository",
+	"description",
+	"homepageUrl",
+	"openGraphImageUrl",
+	"usesCustomOpenGraphImage",
+	"url",
+	"sshUrl",
+	"mirrorUrl",
+	"securityPolicyUrl",
+
+	"createdAt",
+	"pushedAt",
+	"updatedAt",
+
+	"isBlankIssuesEnabled",
+	"isSecurityPolicyEnabled",
+	"hasIssuesEnabled",
+	"hasProjectsEnabled",
+	"hasWikiEnabled",
+	"mergeCommitAllowed",
+	"squashMergeAllowed",
+	"rebaseMergeAllowed",
+
+	"forkCount",
+	"stargazerCount",
+	"watchers",
+	"issues",
+	"pullRequests",
+
+	"codeOfConduct",
+	"contactLinks",
+	"defaultBranchRef",
+	"deleteBranchOnMerge",
+	"diskUsage",
+	"fundingLinks",
+	"isArchived",
+	"isEmpty",
+	"isFork",
+	"isInOrganization",
+	"isMirror",
+	"isPrivate",
+	"isTemplate",
+	"isUserConfigurationRepository",
+	"licenseInfo",
+	"viewerCanAdminister",
+	"viewerDefaultCommitEmail",
+	"viewerDefaultMergeMethod",
+	"viewerHasStarred",
+	"viewerPermission",
+	"viewerPossibleCommitEmails",
+	"viewerSubscription",
+
+	"repositoryTopics",
+	"primaryLanguage",
+	"languages",
+	"issueTemplates",
+	"pullRequestTemplates",
+	"labels",
+	"milestones",
+	"latestRelease",
+
+	"assignableUsers",
+	"mentionableUsers",
+	"projects",
+
+	// "branchProtectionRules", // too complex to expose
+	// "collaborators", // does it make sense to expose without affiliation filter?
+}
+
+func RepositoryGraphQL(fields []string) string {
+	var q []string
+	for _, field := range fields {
+		switch field {
+		case "codeOfConduct":
+			q = append(q, "codeOfConduct{key,name,url}")
+		case "contactLinks":
+			q = append(q, "contactLinks{about,name,url}")
+		case "fundingLinks":
+			q = append(q, "fundingLinks{platform,url}")
+		case "licenseInfo":
+			q = append(q, "licenseInfo{key,name,nickname}")
+		case "owner":
+			q = append(q, "owner{id,login}")
+		case "parent":
+			q = append(q, "parent{id,name,owner{id,login}}")
+		case "templateRepository":
+			q = append(q, "templateRepository{id,name,owner{id,login}}")
+		case "repositoryTopics":
+			q = append(q, "repositoryTopics(first:100){nodes{topic{name}}}")
+		case "issueTemplates":
+			q = append(q, "issueTemplates{name,title,body,about}")
+		case "pullRequestTemplates":
+			q = append(q, "pullRequestTemplates{body,filename}")
+		case "labels":
+			q = append(q, "labels(first:100){nodes{id,color,name,description}}")
+		case "languages":
+			q = append(q, "languages(first:100){edges{size,node{name}}}")
+		case "primaryLanguage":
+			q = append(q, "primaryLanguage{name}")
+		case "latestRelease":
+			q = append(q, "latestRelease{publishedAt,tagName,name,url}")
+		case "milestones":
+			q = append(q, "milestones(first:100,states:OPEN){nodes{number,title,description,dueOn}}")
+		case "assignableUsers":
+			q = append(q, "assignableUsers(first:100){nodes{id,login,name}}")
+		case "mentionableUsers":
+			q = append(q, "mentionableUsers(first:100){nodes{id,login,name}}")
+		case "projects":
+			q = append(q, "projects(first:100,states:OPEN){nodes{id,name,number,body,resourcePath}}")
+		case "watchers":
+			q = append(q, "watchers{totalCount}")
+		case "issues":
+			q = append(q, "issues(states:OPEN){totalCount}")
+		case "pullRequests":
+			q = append(q, "pullRequests(states:OPEN){totalCount}")
+		case "defaultBranchRef":
+			q = append(q, "defaultBranchRef{name}")
+		default:
+			q = append(q, field)
+		}
+	}
+	return strings.Join(q, ",")
+}

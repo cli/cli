@@ -13,7 +13,7 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 		switch f {
 		case "milestone":
 			if issue.Milestone.Title != "" {
-				data[f] = &issue.Milestone
+				data[f] = map[string]string{"title": issue.Milestone.Title}
 			} else {
 				data[f] = nil
 			}
@@ -44,7 +44,7 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 			data[f] = map[string]string{"name": pr.HeadRepository.Name}
 		case "milestone":
 			if pr.Milestone.Title != "" {
-				data[f] = &pr.Milestone
+				data[f] = map[string]string{"title": pr.Milestone.Title}
 			} else {
 				data[f] = nil
 			}
