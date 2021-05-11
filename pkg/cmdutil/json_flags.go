@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -102,11 +103,14 @@ func (e *exportFormat) Fields() []string {
 	return e.fields
 }
 
+// Write serializes data into JSON output written to w. If the object passed as data implements exportable,
+// or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
+// raw data for serialization.
 func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(data); err != nil {
+	if err := encoder.Encode(e.exportData(reflect.ValueOf(data))); err != nil {
 		return err
 	}
 
@@ -121,3 +125,44 @@ func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) e
 	_, err := io.Copy(w, &buf)
 	return err
 }
+
+func (e *exportFormat) exportData(v reflect.Value) interface{} {
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		if !v.IsNil() {
+			return e.exportData(v.Elem())
+		}
+	case reflect.Slice:
+		a := make([]interface{}, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			a[i] = e.exportData(v.Index(i))
+		}
+		return a
+	case reflect.Map:
+		t := reflect.MapOf(v.Type().Key(), emptyInterfaceType)
+		m := reflect.MakeMapWithSize(t, v.Len())
+		iter := v.MapRange()
+		for iter.Next() {
+			ve := reflect.ValueOf(e.exportData(iter.Value()))
+			m.SetMapIndex(iter.Key(), ve)
+		}
+		return m.Interface()
+	case reflect.Struct:
+		if v.CanAddr() && reflect.PtrTo(v.Type()).Implements(exportableType) {
+			ve := v.Addr().Interface().(exportable)
+			return ve.ExportData(e.fields)
+		} else if v.Type().Implements(exportableType) {
+			ve := v.Interface().(exportable)
+			return ve.ExportData(e.fields)
+		}
+	}
+	return v.Interface()
+}
+
+type exportable interface {
+	ExportData([]string) *map[string]interface{}
+}
+
+var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()
+var sliceOfEmptyInterface []interface{}
+var emptyInterfaceType = reflect.TypeOf(sliceOfEmptyInterface).Elem()
