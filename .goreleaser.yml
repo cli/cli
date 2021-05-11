@@ -24,7 +24,7 @@ builds:
   - <<: *build_defaults
     id: linux
     goos: [linux]
-    goarch: [386, arm, amd64, arm64]
+    goarch: [386, arm, amd64, arm64, ppc64le]
     env:
       - CGO_ENABLED=0
 
