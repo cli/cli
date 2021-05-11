@@ -57,3 +57,28 @@ and talk through which code gets run in order.
 10. The program execution is now back at `func main()` of `cmd/gh/main.go`. If there were any Go errors as a
     result of processing the command, the function will abort the process with a non-zero exit status.
     Otherwise, the process ends with status 0 indicating success.
+
+## How to add a new command
+
+0. First, check on our issue tracker to verify that our team had approved the plans for a new command.
+1. Create a package for the new command, e.g. for a new command `gh boom` create the following directory
+   structure: `pkg/cmd/boom/`
+2. The new package should expose a method, e.g. `NewCmdBoom()`, that accepts a `*cmdutil.Factory` type and
+   returns a `*cobra.Command`.
+   * Any logic specific to this command should be kept within the command's package and not added to any
+     "global" packages like `api` or `utils`.
+3. Use the method from the previous step to generate the command and add it to the command tree, typically
+   somewhere in the `NewCmdRoot()` method.
+
+## How to write tests
+
+This task might be tricky. Typically, gh commands do things like look up information from the git repository
+in the current directory, query the GitHub API, scan the user's `~/.ssh/config` file, clone or fetch git
+repositories, etc. Naturally, none of these things should ever happen for real when running tests, unless
+you are sure that any filesystem operations are stricly scoped to a location made for and maintained by the
+test itself. To avoid actually running things like making real API requests or shelling out to `git`
+commands, we stub them. You should look at how that's done within some existing tests.
+
+To make your code testable, write small, isolated pieces of functionality that are designed to be composed
+together. Prefer table-driven tests for maintaining variations of different test inputs and expectations
+when exercising a single piece of functionality.
