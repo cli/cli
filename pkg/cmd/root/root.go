@@ -66,6 +66,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.SetUsageFunc(rootUsageFunc)
 	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
+	cmd.PersistentFlags().Bool("no-pager", false, "Disable pager")
+	_ = cmd.PersistentFlags().MarkHidden("no-pager")
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if cmd.Flags().Changed("no-pager") {
+			f.IOStreams.SetPager("")
+		}
+	}
+
 	formattedVersion := versionCmd.Format(version, buildDate)
 	cmd.SetVersionTemplate(formattedVersion)
 	cmd.Version = formattedVersion
