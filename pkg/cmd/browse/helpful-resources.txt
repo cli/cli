@@ -1,0 +1,10 @@
+
+Slack channel for help
+https://app.slack.com/client/T021TMCB3EU/C01VB0F524
+
+Project layout
+https://github.com/cli/cli/blob/trunk/docs/project-layout.md
+
+Our working fork
+https://github.com/bchadwic/cli/tree/trunk
+
