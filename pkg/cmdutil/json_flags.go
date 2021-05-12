@@ -26,6 +26,21 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
 	f.StringP("template", "t", "", "Format JSON output using a Go template")
 
+	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var results []string
+		if idx := strings.IndexRune(toComplete, ','); idx >= 0 {
+			toComplete = toComplete[idx+1:]
+		}
+		toComplete = strings.ToLower(toComplete)
+		for _, f := range fields {
+			if strings.HasPrefix(strings.ToLower(f), toComplete) {
+				results = append(results, f)
+			}
+		}
+		sort.Strings(results)
+		return results, cobra.ShellCompDirectiveNoSpace
+	})
+
 	oldPreRun := cmd.PreRunE
 	cmd.PreRunE = func(c *cobra.Command, args []string) error {
 		if oldPreRun != nil {
