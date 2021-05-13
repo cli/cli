@@ -10,7 +10,7 @@ Please do:
 * Open an issue if things aren't working as expected.
 * Open an issue to propose a significant change.
 * Open a pull request to fix a bug.
-* Open a pull request to fix documentation about a command.
+* Open a pull request to fix documentation about a command.  
 * Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
 
 Please avoid:
