@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -28,8 +29,9 @@ type EditOptions struct {
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
 
-	Selector string
-	Filename string
+	Selector     string
+	EditFilename string
+	AddFilename  string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -49,7 +51,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit {<id> | <url>}",
 		Short: "Edit one of your gists",
-		Args:  cmdutil.MinimumArgs(1, "cannot edit: gist argument required"),
+		Args:  cmdutil.ExactArgs(1, "cannot edit: gist argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
 
@@ -60,7 +62,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			return editRun(&opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Select a file to edit")
+
+	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
+	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
 }
@@ -83,12 +87,25 @@ func editRun(opts *EditOptions) error {
 
 	apiClient := api.NewClientFromHTTP(client)
 
-	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
+	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	username, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	gist, err := shared.GetGist(client, host, gistID)
+	if err != nil {
+		if errors.Is(err, shared.NotFoundErr) {
+			return fmt.Errorf("gist not found: %s", gistID)
+		}
+		return err
+	}
+
+	username, err := api.CurrentLoginName(apiClient, host)
 	if err != nil {
 		return err
 	}
@@ -97,10 +114,20 @@ func editRun(opts *EditOptions) error {
 		return fmt.Errorf("You do not own this gist.")
 	}
 
+	if opts.AddFilename != "" {
+		files, err := getFilesToAdd(opts.AddFilename)
+		if err != nil {
+			return err
+		}
+
+		gist.Files = files
+		return updateGist(apiClient, host, gist)
+	}
+
 	filesToUpdate := map[string]string{}
 
 	for {
-		filename := opts.Filename
+		filename := opts.EditFilename
 		candidates := []string{}
 		for filename := range gist.Files {
 			candidates = append(candidates, filename)
@@ -126,22 +153,25 @@ func editRun(opts *EditOptions) error {
 			}
 		}
 
-		if _, ok := gist.Files[filename]; !ok {
+		gistFile, found := gist.Files[filename]
+		if !found {
 			return fmt.Errorf("gist has no file %q", filename)
+		}
+		if shared.IsBinaryContents([]byte(gistFile.Content)) {
+			return fmt.Errorf("editing binary files not supported")
 		}
 
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-		text, err := opts.Edit(editorCommand, filename, gist.Files[filename].Content, opts.IO)
+		text, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
 
 		if err != nil {
 			return err
 		}
 
-		if text != gist.Files[filename].Content {
-			gistFile := gist.Files[filename]
+		if text != gistFile.Content {
 			gistFile.Content = text // so it appears if they re-edit
 			filesToUpdate[filename] = text
 		}
@@ -177,7 +207,7 @@ func editRun(opts *EditOptions) error {
 		case "Submit":
 			stop = true
 		case "Cancel":
-			return cmdutil.SilentError
+			return cmdutil.CancelError
 		}
 
 		if stop {
@@ -189,7 +219,7 @@ func editRun(opts *EditOptions) error {
 		return nil
 	}
 
-	err = updateGist(apiClient, ghinstance.OverridableDefault(), gist)
+	err = updateGist(apiClient, host, gist)
 	if err != nil {
 		return err
 	}
@@ -221,4 +251,31 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	}
 
 	return nil
+}
+
+func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
+	isBinary, err := shared.IsBinaryFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+	}
+	if isBinary {
+		return nil, fmt.Errorf("failed to upload %s: binary file not supported", file)
+	}
+
+	content, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+	}
+
+	if len(content) == 0 {
+		return nil, errors.New("file contents cannot be empty")
+	}
+
+	filename := filepath.Base(file)
+	return map[string]*shared.GistFile{
+		filename: {
+			Filename: filename,
+			Content:  string(content),
+		},
+	}, nil
 }

@@ -19,6 +19,8 @@ type RefreshOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (config.Config, error)
 
+	MainExecutable string
+
 	Hostname string
 	Scopes   []string
 	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
@@ -34,6 +36,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
 			return err
 		},
+		MainExecutable: f.Executable,
 	}
 
 	cmd := &cobra.Command{
@@ -121,14 +124,25 @@ func refreshRun(opts *RefreshOptions) error {
 		return err
 	}
 
-	if err := opts.AuthFlow(cfg, opts.IO, hostname, opts.Scopes); err != nil {
+	var additionalScopes []string
+
+	credentialFlow := &shared.GitCredentialFlow{}
+	gitProtocol, _ := cfg.Get(hostname, "git_protocol")
+	if opts.Interactive && gitProtocol == "https" {
+		if err := credentialFlow.Prompt(hostname); err != nil {
+			return err
+		}
+		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
+	}
+
+	if err := opts.AuthFlow(cfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...)); err != nil {
 		return err
 	}
 
-	protocol, _ := cfg.Get(hostname, "git_protocol")
-	if opts.Interactive && protocol == "https" {
+	if credentialFlow.ShouldSetup() {
 		username, _ := cfg.Get(hostname, "user")
-		if err := shared.GitCredentialSetup(cfg, hostname, username); err != nil {
+		password, _ := cfg.Get(hostname, "oauth_token")
+		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err
 		}
 	}

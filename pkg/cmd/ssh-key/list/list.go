@@ -6,28 +6,29 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
-// ListOptions struct for list command
 type ListOptions struct {
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	HTTPClient func() (*http.Client, error)
 }
 
-// NewCmdList creates a command for list all SSH Keys
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		HTTPClient: f.HttpClient,
 		IO:         f.IOStreams,
+		Config:     f.Config,
+		HTTPClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Lists SSH keys in a GitHub account",
+		Short: "Lists SSH keys in your GitHub account",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
@@ -46,7 +47,17 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	sshKeys, err := userKeys(apiClient, "")
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()
@@ -92,5 +103,6 @@ func truncateMiddle(maxWidth int, t string) string {
 	}
 
 	halfWidth := (maxWidth - len(ellipsis)) / 2
-	return t[0:halfWidth] + ellipsis + t[len(t)-halfWidth:]
+	remainder := (maxWidth - len(ellipsis)) % 2
+	return t[0:halfWidth+remainder] + ellipsis + t[len(t)-halfWidth:]
 }

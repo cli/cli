@@ -80,6 +80,26 @@ func TestRESTGetDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRESTWithFullURL(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := NewClient(ReplaceTripper(http))
+
+	http.Register(
+		httpmock.REST("GET", "api/v3/user/repos"),
+		httpmock.StatusStringResponse(200, "{}"))
+	http.Register(
+		httpmock.REST("GET", "user/repos"),
+		httpmock.StatusStringResponse(200, "{}"))
+
+	err := client.REST("example.com", "GET", "user/repos", nil, nil)
+	assert.NoError(t, err)
+	err = client.REST("example.com", "GET", "https://another.net/user/repos", nil, nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "example.com", http.Requests[0].URL.Hostname())
+	assert.Equal(t, "another.net", http.Requests[1].URL.Hostname())
+}
+
 func TestRESTError(t *testing.T) {
 	fakehttp := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(fakehttp))
@@ -108,68 +128,4 @@ func TestRESTError(t *testing.T) {
 		t.Errorf("got %q", httpErr.Error())
 
 	}
-}
-
-func Test_HasMinimumScopes(t *testing.T) {
-	tests := []struct {
-		name    string
-		header  string
-		wantErr string
-	}{
-		{
-			name:    "no scopes",
-			header:  "",
-			wantErr: "",
-		},
-		{
-			name:    "default scopes",
-			header:  "repo, read:org",
-			wantErr: "",
-		},
-		{
-			name:    "admin:org satisfies read:org",
-			header:  "repo, admin:org",
-			wantErr: "",
-		},
-		{
-			name:    "insufficient scope",
-			header:  "repo",
-			wantErr: "missing required scope 'read:org'",
-		},
-		{
-			name:    "insufficient scopes",
-			header:  "gist",
-			wantErr: "missing required scopes 'repo', 'read:org'",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fakehttp := &httpmock.Registry{}
-			client := NewClient(ReplaceTripper(fakehttp))
-
-			fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					Request:    req,
-					StatusCode: 200,
-					Body:       ioutil.NopCloser(&bytes.Buffer{}),
-					Header: map[string][]string{
-						"X-Oauth-Scopes": {tt.header},
-					},
-				}, nil
-			})
-
-			err := client.HasMinimumScopes("github.com")
-			if tt.wantErr == "" {
-				if err != nil {
-					t.Errorf("error: %v", err)
-				}
-				return
-			}
-			if err.Error() != tt.wantErr {
-				t.Errorf("want %q, got %q", tt.wantErr, err.Error())
-
-			}
-		})
-	}
-
 }

@@ -1,6 +1,7 @@
 package fork
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,6 +36,8 @@ type ForkOptions struct {
 	PromptClone  bool
 	PromptRemote bool
 	RemoteName   string
+	Organization string
+	Rename       bool
 }
 
 var Since = func(t time.Time) time.Duration {
@@ -61,7 +64,12 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Short: "Create a fork of a repository",
 		Long: `Create a fork of a repository.
 
-With no argument, creates a fork of the current repository. Otherwise, forks the specified repository.
+With no argument, creates a fork of the current repository. Otherwise, forks
+the specified repository.
+
+By default, the new fork is set to be your 'origin' remote and any existing
+origin remote is renamed to 'upstream'. To alter this behavior, you can set
+a name for the new fork's remote with --remote-name.
 
 Additional 'git clone' flags can be passed in by listing them after '--'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,12 +79,20 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 				opts.GitArgs = args[1:]
 			}
 
+			if opts.RemoteName == "" {
+				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
+			}
+
 			if promptOk && !cmd.Flags().Changed("clone") {
 				opts.PromptClone = true
 			}
 
 			if promptOk && !cmd.Flags().Changed("remote") {
 				opts.PromptRemote = true
+			}
+
+			if !cmd.Flags().Changed("remote-name") {
+				opts.Rename = true
 			}
 
 			if runF != nil {
@@ -95,6 +111,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
+	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 
 	return cmd
 }
@@ -154,7 +171,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -174,7 +191,6 @@ func forkRun(opts *ForkOptions) error {
 				"already exists")
 		} else {
 			fmt.Fprintf(stderr, "%s already exists", ghrepo.FullName(forkedRepo))
-			return nil
 		}
 	} else {
 		if connectedToTerminal {
@@ -237,11 +253,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if _, err := remotes.FindByName(remoteName); err == nil {
-				if connectedToTerminal {
-					return fmt.Errorf("a remote called '%s' already exists. You can rerun this command with --remote-name to specify a different remote name.", remoteName)
-				} else {
-					// TODO next major version we should break this behavior and force users to opt into
-					// remote renaming in a scripting context via --remote-name
+				if opts.Rename {
 					renameTarget := "upstream"
 					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
 					if err != nil {
@@ -251,6 +263,8 @@ func forkRun(opts *ForkOptions) error {
 					if err != nil {
 						return err
 					}
+				} else {
+					return fmt.Errorf("a git remote named '%s' already exists", remoteName)
 				}
 			}
 

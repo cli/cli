@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -16,32 +17,52 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	WebMode      bool
 	LimitResults int
-	State        string
-	BaseBranch   string
-	Labels       []string
-	Assignee     string
+	Exporter     cmdutil.Exporter
+
+	State      string
+	BaseBranch string
+	Labels     []string
+	Author     string
+	Assignee   string
+	Search     string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
-			$ gh pr list --limit 999
-			$ gh pr list --state closed
-			$ gh pr list --label "priority 1" --label "bug"
+			List PRs authored by you
+			$ gh pr list --author @me
+
+			List PRs assigned to you
+			$ gh pr list --assignee @me
+
+			List PRs by label, combining multiple labels with AND
+			$ gh pr list --label bug --label "priority 1"
+
+			List PRs using search syntax
+			$ gh pr list --search "status:success review:required"
+
+			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -65,9 +86,23 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
+	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
+	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"state",
+	"url",
+	"headRefName",
+	"headRepositoryOwner",
+	"isCrossRepository",
+	"isDraft",
 }
 
 func listRun(opts *ListOptions) error {
@@ -75,22 +110,29 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
+	filters := shared.FilterOptions{
+		Entity:     "pr",
+		State:      strings.ToLower(opts.State),
+		Author:     opts.Author,
+		Assignee:   opts.Assignee,
+		Labels:     opts.Labels,
+		BaseBranch: opts.BaseBranch,
+		Search:     opts.Search,
+		Fields:     defaultFields,
+	}
+	if opts.Exporter != nil {
+		filters.Fields = opts.Exporter.Fields()
+	}
+
 	if opts.WebMode {
 		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
-		openURL, err := shared.ListURLWithQuery(prListURL, shared.FilterOptions{
-			Entity:     "pr",
-			State:      opts.State,
-			Assignee:   opts.Assignee,
-			Labels:     opts.Labels,
-			BaseBranch: opts.BaseBranch,
-		})
+		openURL, err := shared.ListURLWithQuery(prListURL, filters)
 		if err != nil {
 			return err
 		}
@@ -98,50 +140,27 @@ func listRun(opts *ListOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
-	var graphqlState []string
-	switch opts.State {
-	case "open":
-		graphqlState = []string{"OPEN"}
-	case "closed":
-		graphqlState = []string{"CLOSED", "MERGED"}
-	case "merged":
-		graphqlState = []string{"MERGED"}
-	case "all":
-		graphqlState = []string{"OPEN", "CLOSED", "MERGED"}
-	default:
-		return fmt.Errorf("invalid state: %s", opts.State)
-	}
-
-	params := map[string]interface{}{
-		"state": graphqlState,
-	}
-	if len(opts.Labels) > 0 {
-		params["labels"] = opts.Labels
-	}
-	if opts.BaseBranch != "" {
-		params["baseBranch"] = opts.BaseBranch
-	}
-	if opts.Assignee != "" {
-		params["assignee"] = opts.Assignee
-	}
-
-	listResult, err := api.PullRequestList(apiClient, baseRepo, params, opts.LimitResults)
+	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
 	if err != nil {
 		return err
 	}
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		data := api.ExportPRs(listResult.PullRequests, opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+	}
+
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := opts.State != "open" || len(opts.Labels) > 0 || opts.BaseBranch != "" || opts.Assignee != ""
-		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, hasFilters)
+		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 

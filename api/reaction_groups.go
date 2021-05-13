@@ -1,14 +1,42 @@
 package api
 
+import (
+	"bytes"
+	"encoding/json"
+)
+
 type ReactionGroups []ReactionGroup
 
+func (rg ReactionGroups) MarshalJSON() ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.WriteRune('[')
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+
+	hasPrev := false
+	for _, g := range rg {
+		if g.Users.TotalCount == 0 {
+			continue
+		}
+		if hasPrev {
+			buf.WriteRune(',')
+		}
+		if err := encoder.Encode(&g); err != nil {
+			return nil, err
+		}
+		hasPrev = true
+	}
+	buf.WriteRune(']')
+	return buf.Bytes(), nil
+}
+
 type ReactionGroup struct {
-	Content string
-	Users   ReactionGroupUsers
+	Content string             `json:"content"`
+	Users   ReactionGroupUsers `json:"users"`
 }
 
 type ReactionGroupUsers struct {
-	TotalCount int
+	TotalCount int `json:"totalCount"`
 }
 
 func (rg ReactionGroup) Count() int {

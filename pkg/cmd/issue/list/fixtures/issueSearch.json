@@ -1,0 +1,54 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true
+    },
+    "search": {
+      "issueCount": 3,
+      "nodes": [
+        {
+          "number": 1,
+          "title": "number won",
+          "url": "https://wow.com",
+          "updatedAt": "2011-01-26T19:01:12Z",
+          "labels": {
+            "nodes": [
+              {
+                "name": "label"
+              }
+            ],
+            "totalCount": 1
+          }
+        },
+        {
+          "number": 2,
+          "title": "number too",
+          "url": "https://wow.com",
+          "updatedAt": "2011-01-26T19:01:12Z",
+          "labels": {
+            "nodes": [
+              {
+                "name": "label"
+              }
+            ],
+            "totalCount": 1
+          }
+        },
+        {
+          "number": 4,
+          "title": "number fore",
+          "url": "https://wow.com",
+          "updatedAt": "2011-01-26T19:01:12Z",
+          "labels": {
+            "nodes": [
+              {
+                "name": "label"
+              }
+            ],
+            "totalCount": 1
+          }
+        }
+      ]
+    }
+  }
+}

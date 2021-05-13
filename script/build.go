@@ -1,6 +1,6 @@
 // Build tasks for the GitHub CLI project.
 //
-// Usage:  go run script/build.go [<task>]
+// Usage:  go run script/build.go [<tasks>...] [<env>...]
 //
 // Known tasks are:
 //
@@ -65,32 +65,52 @@ var tasks = map[string]func(string) error{
 var self string
 
 func main() {
-	task := "bin/gh"
-	if runtime.GOOS == "windows" {
-		task = "bin\\gh.exe"
+	args := os.Args[:1]
+	for _, arg := range os.Args[1:] {
+		if idx := strings.IndexRune(arg, '='); idx >= 0 {
+			os.Setenv(arg[:idx], arg[idx+1:])
+		} else {
+			args = append(args, arg)
+		}
 	}
 
-	if len(os.Args) > 1 {
-		task = os.Args[1]
+	if len(args) < 2 {
+		if isWindowsTarget() {
+			args = append(args, filepath.Join("bin", "gh.exe"))
+		} else {
+			args = append(args, "bin/gh")
+		}
 	}
 
-	self = filepath.Base(os.Args[0])
+	self = filepath.Base(args[0])
 	if self == "build" {
 		self = "build.go"
 	}
 
-	t := tasks[normalizeTask(task)]
-	if t == nil {
-		fmt.Fprintf(os.Stderr, "Don't know how to build task `%s`.\n", task)
-		os.Exit(1)
-	}
+	for _, task := range args[1:] {
+		t := tasks[normalizeTask(task)]
+		if t == nil {
+			fmt.Fprintf(os.Stderr, "Don't know how to build task `%s`.\n", task)
+			os.Exit(1)
+		}
 
-	err := t(task)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintf(os.Stderr, "%s: building task `%s` failed.\n", self, task)
-		os.Exit(1)
+		err := t(task)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "%s: building task `%s` failed.\n", self, task)
+			os.Exit(1)
+		}
 	}
+}
+
+func isWindowsTarget() bool {
+	if os.Getenv("GOOS") == "windows" {
+		return true
+	}
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return false
 }
 
 func version() string {

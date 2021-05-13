@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -313,9 +312,20 @@ type repositoryV3 struct {
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
-	body := bytes.NewBufferString(`{}`)
+
+	params := map[string]interface{}{}
+	if org != "" {
+		params["organization"] = org
+	}
+
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(params); err != nil {
+		return nil, err
+	}
+
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
@@ -497,7 +507,7 @@ func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 			return m.ID, nil
 		}
 	}
-	return "", errors.New("not found")
+	return "", fmt.Errorf("'%s' not found", title)
 }
 
 func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {

@@ -5,19 +5,30 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
+	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	Browser    browser
 
 	Selector  string
 	Filename  string
@@ -29,15 +40,20 @@ type ViewOptions struct {
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<id> | <url>}",
+		Use:   "view [<id> | <url>]",
 		Short: "View a gist",
-		Args:  cmdutil.MinimumArgs(1, "cannot view: gist argument required"),
+		Long:  `View the given gist or select from recent gists.`,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Selector = args[0]
+			if len(args) == 1 {
+				opts.Selector = args[0]
+			}
 
 			if !opts.IO.IsStdoutTTY() {
 				opts.Raw = true
@@ -60,17 +76,43 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 func viewRun(opts *ViewOptions) error {
 	gistID := opts.Selector
+	client, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	hostname, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	cs := opts.IO.ColorScheme()
+	if gistID == "" {
+		gistID, err = promptGists(client, hostname, cs)
+		if err != nil {
+			return err
+		}
+
+		if gistID == "" {
+			fmt.Fprintln(opts.IO.Out, "No gists found.")
+			return nil
+		}
+	}
 
 	if opts.Web {
 		gistURL := gistID
 		if !strings.Contains(gistURL, "/") {
-			hostname := ghinstance.OverridableDefault()
 			gistURL = ghinstance.GistPrefix(hostname) + gistID
 		}
 		if opts.IO.IsStderrTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(gistURL))
 		}
-		return utils.OpenInBrowser(gistURL)
+		return opts.Browser.Browse(gistURL)
 	}
 
 	if strings.Contains(gistID, "/") {
@@ -81,12 +123,7 @@ func viewRun(opts *ViewOptions) error {
 		gistID = id
 	}
 
-	client, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
-	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
+	gist, err := shared.GetGist(client, hostname, gistID)
 	if err != nil {
 		return err
 	}
@@ -99,8 +136,16 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	render := func(gf *shared.GistFile) error {
+		if shared.IsBinaryContents([]byte(gf.Content)) {
+			if len(gist.Files) == 1 || opts.Filename != "" {
+				return fmt.Errorf("error: file is binary")
+			}
+			_, err = fmt.Fprintln(opts.IO.Out, cs.Gray("(skipping rendering binary content)"))
+			return nil
+		}
+
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			rendered, err := markdown.Render(gf.Content, markdownStyle, "")
+			rendered, err := markdown.Render(gf.Content, markdownStyle)
 			if err != nil {
 				return err
 			}
@@ -115,6 +160,7 @@ func viewRun(opts *ViewOptions) error {
 			_, err := fmt.Fprint(opts.IO.Out, "\n")
 			return err
 		}
+
 		return nil
 	}
 
@@ -126,8 +172,6 @@ func viewRun(opts *ViewOptions) error {
 		return render(gistFile)
 	}
 
-	cs := opts.IO.ColorScheme()
-
 	if gist.Description != "" && !opts.ListFiles {
 		fmt.Fprintf(opts.IO.Out, "%s\n\n", cs.Bold(gist.Description))
 	}
@@ -137,7 +181,10 @@ func viewRun(opts *ViewOptions) error {
 	for fn := range gist.Files {
 		filenames = append(filenames, fn)
 	}
-	sort.Strings(filenames)
+
+	sort.Slice(filenames, func(i, j int) bool {
+		return strings.ToLower(filenames[i]) < strings.ToLower(filenames[j])
+	})
 
 	if opts.ListFiles {
 		for _, fn := range filenames {
@@ -159,4 +206,55 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	return nil
+}
+
+func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
+	gists, err := shared.ListGists(client, host, 10, "all")
+	if err != nil {
+		return "", err
+	}
+
+	if len(gists) == 0 {
+		return "", nil
+	}
+
+	var opts []string
+	var result int
+	var gistIDs = make([]string, len(gists))
+
+	for i, gist := range gists {
+		gistIDs[i] = gist.ID
+		description := ""
+		gistName := ""
+
+		if gist.Description != "" {
+			description = gist.Description
+		}
+
+		filenames := make([]string, 0, len(gist.Files))
+		for fn := range gist.Files {
+			filenames = append(filenames, fn)
+		}
+		sort.Strings(filenames)
+		gistName = filenames[0]
+
+		gistTime := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+		// TODO: support dynamic maxWidth
+		description = text.Truncate(100, text.ReplaceExcessiveWhitespace(description))
+		opt := fmt.Sprintf("%s %s %s", cs.Bold(gistName), description, cs.Gray(gistTime))
+		opts = append(opts, opt)
+	}
+
+	questions := &survey.Select{
+		Message: "Select a gist",
+		Options: opts,
+	}
+
+	err = prompt.SurveyAskOne(questions, &result)
+
+	if err != nil {
+		return "", err
+	}
+
+	return gistIDs[result], nil
 }

@@ -99,9 +99,9 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 		fmt.Fprint(&b, formatCommentStatus(cs, comment.Status()))
 	}
 	if comment.Association() != "NONE" {
-		fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" (%s)", strings.Title(strings.ToLower(comment.Association())))))
+		fmt.Fprint(&b, cs.Boldf(" (%s)", strings.Title(strings.ToLower(comment.Association()))))
 	}
-	fmt.Fprint(&b, cs.Bold(fmt.Sprintf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created()))))
+	fmt.Fprint(&b, cs.Boldf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created())))
 	if comment.IsEdited() {
 		fmt.Fprint(&b, cs.Bold(" • Edited"))
 	}
@@ -124,7 +124,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
 	} else {
 		style := markdown.GetStyle(io.TerminalTheme())
-		md, err = markdown.Render(comment.Content(), style, "")
+		md, err = markdown.Render(comment.Content(), style)
 		if err != nil {
 			return "", err
 		}
