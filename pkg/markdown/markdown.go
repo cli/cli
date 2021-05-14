@@ -48,7 +48,7 @@ func Render(text, style string) (string, error) {
 		glamour.WithEmoji(),
 	}
 
-	return render(FormatImgTags(text), opts)
+	return render(formatImgTags(text), opts)
 }
 
 func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
@@ -94,7 +94,7 @@ func GetStyle(defaultStyle string) string {
 	return "notty"
 }
 
-func FormatImgTags(content string) string {
+func formatImgTags(content string) string {
 	lines := strings.Split(content, "\n")
 	re := regexp.MustCompile(`<img[^>]+\bsrc=["']([^"']+)["']`)
 	for i, line := range lines {
