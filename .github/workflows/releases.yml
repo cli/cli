@@ -133,9 +133,11 @@ jobs:
       - name: Build MSI
         id: buildmsi
         shell: bash
+        env:
+          ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
         run: |
           mkdir -p build
-          msi="$(basename "${{ steps.download_exe.outputs.zip }}" ".zip").msi"
+          msi="$(basename "$ZIP_FILE" ".zip").msi"
           printf "::set-output name=msi::%s\n" "$msi"
           go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
       - name: Obtain signing cert
@@ -145,10 +147,10 @@ jobs:
         run: .\script\setup-windows-certificate.ps1
       - name: Sign MSI
         env:
+          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
+          EXE_FILE: ${{ steps.buildmsi.outputs.msi }}
           GITHUB_CERT_PASSWORD: ${{ secrets.GITHUB_CERT_PASSWORD }}
-        run: |
-          .\script\sign.ps1 -Certificate "${{ steps.obtain_cert.outputs.cert-file }}" `
-            -Executable "${{ steps.buildmsi.outputs.msi }}"
+        run: .\script\sign.ps1 -Certificate $env:CERT_FILE -Executable $env:EXE_FILE
       - name: Upload MSI
         shell: bash
         run: |
