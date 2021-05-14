@@ -118,7 +118,7 @@ jobs:
         id: download_exe
         shell: bash
         run: |
-          hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
+          gh release download "${GITHUB_REF#refs/tags/}" -p '*windows_amd64*.zip'
           printf "::set-output name=zip::%s\n" *.zip
           unzip -o *.zip && rm -v *.zip
         env:
@@ -151,8 +151,14 @@ jobs:
             -Executable "${{ steps.buildmsi.outputs.msi }}"
       - name: Upload MSI
         shell: bash
-        run: hub release edit "${GITHUB_REF#refs/tags/}" -m "" --draft=false -a "${{ steps.buildmsi.outputs.msi }}"
+        run: |
+          tag_name="${GITHUB_REF#refs/tags/}"
+          gh release upload "$tag_name" -- "$MSI_FILE"
+          release_url="$(gh api repos/:owner/:repo/releases -q ".[]|select(.tag_name==\"${tag_name}\")|.url")"
+          gh api -X PATCH "$url" -F draft=false -f discussion_category_name="$DISCUSSION_CATEGORY"
         env:
+          MSI_FILE: ${{ steps.buildmsi.outputs.msi }}
+          DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
         uses: mislav/bump-homebrew-formula-action@v1
@@ -171,7 +177,7 @@ jobs:
       - name: Bump scoop bucket
         shell: bash
         run: |
-          hub release download "${GITHUB_REF#refs/tags/}" -i '*_checksums.txt'
+          gh release download "${GITHUB_REF#refs/tags/}" -p '*_checksums.txt'
           script/scoop-gen "${GITHUB_REF#refs/tags/}" ./scoop-gh/gh.json < *_checksums.txt
           git -C ./scoop-gh commit -m "gh ${GITHUB_REF#refs/tags/}" gh.json
           if [[ $GITHUB_REF == *-* ]]; then
