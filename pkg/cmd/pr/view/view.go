@@ -35,6 +35,8 @@ type ViewOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 
+	Exporter cmdutil.Exporter
+
 	SelectorArg string
 	BrowserMode bool
 	Comments    bool
@@ -60,7 +62,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			is displayed.
 
 			With '--web', open the pull request in a web browser instead.
-    	`),
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -83,6 +85,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -112,6 +115,11 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		exportPR := pr.ExportData(opts.Exporter.Fields())
+		return opts.Exporter.Write(opts.IO.Out, exportPR, opts.IO.ColorEnabled())
+	}
 
 	if connectedToTerminal {
 		return printHumanPrPreview(opts, pr)

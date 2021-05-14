@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/cli/cli/internal/build"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/internal/update"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
@@ -100,6 +100,11 @@ func mainRun() exitCode {
 		cmdFactory.IOStreams.SetPager(pager)
 	}
 
+	// TODO: remove after FromFullName has been revisited
+	if host, err := cfg.DefaultHost(); err == nil {
+		ghrepo.SetDefaultHost(host)
+	}
+
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]
@@ -170,6 +175,12 @@ func mainRun() exitCode {
 		}
 
 		printError(stderr, err, cmd, hasDebug)
+
+		if strings.Contains(err.Error(), "Incorrect function") {
+			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
+			fmt.Fprintln(stderr, "To learn about workarounds for this error, run: gh help mintty")
+			return exitError
+		}
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
@@ -253,7 +264,7 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	}
 
 	repo := updaterEnabled
-	stateFilePath := path.Join(config.ConfigDir(), "state.yml")
+	stateFilePath := filepath.Join(config.ConfigDir(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
 }
 

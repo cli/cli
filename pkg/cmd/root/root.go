@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
-	jobCmd "github.com/cli/cli/pkg/cmd/job"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
@@ -74,6 +73,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
+	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
@@ -82,11 +82,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
-
-	cmd.AddCommand(actionsCmd.NewCmdActions(f))
-	cmd.AddCommand(runCmd.NewCmdRun(f))
-	cmd.AddCommand(jobCmd.NewCmdJob(f))
-	cmd.AddCommand(workflowCmd.NewCmdWorkflow(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -102,9 +97,13 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
+	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
+	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
+	cmd.AddCommand(NewHelpTopic("formatting"))
+	cmd.AddCommand(NewHelpTopic("mintty"))
 	referenceCmd := NewHelpTopic("reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)

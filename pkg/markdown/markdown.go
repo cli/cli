@@ -45,6 +45,7 @@ func render(text string, opts RenderOpts) (string, error) {
 func Render(text, style string) (string, error) {
 	opts := RenderOpts{
 		glamour.WithStylePath(style),
+		glamour.WithEmoji(),
 	}
 
 	return render(FormatImgTags(text), opts)
@@ -53,6 +54,7 @@ func Render(text, style string) (string, error) {
 func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
 	defaultOpts := RenderOpts{
 		glamour.WithStylePath(style),
+		glamour.WithEmoji(),
 	}
 	opts = append(defaultOpts, opts...)
 
@@ -62,6 +64,7 @@ func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
 func RenderWithBaseURL(text, style, baseURL string) (string, error) {
 	opts := RenderOpts{
 		glamour.WithStylePath(style),
+		glamour.WithEmoji(),
 		glamour.WithBaseURL(baseURL),
 	}
 
@@ -71,6 +74,7 @@ func RenderWithBaseURL(text, style, baseURL string) (string, error) {
 func RenderWithWrap(text, style string, wrap int) (string, error) {
 	opts := RenderOpts{
 		glamour.WithStylePath(style),
+		glamour.WithEmoji(),
 		glamour.WithWordWrap(wrap),
 	}
 

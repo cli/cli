@@ -76,7 +76,7 @@ func closeRun(opts *CloseOptions) error {
 	if pr.State == "MERGED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) can't be closed because it was already merged", cs.Red("!"), pr.Number, pr.Title)
 		return cmdutil.SilentError
-	} else if pr.Closed {
+	} else if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) is already closed\n", cs.Yellow("!"), pr.Number, pr.Title)
 		return nil
 	}

@@ -6,6 +6,25 @@ import (
 )
 
 var HelpTopics = map[string]map[string]string{
+	"mintty": {
+		"short": "Information about using gh with MinTTY",
+		"long": heredoc.Doc(`
+			MinTTY is the terminal emulator that comes by default with Git
+			for Windows.  It has known issues with gh's ability to prompt a
+			user for input.
+
+			There are a few workarounds to make gh work with MinTTY:
+
+			- Reinstall Git for Windows, checking "Enable experimental support for pseudo consoles".
+
+			- Use a different terminal emulator with Git for Windows like Windows Terminal.
+			  You can run "C:\Program Files\Git\bin\bash.exe" from any terminal emulator to continue
+			  using all of the tooling in Git For Windows without MinTTY.
+
+			- Prefix invocations of gh with winpty, eg: "winpty gh auth login".
+			  NOTE: this can lead to some UI bugs.
+		`),
+	},
 	"environment": {
 		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
@@ -49,6 +68,31 @@ var HelpTopics = map[string]map[string]string{
 	},
 	"reference": {
 		"short": "A comprehensive reference of all gh commands",
+	},
+	"formatting": {
+		"short": "Formatting options for JSON data exported from gh",
+		"long": heredoc.Docf(`
+			Some gh commands support exporting the data as JSON as an alternative to their usual
+			line-based plain text output. This is suitable for passing structured data to scripts.
+			The JSON output is enabled with the %[1]s--json%[1]s option, followed by the list of fields
+			to fetch. Use the flag without a value to get the list of available fields.
+
+			The %[1]s--jq%[1]s option accepts a query in jq syntax and will print only the resulting
+			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s,
+			but does not require the jq utility to be installed on the system. To learn more
+			about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
+
+			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
+			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
+
+			The following functions are available in templates:
+			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
+			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
+		`, "`"),
 	},
 }
 
