@@ -8,7 +8,7 @@ import (
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "issue <command>",
+		Use:   "browse <command>",
 		Short: "",
 		Long:  `Open GitHub in the browser`,
 		Example: heredoc.Doc(`
@@ -17,7 +17,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			$ gh browse branch "master"
 		`),
 		Annotations: map[string]string{
-			"IsCore": "true", // what is this?
+			"IsCore": "true", 
 			"help:arguments": heredoc.Doc(`
 				Branch names, pr numbers, issue numbers, and file paths
 				can be supplied as arguments in the following formats:
@@ -28,7 +28,8 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmdutil.EnableRepoOverride(cmd, f) // what is this?
+	cmdutil.EnableRepoOverride(cmd, f) 
+
 
 	return cmd
 }
