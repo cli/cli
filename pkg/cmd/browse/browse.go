@@ -2,7 +2,6 @@ package browse
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	cmdView "github.com/cli/cli/pkg/cmd/browse/view"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +29,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f) // what is this?
-
-	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 
 	return cmd
 }

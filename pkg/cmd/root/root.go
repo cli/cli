@@ -2,6 +2,7 @@ package root
 
 import (
 	"net/http"
+	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -77,6 +78,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
+	fmt.Println("making browse command");
 	cmd.AddCommand(browseCmd.NewCmdBrowse(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
