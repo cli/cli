@@ -45,6 +45,7 @@ const (
 func main() {
 	code := mainRun()
 	os.Exit(int(code))
+
 }
 
 func mainRun() exitCode {

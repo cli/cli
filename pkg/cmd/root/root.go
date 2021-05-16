@@ -2,7 +2,6 @@ package root
 
 import (
 	"net/http"
-	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
@@ -95,8 +94,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	repoResolvingCmdFactory := *f
 	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo(f)
 
-	fmt.Println("making browse command");
-	cmd.AddCommand(browseCmd.NewCmdBrowse(f))
+	cmd.AddCommand(browseCmd.NewCmdBrowse(f)) // adds to the commands Commands()
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
