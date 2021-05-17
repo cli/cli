@@ -118,7 +118,7 @@ jobs:
         id: download_exe
         shell: bash
         run: |
-          gh release download "${GITHUB_REF#refs/tags/}" -p '*windows_amd64*.zip'
+          hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
           printf "::set-output name=zip::%s\n" *.zip
           unzip -o *.zip && rm -v *.zip
         env:
@@ -155,7 +155,7 @@ jobs:
         shell: bash
         run: |
           tag_name="${GITHUB_REF#refs/tags/}"
-          gh release upload "$tag_name" -- "$MSI_FILE"
+          hub release edit "$tag_name" -m "" -a "$MSI_FILE"
           release_url="$(gh api repos/:owner/:repo/releases -q ".[]|select(.tag_name==\"${tag_name}\")|.url")"
           publish_args=( -F draft=false )
           if [[ $GITHUB_REF != *-* ]]; then
@@ -183,7 +183,7 @@ jobs:
       - name: Bump scoop bucket
         shell: bash
         run: |
-          gh release download "${GITHUB_REF#refs/tags/}" -p '*_checksums.txt'
+          hub release download "${GITHUB_REF#refs/tags/}" -i '*_checksums.txt'
           script/scoop-gen "${GITHUB_REF#refs/tags/}" ./scoop-gh/gh.json < *_checksums.txt
           git -C ./scoop-gh commit -m "gh ${GITHUB_REF#refs/tags/}" gh.json
           if [[ $GITHUB_REF == *-* ]]; then
