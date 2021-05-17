@@ -157,7 +157,11 @@ jobs:
           tag_name="${GITHUB_REF#refs/tags/}"
           gh release upload "$tag_name" -- "$MSI_FILE"
           release_url="$(gh api repos/:owner/:repo/releases -q ".[]|select(.tag_name==\"${tag_name}\")|.url")"
-          gh api -X PATCH "$url" -F draft=false -f discussion_category_name="$DISCUSSION_CATEGORY"
+          publish_args=( -F draft=false )
+          if [[ $GITHUB_REF != *-* ]]; then
+            publish_args+=( -f discussion_category_name="$DISCUSSION_CATEGORY" )
+          fi
+          gh api -X PATCH "$url" "${publish_args[@]}"
         env:
           MSI_FILE: ${{ steps.buildmsi.outputs.msi }}
           DISCUSSION_CATEGORY: General
