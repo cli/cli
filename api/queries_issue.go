@@ -91,7 +91,10 @@ func (p ProjectCards) ProjectNames() []string {
 }
 
 type Milestone struct {
-	Title string `json:"title"`
+	Number      int        `json:"number"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	DueOn       *time.Time `json:"dueOn"`
 }
 
 type IssuesDisabledError struct {

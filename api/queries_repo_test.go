@@ -144,9 +144,9 @@ func Test_RepoMetadata(t *testing.T) {
 func Test_ProjectsToPaths(t *testing.T) {
 	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER"}
 	projects := []RepoProject{
-		{"id1", "My Project", "/OWNER/REPO/projects/PROJECT_NUMBER"},
-		{"id2", "Org Project", "/orgs/ORG/projects/PROJECT_NUMBER"},
-		{"id3", "Project", "/orgs/ORG/projects/PROJECT_NUMBER_2"},
+		{ID: "id1", Name: "My Project", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER"},
+		{ID: "id2", Name: "Org Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER"},
+		{ID: "id3", Name: "Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_2"},
 	}
 	projectNames := []string{"My Project", "Org Project"}
 
