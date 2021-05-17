@@ -119,8 +119,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		exportPR := pr.ExportData(opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, exportPR, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, pr, opts.IO.ColorEnabled())
 	}
 
 	if connectedToTerminal {

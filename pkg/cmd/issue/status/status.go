@@ -96,11 +96,11 @@ func statusRun(opts *StatusOptions) error {
 
 	if opts.Exporter != nil {
 		data := map[string]interface{}{
-			"createdBy": api.ExportIssues(issuePayload.Authored.Issues, opts.Exporter.Fields()),
-			"assigned":  api.ExportIssues(issuePayload.Assigned.Issues, opts.Exporter.Fields()),
-			"mentioned": api.ExportIssues(issuePayload.Mentioned.Issues, opts.Exporter.Fields()),
+			"createdBy": issuePayload.Authored.Issues,
+			"assigned":  issuePayload.Assigned.Issues,
+			"mentioned": issuePayload.Mentioned.Issues,
 		}
-		return opts.Exporter.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
 	}
 
 	out := opts.IO.Out

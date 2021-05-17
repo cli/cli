@@ -6,13 +6,14 @@ import (
 )
 
 func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
+	v := reflect.ValueOf(issue).Elem()
 	data := map[string]interface{}{}
 
 	for _, f := range fields {
 		switch f {
 		case "milestone":
 			if issue.Milestone.Title != "" {
-				data[f] = &issue.Milestone
+				data[f] = map[string]string{"title": issue.Milestone.Title}
 			} else {
 				data[f] = nil
 			}
@@ -25,7 +26,6 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
 		default:
-			v := reflect.ValueOf(issue).Elem()
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
 		}
@@ -35,6 +35,7 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 }
 
 func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
+	v := reflect.ValueOf(pr).Elem()
 	data := map[string]interface{}{}
 
 	for _, f := range fields {
@@ -43,7 +44,7 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 			data[f] = map[string]string{"name": pr.HeadRepository.Name}
 		case "milestone":
 			if pr.Milestone.Title != "" {
-				data[f] = &pr.Milestone
+				data[f] = map[string]string{"title": pr.Milestone.Title}
 			} else {
 				data[f] = nil
 			}
@@ -75,28 +76,11 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 			}
 			data[f] = &requests
 		default:
-			v := reflect.ValueOf(pr).Elem()
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
 		}
 	}
 
-	return &data
-}
-
-func ExportIssues(issues []Issue, fields []string) *[]interface{} {
-	data := make([]interface{}, len(issues))
-	for i := range issues {
-		data[i] = issues[i].ExportData(fields)
-	}
-	return &data
-}
-
-func ExportPRs(prs []PullRequest, fields []string) *[]interface{} {
-	data := make([]interface{}, len(prs))
-	for i := range prs {
-		data[i] = prs[i].ExportData(fields)
-	}
 	return &data
 }
 

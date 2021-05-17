@@ -155,8 +155,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		data := api.ExportIssues(listResult.Issues, opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, listResult.Issues, opts.IO.ColorEnabled())
 	}
 
 	if isTerminal {

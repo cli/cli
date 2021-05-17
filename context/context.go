@@ -104,7 +104,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		if repo == nil {
 			continue
 		}
-		if repo.IsFork() {
+		if repo.Parent != nil {
 			add(repo.Parent)
 		}
 		add(repo)

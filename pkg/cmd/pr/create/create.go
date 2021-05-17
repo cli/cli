@@ -681,7 +681,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo)
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
