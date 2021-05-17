@@ -67,7 +67,7 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 			To see more help, run 'gh help workflow <subcommand>'
 
 			For more in depth help including examples, see online documentation at:
-			https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli
+			<https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli>
 		`, header, runHeader, workflowHeader)
 }
 
