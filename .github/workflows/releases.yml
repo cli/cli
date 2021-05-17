@@ -161,7 +161,7 @@ jobs:
           if [[ $GITHUB_REF != *-* ]]; then
             publish_args+=( -f discussion_category_name="$DISCUSSION_CATEGORY" )
           fi
-          gh api -X PATCH "$url" "${publish_args[@]}"
+          gh api -X PATCH "$release_url" "${publish_args[@]}"
         env:
           MSI_FILE: ${{ steps.buildmsi.outputs.msi }}
           DISCUSSION_CATEGORY: General
