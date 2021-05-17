@@ -1,48 +1,18 @@
 package list
 
 import (
-	"context"
+	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
-	"time"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/pkg/githubsearch"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
-
-type Repository struct {
-	NameWithOwner string
-	Description   string
-	IsFork        bool
-	IsPrivate     bool
-	IsArchived    bool
-	PushedAt      time.Time
-}
-
-func (r Repository) Info() string {
-	var tags []string
-
-	if r.IsPrivate {
-		tags = append(tags, "private")
-	} else {
-		tags = append(tags, "public")
-	}
-	if r.IsFork {
-		tags = append(tags, "fork")
-	}
-	if r.IsArchived {
-		tags = append(tags, "archived")
-	}
-
-	return strings.Join(tags, ", ")
-}
 
 type RepositoryList struct {
 	Owner        string
-	Repositories []Repository
+	Repositories []api.Repository
 	TotalCount   int
 	FromSearch   bool
 }
@@ -54,6 +24,7 @@ type FilterOptions struct {
 	Language    string
 	Archived    bool
 	NonArchived bool
+	Fields      []string
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
@@ -67,62 +38,65 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 	}
 
 	variables := map[string]interface{}{
-		"perPage":   githubv4.Int(perPage),
-		"endCursor": (*githubv4.String)(nil),
+		"perPage": githubv4.Int(perPage),
 	}
 
 	if filter.Visibility != "" {
 		variables["privacy"] = githubv4.RepositoryPrivacy(strings.ToUpper(filter.Visibility))
-	} else {
-		variables["privacy"] = (*githubv4.RepositoryPrivacy)(nil)
 	}
 
 	if filter.Fork {
 		variables["fork"] = githubv4.Boolean(true)
 	} else if filter.Source {
 		variables["fork"] = githubv4.Boolean(false)
-	} else {
-		variables["fork"] = (*githubv4.Boolean)(nil)
 	}
 
+	inputs := []string{"$perPage:Int!", "$endCursor:String", "$privacy:RepositoryPrivacy", "$fork:Boolean"}
 	var ownerConnection string
 	if owner == "" {
-		ownerConnection = `graphql:"repositoryOwner: viewer"`
+		ownerConnection = "repositoryOwner: viewer"
 	} else {
-		ownerConnection = `graphql:"repositoryOwner(login: $owner)"`
+		ownerConnection = "repositoryOwner(login: $owner)"
 		variables["owner"] = githubv4.String(owner)
+		inputs = append(inputs, "$owner:String!")
 	}
 
-	type repositoryOwner struct {
-		Login        string
-		Repositories struct {
-			Nodes      []Repository
-			TotalCount int
-			PageInfo   struct {
-				HasNextPage bool
-				EndCursor   string
+	type result struct {
+		RepositoryOwner struct {
+			Login        string
+			Repositories struct {
+				Nodes      []api.Repository
+				TotalCount int
+				PageInfo   struct {
+					HasNextPage bool
+					EndCursor   string
+				}
 			}
-		} `graphql:"repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC })"`
+		}
 	}
-	query := reflect.StructOf([]reflect.StructField{
-		{
-			Name: "RepositoryOwner",
-			Type: reflect.TypeOf(repositoryOwner{}),
-			Tag:  reflect.StructTag(ownerConnection),
-		},
-	})
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
+	query := fmt.Sprintf(`query RepositoryList(%s) {
+		%s {
+			login
+			repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) {
+				nodes{%s}
+				totalCount
+				pageInfo{hasNextPage,endCursor}
+			}
+		}
+	}`, strings.Join(inputs, ","), ownerConnection, api.RepositoryGraphQL(filter.Fields))
+
+	apiClient := api.NewClientFromHTTP(client)
 	listResult := RepositoryList{}
 pagination:
 	for {
-		result := reflect.New(query)
-		err := gql.QueryNamed(context.Background(), "RepositoryList", result.Interface(), variables)
+		var res result
+		err := apiClient.GraphQL(hostname, query, variables, &res)
 		if err != nil {
 			return nil, err
 		}
 
-		owner := result.Elem().FieldByName("RepositoryOwner").Interface().(repositoryOwner)
+		owner := res.RepositoryOwner
 		listResult.TotalCount = owner.Repositories.TotalCount
 		listResult.Owner = owner.Login
 
@@ -143,18 +117,24 @@ pagination:
 }
 
 func searchRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	type query struct {
+	type result struct {
 		Search struct {
 			RepositoryCount int
-			Nodes           []struct {
-				Repository Repository `graphql:"...on Repository"`
-			}
-			PageInfo struct {
+			Nodes           []api.Repository
+			PageInfo        struct {
 				HasNextPage bool
 				EndCursor   string
 			}
-		} `graphql:"search(type: REPOSITORY, query: $query, first: $perPage, after: $endCursor)"`
+		}
 	}
+
+	query := fmt.Sprintf(`query RepositoryListSearch($query:String!,$perPage:Int!,$endCursor:String) {
+		search(type: REPOSITORY, query: $query, first: $perPage, after: $endCursor) {
+			repositoryCount
+			nodes{...on Repository{%s}}
+			pageInfo{hasNextPage,endCursor}
+		}
+	}`, api.RepositoryGraphQL(filter.Fields))
 
 	perPage := limit
 	if perPage > 100 {
@@ -162,28 +142,27 @@ func searchRepos(client *http.Client, hostname string, limit int, owner string, 
 	}
 
 	variables := map[string]interface{}{
-		"query":     githubv4.String(searchQuery(owner, filter)),
-		"perPage":   githubv4.Int(perPage),
-		"endCursor": (*githubv4.String)(nil),
+		"query":   githubv4.String(searchQuery(owner, filter)),
+		"perPage": githubv4.Int(perPage),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
+	apiClient := api.NewClientFromHTTP(client)
 	listResult := RepositoryList{FromSearch: true}
 pagination:
 	for {
-		var result query
-		err := gql.QueryNamed(context.Background(), "RepositoryListSearch", &result, variables)
+		var result result
+		err := apiClient.GraphQL(hostname, query, variables, &result)
 		if err != nil {
 			return nil, err
 		}
 
 		listResult.TotalCount = result.Search.RepositoryCount
-		for _, node := range result.Search.Nodes {
+		for _, repo := range result.Search.Nodes {
 			if listResult.Owner == "" {
-				idx := strings.IndexRune(node.Repository.NameWithOwner, '/')
-				listResult.Owner = node.Repository.NameWithOwner[:idx]
+				idx := strings.IndexRune(repo.NameWithOwner, '/')
+				listResult.Owner = repo.NameWithOwner[:idx]
 			}
-			listResult.Repositories = append(listResult.Repositories, node.Repository)
+			listResult.Repositories = append(listResult.Repositories, repo)
 			if len(listResult.Repositories) >= limit {
 				break pagination
 			}
