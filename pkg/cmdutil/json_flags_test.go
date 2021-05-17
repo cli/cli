@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -138,6 +139,29 @@ func Test_exportFormat_Write(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:     "call ExportData",
+			exporter: exportFormat{fields: []string{"field1", "field2"}},
+			args: args{
+				data:         &exportableItem{"item1"},
+				colorEnabled: false,
+			},
+			wantW:   "{\"field1\":\"item1:field1\",\"field2\":\"item1:field2\"}\n",
+			wantErr: false,
+		},
+		{
+			name:     "recursively call ExportData",
+			exporter: exportFormat{fields: []string{"f1", "f2"}},
+			args: args{
+				data: map[string]interface{}{
+					"s1": []exportableItem{{"i1"}, {"i2"}},
+					"s2": []exportableItem{{"i3"}},
+				},
+				colorEnabled: false,
+			},
+			wantW:   "{\"s1\":[{\"f1\":\"i1:f1\",\"f2\":\"i1:f2\"},{\"f1\":\"i2:f1\",\"f2\":\"i2:f2\"}],\"s2\":[{\"f1\":\"i3:f1\",\"f2\":\"i3:f2\"}]}\n",
+			wantErr: false,
+		},
+		{
 			name:     "with jq filter",
 			exporter: exportFormat{filter: ".name"},
 			args: args{
@@ -166,8 +190,20 @@ func Test_exportFormat_Write(t *testing.T) {
 				return
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("exportFormat.Write() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("exportFormat.Write() = %q, want %q", gotW, tt.wantW)
 			}
 		})
 	}
+}
+
+type exportableItem struct {
+	Name string
+}
+
+func (e *exportableItem) ExportData(fields []string) *map[string]interface{} {
+	m := map[string]interface{}{}
+	for _, f := range fields {
+		m[f] = fmt.Sprintf("%s:%s", e.Name, f)
+	}
+	return &m
 }

@@ -116,8 +116,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		exportIssue := issue.ExportData(opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, exportIssue, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, issue, opts.IO.ColorEnabled())
 	}
 
 	if opts.IO.IsStdoutTTY() {
