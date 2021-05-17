@@ -158,7 +158,7 @@ pagination:
 
 		listResult.TotalCount = result.Search.RepositoryCount
 		for _, repo := range result.Search.Nodes {
-			if listResult.Owner == "" {
+			if listResult.Owner == "" && repo.NameWithOwner != "" {
 				idx := strings.IndexRune(repo.NameWithOwner, '/')
 				listResult.Owner = repo.NameWithOwner[:idx]
 			}
