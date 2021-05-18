@@ -118,12 +118,6 @@ type PullRequestCommitCommit struct {
 	}
 }
 
-func (pr *PullRequest) StubCommit(oid string) {
-	pr.Commits.Nodes = append(pr.Commits.Nodes, PullRequestCommit{
-		Commit: PullRequestCommitCommit{Oid: oid},
-	})
-}
-
 type PullRequestFile struct {
 	Path      string `json:"path"`
 	Additions int    `json:"additions"`

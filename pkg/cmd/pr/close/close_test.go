@@ -191,7 +191,7 @@ func TestPrClose_deleteBranch_crossRepo(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Closed pull request #96 (The title of the PR)
-		! Avoiding deleting the remote branch of a pull request from fork
+		! Skipped deleting the remote branch of a pull request from fork
 		✓ Deleted branch blueberries
 	`), output.Stderr())
 }

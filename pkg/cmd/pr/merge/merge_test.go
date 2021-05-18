@@ -203,6 +203,12 @@ func baseRepo(owner, repo, branch string) ghrepo.Interface {
 	}, "github.com")
 }
 
+func stubCommit(pr *api.PullRequest, oid string) {
+	pr.Commits.Nodes = append(pr.Commits.Nodes, api.PullRequestCommit{
+		Commit: api.PullRequestCommitCommit{Oid: oid},
+	})
+}
+
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
@@ -456,7 +462,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 		Title:  "Blueberries are a good fruit",
 		State:  "OPEN",
 	}
-	pr.StubCommit("COMMITSHA1")
+	stubCommit(pr, "COMMITSHA1")
 
 	shared.RunCommandFinder(
 		"",
@@ -497,7 +503,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 		Title:  "Blueberries are a good fruit",
 		State:  "OPEN",
 	}
-	pr.StubCommit("COMMITSHA1")
+	stubCommit(pr, "COMMITSHA1")
 
 	shared.RunCommandFinder(
 		"",

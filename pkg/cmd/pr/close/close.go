@@ -122,7 +122,7 @@ func closeRun(opts *CloseOptions) error {
 		}
 
 		if pr.IsCrossRepository {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Avoiding deleting the remote branch of a pull request from fork\n", cs.WarningIcon())
+			fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the remote branch of a pull request from fork\n", cs.WarningIcon())
 			if !opts.DeleteLocalBranch {
 				return nil
 			}

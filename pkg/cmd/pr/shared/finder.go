@@ -28,11 +28,12 @@ type progressIndicator interface {
 }
 
 type finder struct {
-	baseRepoFn func() (ghrepo.Interface, error)
-	branchFn   func() (string, error)
-	remotesFn  func() (context.Remotes, error)
-	httpClient func() (*http.Client, error)
-	progress   progressIndicator
+	baseRepoFn   func() (ghrepo.Interface, error)
+	branchFn     func() (string, error)
+	remotesFn    func() (context.Remotes, error)
+	httpClient   func() (*http.Client, error)
+	branchConfig func(string) git.BranchConfig
+	progress     progressIndicator
 
 	repo       ghrepo.Interface
 	prNumber   int
@@ -47,11 +48,12 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 	}
 
 	return &finder{
-		baseRepoFn: factory.BaseRepo,
-		branchFn:   factory.Branch,
-		remotesFn:  factory.Remotes,
-		httpClient: factory.HttpClient,
-		progress:   factory.IOStreams,
+		baseRepoFn:   factory.BaseRepo,
+		branchFn:     factory.Branch,
+		remotesFn:    factory.Remotes,
+		httpClient:   factory.HttpClient,
+		progress:     factory.IOStreams,
+		branchConfig: git.ReadBranchConfig,
 	}
 }
 
@@ -79,7 +81,10 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		return nil, nil, errors.New("Find error: no fields specified")
 	}
 
-	_ = f.parseURL(opts.Selector)
+	if repo, prNumber, err := f.parseURL(opts.Selector); err == nil {
+		f.prNumber = prNumber
+		f.repo = repo
+	}
 
 	if f.repo == nil {
 		repo, err := f.baseRepoFn()
@@ -90,8 +95,12 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	}
 
 	if opts.Selector == "" {
-		if err := f.parseCurrentBranch(); err != nil {
+		if branch, prNumber, err := f.parseCurrentBranch(); err != nil {
 			return nil, nil, err
+		} else if prNumber > 0 {
+			f.prNumber = prNumber
+		} else {
+			f.branchName = branch
 		}
 	} else if f.prNumber == 0 {
 		if prNumber, err := strconv.Atoi(strings.TrimPrefix(opts.Selector, "#")); err == nil {
@@ -129,44 +138,44 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 
 var pullURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
 
-func (f *finder) parseURL(prURL string) error {
+func (f *finder) parseURL(prURL string) (ghrepo.Interface, int, error) {
 	if prURL == "" {
-		return fmt.Errorf("invalid URL: %q", prURL)
+		return nil, 0, fmt.Errorf("invalid URL: %q", prURL)
 	}
 
 	u, err := url.Parse(prURL)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("invalid scheme: %s", u.Scheme)
+		return nil, 0, fmt.Errorf("invalid scheme: %s", u.Scheme)
 	}
 
 	m := pullURLRE.FindStringSubmatch(u.Path)
 	if m == nil {
-		return fmt.Errorf("not a pull request URL: %s", prURL)
+		return nil, 0, fmt.Errorf("not a pull request URL: %s", prURL)
 	}
 
-	f.repo = ghrepo.NewWithHost(m[1], m[2], u.Hostname())
-	f.prNumber, _ = strconv.Atoi(m[3])
-	return nil
+	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
+	prNumber, _ := strconv.Atoi(m[3])
+	return repo, prNumber, nil
 }
 
 var prHeadRE = regexp.MustCompile(`^refs/pull/(\d+)/head$`)
 
-func (f *finder) parseCurrentBranch() error {
+func (f *finder) parseCurrentBranch() (string, int, error) {
 	prHeadRef, err := f.branchFn()
 	if err != nil {
-		return err
+		return "", 0, err
 	}
 
-	branchConfig := git.ReadBranchConfig(prHeadRef)
+	branchConfig := f.branchConfig(prHeadRef)
 
 	// the branch is configured to merge a special PR head ref
 	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		f.prNumber, _ = strconv.Atoi(m[1])
-		return nil
+		prNumber, _ := strconv.Atoi(m[1])
+		return "", prNumber, nil
 	}
 
 	var branchOwner string
@@ -193,8 +202,7 @@ func (f *finder) parseCurrentBranch() error {
 		}
 	}
 
-	f.branchName = prHeadRef
-	return nil
+	return prHeadRef, 0, nil
 }
 
 func findByNumber(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.PullRequest, error) {
