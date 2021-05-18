@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ func shortenQuery(q string) string {
 }
 
 var issueComments = shortenQuery(`
-	comments(last: 100) {
+	comments(first: 100) {
 		nodes {
 			author{login},
 			authorAssociation,
@@ -29,25 +30,25 @@ var issueComments = shortenQuery(`
 			minimizedReason,
 			reactionGroups{content,users{totalCount}}
 		},
+		pageInfo{hasNextPage,endCursor},
 		totalCount
 	}
 `)
 
 var prReviewRequests = shortenQuery(`
-	reviewRequests(last: 100) {
+	reviewRequests(first: 100) {
 		nodes {
 			requestedReviewer {
 				__typename,
 				...on User{login},
 				...on Team{name}
 			}
-		},
-		totalCount
+		}
 	}
 `)
 
 var prReviews = shortenQuery(`
-	reviews(last: 100) {
+	reviews(first: 100) {
 		nodes {
 			author{login},
 			authorAssociation,
@@ -56,6 +57,7 @@ var prReviews = shortenQuery(`
 			state,
 			reactionGroups{content,users{totalCount}}
 		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -69,14 +71,38 @@ var prFiles = shortenQuery(`
 	}
 `)
 
-var prStatusCheckRollup = shortenQuery(`
-	commits(last: 1) {
-		totalCount,
+var prCommits = shortenQuery(`
+	commits(first: 100) {
 		nodes {
 			commit {
+				authors(first:100) {
+					nodes {
+						name,
+						email,
+						user{id,login}
+					}
+				},
+				messageHeadline,
+				messageBody,
 				oid,
+				committedDate,
+				authoredDate
+			}
+		}
+	}
+`)
+
+func StatusCheckRollupGraphQL(after string) string {
+	var afterClause string
+	if after != "" {
+		afterClause = ",after:" + after
+	}
+	return fmt.Sprintf(shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
 				statusCheckRollup {
-					contexts(last: 100) {
+					contexts(first:100%s) {
 						nodes {
 							__typename
 							...on StatusContext {
@@ -92,13 +118,14 @@ var prStatusCheckRollup = shortenQuery(`
 								completedAt,
 								detailsUrl
 							}
-						}
+						},
+						pageInfo{hasNextPage,endCursor}
 					}
 				}
 			}
 		}
-	}
-`)
+	}`), afterClause)
+}
 
 var IssueFields = []string{
 	"assignees",
@@ -124,6 +151,7 @@ var PullRequestFields = append(IssueFields,
 	"additions",
 	"baseRefName",
 	"changedFiles",
+	"commits",
 	"deletions",
 	"files",
 	"headRefName",
@@ -178,8 +206,12 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, prReviews)
 		case "files":
 			q = append(q, prFiles)
+		case "commits":
+			q = append(q, prCommits)
+		case "commitsCount": // pseudo-field
+			q = append(q, `commits{totalCount}`)
 		case "statusCheckRollup":
-			q = append(q, prStatusCheckRollup)
+			q = append(q, StatusCheckRollupGraphQL(""))
 		default:
 			q = append(q, field)
 		}

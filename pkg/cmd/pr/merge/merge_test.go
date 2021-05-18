@@ -205,7 +205,7 @@ func baseRepo(owner, repo, branch string) ghrepo.Interface {
 
 func stubCommit(pr *api.PullRequest, oid string) {
 	pr.Commits.Nodes = append(pr.Commits.Nodes, api.PullRequestCommit{
-		Commit: api.PullRequestCommitCommit{Oid: oid},
+		Commit: api.PullRequestCommitCommit{OID: oid},
 	})
 }
 

@@ -75,6 +75,33 @@ type PullRequest struct {
 		TotalCount int
 		Nodes      []PullRequestCommit
 	}
+	StatusCheckRollup struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup struct {
+					Contexts struct {
+						Nodes []struct {
+							TypeName    string    `json:"__typename"`
+							Name        string    `json:"name"`
+							Context     string    `json:"context,omitempty"`
+							State       string    `json:"state,omitempty"`
+							Status      string    `json:"status"`
+							Conclusion  string    `json:"conclusion"`
+							StartedAt   time.Time `json:"startedAt"`
+							CompletedAt time.Time `json:"completedAt"`
+							DetailsURL  string    `json:"detailsUrl"`
+							TargetURL   string    `json:"targetUrl,omitempty"`
+						}
+						PageInfo struct {
+							HasNextPage bool
+							EndCursor   string
+						}
+					}
+				}
+			}
+		}
+	}
+
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
@@ -89,6 +116,7 @@ type PRRepository struct {
 	Name string
 }
 
+// Commit loads just the commit SHA and nothing else
 type Commit struct {
 	OID string `json:"oid"`
 }
@@ -97,25 +125,20 @@ type PullRequestCommit struct {
 	Commit PullRequestCommitCommit
 }
 
-// PullRequestCommitCommit is like "Commit" but with StatusCheckRollup
+// PullRequestCommitCommit contains full information about a commit
 type PullRequestCommitCommit struct {
-	Oid               string
-	StatusCheckRollup struct {
-		Contexts struct {
-			Nodes []struct {
-				TypeName    string    `json:"__typename"`
-				Name        string    `json:"name"`
-				Context     string    `json:"context,omitempty"`
-				State       string    `json:"state,omitempty"`
-				Status      string    `json:"status"`
-				Conclusion  string    `json:"conclusion"`
-				StartedAt   time.Time `json:"startedAt"`
-				CompletedAt time.Time `json:"completedAt"`
-				DetailsURL  string    `json:"detailsUrl"`
-				TargetURL   string    `json:"targetUrl,omitempty"`
-			}
+	OID     string `json:"oid"`
+	Authors struct {
+		Nodes []struct {
+			Name  string
+			Email string
+			User  GitHubUser
 		}
 	}
+	MessageHeadline string
+	MessageBody     string
+	CommittedDate   time.Time
+	AuthoredDate    time.Time
 }
 
 type PullRequestFile struct {
@@ -132,7 +155,6 @@ type ReviewRequests struct {
 			Name     string `json:"name"`
 		}
 	}
-	TotalCount int
 }
 
 func (r ReviewRequests) Logins() []string {
@@ -189,10 +211,10 @@ type PullRequestChecksStatus struct {
 }
 
 func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
-	if len(pr.Commits.Nodes) == 0 {
+	if len(pr.StatusCheckRollup.Nodes) == 0 {
 		return
 	}
-	commit := pr.Commits.Nodes[0].Commit
+	commit := pr.StatusCheckRollup.Nodes[0].Commit
 	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
 		state := c.State // StatusContext
 		if state == "" {

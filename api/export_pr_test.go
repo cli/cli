@@ -129,7 +129,7 @@ func TestPullRequest_ExportData(t *testing.T) {
 			name:   "status checks",
 			fields: []string{"statusCheckRollup"},
 			inputJSON: heredoc.Doc(`
-				{ "commits": { "nodes": [
+				{ "statusCheckRollup": { "nodes": [
 					{ "commit": { "statusCheckRollup": { "contexts": { "nodes": [
 						{
 							"__typename": "CheckRun",

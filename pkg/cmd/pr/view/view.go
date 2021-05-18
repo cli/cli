@@ -78,11 +78,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"url", "number", "title", "state", "body", "author",
-	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions",
+	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
-	"comments", // TODO: fetch only 1 last comment unless `opts.Comments` was set
-	"reactionGroups",
+	"comments", "reactionGroups",
 }
 
 func viewRun(opts *ViewOptions) error {

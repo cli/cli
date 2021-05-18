@@ -1,6 +1,6 @@
 { 
   "number": 123, 
-  "commits": { 
+  "statusCheckRollup": { 
     "nodes": [
       {
         "commit": {

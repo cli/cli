@@ -92,11 +92,11 @@ func checksRun(opts *ChecksOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	if len(pr.Commits.Nodes) == 0 {
+	if len(pr.StatusCheckRollup.Nodes) == 0 {
 		return fmt.Errorf("no commit found on the pull request")
 	}
 
-	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	if len(rollup) == 0 {
 		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
@@ -118,7 +118,7 @@ func checksRun(opts *ChecksOptions) error {
 
 	outputs := []output{}
 
-	for _, c := range pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+	for _, c := range pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 		mark := "✓"
 		bucket := "pass"
 		state := c.State

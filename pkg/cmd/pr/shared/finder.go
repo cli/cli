@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,11 +12,15 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
+	remotes "github.com/cli/cli/context"
 	"github.com/cli/cli/git"
+	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/set"
+	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
+	"golang.org/x/sync/errgroup"
 )
 
 type PRFinder interface {
@@ -30,7 +35,7 @@ type progressIndicator interface {
 type finder struct {
 	baseRepoFn   func() (ghrepo.Interface, error)
 	branchFn     func() (string, error)
-	remotesFn    func() (context.Remotes, error)
+	remotesFn    func() (remotes.Remotes, error)
 	httpClient   func() (*http.Client, error)
 	branchConfig func(string) git.BranchConfig
 	progress     progressIndicator
@@ -120,20 +125,43 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		defer f.progress.StopProgressIndicator()
 	}
 
+	fields := set.NewStringSet()
+	fields.AddValues(opts.Fields)
+	numberFieldOnly := fields.Len() == 1 && fields.Contains("number")
+	fields.Add("id") // for additional preload queries below
+
+	var pr *api.PullRequest
 	if f.prNumber > 0 {
-		if len(opts.Fields) == 1 && opts.Fields[0] == "number" {
+		if numberFieldOnly {
 			// avoid hitting the API if we already have all the information
 			return &api.PullRequest{Number: f.prNumber}, f.repo, nil
 		}
-		pr, err := findByNumber(httpClient, f.repo, f.prNumber, opts.Fields)
+		pr, err = findByNumber(httpClient, f.repo, f.prNumber, fields.ToSlice())
+	} else {
+		pr, err = findForBranch(httpClient, f.repo, opts.BaseBranch, f.branchName, opts.States, fields.ToSlice())
+	}
+	if err != nil {
 		return pr, f.repo, err
 	}
 
-	pr, err := findForBranch(httpClient, f.repo, opts.BaseBranch, f.branchName, opts.States, opts.Fields)
+	g, _ := errgroup.WithContext(context.Background())
+	if fields.Contains("reviews") {
+		g.Go(func() error {
+			return preloadPrReviews(httpClient, f.repo, pr)
+		})
+	}
+	if fields.Contains("comments") {
+		g.Go(func() error {
+			return preloadPrComments(httpClient, f.repo, pr)
+		})
+	}
+	if fields.Contains("statusCheckRollup") {
+		g.Go(func() error {
+			return preloadPrChecks(httpClient, f.repo, pr)
+		})
+	}
 
-	// TODO: preload view: api.ReviewsForPullRequest, api.CommentsForPullRequest
-	// TODO: preload checks: get all checks
-	return pr, f.repo, err
+	return pr, f.repo, g.Wait()
 }
 
 var pullURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/pull/(\d+)`)
@@ -289,6 +317,139 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 	}
 
 	return nil, &NotFoundError{fmt.Errorf("no pull requests found for branch %q", headBranch)}
+}
+
+func preloadPrReviews(httpClient *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.Reviews.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				Reviews api.PullRequestReviews `graphql:"reviews(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.Reviews.PageInfo.EndCursor),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+
+	for {
+		var query response
+		err := gql.QueryNamed(context.Background(), "ReviewsForPullRequest", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.Reviews.Nodes = append(pr.Reviews.Nodes, query.Node.PullRequest.Reviews.Nodes...)
+		pr.Reviews.TotalCount = len(pr.Reviews.Nodes)
+
+		if !query.Node.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.Reviews.PageInfo.EndCursor)
+	}
+
+	pr.Reviews.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrComments(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.Comments.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				Comments api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.Comments.PageInfo.EndCursor),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+
+	for {
+		var query response
+		err := gql.QueryNamed(context.Background(), "CommentsForPullRequest", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.Comments.Nodes = append(pr.Comments.Nodes, query.Node.PullRequest.Comments.Nodes...)
+		pr.Comments.TotalCount = len(pr.Comments.Nodes)
+
+		if !query.Node.PullRequest.Comments.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.Comments.PageInfo.EndCursor)
+	}
+
+	pr.Comments.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if len(pr.StatusCheckRollup.Nodes) == 0 {
+		return nil
+	}
+	statusCheckRollup := &pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+	if !statusCheckRollup.PageInfo.HasNextPage {
+		return nil
+	}
+
+	endCursor := statusCheckRollup.PageInfo.EndCursor
+
+	type response struct {
+		Node *api.PullRequest
+	}
+
+	query := fmt.Sprintf(`
+	query PullRequestStatusChecks($id: ID!, $endCursor: String!) {
+		node(id: $id) {
+			...on PullRequest {
+				%s
+			}
+		}
+	}`, api.StatusCheckRollupGraphQL("$endCursor"))
+
+	variables := map[string]interface{}{
+		"id": pr.ID,
+	}
+
+	apiClient := api.NewClientFromHTTP(client)
+	for {
+		variables["endCursor"] = endCursor
+		var resp response
+		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return err
+		}
+
+		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+		statusCheckRollup.Nodes = append(
+			statusCheckRollup.Nodes,
+			result.Nodes...,
+		)
+
+		if !result.PageInfo.HasNextPage {
+			break
+		}
+		endCursor = result.PageInfo.EndCursor
+	}
+
+	statusCheckRollup.PageInfo.HasNextPage = false
+	return nil
 }
 
 type NotFoundError struct {

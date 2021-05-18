@@ -83,7 +83,7 @@ func Test_checksRun(t *testing.T) {
 		},
 		{
 			name:    "no checks",
-			prJSON:  `{ "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
+			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
@@ -114,7 +114,7 @@ func Test_checksRun(t *testing.T) {
 		{
 			name:    "no checks",
 			nontty:  true,
-			prJSON:  `{ "number": 123, "commits": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
+			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
