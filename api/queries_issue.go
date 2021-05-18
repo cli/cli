@@ -36,14 +36,12 @@ type Issue struct {
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
-	Milestone      Milestone
+	Milestone      *Milestone
 	ReactionGroups ReactionGroups
 }
 
 type Assignees struct {
-	Nodes []struct {
-		Login string `json:"login"`
-	}
+	Nodes      []GitHubUser
 	TotalCount int
 }
 
@@ -56,9 +54,7 @@ func (a Assignees) Logins() []string {
 }
 
 type Labels struct {
-	Nodes []struct {
-		Name string `json:"name"`
-	}
+	Nodes      []IssueLabel
 	TotalCount int
 }
 
@@ -101,7 +97,16 @@ type IssuesDisabledError struct {
 	error
 }
 
+type Owner struct {
+	ID    string `json:"id,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Login string `json:"login"`
+}
+
 type Author struct {
+	// adding these breaks generated GraphQL requests
+	//ID    string `json:"id,omitempty"`
+	//Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
 }
 
@@ -269,13 +274,18 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 				createdAt
 				assignees(first: 100) {
 					nodes {
+						id
+						name
 						login
 					}
 					totalCount
 				}
 				labels(first: 100) {
 					nodes {
+						id
 						name
+						description
+						color
 					}
 					totalCount
 				}
@@ -291,7 +301,10 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 					totalCount
 				}
 				milestone {
+					number
 					title
+					description
+					dueOn
 				}
 				reactionGroups {
 					content

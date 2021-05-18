@@ -2,9 +2,9 @@ package checkout
 
 import (
 	"bytes"
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/api"
@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -20,6 +21,43 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+// repo: either "baseOwner/baseRepo" or "baseOwner/baseRepo:defaultBranch"
+// prHead: "headOwner/headRepo:headBranch"
+func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
+	defaultBranch := ""
+	if idx := strings.IndexRune(repo, ':'); idx >= 0 {
+		defaultBranch = repo[idx+1:]
+		repo = repo[:idx]
+	}
+	baseRepo, err := ghrepo.FromFullName(repo)
+	if err != nil {
+		panic(err)
+	}
+	if defaultBranch != "" {
+		baseRepo = api.InitRepoHostname(&api.Repository{
+			Name:             baseRepo.RepoName(),
+			Owner:            api.RepositoryOwner{Login: baseRepo.RepoOwner()},
+			DefaultBranchRef: api.BranchRef{Name: defaultBranch},
+		}, baseRepo.RepoHost())
+	}
+
+	idx := strings.IndexRune(prHead, ':')
+	headRefName := prHead[idx+1:]
+	headRepo, err := ghrepo.FromFullName(prHead[:idx])
+	if err != nil {
+		panic(err)
+	}
+
+	return baseRepo, &api.PullRequest{
+		Number:              123,
+		HeadRefName:         headRefName,
+		HeadRepositoryOwner: api.Owner{Login: headRepo.RepoOwner()},
+		HeadRepository:      &api.PRRepository{Name: headRepo.RepoName()},
+		IsCrossRepository:   !ghrepo.IsSame(baseRepo, headRepo),
+		MaintainerCanModify: false,
+	}
+}
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
@@ -31,13 +69,6 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 		},
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return api.InitRepoHostname(&api.Repository{
-				Name:             "REPO",
-				Owner:            api.RepositoryOwner{Login: "OWNER"},
-				DefaultBranchRef: api.BranchRef{Name: "master"},
-			}, "github.com"), nil
 		},
 		Remotes: func() (context.Remotes, error) {
 			if remotes == nil {
@@ -78,20 +109,8 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -103,141 +122,17 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
-func TestPRCheckout_urlArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
-	cs.Register(`git checkout -b feature --no-track origin/feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
-
-	output, err := runCommand(http, nil, "master", `https://github.com/OWNER/REPO/pull/123/files`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-}
-
-func TestPRCheckout_urlArg_differentBase(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "POE"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git fetch https://github\.com/OTHER/POE\.git refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 1, "")
-	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote https://github\.com/OTHER/POE\.git`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
-
-	output, err := runCommand(http, nil, "master", `https://github.com/OTHER/POE/pull/123/files`)
-	assert.NoError(t, err)
-	assert.Equal(t, "", output.String())
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	reqBody := struct {
-		Variables struct {
-			Owner string
-			Repo  string
-		}
-	}{}
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	assert.Equal(t, "OTHER", reqBody.Variables.Owner)
-	assert.Equal(t, "POE", reqBody.Variables.Repo)
-}
-
-func TestPRCheckout_branchArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(httpmock.GraphQL(`query PullRequestForBranch\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequests": { "nodes": [
-		{ "number": 123,
-		  "headRefName": "feature",
-		  "headRepositoryOwner": {
-		  	"login": "hubot"
-		  },
-		  "headRepository": {
-		  	"name": "REPO"
-		  },
-		  "isCrossRepository": true,
-		  "maintainerCanModify": false }
-	] } } } }
-	`))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-	cs.Register(`git config branch\.feature\.merge`, 1, "")
-	cs.Register(`git checkout feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
-
-	output, err := runCommand(http, nil, "master", `hubot:feature`)
-	assert.NoError(t, err)
-	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_existingBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -250,6 +145,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
@@ -267,20 +163,8 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -294,26 +178,15 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	output, err := runCommand(http, remotes, "master", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_differentRepo(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -327,26 +200,15 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -358,26 +220,15 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_detachedHead(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": true
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -389,26 +240,15 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	output, err := runCommand(http, nil, "", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -420,26 +260,15 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	output, err := runCommand(http, nil, "feature", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "-foo",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:-foo")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -447,26 +276,16 @@ func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.EqualError(t, err, `invalid branch name: "-foo"`)
 	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": true,
-		"maintainerCanModify": true
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	pr.MaintainerCanModify = true
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -480,25 +299,14 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	http := &httpmock.Registry{}
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -513,25 +321,14 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	output, err := runCommand(http, nil, "master", `123 --recurse-submodules`)
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_force(t *testing.T) {
 	http := &httpmock.Registry{}
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
-	{ "data": { "repository": { "pullRequest": {
-		"number": 123,
-		"headRefName": "feature",
-		"headRepositoryOwner": {
-			"login": "hubot"
-		},
-		"headRepository": {
-			"name": "REPO"
-		},
-		"isCrossRepository": false,
-		"maintainerCanModify": false
-	} } } }
-	`))
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -545,26 +342,15 @@ func TestPRCheckout_force(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRCheckout_detach(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(httpmock.GraphQL(`query PullRequestByNumber\b`), httpmock.StringResponse(`
- 	{ "data": { "repository": { "pullRequest": {
- 		"number": 123,
- 		"headRef": "f8f8f8",
- 		"headRepositoryOwner": {
- 			"login": "hubot"
- 		},
- 		"headRepository": {
- 			"name": "REPO"
- 		},
- 		"isCrossRepository": true,
- 		"maintainerCanModify": true
- 	} } } }
- 	`))
+	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -573,6 +359,7 @@ func TestPRCheckout_detach(t *testing.T) {
 	cs.Register(`git fetch origin refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "", `123 --detach`)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
