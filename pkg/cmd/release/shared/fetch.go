@@ -133,11 +133,7 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		if canPush, err := api.CanPushToRepo(httpClient, baseRepo); err == nil && canPush {
-			return FindDraftRelease(httpClient, baseRepo, tagName)
-		} else if err != nil {
-			return nil, err
-		}
+		return FindDraftRelease(httpClient, baseRepo, tagName)
 	}
 
 	if resp.StatusCode > 299 {
@@ -230,11 +226,8 @@ func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagNam
 				return &r, nil
 			}
 		}
-
-		if len(releases) < perPage {
-			break
-		}
-		page++
+		//nolint:staticcheck
+		break
 	}
 
 	return nil, errors.New("release not found")
