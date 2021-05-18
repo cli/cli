@@ -32,7 +32,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 			Create a new pr comment.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
 
 			With '--web', comment on the pull request in a web browser instead.
 		`),

@@ -32,7 +32,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 			Add this to your %[1]s~/.bash_profile%[1]s:
 
 				eval "$(gh completion -s bash)"
-			
+
 			### zsh
 
 			Generate a %[1]s_gh%[1]s completion script and put it somewhere in your %[1]s$fpath%[1]s:
@@ -43,7 +43,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 				autoload -U compinit
 				compinit -i
-			
+
 			Zsh version 5.7 or later is recommended.
 
 			### fish

@@ -52,7 +52,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			Show CI status for a single pull request.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -59,7 +59,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			- Interactively
 			- via -f or -F flags
 			- As JSON, via STDIN
-    `),
+		`),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
 			$ gh workflow run

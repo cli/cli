@@ -373,8 +373,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { 
-				name 
+			defaultBranchRef {
+				name
 			}
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
@@ -390,8 +390,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		queryPrefix = `
 		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { 
-					name 
+				defaultBranchRef {
+					name
 				}
 				pullRequest(number: $number) {
 					...prWithReviews
@@ -401,23 +401,23 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 	}
 
 	query := fragments + queryPrefix + `
-      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-       totalCount: issueCount
-        edges {
-          node {
-            ...prWithReviews
-          }
-        }
-      }
-      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-        totalCount: issueCount
-        edges {
-          node {
-            ...pr
-          }
-        }
-      }
-    }
+			viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+				totalCount: issueCount
+				edges {
+					node {
+						...prWithReviews
+					}
+				}
+			}
+			reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+				totalCount: issueCount
+				edges {
+					node {
+						...pr
+					}
+				}
+			}
+		}
 	`
 
 	currentUsername := options.Username
@@ -626,7 +626,7 @@ func PullRequestByNumber(client *Client, repo ghrepo.Interface, number int) (*Pu
 				additions
 				deletions
 				author {
-				  login
+					login
 				}
 				` + statusesFragment + `
 				baseRefName

@@ -42,10 +42,10 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		Use:   "diff [<number> | <url> | <branch>]",
 		Short: "View changes in a pull request",
 		Long: heredoc.Doc(`
-			View changes in a pull request. 
+			View changes in a pull request.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

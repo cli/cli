@@ -56,7 +56,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			$ gh alias set pv 'pr view'
 			$ gh pv -w 123
 			#=> gh pr view -w 123
-			
+
 			$ gh alias set bugs 'issue list --label="bugs"'
 			$ gh bugs
 
