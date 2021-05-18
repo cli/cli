@@ -80,7 +80,7 @@ jobs:
           popd
       - name: Run reprepro
         env:
-          RELEASES: "cosmic eoan disco groovy focal stable oldstable testing unstable buster bullseye stretch jessie bionic trusty precise xenial"
+          RELEASES: "cosmic eoan disco groovy focal stable oldstable testing unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
           for release in $RELEASES; do
