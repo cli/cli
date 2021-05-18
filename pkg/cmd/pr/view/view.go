@@ -149,7 +149,11 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "reviewers:\t%s\n", reviewers)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
+	var milestoneTitle string
+	if pr.Milestone != nil {
+		milestoneTitle = pr.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
 	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
 	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
@@ -201,7 +205,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if pr.Milestone.Title != "" {
+	if pr.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
 	}

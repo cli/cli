@@ -11,12 +11,6 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "milestone":
-			if issue.Milestone.Title != "" {
-				data[f] = map[string]string{"title": issue.Milestone.Title}
-			} else {
-				data[f] = nil
-			}
 		case "comments":
 			data[f] = issue.Comments.Nodes
 		case "assignees":
@@ -41,13 +35,7 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 	for _, f := range fields {
 		switch f {
 		case "headRepository":
-			data[f] = map[string]string{"name": pr.HeadRepository.Name}
-		case "milestone":
-			if pr.Milestone.Title != "" {
-				data[f] = map[string]string{"title": pr.Milestone.Title}
-			} else {
-				data[f] = nil
-			}
+			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
 			if n := pr.StatusCheckRollup.Nodes; len(n) > 0 {
 				data[f] = n[0].Commit.StatusCheckRollup.Contexts.Nodes

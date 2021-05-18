@@ -40,7 +40,10 @@ func TestIssue_ExportData(t *testing.T) {
 			outputJSON: heredoc.Doc(`
 				{
 					"milestone": {
-						"title": "The next big thing"
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
 					},
 					"number": 2345
 				}
@@ -119,7 +122,10 @@ func TestPullRequest_ExportData(t *testing.T) {
 			outputJSON: heredoc.Doc(`
 				{
 					"milestone": {
-						"title": "The next big thing"
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
 					},
 					"number": 2345
 				}

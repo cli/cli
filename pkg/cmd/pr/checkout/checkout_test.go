@@ -53,7 +53,7 @@ func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
 		Number:              123,
 		HeadRefName:         headRefName,
 		HeadRepositoryOwner: api.Owner{Login: headRepo.RepoOwner()},
-		HeadRepository:      api.PRRepository{Name: headRepo.RepoName()},
+		HeadRepository:      &api.PRRepository{Name: headRepo.RepoName()},
 		IsCrossRepository:   !ghrepo.IsSame(baseRepo, headRepo),
 		MaintainerCanModify: false,
 	}

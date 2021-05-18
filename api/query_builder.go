@@ -21,7 +21,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -177,21 +177,21 @@ func PullRequestGraphQL(fields []string) string {
 	for _, field := range fields {
 		switch field {
 		case "author":
-			q = append(q, `author{login}`)
+			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
-			q = append(q, `mergedBy{login}`)
+			q = append(q, `mergedBy{login,,...on User{id,name}}`)
 		case "headRepositoryOwner":
-			q = append(q, `headRepositoryOwner{login}`)
+			q = append(q, `headRepositoryOwner{id,login,,...on User{name}}`)
 		case "headRepository":
-			q = append(q, `headRepository{name}`)
+			q = append(q, `headRepository{id,name}`)
 		case "assignees":
-			q = append(q, `assignees(first:100){nodes{login},totalCount}`)
+			q = append(q, `assignees(first:100){nodes{id,login,name},totalCount}`)
 		case "labels":
-			q = append(q, `labels(first:100){nodes{name},totalCount}`)
+			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":
 			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
 		case "milestone":
-			q = append(q, `milestone{title}`)
+			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
 		case "mergeCommit":

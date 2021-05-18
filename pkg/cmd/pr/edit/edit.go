@@ -167,7 +167,9 @@ func editRun(opts *EditOptions) error {
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
 	editable.Projects.Default = pr.ProjectCards.ProjectNames()
-	editable.Milestone.Default = pr.Milestone.Title
+	if pr.Milestone != nil {
+		editable.Milestone.Default = pr.Milestone.Title
+	}
 
 	if opts.Interactive {
 		err = opts.Surveyor.FieldsToEdit(&editable)

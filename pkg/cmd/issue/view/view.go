@@ -155,7 +155,11 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
+	var milestoneTitle string
+	if issue.Milestone != nil {
+		milestoneTitle = issue.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
@@ -196,7 +200,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if issue.Milestone.Title != "" {
+	if issue.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}

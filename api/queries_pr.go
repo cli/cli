@@ -58,7 +58,7 @@ type PullRequest struct {
 	Author              Author
 	MergedBy            *Author
 	HeadRepositoryOwner Owner
-	HeadRepository      PRRepository
+	HeadRepository      *PRRepository
 	IsCrossRepository   bool
 	IsDraft             bool
 	MaintainerCanModify bool
@@ -105,7 +105,7 @@ type PullRequest struct {
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
-	Milestone      Milestone
+	Milestone      *Milestone
 	Comments       Comments
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
@@ -113,7 +113,8 @@ type PullRequest struct {
 }
 
 type PRRepository struct {
-	Name string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Commit loads just the commit SHA and nothing else
