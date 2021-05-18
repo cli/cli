@@ -21,7 +21,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
-			author{login,...on User{id,name}},
+			author{login},
 			authorAssociation,
 			body,
 			createdAt,
@@ -177,11 +177,11 @@ func PullRequestGraphQL(fields []string) string {
 	for _, field := range fields {
 		switch field {
 		case "author":
-			q = append(q, `author{login,...on User{id,name}}`)
+			q = append(q, `author{login}`)
 		case "mergedBy":
-			q = append(q, `mergedBy{login,,...on User{id,name}}`)
+			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":
-			q = append(q, `headRepositoryOwner{id,login,,...on User{name}}`)
+			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
 			q = append(q, `headRepository{id,name}`)
 		case "assignees":

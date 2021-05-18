@@ -104,8 +104,9 @@ type Owner struct {
 }
 
 type Author struct {
-	ID    string `json:"id,omitempty"`
-	Name  string `json:"name,omitempty"`
+	// adding these breaks generated GraphQL requests
+	//ID    string `json:"id,omitempty"`
+	//Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
 }
 
