@@ -108,7 +108,7 @@ func viewRun(opts *ViewOptions) error {
 
 	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
-		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v", err)
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 

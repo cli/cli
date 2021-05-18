@@ -313,7 +313,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.HTMLURL)
+	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
 
 	return nil
 }
