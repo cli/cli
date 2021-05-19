@@ -32,6 +32,14 @@ SignWith: C99B11DEB97541F0
 
 Origin: gh
 Label: gh
+Codename: sid
+Architectures: i386 amd64 armhf arm64
+Components: main
+Description: The GitHub CLI - debian unstable repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
 Codename: buster
 Architectures: i386 amd64 armhf arm64
 Components: main
