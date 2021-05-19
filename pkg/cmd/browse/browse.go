@@ -26,6 +26,7 @@ func openInBrowser(cmd *cobra.Command, f *cmdutil.Factory) {
 	baseRepo, err := f.BaseRepo()
 	if err != nil {
 		fmt.Println("error")
+		return
 	}
 	// ATTN: add into the empty string where you want to go within the repo
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
