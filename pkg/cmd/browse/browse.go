@@ -9,6 +9,7 @@ import (
 )
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
+
 	cmd := &cobra.Command{
 		Long:  "Work with GitHub in the browser", // displays when you are on the help page of this command
 		Short: "Open GitHub in the browser",      // displays in the gh root help
