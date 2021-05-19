@@ -65,8 +65,10 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 var runCommandFinder PRFinder
 
 // RunCommandFinder is the NewMockFinder substitute to be used ONLY in runCommand-style tests.
-func RunCommandFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) {
-	runCommandFinder = NewMockFinder(selector, pr, repo)
+func RunCommandFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+	finder := NewMockFinder(selector, pr, repo)
+	runCommandFinder = finder
+	return finder
 }
 
 type FindOptions struct {
@@ -460,7 +462,7 @@ func (err *NotFoundError) Unwrap() error {
 	return err.error
 }
 
-func NewMockFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) PRFinder {
+func NewMockFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
 	var err error
 	if pr == nil {
 		err = &NotFoundError{errors.New("no pull requests found")}
@@ -476,6 +478,7 @@ func NewMockFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) 
 type mockFinder struct {
 	called         bool
 	expectSelector string
+	expectFields   []string
 	pr             *api.PullRequest
 	repo           ghrepo.Interface
 	err            error
@@ -488,6 +491,9 @@ func (m *mockFinder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface,
 	if m.expectSelector != opts.Selector {
 		return nil, nil, fmt.Errorf("mockFinder: expected selector %q, got %q", m.expectSelector, opts.Selector)
 	}
+	if len(m.expectFields) > 0 && !isEqualSet(m.expectFields, opts.Fields) {
+		return nil, nil, fmt.Errorf("mockFinder: expected fields %v, got %v", m.expectFields, opts.Fields)
+	}
 	if m.called {
 		return nil, nil, errors.New("mockFinder used more than once")
 	}
@@ -499,4 +505,28 @@ func (m *mockFinder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface,
 	}
 
 	return m.pr, m.repo, nil
+}
+
+func (m *mockFinder) ExpectFields(fields []string) {
+	m.expectFields = fields
+}
+
+func isEqualSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aCopy := make([]string, len(a))
+	copy(aCopy, a)
+	bCopy := make([]string, len(b))
+	copy(bCopy, b)
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
+
+	for i := range aCopy {
+		if aCopy[i] != bCopy[i] {
+			return false
+		}
+	}
+	return true
 }

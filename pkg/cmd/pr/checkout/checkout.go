@@ -72,7 +72,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 func checkoutRun(opts *CheckoutOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner"},
+		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
