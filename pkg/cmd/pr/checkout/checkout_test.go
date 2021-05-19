@@ -110,7 +110,8 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository"})
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -164,7 +165,8 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository"})
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -186,7 +188,8 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository"})
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
