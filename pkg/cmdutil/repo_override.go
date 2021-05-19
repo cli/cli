@@ -11,6 +11,11 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
 
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Execute rootCmd's PersistentPreRun hook
+		if rootPPreRun := cmd.Root().PersistentPreRun; rootPPreRun != nil {
+			rootPPreRun(cmd, args)
+		}
+
 		repoOverride, _ := cmd.Flags().GetString("repo")
 		if repoFromEnv := os.Getenv("GH_REPO"); repoOverride == "" && repoFromEnv != "" {
 			repoOverride = repoFromEnv
