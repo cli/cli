@@ -3,7 +3,9 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -165,5 +167,30 @@ func Test_ConfigDir(t *testing.T) {
 			}
 			assert.Regexp(t, tt.want, ConfigDir())
 		})
+	}
+}
+
+func Test_configFile_Write_toDisk(t *testing.T) {
+	configDir := filepath.Join(t.TempDir(), ".config", "gh")
+	os.Setenv(GH_CONFIG_DIR, configDir)
+	defer os.Unsetenv(GH_CONFIG_DIR)
+
+	cfg := NewFromString(`pager: less`)
+	err := cfg.Write()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedConfig := "pager: less\n"
+	if configBytes, err := ioutil.ReadFile(filepath.Join(configDir, "config.yml")); err != nil {
+		t.Error(err)
+	} else if string(configBytes) != expectedConfig {
+		t.Errorf("expected config.yml %q, got %q", expectedConfig, string(configBytes))
+	}
+
+	if configBytes, err := ioutil.ReadFile(filepath.Join(configDir, "hosts.yml")); err != nil {
+		t.Error(err)
+	} else if string(configBytes) != "" {
+		t.Errorf("unexpected hosts.yml: %q", string(configBytes))
 	}
 }
