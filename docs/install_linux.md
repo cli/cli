@@ -2,7 +2,7 @@
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
-the following CPU architectures: `i386`, `amd64`, `arm64`.
+the following CPU architectures: `i386`, `amd64`, `arm64`, `armhf`.
 
 Other sources for installation are community-maintained and thus might lag behind
 our release schedule.
@@ -13,29 +13,20 @@ If none of our official binaries, packages, repositories, nor community sources 
 
 ### Debian, Ubuntu Linux (apt)
 
-Install (Using apt-key):
+:warning: This will only work for the [architectures we officially support](/.goreleaser.yml#L27).
+
+The below should work for any debian-based distribution. You can change `stable` to a specific codename [we support](/.github/workflows/releases.yml#L83) if that is your preference.
+
+Install:
 
 ```bash
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-sudo apt-add-repository https://cli.github.com/packages
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
 ```
-
-**Note**: If you are behind a firewall, the connection to `keyserver.ubuntu.com` might fail. In that case, try running `sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key C99B11DEB97541F0`.
 
 **Note**: If you get _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_ error, try installing the `dirmngr` package. Run `sudo apt-get install dirmngr` and repeat the steps above.  
-
-**Note**: most systems will have `apt-add-repository` already. If you get a _command not found_
-error, try running `sudo apt install software-properties-common` and trying these steps again.
-
-Install (without add-apt-repository, with limited keyring scope):
-```bash
-sudo apt-key --keyring /usr/share/keyrings/githubcli-archive-keyring.gpg adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/github-cli2.list > /dev/null
-sudo apt update
-sudo apt install gh
-```
 
 Upgrade:
 
