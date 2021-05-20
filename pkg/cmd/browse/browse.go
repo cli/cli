@@ -39,8 +39,7 @@ func openInBrowser(cmd *cobra.Command, f *cmdutil.Factory) {
 	// ATTN: add into the empty string where you want to go within the repo
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 	f.Browser.Browse(repoUrl)
-	fmt.Fprintf(w, "%s Now opening %s in browser . . .\n%s",
+	fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
 		cs.Green("✓"),
-		cs.Bold(ghrepo.FullName(baseRepo)),
-		help)
+		cs.Bold(ghrepo.FullName(baseRepo)))
 }
