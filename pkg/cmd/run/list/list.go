@@ -142,7 +142,7 @@ func listRun(opts *ListOptions) error {
 			elapsed = 0
 		}
 		tp.AddField(elapsed.String(), nil, nil)
-		age := time.Now().Sub(run.CreatedAt)
+		age := time.Since(run.CreatedAt)
 		if age < 0 {
 			age = 0
 		}
