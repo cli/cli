@@ -13,13 +13,15 @@ If none of our official binaries, packages, repositories, nor community sources 
 
 ### Debian, Ubuntu Linux (apt)
 
-:warning: This will only work for the deb-based distributions we [explicitly support](/.github/workflows/releases.yml#L83) and the [architectures we officially support](/.goreleaser.yml#L27).
+:warning: This will only work for the [architectures we officially support](/.goreleaser.yml#L27).
+
+The below should work for any debian-based distribution. You can change `stable` to a specific codename [we support](/.github/workflows/releases.yml#L83) if that is your preference.
 
 Install:
 
 ```bash
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/github-cli2.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
 ```
