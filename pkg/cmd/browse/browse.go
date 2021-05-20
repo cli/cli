@@ -14,8 +14,9 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Long:  "Work with GitHub in the browser", // displays when you are on the help page of this command
 		Short: "Open GitHub in the browser",      // displays in the gh root help
 		Use:   "browse",                          // necessary!!! This is the cmd that gets passed on the prompt
-		Run: func(cmd *cobra.Command, args []string) { // run gets rid of the usage / runs function
-			openInBrowser(cmd, f)
+		Args:  cobra.RangeArgs(0, 1),             // make sure only one arg at most is passed
+		Run: func(cmd *cobra.Command, args []string) {
+			openInBrowser(cmd, f) // run gets rid of the usage / runs function
 		},
 	}
 
@@ -23,6 +24,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 }
 
 func openInBrowser(cmd *cobra.Command, f *cmdutil.Factory) {
+	// args := cmd.Args
 	baseRepo, err := f.BaseRepo()
 	if err != nil {
 		fmt.Println("error")
