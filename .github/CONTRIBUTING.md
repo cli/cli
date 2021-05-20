@@ -36,6 +36,8 @@ Run the new binary as:
 
 Run tests with: `go test ./...`
 
+See [project layout documentation](../project-layout.md) for information on where to find specific source files.
+
 ## Submitting a pull request
 
 1. Create a new branch: `git checkout -b my-branch-name`

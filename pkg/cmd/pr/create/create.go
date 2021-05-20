@@ -36,6 +36,7 @@ type CreateOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser
+	Finder     shared.PRFinder
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -117,6 +118,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Finder = shared.NewFinder(f)
+
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
@@ -220,9 +223,13 @@ func createRun(opts *CreateOptions) (err error) {
 		state.Body = opts.Body
 	}
 
-	existingPR, err := api.PullRequestForBranch(
-		client, ctx.BaseRepo, ctx.BaseBranch, ctx.HeadBranchLabel, []string{"OPEN"})
-	var notFound *api.NotFoundError
+	existingPR, _, err := opts.Finder.Find(shared.FindOptions{
+		Selector:   ctx.HeadBranchLabel,
+		BaseBranch: ctx.BaseBranch,
+		States:     []string{"OPEN"},
+		Fields:     []string{"url"},
+	})
+	var notFound *shared.NotFoundError
 	if err != nil && !errors.As(err, &notFound) {
 		return fmt.Errorf("error checking for existing pull request: %w", err)
 	}
@@ -674,7 +681,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo)
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)

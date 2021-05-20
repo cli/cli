@@ -2,12 +2,14 @@ package fork
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
@@ -72,8 +74,9 @@ func TestNewCmdFork(t *testing.T) {
 			name: "blank nontty",
 			cli:  "",
 			wants: ForkOptions{
-				RemoteName: "origin",
-				Rename:     true,
+				RemoteName:   "origin",
+				Rename:       true,
+				Organization: "",
 			},
 		},
 		{
@@ -85,6 +88,7 @@ func TestNewCmdFork(t *testing.T) {
 				PromptClone:  true,
 				PromptRemote: true,
 				Rename:       true,
+				Organization: "",
 			},
 		},
 		{
@@ -102,6 +106,16 @@ func TestNewCmdFork(t *testing.T) {
 				RemoteName: "origin",
 				Remote:     true,
 				Rename:     true,
+			},
+		},
+		{
+			name: "to org",
+			cli:  "--org batmanshome",
+			wants: ForkOptions{
+				RemoteName:   "origin",
+				Remote:       false,
+				Rename:       false,
+				Organization: "batmanshome",
 			},
 		},
 	}
@@ -141,6 +155,7 @@ func TestNewCmdFork(t *testing.T) {
 			assert.Equal(t, tt.wants.Remote, gotOpts.Remote)
 			assert.Equal(t, tt.wants.PromptRemote, gotOpts.PromptRemote)
 			assert.Equal(t, tt.wants.PromptClone, gotOpts.PromptClone)
+			assert.Equal(t, tt.wants.Organization, gotOpts.Organization)
 		})
 	}
 }
@@ -289,6 +304,7 @@ func TestRepoFork_in_parent_tty(t *testing.T) {
 	assert.Equal(t, "✓ Created fork someone/REPO\n✓ Added remote origin\n", output.Stderr())
 	reg.Verify(t)
 }
+
 func TestRepoFork_in_parent_nontty(t *testing.T) {
 	defer stubSince(2 * time.Second)()
 	reg := &httpmock.Registry{}
@@ -409,37 +425,65 @@ func TestRepoFork_in_parent(t *testing.T) {
 
 func TestRepoFork_outside(t *testing.T) {
 	tests := []struct {
-		name string
-		args string
+		name         string
+		args         string
+		postBody     string
+		responseBody string
+		wantStderr   string
 	}{
 		{
-			name: "url arg",
-			args: "--clone=false http://github.com/OWNER/REPO.git",
+			name:         "url arg",
+			args:         "--clone=false http://github.com/OWNER/REPO.git",
+			postBody:     "{}\n",
+			responseBody: `{"name":"REPO", "owner":{"login":"monalisa"}}`,
+			wantStderr: heredoc.Doc(`
+				✓ Created fork monalisa/REPO
+			`),
 		},
 		{
-			name: "full name arg",
-			args: "--clone=false OWNER/REPO",
+			name:         "full name arg",
+			args:         "--clone=false OWNER/REPO",
+			postBody:     "{}\n",
+			responseBody: `{"name":"REPO", "owner":{"login":"monalisa"}}`,
+			wantStderr: heredoc.Doc(`
+				✓ Created fork monalisa/REPO
+			`),
+		},
+		{
+			name:         "fork to org without clone",
+			args:         "--clone=false OWNER/REPO --org batmanshome",
+			postBody:     "{\"organization\":\"batmanshome\"}\n",
+			responseBody: `{"name":"REPO", "owner":{"login":"BatmansHome"}}`,
+			wantStderr: heredoc.Doc(`
+				✓ Created fork BatmansHome/REPO
+			`),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer stubSince(2 * time.Second)()
+
 			reg := &httpmock.Registry{}
-			defer reg.StubWithFixturePath(200, "./forkResult.json")()
+			reg.Register(
+				httpmock.REST("POST", "repos/OWNER/REPO/forks"),
+				func(req *http.Request) (*http.Response, error) {
+					bb, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						return nil, err
+					}
+					assert.Equal(t, tt.postBody, string(bb))
+					return &http.Response{
+						Request:    req,
+						StatusCode: 200,
+						Body:       ioutil.NopCloser(bytes.NewBufferString(tt.responseBody)),
+					}, nil
+				})
+
 			httpClient := &http.Client{Transport: reg}
-
 			output, err := runCommand(httpClient, nil, true, tt.args)
-			if err != nil {
-				t.Errorf("error running command `repo fork`: %v", err)
-			}
-
+			assert.NoError(t, err)
 			assert.Equal(t, "", output.String())
-
-			r := regexp.MustCompile(`Created fork.*someone/REPO`)
-			if !r.MatchString(output.Stderr()) {
-				t.Errorf("output did not match regexp /%s/\n> output\n%s\n", r, output)
-				return
-			}
+			assert.Equal(t, tt.wantStderr, output.Stderr())
 			reg.Verify(t)
 		})
 	}

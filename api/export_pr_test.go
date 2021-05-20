@@ -40,7 +40,10 @@ func TestIssue_ExportData(t *testing.T) {
 			outputJSON: heredoc.Doc(`
 				{
 					"milestone": {
-						"title": "The next big thing"
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
 					},
 					"number": 2345
 				}
@@ -90,31 +93,6 @@ func TestIssue_ExportData(t *testing.T) {
 	}
 }
 
-func TestExportIssues(t *testing.T) {
-	issues := []Issue{
-		{Milestone: Milestone{Title: "hi"}},
-		{},
-	}
-	exported := ExportIssues(issues, []string{"milestone"})
-
-	buf := bytes.Buffer{}
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "\t")
-	require.NoError(t, enc.Encode(exported))
-	assert.Equal(t, heredoc.Doc(`
-		[
-			{
-				"milestone": {
-					"title": "hi"
-				}
-			},
-			{
-				"milestone": null
-			}
-		]
-	`), buf.String())
-}
-
 func TestPullRequest_ExportData(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -144,7 +122,10 @@ func TestPullRequest_ExportData(t *testing.T) {
 			outputJSON: heredoc.Doc(`
 				{
 					"milestone": {
-						"title": "The next big thing"
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
 					},
 					"number": 2345
 				}
@@ -154,7 +135,7 @@ func TestPullRequest_ExportData(t *testing.T) {
 			name:   "status checks",
 			fields: []string{"statusCheckRollup"},
 			inputJSON: heredoc.Doc(`
-				{ "commits": { "nodes": [
+				{ "statusCheckRollup": { "nodes": [
 					{ "commit": { "statusCheckRollup": { "contexts": { "nodes": [
 						{
 							"__typename": "CheckRun",

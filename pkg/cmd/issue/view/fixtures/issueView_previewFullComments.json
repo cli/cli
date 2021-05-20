@@ -1,7 +1,6 @@
 {
   "data": {
-    "repository": {
-      "issue": {
+    "node": {
         "comments": {
           "nodes": [
             {
@@ -315,6 +314,5 @@
           "totalCount": 6
         }
       }
-    }
   }
 }

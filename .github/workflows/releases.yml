@@ -80,7 +80,7 @@ jobs:
           popd
       - name: Run reprepro
         env:
-          RELEASES: "cosmic eoan disco groovy focal stable oldstable testing unstable buster bullseye stretch jessie bionic trusty precise xenial"
+          RELEASES: "cosmic eoan disco groovy focal stable oldstable testing unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
           for release in $RELEASES; do
@@ -133,9 +133,11 @@ jobs:
       - name: Build MSI
         id: buildmsi
         shell: bash
+        env:
+          ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
         run: |
           mkdir -p build
-          msi="$(basename "${{ steps.download_exe.outputs.zip }}" ".zip").msi"
+          msi="$(basename "$ZIP_FILE" ".zip").msi"
           printf "::set-output name=msi::%s\n" "$msi"
           go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
       - name: Obtain signing cert
@@ -145,14 +147,24 @@ jobs:
         run: .\script\setup-windows-certificate.ps1
       - name: Sign MSI
         env:
+          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
+          EXE_FILE: ${{ steps.buildmsi.outputs.msi }}
           GITHUB_CERT_PASSWORD: ${{ secrets.GITHUB_CERT_PASSWORD }}
-        run: |
-          .\script\sign.ps1 -Certificate "${{ steps.obtain_cert.outputs.cert-file }}" `
-            -Executable "${{ steps.buildmsi.outputs.msi }}"
+        run: .\script\sign.ps1 -Certificate $env:CERT_FILE -Executable $env:EXE_FILE
       - name: Upload MSI
         shell: bash
-        run: hub release edit "${GITHUB_REF#refs/tags/}" -m "" --draft=false -a "${{ steps.buildmsi.outputs.msi }}"
+        run: |
+          tag_name="${GITHUB_REF#refs/tags/}"
+          hub release edit "$tag_name" -m "" -a "$MSI_FILE"
+          release_url="$(gh api repos/:owner/:repo/releases -q ".[]|select(.tag_name==\"${tag_name}\")|.url")"
+          publish_args=( -F draft=false )
+          if [[ $GITHUB_REF != *-* ]]; then
+            publish_args+=( -f discussion_category_name="$DISCUSSION_CATEGORY" )
+          fi
+          gh api -X PATCH "$release_url" "${publish_args[@]}"
         env:
+          MSI_FILE: ${{ steps.buildmsi.outputs.msi }}
+          DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
         uses: mislav/bump-homebrew-formula-action@v1

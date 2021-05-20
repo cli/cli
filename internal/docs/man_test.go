@@ -175,11 +175,10 @@ func assertNextLineEquals(scanner *bufio.Scanner, expectedLine string) error {
 }
 
 func BenchmarkGenManToFile(b *testing.B) {
-	file, err := ioutil.TempFile("", "")
+	file, err := ioutil.TempFile(b.TempDir(), "")
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.Remove(file.Name())
 	defer file.Close()
 
 	b.ResetTimer()

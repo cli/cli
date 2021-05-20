@@ -36,6 +36,7 @@ type ForkOptions struct {
 	PromptClone  bool
 	PromptRemote bool
 	RemoteName   string
+	Organization string
 	Rename       bool
 }
 
@@ -110,6 +111,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
+	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 
 	return cmd
 }
@@ -169,7 +171,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)

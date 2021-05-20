@@ -29,6 +29,7 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
+	Exporter   cmdutil.Exporter
 
 	RepoArg string
 	Web     bool
@@ -67,9 +68,12 @@ With '--branch', view a specific branch of the repository.`,
 
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a repository in the browser")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "View a specific branch of the repository")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 
 	return cmd
 }
+
+var defaultFields = []string{"name", "owner", "description"}
 
 func viewRun(opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
@@ -101,9 +105,22 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	repo, err := api.GitHubRepo(apiClient, toView)
+	var readme *RepoReadme
+	fields := defaultFields
+	if opts.Exporter != nil {
+		fields = opts.Exporter.Fields()
+	}
+
+	repo, err := fetchRepository(apiClient, toView, fields)
 	if err != nil {
 		return err
+	}
+
+	if !opts.Web && opts.Exporter == nil {
+		readme, err = RepositoryReadme(httpClient, toView, opts.Branch)
+		if err != nil && !errors.Is(err, NotFoundError) {
+			return err
+		}
 	}
 
 	openURL := generateBranchURL(toView, opts.Branch)
@@ -114,21 +131,17 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	fullName := ghrepo.FullName(toView)
-
-	readme, err := RepositoryReadme(httpClient, toView, opts.Branch)
-	if err != nil && err != NotFoundError {
-		return err
-	}
-
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
+	if err := opts.IO.StartPager(); err != nil {
 		return err
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO.Out, repo, opts.IO.ColorEnabled())
+	}
+
+	fullName := ghrepo.FullName(toView)
 	stdout := opts.IO.Out
 
 	if !opts.IO.IsStdoutTTY() {

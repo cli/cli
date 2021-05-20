@@ -693,6 +693,9 @@ func Test_apiRun_inputFile(t *testing.T) {
 			contentLength: 10,
 		},
 	}
+
+	tempDir := t.TempDir()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, stdin, _, _ := iostreams.Test()
@@ -702,13 +705,12 @@ func Test_apiRun_inputFile(t *testing.T) {
 			if tt.inputFile == "-" {
 				_, _ = stdin.Write(tt.inputContents)
 			} else {
-				f, err := ioutil.TempFile("", tt.inputFile)
+				f, err := ioutil.TempFile(tempDir, tt.inputFile)
 				if err != nil {
 					t.Fatal(err)
 				}
 				_, _ = f.Write(tt.inputContents)
-				f.Close()
-				t.Cleanup(func() { os.Remove(f.Name()) })
+				defer f.Close()
 				inputFile = f.Name()
 			}
 
@@ -825,13 +827,13 @@ func Test_parseFields(t *testing.T) {
 }
 
 func Test_magicFieldValue(t *testing.T) {
-	f, err := ioutil.TempFile("", "gh-test")
+	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	fmt.Fprint(f, "file contents")
-	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
 
 	io, _, _, _ := iostreams.Test()
 
@@ -932,13 +934,13 @@ func Test_magicFieldValue(t *testing.T) {
 }
 
 func Test_openUserFile(t *testing.T) {
-	f, err := ioutil.TempFile("", "gh-test")
+	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
+
 	fmt.Fprint(f, "file contents")
-	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
 
 	file, length, err := openUserFile(f.Name(), nil)
 	if err != nil {

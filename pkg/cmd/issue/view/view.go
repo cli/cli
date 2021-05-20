@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
+	"github.com/cli/cli/pkg/set"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -82,9 +83,17 @@ func viewRun(opts *ViewOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, repo, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	loadComments := opts.Comments
+	if !loadComments && opts.Exporter != nil {
+		fields := set.NewStringSet()
+		fields.AddValues(opts.Exporter.Fields())
+		loadComments = fields.Contains("comments")
+	}
+
+	opts.IO.StartProgressIndicator()
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
@@ -97,27 +106,14 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	if opts.Comments {
-		opts.IO.StartProgressIndicator()
-		comments, err := api.CommentsForIssue(apiClient, repo, issue)
-		opts.IO.StopProgressIndicator()
-		if err != nil {
-			return err
-		}
-		issue.Comments = *comments
-	}
-
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		exportIssue := issue.ExportData(opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, exportIssue, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, issue, opts.IO.ColorEnabled())
 	}
 
 	if opts.IO.IsStdoutTTY() {
@@ -130,6 +126,19 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	return printRawIssuePreview(opts.IO.Out, issue)
+}
+
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
+	apiClient := api.NewClientFromHTTP(client)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepoFn, selector)
+	if err != nil {
+		return issue, err
+	}
+
+	if loadComments {
+		err = preloadIssueComments(client, repo, issue)
+	}
+	return issue, err
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
@@ -146,7 +155,11 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
+	var milestoneTitle string
+	if issue.Milestone != nil {
+		milestoneTitle = issue.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
@@ -187,7 +200,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if issue.Milestone.Title != "" {
+	if issue.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
