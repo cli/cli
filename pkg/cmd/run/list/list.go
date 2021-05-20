@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -115,6 +116,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("EVENT", nil, nil)
 		tp.AddField("ID", nil, nil)
+		tp.AddField("ELAPSED", nil, nil)
 		tp.AddField("AGE", nil, nil)
 		tp.EndRow()
 	}
@@ -140,7 +142,11 @@ func listRun(opts *ListOptions) error {
 			elapsed = 0
 		}
 		tp.AddField(elapsed.String(), nil, nil)
-
+		age := time.Now().Sub(run.CreatedAt)
+		if age < 0 {
+			age = 0
+		}
+		tp.AddField(utils.FuzzyAgo(age), nil, nil)
 		tp.EndRow()
 	}
 
