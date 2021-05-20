@@ -71,7 +71,7 @@ MSI installers are available for download on the [releases page][].
 
 ### Github Actions
 
-`gh` is pre-installed on [Github Hosted Runner](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners)
+GitHub CLI comes pre-installed in all [Github-Hosted Runner](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners).
 
 ### Other platforms
 
