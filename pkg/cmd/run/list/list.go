@@ -142,10 +142,6 @@ func listRun(opts *ListOptions) error {
 			elapsed = 0
 		}
 		tp.AddField(elapsed.String(), nil, nil)
-		age := time.Since(run.CreatedAt)
-		if age < 0 {
-			age = 0
-		}
 		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.CreatedAt), nil, nil)
 		tp.EndRow()
 	}
