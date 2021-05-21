@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
@@ -108,6 +109,18 @@ func listRun(opts *ListOptions) error {
 
 	out := opts.IO.Out
 
+	if !opts.PlainOutput {
+		tp.AddField("STATUS", nil, nil)
+		tp.AddField("NAME", nil, nil)
+		tp.AddField("WORKFLOW", nil, nil)
+		tp.AddField("BRANCH", nil, nil)
+		tp.AddField("EVENT", nil, nil)
+		tp.AddField("ID", nil, nil)
+		tp.AddField("ELAPSED", nil, nil)
+		tp.AddField("AGE", nil, nil)
+		tp.EndRow()
+	}
+
 	for _, run := range runs {
 		if opts.PlainOutput {
 			tp.AddField(string(run.Status), nil, nil)
@@ -122,17 +135,14 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(run.Name, nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
-
-		if opts.PlainOutput {
-			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			tp.AddField(elapsed.String(), nil, nil)
-		}
-
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
 
+		elapsed := run.UpdatedAt.Sub(run.CreatedAt)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		tp.AddField(elapsed.String(), nil, nil)
+		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.CreatedAt), nil, nil)
 		tp.EndRow()
 	}
 
