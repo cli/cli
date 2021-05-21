@@ -208,6 +208,8 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, prFiles)
 		case "commits":
 			q = append(q, prCommits)
+		case "lastCommit": // pseudo-field
+			q = append(q, `commits(last:1){nodes{commit{oid}}}`)
 		case "commitsCount": // pseudo-field
 			q = append(q, `commits{totalCount}`)
 		case "statusCheckRollup":
