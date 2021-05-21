@@ -146,7 +146,7 @@ func listRun(opts *ListOptions) error {
 		if age < 0 {
 			age = 0
 		}
-		tp.AddField(utils.FuzzyAgo(age), nil, nil)
+		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.CreatedAt), nil, nil)
 		tp.EndRow()
 	}
 
