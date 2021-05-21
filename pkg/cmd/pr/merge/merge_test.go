@@ -464,11 +464,8 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder(
-		"",
-		pr,
-		baseRepo("OWNER", "REPO", "master"),
-	)
+	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -505,11 +502,8 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder(
-		"",
-		pr,
-		baseRepo("OWNER", "REPO", "master"),
-	)
+	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
