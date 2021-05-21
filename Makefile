@@ -72,3 +72,8 @@ install: bin/gh manpages
 .PHONY: uninstall
 uninstall:
 	rm -f ${DESTDIR}${bindir}/gh ${DESTDIR}${mandir}/man1/gh.1 ${DESTDIR}${mandir}/man1/gh-*.1
+
+## misc.
+
+ghes-%.graphql:
+	curl -fsSL https://docs.github.com/public/$(@:.graphql=)/schema.docs-enterprise.graphql -o "$@"
