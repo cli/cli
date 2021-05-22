@@ -179,12 +179,24 @@ type secretsPayload struct {
 }
 
 func getSecrets(client *api.Client, host, path string) ([]*Secret, error) {
-	result := secretsPayload{}
+	results := secretsPayload{}
 
-	err := client.REST(host, "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
+	perPage := 100
+	page := 1
+
+	for {
+		result := secretsPayload{}
+		err := client.REST(host, "GET", fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page), nil, &result)
+		if err != nil {
+			return nil, err
+		}
+		results.Secrets = append(results.Secrets, result.Secrets...)
+		if len(result.Secrets) == 0 || len(result.Secrets) < 100 {
+			break
+		}
+
+		page++
 	}
 
-	return result.Secrets, nil
+	return results.Secrets, nil
 }
