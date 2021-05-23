@@ -25,7 +25,7 @@ type BrowseOptions struct {
 	FileArg     string // Used for storing the file path
 	NumberArg   int    // Used for storing pull request number
 
-	ProjectFlag  bool
+	ProjectsFlag bool
 	WikiFlag     bool
 	SettingsFlag bool
 }
@@ -53,7 +53,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ProjectFlag, "project", "p", false, "Open projects tab in browser")
+	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open projects tab in browser")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browse")
 
