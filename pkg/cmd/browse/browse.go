@@ -24,6 +24,10 @@ type BrowseOptions struct {
 	SelectorArg string
 	FileArg     string // Used for storing the file path
 	NumberArg   int    // Used for storing pull request number
+
+	ProjectFlag  bool
+	WikiFlag     bool
+	SettingsFlag bool
 }
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
@@ -48,6 +52,10 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			openInBrowser(cmd, opts) // run gets rid of the usage / runs function
 		},
 	}
+
+	cmd.Flags().BoolVarP(&opts.ProjectFlag, "project", "p", false, "Open projects tab in browser")
+	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
+	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browse")
 
 	return cmd
 }
@@ -86,11 +94,3 @@ func parseArgs(opts *BrowseOptions) {
 		}
 	}
 }
-
-func parseFlags(opts *BrowseOptions) {
-
-}
-
-//hello
-
-//making pull request
