@@ -44,6 +44,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Short: "Open GitHub in the browser",      // displays in the gh root help
 		Use:   "browse",                          // necessary!!! This is the cmd that gets passed on the prompt
 		Args:  cobra.RangeArgs(0, 1),             // make sure only one arg at most is passed
+
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if len(args) > 0 {
@@ -66,20 +67,34 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	baseRepo, err := opts.BaseRepo()
 	w := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
-	help := "Use 'gh browse --help' for more information about browse\n"
-	if err != nil {
-		fmt.Fprintf(w, "%s Navigate to a repository to open in browser\n%s",
-			cs.Red("x"),
-			help)
+
+	if !inRepo(err) {
+		fmt.Fprintf(w, "%s Navigate to a repository to open in browser\nUse 'gh browse --help' for more information about browse\n",
+			cs.Red("x"))
+		return
+	}
+
+	if !validFlagAmount(cmd) {
+		fmt.Fprintf(w, "%s Only one flag allowed for 'gh browse'\nUse 'gh browse --help' for more information about browse\n",
+			cs.Red("x"))
+		return
+	}
+
+	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
+	parseArgs(opts)
+
+	if opts.ProjectsFlag && opts.SelectorArg == "" {
+		repoUrl += "/projects"
+		opts.Browser.Browse(repoUrl)
+		printSuccess(opts, repoUrl)
 		return
 	}
 
 	// ATTN: add into the empty string where you want to go within the repo
-	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 	opts.Browser.Browse(repoUrl)
 	fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
 		cs.Green("✓"),
-		cs.Bold(ghrepo.FullName(baseRepo)))
+		cs.Bold(repoUrl))
 }
 
 func parseArgs(opts *BrowseOptions) {
@@ -93,4 +108,18 @@ func parseArgs(opts *BrowseOptions) {
 			opts.NumberArg = convertedArg
 		}
 	}
+}
+
+func printSuccess(opts *BrowseOptions, url string) {
+	fmt.Fprintf(opts.IO.ErrOut, "%s Now opening %s in browser . . .\n",
+		opts.IO.ColorScheme().Green("✓"),
+		opts.IO.ColorScheme().Bold(url))
+}
+
+func validFlagAmount(cmd *cobra.Command) bool {
+	return cmd.Flags().NFlag() <= 1
+}
+
+func inRepo(err error) bool {
+	return err == nil
 }
