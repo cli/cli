@@ -94,7 +94,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 		} else if opts.WikiFlag {
 			repoUrl += "/wiki"
 		}
-		opts.Browser.Browse(repoUrl)
+		opts.Browser.Browse(repoUrl) // ATTN this is where we could check to see if the repoUrl has a 404 before proceeding
 		printExit(exitSuccess, cmd, opts, repoUrl)
 		return
 	}
@@ -116,6 +116,7 @@ func parseArgs(opts *BrowseOptions) {
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
 	w := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
+	help := "Use 'gh browse --help' for more information about browse\n"
 
 	switch errorCode {
 	case exitSuccess:
@@ -124,23 +125,22 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 			opts.IO.ColorScheme().Bold(url))
 		break
 	case exitNotInRepo:
-		fmt.Fprintf(w, "%s Change directory to a repository to open in browser\nUse 'gh browse --help' for more information about browse\n",
-			cs.Red("x"))
+		fmt.Fprintf(w, "%s Change directory to a repository to open in browser\n%s",
+			cs.Red("x"), help)
 		break
 	case exitTooManyFlags:
-		fmt.Fprintf(w, "%s accepts 1 flag, %d flags were recieved\nUse 'gh browse --help' for more information about browse\n",
-			cs.Red("x"), getFlagAmount(cmd))
+		fmt.Fprintf(w, "%s accepts 1 flag, %d flags were recieved\n%s",
+			cs.Red("x"), getFlagAmount(cmd), help)
 		break
 	case exitError:
-		fmt.Fprintf(w, "%s Incorrect use of arguments and flags\nUse 'gh browse --help' for more information about browse\n",
-			cs.Red("x"))
+		fmt.Fprintf(w, "%s Incorrect use of arguments and flags\n%s",
+			cs.Red("x"), help)
 		break
 	}
-
 }
 
 func hasArgs(opts *BrowseOptions) bool {
-	return opts.SelectorArg != ""
+	return opts.NumberArg != 0 || opts.FileArg != ""
 }
 
 func getFlagAmount(cmd *cobra.Command) int {
