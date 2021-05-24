@@ -151,17 +151,27 @@ type PullRequestFile struct {
 type ReviewRequests struct {
 	Nodes []struct {
 		RequestedReviewer struct {
-			TypeName string `json:"__typename"`
-			Login    string `json:"login"`
-			Name     string `json:"name"`
+			TypeName     string `json:"__typename"`
+			Login        string `json:"login"`
+			Name         string `json:"name"`
+			Slug         string `json:"slug"`
+			Organization struct {
+				Login string `json:"login"`
+			}
 		}
 	}
 }
 
+const teamTypeName = "Team"
+
 func (r ReviewRequests) Logins() []string {
 	logins := make([]string, len(r.Nodes))
 	for i, a := range r.Nodes {
-		logins[i] = a.RequestedReviewer.Login
+		if a.RequestedReviewer.TypeName == teamTypeName {
+			logins[i] = a.RequestedReviewer.Organization.Login + "/" + a.RequestedReviewer.Slug
+		} else {
+			logins[i] = a.RequestedReviewer.Login
+		}
 	}
 	return logins
 }
