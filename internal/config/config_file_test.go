@@ -242,6 +242,7 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), ".config", "gh")
 	os.Setenv(GH_CONFIG_DIR, configDir)
 	defer os.Unsetenv(GH_CONFIG_DIR)
+	defer stubMigrateConfigDir()()
 
 	cfg := NewFromString(`pager: less`)
 	err := cfg.Write()
