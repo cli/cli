@@ -2,6 +2,7 @@ package checkout
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -58,6 +59,99 @@ func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
 		MaintainerCanModify: false,
 	}
 }
+
+func Test_checkoutRun(t *testing.T) {
+	tests := []struct {
+		name       string
+		opts       *CheckoutOptions
+		httpStubs  func(*httpmock.Registry)
+		runStubs   func(*run.CommandStubber)
+		remotes    map[string]string
+		wantStdout string
+		wantStderr string
+		wantErr    bool
+	}{
+		{
+			name: "fork repo was deleted",
+			opts: &CheckoutOptions{
+				SelectorArg: "123",
+				Finder: func() shared.PRFinder {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					pr.HeadRepository = nil
+					finder := shared.NewMockFinder("123", pr, baseRepo)
+					return finder
+				}(),
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
+				cs.Register(`git config branch\.feature\.merge`, 1, "")
+				cs.Register(`git checkout feature`, 0, "")
+				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.opts
+
+			io, _, stdout, stderr := iostreams.Test()
+			opts.IO = io
+
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(httpReg)
+			}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: httpReg}, nil
+			}
+
+			cmdStubs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+			if tt.runStubs != nil {
+				tt.runStubs(cmdStubs)
+			}
+
+			opts.Remotes = func() (context.Remotes, error) {
+				if len(tt.remotes) == 0 {
+					return nil, errors.New("no remotes")
+				}
+				var remotes context.Remotes
+				for name, repo := range tt.remotes {
+					r, err := ghrepo.FromFullName(repo)
+					if err != nil {
+						return remotes, err
+					}
+					remotes = append(remotes, &context.Remote{
+						Remote: &git.Remote{Name: name},
+						Repo:   r,
+					})
+				}
+				return remotes, nil
+			}
+
+			err := checkoutRun(opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("want error: %v, got: %v", tt.wantErr, err)
+			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
+}
+
+/** LEGACY TESTS **/
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()

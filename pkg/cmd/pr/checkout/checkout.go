@@ -96,7 +96,9 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	headRemote := baseRemote
-	if pr.IsCrossRepository {
+	if pr.HeadRepository == nil {
+		headRemote = nil
+	} else if pr.IsCrossRepository {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
@@ -207,7 +209,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 
 	remote := baseURLOrName
 	mergeRef := ref
-	if pr.MaintainerCanModify {
+	if pr.MaintainerCanModify && pr.HeadRepository != nil {
 		headRepo := ghrepo.NewWithHost(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name, repoHost)
 		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
