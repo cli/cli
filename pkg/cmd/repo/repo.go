@@ -5,6 +5,7 @@ import (
 	repoCloneCmd "github.com/cli/cli/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
+	repoExploreCmd "github.com/cli/cli/pkg/cmd/repo/explore"
 	repoForkCmd "github.com/cli/cli/pkg/cmd/repo/fork"
 	gardenCmd "github.com/cli/cli/pkg/cmd/repo/garden"
 	repoListCmd "github.com/cli/cli/pkg/cmd/repo/list"
@@ -40,6 +41,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoListCmd.NewCmdList(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
 	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
+	cmd.AddCommand(repoExploreCmd.NewCmdExplore(f, nil))
 
 	return cmd
 }
