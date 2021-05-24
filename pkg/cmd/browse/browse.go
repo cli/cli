@@ -30,6 +30,15 @@ type BrowseOptions struct {
 	SettingsFlag bool
 }
 
+type exitCode int
+
+const (
+	exitSuccess      exitCode = 0
+	exitNotInRepo    exitCode = 1
+	exitTooManyFlags exitCode = 2
+	exitError        exitCode = 3
+)
+
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 
 	opts := &BrowseOptions{
@@ -46,7 +55,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Args:  cobra.RangeArgs(0, 1),             // make sure only one arg at most is passed
 
 		Run: func(cmd *cobra.Command, args []string) {
-
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -62,62 +70,82 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 }
 
 func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
-	// args := cmd.Args
 
 	baseRepo, err := opts.BaseRepo()
-	w := opts.IO.ErrOut
-	cs := opts.IO.ColorScheme()
 
-	if !inRepo(err) {
-		fmt.Fprintf(w, "%s Navigate to a repository to open in browser\nUse 'gh browse --help' for more information about browse\n",
-			cs.Red("x"))
+	if !inRepo(err) { // must be in a repo to execute
+		printExit(exitNotInRepo, cmd, opts, "")
 		return
 	}
 
-	if !validFlagAmount(cmd) {
-		fmt.Fprintf(w, "%s Only one flag allowed for 'gh browse'\nUse 'gh browse --help' for more information about browse\n",
-			cs.Red("x"))
+	if getFlagAmount(cmd) > 1 { // command can't have more than one flag
+		printExit(exitTooManyFlags, cmd, opts, "")
 		return
 	}
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 	parseArgs(opts)
 
-	if opts.ProjectsFlag && opts.SelectorArg == "" {
-		repoUrl += "/projects"
+	if opts.SelectorArg == "" {
+		if opts.ProjectsFlag {
+			repoUrl += "/projects"
+			printExit(exitSuccess, cmd, opts, repoUrl)
+		} else if opts.SettingsFlag {
+			repoUrl += "/settings"
+			printExit(exitSuccess, cmd, opts, repoUrl)
+		} else if opts.WikiFlag {
+			repoUrl += "/wiki"
+			printExit(exitSuccess, cmd, opts, repoUrl)
+		} else if getFlagAmount(cmd) == 0 {
+			printExit(exitSuccess, cmd, opts, repoUrl)
+		}
+
 		opts.Browser.Browse(repoUrl)
-		printSuccess(opts, repoUrl)
 		return
 	}
 
-	// ATTN: add into the empty string where you want to go within the repo
-	opts.Browser.Browse(repoUrl)
-	fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
-		cs.Green("✓"),
-		cs.Bold(repoUrl))
+	printExit(exitError, cmd, opts, "")
 }
 
 func parseArgs(opts *BrowseOptions) {
 	if opts.SelectorArg != "" {
-
 		convertedArg, err := strconv.Atoi(opts.SelectorArg)
 		if err != nil { //It's not a number, but a file name
 			opts.FileArg = opts.SelectorArg
-
 		} else { // It's a number, open issue or pull request
 			opts.NumberArg = convertedArg
 		}
 	}
 }
 
-func printSuccess(opts *BrowseOptions, url string) {
-	fmt.Fprintf(opts.IO.ErrOut, "%s Now opening %s in browser . . .\n",
-		opts.IO.ColorScheme().Green("✓"),
-		opts.IO.ColorScheme().Bold(url))
+func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
+	w := opts.IO.ErrOut
+	cs := opts.IO.ColorScheme()
+
+	switch errorCode {
+	case exitSuccess:
+		fmt.Fprintf(opts.IO.ErrOut, "%s Now opening %s in browser . . .\n",
+			opts.IO.ColorScheme().Green("✓"),
+			opts.IO.ColorScheme().Bold(url))
+		break
+	case exitNotInRepo:
+		fmt.Fprintf(w, "%s Change directory to a repository to open in browser\nUse 'gh browse --help' for more information about browse\n",
+			cs.Red("x"))
+		break
+	case exitTooManyFlags:
+		fmt.Fprintf(w, "%s accepts 1 flag, %d flags were recieved\nUse 'gh browse --help' for more information about browse\n",
+			cs.Red("x"), getFlagAmount(cmd))
+		break
+	case exitError:
+		fmt.Fprintf(w, "%s Incorrect use of arguments and flags\nUse 'gh browse --help' for more information about browse\n",
+			cs.Red("x"))
+		break
+	}
+
 }
 
-func validFlagAmount(cmd *cobra.Command) bool {
-	return cmd.Flags().NFlag() <= 1
+func getFlagAmount(cmd *cobra.Command) int {
+	return cmd.Flags().NFlag()
 }
 
 func inRepo(err error) bool {
