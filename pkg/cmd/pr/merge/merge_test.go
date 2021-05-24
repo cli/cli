@@ -465,7 +465,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -503,7 +503,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -947,7 +947,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 		MergeMethod:     PullRequestMergeMethodSquash,
 		Finder: shared.NewMockFinder(
 			"https://github.com/OWNER/REPO/pull/123",
-			&api.PullRequest{ID: "THE-ID", Number: 123},
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "BLOCKED"},
 			ghrepo.New("OWNER", "REPO"),
 		),
 	})

@@ -156,7 +156,7 @@ func mergeRun(opts *MergeOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -202,12 +202,13 @@ func mergeRun(opts *MergeOptions) error {
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
-			repo:          baseRepo,
-			pullRequestID: pr.ID,
-			method:        opts.MergeMethod,
-			auto:          opts.AutoMergeEnable,
-			commitBody:    opts.Body,
-			setCommitBody: opts.BodySet,
+			repo:             baseRepo,
+			pullRequestID:    pr.ID,
+			mergeStateStatus: pr.MergeStateStatus,
+			method:           opts.MergeMethod,
+			auto:             opts.AutoMergeEnable,
+			commitBody:       opts.Body,
+			setCommitBody:    opts.BodySet,
 		}
 
 		if opts.InteractiveMode {
@@ -262,7 +263,7 @@ func mergeRun(opts *MergeOptions) error {
 		}
 
 		if isTerminal {
-			if payload.auto {
+			if payload.auto && payload.mergeStateStatus == "BLOCKED" {
 				method := ""
 				switch payload.method {
 				case PullRequestMergeMethodRebase:
