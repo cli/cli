@@ -86,21 +86,16 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 	parseArgs(opts)
 
-	if opts.SelectorArg == "" {
+	if !hasArgs(opts) { // handle flags without args
 		if opts.ProjectsFlag {
 			repoUrl += "/projects"
-			printExit(exitSuccess, cmd, opts, repoUrl)
 		} else if opts.SettingsFlag {
 			repoUrl += "/settings"
-			printExit(exitSuccess, cmd, opts, repoUrl)
 		} else if opts.WikiFlag {
 			repoUrl += "/wiki"
-			printExit(exitSuccess, cmd, opts, repoUrl)
-		} else if getFlagAmount(cmd) == 0 {
-			printExit(exitSuccess, cmd, opts, repoUrl)
 		}
-
 		opts.Browser.Browse(repoUrl)
+		printExit(exitSuccess, cmd, opts, repoUrl)
 		return
 	}
 
@@ -142,6 +137,10 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 		break
 	}
 
+}
+
+func hasArgs(opts *BrowseOptions) bool {
+	return opts.SelectorArg != ""
 }
 
 func getFlagAmount(cmd *cobra.Command) int {
