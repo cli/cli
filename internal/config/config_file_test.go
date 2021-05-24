@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -152,20 +153,87 @@ func Test_parseConfigFile(t *testing.T) {
 
 func Test_ConfigDir(t *testing.T) {
 	tests := []struct {
-		envVar string
-		want   string
+		name        string
+		onlyWindows bool
+		env         map[string]string
+		output      string
 	}{
-		{"/tmp/gh", ".tmp.gh"},
-		{"", ".config.gh"},
+		{
+			name: "no envVars",
+			env: map[string]string{
+				"GH_CONFIG_DIR":   "",
+				"XDG_CONFIG_HOME": "",
+				"AppData":         "",
+				"USERPROFILE":     "",
+				"HOME":            "",
+			},
+			output: ".config/gh",
+		},
+		{
+			name: "GH_CONFIG_DIR specified",
+			env: map[string]string{
+				"GH_CONFIG_DIR": "/tmp/gh_config_dir",
+			},
+			output: "/tmp/gh_config_dir",
+		},
+		{
+			name: "XDG_CONFIG_HOME specified",
+			env: map[string]string{
+				"XDG_CONFIG_HOME": "/tmp",
+			},
+			output: "/tmp/gh",
+		},
+		{
+			name: "GH_CONFIG_DIR and XDG_CONFIG_HOME specified",
+			env: map[string]string{
+				"GH_CONFIG_DIR":   "/tmp/gh_config_dir",
+				"XDG_CONFIG_HOME": "/tmp",
+			},
+			output: "/tmp/gh_config_dir",
+		},
+		{
+			name:        "AppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"AppData": "/tmp/",
+			},
+			output: "/tmp/GitHub CLI",
+		},
+		{
+			name:        "GH_CONFIG_DIR and AppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"GH_CONFIG_DIR": "/tmp/gh_config_dir",
+				"AppData":       "/tmp",
+			},
+			output: "/tmp/gh_config_dir",
+		},
+		{
+			name:        "XDG_CONFIG_HOME and AppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"XDG_CONFIG_HOME": "/tmp",
+				"AppData":         "/tmp",
+			},
+			output: "/tmp/gh",
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("envVar: %q", tt.envVar), func(t *testing.T) {
-			if tt.envVar != "" {
-				os.Setenv(GH_CONFIG_DIR, tt.envVar)
-				defer os.Unsetenv(GH_CONFIG_DIR)
+		if tt.onlyWindows && runtime.GOOS != "windows" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, filepath.FromSlash(v))
+					defer os.Setenv(k, old)
+				}
 			}
-			assert.Regexp(t, tt.want, ConfigDir())
+
+			defer stubMigrateConfigDir()()
+			assert.Equal(t, filepath.FromSlash(tt.output), ConfigDir())
 		})
 	}
 }
@@ -193,4 +261,70 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 	} else if string(configBytes) != "" {
 		t.Errorf("unexpected hosts.yml: %q", string(configBytes))
 	}
+}
+
+func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
+	migrateDir := t.TempDir()
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, "/nonexistent-dir")
+	defer os.Setenv(homeEnvVar, old)
+
+	autoMigrateConfigDir(migrateDir)
+
+	files, err := ioutil.ReadDir(migrateDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(files))
+}
+
+func Test_autoMigrateConfigDir_noMigration_samePath(t *testing.T) {
+	migrateDir := t.TempDir()
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, migrateDir)
+	defer os.Setenv(homeEnvVar, old)
+
+	autoMigrateConfigDir(migrateDir)
+
+	files, err := ioutil.ReadDir(migrateDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(files))
+}
+
+func Test_autoMigrateConfigDir_migration(t *testing.T) {
+	defaultDir := t.TempDir()
+	dd := filepath.Join(defaultDir, ".config", "gh")
+	migrateDir := t.TempDir()
+	md := filepath.Join(migrateDir, ".config", "gh")
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, defaultDir)
+	defer os.Setenv(homeEnvVar, old)
+
+	err := os.MkdirAll(dd, 0777)
+	assert.NoError(t, err)
+	f, err := ioutil.TempFile(dd, "")
+	assert.NoError(t, err)
+	f.Close()
+
+	autoMigrateConfigDir(md)
+
+	_, err = ioutil.ReadDir(dd)
+	assert.True(t, os.IsNotExist(err))
+
+	files, err := ioutil.ReadDir(md)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(files))
 }
