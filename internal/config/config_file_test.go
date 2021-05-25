@@ -152,6 +152,8 @@ func Test_parseConfigFile(t *testing.T) {
 }
 
 func Test_ConfigDir(t *testing.T) {
+	tempDir := t.TempDir()
+
 	tests := []struct {
 		name        string
 		onlyWindows bool
@@ -159,63 +161,63 @@ func Test_ConfigDir(t *testing.T) {
 		output      string
 	}{
 		{
-			name: "no envVars",
+			name: "HOME/USERPROFILE specified",
 			env: map[string]string{
 				"GH_CONFIG_DIR":   "",
 				"XDG_CONFIG_HOME": "",
 				"AppData":         "",
-				"USERPROFILE":     "",
-				"HOME":            "",
+				"USERPROFILE":     tempDir,
+				"HOME":            tempDir,
 			},
-			output: ".config/gh",
+			output: filepath.Join(tempDir, ".config", "gh"),
 		},
 		{
 			name: "GH_CONFIG_DIR specified",
 			env: map[string]string{
-				"GH_CONFIG_DIR": "/tmp/gh_config_dir",
+				"GH_CONFIG_DIR": filepath.Join(tempDir, "gh_config_dir"),
 			},
-			output: "/tmp/gh_config_dir",
+			output: filepath.Join(tempDir, "gh_config_dir"),
 		},
 		{
 			name: "XDG_CONFIG_HOME specified",
 			env: map[string]string{
-				"XDG_CONFIG_HOME": "/tmp",
+				"XDG_CONFIG_HOME": tempDir,
 			},
-			output: "/tmp/gh",
+			output: filepath.Join(tempDir, "gh"),
 		},
 		{
 			name: "GH_CONFIG_DIR and XDG_CONFIG_HOME specified",
 			env: map[string]string{
-				"GH_CONFIG_DIR":   "/tmp/gh_config_dir",
-				"XDG_CONFIG_HOME": "/tmp",
+				"GH_CONFIG_DIR":   filepath.Join(tempDir, "gh_config_dir"),
+				"XDG_CONFIG_HOME": tempDir,
 			},
-			output: "/tmp/gh_config_dir",
+			output: filepath.Join(tempDir, "gh_config_dir"),
 		},
 		{
 			name:        "AppData specified",
 			onlyWindows: true,
 			env: map[string]string{
-				"AppData": "/tmp/",
+				"AppData": tempDir,
 			},
-			output: "/tmp/GitHub CLI",
+			output: filepath.Join(tempDir, "GitHub CLI"),
 		},
 		{
 			name:        "GH_CONFIG_DIR and AppData specified",
 			onlyWindows: true,
 			env: map[string]string{
-				"GH_CONFIG_DIR": "/tmp/gh_config_dir",
-				"AppData":       "/tmp",
+				"GH_CONFIG_DIR": filepath.Join(tempDir, "gh_config_dir"),
+				"AppData":       tempDir,
 			},
-			output: "/tmp/gh_config_dir",
+			output: filepath.Join(tempDir, "gh_config_dir"),
 		},
 		{
 			name:        "XDG_CONFIG_HOME and AppData specified",
 			onlyWindows: true,
 			env: map[string]string{
-				"XDG_CONFIG_HOME": "/tmp",
-				"AppData":         "/tmp",
+				"XDG_CONFIG_HOME": tempDir,
+				"AppData":         tempDir,
 			},
-			output: "/tmp/gh",
+			output: filepath.Join(tempDir, "gh"),
 		},
 	}
 
@@ -227,22 +229,25 @@ func Test_ConfigDir(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
 					old := os.Getenv(k)
-					os.Setenv(k, filepath.FromSlash(v))
+					os.Setenv(k, v)
 					defer os.Setenv(k, old)
 				}
 			}
 
-			defer stubMigrateConfigDir()()
-			assert.Equal(t, filepath.FromSlash(tt.output), ConfigDir())
+			// Create directory to skip auto migration code
+			// which gets run when target directory does not exist
+			_ = os.MkdirAll(tt.output, 0755)
+
+			assert.Equal(t, tt.output, ConfigDir())
 		})
 	}
 }
 
 func Test_configFile_Write_toDisk(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), ".config", "gh")
+	_ = os.MkdirAll(configDir, 0755)
 	os.Setenv(GH_CONFIG_DIR, configDir)
 	defer os.Unsetenv(GH_CONFIG_DIR)
-	defer stubMigrateConfigDir()()
 
 	cfg := NewFromString(`pager: less`)
 	err := cfg.Write()
@@ -265,6 +270,8 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 }
 
 func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
+	// homeDir does not have any config files
+	homeDir := t.TempDir()
 	migrateDir := t.TempDir()
 
 	homeEnvVar := "HOME"
@@ -272,7 +279,7 @@ func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
 		homeEnvVar = "USERPROFILE"
 	}
 	old := os.Getenv(homeEnvVar)
-	os.Setenv(homeEnvVar, "/nonexistent-dir")
+	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
 	autoMigrateConfigDir(migrateDir)
@@ -283,14 +290,17 @@ func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
 }
 
 func Test_autoMigrateConfigDir_noMigration_samePath(t *testing.T) {
-	migrateDir := t.TempDir()
+	homeDir := t.TempDir()
+	migrateDir := filepath.Join(homeDir, ".config", "gh")
+	err := os.MkdirAll(migrateDir, 0755)
+	assert.NoError(t, err)
 
 	homeEnvVar := "HOME"
 	if runtime.GOOS == "windows" {
 		homeEnvVar = "USERPROFILE"
 	}
 	old := os.Getenv(homeEnvVar)
-	os.Setenv(homeEnvVar, migrateDir)
+	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
 	autoMigrateConfigDir(migrateDir)
@@ -301,31 +311,158 @@ func Test_autoMigrateConfigDir_noMigration_samePath(t *testing.T) {
 }
 
 func Test_autoMigrateConfigDir_migration(t *testing.T) {
-	defaultDir := t.TempDir()
-	dd := filepath.Join(defaultDir, ".config", "gh")
+	homeDir := t.TempDir()
 	migrateDir := t.TempDir()
-	md := filepath.Join(migrateDir, ".config", "gh")
+	homeConfigDir := filepath.Join(homeDir, ".config", "gh")
+	migrateConfigDir := filepath.Join(migrateDir, ".config", "gh")
 
 	homeEnvVar := "HOME"
 	if runtime.GOOS == "windows" {
 		homeEnvVar = "USERPROFILE"
 	}
 	old := os.Getenv(homeEnvVar)
-	os.Setenv(homeEnvVar, defaultDir)
+	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
-	err := os.MkdirAll(dd, 0777)
+	err := os.MkdirAll(homeConfigDir, 0755)
 	assert.NoError(t, err)
-	f, err := ioutil.TempFile(dd, "")
+	f, err := ioutil.TempFile(homeConfigDir, "")
 	assert.NoError(t, err)
 	f.Close()
 
-	autoMigrateConfigDir(md)
+	autoMigrateConfigDir(migrateConfigDir)
 
-	_, err = ioutil.ReadDir(dd)
+	_, err = ioutil.ReadDir(homeConfigDir)
 	assert.True(t, os.IsNotExist(err))
 
-	files, err := ioutil.ReadDir(md)
+	files, err := ioutil.ReadDir(migrateConfigDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(files))
+}
+
+func Test_StateDir(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name   string
+		env    map[string]string
+		output string
+	}{
+		{
+			name: "HOME/USERPROFILE specified",
+			env: map[string]string{
+				"XDG_STATE_HOME":  "",
+				"GH_CONFIG_DIR":   "",
+				"XDG_CONFIG_HOME": "",
+				"AppData":         "",
+				"USERPROFILE":     tempDir,
+				"HOME":            tempDir,
+			},
+			output: filepath.Join(tempDir, ".config", "gh"),
+		},
+		{
+			name: "XDG_STATE_HOME specified",
+			env: map[string]string{
+				"XDG_STATE_HOME": tempDir,
+			},
+			output: filepath.Join(tempDir, "gh"),
+		},
+		{
+			name: "GH_CONFIG_DIR specified",
+			env: map[string]string{
+				"GH_CONFIG_DIR": filepath.Join(tempDir, "gh_config_dir"),
+			},
+			output: filepath.Join(tempDir, "gh_config_dir"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, v)
+					defer os.Setenv(k, old)
+				}
+			}
+
+			// Create directory to skip auto migration code
+			// which gets run when target directory does not exist
+			_ = os.MkdirAll(tt.output, 0755)
+
+			assert.Equal(t, tt.output, StateDir())
+		})
+	}
+}
+
+func Test_autoMigrateStateDir_noMigration(t *testing.T) {
+	// homeDir does not have any config files
+	homeDir := t.TempDir()
+	migrateDir := t.TempDir()
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, homeDir)
+	defer os.Setenv(homeEnvVar, old)
+
+	autoMigrateStateDir(migrateDir)
+
+	files, err := ioutil.ReadDir(migrateDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(files))
+}
+
+func Test_autoMigrateStateDir_noMigration_samePath(t *testing.T) {
+	homeDir := t.TempDir()
+	migrateDir := filepath.Join(homeDir, ".config", "gh")
+	err := os.MkdirAll(migrateDir, 0755)
+	assert.NoError(t, err)
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, homeDir)
+	defer os.Setenv(homeEnvVar, old)
+
+	autoMigrateStateDir(migrateDir)
+
+	files, err := ioutil.ReadDir(migrateDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(files))
+}
+
+func Test_autoMigrateStateDir_migration(t *testing.T) {
+	homeDir := t.TempDir()
+	migrateDir := t.TempDir()
+	homeConfigDir := filepath.Join(homeDir, ".config", "gh")
+	migrateConfigDir := filepath.Join(migrateDir, ".config", "gh")
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+	old := os.Getenv(homeEnvVar)
+	os.Setenv(homeEnvVar, homeDir)
+	defer os.Setenv(homeEnvVar, old)
+
+	err := os.MkdirAll(homeConfigDir, 0755)
+	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(homeConfigDir, "state.yml"), nil, 0755)
+	assert.NoError(t, err)
+
+	autoMigrateStateDir(migrateConfigDir)
+
+	files, err := ioutil.ReadDir(homeConfigDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(files))
+
+	files, err = ioutil.ReadDir(migrateConfigDir)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(files))
+	assert.Equal(t, "state.yml", files[0].Name())
 }

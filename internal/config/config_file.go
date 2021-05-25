@@ -16,6 +16,7 @@ import (
 const (
 	GH_CONFIG_DIR   = "GH_CONFIG_DIR"
 	XDG_CONFIG_HOME = "XDG_CONFIG_HOME"
+	XDG_STATE_HOME  = "XDG_STATE_HOME"
 	APP_DATA        = "AppData"
 )
 
@@ -51,14 +52,72 @@ func ConfigDir() string {
 func autoMigrateConfigDir(newPath string) {
 	path, err := os.UserHomeDir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateConfigDir(oldPath, newPath)
+		migrateDir(oldPath, newPath)
 		return
 	}
 
 	path, err = homedir.Dir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateConfigDir(oldPath, newPath)
+		migrateDir(oldPath, newPath)
 	}
+}
+
+func StateDir() string {
+	if path := os.Getenv(XDG_STATE_HOME); path != "" {
+		path = filepath.Join(path, "gh")
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			_ = os.MkdirAll(path, 0755)
+			autoMigrateStateDir(path)
+		}
+		return path
+	}
+
+	return ConfigDir()
+}
+
+// Check default paths (os.UserHomeDir, and homedir.Dir) for existing state file (state.yml)
+// If state file exist then move it to newPath
+// TODO: Remove support for homedir.Dir location in v2
+func autoMigrateStateDir(newPath string) {
+	path, err := os.UserHomeDir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		migrateFile(oldPath, newPath, "state.yml")
+		return
+	}
+
+	path, err = homedir.Dir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		migrateFile(oldPath, newPath, "state.yml")
+	}
+}
+
+func migrateFile(oldPath, newPath, file string) {
+	if oldPath == newPath {
+		return
+	}
+
+	oldFile := filepath.Join(oldPath, file)
+	newFile := filepath.Join(newPath, file)
+
+	if !fileExists(oldFile) {
+		return
+	}
+
+	_ = os.MkdirAll(filepath.Dir(newFile), 0755)
+	_ = os.Rename(oldFile, newFile)
+}
+
+func migrateDir(oldPath, newPath string) {
+	if oldPath == newPath {
+		return
+	}
+
+	if !dirExists(oldPath) {
+		return
+	}
+
+	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
+	_ = os.Rename(oldPath, newPath)
 }
 
 func dirExists(path string) bool {
@@ -66,13 +125,9 @@ func dirExists(path string) bool {
 	return err == nil && f.IsDir()
 }
 
-var migrateConfigDir = func(oldPath, newPath string) {
-	if oldPath == newPath {
-		return
-	}
-
-	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
-	_ = os.Rename(oldPath, newPath)
+func fileExists(path string) bool {
+	f, err := os.Stat(path)
+	return err == nil && !f.IsDir()
 }
 
 func ConfigFile() string {
