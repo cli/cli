@@ -23,13 +23,14 @@ type BrowseOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
 
-	SelectorArg string
-	FileArg     string // Used for storing the file path
-	NumberArg   int    // Used for storing pull request number
+	SelectorArg   string
+	AdditionalArg string
+	// FileArg     string // Used for storing the file path
+	IsNumberArg   bool    // Used for storing pull request number
 
-	ProjectsFlag bool
-	WikiFlag     bool
-	SettingsFlag bool
+	ProjectsFlag  bool
+	WikiFlag      bool
+	SettingsFlag  bool
 }
 
 type exitCode int
@@ -56,9 +57,14 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Long:  "Work with GitHub in the browser", // displays when you are on the help page of this command
 		Short: "Open GitHub in the browser",      // displays in the gh root help
 		Use:   "browse",                          // necessary!!! This is the cmd that gets passed on the prompt
-		Args:  cobra.RangeArgs(0, 1),             // make sure only one arg at most is passed
+		Args:  cobra.RangeArgs(0, 2),             // make sure only one arg at most is passed
 
 		Run: func(cmd *cobra.Command, args []string) {
+
+			if len(args) > 1 {
+				
+			}
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -90,28 +96,38 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 	parseArgs(opts)
 
-	if !hasArgs(opts) { // handle flags without args
-		repoUrl += addFlags(opts) // add flags, if any
-		response := getHttpResponse(opts, repoUrl)
-		if response != exitSuccess { // test the connection to see if the url is valid
-			printExit(response, cmd, opts, repoUrl) // if not, print error, and return
-			return
-		}
-		opts.Browser.Browse(repoUrl)            // otherwise open repo
-		printExit(response, cmd, opts, repoUrl) // print success
-		return
-	}
+	if !hasArgs(opts) && hasFlags(cmd) {
+		repoUrl += addFlags(opts)
+	} else if hasArgs(opts) && !hasFlags(cmd) {
+		repoUrl += addArgs(opts)
+	} else if hasArgs(opts) && hasFlags(cmd) {
+
+	}	
+
+	
+
+	// if !hasArgs(opts) { // handle flags without args
+	// 	repoUrl += addFlags(opts) // add flags, if any
+	// 	response := getHttpResponse(opts, repoUrl)
+	// 	if response != exitSuccess { // test the connection to see if the url is valid
+	// 		printExit(response, cmd, opts, repoUrl) // if not, print error, and return
+	// 		return
+	// 	}
+	// 	opts.Browser.Browse(repoUrl)            // otherwise open repo
+	// 	printExit(response, cmd, opts, repoUrl) // print success
+	// 	return
+	// }
 
 	printExit(exitError, cmd, opts, "")
 }
 
 func parseArgs(opts *BrowseOptions) {
 	if opts.SelectorArg != "" {
-		convertedArg, err := strconv.Atoi(opts.SelectorArg)
+		_, err := strconv.Atoi(opts.SelectorArg)
 		if err != nil { //It's not a number, but a file name
-			opts.FileArg = opts.SelectorArg
+			opts.IsNumberArg = false
 		} else { // It's a number, open issue or pull request
-			opts.NumberArg = convertedArg
+			opts.IsNumberArg = true
 		}
 	}
 }
@@ -125,6 +141,13 @@ func addFlags(opts *BrowseOptions) string {
 		return "/wiki"
 	}
 	return ""
+}
+
+func addArgs(opts *BrowseOptions) string {
+	if opts.IsNumberArg {
+		return "/issues/" + opts.SelectorArg
+	}
+	return "/" + opts.SelectorArg
 }
 
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
@@ -181,8 +204,12 @@ func getHttpResponse(opts *BrowseOptions, url string) exitCode {
 	return exitError
 }
 
+func hasFlags(cmd *cobra.Command) bool {
+	return getFlagAmount(cmd) > 0
+}
+
 func hasArgs(opts *BrowseOptions) bool {
-	return opts.NumberArg != 0 || opts.FileArg != ""
+	return opts.SelectorArg != ""
 }
 
 func getFlagAmount(cmd *cobra.Command) int {
