@@ -9,6 +9,8 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
+
+	"github.com/cli/cli/utils"
 )
 
 type browser interface {
@@ -36,7 +38,9 @@ const (
 	exitSuccess      exitCode = 0
 	exitNotInRepo    exitCode = 1
 	exitTooManyFlags exitCode = 2
-	exitError        exitCode = 3
+	exitInvalidUrl   exitCode = 3
+	exitHttpError    exitCode = 4
+	exitError        exitCode = 5
 )
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
@@ -87,15 +91,14 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	parseArgs(opts)
 
 	if !hasArgs(opts) { // handle flags without args
-		if opts.ProjectsFlag {
-			repoUrl += "/projects"
-		} else if opts.SettingsFlag {
-			repoUrl += "/settings"
-		} else if opts.WikiFlag {
-			repoUrl += "/wiki"
+		repoUrl += addFlags(opts) // add flags, if any
+		response := getHttpResponse(opts, repoUrl)
+		if response != exitSuccess { // test the connection to see if the url is valid
+			printExit(response, cmd, opts, repoUrl) // if not, print error, and return
+			return
 		}
-		opts.Browser.Browse(repoUrl) // ATTN this is where we could check to see if the repoUrl has a 404 before proceeding
-		printExit(exitSuccess, cmd, opts, repoUrl)
+		opts.Browser.Browse(repoUrl)            // otherwise open repo
+		printExit(response, cmd, opts, repoUrl) // print success
 		return
 	}
 
@@ -113,6 +116,17 @@ func parseArgs(opts *BrowseOptions) {
 	}
 }
 
+func addFlags(opts *BrowseOptions) string {
+	if opts.ProjectsFlag {
+		return "/projects"
+	} else if opts.SettingsFlag {
+		return "/settings"
+	} else if opts.WikiFlag {
+		return "/wiki"
+	}
+	return ""
+}
+
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
 	w := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
@@ -120,9 +134,8 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 
 	switch errorCode {
 	case exitSuccess:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Now opening %s in browser . . .\n",
-			opts.IO.ColorScheme().Green("✓"),
-			opts.IO.ColorScheme().Bold(url))
+		fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
+			cs.Green("✓"), cs.Bold(url))
 		break
 	case exitNotInRepo:
 		fmt.Fprintf(w, "%s Change directory to a repository to open in browser\n%s",
@@ -132,11 +145,40 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 		fmt.Fprintf(w, "%s accepts 1 flag, %d flags were recieved\n%s",
 			cs.Red("x"), getFlagAmount(cmd), help)
 		break
-	case exitError:
-		fmt.Fprintf(w, "%s Incorrect use of arguments and flags\n%s",
+	case exitInvalidUrl:
+		fmt.Fprintf(w, "%s Invalid url format, could not open %s\n%s",
+			cs.Red("x"), cs.Bold(url), help)
+		break
+	case exitHttpError:
+		fmt.Fprintf(w, "%s Could not successfully create an http request\n%s",
 			cs.Red("x"), help)
 		break
+	case exitError:
+		fmt.Fprintf(w, "%s Could not successfully find %s\n%s",
+			cs.Red("x"), cs.Bold(url), help)
+		break
 	}
+}
+
+func getHttpResponse(opts *BrowseOptions, url string) exitCode {
+
+	if !utils.IsURL(url) || !utils.ValidURL(url) {
+		return exitInvalidUrl
+	}
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		return exitHttpError
+	}
+
+	statusCode := resp.StatusCode
+
+	if 200 <= statusCode && statusCode < 300 {
+		return exitSuccess
+	}
+
+	return exitError
 }
 
 func hasArgs(opts *BrowseOptions) bool {
