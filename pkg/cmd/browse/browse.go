@@ -25,12 +25,10 @@ type BrowseOptions struct {
 
 	SelectorArg   string
 	AdditionalArg string
-	// FileArg     string // Used for storing the file path
-	IsNumberArg   bool    // Used for storing pull request number
 
-	ProjectsFlag  bool
-	WikiFlag      bool
-	SettingsFlag  bool
+	ProjectsFlag bool
+	WikiFlag     bool
+	SettingsFlag bool
 }
 
 type exitCode int
@@ -41,7 +39,8 @@ const (
 	exitTooManyFlags exitCode = 2
 	exitInvalidUrl   exitCode = 3
 	exitHttpError    exitCode = 4
-	exitError        exitCode = 5
+	exitInvalidCombo exitCode = 5
+	exitError        exitCode = 6
 )
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
@@ -62,7 +61,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if len(args) > 1 {
-				
+
 			}
 
 			if len(args) > 0 {
@@ -94,43 +93,43 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	}
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
-	parseArgs(opts)
+	//parseArgs(opts)
 
 	if !hasArgs(opts) && hasFlags(cmd) {
 		repoUrl += addFlags(opts)
 	} else if hasArgs(opts) && !hasFlags(cmd) {
 		repoUrl += addArgs(opts)
 	} else if hasArgs(opts) && hasFlags(cmd) {
-
-	}	
-
-	
-
-	// if !hasArgs(opts) { // handle flags without args
-	// 	repoUrl += addFlags(opts) // add flags, if any
-	// 	response := getHttpResponse(opts, repoUrl)
-	// 	if response != exitSuccess { // test the connection to see if the url is valid
-	// 		printExit(response, cmd, opts, repoUrl) // if not, print error, and return
-	// 		return
-	// 	}
-	// 	opts.Browser.Browse(repoUrl)            // otherwise open repo
-	// 	printExit(response, cmd, opts, repoUrl) // print success
-	// 	return
-	// }
-
-	printExit(exitError, cmd, opts, "")
-}
-
-func parseArgs(opts *BrowseOptions) {
-	if opts.SelectorArg != "" {
-		_, err := strconv.Atoi(opts.SelectorArg)
-		if err != nil { //It's not a number, but a file name
-			opts.IsNumberArg = false
-		} else { // It's a number, open issue or pull request
-			opts.IsNumberArg = true
-		}
+		repoUrl += addCombined(opts)
 	}
+
+	response := getHttpResponse(opts, repoUrl)
+	if response == exitSuccess { // test the connection to see if the url is valid
+		opts.Browser.Browse(repoUrl) // otherwise open repo
+	}
+
+	printExit(response, cmd, opts, repoUrl) // print success
+
 }
+
+func addCombined(opts *BrowseOptions) string {
+	if isNumber(opts.AdditionalArg) { // if second arg is a number it should be a line number
+		return "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
+	}
+	return "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
+}
+
+// func parseArgs(opts *BrowseOptions) exitCode {
+// 	if opts.SelectorArg != "" {
+// 		opts.IsNumberArg = isNumber(opts.SelectorArg)
+// 	}
+// 	if opts.AdditionalArg != "" {
+// 		if opts.IsNumberArg {
+// 			return exitInvalidCombo
+// 		}
+// 		opts.IsNumberArg = isNumber(opts.AdditionalArg)
+// 	}
+// }
 
 func addFlags(opts *BrowseOptions) string {
 	if opts.ProjectsFlag {
@@ -144,10 +143,10 @@ func addFlags(opts *BrowseOptions) string {
 }
 
 func addArgs(opts *BrowseOptions) string {
-	if opts.IsNumberArg {
+	if isNumber(opts.SelectorArg) {
 		return "/issues/" + opts.SelectorArg
 	}
-	return "/" + opts.SelectorArg
+	return "/tree/master" + opts.SelectorArg
 }
 
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
@@ -174,6 +173,10 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 		break
 	case exitHttpError:
 		fmt.Fprintf(w, "%s Could not successfully create an http request\n%s",
+			cs.Red("x"), help)
+		break
+	case exitInvalidCombo:
+		fmt.Fprintf(w, "%s Invalid combination of arguments\n%s",
 			cs.Red("x"), help)
 		break
 	case exitError:
@@ -218,4 +221,13 @@ func getFlagAmount(cmd *cobra.Command) int {
 
 func inRepo(err error) bool {
 	return err == nil
+}
+
+func isNumber(arg string) bool {
+	_, err := strconv.Atoi(arg)
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }
