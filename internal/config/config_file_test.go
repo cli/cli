@@ -269,8 +269,7 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 	}
 }
 
-func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
-	// homeDir does not have any config files
+func Test_autoMigrateConfigDir_noMigration_notExist(t *testing.T) {
 	homeDir := t.TempDir()
 	migrateDir := t.TempDir()
 
@@ -282,7 +281,8 @@ func Test_autoMigrateConfigDir_noMigration(t *testing.T) {
 	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
-	autoMigrateConfigDir(migrateDir)
+	err := autoMigrateConfigDir(migrateDir)
+	assert.Equal(t, errNotExist, err)
 
 	files, err := ioutil.ReadDir(migrateDir)
 	assert.NoError(t, err)
@@ -303,7 +303,8 @@ func Test_autoMigrateConfigDir_noMigration_samePath(t *testing.T) {
 	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
-	autoMigrateConfigDir(migrateDir)
+	err = autoMigrateConfigDir(migrateDir)
+	assert.Equal(t, errSamePath, err)
 
 	files, err := ioutil.ReadDir(migrateDir)
 	assert.NoError(t, err)
@@ -330,7 +331,8 @@ func Test_autoMigrateConfigDir_migration(t *testing.T) {
 	assert.NoError(t, err)
 	f.Close()
 
-	autoMigrateConfigDir(migrateConfigDir)
+	err = autoMigrateConfigDir(migrateConfigDir)
+	assert.NoError(t, err)
 
 	_, err = ioutil.ReadDir(homeConfigDir)
 	assert.True(t, os.IsNotExist(err))
@@ -395,8 +397,7 @@ func Test_StateDir(t *testing.T) {
 	}
 }
 
-func Test_autoMigrateStateDir_noMigration(t *testing.T) {
-	// homeDir does not have any config files
+func Test_autoMigrateStateDir_noMigration_notExist(t *testing.T) {
 	homeDir := t.TempDir()
 	migrateDir := t.TempDir()
 
@@ -408,7 +409,8 @@ func Test_autoMigrateStateDir_noMigration(t *testing.T) {
 	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
-	autoMigrateStateDir(migrateDir)
+	err := autoMigrateStateDir(migrateDir)
+	assert.Equal(t, errNotExist, err)
 
 	files, err := ioutil.ReadDir(migrateDir)
 	assert.NoError(t, err)
@@ -429,7 +431,8 @@ func Test_autoMigrateStateDir_noMigration_samePath(t *testing.T) {
 	os.Setenv(homeEnvVar, homeDir)
 	defer os.Setenv(homeEnvVar, old)
 
-	autoMigrateStateDir(migrateDir)
+	err = autoMigrateStateDir(migrateDir)
+	assert.Equal(t, errSamePath, err)
 
 	files, err := ioutil.ReadDir(migrateDir)
 	assert.NoError(t, err)
@@ -455,7 +458,8 @@ func Test_autoMigrateStateDir_migration(t *testing.T) {
 	err = ioutil.WriteFile(filepath.Join(homeConfigDir, "state.yml"), nil, 0755)
 	assert.NoError(t, err)
 
-	autoMigrateStateDir(migrateConfigDir)
+	err = autoMigrateStateDir(migrateConfigDir)
+	assert.NoError(t, err)
 
 	files, err := ioutil.ReadDir(homeConfigDir)
 	assert.NoError(t, err)

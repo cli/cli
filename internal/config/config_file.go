@@ -40,34 +40,18 @@ func ConfigDir() string {
 
 	// If the path does not exist try migrating config from default paths
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		autoMigrateConfigDir(path)
+		_ = autoMigrateConfigDir(path)
 	}
 
 	return path
 }
 
-// Check default paths (os.UserHomeDir, and homedir.Dir) for existing configs
-// If configs exist then move them to newPath
-// TODO: Remove support for homedir.Dir location in v2
-func autoMigrateConfigDir(newPath string) {
-	path, err := os.UserHomeDir()
-	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateDir(oldPath, newPath)
-		return
-	}
-
-	path, err = homedir.Dir()
-	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateDir(oldPath, newPath)
-	}
-}
-
 func StateDir() string {
 	if path := os.Getenv(XDG_STATE_HOME); path != "" {
 		path = filepath.Join(path, "gh")
-		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if !dirExists(path) {
 			_ = os.MkdirAll(path, 0755)
-			autoMigrateStateDir(path)
+			_ = autoMigrateStateDir(path)
 		}
 		return path
 	}
@@ -75,49 +59,70 @@ func StateDir() string {
 	return ConfigDir()
 }
 
-// Check default paths (os.UserHomeDir, and homedir.Dir) for existing state file (state.yml)
-// If state file exist then move it to newPath
+var errSamePath = errors.New("same path")
+var errNotExist = errors.New("not exist")
+
+// Check default paths (os.UserHomeDir, and homedir.Dir) for existing configs
+// If configs exist then move them to newPath
 // TODO: Remove support for homedir.Dir location in v2
-func autoMigrateStateDir(newPath string) {
+func autoMigrateConfigDir(newPath string) error {
 	path, err := os.UserHomeDir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateFile(oldPath, newPath, "state.yml")
-		return
+		return migrateDir(oldPath, newPath)
 	}
 
 	path, err = homedir.Dir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateFile(oldPath, newPath, "state.yml")
+		return migrateDir(oldPath, newPath)
 	}
+
+	return errNotExist
 }
 
-func migrateFile(oldPath, newPath, file string) {
+// Check default paths (os.UserHomeDir, and homedir.Dir) for existing state file (state.yml)
+// If state file exist then move it to newPath
+// TODO: Remove support for homedir.Dir location in v2
+func autoMigrateStateDir(newPath string) error {
+	path, err := os.UserHomeDir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		return migrateFile(oldPath, newPath, "state.yml")
+	}
+
+	path, err = homedir.Dir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		return migrateFile(oldPath, newPath, "state.yml")
+	}
+
+	return errNotExist
+}
+
+func migrateFile(oldPath, newPath, file string) error {
 	if oldPath == newPath {
-		return
+		return errSamePath
 	}
 
 	oldFile := filepath.Join(oldPath, file)
 	newFile := filepath.Join(newPath, file)
 
 	if !fileExists(oldFile) {
-		return
+		return errNotExist
 	}
 
 	_ = os.MkdirAll(filepath.Dir(newFile), 0755)
-	_ = os.Rename(oldFile, newFile)
+	return os.Rename(oldFile, newFile)
 }
 
-func migrateDir(oldPath, newPath string) {
+func migrateDir(oldPath, newPath string) error {
 	if oldPath == newPath {
-		return
+		return errSamePath
 	}
 
 	if !dirExists(oldPath) {
-		return
+		return errNotExist
 	}
 
 	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
-	_ = os.Rename(oldPath, newPath)
+	return os.Rename(oldPath, newPath)
 }
 
 func dirExists(path string) bool {
