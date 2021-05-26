@@ -29,6 +29,8 @@ type BrowseOptions struct {
 	ProjectsFlag bool
 	WikiFlag     bool
 	SettingsFlag bool
+	BranchFlag   bool
+	LineFlag     bool
 }
 
 type exitCode int
@@ -61,7 +63,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if len(args) > 1 {
-
+				opts.AdditionalArg = args[1]
 			}
 
 			if len(args) > 0 {
@@ -73,7 +75,9 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open projects tab in browser")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
-	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browse")
+	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browser")
+	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Opens a branch in the browser")
+	cmd.Flags().BoolVarP(&opts.LineFlag, "line", "l", false, "Opens up to a line in a file in the browser")
 
 	return cmd
 }
@@ -113,7 +117,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 }
 
 func addCombined(opts *BrowseOptions) string {
-	if isNumber(opts.AdditionalArg) { // if second arg is a number it should be a line number
+	if isNumber(opts.AdditionalArg) && opts.LineFlag { // if second arg is a number it should be a line number
 		return "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
 	}
 	return "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
