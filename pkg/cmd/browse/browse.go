@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/utils"
 )
 
@@ -85,6 +86,12 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 
 	baseRepo, err := opts.BaseRepo()
+	//baseRepo, _ := opts.BaseRepo()
+	httpClient, _ := opts.HttpClient()
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+	response := exitSuccess
 
 	if !inRepo(err) { // must be in a repo to execute
 		printExit(exitNotInRepo, cmd, opts, "")
@@ -100,14 +107,14 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	//parseArgs(opts)
 
 	if !hasArgs(opts) && hasFlags(cmd) {
-		repoUrl += addFlags(opts)
+		response, repoUrl = addFlags(opts, repoUrl)
 	} else if hasArgs(opts) && !hasFlags(cmd) {
-		repoUrl += addArgs(opts)
+		response, repoUrl = addArgs(opts, repoUrl, branchName)
 	} else if hasArgs(opts) && hasFlags(cmd) {
-		repoUrl += addCombined(opts)
+		response, repoUrl = addCombined(opts, repoUrl, branchName)
 	}
 
-	response := getHttpResponse(opts, repoUrl)
+	response = getHttpResponse(opts, repoUrl)
 	if response == exitSuccess { // test the connection to see if the url is valid
 		opts.Browser.Browse(repoUrl) // otherwise open repo
 	}
@@ -116,41 +123,44 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 
 }
 
-func addCombined(opts *BrowseOptions) string {
-	if isNumber(opts.AdditionalArg) && opts.LineFlag { // if second arg is a number it should be a line number
-		return "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
+func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
+
+	if opts.SelectorArg == "" || opts.AdditionalArg == "" {
+		return exitError, "" //makeing new exit error
 	}
-	return "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
+
+	if opts.BranchFlag {
+		return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
+	}
+
+	if opts.LineFlag {
+		return exitSuccess, url + "/tree/" + branchName + "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
+	}
+	return exitError, ""
+
+	// 	if isNumber(opts.AdditionalArg) && opts.LineFlag { // if second arg is a number it should be a line number
+	// 		return "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
+	// 	}
+	// 	return "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
+	// }
 }
 
-// func parseArgs(opts *BrowseOptions) exitCode {
-// 	if opts.SelectorArg != "" {
-// 		opts.IsNumberArg = isNumber(opts.SelectorArg)
-// 	}
-// 	if opts.AdditionalArg != "" {
-// 		if opts.IsNumberArg {
-// 			return exitInvalidCombo
-// 		}
-// 		opts.IsNumberArg = isNumber(opts.AdditionalArg)
-// 	}
-// }
-
-func addFlags(opts *BrowseOptions) string {
+func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
 	if opts.ProjectsFlag {
-		return "/projects"
+		return exitSuccess, url + "/projects"
 	} else if opts.SettingsFlag {
-		return "/settings"
+		return exitSuccess, url + "/settings"
 	} else if opts.WikiFlag {
-		return "/wiki"
+		return exitSuccess, url + "/wiki"
 	}
-	return ""
+	return exitError, "" //TODO need a new exit error later (possiblly)
 }
 
-func addArgs(opts *BrowseOptions) string {
+func addArgs(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 	if isNumber(opts.SelectorArg) {
-		return "/issues/" + opts.SelectorArg
+		return exitSuccess, url + "/issues/" + opts.SelectorArg
 	}
-	return "/tree/master" + opts.SelectorArg
+	return exitSuccess, url + "/tree/" + branchName + "/" + opts.SelectorArg
 }
 
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
@@ -207,6 +217,9 @@ func getHttpResponse(opts *BrowseOptions, url string) exitCode {
 	if 200 <= statusCode && statusCode < 300 {
 		return exitSuccess
 	}
+
+	//fmt.Println("print", url, statusCode)
+	//Setting is not opening
 
 	return exitError
 }
