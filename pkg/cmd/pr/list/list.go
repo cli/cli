@@ -119,6 +119,9 @@ func listRun(opts *ListOptions) error {
 	}
 
 	argv, err := shlex.Split(opts.Search)
+	if err != nil {
+		return err
+	}
 
 	re := regexp.MustCompile(`^merged:.*`)
 
