@@ -114,6 +114,11 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 		response, repoUrl = addCombined(opts, repoUrl, branchName)
 	}
 
+	if response != exitSuccess {
+		printExit(response, cmd, opts, repoUrl) // print success
+		return
+	}
+
 	response = getHttpResponse(opts, repoUrl)
 	if response == exitSuccess { // test the connection to see if the url is valid
 		opts.Browser.Browse(repoUrl) // otherwise open repo
@@ -138,11 +143,6 @@ func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, 
 	}
 	return exitError, ""
 
-	// 	if isNumber(opts.AdditionalArg) && opts.LineFlag { // if second arg is a number it should be a line number
-	// 		return "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
-	// 	}
-	// 	return "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
-	// }
 }
 
 func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
@@ -157,6 +157,12 @@ func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
 }
 
 func addArgs(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
+
+	if opts.AdditionalArg != "" {
+		// fmt.Println("test secodn argument")
+		return exitError, ""
+	}
+
 	if isNumber(opts.SelectorArg) {
 		return exitSuccess, url + "/issues/" + opts.SelectorArg
 	}
