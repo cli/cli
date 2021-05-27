@@ -86,7 +86,8 @@ type Issue struct {
 }
 
 func NewIssue(x, y int, dir Direction, text string, game *Game) *Issue {
-	style := game.Style.Foreground(tcell.ColorWhite).Background(tcell.ColorBlack)
+	// I disabled the background because i didn't like how spaces left behind had gray behind them while spaces between issues were black. mainly i just want it to be consistent.
+	style := game.Style.Foreground(tcell.ColorWhite) //.Background(tcell.ColorBlack)
 	return &Issue{
 		dir: dir,
 		GameObject: GameObject{
