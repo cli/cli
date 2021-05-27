@@ -191,6 +191,7 @@ type CommitLauncher struct {
 type CommitShot struct {
 	GameObject
 	life int
+	sha  string
 }
 
 func (cs *CommitShot) Update() {
@@ -200,13 +201,18 @@ func (cs *CommitShot) Update() {
 	cs.life--
 }
 
+func (cs *CommitShot) LetterAt(y int) rune {
+	return rune(cs.sha[y])
+}
+
 func NewCommitShot(g *Game, x, y int, sha string) *CommitShot {
 	sprite := ""
-	for _, c := range sha {
-		sprite += string(c) + "\n"
+	for i := len(sha) - 1; i >= 0; i-- {
+		sprite += string(sha[i]) + "\n"
 	}
 	return &CommitShot{
 		life: 3,
+		sha:  sha,
 		GameObject: GameObject{
 			Sprite: sprite,
 			x:      x,
@@ -269,7 +275,7 @@ func (cl *CommitLauncher) Launch() {
 	for i := 0; i < len(sha); i++ {
 		ray.AddPoint(shotX, shotY+i)
 	}
-	cl.Game.DetectHits(ray, shot.Sprite)
+	cl.Game.DetectHits(ray, shot)
 	cl.Game.AddDrawable(shot)
 }
 
@@ -396,7 +402,7 @@ func (g *Game) FilterGameObjects(fn func(Drawable) bool) []Drawable {
 	return out
 }
 
-func (g *Game) DetectHits(r *Ray, shaText string) {
+func (g *Game) DetectHits(r *Ray, shot *CommitShot) {
 	score := g.FindGameObject(func(gobj Drawable) bool {
 		_, ok := gobj.(*Score)
 		return ok
@@ -421,7 +427,7 @@ func (g *Game) DetectHits(r *Ray, shaText string) {
 			return false
 		}
 		shotX := r.Points[0].X
-		shotY := r.Points[0].Y
+		shotY := r.Points[len(r.Points)-1].Y
 		if shotX < issue.x || shotX >= issue.x+issue.w {
 			return false
 		}
@@ -433,7 +439,7 @@ func (g *Game) DetectHits(r *Ray, shaText string) {
 
 		issue.DestroyLetterAt(shotX - issue.x)
 
-		if byte(r) == shaText[issue.y-shotY] {
+		if r == shot.LetterAt(shotY-issue.y) {
 			g.Debugf("OMG CHARACTER HIT %s\n", string(r))
 			matchesMultiplier *= 2
 		}
