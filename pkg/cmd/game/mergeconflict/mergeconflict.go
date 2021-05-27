@@ -113,6 +113,22 @@ func (i *Issue) Update() {
 	}
 }
 
+func (i *Issue) LetterAt(x int) rune {
+	return rune(i.Sprite[x])
+}
+
+func (i *Issue) DestroyLetterAt(x int) {
+	newSprite := ""
+	for ix := 0; ix < i.w; ix++ {
+		if ix == x {
+			newSprite += " "
+		} else {
+			newSprite += string(i.Sprite[ix])
+		}
+	}
+	i.Sprite = newSprite
+}
+
 // would be nice to just call "spawn" at random intervals but have the spawner lock itself if it's already got something still going
 // how should it track if it's active?
 type IssueSpawner struct {
@@ -370,6 +386,16 @@ func (g *Game) FindGameObject(fn func(Drawable) bool) Drawable {
 	return nil
 }
 
+func (g *Game) FilterGameObjects(fn func(Drawable) bool) []Drawable {
+	out := []Drawable{}
+	for _, gobj := range g.drawables {
+		if fn(gobj) {
+			out = append(out, gobj)
+		}
+	}
+	return out
+}
+
 func (g *Game) DetectHits(r *Ray, shaText string) {
 	score := g.FindGameObject(func(gobj Drawable) bool {
 		_, ok := gobj.(*Score)
@@ -387,19 +413,33 @@ func (g *Game) DetectHits(r *Ray, shaText string) {
 	}
 	thisShot := 0
 	matchesMultiplier := 1
-	for i, point := range r.Points {
-		r, _, _, _ := g.Screen.GetContent(point.X, point.Y)
-		g.Debugf("found at point %s: %s\n", point, string(r))
-		if r == ' ' {
-			continue
+
+	// TODO dirty to do side effects in a filter, consider renaming/tweaking
+	_ = g.FilterGameObjects(func(gobj Drawable) bool {
+		issue, ok := gobj.(*Issue)
+		if !ok {
+			return false
 		}
-		if byte(r) == shaText[i] {
+		shotX := r.Points[0].X
+		shotY := r.Points[0].Y
+		if shotX < issue.x || shotX >= issue.x+issue.w {
+			return false
+		}
+
+		r := issue.LetterAt(shotX - issue.x)
+		if r == ' ' {
+			return false
+		}
+
+		issue.DestroyLetterAt(shotX - issue.x)
+
+		if byte(r) == shaText[issue.y-shotY] {
 			g.Debugf("OMG CHARACTER HIT %s\n", string(r))
 			matchesMultiplier *= 2
 		}
 
-		thisShot++
-	}
+		return true
+	})
 
 	bonus := false
 	if thisShot == 10 {
