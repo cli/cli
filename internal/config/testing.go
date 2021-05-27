@@ -62,3 +62,11 @@ func stubConfig(main, hosts string) func() {
 		ReadConfigFile = orig
 	}
 }
+
+func stubMigrateConfigDir() func() {
+	orig := migrateConfigDir
+	migrateConfigDir = func(_, _ string) {}
+	return func() {
+		migrateConfigDir = orig
+	}
+}

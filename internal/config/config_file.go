@@ -3,11 +3,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
@@ -15,16 +14,65 @@ import (
 )
 
 const (
-	GH_CONFIG_DIR = "GH_CONFIG_DIR"
+	GH_CONFIG_DIR   = "GH_CONFIG_DIR"
+	XDG_CONFIG_HOME = "XDG_CONFIG_HOME"
+	APP_DATA        = "AppData"
 )
 
+// Config path precedence
+// 1. GH_CONFIG_DIR
+// 2. XDG_CONFIG_HOME
+// 3. AppData (windows only)
+// 4. HOME
 func ConfigDir() string {
-	if v := os.Getenv(GH_CONFIG_DIR); v != "" {
-		return v
+	var path string
+	if a := os.Getenv(GH_CONFIG_DIR); a != "" {
+		path = a
+	} else if b := os.Getenv(XDG_CONFIG_HOME); b != "" {
+		path = filepath.Join(b, "gh")
+	} else if c := os.Getenv(APP_DATA); runtime.GOOS == "windows" && c != "" {
+		path = filepath.Join(c, "GitHub CLI")
+	} else {
+		d, _ := os.UserHomeDir()
+		path = filepath.Join(d, ".config", "gh")
 	}
 
-	homeDir, _ := homeDirAutoMigrate()
-	return homeDir
+	// If the path does not exist try migrating config from default paths
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		autoMigrateConfigDir(path)
+	}
+
+	return path
+}
+
+// Check default paths (os.UserHomeDir, and homedir.Dir) for existing configs
+// If configs exist then move them to newPath
+// TODO: Remove support for homedir.Dir location in v2
+func autoMigrateConfigDir(newPath string) {
+	path, err := os.UserHomeDir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		migrateConfigDir(oldPath, newPath)
+		return
+	}
+
+	path, err = homedir.Dir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		migrateConfigDir(oldPath, newPath)
+	}
+}
+
+func dirExists(path string) bool {
+	f, err := os.Stat(path)
+	return err == nil && f.IsDir()
+}
+
+var migrateConfigDir = func(oldPath, newPath string) {
+	if oldPath == newPath {
+		return
+	}
+
+	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
+	_ = os.Rename(oldPath, newPath)
 }
 
 func ConfigFile() string {
@@ -65,36 +113,6 @@ func HomeDirPath(subdir string) (string, error) {
 	return newPath, nil
 }
 
-// Looks up the `~/.config/gh` directory with backwards-compatibility with go-homedir and auto-migration
-// when an old homedir location was found.
-func homeDirAutoMigrate() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// TODO: remove go-homedir fallback in GitHub CLI v2
-		if legacyDir, err := homedir.Dir(); err == nil {
-			return filepath.Join(legacyDir, ".config", "gh"), nil
-		}
-		return "", err
-	}
-
-	newPath := filepath.Join(homeDir, ".config", "gh")
-	_, newPathErr := os.Stat(newPath)
-	if newPathErr == nil || !os.IsNotExist(err) {
-		return newPath, newPathErr
-	}
-
-	// TODO: remove go-homedir fallback in GitHub CLI v2
-	if legacyDir, err := homedir.Dir(); err == nil {
-		legacyPath := filepath.Join(legacyDir, ".config", "gh")
-		if s, err := os.Stat(legacyPath); err == nil && s.IsDir() {
-			_ = os.MkdirAll(filepath.Dir(newPath), 0755)
-			return newPath, os.Rename(legacyPath, newPath)
-		}
-	}
-
-	return newPath, nil
-}
-
 var ReadConfigFile = func(filename string) ([]byte, error) {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -111,7 +129,7 @@ var ReadConfigFile = func(filename string) ([]byte, error) {
 }
 
 var WriteConfigFile = func(filename string, data []byte) error {
-	err := os.MkdirAll(path.Dir(filename), 0771)
+	err := os.MkdirAll(filepath.Dir(filename), 0771)
 	if err != nil {
 		return pathError(err)
 	}
@@ -122,11 +140,7 @@ var WriteConfigFile = func(filename string, data []byte) error {
 	}
 	defer cfgFile.Close()
 
-	n, err := cfgFile.Write(data)
-	if err == nil && n < len(data) {
-		err = io.ErrShortWrite
-	}
-
+	_, err = cfgFile.Write(data)
 	return err
 }
 
@@ -263,7 +277,7 @@ func findRegularFile(p string) string {
 		if s, err := os.Stat(p); err == nil && s.Mode().IsRegular() {
 			return p
 		}
-		newPath := path.Dir(p)
+		newPath := filepath.Dir(p)
 		if newPath == p || newPath == "/" || newPath == "." {
 			break
 		}

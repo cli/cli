@@ -3,10 +3,12 @@ package view
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -624,4 +626,52 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
 			reg.Verify(t)
 		})
 	}
+}
+
+func Test_viewRun_json(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(false)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+
+	opts := &ViewOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		Exporter: &testExporter{
+			fields: []string{"name", "defaultBranchRef"},
+		},
+	}
+
+	_, teardown := run.Stub()
+	defer teardown(t)
+
+	err := viewRun(opts)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		name: REPO
+		defaultBranchRef: main
+	`), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+type testExporter struct {
+	fields []string
+}
+
+func (e *testExporter) Fields() []string {
+	return e.fields
+}
+
+func (e *testExporter) Write(w io.Writer, data interface{}, colorize bool) error {
+	r := data.(*api.Repository)
+	fmt.Fprintf(w, "name: %s\n", r.Name)
+	fmt.Fprintf(w, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)
+	return nil
 }

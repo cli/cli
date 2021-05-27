@@ -2,11 +2,8 @@ package comment
 
 import (
 	"errors"
-	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -48,7 +45,13 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 			if len(args) > 0 {
 				selector = args[0]
 			}
-			opts.RetrieveCommentable = retrievePR(f.HttpClient, f.BaseRepo, f.Branch, f.Remotes, selector)
+			finder := shared.NewFinder(f)
+			opts.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
+				return finder.Find(shared.FindOptions{
+					Selector: selector,
+					Fields:   []string{"id", "url"},
+				})
+			}
 			return shared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,25 +76,4 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
 
 	return cmd
-}
-
-func retrievePR(httpClient func() (*http.Client, error),
-	baseRepo func() (ghrepo.Interface, error),
-	branch func() (string, error),
-	remotes func() (context.Remotes, error),
-	selector string) func() (shared.Commentable, ghrepo.Interface, error) {
-	return func() (shared.Commentable, ghrepo.Interface, error) {
-		httpClient, err := httpClient()
-		if err != nil {
-			return nil, nil, err
-		}
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		pr, repo, err := shared.PRFromArgs(apiClient, baseRepo, branch, remotes, selector)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return pr, repo, nil
-	}
 }

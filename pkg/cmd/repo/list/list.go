@@ -3,8 +3,10 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -17,6 +19,7 @@ type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
+	Exporter   cmdutil.Exporter
 
 	Limit int
 	Owner string
@@ -88,9 +91,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 
 	return cmd
 }
+
+var defaultFields = []string{"nameWithOwner", "description", "isPrivate", "isFork", "isArchived", "createdAt", "pushedAt"}
 
 func listRun(opts *ListOptions) error {
 	httpClient, err := opts.HttpClient()
@@ -105,6 +111,10 @@ func listRun(opts *ListOptions) error {
 		Language:    opts.Language,
 		Archived:    opts.Archived,
 		NonArchived: opts.NonArchived,
+		Fields:      defaultFields,
+	}
+	if opts.Exporter != nil {
+		filter.Fields = opts.Exporter.Fields()
 	}
 
 	cfg, err := opts.Config()
@@ -127,27 +137,31 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO.Out, listResult.Repositories, opts.IO.ColorEnabled())
+	}
+
 	cs := opts.IO.ColorScheme()
 	tp := utils.NewTablePrinter(opts.IO)
 	now := opts.Now()
 
 	for _, repo := range listResult.Repositories {
-		info := repo.Info()
+		info := repoInfo(repo)
 		infoColor := cs.Gray
 		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
 
 		t := repo.PushedAt
-		// if listResult.FromSearch {
-		// 	t = repo.UpdatedAt
-		// }
+		if repo.PushedAt == nil {
+			t = &repo.CreatedAt
+		}
 
 		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
 		tp.AddField(text.ReplaceExcessiveWhitespace(repo.Description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(now, t), nil, cs.Gray)
+			tp.AddField(utils.FuzzyAgoAbbr(now, *t), nil, cs.Gray)
 		} else {
 			tp.AddField(t.Format(time.RFC3339), nil, nil)
 		}
@@ -178,4 +192,22 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 		matchStr = " that match your search"
 	}
 	return fmt.Sprintf("Showing %d of %d repositories in @%s%s", matchCount, totalMatchCount, owner, matchStr)
+}
+
+func repoInfo(r api.Repository) string {
+	var tags []string
+
+	if r.IsPrivate {
+		tags = append(tags, "private")
+	} else {
+		tags = append(tags, "public")
+	}
+	if r.IsFork {
+		tags = append(tags, "fork")
+	}
+	if r.IsArchived {
+		tags = append(tags, "archived")
+	}
+
+	return strings.Join(tags, ", ")
 }

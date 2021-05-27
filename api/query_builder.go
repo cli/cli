@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ func shortenQuery(q string) string {
 }
 
 var issueComments = shortenQuery(`
-	comments(last: 100) {
+	comments(first: 100) {
 		nodes {
 			author{login},
 			authorAssociation,
@@ -29,25 +30,25 @@ var issueComments = shortenQuery(`
 			minimizedReason,
 			reactionGroups{content,users{totalCount}}
 		},
+		pageInfo{hasNextPage,endCursor},
 		totalCount
 	}
 `)
 
 var prReviewRequests = shortenQuery(`
-	reviewRequests(last: 100) {
+	reviewRequests(first: 100) {
 		nodes {
 			requestedReviewer {
 				__typename,
 				...on User{login},
 				...on Team{name}
 			}
-		},
-		totalCount
+		}
 	}
 `)
 
 var prReviews = shortenQuery(`
-	reviews(last: 100) {
+	reviews(first: 100) {
 		nodes {
 			author{login},
 			authorAssociation,
@@ -56,6 +57,7 @@ var prReviews = shortenQuery(`
 			state,
 			reactionGroups{content,users{totalCount}}
 		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -69,14 +71,38 @@ var prFiles = shortenQuery(`
 	}
 `)
 
-var prStatusCheckRollup = shortenQuery(`
-	commits(last: 1) {
-		totalCount,
+var prCommits = shortenQuery(`
+	commits(first: 100) {
 		nodes {
 			commit {
+				authors(first:100) {
+					nodes {
+						name,
+						email,
+						user{id,login}
+					}
+				},
+				messageHeadline,
+				messageBody,
 				oid,
+				committedDate,
+				authoredDate
+			}
+		}
+	}
+`)
+
+func StatusCheckRollupGraphQL(after string) string {
+	var afterClause string
+	if after != "" {
+		afterClause = ",after:" + after
+	}
+	return fmt.Sprintf(shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
 				statusCheckRollup {
-					contexts(last: 100) {
+					contexts(first:100%s) {
 						nodes {
 							__typename
 							...on StatusContext {
@@ -92,13 +118,14 @@ var prStatusCheckRollup = shortenQuery(`
 								completedAt,
 								detailsUrl
 							}
-						}
+						},
+						pageInfo{hasNextPage,endCursor}
 					}
 				}
 			}
 		}
-	}
-`)
+	}`), afterClause)
+}
 
 var IssueFields = []string{
 	"assignees",
@@ -124,6 +151,7 @@ var PullRequestFields = append(IssueFields,
 	"additions",
 	"baseRefName",
 	"changedFiles",
+	"commits",
 	"deletions",
 	"files",
 	"headRefName",
@@ -153,17 +181,17 @@ func PullRequestGraphQL(fields []string) string {
 		case "mergedBy":
 			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":
-			q = append(q, `headRepositoryOwner{login}`)
+			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
-			q = append(q, `headRepository{name}`)
+			q = append(q, `headRepository{id,name}`)
 		case "assignees":
-			q = append(q, `assignees(first:100){nodes{login},totalCount}`)
+			q = append(q, `assignees(first:100){nodes{id,login,name},totalCount}`)
 		case "labels":
-			q = append(q, `labels(first:100){nodes{name},totalCount}`)
+			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":
 			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
 		case "milestone":
-			q = append(q, `milestone{title}`)
+			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "reactionGroups":
 			q = append(q, `reactionGroups{content,users{totalCount}}`)
 		case "mergeCommit":
@@ -178,8 +206,144 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, prReviews)
 		case "files":
 			q = append(q, prFiles)
+		case "commits":
+			q = append(q, prCommits)
+		case "lastCommit": // pseudo-field
+			q = append(q, `commits(last:1){nodes{commit{oid}}}`)
+		case "commitsCount": // pseudo-field
+			q = append(q, `commits{totalCount}`)
 		case "statusCheckRollup":
-			q = append(q, prStatusCheckRollup)
+			q = append(q, StatusCheckRollupGraphQL(""))
+		default:
+			q = append(q, field)
+		}
+	}
+	return strings.Join(q, ",")
+}
+
+var RepositoryFields = []string{
+	"id",
+	"name",
+	"nameWithOwner",
+	"owner",
+	"parent",
+	"templateRepository",
+	"description",
+	"homepageUrl",
+	"openGraphImageUrl",
+	"usesCustomOpenGraphImage",
+	"url",
+	"sshUrl",
+	"mirrorUrl",
+	"securityPolicyUrl",
+
+	"createdAt",
+	"pushedAt",
+	"updatedAt",
+
+	"isBlankIssuesEnabled",
+	"isSecurityPolicyEnabled",
+	"hasIssuesEnabled",
+	"hasProjectsEnabled",
+	"hasWikiEnabled",
+	"mergeCommitAllowed",
+	"squashMergeAllowed",
+	"rebaseMergeAllowed",
+
+	"forkCount",
+	"stargazerCount",
+	"watchers",
+	"issues",
+	"pullRequests",
+
+	"codeOfConduct",
+	"contactLinks",
+	"defaultBranchRef",
+	"deleteBranchOnMerge",
+	"diskUsage",
+	"fundingLinks",
+	"isArchived",
+	"isEmpty",
+	"isFork",
+	"isInOrganization",
+	"isMirror",
+	"isPrivate",
+	"isTemplate",
+	"isUserConfigurationRepository",
+	"licenseInfo",
+	"viewerCanAdminister",
+	"viewerDefaultCommitEmail",
+	"viewerDefaultMergeMethod",
+	"viewerHasStarred",
+	"viewerPermission",
+	"viewerPossibleCommitEmails",
+	"viewerSubscription",
+
+	"repositoryTopics",
+	"primaryLanguage",
+	"languages",
+	"issueTemplates",
+	"pullRequestTemplates",
+	"labels",
+	"milestones",
+	"latestRelease",
+
+	"assignableUsers",
+	"mentionableUsers",
+	"projects",
+
+	// "branchProtectionRules", // too complex to expose
+	// "collaborators", // does it make sense to expose without affiliation filter?
+}
+
+func RepositoryGraphQL(fields []string) string {
+	var q []string
+	for _, field := range fields {
+		switch field {
+		case "codeOfConduct":
+			q = append(q, "codeOfConduct{key,name,url}")
+		case "contactLinks":
+			q = append(q, "contactLinks{about,name,url}")
+		case "fundingLinks":
+			q = append(q, "fundingLinks{platform,url}")
+		case "licenseInfo":
+			q = append(q, "licenseInfo{key,name,nickname}")
+		case "owner":
+			q = append(q, "owner{id,login}")
+		case "parent":
+			q = append(q, "parent{id,name,owner{id,login}}")
+		case "templateRepository":
+			q = append(q, "templateRepository{id,name,owner{id,login}}")
+		case "repositoryTopics":
+			q = append(q, "repositoryTopics(first:100){nodes{topic{name}}}")
+		case "issueTemplates":
+			q = append(q, "issueTemplates{name,title,body,about}")
+		case "pullRequestTemplates":
+			q = append(q, "pullRequestTemplates{body,filename}")
+		case "labels":
+			q = append(q, "labels(first:100){nodes{id,color,name,description}}")
+		case "languages":
+			q = append(q, "languages(first:100){edges{size,node{name}}}")
+		case "primaryLanguage":
+			q = append(q, "primaryLanguage{name}")
+		case "latestRelease":
+			q = append(q, "latestRelease{publishedAt,tagName,name,url}")
+		case "milestones":
+			q = append(q, "milestones(first:100,states:OPEN){nodes{number,title,description,dueOn}}")
+		case "assignableUsers":
+			q = append(q, "assignableUsers(first:100){nodes{id,login,name}}")
+		case "mentionableUsers":
+			q = append(q, "mentionableUsers(first:100){nodes{id,login,name}}")
+		case "projects":
+			q = append(q, "projects(first:100,states:OPEN){nodes{id,name,number,body,resourcePath}}")
+		case "watchers":
+			q = append(q, "watchers{totalCount}")
+		case "issues":
+			q = append(q, "issues(states:OPEN){totalCount}")
+		case "pullRequests":
+			q = append(q, "pullRequests(states:OPEN){totalCount}")
+		case "defaultBranchRef":
+			q = append(q, "defaultBranchRef{name}")
 		default:
 			q = append(q, field)
 		}

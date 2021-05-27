@@ -12,24 +12,7 @@
               "state": "CLOSED",
               "url": "https://github.com/cli/cli/pull/8",
               "headRefName": "blueberries",
-              "reviewDecision": "CHANGES_REQUESTED",
-              "commits": {
-                "nodes": [
-                  {
-                    "commit": {
-                      "statusCheckRollup": {
-                        "contexts": {
-                          "nodes": [
-                            {
-                              "state": "SUCCESS"
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                ]
-              }
+              "reviewDecision": "CHANGES_REQUESTED"
             }
           }
         ]

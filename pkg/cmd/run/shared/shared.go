@@ -134,11 +134,10 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
-		var notFound *api.NotFoundError
-		if !errors.As(err, &notFound) {
+		var httpError api.HTTPError
+		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
 			return []Annotation{}, nil
 		}
-
 		return nil, err
 	}
 
