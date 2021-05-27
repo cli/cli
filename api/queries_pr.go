@@ -168,7 +168,7 @@ func (r ReviewRequests) Logins() []string {
 	logins := make([]string, len(r.Nodes))
 	for i, a := range r.Nodes {
 		if a.RequestedReviewer.TypeName == teamTypeName {
-			logins[i] = a.RequestedReviewer.Organization.Login + "/" + a.RequestedReviewer.Slug
+			logins[i] = fmt.Sprintf("%s/%s", a.RequestedReviewer.Organization.Login, a.RequestedReviewer.Slug)
 		} else {
 			logins[i] = a.RequestedReviewer.Login
 		}
@@ -403,8 +403,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { 
-				name 
+			defaultBranchRef {
+				name
 			}
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
@@ -420,8 +420,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		queryPrefix = `
 		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { 
-					name 
+				defaultBranchRef {
+					name
 				}
 				pullRequest(number: $number) {
 					...prWithReviews
