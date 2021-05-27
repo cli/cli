@@ -2,7 +2,9 @@ package list
 
 import (
 	"fmt"
+	"github.com/google/shlex"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -114,6 +116,16 @@ func listRun(opts *ListOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
+	}
+
+	argv, err := shlex.Split(opts.Search)
+
+	re := regexp.MustCompile(`^merged:.*`)
+
+	for _, arg := range argv {
+		if opts.State == "open" && (arg == "is:closed" || arg == "is:merged" || re.MatchString(arg)) {
+			opts.State = ""
+		}
 	}
 
 	filters := shared.FilterOptions{
