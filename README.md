@@ -36,7 +36,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### Linux
 
-`gh` is available via [Homebrew](#homebrew), and as downloadable binaries from the [releases page][].
+`gh` is available via [Homebrew][], and as downloadable binaries from the [releases page][].
 
 For more information and distro-specific instructions, see the [Linux installation docs](./docs/install_linux.md).
 
