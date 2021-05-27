@@ -437,6 +437,8 @@ func (g *Game) DetectHits(r *Ray, shot *CommitShot) {
 			return false
 		}
 
+		thisShot++
+
 		issue.DestroyLetterAt(shotX - issue.x)
 
 		if r == shot.LetterAt(shotY-issue.y) {
