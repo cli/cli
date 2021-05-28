@@ -334,13 +334,15 @@ func (cl *CommitLauncher) Launch() {
 }
 
 func NewCommitLauncher(g *Game, shas []string) *CommitLauncher {
+	style := g.Style.Foreground(tcell.ColorPurple)
 	return &CommitLauncher{
 		Shas: shas,
 		GameObject: GameObject{
-			Sprite: "-=$^$=-",
-			w:      7,
-			h:      1,
-			Game:   g,
+			Sprite:        "-=$^$=-",
+			w:             7,
+			h:             1,
+			Game:          g,
+			StyleOverride: &style,
 		},
 	}
 }
@@ -351,14 +353,16 @@ type CommitCounter struct {
 }
 
 func NewCommitCounter(x, y int, cl *CommitLauncher, game *Game) *CommitCounter {
+	style := game.Style.Background(tcell.ColorCornflowerBlue)
 	return &CommitCounter{
 		cl: cl,
 		GameObject: GameObject{
-			x:      x,
-			y:      y,
-			h:      1,
-			Sprite: fmt.Sprintf("%d commits remain", len(cl.Shas)),
-			Game:   game,
+			x:             x,
+			y:             y,
+			h:             1,
+			Sprite:        fmt.Sprintf("%d commits remain", len(cl.Shas)),
+			Game:          game,
+			StyleOverride: &style,
 		},
 	}
 }
@@ -379,15 +383,17 @@ func (s *Score) Add(i int) {
 }
 
 func NewScore(x, y int, game *Game) *Score {
+	style := game.Style.Foreground(tcell.ColorGold)
 	text := fmt.Sprintf("SCORE: %d", 0)
 	return &Score{
 		GameObject: GameObject{
-			x:      x,
-			y:      y,
-			w:      len(text),
-			h:      1,
-			Game:   game,
-			Sprite: text,
+			x:             x,
+			y:             y,
+			w:             len(text),
+			h:             1,
+			Game:          game,
+			Sprite:        text,
+			StyleOverride: &style,
 		},
 	}
 }
@@ -551,11 +557,13 @@ type ScoreLog struct {
 }
 
 func NewScoreLog(x, y int, game *Game) *ScoreLog {
+	style := game.Style.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite)
 	return &ScoreLog{
 		GameObject: GameObject{
-			x:    x,
-			y:    y,
-			Game: game,
+			x:             x,
+			y:             y,
+			Game:          game,
+			StyleOverride: &style,
 		},
 	}
 }
