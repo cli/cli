@@ -201,6 +201,7 @@ func NewBurst(x, y int, g *Game) *Burst {
 			Game:          g,
 			StyleOverride: &style,
 			Sprite: `\ /
+
 / \`,
 		},
 	}
@@ -212,9 +213,9 @@ func NewBigBurst(x, y int, g *Game) *Burst {
 		life: 3,
 		GameObject: GameObject{
 			x:             x - 6,
-			y:             y - 6,
+			y:             y - 3,
 			w:             13,
-			h:             13,
+			h:             6,
 			Game:          g,
 			StyleOverride: &style,
 			Sprite: `*     *
@@ -551,6 +552,20 @@ func (r *Ray) AddPoint(x, y int) {
 	r.Points = append(r.Points, Point{X: x, Y: y})
 }
 
+func NewLegend(x, y int, game *Game) *GameObject {
+	return &GameObject{
+		x:    x,
+		y:    y,
+		Game: game,
+		Sprite: `move:  ← →
+space: fire
+q:     quit`,
+	}
+}
+
+func (g *GameObject) Update() {
+}
+
 type ScoreLog struct {
 	GameObject
 	log []string
@@ -672,6 +687,9 @@ func mergeconflictRun(opts *MCOpts) error {
 
 	scoreLog := NewScoreLog(15, 15, game)
 	game.AddDrawable(scoreLog)
+
+	legend := NewLegend(1, 15, game)
+	game.AddDrawable(legend)
 
 	quit := make(chan struct{})
 	go func() {
