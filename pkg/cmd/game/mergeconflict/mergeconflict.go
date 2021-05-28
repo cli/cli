@@ -182,6 +182,57 @@ func (is *IssueSpawner) AddIssue(issue string) {
 	is.issues = append(is.issues, issue)
 }
 
+type Burst struct {
+	GameObject
+	life int
+}
+
+func NewBurst(x, y int, g *Game) *Burst {
+	style := g.Style.Foreground(tcell.ColorYellow)
+	return &Burst{
+		life: 3,
+		GameObject: GameObject{
+			x:             x - 1,
+			y:             y - 1,
+			w:             3,
+			h:             3,
+			Game:          g,
+			StyleOverride: &style,
+			Sprite: `\ /
+/ \`,
+		},
+	}
+}
+
+func NewBigBurst(x, y int, g *Game) *Burst {
+	style := g.Style.Foreground(tcell.ColorPink)
+	return &Burst{
+		life: 3,
+		GameObject: GameObject{
+			x:             x - 6,
+			y:             y - 6,
+			w:             13,
+			h:             13,
+			Game:          g,
+			StyleOverride: &style,
+			Sprite: `*     *
+    \   /
+*)___\ /___(*
+     / \
+    /   \
+   *     *`,
+		},
+	}
+}
+
+func (b *Burst) Update() {
+	if b.life == 0 {
+		b.Game.Destroy(b)
+		return
+	}
+	b.life--
+}
+
 type CommitLauncher struct {
 	GameObject
 	cooldown     int // prevents double shooting which make bullets collide
@@ -442,10 +493,16 @@ func (g *Game) DetectHits(r *Ray, shot *CommitShot) {
 
 		issue.DestroyLetterAt(shotX - issue.x)
 
+		var burst *Burst
+
 		if r == shot.LetterAt(shotY-issue.y) {
 			g.Debugf("OMG CHARACTER HIT %s\n", string(r))
 			matchesMultiplier *= 2
+			burst = NewBigBurst(shotX, issue.y, g)
+		} else {
+			burst = NewBurst(shotX, issue.y, g)
 		}
+		g.AddDrawable(burst)
 
 		return true
 	})
