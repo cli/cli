@@ -2,19 +2,25 @@ package mergeconflict
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 type MCOpts struct {
@@ -62,6 +68,8 @@ type GameObject struct {
 	Game          *Game
 	StyleOverride *tcell.Style
 }
+
+func (g *GameObject) Update() {}
 
 func (g *GameObject) Transform(x, y int) {
 	g.x += x
@@ -412,6 +420,7 @@ type Game struct {
 	Style     tcell.Style
 	MaxWidth  int
 	Logger    *log.Logger
+	State     map[string]interface{}
 }
 
 func (g *Game) Debugf(format string, v ...interface{}) {
@@ -419,6 +428,30 @@ func (g *Game) Debugf(format string, v ...interface{}) {
 		return
 	}
 	g.Logger.Printf(format, v...)
+}
+
+func (g *Game) LoadState() error {
+	stateFilePath := filepath.Join(config.ConfigDir(), "mc.yml")
+
+	g.State = map[string]interface{}{}
+	g.State["HighScores"] = map[string]int{}
+
+	content, err := ioutil.ReadFile(stateFilePath)
+	if err != nil {
+		return err
+	}
+	err = yaml.Unmarshal(content, &g.State)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *Game) SaveState() error {
+	// TODO
+
+	return nil
 }
 
 func (g *Game) AddDrawable(d Drawable) {
@@ -563,7 +596,20 @@ q:     quit`,
 	}
 }
 
-func (g *GameObject) Update() {
+func NewHighScores(x, y int, g *Game) *GameObject {
+	sprite := "~* high scores *~"
+	highScores, ok := g.State["HighScores"].(map[string]int)
+	if ok {
+		for k, v := range highScores {
+			sprite += fmt.Sprintf("\n%s %d", k, v)
+		}
+	}
+	return &GameObject{
+		x:      x,
+		y:      y,
+		Game:   g,
+		Sprite: sprite,
+	}
 }
 
 type ScoreLog struct {
@@ -638,6 +684,11 @@ func mergeconflictRun(opts *MCOpts) error {
 		Logger:   logger,
 	}
 
+	err = game.LoadState()
+	if err != nil {
+		game.Debugf("failed to load state: %s", err)
+	}
+
 	issues, err := getIssues(client, repo)
 	if err != nil {
 		return fmt.Errorf("failed to get issues for %s: %w", ghrepo.FullName(repo), err)
@@ -682,14 +733,16 @@ func mergeconflictRun(opts *MCOpts) error {
 	cc := NewCommitCounter(35, 14, cl, game)
 	game.AddDrawable(cc)
 
-	score := NewScore(40, 18, game)
+	score := NewScore(38, 18, game)
 	game.AddDrawable(score)
 
 	scoreLog := NewScoreLog(15, 15, game)
 	game.AddDrawable(scoreLog)
 
-	legend := NewLegend(1, 15, game)
-	game.AddDrawable(legend)
+	game.AddDrawable(NewLegend(1, 15, game))
+
+	highScores := NewHighScores(60, 15, game)
+	game.AddDrawable(highScores)
 
 	quit := make(chan struct{})
 	go func() {
@@ -724,7 +777,6 @@ func mergeconflictRun(opts *MCOpts) error {
 	// TODO UI
 	// - high score listing
 	// - "now playing" note
-	// - key legend
 	// TODO high score saving/loading
 
 loop:
@@ -746,6 +798,45 @@ loop:
 	}
 
 	s.Fini()
+
+	// TODO this following code is very bad, abstract to function and clean up
+	// TODO GetState helper on Game
+	// TODO likely reference issue on the high score map
+	hs := map[string]int{}
+	hs, ok := game.State["HighScores"].(map[string]int)
+	if !ok {
+		game.Debugf("failed to save high scores")
+		return nil
+	}
+
+	maxScore := 0
+	for _, v := range hs {
+		if v > maxScore {
+			maxScore = v
+		}
+	}
+
+	if score.score >= maxScore && score.score > 0 {
+		answer := false
+		err = prompt.SurveyAskOne(
+			&survey.Confirm{
+				Message: "new high score! save it?",
+			}, &answer)
+		if err == nil && answer {
+			answer := ""
+			err = prompt.SurveyAskOne(
+				&survey.Input{
+					Message: "name",
+				}, &answer)
+			if err == nil {
+				hs[answer] = score.score
+				err = game.SaveState()
+				if err != nil {
+					game.Debugf("failed to save state: %s", err)
+				}
+			}
+		}
+	}
 
 	return nil
 }
