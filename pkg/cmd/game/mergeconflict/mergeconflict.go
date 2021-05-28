@@ -21,6 +21,7 @@ type MCOpts struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Debug      bool
 }
 
 func NewCmdMergeconflict(f *cmdutil.Factory, runF func(*MCOpts) error) *cobra.Command {
@@ -42,6 +43,7 @@ func NewCmdMergeconflict(f *cmdutil.Factory, runF func(*MCOpts) error) *cobra.Co
 			return mergeconflictRun(opts)
 		},
 	}
+	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", false, "enable logging")
 
 	return cmd
 }
@@ -397,6 +399,7 @@ func (s *Score) Update() {
 }
 
 type Game struct {
+	debug     bool
 	drawables []Drawable
 	Screen    tcell.Screen
 	Style     tcell.Style
@@ -405,6 +408,9 @@ type Game struct {
 }
 
 func (g *Game) Debugf(format string, v ...interface{}) {
+	if g.debug == false {
+		return
+	}
 	g.Logger.Printf(format, v...)
 }
 
@@ -581,9 +587,14 @@ func mergeconflictRun(opts *MCOpts) error {
 		return fmt.Errorf("could not build http client: %w", err)
 	}
 
-	f, _ := os.Create("mclog.txt")
-	logger := log.New(f, "", log.Lshortfile)
-	logger.Println("hey what's up")
+	debug := opts.Debug
+
+	var logger *log.Logger
+	if debug {
+		f, _ := os.Create("mclog.txt")
+		logger = log.New(f, "", log.Lshortfile)
+		logger.Println("hey what's up")
+	}
 
 	style := tcell.StyleDefault
 
@@ -597,6 +608,7 @@ func mergeconflictRun(opts *MCOpts) error {
 	s.SetStyle(style)
 
 	game := &Game{
+		debug:    debug,
 		Screen:   s,
 		Style:    style,
 		MaxWidth: 80,
