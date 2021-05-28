@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"github.com/google/shlex"
 	"net/url"
 	"strings"
 
@@ -241,6 +242,21 @@ func SearchQueryBuild(options FilterOptions) string {
 	}
 
 	return q.String()
+}
+
+func QueryHasStateClause(searchQuery string) bool {
+	argv, err := shlex.Split(searchQuery)
+	if err != nil {
+		return false
+	}
+
+	for _, arg := range argv {
+		if arg == "is:closed" || arg == "is:merged" || arg == "state:closed" || arg == "state:merged" || strings.HasPrefix(arg, "merged:") || strings.HasPrefix(arg, "closed:") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MeReplacer resolves usages of `@me` to the handle of the currently logged in user.
