@@ -112,6 +112,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if opts.State == "open" && shared.QueryHasStateClause(opts.Search) {
+		opts.State = ""
+	}
+
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
 		State:     strings.ToLower(opts.State),
