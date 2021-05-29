@@ -26,17 +26,19 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name          string
-	Description   string
-	Homepage      string
-	Team          string
-	Template      string
-	EnableIssues  bool
-	EnableWiki    bool
-	Public        bool
-	Private       bool
-	Internal      bool
-	ConfirmSubmit bool
+	Name              string
+	Description       string
+	Homepage          string
+	Team              string
+	Template          string
+	EnableIssues      bool
+	EnableWiki        bool
+	Public            bool
+	Private           bool
+	Internal          bool
+	ConfirmSubmit     bool
+	GitIgnoreTemplate string
+	LicenseTemplate   string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -123,7 +125,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
 	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
-
+	cmd.Flags().StringVarP(&opts.GitIgnoreTemplate, "gitignore", "g", "", "Specify a gitignore template for the repository")
+	cmd.Flags().StringVarP(&opts.LicenseTemplate, "license", "l", "", "Specify an Open Source License for the repository")
 	return cmd
 }
 
@@ -164,6 +167,16 @@ func createRun(opts *CreateOptions) error {
 		isVisibilityPassed = true
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	var gitIgnoreTemplate, repoLicenseTemplate string
+
+	gitIgnoreTemplate = opts.GitIgnoreTemplate
+	repoLicenseTemplate = opts.LicenseTemplate
+
 	// Trigger interactive prompt if name is not passed
 	if !isNameAnArg {
 		newName, newDesc, newVisibility, err := interactiveRepoCreate(isDescEmpty, isVisibilityPassed, opts.Name)
@@ -179,6 +192,19 @@ func createRun(opts *CreateOptions) error {
 		if newVisibility != "" {
 			visibility = newVisibility
 		}
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+
+		host, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+
+		gt, lt := interactiveGitIgnoreLicense(api.NewClientFromHTTP(httpClient), host)
+		gitIgnoreTemplate = gt
+		repoLicenseTemplate = lt
 	} else {
 		// Go for a prompt only if visibility isn't passed
 		if !isVisibilityPassed {
@@ -188,11 +214,6 @@ func createRun(opts *CreateOptions) error {
 			}
 			visibility = newVisibility
 		}
-	}
-
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
 	}
 
 	var repoToCreate ghrepo.Interface
@@ -245,14 +266,16 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:             repoToCreate.RepoName(),
-		Visibility:       visibility,
-		OwnerID:          repoToCreate.RepoOwner(),
-		TeamID:           opts.Team,
-		Description:      opts.Description,
-		HomepageURL:      opts.Homepage,
-		HasIssuesEnabled: opts.EnableIssues,
-		HasWikiEnabled:   opts.EnableWiki,
+		Name:              repoToCreate.RepoName(),
+		Visibility:        visibility,
+		OwnerID:           repoToCreate.RepoOwner(),
+		TeamID:            opts.Team,
+		Description:       opts.Description,
+		HomepageURL:       opts.Homepage,
+		HasIssuesEnabled:  opts.EnableIssues,
+		HasWikiEnabled:    opts.EnableWiki,
+		GitIgnoreTemplate: gitIgnoreTemplate,
+		LicenseTemplate:   repoLicenseTemplate,
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -273,7 +296,6 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-
 		stderr := opts.IO.ErrOut
 		stdout := opts.IO.Out
 		cs := opts.IO.ColorScheme()
@@ -282,7 +304,7 @@ func createRun(opts *CreateOptions) error {
 		if isTTY {
 			fmt.Fprintf(stderr, "%s Created repository %s on GitHub\n", cs.SuccessIconWithColor(cs.Green), ghrepo.FullName(repo))
 		} else {
-			fmt.Fprintln(stdout, repo.URL)
+			fmt.Fprintln(stdout, ghrepo.GenerateRepoURL(repo, ""))
 		}
 
 		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
@@ -309,7 +331,7 @@ func createRun(opts *CreateOptions) error {
 				}
 			}
 			if createLocalDirectory {
-				path := repo.Name
+				path := repo.RepoName()
 				checkoutBranch := ""
 				if opts.Template != "" {
 					// NOTE: we cannot read `defaultBranchRef` from the newly created repository as it will
@@ -330,6 +352,101 @@ func createRun(opts *CreateOptions) error {
 	}
 	fmt.Fprintln(opts.IO.Out, "Discarding...")
 	return nil
+}
+
+func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, string) {
+
+	var answers []string
+	var addBoth bool
+	var initialQs []*survey.Question
+
+	optionToSkip := &survey.Question{
+		Name: "optionToSkip",
+		Prompt: &survey.Confirm{
+			Message: "Would you like to add a .gitignore or a license?",
+			Default: false,
+		},
+	}
+	initialQs = append(initialQs, optionToSkip)
+	survey.Ask(initialQs, &addBoth)
+
+	if addBoth {
+		var addQs []*survey.Question
+
+		gitIgnoreLicenseQuestion := &survey.Question{
+			Name: "gitIgnoreLicense",
+			Prompt: &survey.MultiSelect{
+				Message: "What do you want to add?",
+				Options: []string{".gitignore", "license"},
+			},
+		}
+		addQs = append(addQs, gitIgnoreLicenseQuestion)
+
+		survey.Ask(addQs, &answers)
+
+		wantGitIgnore, wantLicense := false, false
+
+		if len(answers) > 0 {
+			if len(answers) > 1 {
+				wantGitIgnore, wantLicense = answers[0] == ".gitignore", answers[1] == "license"
+			} else if answers[0] == ".gitignore" {
+				wantGitIgnore = true
+			} else if answers[0] == "license" {
+				wantLicense = true
+			}
+
+			qs := []*survey.Question{}
+
+			if wantGitIgnore {
+				gitIgnoretemplates, err := ListGitIgnoreTemplates(client, hostname)
+				if err != nil {
+					fmt.Println(err)
+				}
+				gitIgnoreQuestion := &survey.Question{
+					Name: "repoGitIgnore",
+					Prompt: &survey.Select{
+						Message: "Choose a .gitignore template",
+						Options: gitIgnoretemplates,
+					},
+				}
+				qs = append(qs, gitIgnoreQuestion)
+			}
+
+			licenseKey := map[string]string{}
+
+			if wantLicense {
+				licenseTemplates, err := ListLicenseTemplates(client, hostname)
+				if err != nil {
+					fmt.Println(err)
+				}
+				var licenseNames []string
+				for _, l := range licenseTemplates {
+					licenseNames = append(licenseNames, l.Name)
+					licenseKey[l.Name] = l.Key
+				}
+				licenseQuestion := &survey.Question{
+					Name: "repoLicense",
+					Prompt: &survey.Select{
+						Message: "Choose a license",
+						Options: licenseNames,
+					},
+				}
+				qs = append(qs, licenseQuestion)
+			}
+
+			templateAnswers := struct {
+				RepoGitIgnore string
+				RepoLicense   string
+			}{}
+
+			survey.Ask(qs, &templateAnswers)
+			return templateAnswers.RepoGitIgnore, licenseKey[templateAnswers.RepoLicense]
+
+		}
+		return "", ""
+	}
+
+	return "", ""
 }
 
 func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {

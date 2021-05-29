@@ -455,6 +455,18 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
+		{
+			Name: "optionToSkip",
+			Value: true,
+		},
+		{
+			Name: "gitIgnoreLicense",
+			Value: "license",
+		},
+		{
+			Name: "repoLicense",
+			Value: "Apache License 2.0",
+		},
 	})
 	as.Stub([]*prompt.QuestionStub{
 		{

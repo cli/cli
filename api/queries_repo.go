@@ -19,7 +19,7 @@ type Repository struct {
 	ID                       string
 	Name                     string
 	NameWithOwner            string
-	Owner                    RepositoryOwner
+	Owner                    RepositoryOwner `json:"owner"`
 	Parent                   *Repository
 	TemplateRepository       *Repository
 	Description              string
@@ -187,6 +187,11 @@ type IssueLabel struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
+}
+
+type License struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // RepoOwner is the login name of the owner
@@ -434,14 +439,36 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	return repo
 }
 
-// repositoryV3 is the repository result from GitHub API v3
-type repositoryV3 struct {
+func InitRepoV3Hostname(repo *RepositoryV3, hostname string) *RepositoryV3 {
+	repo.hostname = hostname
+	if repo.Parent != nil {
+		repo.Parent.hostname = hostname
+	}
+	return repo
+}
+
+// RepositoryV3 is the repository result from GitHub API v3
+type RepositoryV3 struct {
 	NodeID    string
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
 	Owner     struct {
 		Login string
 	}
+	Parent   *RepositoryV3
+	hostname string
+}
+
+func (r RepositoryV3) RepoOwner() string {
+	return r.Owner.Login
+}
+
+func (r RepositoryV3) RepoHost() string {
+	return r.hostname
+}
+
+func (r RepositoryV3) RepoName() string {
+	return r.Name
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
@@ -459,7 +486,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		return nil, err
 	}
 
-	result := repositoryV3{}
+	result := RepositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
 		return nil, err

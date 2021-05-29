@@ -1,7 +1,10 @@
 package create
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/cli/cli/internal/ghrepo"
 	"net/http"
 
 	"github.com/cli/cli/api"
@@ -17,8 +20,10 @@ type repoCreateInput struct {
 	OwnerID string `json:"ownerId,omitempty"`
 	TeamID  string `json:"teamId,omitempty"`
 
-	HasIssuesEnabled bool `json:"hasIssuesEnabled"`
-	HasWikiEnabled   bool `json:"hasWikiEnabled"`
+	HasIssuesEnabled  bool   `json:"hasIssuesEnabled"`
+	HasWikiEnabled    bool   `json:"hasWikiEnabled"`
+	GitIgnoreTemplate string `json:"gitignore_template,omitempty"`
+	LicenseTemplate   string `json:"license_template,omitempty"`
 }
 
 type repoTemplateInput struct {
@@ -31,7 +36,7 @@ type repoTemplateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
+func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (ghrepo.Interface, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
@@ -104,6 +109,21 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 		"input": input,
 	}
 
+	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" {
+		body := &bytes.Buffer{}
+		enc := json.NewEncoder(body)
+		if err := enc.Encode(input); err != nil {
+			return nil, err
+		}
+		var responseV3 api.RepositoryV3
+		err := apiClient.REST(hostname, "POST", fmt.Sprintf("user/repos"), body, &responseV3)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(&responseV3, "==========response v3===========")
+		return &responseV3, nil
+	}
+
 	err := apiClient.GraphQL(hostname, `
 	mutation RepositoryCreate($input: CreateRepositoryInput!) {
 		createRepository(input: $input) {
@@ -142,4 +162,24 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 	}
 	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return response.Organization.NodeID, response.NodeID, err
+}
+
+// ListGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.
+func ListGitIgnoreTemplates(client *api.Client, hostname string) ([]string, error) {
+	var gitIgnoreTemplates []string
+	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates"), nil, &gitIgnoreTemplates)
+	if err != nil {
+		return []string{}, err
+	}
+	return gitIgnoreTemplates, nil
+}
+
+// ListLicenseTemplates uses API v3 here because license template isn't supported by GraphQL yet.
+func ListLicenseTemplates(client *api.Client, hostname string) ([]api.License, error) {
+	var licenseTemplates []api.License
+	err := client.REST(hostname, "GET", fmt.Sprintf("licenses"), nil, &licenseTemplates)
+	if err != nil {
+		return nil, err
+	}
+	return licenseTemplates, nil
 }
