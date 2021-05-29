@@ -160,6 +160,7 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 		milestoneTitle = issue.Milestone.Title
 	}
 	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
