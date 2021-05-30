@@ -120,8 +120,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(&responseV3, "==========response v3===========")
-		return &responseV3, nil
+		return api.InitRepoV3Hostname(&responseV3, hostname), nil
 	}
 
 	err := apiClient.GraphQL(hostname, `

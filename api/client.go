@@ -220,7 +220,6 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 	if err != nil {
 		return err
 	}
-
 	err = json.Unmarshal(b, &data)
 	if err != nil {
 		return err

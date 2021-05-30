@@ -455,6 +455,8 @@ type RepositoryV3 struct {
 	Owner     struct {
 		Login string
 	}
+	Private  bool
+	HTMLUrl  string `json:"html_url"`
 	Parent   *RepositoryV3
 	hostname string
 }

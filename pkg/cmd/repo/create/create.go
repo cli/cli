@@ -202,7 +202,11 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		gt, lt := interactiveGitIgnoreLicense(api.NewClientFromHTTP(httpClient), host)
+		gt, lt, err := interactiveGitIgnoreLicense(api.NewClientFromHTTP(httpClient), host)
+		if err != nil {
+			return err
+		}
+
 		gitIgnoreTemplate = gt
 		repoLicenseTemplate = lt
 	} else {
@@ -311,6 +315,7 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
+
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if inLocalRepo {
@@ -354,21 +359,24 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, string) {
+func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, string, error) {
 
-	var answers []string
 	var addBoth bool
 	var initialQs []*survey.Question
 
-	optionToSkip := &survey.Question{
-		Name: "optionToSkip",
+	addGitIgnoreLicense := &survey.Question{
+		Name: "addGitIgnoreLicense",
 		Prompt: &survey.Confirm{
 			Message: "Would you like to add a .gitignore or a license?",
 			Default: false,
 		},
 	}
-	initialQs = append(initialQs, optionToSkip)
-	survey.Ask(initialQs, &addBoth)
+
+	initialQs = append(initialQs, addGitIgnoreLicense)
+	err := prompt.SurveyAsk(initialQs, &addBoth)
+	if err != nil {
+		return "", "", err
+	}
 
 	if addBoth {
 		var addQs []*survey.Question
@@ -382,7 +390,11 @@ func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, s
 		}
 		addQs = append(addQs, gitIgnoreLicenseQuestion)
 
-		survey.Ask(addQs, &answers)
+		var answers []string
+		err = prompt.SurveyAsk(addQs, &answers)
+		if err != nil {
+			return "", "", err
+		}
 
 		wantGitIgnore, wantLicense := false, false
 
@@ -439,14 +451,17 @@ func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, s
 				RepoLicense   string
 			}{}
 
-			survey.Ask(qs, &templateAnswers)
-			return templateAnswers.RepoGitIgnore, licenseKey[templateAnswers.RepoLicense]
+			err = prompt.SurveyAsk(qs, &templateAnswers)
+			if err != nil {
+				return "", "", err
+			}
+			return templateAnswers.RepoGitIgnore, licenseKey[templateAnswers.RepoLicense], nil
 
 		}
-		return "", ""
+		return "", "", nil
 	}
 
-	return "", ""
+	return "", "", nil
 }
 
 func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {
