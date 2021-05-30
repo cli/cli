@@ -116,7 +116,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 			return nil, err
 		}
 		var responseV3 api.RepositoryV3
-		err := apiClient.REST(hostname, "POST", fmt.Sprintf("user/repos"), body, &responseV3)
+		err := apiClient.REST(hostname, "POST", "user/repos", body, &responseV3)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +166,7 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 // ListGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.
 func ListGitIgnoreTemplates(client *api.Client, hostname string) ([]string, error) {
 	var gitIgnoreTemplates []string
-	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates"), nil, &gitIgnoreTemplates)
+	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
 	if err != nil {
 		return []string{}, err
 	}
@@ -176,7 +176,7 @@ func ListGitIgnoreTemplates(client *api.Client, hostname string) ([]string, erro
 // ListLicenseTemplates uses API v3 here because license template isn't supported by GraphQL yet.
 func ListLicenseTemplates(client *api.Client, hostname string) ([]api.License, error) {
 	var licenseTemplates []api.License
-	err := client.REST(hostname, "GET", fmt.Sprintf("licenses"), nil, &licenseTemplates)
+	err := client.REST(hostname, "GET", "licenses", nil, &licenseTemplates)
 	if err != nil {
 		return nil, err
 	}
