@@ -116,9 +116,14 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	prState := strings.ToLower(opts.State)
+	if prState == "open" && shared.QueryHasStateClause(opts.Search) {
+		prState = ""
+	}
+
 	filters := shared.FilterOptions{
 		Entity:     "pr",
-		State:      strings.ToLower(opts.State),
+		State:      prState,
 		Author:     opts.Author,
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
