@@ -3,8 +3,8 @@ package browse
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/utils"
 )
 
 type browser interface {
@@ -107,7 +106,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 
 	if !hasArg(opts) && hasFlag(cmd) {
-		response, repoUrl = addFlags(opts, repoUrl)
+		response, repoUrl = addFlag(opts, repoUrl)
 	} else if hasArg(opts) && !hasFlag(cmd) {
 		response, repoUrl = addArg(opts, repoUrl, branchName)
 	} else if hasArg(opts) && hasFlag(cmd) {
@@ -124,35 +123,39 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-	if(!opts.BranchFlag){ // gh browse --settings main.go
+	if !opts.BranchFlag { // gh browse --settings main.go
 		return exitError, "" // TODO still need to make error codes better!! If not branch say, "Sorry this flag doesnt work with args"
 	}
 
-
-	arr := parseFileArg(opts)
-	if(len(arr) > 1){
-		return exitSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
+	if opts.AdditionalArg == "" {
+		return exitSuccess, url + "/tree/" + opts.SelectorArg
 	}
 
-	return exitSuccess, url + "/tree/" + branchName + "/" + arr[0]
+	arr := parseFileArg(opts)
+	if len(arr) > 1 {
+		return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0] + "#L" + arr[1]
+	}
+
+	return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0]
 
 }
 
-func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
+func addFlag(opts *BrowseOptions, url string) (exitCode, string) {
 	if opts.ProjectsFlag {
 		return exitSuccess, url + "/projects"
 	} else if opts.SettingsFlag {
 		return exitSuccess, url + "/settings"
 	} else if opts.WikiFlag {
 		return exitSuccess, url + "/wiki"
+	} else if opts.BranchFlag {
+		return exitError, "" // If you have a branch flag but no arg, this won't work
 	}
 	return exitError, "" //TODO need a new exit error later (possiblly)
 }
 
 func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-
-	if(opts.AdditionalArg != ""){
+	if opts.AdditionalArg != "" {
 		return exitError, "" // TODO refine the exit codes to make sense
 	}
 
@@ -162,14 +165,14 @@ func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, strin
 	}
 
 	arr := parseFileArg(opts)
-	if(len(arr) > 1){
+	if len(arr) > 1 {
 		return exitSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
 	}
 
 	return exitSuccess, url + "/tree/" + branchName + "/" + arr[0]
 }
 
-func parseFileArg(opts *BrowseOptions) (string[]) {
+func parseFileArg(opts *BrowseOptions) []string {
 	arr := strings.Split(opts.SelectorArg, ":")
 	return arr
 }
