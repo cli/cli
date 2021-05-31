@@ -55,11 +55,10 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Long:  "Work with GitHub in the browser", // displays when you are on the help page of this command
-		Short: "Open GitHub in the browser",      // displays in the gh root help
-		Use:   "browse",                          // necessary!!! This is the cmd that gets passed on the prompt
-		Args:  cobra.RangeArgs(0, 2),             // make sure only one arg at most is passed
-
+		Long:  "Work with GitHub in the browser",       // displays when you are on the help page of this command
+		Short: "Open GitHub in the browser",            // displays in the gh root help
+		Use:   "browse {<number> | <file> | <branch>}", // necessary!!! This is the cmd that gets passed on the prompt
+		Args:  cobra.RangeArgs(0, 2),                   // make sure only one arg at most is passed
 		Example: heredoc.Doc(`
 			$ gh browse
 			#=> Opens repository in browser
@@ -73,7 +72,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			$ gh browse src/fileName:312 --branch main
 			#=> Opens src/fileName at line 312 in main branch
 		`),
-
 		Annotations: map[string]string{
 			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
@@ -82,7 +80,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 				- by file or branch name, e.g. "main.java" or "trunk".
 			`),
 		},
-
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if len(args) > 1 {
@@ -104,25 +101,25 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
+func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) (exitCode, string) {
 
 	baseRepo, err := opts.BaseRepo()
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
 	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-	response := exitSuccess
 
 	if !inRepo(err) { // must be in a repo to execute
 		printExit(exitNotInRepo, cmd, opts, "")
-		return
+		return exitNotInRepo, ""
 	}
 
 	if getFlagAmount(cmd) > 1 { // command can't have more than one flag
 		printExit(exitTooManyFlags, cmd, opts, "")
-		return
+		return exitTooManyFlags, ""
 	}
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
+	response := exitSuccess
 
 	if !hasArg(opts) && hasFlag(cmd) {
 		response, repoUrl = addFlag(opts, repoUrl)
@@ -137,7 +134,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	}
 
 	printExit(response, cmd, opts, repoUrl) // print success
-
+	return response, repoUrl
 }
 
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
