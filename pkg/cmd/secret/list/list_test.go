@@ -40,6 +40,13 @@ func Test_NewCmdList(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 		},
+		{
+			name: "env",
+			cli:  "-eDevelopment",
+			wants: ListOptions{
+				EnvName: "Development",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -66,7 +73,7 @@ func Test_NewCmdList(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
-
+			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 		})
 	}
 }
@@ -122,16 +129,44 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30\tSELECTED",
 			},
 		},
+		{
+			name: "env tty",
+			tty:  true,
+			opts: &ListOptions{
+				EnvName: "Development",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11",
+				"SECRET_TWO.*Updated 2020-12-04",
+				"SECRET_THREE.*Updated 1975-11-30",
+			},
+		},
+		{
+			name: "env not tty",
+			tty:  false,
+			opts: &ListOptions{
+				EnvName: "Development",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11",
+				"SECRET_TWO\t2020-12-04",
+				"SECRET_THREE\t1975-11-30",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
+			path := "repos/owner/repo/actions/secrets"
+			if tt.opts.EnvName != "" {
+				path = fmt.Sprintf("repos/owner/repo/environments/%s/secrets", tt.opts.EnvName)
+			}
+
 			t0, _ := time.Parse("2006-01-02", "1988-10-11")
 			t1, _ := time.Parse("2006-01-02", "2020-12-04")
 			t2, _ := time.Parse("2006-01-02", "1975-11-30")
-			path := "repos/owner/repo/actions/secrets"
 			payload := secretsPayload{}
 			payload.Secrets = []*Secret{
 				{
