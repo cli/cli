@@ -40,10 +40,9 @@ const (
 	exitSuccess      exitCode = 0
 	exitNotInRepo    exitCode = 1
 	exitTooManyFlags exitCode = 2
-	exitInvalidUrl   exitCode = 3
-	exitHttpError    exitCode = 4
+	exitTooManyArgs  exitCode = 3
+	exitExpectedArg  exitCode = 4
 	exitInvalidCombo exitCode = 5
-	exitError        exitCode = 6
 )
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
@@ -73,12 +72,11 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			openInBrowser(cmd, opts) // run gets rid of the usage / runs function
 		},
 	}
-
+	cmdutil.EnableRepoOverride(cmd, f)
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open projects tab in browser")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browser")
 	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Opens a branch in the browser")
-	//cmd.Flags().BoolVarP(&opts.LineFlag, "line", "l", false, "Opens up to a line in a file in the browser")
 
 	return cmd
 }
@@ -86,10 +84,8 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 
 	baseRepo, err := opts.BaseRepo()
-	//baseRepo, _ := opts.BaseRepo()
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
-
 	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
 	response := exitSuccess
 
@@ -124,7 +120,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
 	if !opts.BranchFlag { // gh browse --settings main.go
-		return exitError, "" // TODO still need to make error codes better!! If not branch say, "Sorry this flag doesnt work with args"
+		return exitInvalidCombo, ""
 	}
 
 	if opts.AdditionalArg == "" {
@@ -147,16 +143,14 @@ func addFlag(opts *BrowseOptions, url string) (exitCode, string) {
 		return exitSuccess, url + "/settings"
 	} else if opts.WikiFlag {
 		return exitSuccess, url + "/wiki"
-	} else if opts.BranchFlag {
-		return exitError, "" // If you have a branch flag but no arg, this won't work
 	}
-	return exitError, "" //TODO need a new exit error later (possiblly)
+	return exitExpectedArg, "" // Flag is a branch and needs an argument
 }
 
 func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
 	if opts.AdditionalArg != "" {
-		return exitError, "" // TODO refine the exit codes to make sense
+		return exitTooManyArgs, ""
 	}
 
 	if isNumber(opts.SelectorArg) {
@@ -184,32 +178,28 @@ func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url strin
 
 	switch exit {
 	case exitSuccess:
-		fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
+		fmt.Fprintf(w, "%s now opening %s in browser . . .\n",
 			cs.Green("✓"), cs.Bold(url))
 		break
 	case exitNotInRepo:
-		fmt.Fprintf(w, "%s Change directory to a repository to open in browser\n%s",
+		fmt.Fprintf(w, "%s change directory to a repository to open in browser\n%s",
 			cs.Red("x"), help)
 		break
 	case exitTooManyFlags:
-		fmt.Fprintf(w, "%s accepts 1 flag, %d flags were recieved\n%s",
+		fmt.Fprintf(w, "%s accepts 1 flag, %d flag(s) were recieved\n%s",
 			cs.Red("x"), getFlagAmount(cmd), help)
 		break
-	case exitInvalidUrl:
-		fmt.Fprintf(w, "%s Invalid url format, could not open %s\n%s",
-			cs.Red("x"), cs.Bold(url), help)
-		break
-	case exitHttpError:
-		fmt.Fprintf(w, "%s Could not successfully create an http request\n%s",
+	case exitTooManyArgs:
+		fmt.Fprintf(w, "%s accepts 1 arg, 2 arg(s) were received \n%s",
 			cs.Red("x"), help)
+		break
+	case exitExpectedArg:
+		fmt.Fprintf(w, "%s expected argument with this flag %s\n%s",
+			cs.Red("x"), cs.Bold(url), help)
 		break
 	case exitInvalidCombo:
-		fmt.Fprintf(w, "%s Invalid combination of arguments\n%s",
+		fmt.Fprintf(w, "%s invalid use of flag and argument\n%s",
 			cs.Red("x"), help)
-		break
-	case exitError:
-		fmt.Fprintf(w, "%s Could not successfully find %s\n%s",
-			cs.Red("x"), cs.Bold(url), help)
 		break
 	}
 }
