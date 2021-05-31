@@ -26,6 +26,7 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	OrgName string
+	EnvName string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -38,11 +39,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List secrets",
-		Long:  "List secrets for a repository or organization",
+		Long:  "List secrets for a repository, environment, or organization",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+				return err
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -53,6 +58,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List secrets for an environment")
 
 	return cmd
 }
@@ -64,6 +70,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	orgName := opts.OrgName
+	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
@@ -75,7 +82,11 @@ func listRun(opts *ListOptions) error {
 
 	var secrets []*Secret
 	if orgName == "" {
-		secrets, err = getRepoSecrets(client, baseRepo)
+		if envName == "" {
+			secrets, err = getRepoSecrets(client, baseRepo)
+		} else {
+			secrets, err = getEnvSecrets(client, baseRepo, envName)
+		}
 	} else {
 		var cfg config.Config
 		var host string
@@ -169,6 +180,11 @@ func getOrgSecrets(client httpClient, host, orgName string) ([]*Secret, error) {
 	}
 
 	return secrets, nil
+}
+
+func getEnvSecrets(client httpClient, repo ghrepo.Interface, envName string) ([]*Secret, error) {
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), envName)
+	return getSecrets(client, repo.RepoHost(), path)
 }
 
 func getRepoSecrets(client httpClient, repo ghrepo.Interface) ([]*Secret, error) {
