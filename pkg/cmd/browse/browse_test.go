@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
+	"github.com/spf13/cobra"
 )
 
 func TestNewCmdBrowse(t *testing.T) {
@@ -65,10 +66,51 @@ func TestBrowseOpen(t *testing.T) {
 
 func Test_browseList(t *testing.T) {
 	type args struct {
-		repo            ghrepo.Interface
-		cli             string
-		expectedOutputs string
+		repo ghrepo.Interface
+		cli  string
 	}
 	tests := []struct {
+		name         string
+		args         args
+		urlExpected  string
+		exitExpected exitCode
 	}{}
+	for _, test := range tests {
+
+	}
+}
+
+func createCommand(repo ghrepo.Interface, cli string) *cobra.Command {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(false)
+	io.SetStdinTTY(false) // Ask the team about TTY
+	io.SetStderrTTY(false)
+
+	factory := &cmdutil.Factory{
+		IOStreams: io,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+	}
+
+	cmd := NewCmdView(factory, nil)
+
+	argv, err := shlex.Split(cli)
+	if err != nil {
+		return nil, err
+	}
+	cmd.SetArgs(argv)
+
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(ioutil.Discard)
+	cmd.SetErr(ioutil.Discard)
+
+	_, err = cmd.ExecuteC()
+	return &test.CmdOut{
+		OutBuf: stdout,
+		ErrBuf: stderr,
+	}, err
 }
