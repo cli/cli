@@ -3,7 +3,9 @@ package list
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,4 +201,33 @@ func Test_listRun(t *testing.T) {
 			test.ExpectLines(t, stdout.String(), tt.wantOut...)
 		})
 	}
+}
+
+func Test_getSecrets_pagination(t *testing.T) {
+	var requests []*http.Request
+	var client testClient = func(req *http.Request) (*http.Response, error) {
+		header := make(map[string][]string)
+		if len(requests) == 0 {
+			header["Link"] = []string{`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`}
+		}
+		requests = append(requests, req)
+		return &http.Response{
+			Request: req,
+			Body:    ioutil.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
+			Header:  header,
+		}, nil
+	}
+
+	secrets, err := getSecrets(client, "github.com", "path/to")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(requests))
+	assert.Equal(t, 4, len(secrets))
+	assert.Equal(t, "https://api.github.com/path/to?per_page=100", requests[0].URL.String())
+	assert.Equal(t, "http://example.com/page/2", requests[1].URL.String())
+}
+
+type testClient func(*http.Request) (*http.Response, error)
+
+func (c testClient) Do(req *http.Request) (*http.Response, error) {
+	return c(req)
 }
