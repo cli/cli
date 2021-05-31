@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
-
-	"github.com/cli/cli/api"
 )
 
 type browser interface {
@@ -59,6 +59,29 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Short: "Open GitHub in the browser",      // displays in the gh root help
 		Use:   "browse",                          // necessary!!! This is the cmd that gets passed on the prompt
 		Args:  cobra.RangeArgs(0, 2),             // make sure only one arg at most is passed
+
+		Example: heredoc.Doc(`
+			$ gh browse
+			#=> Opens repository in browser
+
+			$ gh browse 217
+			#=> Opens issue or pull request 217
+
+			$ gh browse --settings
+			#=> Opens repository settings in browser
+
+			$ gh browse src/fileName:312 --branch main
+			#=> Opens src/fileName at line 312 in main branch
+		`),
+
+		Annotations: map[string]string{
+			"IsCore": "true",
+			"help:arguments": heredoc.Doc(`
+				A browse location can be supplied as an argument in any of the following formats:
+				- by number, e.g. "123"; or
+				- by file or branch name, e.g. "main.java" or "trunk".
+			`),
+		},
 
 		Run: func(cmd *cobra.Command, args []string) {
 
