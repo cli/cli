@@ -3,6 +3,7 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"strconv"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -104,13 +105,12 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 	}
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
-	//parseArgs(opts)
 
-	if !hasArgs(opts) && hasFlags(cmd) {
+	if !hasArg(opts) && hasFlag(cmd) {
 		response, repoUrl = addFlags(opts, repoUrl)
-	} else if hasArgs(opts) && !hasFlags(cmd) {
-		response, repoUrl = addArgs(opts, repoUrl, branchName)
-	} else if hasArgs(opts) && hasFlags(cmd) {
+	} else if hasArg(opts) && !hasFlag(cmd) {
+		response, repoUrl = addArg(opts, repoUrl, branchName)
+	} else if hasArg(opts) && hasFlag(cmd) {
 		response, repoUrl = addCombined(opts, repoUrl, branchName)
 	}
 
@@ -124,15 +124,17 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-	if opts.SelectorArg == "" || opts.AdditionalArg == "" {
-		return exitError, "" //makeing new exit error
+	if(!opts.BranchFlag){ // gh browse --settings main.go
+		return exitError, "" // TODO still need to make error codes better!! If not branch say, "Sorry this flag doesnt work with args"
 	}
 
-	if opts.BranchFlag {
-		return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
+
+	arr := parseFileArg(opts)
+	if(len(arr) > 1){
+		return exitSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
 	}
 
-	return exitError, ""
+	return exitSuccess, url + "/tree/" + branchName + "/" + arr[0]
 
 }
 
@@ -147,26 +149,37 @@ func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
 	return exitError, "" //TODO need a new exit error later (possiblly)
 }
 
-func addArgs(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
+func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-	exit := exitSuccess
+
+	if(opts.AdditionalArg != ""){
+		return exitError, "" // TODO refine the exit codes to make sense
+	}
 
 	if isNumber(opts.SelectorArg) {
 		url += "/issues/" + opts.SelectorArg
-
-		exit = getHttpResponse(opts, url)
-		return exit, url
+		return exitSuccess, url
 	}
 
-	return exit, url + "/tree/" + branchName + "/" + opts.SelectorArg
+	arr := parseFileArg(opts)
+	if(len(arr) > 1){
+		return exitSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
+	}
+
+	return exitSuccess, url + "/tree/" + branchName + "/" + arr[0]
 }
 
-func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
+func parseFileArg(opts *BrowseOptions) (string[]) {
+	arr := strings.Split(opts.SelectorArg, ":")
+	return arr
+}
+
+func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
 	w := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
 	help := "Use 'gh browse --help' for more information about browse\n"
 
-	switch errorCode {
+	switch exit {
 	case exitSuccess:
 		fmt.Fprintf(w, "%s Now opening %s in browser . . .\n",
 			cs.Green("✓"), cs.Bold(url))
@@ -198,33 +211,11 @@ func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url 
 	}
 }
 
-func getHttpResponse(opts *BrowseOptions, url string) exitCode {
-
-	if !utils.IsURL(url) || !utils.ValidURL(url) {
-		return exitInvalidUrl
-	}
-
-	resp, err := http.Get(url)
-
-	if err != nil {
-		return exitHttpError
-	}
-
-	statusCode := resp.StatusCode
-
-	if 200 <= statusCode && statusCode < 300 {
-		fmt.Println("print something")
-		return exitSuccess
-	}
-
-	return exitError
-}
-
-func hasFlags(cmd *cobra.Command) bool {
+func hasFlag(cmd *cobra.Command) bool {
 	return getFlagAmount(cmd) > 0
 }
 
-func hasArgs(opts *BrowseOptions) bool {
+func hasArg(opts *BrowseOptions) bool {
 	return opts.SelectorArg != ""
 }
 
