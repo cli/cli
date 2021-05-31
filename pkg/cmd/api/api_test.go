@@ -43,7 +43,7 @@ func Test_NewCmdApi(t *testing.T) {
 				RequestInputFile:    "",
 				RawFields:           []string(nil),
 				MagicFields:         []string(nil),
-				RequestHeaders:      []string(nil),
+				RequestHeaders:      []string(nil),   
 				ShowResponseHeaders: false,
 				Paginate:            false,
 				Silent:              false,

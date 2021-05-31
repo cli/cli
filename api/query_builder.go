@@ -41,7 +41,11 @@ var prReviewRequests = shortenQuery(`
 			requestedReviewer {
 				__typename,
 				...on User{login},
-				...on Team{name}
+				...on Team{
+					organization{login}
+					name,
+					slug
+				}
 			}
 		}
 	}
