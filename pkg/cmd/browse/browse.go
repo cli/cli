@@ -31,7 +31,7 @@ type BrowseOptions struct {
 	WikiFlag     bool
 	SettingsFlag bool
 	BranchFlag   bool
-	LineFlag     bool
+	//LineFlag     bool
 }
 
 type exitCode int
@@ -78,7 +78,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browser")
 	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Opens a branch in the browser")
-	cmd.Flags().BoolVarP(&opts.LineFlag, "line", "l", false, "Opens up to a line in a file in the browser")
+	//cmd.Flags().BoolVarP(&opts.LineFlag, "line", "l", false, "Opens up to a line in a file in the browser")
 
 	return cmd
 }
@@ -114,13 +114,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) {
 		response, repoUrl = addCombined(opts, repoUrl, branchName)
 	}
 
-	if response != exitSuccess {
-		printExit(response, cmd, opts, repoUrl) // print success
-		return
-	}
-
-	response = getHttpResponse(opts, repoUrl)
-	if response == exitSuccess { // test the connection to see if the url is valid
+	if response == exitSuccess {
 		opts.Browser.Browse(repoUrl) // otherwise open repo
 	}
 
@@ -138,9 +132,6 @@ func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, 
 		return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + opts.SelectorArg
 	}
 
-	if opts.LineFlag {
-		return exitSuccess, url + "/tree/" + branchName + "/" + opts.SelectorArg + "#L" + opts.AdditionalArg
-	}
 	return exitError, ""
 
 }
@@ -158,15 +149,16 @@ func addFlags(opts *BrowseOptions, url string) (exitCode, string) {
 
 func addArgs(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-	if opts.AdditionalArg != "" {
-		// fmt.Println("test secodn argument")
-		return exitError, ""
-	}
+	exit := exitSuccess
 
 	if isNumber(opts.SelectorArg) {
-		return exitSuccess, url + "/issues/" + opts.SelectorArg
+		url += "/issues/" + opts.SelectorArg
+
+		exit = getHttpResponse(opts, url)
+		return exit, url
 	}
-	return exitSuccess, url + "/tree/" + branchName + "/" + opts.SelectorArg
+
+	return exit, url + "/tree/" + branchName + "/" + opts.SelectorArg
 }
 
 func printExit(errorCode exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
@@ -221,11 +213,9 @@ func getHttpResponse(opts *BrowseOptions, url string) exitCode {
 	statusCode := resp.StatusCode
 
 	if 200 <= statusCode && statusCode < 300 {
+		fmt.Println("print something")
 		return exitSuccess
 	}
-
-	//fmt.Println("print", url, statusCode)
-	//Setting is not opening
 
 	return exitError
 }
