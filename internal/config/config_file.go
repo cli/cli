@@ -18,6 +18,7 @@ const (
 	XDG_CONFIG_HOME = "XDG_CONFIG_HOME"
 	XDG_STATE_HOME  = "XDG_STATE_HOME"
 	APP_DATA        = "AppData"
+	LOCAL_APP_DATA  = "LocalAppData"
 )
 
 // Config path precedence
@@ -39,24 +40,34 @@ func ConfigDir() string {
 	}
 
 	// If the path does not exist try migrating config from default paths
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	if !dirExists(path) {
 		_ = autoMigrateConfigDir(path)
 	}
 
 	return path
 }
 
+// State path precedence
+// 1. XDG_CONFIG_HOME
+// 2. LocalAppData (windows only)
+// 3. HOME
 func StateDir() string {
-	if path := os.Getenv(XDG_STATE_HOME); path != "" {
-		path = filepath.Join(path, "gh")
-		if !dirExists(path) {
-			_ = os.MkdirAll(path, 0755)
-			_ = autoMigrateStateDir(path)
-		}
-		return path
+	var path string
+	if a := os.Getenv(XDG_STATE_HOME); a != "" {
+		path = filepath.Join(a, "gh")
+	} else if b := os.Getenv(LOCAL_APP_DATA); runtime.GOOS == "windows" && b != "" {
+		path = filepath.Join(b, "GitHub CLI")
+	} else {
+		c, _ := os.UserHomeDir()
+		path = filepath.Join(c, ".local", "state", "gh")
 	}
 
-	return ConfigDir()
+	// If the path does not exist try migrating state from default paths
+	if !dirExists(path) {
+		_ = autoMigrateStateDir(path)
+	}
+
+	return path
 }
 
 var errSamePath = errors.New("same path")

@@ -346,9 +346,10 @@ func Test_StateDir(t *testing.T) {
 	tempDir := t.TempDir()
 
 	tests := []struct {
-		name   string
-		env    map[string]string
-		output string
+		name        string
+		onlyWindows bool
+		env         map[string]string
+		output      string
 	}{
 		{
 			name: "HOME/USERPROFILE specified",
@@ -356,11 +357,11 @@ func Test_StateDir(t *testing.T) {
 				"XDG_STATE_HOME":  "",
 				"GH_CONFIG_DIR":   "",
 				"XDG_CONFIG_HOME": "",
-				"AppData":         "",
+				"LocalAppData":    "",
 				"USERPROFILE":     tempDir,
 				"HOME":            tempDir,
 			},
-			output: filepath.Join(tempDir, ".config", "gh"),
+			output: filepath.Join(tempDir, ".local", "state", "gh"),
 		},
 		{
 			name: "XDG_STATE_HOME specified",
@@ -370,15 +371,28 @@ func Test_StateDir(t *testing.T) {
 			output: filepath.Join(tempDir, "gh"),
 		},
 		{
-			name: "GH_CONFIG_DIR specified",
+			name:        "LocalAppData specified",
+			onlyWindows: true,
 			env: map[string]string{
-				"GH_CONFIG_DIR": filepath.Join(tempDir, "gh_config_dir"),
+				"LocalAppData": tempDir,
 			},
-			output: filepath.Join(tempDir, "gh_config_dir"),
+			output: filepath.Join(tempDir, "GitHub CLI"),
+		},
+		{
+			name:        "XDG_STATE_HOME and LocalAppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"XDG_STATE_HOME": tempDir,
+				"LocalAppData":   tempDir,
+			},
+			output: filepath.Join(tempDir, "gh"),
 		},
 	}
 
 	for _, tt := range tests {
+		if tt.onlyWindows && runtime.GOOS != "windows" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
@@ -443,7 +457,7 @@ func Test_autoMigrateStateDir_migration(t *testing.T) {
 	homeDir := t.TempDir()
 	migrateDir := t.TempDir()
 	homeConfigDir := filepath.Join(homeDir, ".config", "gh")
-	migrateConfigDir := filepath.Join(migrateDir, ".config", "gh")
+	migrateStateDir := filepath.Join(migrateDir, ".local", "state", "gh")
 
 	homeEnvVar := "HOME"
 	if runtime.GOOS == "windows" {
@@ -458,14 +472,14 @@ func Test_autoMigrateStateDir_migration(t *testing.T) {
 	err = ioutil.WriteFile(filepath.Join(homeConfigDir, "state.yml"), nil, 0755)
 	assert.NoError(t, err)
 
-	err = autoMigrateStateDir(migrateConfigDir)
+	err = autoMigrateStateDir(migrateStateDir)
 	assert.NoError(t, err)
 
 	files, err := ioutil.ReadDir(homeConfigDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 
-	files, err = ioutil.ReadDir(migrateConfigDir)
+	files, err = ioutil.ReadDir(migrateStateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "state.yml", files[0].Name())
