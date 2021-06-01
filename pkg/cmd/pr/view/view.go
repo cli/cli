@@ -170,7 +170,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintf(out, "%s #%d", cs.Bold(pr.Title), pr.Number)
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),

@@ -173,7 +173,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintf(out, "%s #%d", cs.Bold(issue.Title), issue.Number)
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue.State),
