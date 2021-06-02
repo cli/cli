@@ -184,12 +184,10 @@ func setRun(opts *SetOptions) error {
 
 	if orgName != "" {
 		err = putOrgSecret(client, host, pk, *opts, encoded)
+	} else if envName != "" {
+		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
 	} else {
-		if envName != "" {
-			err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
-		} else {
-			err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
-		}
+		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to set secret: %w", err)
