@@ -64,6 +64,12 @@ var HelpTopics = map[string]map[string]string{
 			GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.
+
+			GH_CONFIG_DIR, XDG_CONFIG_HOME (in order of precedence): the directory where gh will store configuration files.
+
+			XDG_STATE_HOME: the directory where gh will store state files.
+
+			XDG_DATA_HOME: the directory where gh will store data files.
 		`),
 	},
 	"reference": {
