@@ -17,6 +17,7 @@ const (
 	GH_CONFIG_DIR   = "GH_CONFIG_DIR"
 	XDG_CONFIG_HOME = "XDG_CONFIG_HOME"
 	XDG_STATE_HOME  = "XDG_STATE_HOME"
+	XDG_DATA_HOME   = "XDG_DATA_HOME"
 	APP_DATA        = "AppData"
 	LOCAL_APP_DATA  = "LocalAppData"
 )
@@ -65,6 +66,24 @@ func StateDir() string {
 	// If the path does not exist try migrating state from default paths
 	if !dirExists(path) {
 		_ = autoMigrateStateDir(path)
+	}
+
+	return path
+}
+
+// Data path precedence
+// 1. XDG_DATA_HOME
+// 2. LocalAppData (windows only)
+// 3. HOME
+func DataDir() string {
+	var path string
+	if a := os.Getenv(XDG_DATA_HOME); a != "" {
+		path = filepath.Join(a, "gh")
+	} else if b := os.Getenv(LOCAL_APP_DATA); runtime.GOOS == "windows" && b != "" {
+		path = filepath.Join(b, "GitHub CLI")
+	} else {
+		c, _ := os.UserHomeDir()
+		path = filepath.Join(c, ".local", "share", "gh")
 	}
 
 	return path
