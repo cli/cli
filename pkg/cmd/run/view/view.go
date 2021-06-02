@@ -462,7 +462,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 }
 
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, job.Name, step.Number)
+	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(job.Name), step.Number)
 	return regexp.MustCompile(re)
 }
 
