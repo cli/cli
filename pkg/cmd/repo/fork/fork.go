@@ -206,6 +206,14 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
+	// TODO
+	// pull this apart. There's:
+	// - host setting
+	// - globabl setting
+	// - hardcoded default
+	// - scheme set in fetch url
+	// - scheme set in push url
+	// decide how to negotiate all these given that git_protocl can be blank. will probably want a smarter Get()
 	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
