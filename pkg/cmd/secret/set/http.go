@@ -90,6 +90,15 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	return putSecret(client, host, path, payload)
 }
 
+func putEnvSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, envName string, secretName, eValue string) error {
+	payload := SecretPayload{
+		EncryptedValue: eValue,
+		KeyID:          pk.ID,
+	}
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(repo), envName, secretName)
+	return putSecret(client, repo.RepoHost(), path, payload)
+}
+
 func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string) error {
 	payload := SecretPayload{
 		EncryptedValue: eValue,
