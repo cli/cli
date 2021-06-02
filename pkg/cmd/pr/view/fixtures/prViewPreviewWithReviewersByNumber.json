@@ -21,10 +21,12 @@
               }
             },
             {
-                "requestedReviewer": {
-                    "__typename": "Team",
-                    "name": "Team 1"
-                }
+              "requestedReviewer": {
+                "__typename": "Team",
+                "name": "Team 1",
+                "slug": "team-1",
+                "organization": {"login": "my-org"}
+              }
             },
             {
               "requestedReviewer": {
