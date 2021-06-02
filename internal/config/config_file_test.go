@@ -484,3 +484,68 @@ func Test_autoMigrateStateDir_migration(t *testing.T) {
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "state.yml", files[0].Name())
 }
+
+func Test_DataDir(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name        string
+		onlyWindows bool
+		env         map[string]string
+		output      string
+	}{
+		{
+			name: "HOME/USERPROFILE specified",
+			env: map[string]string{
+				"XDG_DATA_HOME":   "",
+				"GH_CONFIG_DIR":   "",
+				"XDG_CONFIG_HOME": "",
+				"LocalAppData":    "",
+				"USERPROFILE":     tempDir,
+				"HOME":            tempDir,
+			},
+			output: filepath.Join(tempDir, ".local", "share", "gh"),
+		},
+		{
+			name: "XDG_DATA_HOME specified",
+			env: map[string]string{
+				"XDG_DATA_HOME": tempDir,
+			},
+			output: filepath.Join(tempDir, "gh"),
+		},
+		{
+			name:        "LocalAppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"LocalAppData": tempDir,
+			},
+			output: filepath.Join(tempDir, "GitHub CLI"),
+		},
+		{
+			name:        "XDG_DATA_HOME and LocalAppData specified",
+			onlyWindows: true,
+			env: map[string]string{
+				"XDG_DATA_HOME": tempDir,
+				"LocalAppData":  tempDir,
+			},
+			output: filepath.Join(tempDir, "gh"),
+		},
+	}
+
+	for _, tt := range tests {
+		if tt.onlyWindows && runtime.GOOS != "windows" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, v)
+					defer os.Setenv(k, old)
+				}
+			}
+
+			assert.Equal(t, tt.output, DataDir())
+		})
+	}
+}
