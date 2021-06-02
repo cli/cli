@@ -250,7 +250,7 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`milestone:\t\n`,
 				`additions:\t100\n`,
 				`deletions:\t10\n`,
-				`reviewers:\tDEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), Team 1 \(Requested\), abc \(Requested\)\n`,
+				`reviewers:\tDEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), abc \(Requested\), my-org\/team-1 \(Requested\)\n`,
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
@@ -383,7 +383,7 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Reviewers:.*DEF \(.*Commented.*\), def \(.*Changes requested.*\), ghost \(.*Approved.*\), hubot \(Commented\), xyz \(.*Approved.*\), 123 \(.*Requested.*\), Team 1 \(.*Requested.*\), abc \(.*Requested.*\)\n`,
+				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), abc \(Requested\), my-org\/team-1 \(Requested\)`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},

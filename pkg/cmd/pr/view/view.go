@@ -294,8 +294,6 @@ func prReviewerList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	return reviewerList
 }
 
-const teamTypeName = "Team"
-
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
@@ -317,10 +315,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.Login
-		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
-			name = reviewRequest.RequestedReviewer.Name
-		}
+		name := reviewRequest.RequestedReviewer.LoginOrSlug()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,
