@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/cli/cli/internal/config"
@@ -44,6 +45,17 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	if exe == "" {
 		return false, nil
+	}
+
+	if f, err := os.Stat(exe); err != nil || f.IsDir() {
+		dir := fmt.Sprintf("%s_%s_%s", extName, runtime.GOOS, runtime.GOARCH)
+		if runtime.GOOS == "windows" {
+			extName = fmt.Sprintf("%s.exe", extName)
+		}
+		path := filepath.Join(filepath.Dir(exe), "dist", dir, extName)
+		if f, err := os.Stat(path); err == nil && !f.IsDir() {
+			exe = path
+		}
 	}
 
 	// TODO: parse the shebang on Windows and invoke the correct interpreter instead of invoking directly
