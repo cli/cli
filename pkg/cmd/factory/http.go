@@ -57,7 +57,7 @@ type configGetter interface {
 }
 
 // generic authenticated HTTP client for commands
-func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string, setAccept bool) *http.Client {
+func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string, setAccept bool) (*http.Client, error) {
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		logTraffic := strings.Contains(verbose, "api")
@@ -98,7 +98,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 		)
 	}
 
-	return api.NewHTTPClient(opts...)
+	return api.NewHTTPClient(opts...), nil
 }
 
 func getHost(r *http.Request) string {
