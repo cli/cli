@@ -3,6 +3,7 @@ package extensions
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -43,6 +44,13 @@ func NewCmdExtensions(io *iostreams.IOStreams) *cobra.Command {
 			Short: "Install a gh extension from a repository",
 			Args:  cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 			RunE: func(cmd *cobra.Command, args []string) error {
+				if args[0] == "." {
+					wd, err := os.Getwd()
+					if err != nil {
+						return err
+					}
+					return m.InstallLocal(wd)
+				}
 				repo, err := ghrepo.FromFullName(args[0])
 				if err != nil {
 					return err

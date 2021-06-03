@@ -2,6 +2,7 @@ package extensions
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -17,14 +18,12 @@ import (
 type Manager struct {
 	dataDir  func() string
 	lookPath func(string) (string, error)
-	pathEnv  string
 }
 
 func NewManager() *Manager {
 	return &Manager{
 		dataDir:  config.ConfigDir,
 		lookPath: safeexec.LookPath,
-		pathEnv:  os.Getenv("PATH"),
 	}
 }
 
@@ -37,18 +36,14 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	extName := "gh-" + args[0]
 	forwardArgs := args[1:]
 
-	for _, e := range m.listInstalled() {
+	for _, e := range m.List() {
 		if filepath.Base(e) == extName {
 			exe = e
 			break
 		}
 	}
 	if exe == "" {
-		var err error
-		exe, err = m.lookPath(extName)
-		if err != nil {
-			return false, nil
-		}
+		return false, nil
 	}
 
 	// TODO: parse the shebang on Windows and invoke the correct interpreter instead of invoking directly
@@ -59,7 +54,7 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	return true, externalCmd.Run()
 }
 
-func (m *Manager) listInstalled() []string {
+func (m *Manager) List() []string {
 	dir := m.installDir()
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -68,7 +63,7 @@ func (m *Manager) listInstalled() []string {
 
 	var results []string
 	for _, f := range entries {
-		if !strings.HasPrefix(f.Name(), "gh-") || !f.IsDir() {
+		if !strings.HasPrefix(f.Name(), "gh-") || !(f.IsDir() || f.Mode()&os.ModeSymlink != 0) {
 			continue
 		}
 		results = append(results, filepath.Join(dir, f.Name(), f.Name()))
@@ -76,31 +71,10 @@ func (m *Manager) listInstalled() []string {
 	return results
 }
 
-func (m *Manager) List() []string {
-	results := m.listInstalled()
-	seen := make(map[string]struct{})
-	for _, f := range results {
-		seen[filepath.Base(f)] = struct{}{}
-	}
-
-	for _, p := range filepath.SplitList(m.pathEnv) {
-		entries, err := ioutil.ReadDir(p)
-		if err != nil {
-			continue
-		}
-		for _, f := range entries {
-			if _, ok := seen[f.Name()]; ok {
-				continue
-			}
-			if !strings.HasPrefix(f.Name(), "gh-") || !isExecutable(f) {
-				continue
-			}
-			results = append(results, filepath.Join(p, f.Name()))
-			seen[f.Name()] = struct{}{}
-		}
-	}
-
-	return results
+func (m *Manager) InstallLocal(dir string) error {
+	name := filepath.Base(dir)
+	targetDir := filepath.Join(m.installDir(), name)
+	return os.Symlink(dir, targetDir)
 }
 
 func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
@@ -124,13 +98,15 @@ func (m *Manager) Upgrade(stdout, stderr io.Writer) error {
 		return err
 	}
 
-	exts := m.listInstalled()
+	exts := m.List()
 	if len(exts) == 0 {
 		return errors.New("no extensions installed")
 	}
 
 	for _, f := range exts {
-		externalCmd := exec.Command(exe, "-C", filepath.Dir(f), "pull", "--ff-only")
+		fmt.Fprintf(stdout, "[%s]: ", filepath.Base(f))
+		dir := filepath.Dir(f)
+		externalCmd := exec.Command(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
 		externalCmd.Stdout = stdout
 		externalCmd.Stderr = stderr
 		if e := externalCmd.Run(); e != nil {
@@ -142,9 +118,4 @@ func (m *Manager) Upgrade(stdout, stderr io.Writer) error {
 
 func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
-}
-
-// TODO: ignore file mode on Windows
-func isExecutable(f os.FileInfo) bool {
-	return !f.IsDir() && f.Mode()&0111 != 0
 }
