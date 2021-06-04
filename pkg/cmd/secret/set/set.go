@@ -124,7 +124,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		},
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
-	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
