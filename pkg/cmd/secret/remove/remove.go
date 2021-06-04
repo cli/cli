@@ -32,7 +32,8 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 
 	cmd := &cobra.Command{
 		Use:   "remove <secret-name>",
-		Short: "Remove an organization, environment, or repository secret",
+		Short: "Remove secrets",
+		Long:  "Remove a secret for a repository, environment, or organization",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
