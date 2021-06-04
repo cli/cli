@@ -9,6 +9,7 @@ import (
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
+	GetOrDefault(string, string) (string, error)
 	GetWithSource(string, string) (string, string, error)
 	Set(string, string, string) error
 	UnsetHost(string)
@@ -50,6 +51,15 @@ var configOptions = []ConfigOption{
 		Description:  "the terminal pager program to send standard output to",
 		DefaultValue: "",
 	},
+}
+
+func DefaultFor(key string) string {
+	for _, co := range configOptions {
+		if co.Key == key {
+			return co.DefaultValue
+		}
+	}
+	return ""
 }
 
 func ConfigOptions() []ConfigOption {

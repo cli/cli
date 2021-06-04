@@ -31,6 +31,19 @@ func (c *fileConfig) Get(hostname, key string) (string, error) {
 	return val, err
 }
 
+func (c *fileConfig) GetOrDefault(hostname, key string) (string, error) {
+	val, err := c.Get(hostname, key)
+	if err != nil {
+		return "", err
+	}
+
+	if val == "" {
+		return DefaultFor(key), nil
+	}
+
+	return val, err
+}
+
 func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error) {
 	if hostname != "" {
 		var notFound *NotFoundError
@@ -60,13 +73,9 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 	var notFound *NotFoundError
 
 	if err != nil && errors.As(err, &notFound) {
-		return defaultFor(key), defaultSource, nil
+		return "", defaultSource, nil
 	} else if err != nil {
 		return "", defaultSource, err
-	}
-
-	if value == "" {
-		return defaultFor(key), defaultSource, nil
 	}
 
 	return value, defaultSource, nil
@@ -306,13 +315,4 @@ func yamlNormalize(b []byte) []byte {
 		return []byte{}
 	}
 	return b
-}
-
-func defaultFor(key string) string {
-	for _, co := range configOptions {
-		if co.Key == key {
-			return co.DefaultValue
-		}
-	}
-	return ""
 }

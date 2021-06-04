@@ -18,6 +18,19 @@ func (c ConfigStub) Get(host, key string) (string, error) {
 	return val, err
 }
 
+func (c ConfigStub) GetOrDefault(host, key string) (string, error) {
+	val, err := c.Get(host, key)
+	if err != nil {
+		return "", err
+	}
+
+	if val == "" {
+		return DefaultFor(key), nil
+	}
+
+	return val, err
+}
+
 func (c ConfigStub) GetWithSource(host, key string) (string, string, error) {
 	if v, found := c[genKey(host, key)]; found {
 		return v, "(memory)", nil
