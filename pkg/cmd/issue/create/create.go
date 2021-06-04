@@ -234,10 +234,6 @@ func createRun(opts *CreateOptions) (err error) {
 			if err != nil {
 				return
 			}
-
-			if tb.Body == "" {
-				tb.Body = templateContent
-			}
 		}
 
 		openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
