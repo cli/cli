@@ -59,8 +59,15 @@ func Test_GhEditor_Prompt(t *testing.T) {
 		errc <- err
 	}()
 
-	time.Sleep(5 * time.Millisecond)
+	for {
+		time.Sleep(time.Millisecond)
+		if strings.Contains(out.String(), "Body") {
+			break
+		}
+	}
+
 	assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch false, enter to skip] \x1b[0m\x1b[?25l", out.String())
+	out.Reset()
 	fmt.Fprint(pty, "\n") // send Enter key
 
 	err = <-errc
@@ -126,7 +133,12 @@ func (f *teeWriter) Write(p []byte) (n int, err error) {
 func (f *teeWriter) String() string {
 	f.mu.Lock()
 	s := f.buf.String()
-	f.buf.Reset()
 	f.mu.Unlock()
 	return s
+}
+
+func (f *teeWriter) Reset() {
+	f.mu.Lock()
+	f.buf.Reset()
+	f.mu.Unlock()
 }
