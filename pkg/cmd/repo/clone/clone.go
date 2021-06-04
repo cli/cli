@@ -121,7 +121,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 
-		protocol, err = cfg.Get(repo.RepoHost(), "git_protocol")
+		protocol, err = cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}

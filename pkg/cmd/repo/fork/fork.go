@@ -206,14 +206,6 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	// TODO
-	// pull this apart. There's:
-	// - host setting
-	// - globabl setting
-	// - hardcoded default
-	// - scheme set in fetch url
-	// - scheme set in push url
-	// decide how to negotiate all these given that git_protocl can be blank. will probably want a smarter Get()
 	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
@@ -226,17 +218,24 @@ func forkRun(opts *ForkOptions) error {
 		}
 
 		if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
+			if protocol == "" {
+				// user has no preference, use remote config's scheme
+				scheme := ""
+				if remote.FetchURL != nil {
+					scheme = remote.FetchURL.Scheme
+				}
+				if remote.PushURL != nil {
+					scheme = remote.PushURL.Scheme
+				}
+				if scheme != "" {
+					protocol = scheme
+				}
+			}
+		}
 
-			scheme := ""
-			if remote.FetchURL != nil {
-				scheme = remote.FetchURL.Scheme
-			}
-			if remote.PushURL != nil {
-				scheme = remote.PushURL.Scheme
-			}
-			if scheme != "" {
-				protocol = scheme
-			}
+		if protocol == "" {
+			// user has no preference and we could not infer from remote config, so fall back to default
+			protocol = config.DefaultFor("git_protocol")
 		}
 
 		if remote, err := remotes.FindByRepo(forkedRepo.RepoOwner(), forkedRepo.RepoName()); err == nil {
@@ -296,6 +295,10 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if cloneDesired {
+			if protocol == "" {
+				// user has no preference, use default
+				protocol = config.DefaultFor("git_protocol")
+			}
 			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 			cloneDir, err := git.RunClone(forkedRepoURL, opts.GitArgs)
 			if err != nil {
