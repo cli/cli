@@ -709,6 +709,13 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 
 	cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
 
+	// TODO this breaks, i assume, because as far as this test is concerned "https" has been explicitly configured by the user.
+
+	// TODO split this into multiple explicit test cases for:
+	// - user has no protocol configured
+	// - user has host protocol configured that differs from global and from arguments
+	// - user has protocol configured that matches arguments
+
 	remotes := []*context.Remote{
 		{
 			Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
@@ -731,6 +738,7 @@ func TestRepoFork_in_parent_match_protocol(t *testing.T) {
 		"Added remote.*fork")
 }
 
+// TODO try to replace with a Now in the opts
 func stubSince(d time.Duration) func() {
 	originalSince := Since
 	Since = func(t time.Time) time.Duration {
@@ -738,5 +746,73 @@ func stubSince(d time.Duration) func() {
 	}
 	return func() {
 		Since = originalSince
+	}
+}
+
+func TestRepoFork_in_parent_no_protocol_configured(t *testing.T) {
+}
+
+func TestRepoFork(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      *ForkOptions
+		cfg       func(*config.Config)
+		tty       bool
+		httpStubs func(*httpmock.Registry)
+		execStubs func(*run.COmmandStubber)
+		remotes   []*context.Remote
+		wantOut   string
+		wantErr   string
+	}{
+		// TODO in parent no protocol configured
+		// TODO in parent protocol configured
+		// TODO in parent nontty
+		// TODO in parent existing remote error
+
+	}
+
+	for _, tt := range tests {
+		io, _, stdout, stderr := iostreams.Test()
+		io.SetStdinTTY(tt.tty)
+		io.SetStdoutTTY(tt.tty)
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		}
+
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+
+		cfg := config.NewBlankConfig()
+		if tt.cfg != nil {
+			cfg = tt.cfg(cfg)
+		}
+
+		tt.opts.Config = func() (config.Config, error) {
+			return cfg
+		}
+
+		tt.opts.Remotes = func() (context.Remotes, error) {
+			if remotes == nil {
+				return []*context.Remote{
+					{
+						Remote: &git.Remote{
+							Name:     "origin",
+							FetchURL: &url.URL{},
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
+					},
+				}, nil
+			}
+			return remotes, nil
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, 1, 1)
+		})
 	}
 }
