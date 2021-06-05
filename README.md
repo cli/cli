@@ -19,7 +19,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda](#Conda), and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
@@ -35,13 +35,13 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### Linux
 
-`gh` is available via [Homebrew](#homebrew), and as downloadable binaries from the [releases page][].
+`gh` is available via [Homebrew](#homebrew), [Conda](#Conda), and as downloadable binaries from the [releases page][].
 
 For more information and distro-specific instructions, see the [Linux installation docs](./docs/install_linux.md).
 
 ### Windows
 
-`gh` is available via [WinGet][], [scoop][], [Chocolatey][], and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#Conda), and as downloadable MSI.
 
 #### WinGet
 
