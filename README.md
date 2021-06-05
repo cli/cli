@@ -67,6 +67,18 @@ For more information and distro-specific instructions, see the [Linux installati
 
 MSI installers are available for download on the [releases page][].
 
+### Other package managers
+
+#### Conda
+
+`gh` is available via [Conda][], a cross-platform package and environment manager.
+
+| Install:                                 | Upgrade:                                |
+|------------------------------------------|-----------------------------------------|
+| `conda install gh --channel conda-forge` | `conda update gh --channel conda-forge` |
+
+Additional installation options available on the [gh-feedstock page](https://github.com/conda-forge/gh-feedstock#installing-gh).
+
 ### GitHub Actions
 
 GitHub CLI comes pre-installed in all [GitHub-Hosted Runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners).
@@ -93,6 +105,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [winget]: https://github.com/microsoft/winget-cli
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
+[Conda]: https://docs.conda.io/en/latest/
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing]: ./.github/CONTRIBUTING.md
