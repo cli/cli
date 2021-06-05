@@ -14,7 +14,6 @@ GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterpr
 
 If anything feels off, or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
 
-
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
 
@@ -43,7 +42,6 @@ For more information and distro-specific instructions, see the [Linux installati
 ### Windows
 
 `gh` is available via [WinGet][], [scoop][], [Chocolatey][], and as downloadable MSI.
-
 
 #### WinGet
 
@@ -97,7 +95,6 @@ For many years, [hub][] was the unofficial GitHub CLI tool. `gh` is a new projec
 what an official GitHub CLI tool can look like with a fundamentally different design. While both
 tools bring GitHub to the terminal, `hub` behaves as a proxy to `git`, and `gh` is a standalone
 tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
-
 
 [manual]: https://cli.github.com/manual/
 [Homebrew]: https://brew.sh
