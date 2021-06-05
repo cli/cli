@@ -19,7 +19,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda](#Conda), and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
@@ -32,6 +32,14 @@ If anything feels off, or if you feel that some functionality is missing, please
 | Install:               | Upgrade:                                       |
 | ---------------------- | ---------------------------------------------- |
 | `sudo port install gh` | `sudo port selfupdate && sudo port upgrade gh` |
+
+#### Conda
+
+| Install:                                 | Upgrade:                                |
+|------------------------------------------|-----------------------------------------|
+| `conda install gh --channel conda-forge` | `conda update gh --channel conda-forge` |
+
+Additional Conda installation options available on the [gh-feedstock page](https://github.com/conda-forge/gh-feedstock#installing-gh).
 
 ### Linux
 
@@ -64,18 +72,6 @@ For more information and distro-specific instructions, see the [Linux installati
 #### Signed MSI
 
 MSI installers are available for download on the [releases page][].
-
-### Other package managers
-
-#### Conda
-
-`gh` is available via [Conda][], a cross-platform package and environment manager.
-
-| Install:                                 | Upgrade:                                |
-|------------------------------------------|-----------------------------------------|
-| `conda install gh --channel conda-forge` | `conda update gh --channel conda-forge` |
-
-Additional installation options available on the [gh-feedstock page](https://github.com/conda-forge/gh-feedstock#installing-gh).
 
 ### GitHub Actions
 
