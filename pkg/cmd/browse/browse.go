@@ -31,7 +31,6 @@ type BrowseOptions struct {
 	WikiFlag     bool
 	SettingsFlag bool
 	BranchFlag   bool
-	//LineFlag     bool
 }
 
 type exitCode int
@@ -139,7 +138,6 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) error {
 	}
 
 	return printExit(response, cmd, opts, repoUrl)
-
 }
 
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
@@ -158,7 +156,6 @@ func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, 
 	}
 
 	return exitUrlSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0]
-
 }
 
 func addFlag(opts *BrowseOptions, url string) (exitCode, string) {
@@ -169,7 +166,7 @@ func addFlag(opts *BrowseOptions, url string) (exitCode, string) {
 	} else if opts.WikiFlag {
 		return exitUrlSuccess, url + "/wiki"
 	}
-	return exitExpectedArg, "" // Flag is a branch and needs an argument
+	return exitExpectedArg, ""
 }
 
 func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
@@ -204,10 +201,8 @@ func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url strin
 	switch exit {
 	case exitUrlSuccess:
 		fmt.Fprintf(w, "now opening %s in browser . . .\n", cs.Bold(url))
-		break
 	case exitNonUrlSuccess:
 		fmt.Fprintf(w, "now opening issue/pr in browser . . .\n")
-		break
 	case exitNotInRepo:
 		return fmt.Errorf("change directory to a repository to open in browser\n%s", help)
 	case exitTooManyFlags:

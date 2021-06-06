@@ -96,7 +96,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	repoResolvingCmdFactory := *f
 	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo(f)
 
-	cmd.AddCommand(browseCmd.NewCmdBrowse(f)) // adds to the commands Commands()
+	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory)) // adds to the commands Commands()
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
