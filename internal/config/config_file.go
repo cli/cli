@@ -16,7 +16,10 @@ import (
 const (
 	GH_CONFIG_DIR   = "GH_CONFIG_DIR"
 	XDG_CONFIG_HOME = "XDG_CONFIG_HOME"
+	XDG_STATE_HOME  = "XDG_STATE_HOME"
+	XDG_DATA_HOME   = "XDG_DATA_HOME"
 	APP_DATA        = "AppData"
+	LOCAL_APP_DATA  = "LocalAppData"
 )
 
 // Config path precedence
@@ -38,27 +41,118 @@ func ConfigDir() string {
 	}
 
 	// If the path does not exist try migrating config from default paths
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		autoMigrateConfigDir(path)
+	if !dirExists(path) {
+		_ = autoMigrateConfigDir(path)
 	}
 
 	return path
 }
 
+// State path precedence
+// 1. XDG_CONFIG_HOME
+// 2. LocalAppData (windows only)
+// 3. HOME
+func StateDir() string {
+	var path string
+	if a := os.Getenv(XDG_STATE_HOME); a != "" {
+		path = filepath.Join(a, "gh")
+	} else if b := os.Getenv(LOCAL_APP_DATA); runtime.GOOS == "windows" && b != "" {
+		path = filepath.Join(b, "GitHub CLI")
+	} else {
+		c, _ := os.UserHomeDir()
+		path = filepath.Join(c, ".local", "state", "gh")
+	}
+
+	// If the path does not exist try migrating state from default paths
+	if !dirExists(path) {
+		_ = autoMigrateStateDir(path)
+	}
+
+	return path
+}
+
+// Data path precedence
+// 1. XDG_DATA_HOME
+// 2. LocalAppData (windows only)
+// 3. HOME
+func DataDir() string {
+	var path string
+	if a := os.Getenv(XDG_DATA_HOME); a != "" {
+		path = filepath.Join(a, "gh")
+	} else if b := os.Getenv(LOCAL_APP_DATA); runtime.GOOS == "windows" && b != "" {
+		path = filepath.Join(b, "GitHub CLI")
+	} else {
+		c, _ := os.UserHomeDir()
+		path = filepath.Join(c, ".local", "share", "gh")
+	}
+
+	return path
+}
+
+var errSamePath = errors.New("same path")
+var errNotExist = errors.New("not exist")
+
 // Check default paths (os.UserHomeDir, and homedir.Dir) for existing configs
 // If configs exist then move them to newPath
 // TODO: Remove support for homedir.Dir location in v2
-func autoMigrateConfigDir(newPath string) {
+func autoMigrateConfigDir(newPath string) error {
 	path, err := os.UserHomeDir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateConfigDir(oldPath, newPath)
-		return
+		return migrateDir(oldPath, newPath)
 	}
 
 	path, err = homedir.Dir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		migrateConfigDir(oldPath, newPath)
+		return migrateDir(oldPath, newPath)
 	}
+
+	return errNotExist
+}
+
+// Check default paths (os.UserHomeDir, and homedir.Dir) for existing state file (state.yml)
+// If state file exist then move it to newPath
+// TODO: Remove support for homedir.Dir location in v2
+func autoMigrateStateDir(newPath string) error {
+	path, err := os.UserHomeDir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		return migrateFile(oldPath, newPath, "state.yml")
+	}
+
+	path, err = homedir.Dir()
+	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
+		return migrateFile(oldPath, newPath, "state.yml")
+	}
+
+	return errNotExist
+}
+
+func migrateFile(oldPath, newPath, file string) error {
+	if oldPath == newPath {
+		return errSamePath
+	}
+
+	oldFile := filepath.Join(oldPath, file)
+	newFile := filepath.Join(newPath, file)
+
+	if !fileExists(oldFile) {
+		return errNotExist
+	}
+
+	_ = os.MkdirAll(filepath.Dir(newFile), 0755)
+	return os.Rename(oldFile, newFile)
+}
+
+func migrateDir(oldPath, newPath string) error {
+	if oldPath == newPath {
+		return errSamePath
+	}
+
+	if !dirExists(oldPath) {
+		return errNotExist
+	}
+
+	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
+	return os.Rename(oldPath, newPath)
 }
 
 func dirExists(path string) bool {
@@ -66,13 +160,9 @@ func dirExists(path string) bool {
 	return err == nil && f.IsDir()
 }
 
-var migrateConfigDir = func(oldPath, newPath string) {
-	if oldPath == newPath {
-		return
-	}
-
-	_ = os.MkdirAll(filepath.Dir(newPath), 0755)
-	_ = os.Rename(oldPath, newPath)
+func fileExists(path string) bool {
+	f, err := os.Stat(path)
+	return err == nil && !f.IsDir()
 }
 
 func ConfigFile() string {

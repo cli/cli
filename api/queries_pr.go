@@ -150,28 +150,33 @@ type PullRequestFile struct {
 
 type ReviewRequests struct {
 	Nodes []struct {
-		RequestedReviewer struct {
-			TypeName     string `json:"__typename"`
-			Login        string `json:"login"`
-			Name         string `json:"name"`
-			Slug         string `json:"slug"`
-			Organization struct {
-				Login string `json:"login"`
-			}
-		}
+		RequestedReviewer RequestedReviewer
 	}
+}
+
+type RequestedReviewer struct {
+	TypeName     string `json:"__typename"`
+	Login        string `json:"login"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	Organization struct {
+		Login string `json:"login"`
+	} `json:"organization"`
+}
+
+func (r RequestedReviewer) LoginOrSlug() string {
+	if r.TypeName == teamTypeName {
+		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
+	}
+	return r.Login
 }
 
 const teamTypeName = "Team"
 
 func (r ReviewRequests) Logins() []string {
 	logins := make([]string, len(r.Nodes))
-	for i, a := range r.Nodes {
-		if a.RequestedReviewer.TypeName == teamTypeName {
-			logins[i] = fmt.Sprintf("%s/%s", a.RequestedReviewer.Organization.Login, a.RequestedReviewer.Slug)
-		} else {
-			logins[i] = a.RequestedReviewer.Login
-		}
+	for i, r := range r.Nodes {
+		logins[i] = r.RequestedReviewer.LoginOrSlug()
 	}
 	return logins
 }

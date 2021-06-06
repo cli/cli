@@ -80,10 +80,20 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 		case "reviewRequests":
 			requests := make([]interface{}, 0, len(pr.ReviewRequests.Nodes))
 			for _, req := range pr.ReviewRequests.Nodes {
-				if req.RequestedReviewer.TypeName == "" {
-					continue
+				r := req.RequestedReviewer
+				switch r.TypeName {
+				case "User":
+					requests = append(requests, map[string]string{
+						"__typename": r.TypeName,
+						"login":      r.Login,
+					})
+				case "Team":
+					requests = append(requests, map[string]string{
+						"__typename": r.TypeName,
+						"name":       r.Name,
+						"slug":       r.LoginOrSlug(),
+					})
 				}
-				requests = append(requests, req.RequestedReviewer)
 			}
 			data[f] = &requests
 		default:
