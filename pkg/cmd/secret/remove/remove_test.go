@@ -41,6 +41,14 @@ func TestNewCmdRemove(t *testing.T) {
 				OrgName:    "anOrg",
 			},
 		},
+		{
+			name: "env",
+			cli:  "cool --env anEnv",
+			wants: RemoveOptions{
+				SecretName: "cool",
+				EnvName:    "anEnv",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -72,6 +80,7 @@ func TestNewCmdRemove(t *testing.T) {
 
 			assert.Equal(t, tt.wants.SecretName, gotOpts.SecretName)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
+			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 		})
 	}
 
@@ -98,6 +107,36 @@ func Test_removeRun_repo(t *testing.T) {
 			return ghrepo.FromFullName("owner/repo")
 		},
 		SecretName: "cool_secret",
+	}
+
+	err := removeRun(opts)
+	assert.NoError(t, err)
+
+	reg.Verify(t)
+}
+
+func Test_removeRun_env(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	reg.Register(
+		httpmock.REST("DELETE", "repos/owner/repo/environments/development/secrets/cool_secret"),
+		httpmock.StatusStringResponse(204, "No Content"))
+
+	io, _, _, _ := iostreams.Test()
+
+	opts := &RemoveOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		},
+		SecretName: "cool_secret",
+		EnvName:    "development",
 	}
 
 	err := removeRun(opts)

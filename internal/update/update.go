@@ -3,6 +3,8 @@ package update
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -83,9 +85,14 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 	if err != nil {
 		return err
 	}
-	_ = ioutil.WriteFile(stateFilePath, content, 0600)
 
-	return nil
+	err = os.MkdirAll(filepath.Dir(stateFilePath), 0755)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(stateFilePath, content, 0600)
+	return err
 }
 
 func versionGreaterThan(v, w string) bool {

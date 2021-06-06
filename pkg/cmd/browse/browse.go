@@ -37,12 +37,13 @@ type BrowseOptions struct {
 type exitCode int
 
 const (
-	exitSuccess      exitCode = 0
-	exitNotInRepo    exitCode = 1
-	exitTooManyFlags exitCode = 2
-	exitTooManyArgs  exitCode = 3
-	exitExpectedArg  exitCode = 4
-	exitInvalidCombo exitCode = 5
+	exitUrlSuccess    exitCode = 0
+	exitNonUrlSuccess exitCode = 1
+	exitNotInRepo     exitCode = 2
+	exitTooManyFlags  exitCode = 3
+	exitTooManyArgs   exitCode = 4
+	exitExpectedArg   exitCode = 5
+	exitInvalidCombo  exitCode = 6
 )
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
@@ -55,32 +56,38 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Long:  "Work with GitHub in the browser",       // displays when you are on the help page of this command
-		Short: "Open GitHub in the browser",            // displays in the gh root help
-		Use:   "browse {<number> | <file> | <branch>}", // necessary!!! This is the cmd that gets passed on the prompt
-		Args:  cobra.RangeArgs(0, 2),                   // make sure only one arg at most is passed
+		Long:  "Open specific pages in the browser on GitHub",
+		Short: "Open GitHub in the browser",
+		Use:   "browse {<number> | <path>}",
+		Args:  cobra.RangeArgs(0, 2),
 		Example: heredoc.Doc(`
 			$ gh browse
-			#=> Opens repository in browser
+			#=> Open current repository to the default branch
 
 			$ gh browse 217
-			#=> Opens issue or pull request 217
+			#=> Open issue or pull request 217
 
 			$ gh browse --settings
-			#=> Opens repository settings in browser
+			#=> Open repository settings
 
-			$ gh browse src/fileName:312 --branch main
-			#=> Opens src/fileName at line 312 in main branch
+			$ gh browse main.go:312
+			#=> Open main.go at line 312
+
+			$ gh browse main.go --branch main
+			#=> Open main.go in the main branch
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
-				A browse location can be supplied as an argument in any of the following formats:
-				- by number, e.g. "123"; or
-				- by file or branch name, e.g. "main.java" or "trunk".
+				A browser location can be specified using arguments in the following format:
+				- by number for issue or pull request, e.g. "123"; or
+				- by path for opening folders and files, e.g. "cmd/gh/main.go"
+			`),
+			"help:environment": heredoc.Doc(`
+				To configure a web browser other than the default, use the BROWSER environment variable 
 			`),
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) > 1 {
 				opts.AdditionalArg = args[1]
@@ -89,37 +96,35 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
-			openInBrowser(cmd, opts) // run gets rid of the usage / runs function
+			return openInBrowser(cmd, opts)
 		},
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
-	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open projects tab in browser")
-	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
-	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browser")
-	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Opens a branch in the browser")
+	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
+	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
+	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
+	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Select another branch by passing in the branch name")
 
 	return cmd
 }
 
-func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) (exitCode, string) {
+func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) error {
 
 	baseRepo, err := opts.BaseRepo()
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
 	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
 
-	if !inRepo(err) { // must be in a repo to execute
-		printExit(exitNotInRepo, cmd, opts, "")
-		return exitNotInRepo, ""
+	if !inRepo(err) {
+		return printExit(exitNotInRepo, cmd, opts, "")
 	}
 
-	if getFlagAmount(cmd) > 1 { // command can't have more than one flag
-		printExit(exitTooManyFlags, cmd, opts, "")
-		return exitTooManyFlags, ""
+	if getFlagAmount(cmd) > 1 {
+		return printExit(exitTooManyFlags, cmd, opts, "")
 	}
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
-	response := exitSuccess
+	response := exitUrlSuccess
 
 	if !hasArg(opts) && hasFlag(cmd) {
 		response, repoUrl = addFlag(opts, repoUrl)
@@ -129,40 +134,40 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) (exitCode, string) {
 		response, repoUrl = addCombined(opts, repoUrl, branchName)
 	}
 
-	if response == exitSuccess {
-		opts.Browser.Browse(repoUrl) // otherwise open repo
+	if response == exitUrlSuccess || response == exitNonUrlSuccess {
+		opts.Browser.Browse(repoUrl)
 	}
 
-	printExit(response, cmd, opts, repoUrl) // print success
-	return response, repoUrl
+	return printExit(response, cmd, opts, repoUrl)
+
 }
 
 func addCombined(opts *BrowseOptions, url string, branchName string) (exitCode, string) {
 
-	if !opts.BranchFlag { // gh browse --settings main.go
+	if !opts.BranchFlag {
 		return exitInvalidCombo, ""
 	}
 
 	if opts.AdditionalArg == "" {
-		return exitSuccess, url + "/tree/" + opts.SelectorArg
+		return exitUrlSuccess, url + "/tree/" + opts.SelectorArg
 	}
 
 	arr := parseFileArg(opts)
 	if len(arr) > 1 {
-		return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0] + "#L" + arr[1]
+		return exitUrlSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0] + "#L" + arr[1]
 	}
 
-	return exitSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0]
+	return exitUrlSuccess, url + "/tree/" + opts.AdditionalArg + "/" + arr[0]
 
 }
 
 func addFlag(opts *BrowseOptions, url string) (exitCode, string) {
 	if opts.ProjectsFlag {
-		return exitSuccess, url + "/projects"
+		return exitUrlSuccess, url + "/projects"
 	} else if opts.SettingsFlag {
-		return exitSuccess, url + "/settings"
+		return exitUrlSuccess, url + "/settings"
 	} else if opts.WikiFlag {
-		return exitSuccess, url + "/wiki"
+		return exitUrlSuccess, url + "/wiki"
 	}
 	return exitExpectedArg, "" // Flag is a branch and needs an argument
 }
@@ -175,15 +180,15 @@ func addArg(opts *BrowseOptions, url string, branchName string) (exitCode, strin
 
 	if isNumber(opts.SelectorArg) {
 		url += "/issues/" + opts.SelectorArg
-		return exitSuccess, url
+		return exitNonUrlSuccess, url
 	}
 
 	arr := parseFileArg(opts)
 	if len(arr) > 1 {
-		return exitSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
+		return exitUrlSuccess, url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
 	}
 
-	return exitSuccess, url + "/tree/" + branchName + "/" + arr[0]
+	return exitUrlSuccess, url + "/tree/" + branchName + "/" + arr[0]
 }
 
 func parseFileArg(opts *BrowseOptions) []string {
@@ -191,37 +196,30 @@ func parseFileArg(opts *BrowseOptions) []string {
 	return arr
 }
 
-func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) {
+func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url string) error {
 	w := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
 	help := "Use 'gh browse --help' for more information about browse\n"
 
 	switch exit {
-	case exitSuccess:
-		fmt.Fprintf(w, "%s now opening %s in browser . . .\n",
-			cs.Green("✓"), cs.Bold(url))
+	case exitUrlSuccess:
+		fmt.Fprintf(w, "now opening %s in browser . . .\n", cs.Bold(url))
+		break
+	case exitNonUrlSuccess:
+		fmt.Fprintf(w, "now opening issue/pr in browser . . .\n")
 		break
 	case exitNotInRepo:
-		fmt.Fprintf(w, "%s change directory to a repository to open in browser\n%s",
-			cs.Red("x"), help)
-		break
+		return fmt.Errorf("change directory to a repository to open in browser\n%s", help)
 	case exitTooManyFlags:
-		fmt.Fprintf(w, "%s accepts 1 flag, %d flag(s) were recieved\n%s",
-			cs.Red("x"), getFlagAmount(cmd), help)
-		break
+		return fmt.Errorf("accepts 1 flag, %d flag(s) were recieved\n%s", getFlagAmount(cmd), help)
 	case exitTooManyArgs:
-		fmt.Fprintf(w, "%s accepts 1 arg, 2 arg(s) were received \n%s",
-			cs.Red("x"), help)
-		break
+		return fmt.Errorf("accepts 1 arg, 2 arg(s) were received \n%s", help)
 	case exitExpectedArg:
-		fmt.Fprintf(w, "%s expected argument with this flag %s\n%s",
-			cs.Red("x"), cs.Bold(url), help)
-		break
+		return fmt.Errorf("expected argument with this flag %s\n%s", cs.Bold(url), help)
 	case exitInvalidCombo:
-		fmt.Fprintf(w, "%s invalid use of flag and argument\n%s",
-			cs.Red("x"), help)
-		break
+		return fmt.Errorf("invalid use of flag and argument\n%s", help)
 	}
+	return nil
 }
 
 func hasFlag(cmd *cobra.Command) bool {
