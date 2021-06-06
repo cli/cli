@@ -55,29 +55,35 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Long:  "Work with GitHub in the browser",       // displays when you are on the help page of this command
-		Short: "Open GitHub in the browser",            // displays in the gh root help
-		Use:   "browse {<number> | <file> | <branch>}", // necessary!!! This is the cmd that gets passed on the prompt
-		Args:  cobra.RangeArgs(0, 2),                   // make sure only one arg at most is passed
+		Long:  "Open a GitHub repository in the web browser",
+		Short: "Open GitHub in the browser",
+		Use:   "browse {<number> | <path>}",
+		Args:  cobra.RangeArgs(0, 2),
 		Example: heredoc.Doc(`
 			$ gh browse
-			#=> Opens repository in browser
+			#=> Open current repository to the default branch
 
 			$ gh browse 217
-			#=> Opens issue or pull request 217
+			#=> Open issue or pull request 217
 
 			$ gh browse --settings
-			#=> Opens repository settings in browser
+			#=> Open repository settings
 
-			$ gh browse src/fileName:312 --branch main
-			#=> Opens src/fileName at line 312 in main branch
+			$ gh browse main.go:312
+			#=> Open main.go at line 312
+
+			$ gh browse main.go --branch main
+			#=> Open main.go in the main branch
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
-				A browse location can be supplied as an argument in any of the following formats:
-				- by number, e.g. "123"; or
-				- by file or branch name, e.g. "main.java" or "trunk".
+				A browser location can be specified using arguments in the following format:
+				- by number for issue or pull request, e.g. "123"; or
+				- by path for opening folders and files, e.g. "cmd/gh/main.go"
+			`),
+			"help:environment": heredoc.Doc(`
+				To configure a web browser other than the default, use the BROWSER environment variable 
 			`),
 		},
 		Run: func(cmd *cobra.Command, args []string) {
@@ -89,14 +95,14 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
-			openInBrowser(cmd, opts) // run gets rid of the usage / runs function
+			openInBrowser(cmd, opts)
 		},
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
-	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open projects tab in browser")
-	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Opens the wiki in browser")
-	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Opens the settings in browser")
-	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Opens a branch in the browser")
+	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
+	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
+	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
+	cmd.Flags().BoolVarP(&opts.BranchFlag, "branch", "b", false, "Select another branch by passing in the branch name")
 
 	return cmd
 }
