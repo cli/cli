@@ -170,7 +170,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(pr.Title))
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
@@ -294,8 +294,6 @@ func prReviewerList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	return reviewerList
 }
 
-const teamTypeName = "Team"
-
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
@@ -317,10 +315,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.Login
-		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
-			name = reviewRequest.RequestedReviewer.Name
-		}
+		name := reviewRequest.RequestedReviewer.LoginOrSlug()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,
