@@ -97,7 +97,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 				opts.SelectorArg = args[0]
 			}
 			return openInBrowser(cmd, opts)
-
 		},
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
