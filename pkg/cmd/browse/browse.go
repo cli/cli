@@ -112,7 +112,7 @@ func openInBrowser(cmd *cobra.Command, opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
-	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+	branchName, _ := api.RepoDefaultBranch(apiClient, baseRepo)
 
 	if !inRepo(err) {
 		return printExit(exitNotInRepo, cmd, opts, "")
