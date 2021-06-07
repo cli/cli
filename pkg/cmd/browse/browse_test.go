@@ -6,157 +6,122 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
-	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
+type args struct {
+	repo ghrepo.Interface
+	cli  string
+}
+type testCase struct {
+	name           string
+	args           args
+	errorExpected  bool
+	stdoutExpected string
+	stderrExpected string
+}
+
+func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
+	io, _, stdout, stderr := iostreams.Test()
+
+	browser := &cmdutil.TestBrowser{}
+	factory := &cmdutil.Factory{
+		IOStreams: io,
+		Browser:   browser,
+
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: rt}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+	}
+
+	cmd := NewCmdBrowse(factory)
+
+	argv, err := shlex.Split(t.args.cli)
+	if err != nil {
+		return nil, err
+	}
+	cmd.SetArgs(argv)
+
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(ioutil.Discard)
+	cmd.SetErr(ioutil.Discard)
+
+	_, err = cmd.ExecuteC()
+	return &test.CmdOut{
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
+	}, err
+}
 func TestNewCmdBrowse(t *testing.T) {
 
-	type args struct {
-		repo ghrepo.Interface
-		cli  string
-	}
-	tests := []struct {
-		name         	string
-		args         	args
-		errorExpected 	error
-		stdoutExpected 	string
-		stderrExpected 	string
-	}{
-		name: "test1",
-		arg : args{
-			repo: ghrepo.New("bchadwic","cli"),
-			cli: "--settings",
+	var tests = []testCase{
+		{
+			name: "test1",
+			args: args{
+				repo: ghrepo.New("bchadwic", "cli"),
+				cli:  "--settings --projects",
+			},
+			errorExpected:  true,
+			stdoutExpected: "",
+			stderrExpected: "Error: accepts 1 flag, 2 flag(s) were recieved\nUse 'gh browse --help' for more information about browse\n\n",
 		},
-		errorExpected: nil,
-		stdoutExpected: "now opening https://github.com/bchadwic/cli/settings in browser . . .\n",
-		stderrExpected: "",
+		{
+			name: "test2",
+			args: args{
+				repo: ghrepo.New("bchadwic", "cli"),
+				cli:  "--settings",
+			},
+			errorExpected:  false,
+			stdoutExpected: "hello world",
+			stderrExpected: "hello world",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, stdout, stderr := iostreams.Test()
-			//	tt.topic
 
-			factory := &cmdutil.Factory{
-				IOStreams: io,
-				//os.Getenv("BROWSER")
-				Browser: cmdutil.NewBrowser("", stdout, stderr),
-				HttpClient: func() (*http.Client, error) {
-					return &http.Client{Transport: rt}, nil
-				},
-				BaseRepo: tt.args.repo,
-				},
-			}
-			cmd := NewCmdBrowse(factory)
+			http := &httpmock.Registry{}
+			defer http.Verify(t)
 
-			argv, err := shlex.Split(cli)
-			if err != nil {
-				return 
-			}
-			cmd.SetArgs(argv)
-			cmd.SetOut(stdout)
-			cmd.SetErr(stderr)
+			_, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
 
-			_, err := cmd.ExecuteC()
-			assert.Error(t, err)
-			if stdoutExpected != "" {
-				assert.Contains(t, stdout.String(), tt.outputExpected) // success outputs
+			output, err := runCommand(http, tt)
+
+			if tt.errorExpected {
+				assert.Error(t, err)
 			}
-			if stderrExpected != "" {
-				assert.Contains(t, stderr.String(), tt.outputExpected) // error outputs
-			}
+
+			assert.Contains(t, output.String(), tt.stdoutExpected) // success outputs
+
+			assert.Contains(t, output.Stderr(), tt.stderrExpected) // error outputs
+
 		})
 	}
 }
 
+// http := initFakeHTTP()
+// defer http.Verify(t)
 
+// _, cmdTeardown := run.Stub()
+// defer cmdTeardown(t)
 
-// func runCommand(isTTY bool, cli string) (*test.CmdOut, error) {
-// 	io, _, stdout, stderr := iostreams.Test()
-// 	io.SetStdoutTTY(isTTY)
-// 	io.SetStdinTTY(isTTY)
-// 	io.SetStderrTTY(isTTY)
-
-// 	factory := &cmdutil.Factory{
-// 		IOStreams: io,
-// 		HttpClient: func() (*http.Client, error) {
-// 			return &http.Client{Transport: rt}, nil
-// 		},
-// 		Config: func() (config.Config, error) {
-// 			return config.NewBlankConfig(), nil
-// 		},
-// 		BaseRepo: func() (ghrepo.Interface, error) {
-// 			return ghrepo.New("OWNER", "REPO"), nil
-// 		},
-// 	}
-
-// 	cmd := NewCmdBrowse(factory)
-
-// 	argv, err := shlex.Split(cli)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	cmd.SetArgs(argv)
-
-// 	cmd.SetIn(&bytes.Buffer{})
-// 	cmd.SetOut(ioutil.Discard)
-// 	cmd.SetErr(ioutil.Discard)
-
-// 	_, err = cmd.ExecuteC()
-// 	return &test.CmdOut{
-// 		OutBuf: stdout,
-// 		ErrBuf: stderr,
-// 	}, err
+// output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
+// if err != nil {
+// 	t.Errorf("error running command `pr list` with `--web` flag: %v", err)
 // }
 
-// func TestBrowseOpen(t *testing.T) {
-// 	runCommand(true, "")
-// }
-
-// func Test_browseList(t *testing.T) {
-// 	for _, test := range tests {
-// 		arg = test.args
-// 		cmd := createCommand(arg.repo, arg.cli)
-// 		err := cmd.RunE();
-// 	}
-// }
-
-// func createCommand(repo ghrepo.Interface, cli string) *cobra.Command {
-// 	io, _, stdout, stderr := iostreams.Test()
-// 	io.SetStdoutTTY(false)
-// 	io.SetStdinTTY(false) // Ask the team about TTY
-// 	io.SetStderrTTY(false)
-
-// 	factory := &cmdutil.Factory{
-// 		IOStreams: io,
-// 		Config: func() (config.Config, error) {
-// 			return config.NewBlankConfig(), nil
-// 		},
-// 		BaseRepo: repo
-// 		},
-// 	}
-
-// 	cmd := NewCmdBrowse(factory, nil)
-
-// 	argv, err := shlex.Split(cli)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	cmd.SetArgs(argv)
-
-// 	cmd.SetIn(&bytes.Buffer{})
-// 	cmd.SetOut(ioutil.Discard)
-// 	cmd.SetErr(ioutil.Discard)
-
-// 	_, err = cmd.RunE()
-// 	return &test.CmdOut{
-// 		OutBuf: stdout,
-// 		ErrBuf: stderr,
-// 	}, err
-// }
+// assert.Equal(t, "", output.String())
+// assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
+// assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", output.BrowsedURL)

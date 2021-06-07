@@ -200,9 +200,11 @@ func printExit(exit exitCode, cmd *cobra.Command, opts *BrowseOptions, url strin
 
 	switch exit {
 	case exitUrlSuccess:
-		fmt.Fprintf(w, "now opening %s in browser . . .\n", cs.Bold(url))
+		//fmt.Fprintf(w, "now opening %s in browser . . .\n", cs.Bold(url))
+		fmt.Fprintln(w, "Hello World One")
 	case exitNonUrlSuccess:
-		fmt.Fprintf(w, "now opening issue/pr in browser . . .\n")
+		//fmt.Fprintf(w, "now opening issue/pr in browser . . .\n")
+		fmt.Fprintln(w, "Hello World Two")
 	case exitNotInRepo:
 		return fmt.Errorf("change directory to a repository to open in browser\n%s", help)
 	case exitTooManyFlags:
