@@ -2,7 +2,7 @@ package browse
 
 import (
 	"bytes"
-	"io/ioutil"
+	//"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -53,8 +53,8 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -76,16 +76,16 @@ func TestNewCmdBrowse(t *testing.T) {
 			stdoutExpected: "",
 			stderrExpected: "Error: accepts 1 flag, 2 flag(s) were recieved\nUse 'gh browse --help' for more information about browse\n\n",
 		},
-		{
-			name: "test2",
-			args: args{
-				repo: ghrepo.New("bchadwic", "cli"),
-				cli:  "--settings",
-			},
-			errorExpected:  false,
-			stdoutExpected: "hello world",
-			stderrExpected: "hello world",
-		},
+		// {
+		// 	name: "test2",
+		// 	args: args{
+		// 		repo: ghrepo.New("bchadwic", "cli"),
+		// 		cli:  "--settings",
+		// 	},
+		// 	errorExpected:  false,
+		// 	stdoutExpected: "hello world",
+		// 	stderrExpected: "hello world",
+		// },
 	}
 
 	for _, tt := range tests {
@@ -103,9 +103,9 @@ func TestNewCmdBrowse(t *testing.T) {
 				assert.Error(t, err)
 			}
 
-			assert.Contains(t, output.String(), tt.stdoutExpected) // success outputs
+			assert.Contains(t, output.OutBuf.String(), tt.stdoutExpected) // success outputs
 
-			assert.Contains(t, output.Stderr(), tt.stderrExpected) // error outputs
+			assert.Contains(t, output.ErrBuf.String(), tt.stderrExpected) // error outputs
 
 		})
 	}
