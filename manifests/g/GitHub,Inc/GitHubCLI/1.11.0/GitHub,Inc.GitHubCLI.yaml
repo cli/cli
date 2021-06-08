@@ -1,0 +1,7 @@
+# Created using wingetcreate
+
+PackageIdentifier: GitHub,Inc.GitHubCLI
+PackageVersion: 1.11.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.0.0

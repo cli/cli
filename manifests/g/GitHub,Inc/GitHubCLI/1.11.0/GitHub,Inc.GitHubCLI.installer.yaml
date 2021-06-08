@@ -1,0 +1,13 @@
+# Created using wingetcreate
+
+PackageIdentifier: GitHub,Inc.GitHubCLI
+PackageVersion: 1.11.0
+Installers:
+- InstallerLocale: en-US
+  Architecture: neutral
+  InstallerType: msi
+  InstallerUrl: https://github.com/cli/cli/releases/download/v1.11.0/gh_1.11.0_windows_amd64.msi
+  InstallerSha256: 5211C3281416BF441BF82567B2F5E1FE7C703BB7EC884BF78C96780E09EA47A8
+  ProductCode: '{3BE5325F-4514-4D14-BF04-9BC7039E312B}'
+ManifestType: installer
+ManifestVersion: 1.0.0
