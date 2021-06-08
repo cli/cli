@@ -61,7 +61,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Args:  cobra.RangeArgs(0, 2),
 		Example: heredoc.Doc(`
 			$ gh browse
-			#=> Open current repository to the default branch
+			#=> Open the home page of the current repository
 
 			$ gh browse 217
 			#=> Open issue or pull request 217
