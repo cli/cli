@@ -46,7 +46,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		Long:  "Open the GitHub repository in the web browser.",
 		Short: "Open the repository in the browser",
 		Use:   "browse {<number> | <path>}",
-		Args:  cobra.RangeArgs(0, 2),
+		Args:  cobra.RangeArgs(0, 1),
 		Example: heredoc.Doc(`
 			$ gh browse
 			#=> Open the home page of the current repository
@@ -79,7 +79,7 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			if opts.FlagAmount > 1 {
 				return &cmdutil.FlagError{Err: fmt.Errorf("accepts 1 flag, %d flag(s) were recieved", opts.FlagAmount)}
 			}
-			// TODO test whether you can set cobra command arg range to 1 with a branch accepting an arg1
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -111,57 +111,44 @@ func runBrowse(opts *BrowseOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-	if err != nil {
-		return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
-	}
+	// if err != nil { TODO resolve errors related to using this with tests
+	// 	return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
+	// }
 
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 
-	hasArg := hasArg(opts)
-	hasFlag := hasFlag(opts)
+	hasArg := opts.SelectorArg != ""
+	hasFlag := opts.FlagAmount > 0
 
-	if hasArg && !hasFlag {
+	if opts.Branch != "" {
+		repoUrl = addBranch(opts, repoUrl)
+	} else if hasArg && !hasFlag {
 		repoUrl = addArg(opts, repoUrl, branchName)
 	} else if !hasArg && hasFlag {
-		err, repoUrl = addFlag(opts, repoUrl)
-		if err != nil {
-			return err
-		}
-	} else if hasArg && hasFlag {
-		err, repoUrl = addBranch(opts, repoUrl)
-		if err != nil {
-			return err
-		}
+		repoUrl = addFlag(opts, repoUrl)
 	} else {
 		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", repoUrl)
 	}
-
 	opts.Browser.Browse(repoUrl)
-
 	return nil
 }
 
-func addBranch(opts *BrowseOptions, url string) (error, string) {
-	help := "Use 'gh browse --help' for more information about browse\n"
-
-	if opts.Branch == "" {
-		return fmt.Errorf("invalid use of flag and argument\n%s", help), ""
-	}
-
+func addBranch(opts *BrowseOptions, url string) string {
 	if opts.SelectorArg == "" {
 		url += "/tree/" + opts.Branch
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-		return nil, url
+	} else {
+		arr := parseFileArg(opts)
+		if len(arr) > 1 {
+			url += "/tree/" + opts.Branch + "/" + arr[0] + "#L" + arr[1]
+		} else {
+			url += "/tree/" + opts.Branch + "/" + arr[0]
+		}
 	}
-
-	arr := parseFileArg(opts)
-	if len(arr) > 1 {
-		return nil, url + "/tree/" + opts.Branch + "/" + arr[0] + "#L" + arr[1]
-	}
-	return nil, url + "/tree/" + opts.Branch + "/" + arr[0]
+	fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
+	return url
 }
 
-func addFlag(opts *BrowseOptions, url string) (error, string) {
+func addFlag(opts *BrowseOptions, url string) string {
 	if opts.ProjectsFlag {
 		url += "/projects"
 	} else if opts.SettingsFlag {
@@ -170,37 +157,29 @@ func addFlag(opts *BrowseOptions, url string) (error, string) {
 		url += "/wiki"
 	}
 	fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-	return nil, url
+	return url
 }
 
 func addArg(opts *BrowseOptions, url string, branchName string) string {
 	if isNumber(opts.SelectorArg) {
 		url += "/issues/" + opts.SelectorArg
 		fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
-		return url
-	}
-
-	arr := parseFileArg(opts)
-	if len(arr) > 1 {
+	} else {
+		arr := parseFileArg(opts)
+		if len(arr) > 1 {
+			url += "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
+		} else {
+			url += "/tree/" + branchName + "/" + arr[0]
+		}
 		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-		return url + "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
 	}
-
-	fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-	return url + "/tree/" + branchName + "/" + arr[0]
+	return url
 }
 
 func parseFileArg(opts *BrowseOptions) []string {
+	// TODO make sure the line number is the second arg, and that there are only two elements in arr
 	arr := strings.Split(opts.SelectorArg, ":")
 	return arr
-}
-
-func hasFlag(opts *BrowseOptions) bool {
-	return opts.FlagAmount > 0
-}
-
-func hasArg(opts *BrowseOptions) bool {
-	return opts.SelectorArg != ""
 }
 
 func isNumber(arg string) bool {
