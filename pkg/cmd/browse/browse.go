@@ -43,13 +43,13 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Long:  "Open specific pages in the browser on GitHub",
-		Short: "Open GitHub in the browser",
+		Long:  "Open the GitHub repository in the web browser.",
+		Short: "Open the repository in the browser",
 		Use:   "browse {<number> | <path>}",
 		Args:  cobra.RangeArgs(0, 2),
 		Example: heredoc.Doc(`
 			$ gh browse
-			#=> Open current repository to the default branch
+			#=> Open the home page of the current repository
 
 			$ gh browse 217
 			#=> Open issue or pull request 217
