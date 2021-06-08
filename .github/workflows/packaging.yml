@@ -20,7 +20,7 @@ jobs:
       - name: Update manifest
         shell: powershell
         run: |
-            wingetcreate.exe update --id GitHub,Inc.GitHubCLI --url https://github.com/cli/cli/releases/download/v$env:GITHUB_CLI_VERSION/gh_${env:GITHUB_CLI_VERSION}_windows_amd64.msi --version ${env:GITHUB_CLI_VERSION} --out .\manifest\
+            wingetcreate.exe update --id GitHub.cli --url https://github.com/cli/cli/releases/download/v$env:GITHUB_CLI_VERSION/gh_${env:GITHUB_CLI_VERSION}_windows_amd64.msi --version ${env:GITHUB_CLI_VERSION} --out .\manifest\
       - name: Submit Pull Request to Winget Pkg
         shell: powershell
         run: wingetcreate.exe submit .\manifest\
