@@ -531,67 +531,23 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 		return "", err
 	}
 
-	var reviewsFragment string
-	if prFeatures.HasReviewDecision {
-		reviewsFragment = "reviewDecision"
+	fields := []string{
+		"number", "title", "state", "url", "isDraft", "isCrossRepository",
+		"headRefName", "headRepositoryOwner", "mergeStateStatus",
 	}
-
-	var statusesFragment string
 	if prFeatures.HasStatusCheckRollup {
-		statusesFragment = `
-		commits(last: 1) {
-			nodes {
-				commit {
-					statusCheckRollup {
-						contexts(last: 100) {
-							nodes {
-								...on StatusContext {
-									state
-								}
-								...on CheckRun {
-									conclusion
-									status
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		`
+		fields = append(fields, "statusCheckRollup")
 	}
 
-	var requiresStrictStatusChecks string
-	if prFeatures.HasBranchProtectionRule {
-		requiresStrictStatusChecks = `
-		baseRef {
-			branchProtectionRule {
-				requiresStrictStatusChecks
-			}
-		}`
+	var reviewFields []string
+	if prFeatures.HasReviewDecision {
+		reviewFields = append(reviewFields, "reviewDecision")
 	}
 
 	fragments := fmt.Sprintf(`
-	fragment pr on PullRequest {
-		number
-		title
-		state
-		url
-		headRefName
-		mergeStateStatus
-		headRepositoryOwner {
-			login
-		}
-		%s
-		isCrossRepository
-		isDraft
-		%s
-	}
-	fragment prWithReviews on PullRequest {
-		...pr
-		%s
-	}
-	`, requiresStrictStatusChecks, statusesFragment, reviewsFragment)
+	fragment pr on PullRequest {%s}
+	fragment prWithReviews on PullRequest {...pr,%s}
+	`, PullRequestGraphQL(fields), PullRequestGraphQL(reviewFields))
 	return fragments, nil
 }
 
