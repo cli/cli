@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -53,8 +52,12 @@ var timezoneNames = map[int]string{
 	50400:  "Pacific/Kiritimati",
 }
 
+type configGetter interface {
+	Get(string, string) (string, error)
+}
+
 // generic authenticated HTTP client for commands
-func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string, setAccept bool) *http.Client {
+func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string, setAccept bool) *http.Client {
 	var opts []api.ClientOption
 	if verbose := os.Getenv("DEBUG"); verbose != "" {
 		logTraffic := strings.Contains(verbose, "api")
@@ -64,7 +67,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 	opts = append(opts,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
-			hostname := ghinstance.NormalizeHostname(req.URL.Hostname())
+			hostname := ghinstance.NormalizeHostname(getHost(req))
 			if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
 				return fmt.Sprintf("token %s", token), nil
 			}
@@ -89,7 +92,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 				accept := "application/vnd.github.antiope-preview+json"
 				// introduced for #2952: pr branch up to date status
 				accept += ", application/vnd.github.merge-info-preview+json"
-				if ghinstance.IsEnterprise(req.URL.Hostname()) {
+				if ghinstance.IsEnterprise(getHost(req)) {
 					// shadow-cat-preview: Draft pull requests
 					accept += ", application/vnd.github.shadow-cat-preview"
 				}
@@ -99,4 +102,11 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg config.Config, appVersion string
 	}
 
 	return api.NewHTTPClient(opts...)
+}
+
+func getHost(r *http.Request) string {
+	if r.Host != "" {
+		return r.Host
+	}
+	return r.URL.Hostname()
 }
