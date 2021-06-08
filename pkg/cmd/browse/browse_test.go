@@ -2,10 +2,11 @@ package browse
 
 import (
 	"bytes"
-	//"io/ioutil"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -26,6 +27,7 @@ type testCase struct {
 	errorExpected  bool
 	stdoutExpected string
 	stderrExpected string
+	urlExpected    string
 }
 
 func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
@@ -39,8 +41,11 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
+			return t.args.repo, nil
 		},
 	}
 
@@ -53,8 +58,8 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
+	cmd.SetOut(ioutil.Discard)
+	cmd.SetErr(ioutil.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -64,33 +69,66 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 	}, err
 }
 func TestNewCmdBrowse(t *testing.T) {
-
 	var tests = []testCase{
 		{
-			name: "test1",
+			name: "multiple flag",
 			args: args{
-				repo: ghrepo.New("bchadwic", "cli"),
+				repo: ghrepo.New("jessica", "cli"),
 				cli:  "--settings --projects",
 			},
 			errorExpected:  true,
 			stdoutExpected: "",
-			stderrExpected: "Error: accepts 1 flag, 2 flag(s) were recieved\nUse 'gh browse --help' for more information about browse\n\n",
+			stderrExpected: "accepts 1 flag, 2 flag(s) were recieved\nUse 'gh browse --help' for more information about browse\n",
+			urlExpected:    "",
 		},
-		// {
-		// 	name: "test2",
-		// 	args: args{
-		// 		repo: ghrepo.New("bchadwic", "cli"),
-		// 		cli:  "--settings",
-		// 	},
-		// 	errorExpected:  false,
-		// 	stdoutExpected: "hello world",
-		// 	stderrExpected: "hello world",
-		// },
+		{
+			name: "settings flag",
+			args: args{
+				repo: ghrepo.New("husrav", "cli"),
+				cli:  "--settings",
+			},
+			errorExpected:  false,
+			stdoutExpected: "now opening https://github.com/husrav/cli/settings in browser . . .\n",
+			stderrExpected: "",
+			urlExpected:    "https://github.com/husrav/cli/settings",
+		},
+		{
+			name: "projects flag",
+			args: args{
+				repo: ghrepo.New("ben", "cli"),
+				cli:  "--projects",
+			},
+			errorExpected:  false,
+			stdoutExpected: "now opening https://github.com/ben/cli/projects in browser . . .\n",
+			stderrExpected: "",
+			urlExpected:    "https://github.com/ben/cli/projects",
+		},
+		{
+			name: "wiki flag",
+			args: args{
+				repo: ghrepo.New("thanh", "cli"),
+				cli:  "--wiki",
+			},
+			errorExpected:  false,
+			stdoutExpected: "now opening https://github.com/thanh/cli/wiki in browser . . .\n",
+			stderrExpected: "",
+			urlExpected:    "https://github.com/thanh/cli/wiki",
+		},
+		{
+			name: "branch flag",
+			args: args{
+				repo: ghrepo.New("ken", "cli"),
+				cli:  "--branch",
+			},
+			errorExpected:  false,
+			stdoutExpected: "",
+			stderrExpected: "Aa",
+			urlExpected:    "",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
@@ -100,28 +138,12 @@ func TestNewCmdBrowse(t *testing.T) {
 			output, err := runCommand(http, tt)
 
 			if tt.errorExpected {
-				assert.Error(t, err)
+				assert.Equal(t, err.Error(), tt.stderrExpected)
+			} else {
+				assert.Equal(t, err, nil)
 			}
-
-			assert.Contains(t, output.OutBuf.String(), tt.stdoutExpected) // success outputs
-
-			assert.Contains(t, output.ErrBuf.String(), tt.stderrExpected) // error outputs
-
+			assert.Equal(t, output.OutBuf.String(), tt.stdoutExpected)
+			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
 		})
 	}
 }
-
-// http := initFakeHTTP()
-// defer http.Verify(t)
-
-// _, cmdTeardown := run.Stub()
-// defer cmdTeardown(t)
-
-// output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
-// if err != nil {
-// 	t.Errorf("error running command `pr list` with `--web` flag: %v", err)
-// }
-
-// assert.Equal(t, "", output.String())
-// assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
-// assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", output.BrowsedURL)
