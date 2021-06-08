@@ -1,5 +1,11 @@
 {
     "search.exclude": {
         "vendor/**": true
-    }
+    },
+    "vim.easymotion": true,
+    "vim.handleKeys": {
+
+        "<C-d>": true
+    }, 
+    "vim.leader": "Space"
 }
