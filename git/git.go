@@ -368,3 +368,30 @@ func getBranchShortName(output []byte) string {
 	branch := firstLine(output)
 	return strings.TrimPrefix(branch, "refs/heads/")
 }
+
+func IsAncestor(ancestor, commit string) (bool, error) {
+	cmd, err := GitCommand("merge-base", "--is-ancestor", ancestor, commit)
+	if err != nil {
+		return false, err
+	}
+	err = run.PrepareCmd(cmd).Run()
+	return err == nil, nil
+}
+
+func IsDirty() (bool, error) {
+	cmd, err := GitCommand("status", "--untracked-files=no", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+
+	output, err := run.PrepareCmd(cmd).Output()
+	if err != nil {
+		return true, err
+	}
+
+	if len(output) > 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
