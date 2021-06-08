@@ -6,6 +6,6 @@ PackageLocale: en-US
 Publisher: GitHub, Inc.
 PackageName: GitHub CLI
 License: MIT License
-ShortDescription: GitHub’s official command line tool
+ShortDescription: GitHub's official command line tool
 ManifestType: defaultLocale
 ManifestVersion: 1.0.0
