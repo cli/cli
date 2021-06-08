@@ -114,6 +114,17 @@ func TestNewCmdBrowse(t *testing.T) {
 			stderrExpected: "",
 			urlExpected:    "https://github.com/thanh/cli/wiki",
 		},
+		{
+			name: "branch flag",
+			args: args{
+				repo: ghrepo.New("ken", "cli"),
+				cli:  "--branch",
+			},
+			errorExpected:  false,
+			stdoutExpected: "",
+			stderrExpected: "Aa",
+			urlExpected:    "",
+		},
 	}
 
 	for _, tt := range tests {
