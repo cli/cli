@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -40,9 +39,6 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return t.args.repo, nil
@@ -78,7 +74,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			},
 			errorExpected:  true,
 			stdoutExpected: "",
-			stderrExpected: "accepts 1 flag, 2 flag(s) were recieved\nUse 'gh browse --help' for more information about browse\n",
+			stderrExpected: "accepts 1 flag, 2 flag(s) were recieved",
 			urlExpected:    "",
 		},
 		{
@@ -114,17 +110,17 @@ func TestNewCmdBrowse(t *testing.T) {
 			stderrExpected: "",
 			urlExpected:    "https://github.com/thanh/cli/wiki",
 		},
-		{
-			name: "branch flag",
-			args: args{
-				repo: ghrepo.New("ken", "cli"),
-				cli:  "--branch",
-			},
-			errorExpected:  false,
-			stdoutExpected: "",
-			stderrExpected: "Aa",
-			urlExpected:    "",
-		},
+		// {
+		// 	name: "branch flag",
+		// 	args: args{
+		// 		repo: ghrepo.New("ken", "cli"),
+		// 		cli:  "--branch",
+		// 	},
+		// 	errorExpected:  false,
+		// 	stdoutExpected: "",
+		// 	stderrExpected: "Aa",
+		// 	urlExpected:    "",
+		// },
 	}
 
 	for _, tt := range tests {
@@ -142,7 +138,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			} else {
 				assert.Equal(t, err, nil)
 			}
-			assert.Equal(t, output.OutBuf.String(), tt.stdoutExpected)
+			assert.Equal(t, tt.stdoutExpected, output.OutBuf.String())
 			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
 		})
 	}
