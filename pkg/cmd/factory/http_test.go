@@ -39,7 +39,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.antiope-preview+json, application/vnd.github.merge-info-preview+json",
+				"accept":        "application/vnd.github.merge-info-preview+json",
 			},
 			wantStderr: "",
 		},
@@ -97,7 +97,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token GHETOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.antiope-preview+json, application/vnd.github.merge-info-preview+json, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: "",
 		},
