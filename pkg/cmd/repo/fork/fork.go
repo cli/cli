@@ -83,6 +83,10 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 				opts.GitArgs = args[1:]
 			}
 
+			if cmd.Flags().Changed("org") && opts.Organization == "" {
+				return &cmdutil.FlagError{Err: errors.New("--org cannot be blank")}
+			}
+
 			if opts.RemoteName == "" {
 				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
 			}
