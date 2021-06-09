@@ -20,7 +20,7 @@ type GistFile struct {
 	Filename string `json:"filename,omitempty"`
 	Type     string `json:"type,omitempty"`
 	Language string `json:"language,omitempty"`
-	Content  string `json:"content"`
+	Content  string `json:"content,omitempty"`
 }
 
 type GistOwner struct {
