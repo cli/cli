@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const defaultRemoteName = "origin"
+
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -110,7 +112,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
-	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
+	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify a name for a fork's new remote.")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 
 	return cmd
