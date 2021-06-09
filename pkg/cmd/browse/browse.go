@@ -19,26 +19,27 @@ type browser interface {
 }
 
 type BrowseOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
 
-	SelectorArg string
 	FlagAmount  int
+	SelectorArg string
 
-	ProjectsFlag bool
-	WikiFlag     bool
-	SettingsFlag bool
 	Branch       string
+	ProjectsFlag bool
+	RepoFlag     bool
+	SettingsFlag bool
+	WikiFlag     bool
 }
 
 func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 
 	opts := &BrowseOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
@@ -80,8 +81,10 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 			if opts.FlagAmount > 2 {
 				return &cmdutil.FlagError{Err: fmt.Errorf("cannot have more than two flags, %d were recieved", opts.FlagAmount)}
 			}
-
-			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride == "" && opts.FlagAmount > 1 {
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" {
+				opts.RepoFlag = true
+			}
+			if opts.FlagAmount > 1 && !opts.RepoFlag {
 				return &cmdutil.FlagError{Err: fmt.Errorf("these two flags are incompatible, see below for instructions")}
 			}
 
@@ -127,7 +130,7 @@ func runBrowse(opts *BrowseOptions) error {
 
 	if opts.Branch != "" {
 		repoUrl = addBranch(opts, repoUrl)
-	} else if hasArg && !hasFlag {
+	} else if hasArg && !hasFlag || opts.RepoFlag {
 		repoUrl = addArg(opts, repoUrl, branchName)
 	} else if !hasArg && hasFlag {
 		repoUrl = addFlag(opts, repoUrl)
