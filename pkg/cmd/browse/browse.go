@@ -39,7 +39,6 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -71,13 +70,19 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 				- by path for opening folders and files, e.g. "cmd/gh/main.go"
 			`),
 			"help:environment": heredoc.Doc(`
-				To configure a web browser other than the default, use the BROWSER environment variable 
+				To configure a web browser other than the default, use the BROWSER environment variable. 
 			`),
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.BaseRepo = f.BaseRepo
 			opts.FlagAmount = cmd.Flags().NFlag()
-			if opts.FlagAmount > 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("accepts 1 flag, %d flag(s) were recieved", opts.FlagAmount)}
+
+			if opts.FlagAmount > 2 {
+				return &cmdutil.FlagError{Err: fmt.Errorf("cannot have more than two flags, %d were recieved", opts.FlagAmount)}
+			}
+
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride == "" && opts.FlagAmount > 1 {
+				return &cmdutil.FlagError{Err: fmt.Errorf("these two flags are incompatible, see below for instructions")}
 			}
 
 			if len(args) > 0 {
@@ -104,14 +109,14 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to determine base repository: %w\n%s", err, help)
 	}
 
-	httpClient, _ := opts.HttpClient()
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("unable to create an http client: %w\n%s", err, help)
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-	// if err != nil { TODO resolve errors related to using this with tests
+	// if err != nil { //TODO resolve errors related to using this with tests
 	// 	return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
 	// }
 
@@ -166,6 +171,9 @@ func addArg(opts *BrowseOptions, url string, branchName string) string {
 		fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
 	} else {
 		arr := parseFileArg(opts)
+		// if err != nil {
+
+		// }
 		if len(arr) > 1 {
 			url += "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
 		} else {
