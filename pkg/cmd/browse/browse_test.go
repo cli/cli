@@ -16,20 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type args struct {
-	repo ghrepo.Interface
-	cli  string
-}
-type testCase struct {
-	name           string
-	args           args
-	errorExpected  bool
-	stdoutExpected string
-	stderrExpected string
-	urlExpected    string
-}
-
-func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
+func runCommand(rt http.RoundTripper, repo ghrepo.Interface, cli string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 
 	browser := &cmdutil.TestBrowser{}
@@ -41,13 +28,13 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
-			return t.args.repo, nil
+			return repo, nil
 		},
 	}
 
 	cmd := NewCmdBrowse(factory)
 
-	argv, err := shlex.Split(t.args.cli)
+	argv, err := shlex.Split(cli)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +52,20 @@ func runCommand(rt http.RoundTripper, t testCase) (*test.CmdOut, error) {
 	}, err
 }
 func TestNewCmdBrowse(t *testing.T) {
-	var tests = []testCase{
+
+	type args struct {
+		repo ghrepo.Interface
+		cli  string
+	}
+
+	tests := []struct {
+		name           string
+		args           args
+		errorExpected  bool
+		stdoutExpected string
+		stderrExpected string
+		urlExpected    string
+	}{
 		{
 			name: "multiple flag",
 			args: args{
@@ -74,7 +74,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			},
 			errorExpected:  true,
 			stdoutExpected: "",
-			stderrExpected: "accepts 1 flag, 2 flag(s) were recieved",
+			stderrExpected: "these two flags are incompatible, see below for instructions",
 			urlExpected:    "",
 		},
 		{
@@ -131,7 +131,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			_, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 
-			output, err := runCommand(http, tt)
+			output, err := runCommand(http, tt.args.repo, tt.args.cli)
 
 			if tt.errorExpected {
 				assert.Equal(t, err.Error(), tt.stderrExpected)
@@ -141,5 +141,48 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.stdoutExpected, output.OutBuf.String())
 			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
 		})
+	}
+}
+func TestFileArgParsing(t *testing.T) {
+	tests := []struct {
+		name           string
+		arg            string
+		errorExpected  bool
+		fileArg        string
+		lineArg        string
+		stderrExpected string
+	}{
+		{
+			name:          "non line number",
+			arg:           "main.go",
+			errorExpected: false,
+			fileArg:       "main.go",
+		},
+		{
+			name:          "line number",
+			arg:           "main.go:32",
+			errorExpected: false,
+			fileArg:       "main.go",
+			lineArg:       "32",
+		},
+		{
+			name:           "non line number error",
+			arg:            "ma:in.go",
+			errorExpected:  true,
+			stderrExpected: "invalid line number after colon\nUse 'gh browse --help' for more information about browse\n",
+		},
+	}
+	for _, tt := range tests {
+		err, arr := parseFileArg(tt.arg)
+		if tt.errorExpected {
+			assert.Equal(t, err.Error(), tt.stderrExpected)
+		} else {
+			assert.Equal(t, err, nil)
+			if len(arr) > 1 {
+				assert.Equal(t, tt.lineArg, arr[1])
+			}
+			assert.Equal(t, tt.fileArg, arr[0])
+		}
+
 	}
 }
