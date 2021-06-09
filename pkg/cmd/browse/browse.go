@@ -150,7 +150,7 @@ func addBranch(opts *BrowseOptions, url string) (error, string) {
 	if opts.SelectorArg == "" {
 		url += "/tree/" + opts.Branch
 	} else {
-		err, arr := parseFileArg(opts)
+		err, arr := parseFileArg(opts.SelectorArg)
 		if err != nil {
 			return err, url
 		}
@@ -181,7 +181,7 @@ func addArg(opts *BrowseOptions, url string, branchName string) (error, string) 
 		url += "/issues/" + opts.SelectorArg
 		fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
 	} else {
-		err, arr := parseFileArg(opts)
+		err, arr := parseFileArg(opts.SelectorArg)
 		if err != nil {
 			return err, url
 		}
@@ -195,13 +195,13 @@ func addArg(opts *BrowseOptions, url string, branchName string) (error, string) 
 	return nil, url
 }
 
-func parseFileArg(opts *BrowseOptions) (error, []string) {
-	arr := strings.Split(opts.SelectorArg, ":")
+func parseFileArg(fileArg string) (error, []string) {
+	arr := strings.Split(fileArg, ":")
 	if len(arr) > 2 {
 		return fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n"), arr
 	}
 	if len(arr) > 1 && !isNumber(arr[1]) {
-		return fmt.Errorf("nvalid line number after colon\nUse 'gh browse --help' for more information about browse\n"), arr
+		return fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n"), arr
 	}
 	return nil, arr
 }
