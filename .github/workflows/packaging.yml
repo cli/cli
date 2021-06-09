@@ -15,12 +15,8 @@ jobs:
         shell: powershell
         run: |
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-      - name: Parse release version from github reference
-        run: Set-Item -PATH Env:\GITHUB_CLI_VERSION -Value ${{ github.ref }}.substring(1) 
-      - name: Update manifest
+      - name: Update manifest and submit
         shell: powershell
         run: |
-            wingetcreate.exe update --id GitHub.cli --url https://github.com/cli/cli/releases/download/v$env:GITHUB_CLI_VERSION/gh_${env:GITHUB_CLI_VERSION}_windows_amd64.msi --version ${env:GITHUB_CLI_VERSION} --out .\manifest\
-      - name: Submit Pull Request to Winget Pkg
-        shell: powershell
-        run: wingetcreate.exe submit .\manifest\
+            $version = ${{ github.ref }}.Substring(1)
+            wingetcreate.exe update --id GitHub.cli --url https://github.com/cli/cli/releases/download/v${version}/gh_${version}_windows_amd64.msi --version ${version} --out .\manifest\ --submit True --token ${{ secrets.GITHUB_TOKEN }}
