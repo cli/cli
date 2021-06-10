@@ -170,17 +170,6 @@ func TestNewCmdFork(t *testing.T) {
 	}
 }
 
-// TODO try to replace with a Now in the opts
-func stubSince(d time.Duration) func() {
-	originalSince := Since
-	Since = func(t time.Time) time.Duration {
-		return d
-	}
-	return func() {
-		Since = originalSince
-	}
-}
-
 func TestRepoFork(t *testing.T) {
 	forkResult := `{
     "node_id": "123",
@@ -206,9 +195,6 @@ func TestRepoFork(t *testing.T) {
 		wantErr    bool
 		errMsg     string
 	}{
-
-		// TODO i don't like passing since every time, clean that up
-
 		// TODO implicit, override existing remote's protocol with configured protocol
 		{
 			name: "implicit match existing remote's protocol",
@@ -233,7 +219,6 @@ func TestRepoFork(t *testing.T) {
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
 		},
 		{
@@ -252,7 +237,6 @@ func TestRepoFork(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(false)
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n",
 		},
 		{
@@ -275,7 +259,6 @@ func TestRepoFork(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(true)
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
 		},
 		{
@@ -300,7 +283,6 @@ func TestRepoFork(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					httpmock.StringResponse(forkResult))
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Using existing remote origin\n",
 		},
 		{
@@ -318,12 +300,15 @@ func TestRepoFork(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "a git remote named 'origin' already exists",
-			since:   2 * time.Second,
 		},
 		{
 			name: "implicit tty already forked",
 			tty:  true,
-			opts: &ForkOptions{},
+			opts: &ForkOptions{
+				Since: func(t time.Time) time.Duration {
+					return 120 * time.Second
+				},
+			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
@@ -348,7 +333,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
 		},
 		{
@@ -373,7 +357,6 @@ func TestRepoFork(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					httpmock.StringResponse(forkResult))
 			},
-			since: 2 * time.Second,
 		},
 		{
 			name: "implicit nontty remote exists",
@@ -389,11 +372,14 @@ func TestRepoFork(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "a git remote named 'origin' already exists",
-			since:   2 * time.Second,
 		},
 		{
 			name: "implicit nontty already forked",
-			opts: &ForkOptions{},
+			opts: &ForkOptions{
+				Since: func(t time.Time) time.Duration {
+					return 120 * time.Second
+				},
+			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
@@ -417,7 +403,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
-			since: 2 * time.Second,
 		},
 		{
 			name: "implicit nontty no args",
@@ -427,7 +412,6 @@ func TestRepoFork(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					httpmock.StringResponse(forkResult))
 			},
-			since: 2 * time.Second,
 		},
 		{
 			name: "passes git flags",
@@ -446,7 +430,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
 		{
@@ -477,7 +460,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n",
 		},
 		{
@@ -496,7 +478,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
 		{
@@ -514,7 +495,6 @@ func TestRepoFork(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(false)
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n",
 		},
 		{
@@ -536,7 +516,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
-			since:      2 * time.Second,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
 		{
@@ -545,6 +524,9 @@ func TestRepoFork(t *testing.T) {
 			opts: &ForkOptions{
 				Repository:  "OWNER/REPO",
 				PromptClone: true,
+				Since: func(t time.Time) time.Duration {
+					return 120 * time.Second
+				},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -570,12 +552,14 @@ func TestRepoFork(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					httpmock.StringResponse(forkResult))
 			},
-			since: 2 * time.Second,
 		},
 		{
 			name: "repo arg nontty repo already exists",
 			opts: &ForkOptions{
 				Repository: "OWNER/REPO",
+				Since: func(t time.Time) time.Duration {
+					return 120 * time.Second
+				},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -589,6 +573,9 @@ func TestRepoFork(t *testing.T) {
 			opts: &ForkOptions{
 				Repository: "OWNER/REPO",
 				Clone:      true,
+				Since: func(t time.Time) time.Duration {
+					return 120 * time.Second
+				},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -616,7 +603,6 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
-			since: 2 * time.Second,
 		},
 	}
 
@@ -675,9 +661,10 @@ func TestRepoFork(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.since > 0 {
-				// TODO hate this
-				defer stubSince(tt.since)()
+			if tt.opts.Since == nil {
+				tt.opts.Since = func(t time.Time) time.Duration {
+					return 2 * time.Second
+				}
 			}
 			defer reg.Verify(t)
 			err := forkRun(tt.opts)

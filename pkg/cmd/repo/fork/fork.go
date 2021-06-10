@@ -30,6 +30,7 @@ type ForkOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
+	Since      func(time.Time) time.Duration
 
 	GitArgs      []string
 	Repository   string
@@ -40,11 +41,6 @@ type ForkOptions struct {
 	RemoteName   string
 	Organization string
 	Rename       bool
-}
-
-// TODO get this into the Options
-var Since = func(t time.Time) time.Duration {
-	return time.Since(t)
 }
 
 // TODO warn about useless flags (--remote, --remote-name) when running from outside a repository
@@ -58,6 +54,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
+		Since:      time.Since,
 	}
 
 	cmd := &cobra.Command{
@@ -189,7 +186,7 @@ func forkRun(opts *ForkOptions) error {
 	// returns the fork repo data even if it already exists -- with no change in status code or
 	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
 	// we assume the fork already existed and report an error.
-	createdAgo := Since(forkedRepo.CreatedAt)
+	createdAgo := opts.Since(forkedRepo.CreatedAt)
 	if createdAgo > time.Minute {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s %s %s\n",
