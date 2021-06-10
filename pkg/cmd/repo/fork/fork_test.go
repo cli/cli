@@ -171,25 +171,28 @@ func TestNewCmdFork(t *testing.T) {
 }
 
 func TestRepoFork(t *testing.T) {
-	forkResult := `{
-    "node_id": "123",
-    "name": "REPO",
-    "clone_url": "https://github.com/someone/repo.git",
-    "created_at": "2011-01-26T19:01:12Z",
-    "owner": {
-      "login": "someone"
-    }
-  }`
+	forkPost := func(reg *httpmock.Registry) {
+		forkResult := `{
+			"node_id": "123",
+			"name": "REPO",
+			"clone_url": "https://github.com/someone/repo.git",
+			"created_at": "2011-01-26T19:01:12Z",
+			"owner": {
+				"login": "someone"
+			}
+		}`
+		reg.Register(
+			httpmock.REST("POST", "repos/OWNER/REPO/forks"),
+			httpmock.StringResponse(forkResult))
+	}
 	tests := []struct {
 		name       string
 		opts       *ForkOptions
-		cfg        func(config.Config)
 		tty        bool
 		httpStubs  func(*httpmock.Registry)
 		execStubs  func(*run.CommandStubber)
 		askStubs   func(*prompt.AskStubber)
 		remotes    []*context.Remote
-		since      time.Duration
 		wantOut    string
 		wantErrOut string
 		wantErr    bool
@@ -211,11 +214,7 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
 			},
@@ -229,11 +228,7 @@ func TestRepoFork(t *testing.T) {
 				Rename:       true,
 				RemoteName:   defaultRemoteName,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(false)
 			},
@@ -247,11 +242,7 @@ func TestRepoFork(t *testing.T) {
 				Rename:       true,
 				RemoteName:   defaultRemoteName,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
@@ -278,11 +269,7 @@ func TestRepoFork(t *testing.T) {
 					Repo:   ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs:  forkPost,
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Using existing remote origin\n",
 		},
 		{
@@ -293,13 +280,9 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: defaultRemoteName,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
-			wantErr: true,
-			errMsg:  "a git remote named 'origin' already exists",
+			httpStubs: forkPost,
+			wantErr:   true,
+			errMsg:    "a git remote named 'origin' already exists",
 		},
 		{
 			name: "implicit tty already forked",
@@ -309,11 +292,7 @@ func TestRepoFork(t *testing.T) {
 					return 120 * time.Second
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs:  forkPost,
 			wantErrOut: "! someone/REPO already exists\n",
 		},
 		{
@@ -324,11 +303,7 @@ func TestRepoFork(t *testing.T) {
 				RemoteName: defaultRemoteName,
 				Rename:     true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
@@ -352,11 +327,7 @@ func TestRepoFork(t *testing.T) {
 					Repo:   ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 		},
 		{
 			name: "implicit nontty remote exists",
@@ -365,13 +336,9 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: defaultRemoteName,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
-			wantErr: true,
-			errMsg:  "a git remote named 'origin' already exists",
+			httpStubs: forkPost,
+			wantErr:   true,
+			errMsg:    "a git remote named 'origin' already exists",
 		},
 		{
 			name: "implicit nontty already forked",
@@ -380,11 +347,7 @@ func TestRepoFork(t *testing.T) {
 					return 120 * time.Second
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs:  forkPost,
 			wantErrOut: "someone/REPO already exists",
 		},
 		{
@@ -394,24 +357,16 @@ func TestRepoFork(t *testing.T) {
 				RemoteName: defaultRemoteName,
 				Rename:     true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 		},
 		{
-			name: "implicit nontty no args",
-			opts: &ForkOptions{},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			name:      "implicit nontty no args",
+			opts:      &ForkOptions{},
+			httpStubs: forkPost,
 		},
 		{
 			name: "passes git flags",
@@ -421,11 +376,7 @@ func TestRepoFork(t *testing.T) {
 				GitArgs:    []string{"--depth", "1"},
 				Clone:      true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
@@ -469,11 +420,7 @@ func TestRepoFork(t *testing.T) {
 				Repository: "https://github.com/OWNER/REPO.git",
 				Clone:      true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
@@ -487,11 +434,7 @@ func TestRepoFork(t *testing.T) {
 				Repository:  "OWNER/REPO",
 				PromptClone: true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(false)
 			},
@@ -504,11 +447,7 @@ func TestRepoFork(t *testing.T) {
 				Repository:  "OWNER/REPO",
 				PromptClone: true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(true)
 			},
@@ -528,11 +467,7 @@ func TestRepoFork(t *testing.T) {
 					return 120 * time.Second
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(true)
 			},
@@ -547,11 +482,7 @@ func TestRepoFork(t *testing.T) {
 			opts: &ForkOptions{
 				Repository: "OWNER/REPO",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 		},
 		{
 			name: "repo arg nontty repo already exists",
@@ -561,11 +492,7 @@ func TestRepoFork(t *testing.T) {
 					return 120 * time.Second
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs:  forkPost,
 			wantErrOut: "someone/REPO already exists",
 		},
 		{
@@ -577,11 +504,7 @@ func TestRepoFork(t *testing.T) {
 					return 120 * time.Second
 				},
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
@@ -594,11 +517,7 @@ func TestRepoFork(t *testing.T) {
 				Repository: "OWNER/REPO",
 				Clone:      true,
 			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StringResponse(forkResult))
-			},
+			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
@@ -626,10 +545,6 @@ func TestRepoFork(t *testing.T) {
 		}
 
 		cfg := config.NewBlankConfig()
-		if tt.cfg != nil {
-			tt.cfg(cfg)
-		}
-
 		tt.opts.Config = func() (config.Config, error) {
 			return cfg, nil
 		}
