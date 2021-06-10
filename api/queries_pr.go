@@ -396,7 +396,7 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
 		gr := PullRequestGraphQL(fields.ToSlice())
-		fragments = fmt.Sprintf("fragment pr on PullRequest{%[1]s}fragment prWithReviews on PullRequest{%[1]s}", gr)
+		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
 		fragments, err = pullRequestFragment(client.http, repo.RepoHost())
