@@ -20,9 +20,9 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	if state.Title != "" {
 		q.Set("title", state.Title)
 	}
-	// We always want to set body, even if it's empty, to prevent the web interface to apply the default
-	// template. Since the user has the option to select a template in the terminal, assume that empty body
-	// here means that the user either skipped it or erased its contents.
+	// We always want to send the body parameter, even if it's empty, to prevent the web interface from
+	// applying the default template. Since the user has the option to select a template in the terminal,
+	// assume that empty body here means that the user either skipped it or erased its contents.
 	q.Set("body", state.Body)
 	if len(state.Assignees) > 0 {
 		q.Set("assignees", strings.Join(state.Assignees, ","))
