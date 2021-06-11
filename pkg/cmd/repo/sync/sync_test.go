@@ -17,6 +17,7 @@ func TestNewCmdSync(t *testing.T) {
 		input    string
 		output   SyncOptions
 		wantsErr bool
+		errMsg   string
 	}{
 		{
 			name:   "no argument",
@@ -69,6 +70,7 @@ func TestNewCmdSync(t *testing.T) {
 			tty:      false,
 			input:    "",
 			wantsErr: true,
+			errMsg:   "`--confirm` required when not running interactively",
 		},
 	}
 	for _, tt := range tests {
@@ -94,6 +96,7 @@ func TestNewCmdSync(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
 				return
 			}
 

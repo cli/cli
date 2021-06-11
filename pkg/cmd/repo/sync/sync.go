@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"regexp"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -13,11 +12,9 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +24,7 @@ type SyncOptions struct {
 	BaseRepo      func() (ghrepo.Interface, error)
 	Remotes       func() (context.Remotes, error)
 	CurrentBranch func() (string, error)
+	Git           gitClient
 	DestArg       string
 	SrcArg        string
 	Branch        string
@@ -41,6 +39,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		BaseRepo:      f.BaseRepo,
 		Remotes:       f.Remotes,
 		CurrentBranch: f.Branch,
+		Git:           &gitExecuter{gitCommand: git.GitCommand},
 	}
 
 	cmd := &cobra.Command{
@@ -202,12 +201,16 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	}
 	remote := remotes[0]
 	branch := opts.Branch
+	git := opts.Git
 
-	_ = executeCmds([][]string{{"git", "fetch", remote.Name, fmt.Sprintf("+refs/heads/%s", branch)}})
+	err = git.Fetch([]string{remote.Name, fmt.Sprintf("+refs/heads/%s", branch)})
+	if err != nil {
+		return err
+	}
 
-	hasLocalBranch := git.HasLocalBranch(branch)
+	hasLocalBranch := git.HasLocalBranch([]string{branch})
 	if hasLocalBranch {
-		fastForward, err := git.IsAncestor(branch, fmt.Sprintf("%s/%s", remote.Name, branch))
+		fastForward, err := git.IsAncestor([]string{branch, fmt.Sprintf("%s/%s", remote.Name, branch)})
 		if err != nil {
 			return err
 		}
@@ -217,38 +220,54 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 		}
 	}
 
-	startBranch, err := opts.CurrentBranch()
-	if err != nil {
-		return err
-	}
-
 	dirtyRepo, err := git.IsDirty()
 	if err != nil {
 		return err
 	}
+	startBranch, err := git.CurrentBranch()
+	if err != nil {
+		return err
+	}
 
-	var cmds [][]string
 	if dirtyRepo {
-		cmds = append(cmds, []string{"git", "stash", "push"})
-	}
-	if startBranch != branch {
-		cmds = append(cmds, []string{"git", "checkout", branch})
-	}
-	if hasLocalBranch {
-		if opts.Force {
-			cmds = append(cmds, []string{"git", "reset", "--hard", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
-		} else {
-			cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
+		err = git.Stash([]string{"push"})
+		if err != nil {
+			return err
 		}
 	}
 	if startBranch != branch {
-		cmds = append(cmds, []string{"git", "checkout", startBranch})
+		err = git.Checkout([]string{branch})
+		if err != nil {
+			return err
+		}
+	}
+	if hasLocalBranch {
+		if opts.Force {
+			err = git.Reset([]string{"--hard", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
+			if err != nil {
+				return err
+			}
+		} else {
+			err = git.Merge([]string{"--ff-only", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if startBranch != branch {
+		err = git.Checkout([]string{startBranch})
+		if err != nil {
+			return err
+		}
 	}
 	if dirtyRepo {
-		cmds = append(cmds, []string{"git", "stash", "pop"})
+		err = git.Stash([]string{"pop"})
+		if err != nil {
+			return err
+		}
 	}
 
-	return executeCmds(cmds)
+	return nil
 }
 
 func syncRemoteRepo(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) error {
@@ -269,18 +288,4 @@ func syncRemoteRepo(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts
 	}
 
 	return err
-}
-
-func executeCmds(cmdQueue [][]string) error {
-	exe, err := safeexec.LookPath("git")
-	if err != nil {
-		return err
-	}
-	for _, args := range cmdQueue {
-		cmd := exec.Command(exe, args[1:]...)
-		if err := run.PrepareCmd(cmd).Run(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
