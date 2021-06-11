@@ -46,15 +46,30 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com no Accept header",
 			args: args{
-				config:     tinyConfig{"example.com:oauth_token": "MYTOKEN"},
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
 				appVersion: "v1.2.3",
 				setAccept:  false,
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
-				"authorization": "",
+				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
 				"accept":        "",
+			},
+			wantStderr: "",
+		},
+		{
+			name: "github.com no authentication token",
+			args: args{
+				config:     tinyConfig{"example.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
+			},
+			host: "github.com",
+			wantHeader: map[string]string{
+				"authorization": "",
+				"user-agent":    "GitHub CLI v1.2.3",
+				"accept":        "application/vnd.github.merge-info-preview+json",
 			},
 			wantStderr: "",
 		},
@@ -63,20 +78,21 @@ func TestNewHTTPClient(t *testing.T) {
 			args: args{
 				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
 				appVersion: "v1.2.3",
-				setAccept:  false,
+				setAccept:  true,
 			},
 			host:     "github.com",
 			envDebug: "api",
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "",
+				"accept":        "application/vnd.github.merge-info-preview+json",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
+				> Accept: application/vnd.github.merge-info-preview+json
 				> Authorization: token ████████████████████
 				> User-Agent: GitHub CLI v1.2.3
 				
