@@ -51,98 +51,113 @@ func runCommand(rt http.RoundTripper, repo ghrepo.Interface, cli string) (*test.
 		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
-func TestNewCmdBrowse(t *testing.T) {
+// func TestNewCmdBrowse(t *testing.T) {
 
-	type args struct {
-		repo ghrepo.Interface
-		cli  string
+// 	type args struct {
+// 		repo ghrepo.Interface
+// 		cli  string
+// 	}
+
+// 	tests := []struct {
+// 		name           string
+// 		args           args
+// 		errorExpected  bool
+// 		stdoutExpected string
+// 		stderrExpected string
+// 		urlExpected    string
+// 	}{
+// 		{
+// 			name: "multiple flag",
+// 			args: args{
+// 				repo: ghrepo.New("jessica", "cli"),
+// 				cli:  "--settings --projects",
+// 			},
+// 			errorExpected:  true,
+// 			stdoutExpected: "",
+// 			stderrExpected: "these two flags are incompatible, see below for instructions",
+// 			urlExpected:    "",
+// 		},
+// 		{
+// 			name: "settings flag",
+// 			args: args{
+// 				repo: ghrepo.New("husrav", "cli"),
+// 				cli:  "--settings",
+// 			},
+// 			errorExpected:  false,
+// 			stdoutExpected: "now opening https://github.com/husrav/cli/settings in browser . . .\n",
+// 			stderrExpected: "",
+// 			urlExpected:    "https://github.com/husrav/cli/settings",
+// 		},
+// 		{
+// 			name: "projects flag",
+// 			args: args{
+// 				repo: ghrepo.New("ben", "cli"),
+// 				cli:  "--projects",
+// 			},
+// 			errorExpected:  false,
+// 			stdoutExpected: "now opening https://github.com/ben/cli/projects in browser . . .\n",
+// 			stderrExpected: "",
+// 			urlExpected:    "https://github.com/ben/cli/projects",
+// 		},
+// 		{
+// 			name: "wiki flag",
+// 			args: args{
+// 				repo: ghrepo.New("thanh", "cli"),
+// 				cli:  "--wiki",
+// 			},
+// 			errorExpected:  false,
+// 			stdoutExpected: "now opening https://github.com/thanh/cli/wiki in browser . . .\n",
+// 			stderrExpected: "",
+// 			urlExpected:    "https://github.com/thanh/cli/wiki",
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			http := &httpmock.Registry{}
+// 			// http.StubRepoInfoResponse(tt.args.repo.RepoHost(), tt.args.repo.RepoName(), "main")
+// 			defer http.Verify(t)
+
+// 			_, cmdTeardown := run.Stub()
+// 			defer cmdTeardown(t)
+
+// 			output, err := runCommand(http, tt.args.repo, tt.args.cli)
+
+// 			if tt.errorExpected {
+// 				assert.Equal(t, err.Error(), tt.stderrExpected)
+// 			} else {
+// 				assert.Equal(t, err, nil)
+// 			}
+// 			assert.Equal(t, tt.stdoutExpected, output.OutBuf.String())
+// 			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
+// 		})
+// 	}
+// }
+
+func TestBrowse(t *testing.T) {
+	tests := []BrowseOptions{
+		{
+
+			BaseRepo   func() (ghrepo.Interface, error)
+			Browser    browser
+			HttpClient func() (*http.Client, error)
+			IO         *iostreams.IOStreams
+
+			FlagAmount  int
+			SelectorArg string
+
+			Branch       string
+			ProjectsFlag bool
+			RepoFlag     bool
+			SettingsFlag bool
+			WikiFlag     bool
+		},
 	}
+	for _,tt range tests {
 
-	tests := []struct {
-		name           string
-		args           args
-		errorExpected  bool
-		stdoutExpected string
-		stderrExpected string
-		urlExpected    string
-	}{
-		{
-			name: "multiple flag",
-			args: args{
-				repo: ghrepo.New("jessica", "cli"),
-				cli:  "--settings --projects",
-			},
-			errorExpected:  true,
-			stdoutExpected: "",
-			stderrExpected: "these two flags are incompatible, see below for instructions",
-			urlExpected:    "",
-		},
-		{
-			name: "settings flag",
-			args: args{
-				repo: ghrepo.New("husrav", "cli"),
-				cli:  "--settings",
-			},
-			errorExpected:  false,
-			stdoutExpected: "now opening https://github.com/husrav/cli/settings in browser . . .\n",
-			stderrExpected: "",
-			urlExpected:    "https://github.com/husrav/cli/settings",
-		},
-		{
-			name: "projects flag",
-			args: args{
-				repo: ghrepo.New("ben", "cli"),
-				cli:  "--projects",
-			},
-			errorExpected:  false,
-			stdoutExpected: "now opening https://github.com/ben/cli/projects in browser . . .\n",
-			stderrExpected: "",
-			urlExpected:    "https://github.com/ben/cli/projects",
-		},
-		{
-			name: "wiki flag",
-			args: args{
-				repo: ghrepo.New("thanh", "cli"),
-				cli:  "--wiki",
-			},
-			errorExpected:  false,
-			stdoutExpected: "now opening https://github.com/thanh/cli/wiki in browser . . .\n",
-			stderrExpected: "",
-			urlExpected:    "https://github.com/thanh/cli/wiki",
-		},
-		// {
-		// 	name: "branch flag",
-		// 	args: args{
-		// 		repo: ghrepo.New("ken", "cli"),
-		// 		cli:  "--branch",
-		// 	},
-		// 	errorExpected:  false,
-		// 	stdoutExpected: "",
-		// 	stderrExpected: "Aa",
-		// 	urlExpected:    "",
-		// },
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			defer http.Verify(t)
-
-			_, cmdTeardown := run.Stub()
-			defer cmdTeardown(t)
-
-			output, err := runCommand(http, tt.args.repo, tt.args.cli)
-
-			if tt.errorExpected {
-				assert.Equal(t, err.Error(), tt.stderrExpected)
-			} else {
-				assert.Equal(t, err, nil)
-			}
-			assert.Equal(t, tt.stdoutExpected, output.OutBuf.String())
-			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
-		})
 	}
 }
+
 func TestFileArgParsing(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -173,7 +188,7 @@ func TestFileArgParsing(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		err, arr := parseFileArg(tt.arg)
+		arr, err := parseFileArg(tt.arg)
 		if tt.errorExpected {
 			assert.Equal(t, err.Error(), tt.stderrExpected)
 		} else {

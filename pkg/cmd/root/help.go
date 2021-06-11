@@ -15,7 +15,6 @@ import (
 func rootUsageFunc(command *cobra.Command) error {
 	command.Printf("Usage:  %s", command.UseLine())
 
-	// make sure commands isn't empty
 	subcommands := command.Commands()
 	if len(subcommands) > 0 {
 		command.Print("\n\nAvailable commands:\n")
