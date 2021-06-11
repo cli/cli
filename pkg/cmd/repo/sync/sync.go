@@ -19,27 +19,25 @@ import (
 )
 
 type SyncOptions struct {
-	HttpClient    func() (*http.Client, error)
-	IO            *iostreams.IOStreams
-	BaseRepo      func() (ghrepo.Interface, error)
-	Remotes       func() (context.Remotes, error)
-	CurrentBranch func() (string, error)
-	Git           gitClient
-	DestArg       string
-	SrcArg        string
-	Branch        string
-	Force         bool
-	SkipConfirm   bool
+	HttpClient  func() (*http.Client, error)
+	IO          *iostreams.IOStreams
+	BaseRepo    func() (ghrepo.Interface, error)
+	Remotes     func() (context.Remotes, error)
+	Git         gitClient
+	DestArg     string
+	SrcArg      string
+	Branch      string
+	Force       bool
+	SkipConfirm bool
 }
 
 func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Command {
 	opts := SyncOptions{
-		HttpClient:    f.HttpClient,
-		IO:            f.IOStreams,
-		BaseRepo:      f.BaseRepo,
-		Remotes:       f.Remotes,
-		CurrentBranch: f.Branch,
-		Git:           &gitExecuter{gitCommand: git.GitCommand},
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		BaseRepo:   f.BaseRepo,
+		Remotes:    f.Remotes,
+		Git:        &gitExecuter{gitCommand: git.GitCommand},
 	}
 
 	cmd := &cobra.Command{
