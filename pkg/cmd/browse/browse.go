@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -45,8 +46,8 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Long:  "Open the GitHub repository in the web browser.",
 		Short: "Open the repository in the browser",
-		Use:   "browse {<number> | <path>}",
-		Args:  cobra.RangeArgs(0, 1),
+		Use:   "browse [<number> | <path>]",
+		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			$ gh browse
 			#=> Open the home page of the current repository
@@ -116,52 +117,51 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to create an http client: %w\nUse 'gh browse --help' for more information about browse\n", err)
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-	// if err != nil { //TODO resolve errors related to using this with tests
-	// 	return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
-	// }
-
 	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
 
 	hasArg := opts.SelectorArg != ""
 	hasFlag := opts.FlagAmount > 0
 
 	if opts.Branch != "" {
-		err, repoUrl = addBranch(opts, repoUrl)
+		repoUrl, err = addBranch(opts, repoUrl)
 		if err != nil {
 			return err
 		}
 	} else if hasArg && (!hasFlag || opts.RepoFlag) {
-		err, repoUrl = addArg(opts, repoUrl, branchName)
+		apiClient := api.NewClientFromHTTP(httpClient)
+		branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
+		}
+		repoUrl, err = addArg(opts, repoUrl, branchName)
 		if err != nil {
 			return err
 		}
 	} else if !hasArg && hasFlag {
 		repoUrl = addFlag(opts, repoUrl)
 	} else {
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", repoUrl)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(repoUrl))
+		}
 	}
 	opts.Browser.Browse(repoUrl)
 	return nil
 }
 
-func addBranch(opts *BrowseOptions, url string) (error, string) {
+func addBranch(opts *BrowseOptions, url string) (string, error) {
 	if opts.SelectorArg == "" {
 		url += "/tree/" + opts.Branch
 	} else {
-		err, arr := parseFileArg(opts.SelectorArg)
+		arr, err := parseFileArg(opts.SelectorArg)
 		if err != nil {
-			return err, url
+			return url, err
 		}
-		if len(arr) > 1 {
-			url += "/tree/" + opts.Branch + "/" + arr[0] + "#L" + arr[1]
-		} else {
-			url += "/tree/" + opts.Branch + "/" + arr[0]
-		}
+		url += parsedUrl(arr, opts.Branch)
 	}
-	fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-	return nil, url
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
+	}
+	return url, nil
 }
 
 func addFlag(opts *BrowseOptions, url string) string {
@@ -172,38 +172,50 @@ func addFlag(opts *BrowseOptions, url string) string {
 	} else if opts.WikiFlag {
 		url += "/wiki"
 	}
-	fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
+	}
 	return url
 }
 
-func addArg(opts *BrowseOptions, url string, branchName string) (error, string) {
+func addArg(opts *BrowseOptions, url string, branchName string) (string, error) {
 	if isNumber(opts.SelectorArg) {
 		url += "/issues/" + opts.SelectorArg
-		fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
+		}
 	} else {
-		err, arr := parseFileArg(opts.SelectorArg)
+		arr, err := parseFileArg(opts.SelectorArg)
 		if err != nil {
-			return err, url
+			return url, err
 		}
-		if len(arr) > 1 {
-			url += "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
-		} else {
-			url += "/tree/" + branchName + "/" + arr[0]
+
+		url += parsedUrl(arr, branchName)
+
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
 		}
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
 	}
-	return nil, url
+	return url, nil
 }
 
-func parseFileArg(fileArg string) (error, []string) {
+func parsedUrl(arr []string, branchName string) string {
+	if len(arr) > 1 {
+		return "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
+	} else {
+		return "/tree/" + branchName + "/" + arr[0]
+	}
+}
+
+func parseFileArg(fileArg string) ([]string, error) {
 	arr := strings.Split(fileArg, ":")
 	if len(arr) > 2 {
-		return fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n"), arr
+		return arr, fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
 	}
 	if len(arr) > 1 && !isNumber(arr[1]) {
-		return fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n"), arr
+		return arr, fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
 	}
-	return nil, arr
+	return arr, nil
 }
 
 func isNumber(arg string) bool {
