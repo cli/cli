@@ -216,7 +216,7 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 		}
 
 		if !fastForward && !opts.Force {
-			return fmt.Errorf("can't sync .:%s because there are diverging commits, try using `--force`", branch)
+			return fmt.Errorf("can't sync because there are diverging commits, you can use `--force` to overwrite the commits on .:%s", branch)
 		}
 	}
 
@@ -282,9 +282,9 @@ func syncRemoteRepo(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts
 	err = syncFork(client, destRepo, opts.Branch, commit.Object.SHA, opts.Force)
 	var httpErr api.HTTPError
 	if err != nil && errors.As(err, &httpErr) && notFastForwardErrorMessage.MatchString(httpErr.Message) {
-		return fmt.Errorf("can't sync %s:%s because there are diverging commits, try using `--force`",
-			ghrepo.FullName(destRepo),
-			opts.Branch)
+		destStr := fmt.Sprintf("%s:%s", ghrepo.FullName(destRepo), opts.Branch)
+		return fmt.Errorf("can't sync because there are diverging commits, you can use `--force` to overwrite the commits on %s",
+			destStr)
 	}
 
 	return err
