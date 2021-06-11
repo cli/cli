@@ -1,160 +1,113 @@
 package browse
 
 import (
-	"bytes"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
-	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
-func runCommand(rt http.RoundTripper, repo ghrepo.Interface, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
+func TestNewCmdBrowse(t *testing.T) {
+	f := cmdutil.Factory{}
+	var opts *BrowseOptions
+	// pass a stub implementation of `runBrowse` for testing to avoid having real `runBrowse` called
+	cmd := NewCmdBrowse(&f, func(o *BrowseOptions) error {
+		opts = o
+		return nil
+	})
 
-	browser := &cmdutil.TestBrowser{}
-	factory := &cmdutil.Factory{
-		IOStreams: io,
-		Browser:   browser,
+	cmd.SetArgs([]string{"--branch", "main"})
+	_, err := cmd.ExecuteC()
+	assert.NoError(t, err)
 
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return repo, nil
-		},
-	}
-
-	cmd := NewCmdBrowse(factory)
-
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf:     stdout,
-		ErrBuf:     stderr,
-		BrowsedURL: browser.BrowsedURL(),
-	}, err
+	assert.Equal(t, "main", opts.Branch)
+	assert.Equal(t, "", opts.SelectorArg)
+	assert.Equal(t, false, opts.ProjectsFlag)
+	assert.Equal(t, false, opts.WikiFlag)
+	assert.Equal(t, false, opts.SettingsFlag)
+	assert.Equal(t, 1, opts.FlagAmount)
 }
-// func TestNewCmdBrowse(t *testing.T) {
 
-// 	type args struct {
-// 		repo ghrepo.Interface
-// 		cli  string
-// 	}
-
-// 	tests := []struct {
-// 		name           string
-// 		args           args
-// 		errorExpected  bool
-// 		stdoutExpected string
-// 		stderrExpected string
-// 		urlExpected    string
-// 	}{
-// 		{
-// 			name: "multiple flag",
-// 			args: args{
-// 				repo: ghrepo.New("jessica", "cli"),
-// 				cli:  "--settings --projects",
-// 			},
-// 			errorExpected:  true,
-// 			stdoutExpected: "",
-// 			stderrExpected: "these two flags are incompatible, see below for instructions",
-// 			urlExpected:    "",
-// 		},
-// 		{
-// 			name: "settings flag",
-// 			args: args{
-// 				repo: ghrepo.New("husrav", "cli"),
-// 				cli:  "--settings",
-// 			},
-// 			errorExpected:  false,
-// 			stdoutExpected: "now opening https://github.com/husrav/cli/settings in browser . . .\n",
-// 			stderrExpected: "",
-// 			urlExpected:    "https://github.com/husrav/cli/settings",
-// 		},
-// 		{
-// 			name: "projects flag",
-// 			args: args{
-// 				repo: ghrepo.New("ben", "cli"),
-// 				cli:  "--projects",
-// 			},
-// 			errorExpected:  false,
-// 			stdoutExpected: "now opening https://github.com/ben/cli/projects in browser . . .\n",
-// 			stderrExpected: "",
-// 			urlExpected:    "https://github.com/ben/cli/projects",
-// 		},
-// 		{
-// 			name: "wiki flag",
-// 			args: args{
-// 				repo: ghrepo.New("thanh", "cli"),
-// 				cli:  "--wiki",
-// 			},
-// 			errorExpected:  false,
-// 			stdoutExpected: "now opening https://github.com/thanh/cli/wiki in browser . . .\n",
-// 			stderrExpected: "",
-// 			urlExpected:    "https://github.com/thanh/cli/wiki",
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			http := &httpmock.Registry{}
-// 			// http.StubRepoInfoResponse(tt.args.repo.RepoHost(), tt.args.repo.RepoName(), "main")
-// 			defer http.Verify(t)
-
-// 			_, cmdTeardown := run.Stub()
-// 			defer cmdTeardown(t)
-
-// 			output, err := runCommand(http, tt.args.repo, tt.args.cli)
-
-// 			if tt.errorExpected {
-// 				assert.Equal(t, err.Error(), tt.stderrExpected)
-// 			} else {
-// 				assert.Equal(t, err, nil)
-// 			}
-// 			assert.Equal(t, tt.stdoutExpected, output.OutBuf.String())
-// 			assert.Equal(t, tt.urlExpected, output.BrowsedURL)
-// 		})
-// 	}
-// }
-
-func TestBrowse(t *testing.T) {
-	tests := []BrowseOptions{
+func Test_runBrowse(t *testing.T) {
+	tests := []struct {
+		name          string
+		opts          BrowseOptions
+		baseRepo      ghrepo.Interface
+		defaultBranch string
+		expectedURL   string
+		wantsErr      bool
+	}{
 		{
-
-			BaseRepo   func() (ghrepo.Interface, error)
-			Browser    browser
-			HttpClient func() (*http.Client, error)
-			IO         *iostreams.IOStreams
-
-			FlagAmount  int
-			SelectorArg string
-
-			Branch       string
-			ProjectsFlag bool
-			RepoFlag     bool
-			SettingsFlag bool
-			WikiFlag     bool
+			name: "no arguments",
+			opts: BrowseOptions{
+				SelectorArg: "",
+				FlagAmount:  0,
+			},
+			baseRepo:    ghrepo.New("jessica", "cli"),
+			expectedURL: "https://github.com/jessica/cli",
+		},
+		{
+			name:          "file argument",
+			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
+			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			defaultBranch: "main",
+			expectedURL:   "https://github.com/bchadwic/cli/tree/main/path/to/file.txt",
+		},
+		{
+			name: "branch flag",
+			opts: BrowseOptions{
+				Branch:     "trunk",
+				FlagAmount: 1,
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			expectedURL: "https://github.com/bchadwic/cli/tree/trunk",
+		},
+		{
+			name: "settings flag",
+			opts: BrowseOptions{
+				SettingsFlag: true,
+				FlagAmount:   1,
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			expectedURL: "https://github.com/bchadwic/cli/settings",
 		},
 	}
-	for _,tt range tests {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, stdout, stderr := iostreams.Test()
+			browser := cmdutil.TestBrowser{}
 
+			reg := httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.defaultBranch != "" {
+				reg.StubRepoInfoResponse(tt.baseRepo.RepoOwner(), tt.baseRepo.RepoName(), tt.defaultBranch)
+			}
+
+			opts := tt.opts
+			opts.IO = io
+			opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return tt.baseRepo, nil
+			}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: &reg}, nil
+			}
+			opts.Browser = &browser
+
+			err := runBrowse(&opts)
+			if tt.wantsErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
+			browser.Verify(t, tt.expectedURL)
+		})
 	}
 }
 
@@ -198,6 +151,5 @@ func TestFileArgParsing(t *testing.T) {
 			}
 			assert.Equal(t, tt.fileArg, arr[0])
 		}
-
 	}
 }

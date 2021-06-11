@@ -35,8 +35,7 @@ type BrowseOptions struct {
 	WikiFlag     bool
 }
 
-func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
-
+func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
 		Browser:    f.Browser,
 		HttpClient: f.HttpClient,
@@ -93,6 +92,9 @@ func NewCmdBrowse(f *cmdutil.Factory) *cobra.Command {
 				opts.SelectorArg = args[0]
 			}
 
+			if runF != nil {
+				return runF(opts)
+			}
 			return runBrowse(opts)
 		},
 	}
