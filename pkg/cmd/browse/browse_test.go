@@ -45,23 +45,24 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "",
 			},
-			baseRepo:    ghrepo.New("jessica", "cli"),
-			expectedURL: "https://github.com/jessica/cli",
+			baseRepo:      ghrepo.New("jessica", "cli"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/jessica/cli/tree/trunk/",
 		},
 		{
 			name:          "file argument",
 			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
-			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			baseRepo:      ghrepo.New("ken", "cli"),
 			defaultBranch: "main",
-			expectedURL:   "https://github.com/bchadwic/cli/tree/main/path/to/file.txt",
+			expectedURL:   "https://github.com/ken/cli/tree/main/path/to/file.txt",
 		},
 		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",
 			},
-			baseRepo:    ghrepo.New("bchadwic", "cli"),
-			expectedURL: "https://github.com/bchadwic/cli/tree/trunk",
+			baseRepo:    ghrepo.New("thanh", "cli"),
+			expectedURL: "https://github.com/thanh/cli/tree/trunk/",
 		},
 		{
 			name: "settings flag",
@@ -71,7 +72,32 @@ func Test_runBrowse(t *testing.T) {
 			baseRepo:    ghrepo.New("bchadwic", "cli"),
 			expectedURL: "https://github.com/bchadwic/cli/settings",
 		},
+		{
+			name: "projects flag",
+			opts: BrowseOptions{
+				ProjectsFlag: true,
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			expectedURL: "https://github.com/bchadwic/cli/projects",
+		},
+		{
+			name: "wiki flag",
+			opts: BrowseOptions{
+				WikiFlag: true,
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			expectedURL: "https://github.com/bchadwic/cli/wiki",
+		},
+		{
+			name: "issue argument",
+			opts: BrowseOptions{
+				SelectorArg: "217",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			expectedURL: "https://github.com/bchadwic/cli/issues/217",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
