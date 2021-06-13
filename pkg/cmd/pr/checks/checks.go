@@ -187,6 +187,13 @@ func checksRun(opts *ChecksOptions) error {
 	})
 
 	tp := utils.NewTablePrinter(opts.IO)
+	if isTerminal {
+		tp.AddField("STATUS", nil, nil)
+		tp.AddField("NAME", nil, nil)
+		tp.AddField("ELAPSED", nil, nil)
+		tp.AddField("LINK", nil, nil)
+		tp.EndRow()
+	}
 
 	for _, o := range outputs {
 		if isTerminal {
