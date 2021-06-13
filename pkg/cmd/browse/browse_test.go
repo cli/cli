@@ -29,7 +29,6 @@ func TestNewCmdBrowse(t *testing.T) {
 	assert.Equal(t, false, opts.ProjectsFlag)
 	assert.Equal(t, false, opts.WikiFlag)
 	assert.Equal(t, false, opts.SettingsFlag)
-	assert.Equal(t, 1, opts.FlagAmount)
 }
 
 func Test_runBrowse(t *testing.T) {
@@ -45,7 +44,6 @@ func Test_runBrowse(t *testing.T) {
 			name: "no arguments",
 			opts: BrowseOptions{
 				SelectorArg: "",
-				FlagAmount:  0,
 			},
 			baseRepo:    ghrepo.New("jessica", "cli"),
 			expectedURL: "https://github.com/jessica/cli",
@@ -60,8 +58,7 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "branch flag",
 			opts: BrowseOptions{
-				Branch:     "trunk",
-				FlagAmount: 1,
+				Branch: "trunk",
 			},
 			baseRepo:    ghrepo.New("bchadwic", "cli"),
 			expectedURL: "https://github.com/bchadwic/cli/tree/trunk",
@@ -70,7 +67,6 @@ func Test_runBrowse(t *testing.T) {
 			name: "settings flag",
 			opts: BrowseOptions{
 				SettingsFlag: true,
-				FlagAmount:   1,
 			},
 			baseRepo:    ghrepo.New("bchadwic", "cli"),
 			expectedURL: "https://github.com/bchadwic/cli/settings",

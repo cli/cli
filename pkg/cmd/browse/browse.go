@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +24,6 @@ type BrowseOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	FlagAmount  int
 	SelectorArg string
 
 	Branch       string
@@ -71,25 +69,33 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				- by path for opening folders and files, e.g. "cmd/gh/main.go"
 			`),
 			"help:environment": heredoc.Doc(`
-				To configure a web browser other than the default, use the BROWSER environment variable. 
+				To configure a web browser other than the default, use the BROWSER environment variable.
 			`),
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
-			opts.FlagAmount = cmd.Flags().NFlag()
-
-			if opts.FlagAmount > 2 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("cannot have more than two flags, %d were recieved", opts.FlagAmount)}
-			}
-			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" {
-				opts.RepoFlag = true
-			}
-			if opts.FlagAmount > 1 && !opts.RepoFlag {
-				return &cmdutil.FlagError{Err: fmt.Errorf("these two flags are incompatible, see below for instructions")}
-			}
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			}
+
+			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.SettingsFlag); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.WikiFlag); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.Branch != ""); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("", opts.SettingsFlag, opts.WikiFlag); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("", opts.SettingsFlag, opts.Branch != ""); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("", opts.WikiFlag, opts.Branch != ""); err != nil {
+				return err
 			}
 
 			if runF != nil {
@@ -98,6 +104,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			return runBrowse(opts)
 		},
 	}
+
 	cmdutil.EnableRepoOverride(cmd, f)
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
@@ -119,96 +126,61 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to create an http client: %w\nUse 'gh browse --help' for more information about browse\n", err)
 	}
 
-	repoUrl := ghrepo.GenerateRepoURL(baseRepo, "")
+	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
-	hasArg := opts.SelectorArg != ""
-	hasFlag := opts.FlagAmount > 0
+	if opts.ProjectsFlag {
+		url += "/projects"
+		err := opts.Browser.Browse(url)
+		return err
+	}
+
+	if opts.SettingsFlag {
+		url += "/settings"
+		err := opts.Browser.Browse(url)
+		return err
+	}
+
+	if opts.WikiFlag {
+		url += "/wiki"
+		err := opts.Browser.Browse(url)
+		return err
+	}
+
+	if isNumber(opts.SelectorArg) {
+		url += "/issues/" + opts.SelectorArg
+		err := opts.Browser.Browse(url)
+		return err
+	}
 
 	if opts.Branch != "" {
-		repoUrl, err = addBranch(opts, repoUrl)
-		if err != nil {
-			return err
-		}
-	} else if hasArg && (!hasFlag || opts.RepoFlag) {
+		url += "/tree/" + opts.Branch + "/"
+	} else {
 		apiClient := api.NewClientFromHTTP(httpClient)
 		branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
 		if err != nil {
-			return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(baseRepo), err)
+			return err
 		}
-		repoUrl, err = addArg(opts, repoUrl, branchName)
+		url += "/tree/" + branchName + "/"
+	}
+
+	if opts.SelectorArg != "" {
+		arr, err := parseFileArg(opts.SelectorArg)
 		if err != nil {
 			return err
 		}
-	} else if !hasArg && hasFlag {
-		repoUrl = addFlag(opts, repoUrl)
-	} else {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(repoUrl))
+		if len(arr) > 1 {
+			url += arr[0] + "#L" + arr[1]
+		} else {
+			url += arr[0]
 		}
 	}
-	opts.Browser.Browse(repoUrl)
-	return nil
-}
 
-func addBranch(opts *BrowseOptions, url string) (string, error) {
-	if opts.SelectorArg == "" {
-		url += "/tree/" + opts.Branch
-	} else {
-		arr, err := parseFileArg(opts.SelectorArg)
-		if err != nil {
-			return url, err
-		}
-		url += parsedUrl(arr, opts.Branch)
-	}
-	if opts.IO.IsStdoutTTY() {
+	err = opts.Browser.Browse(url)
+	if opts.IO.IsStdoutTTY() && err == nil {
 		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
 	}
-	return url, nil
+	return err
 }
-
-func addFlag(opts *BrowseOptions, url string) string {
-	if opts.ProjectsFlag {
-		url += "/projects"
-	} else if opts.SettingsFlag {
-		url += "/settings"
-	} else if opts.WikiFlag {
-		url += "/wiki"
-	}
-	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-	}
-	return url
-}
-
-func addArg(opts *BrowseOptions, url string, branchName string) (string, error) {
-	if isNumber(opts.SelectorArg) {
-		url += "/issues/" + opts.SelectorArg
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "now opening issue/pr in browser . . .\n")
-		}
-	} else {
-		arr, err := parseFileArg(opts.SelectorArg)
-		if err != nil {
-			return url, err
-		}
-
-		url += parsedUrl(arr, branchName)
-
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
-		}
-	}
-	return url, nil
-}
-
-func parsedUrl(arr []string, branchName string) string {
-	if len(arr) > 1 {
-		return "/tree/" + branchName + "/" + arr[0] + "#L" + arr[1]
-	} else {
-		return "/tree/" + branchName + "/" + arr[0]
-	}
-}
-
 func parseFileArg(fileArg string) ([]string, error) {
 	arr := strings.Split(fileArg, ":")
 	if len(arr) > 2 {
@@ -217,6 +189,7 @@ func parseFileArg(fileArg string) ([]string, error) {
 	if len(arr) > 1 && !isNumber(arr[1]) {
 		return arr, fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
 	}
+
 	return arr, nil
 }
 
