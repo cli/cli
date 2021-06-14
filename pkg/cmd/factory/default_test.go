@@ -272,10 +272,120 @@ func Test_OverrideBaseRepo(t *testing.T) {
 	}
 }
 
+func Test_ioStreams_pager(t *testing.T) {
+	tests := []struct {
+		name      string
+		env       map[string]string
+		config    config.Config
+		wantPager string
+	}{
+		{
+			name: "GH_PAGER and PAGER set",
+			env: map[string]string{
+				"GH_PAGER": "GH_PAGER",
+				"PAGER":    "PAGER",
+			},
+			wantPager: "GH_PAGER",
+		},
+		{
+			name: "GH_PAGER and config pager set",
+			env: map[string]string{
+				"GH_PAGER": "GH_PAGER",
+			},
+			config:    pagerConfig(),
+			wantPager: "GH_PAGER",
+		},
+		{
+			name: "config pager and PAGER set",
+			env: map[string]string{
+				"PAGER": "PAGER",
+			},
+			config:    pagerConfig(),
+			wantPager: "CONFIG_PAGER",
+		},
+		{
+			name: "only PAGER set",
+			env: map[string]string{
+				"PAGER": "PAGER",
+			},
+			wantPager: "PAGER",
+		},
+		{
+			name: "GH_PAGER set to blank string",
+			env: map[string]string{
+				"GH_PAGER": "",
+				"PAGER":    "PAGER",
+			},
+			wantPager: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, v)
+					if k == "GH_PAGER" {
+						defer os.Unsetenv(k)
+					} else {
+						defer os.Setenv(k, old)
+					}
+				}
+			}
+			f := New("1")
+			if tt.config != nil {
+				f.Config = func() (config.Config, error) {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.wantPager, io.GetPager())
+		})
+	}
+}
+
+func Test_ioStreams_prompt(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         config.Config
+		promptDisabled bool
+	}{
+		{
+			name:           "default config",
+			promptDisabled: false,
+		},
+		{
+			name:           "config with prompt disabled",
+			config:         disablePromptConfig(),
+			promptDisabled: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			if tt.config != nil {
+				f.Config = func() (config.Config, error) {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.promptDisabled, io.GetNeverPrompt())
+		})
+	}
+}
+
 func defaultConfig() config.Config {
 	return config.InheritEnv(config.NewFromString(heredoc.Doc(`
     hosts:
       nonsense.com:
         oauth_token: BLAH
 		`)))
+}
+
+func pagerConfig() config.Config {
+	return config.NewFromString("pager: CONFIG_PAGER")
+}
+
+func disablePromptConfig() config.Config {
+	return config.NewFromString("prompt: disabled")
 }

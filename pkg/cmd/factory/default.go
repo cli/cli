@@ -17,12 +17,12 @@ import (
 
 func New(appVersion string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
-		IOStreams:  iostreams.System(), // No factory dependencies
-		Config:     configFunc(),       // No factory dependencies
-		Branch:     branchFunc(),       // No factory dependencies
-		Executable: executable(),       // No factory dependencies
+		Config:     configFunc(), // No factory dependencies
+		Branch:     branchFunc(), // No factory dependencies
+		Executable: executable(), // No factory dependencies
 	}
 
+	f.IOStreams = ioStreams(f)                   // Depends on Config
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
@@ -124,4 +124,28 @@ func branchFunc() func() (string, error) {
 		}
 		return currentBranch, nil
 	}
+}
+
+func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
+	io := iostreams.System()
+	cfg, err := f.Config()
+	if err != nil {
+		return io
+	}
+
+	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
+		io.SetNeverPrompt(true)
+	}
+
+	// Pager precedence
+	// 1. GH_PAGER
+	// 2. pager from config
+	// 3. PAGER
+	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
+		io.SetPager(ghPager)
+	} else if pager, _ := cfg.Get("", "pager"); pager != "" {
+		io.SetPager(pager)
+	}
+
+	return io
 }
