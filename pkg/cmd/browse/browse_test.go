@@ -110,7 +110,6 @@ func TestNewCmdBrowse(t *testing.T) {
 			if tt.wantsErr {
 				assert.Error(t, err)
 				return
-
 			} else {
 				assert.NoError(t, err)
 			}
