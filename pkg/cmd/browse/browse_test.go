@@ -8,27 +8,121 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCmdBrowse(t *testing.T) {
-	f := cmdutil.Factory{}
-	var opts *BrowseOptions
-	// pass a stub implementation of `runBrowse` for testing to avoid having real `runBrowse` called
-	cmd := NewCmdBrowse(&f, func(o *BrowseOptions) error {
-		opts = o
-		return nil
-	})
+	tests := []struct {
+		name     string
+		cli      string
+		factory  func(*cmdutil.Factory) *cmdutil.Factory
+		wants    BrowseOptions
+		wantsErr bool
+	}{
+		{
+			name:     "no arguments",
+			cli:      "",
+			wantsErr: false,
+		},
+		{
+			name: "settings flag",
+			cli:  "--settings",
+			wants: BrowseOptions{
+				SettingsFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "projects flag",
+			cli:  "--projects",
+			wants: BrowseOptions{
+				ProjectsFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "wiki flag",
+			cli:  "--wiki",
+			wants: BrowseOptions{
+				WikiFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "branch flag",
+			cli:  "--branch main",
+			wants: BrowseOptions{
+				Branch: "main",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "branch flag without a branch name",
+			cli:      "--branch",
+			wantsErr: true,
+		},
+		{
+			name: "combination: settings projects",
+			cli:  "--settings --projects",
+			wants: BrowseOptions{
+				SettingsFlag: true,
+				ProjectsFlag: true,
+			},
+			wantsErr: true,
+		},
+		{
+			name: "combination: projects wiki",
+			cli:  "--projects --wiki",
+			wants: BrowseOptions{
+				ProjectsFlag: true,
+				WikiFlag:     true,
+			},
+			wantsErr: true,
+		},
+		{
+			name: "passed argument",
+			cli:  "main.go",
+			wants: BrowseOptions{
+				SelectorArg: "main.go",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "no arguments",
+			cli:      "",
+			wantsErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := cmdutil.Factory{}
+			var opts *BrowseOptions
+			// pass a stub implementation of `runBrowse` for testing to avoid having real `runBrowse` called
+			cmd := NewCmdBrowse(&f, func(o *BrowseOptions) error {
+				opts = o
+				return nil
+			})
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
 
-	cmd.SetArgs([]string{"--branch", "main"})
-	_, err := cmd.ExecuteC()
-	assert.NoError(t, err)
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
 
-	assert.Equal(t, "main", opts.Branch)
-	assert.Equal(t, "", opts.SelectorArg)
-	assert.Equal(t, false, opts.ProjectsFlag)
-	assert.Equal(t, false, opts.WikiFlag)
-	assert.Equal(t, false, opts.SettingsFlag)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wants.Branch, opts.Branch)
+			assert.Equal(t, tt.wants.SelectorArg, opts.SelectorArg)
+			assert.Equal(t, tt.wants.ProjectsFlag, opts.ProjectsFlag)
+			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
+			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
+		})
+	}
 }
 
 func Test_runBrowse(t *testing.T) {
@@ -95,6 +189,33 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("bchadwic", "cli"),
 			expectedURL: "https://github.com/bchadwic/cli/issues/217",
+		},
+		{
+			name: "file with line argument",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32",
+			},
+			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/cli/tree/trunk/path/to/file.txt#L32",
+		},
+		{
+			name: "file with invalid line number",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32:32",
+			},
+			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			defaultBranch: "trunk",
+			wantsErr:      true,
+		},
+		{
+			name: "file with line argument",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32",
+			},
+			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/cli/tree/trunk/path/to/file.txt#L32",
 		},
 	}
 
