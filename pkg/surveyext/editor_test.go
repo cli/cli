@@ -74,7 +74,7 @@ func Test_GhEditor_Prompt_skip(t *testing.T) {
 	// wait until the prompt is rendered and send the Enter key
 	go func() {
 		pty.WaitForOutput("Body")
-		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch vim, enter to skip] \x1b[0m\x1b[?25l", pty.Output())
+		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch vim, enter to skip] \x1b[0m", normalizeANSI(pty.Output()))
 		pty.ResetOutput()
 		assert.NoError(t, pty.SendKey('\n'))
 	}()
@@ -82,7 +82,7 @@ func Test_GhEditor_Prompt_skip(t *testing.T) {
 	res, err := e.Prompt(defaultPromptConfig())
 	assert.NoError(t, err)
 	assert.Equal(t, "initial value", res)
-	assert.Equal(t, "\x1b[?25h", pty.Output())
+	assert.Equal(t, "", normalizeANSI(pty.Output()))
 }
 
 func Test_GhEditor_Prompt_editorAppend(t *testing.T) {
@@ -105,7 +105,7 @@ func Test_GhEditor_Prompt_editorAppend(t *testing.T) {
 	// wait until the prompt is rendered and send the 'e' key
 	go func() {
 		pty.WaitForOutput("Body")
-		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch vim, enter to skip] \x1b[0m\x1b[?25l", pty.Output())
+		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch vim, enter to skip] \x1b[0m", normalizeANSI(pty.Output()))
 		pty.ResetOutput()
 		assert.NoError(t, pty.SendKey('e'))
 	}()
@@ -113,7 +113,7 @@ func Test_GhEditor_Prompt_editorAppend(t *testing.T) {
 	res, err := e.Prompt(defaultPromptConfig())
 	assert.NoError(t, err)
 	assert.Equal(t, "initial value - added by vim", res)
-	assert.Equal(t, "\x1b[?25h\x1b[?25h", pty.Output())
+	assert.Equal(t, "", normalizeANSI(pty.Output()))
 }
 
 func Test_GhEditor_Prompt_editorTruncate(t *testing.T) {
@@ -136,7 +136,7 @@ func Test_GhEditor_Prompt_editorTruncate(t *testing.T) {
 	// wait until the prompt is rendered and send the 'e' key
 	go func() {
 		pty.WaitForOutput("Body")
-		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch nano, enter to skip] \x1b[0m\x1b[?25l", pty.Output())
+		assert.Equal(t, "\x1b[0G\x1b[2K\x1b[0;1;92m? \x1b[0m\x1b[0;1;99mBody \x1b[0m\x1b[0;36m[(e) to launch nano, enter to skip] \x1b[0m", normalizeANSI(pty.Output()))
 		pty.ResetOutput()
 		assert.NoError(t, pty.SendKey('e'))
 	}()
@@ -144,7 +144,7 @@ func Test_GhEditor_Prompt_editorTruncate(t *testing.T) {
 	res, err := e.Prompt(defaultPromptConfig())
 	assert.NoError(t, err)
 	assert.Equal(t, "", res)
-	assert.Equal(t, "\x1b[?25h\x1b[?25h", pty.Output())
+	assert.Equal(t, "", normalizeANSI(pty.Output()))
 }
 
 // survey doesn't expose this
@@ -274,4 +274,11 @@ func (f *teeWriter) Reset() {
 	f.mu.Lock()
 	f.buf.Reset()
 	f.mu.Unlock()
+}
+
+// strips some ANSI escape sequences that we do not want tests to be concerned with
+func normalizeANSI(t string) string {
+	t = strings.ReplaceAll(t, "\x1b[?25h", "") // strip sequence that shows cursor
+	t = strings.ReplaceAll(t, "\x1b[?25l", "") // strip sequence that hides cursor
+	return t
 }
