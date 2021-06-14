@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/internal/run"
 )
 
+//counterfeiter:generate . gitClient
 type gitClient interface {
 	Checkout([]string) error
 	CurrentBranch() (string, error)
