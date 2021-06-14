@@ -89,16 +89,15 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:     "no arguments",
-			cli:      "",
-			wantsErr: false,
+			name:     "passed two arguments",
+			cli:      "main.go main.go",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := cmdutil.Factory{}
 			var opts *BrowseOptions
-			// pass a stub implementation of `runBrowse` for testing to avoid having real `runBrowse` called
 			cmd := NewCmdBrowse(&f, func(o *BrowseOptions) error {
 				opts = o
 				return nil
@@ -191,7 +190,7 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/cli/issues/217",
 		},
 		{
-			name: "file with line argument",
+			name: "file with line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32",
 			},

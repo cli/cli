@@ -28,7 +28,6 @@ type BrowseOptions struct {
 
 	Branch       string
 	ProjectsFlag bool
-	RepoFlag     bool
 	SettingsFlag bool
 	WikiFlag     bool
 }
@@ -79,22 +78,22 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				opts.SelectorArg = args[0]
 			}
 
-			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.SettingsFlag); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --projects with --settings", opts.ProjectsFlag, opts.SettingsFlag); err != nil {
 				return err
 			}
-			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.WikiFlag); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --projects with --wiki", opts.ProjectsFlag, opts.WikiFlag); err != nil {
 				return err
 			}
-			if err := cmdutil.MutuallyExclusive("", opts.ProjectsFlag, opts.Branch != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --projects with --branch", opts.ProjectsFlag, opts.Branch != ""); err != nil {
 				return err
 			}
-			if err := cmdutil.MutuallyExclusive("", opts.SettingsFlag, opts.WikiFlag); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --settings with --wiki", opts.SettingsFlag, opts.WikiFlag); err != nil {
 				return err
 			}
-			if err := cmdutil.MutuallyExclusive("", opts.SettingsFlag, opts.Branch != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --settings with --branch", opts.SettingsFlag, opts.Branch != ""); err != nil {
 				return err
 			}
-			if err := cmdutil.MutuallyExclusive("", opts.WikiFlag, opts.Branch != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("cannot use --wiki with --branch", opts.WikiFlag, opts.Branch != ""); err != nil {
 				return err
 			}
 
@@ -129,20 +128,17 @@ func runBrowse(opts *BrowseOptions) error {
 	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
 	if opts.ProjectsFlag {
-		url += "/projects"
-		err := opts.Browser.Browse(url)
+		err := opts.Browser.Browse(url + "/projects")
 		return err
 	}
 
 	if opts.SettingsFlag {
-		url += "/settings"
-		err := opts.Browser.Browse(url)
+		err := opts.Browser.Browse(url + "/settings")
 		return err
 	}
 
 	if opts.WikiFlag {
-		url += "/wiki"
-		err := opts.Browser.Browse(url)
+		err := opts.Browser.Browse(url + "/wiki")
 		return err
 	}
 
@@ -177,7 +173,7 @@ func runBrowse(opts *BrowseOptions) error {
 
 	err = opts.Browser.Browse(url)
 	if opts.IO.IsStdoutTTY() && err == nil {
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser . . .\n", url)
+		fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
 	}
 	return err
 }
