@@ -137,83 +137,101 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "",
 			},
-			baseRepo:      ghrepo.New("jessica", "cli"),
-			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/jessica/cli/tree/trunk/",
-		},
-		{
-			name:          "file argument",
-			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
-			baseRepo:      ghrepo.New("ken", "cli"),
-			defaultBranch: "main",
-			expectedURL:   "https://github.com/ken/cli/tree/main/path/to/file.txt",
-		},
-		{
-			name: "branch flag",
-			opts: BrowseOptions{
-				Branch: "trunk",
-			},
-			baseRepo:    ghrepo.New("thanh", "cli"),
-			expectedURL: "https://github.com/thanh/cli/tree/trunk/",
+			baseRepo:    ghrepo.New("jlsestak", "cli"),
+			expectedURL: "https://github.com/jlsestak/cli",
 		},
 		{
 			name: "settings flag",
 			opts: BrowseOptions{
 				SettingsFlag: true,
 			},
-			baseRepo:    ghrepo.New("bchadwic", "cli"),
-			expectedURL: "https://github.com/bchadwic/cli/settings",
+			baseRepo:    ghrepo.New("bchadwic", "ObscuredByClouds"),
+			expectedURL: "https://github.com/bchadwic/ObscuredByClouds/settings",
 		},
 		{
 			name: "projects flag",
 			opts: BrowseOptions{
 				ProjectsFlag: true,
 			},
-			baseRepo:    ghrepo.New("bchadwic", "cli"),
-			expectedURL: "https://github.com/bchadwic/cli/projects",
+			baseRepo:    ghrepo.New("ttran112", "7ate9"),
+			expectedURL: "https://github.com/ttran112/7ate9/projects",
 		},
 		{
 			name: "wiki flag",
 			opts: BrowseOptions{
 				WikiFlag: true,
 			},
-			baseRepo:    ghrepo.New("bchadwic", "cli"),
-			expectedURL: "https://github.com/bchadwic/cli/wiki",
+			baseRepo:    ghrepo.New("ravocean", "ThreatLevelMidnight"),
+			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/wiki",
+		},
+		{
+			name:          "file argument",
+			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
+			baseRepo:      ghrepo.New("ken", "mrprofessor"),
+			defaultBranch: "main",
+			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/path/to/file.txt",
 		},
 		{
 			name: "issue argument",
 			opts: BrowseOptions{
 				SelectorArg: "217",
 			},
-			baseRepo:    ghrepo.New("bchadwic", "cli"),
-			expectedURL: "https://github.com/bchadwic/cli/issues/217",
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/217",
+		},
+		{
+			name: "branch flag",
+			opts: BrowseOptions{
+				Branch: "trunk",
+			},
+			baseRepo:    ghrepo.New("jlsestak", "CouldNotThinkOfARepoName"),
+			expectedURL: "https://github.com/jlsestak/CouldNotThinkOfARepoName/tree/trunk/",
+		},
+		{
+			name: "branch flag with file",
+			opts: BrowseOptions{
+				Branch:      "trunk",
+				SelectorArg: "main.go",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "LedZeppelinIV"),
+			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/main.go",
 		},
 		{
 			name: "file with line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32",
 			},
-			baseRepo:      ghrepo.New("bchadwic", "cli"),
+			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/bchadwic/cli/tree/trunk/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
 		},
 		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32:32",
 			},
-			baseRepo:      ghrepo.New("bchadwic", "cli"),
-			defaultBranch: "trunk",
-			wantsErr:      true,
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
-			name: "file with line argument",
+			name: "branch with issue number",
 			opts: BrowseOptions{
-				SelectorArg: "path/to/file.txt:32",
+				SelectorArg: "217",
+				Branch:      "trunk",
 			},
-			baseRepo:      ghrepo.New("bchadwic", "cli"),
-			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/bchadwic/cli/tree/trunk/path/to/file.txt#L32",
+			baseRepo:    ghrepo.New("ken", "grc"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/ken/grc/issues/217",
+		},
+		{
+			name: "opening branch file with line number",
+			opts: BrowseOptions{
+				Branch:      "first-browse-pull",
+				SelectorArg: "browse.go:32",
+			},
+			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
 		},
 	}
 
