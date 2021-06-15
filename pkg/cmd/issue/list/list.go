@@ -112,9 +112,14 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	issueState := strings.ToLower(opts.State)
+	if issueState == "open" && shared.QueryHasStateClause(opts.Search) {
+		issueState = ""
+	}
+
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
-		State:     strings.ToLower(opts.State),
+		State:     issueState,
 		Assignee:  opts.Assignee,
 		Labels:    opts.Labels,
 		Author:    opts.Author,
@@ -155,8 +160,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		data := api.ExportIssues(listResult.Issues, opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, listResult.Issues, opts.IO.ColorEnabled())
 	}
 
 	if isTerminal {

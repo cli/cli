@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/context"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -224,7 +224,6 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -238,9 +237,6 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
-			},
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
@@ -253,7 +249,6 @@ func Test_commentRun(t *testing.T) {
 				EditSurvey: func() (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -266,7 +261,6 @@ func Test_commentRun(t *testing.T) {
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -280,16 +274,20 @@ func Test_commentRun(t *testing.T) {
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
-		tt.httpStubs(t, reg)
+		if tt.httpStubs != nil {
+			tt.httpStubs(t, reg)
+		}
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-		branch := func() (string, error) { return "", nil }
-		remotes := func() (context.Remotes, error) { return nil, nil }
 
 		tt.input.IO = io
 		tt.input.HttpClient = httpClient
-		tt.input.RetrieveCommentable = retrievePR(httpClient, baseRepo, branch, remotes, "123")
+		tt.input.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
+			return &api.PullRequest{
+				Number: 123,
+				URL:    "https://github.com/OWNER/REPO/pull/123",
+			}, ghrepo.New("OWNER", "REPO"), nil
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
@@ -298,17 +296,6 @@ func Test_commentRun(t *testing.T) {
 			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
-}
-
-func mockPullRequestFromNumber(_ *testing.T, reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/pull/123"
-			} } } }`),
-	)
 }
 
 func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {

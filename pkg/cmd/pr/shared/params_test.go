@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"reflect"
 	"testing"
@@ -149,5 +150,45 @@ func TestMeReplacer_Replace(t *testing.T) {
 				tt.verify(t)
 			}
 		})
+	}
+}
+
+func Test_QueryHasStateClause(t *testing.T) {
+	tests := []struct {
+		searchQuery string
+		hasState    bool
+	}{
+		{
+			searchQuery: "is:closed is:merged",
+			hasState:    true,
+		},
+		{
+			searchQuery: "author:mislav",
+			hasState:    false,
+		},
+		{
+			searchQuery: "assignee:g14a mentions:vilmibm",
+			hasState:    false,
+		},
+		{
+			searchQuery: "merged:>2021-05-20",
+			hasState:    true,
+		},
+		{
+			searchQuery: "state:merged state:open",
+			hasState:    true,
+		},
+		{
+			searchQuery: "assignee:g14a is:closed",
+			hasState:    true,
+		},
+		{
+			searchQuery: "state:closed label:bug",
+			hasState:    true,
+		},
+	}
+	for _, tt := range tests {
+		gotState := QueryHasStateClause(tt.searchQuery)
+		assert.Equal(t, tt.hasState, gotState)
 	}
 }

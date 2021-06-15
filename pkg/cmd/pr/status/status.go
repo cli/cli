@@ -113,13 +113,13 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		data := map[string]interface{}{
 			"currentBranch": nil,
-			"createdBy":     api.ExportPRs(prPayload.ViewerCreated.PullRequests, opts.Exporter.Fields()),
-			"needsReview":   api.ExportPRs(prPayload.ReviewRequested.PullRequests, opts.Exporter.Fields()),
+			"createdBy":     prPayload.ViewerCreated.PullRequests,
+			"needsReview":   prPayload.ReviewRequested.PullRequests,
 		}
 		if prPayload.CurrentPR != nil {
-			data["currentBranch"] = prPayload.CurrentPR.ExportData(opts.Exporter.Fields())
+			data["currentBranch"] = prPayload.CurrentPR
 		}
-		return opts.Exporter.Write(opts.IO.Out, &data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
 	}
 
 	out := opts.IO.Out

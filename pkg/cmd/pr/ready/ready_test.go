@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 	"testing"
 
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -101,23 +99,6 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		},
-		Remotes: func() (context.Remotes, error) {
-			return context.Remotes{
-				{
-					Remote: &git.Remote{Name: "origin"},
-					Repo:   ghrepo.New("OWNER", "REPO"),
-				},
-			}, nil
-		},
-		Branch: func() (string, error) {
-			return "main", nil
-		},
 	}
 
 	cmd := NewCmdReady(factory, nil)
@@ -143,13 +124,13 @@ func TestPRReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"pullRequest": { "id": "THE-ID", "number": 444, "state": "OPEN", "isDraft": true}
-			} } }`),
-	)
+	shared.RunCommandFinder("123", &api.PullRequest{
+		ID:      "THE-ID",
+		Number:  123,
+		State:   "OPEN",
+		IsDraft: true,
+	}, ghrepo.New("OWNER", "REPO"))
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReadyForReview\b`),
 		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
@@ -158,62 +139,42 @@ func TestPRReady(t *testing.T) {
 			}),
 	)
 
-	output, err := runCommand(http, true, "444")
-	if err != nil {
-		t.Fatalf("error running command `pr ready`: %v", err)
-	}
-
-	r := regexp.MustCompile(`Pull request #444 is marked as "ready for review"`)
-
-	if !r.MatchString(output.Stderr()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-	}
+	output, err := runCommand(http, true, "123")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Pull request #123 is marked as \"ready for review\"\n", output.Stderr())
 }
 
 func TestPRReady_alreadyReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"pullRequest": { "number": 445, "state": "OPEN", "isDraft": false}
-			} } }`),
-	)
+	shared.RunCommandFinder("123", &api.PullRequest{
+		ID:      "THE-ID",
+		Number:  123,
+		State:   "OPEN",
+		IsDraft: false,
+	}, ghrepo.New("OWNER", "REPO"))
 
-	output, err := runCommand(http, true, "445")
-	if err != nil {
-		t.Fatalf("error running command `pr ready`: %v", err)
-	}
-
-	r := regexp.MustCompile(`Pull request #445 is already "ready for review"`)
-
-	if !r.MatchString(output.Stderr()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-	}
+	output, err := runCommand(http, true, "123")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request #123 is already \"ready for review\"\n", output.Stderr())
 }
 
 func TestPRReady_closed(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"pullRequest": { "number": 446, "state": "CLOSED", "isDraft": true}
-			} } }`),
-	)
+	shared.RunCommandFinder("123", &api.PullRequest{
+		ID:      "THE-ID",
+		Number:  123,
+		State:   "CLOSED",
+		IsDraft: true,
+	}, ghrepo.New("OWNER", "REPO"))
 
-	output, err := runCommand(http, true, "446")
-	if err == nil {
-		t.Fatalf("expected an error running command `pr ready` on a review that is closed!: %v", err)
-	}
-
-	r := regexp.MustCompile(`Pull request #446 is closed. Only draft pull requests can be marked as "ready for review"`)
-
-	if !r.MatchString(output.Stderr()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-	}
+	output, err := runCommand(http, true, "123")
+	assert.EqualError(t, err, "SilentError")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "X Pull request #123 is closed. Only draft pull requests can be marked as \"ready for review\"\n", output.Stderr())
 }

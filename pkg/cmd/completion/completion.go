@@ -21,7 +21,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 			When installing GitHub CLI through a package manager, it's possible that
 			no additional shell configuration is necessary to gain completion support. For
-			Homebrew, see https://docs.brew.sh/Shell-Completion
+			Homebrew, see <https://docs.brew.sh/Shell-Completion>
 
 			If you need to set up completions manually, follow the instructions below. The exact
 			config file locations might vary based on your system. Make sure to restart your

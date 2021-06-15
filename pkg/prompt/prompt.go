@@ -18,7 +18,7 @@ var Confirm = func(prompt string, result *bool) error {
 		Message: prompt,
 		Default: true,
 	}
-	return survey.AskOne(p, result)
+	return SurveyAskOne(p, result)
 }
 
 var SurveyAskOne = func(p survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
