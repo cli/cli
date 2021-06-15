@@ -281,12 +281,7 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	var pagerCommand string
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		pagerCommand = ghPager
-	} else {
-		pagerCommand = os.Getenv("PAGER")
-	}
+	pagerCommand := os.Getenv("PAGER")
 
 	io := &IOStreams{
 		In:           os.Stdin,

@@ -96,8 +96,9 @@ func mainRun() exitCode {
 	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
 		cmdFactory.IOStreams.SetNeverPrompt(true)
 	}
-
-	if pager, _ := cfg.Get("", "pager"); pager != "" {
+	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
+		cmdFactory.IOStreams.SetPager(ghPager)
+	} else if pager, _ := cfg.Get("", "pager"); pager != "" {
 		cmdFactory.IOStreams.SetPager(pager)
 	}
 
