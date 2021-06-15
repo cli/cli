@@ -138,9 +138,8 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "",
 			},
-			baseRepo:      ghrepo.New("jessica", "cli"),
-			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/jessica/cli/tree/trunk/",
+			baseRepo:    ghrepo.New("jessica", "cli"),
+			expectedURL: "https://github.com/jessica/cli",
 		},
 		{
 			name:          "file argument",
@@ -156,6 +155,15 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("thanh", "cli"),
 			expectedURL: "https://github.com/thanh/cli/tree/trunk/",
+		},
+		{
+			name: "branch flag with file",
+			opts: BrowseOptions{
+				Branch:      "trunk",
+				SelectorArg: "main.go",
+			},
+			baseRepo:    ghrepo.New("thanh", "cli"),
+			expectedURL: "https://github.com/thanh/cli/tree/trunk/main.go",
 		},
 		{
 			name: "settings flag",
@@ -203,9 +211,27 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32:32",
 			},
-			baseRepo:      ghrepo.New("bchadwic", "cli"),
-			defaultBranch: "trunk",
-			wantsErr:      true,
+			baseRepo: ghrepo.New("bchadwic", "cli"),
+			wantsErr: true,
+		},
+		{
+			name: "branch with issue number",
+			opts: BrowseOptions{
+				SelectorArg: "217",
+				Branch:      "trunk",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "cli"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/bchadwic/cli/issues/217",
+		},
+		{
+			name: "opening branch",
+			opts: BrowseOptions{
+				Branch: "first-browse-pull",
+			},
+			baseRepo:    ghrepo.New("ravocean", "cli"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/ravocean/cli/tree/first-browse-pull/",
 		},
 		{
 			name: "file with line argument",
