@@ -158,6 +158,9 @@ func sourceFilesLaterThan(t time.Time) bool {
 			}
 		}
 		if info.IsDir() {
+			if name := filepath.Base(path); name == "vendor" || name == "node_modules" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if path == "go.mod" || path == "go.sum" || (strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go")) {
