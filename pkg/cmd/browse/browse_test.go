@@ -185,8 +185,8 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				Branch: "trunk",
 			},
-			baseRepo:    ghrepo.New("jlsestak", "vegan"),
-			expectedURL: "https://github.com/jlsestak/vegan/tree/trunk/",
+			baseRepo:    ghrepo.New("jlsestak", "CouldNotThinkOfARepoName"),
+			expectedURL: "https://github.com/jlsestak/CouldNotThinkOfARepoName/tree/trunk/",
 		},
 		{
 			name: "branch flag with file",
@@ -225,13 +225,14 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/ken/grc/issues/217",
 		},
 		{
-			name: "opening branch",
+			name: "opening branch file with line number",
 			opts: BrowseOptions{
-				Branch: "first-browse-pull",
+				Branch:      "first-browse-pull",
+				SelectorArg: "browse.go:32",
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/",
+			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
 		},
 	}
 

@@ -105,7 +105,6 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 }
 
 func runBrowse(opts *BrowseOptions) error {
-
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("unable to determine base repository: %w\nUse 'gh browse --help' for more information about browse\n", err)
@@ -115,19 +114,15 @@ func runBrowse(opts *BrowseOptions) error {
 	if err != nil {
 		return fmt.Errorf("unable to create an http client: %w\nUse 'gh browse --help' for more information about browse\n", err)
 	}
-
 	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
 	if opts.SelectorArg == "" {
-
 		if opts.ProjectsFlag {
 			url += "/projects"
 		}
-
 		if opts.SettingsFlag {
 			url += "/settings"
 		}
-
 		if opts.WikiFlag {
 			url += "/wiki"
 		}
@@ -161,6 +156,7 @@ func runBrowse(opts *BrowseOptions) error {
 			}
 		}
 	}
+
 	err = opts.Browser.Browse(url)
 	if opts.IO.IsStdoutTTY() && err == nil {
 		fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
@@ -168,6 +164,7 @@ func runBrowse(opts *BrowseOptions) error {
 
 	return err
 }
+
 func parseFileArg(fileArg string) ([]string, error) {
 	arr := strings.Split(fileArg, ":")
 	if len(arr) > 2 {
@@ -176,7 +173,6 @@ func parseFileArg(fileArg string) ([]string, error) {
 	if len(arr) > 1 && !isNumber(arr[1]) {
 		return arr, fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
 	}
-
 	return arr, nil
 }
 
