@@ -957,6 +957,44 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
 }
 
+func TestMergeRun_autoMerge_directMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeEnable: true,
+		MergeMethod:     PullRequestMergeMethodMerge,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Merged pull request #123 ()\n", stderr.String())
+}
+
 func TestMergeRun_disableAutoMerge(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(true)
