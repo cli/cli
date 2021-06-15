@@ -93,15 +93,6 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
-		cmdFactory.IOStreams.SetNeverPrompt(true)
-	}
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		cmdFactory.IOStreams.SetPager(ghPager)
-	} else if pager, _ := cfg.Get("", "pager"); pager != "" {
-		cmdFactory.IOStreams.SetPager(pager)
-	}
-
 	// TODO: remove after FromFullName has been revisited
 	if host, err := cfg.DefaultHost(); err == nil {
 		ghrepo.SetDefaultHost(host)

@@ -140,6 +140,10 @@ func (s *IOStreams) SetPager(cmd string) {
 	s.pagerCommand = cmd
 }
 
+func (s *IOStreams) GetPager() string {
+	return s.pagerCommand
+}
+
 func (s *IOStreams) StartPager() error {
 	if s.pagerCommand == "" || s.pagerCommand == "cat" || !s.IsStdoutTTY() {
 		return nil
@@ -200,6 +204,10 @@ func (s *IOStreams) CanPrompt() bool {
 	}
 
 	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
+func (s *IOStreams) GetNeverPrompt() bool {
+	return s.neverPrompt
 }
 
 func (s *IOStreams) SetNeverPrompt(v bool) {
@@ -281,8 +289,6 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	pagerCommand := os.Getenv("PAGER")
-
 	io := &IOStreams{
 		In:           os.Stdin,
 		originalOut:  os.Stdout,
@@ -290,7 +296,7 @@ func System() *IOStreams {
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
-		pagerCommand: pagerCommand,
+		pagerCommand: os.Getenv("PAGER"),
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
