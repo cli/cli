@@ -107,12 +107,12 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 func runBrowse(opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("unable to determine base repository: %w\nUse 'gh browse --help' for more information about browse\n", err)
+		return fmt.Errorf("unable to determine base repository: %w\n", err)
 	}
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
-		return fmt.Errorf("unable to create an http client: %w\nUse 'gh browse --help' for more information about browse\n", err)
+		return fmt.Errorf("unable to create an http client: %w\n", err)
 	}
 	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
@@ -133,7 +133,7 @@ func runBrowse(opts *BrowseOptions) error {
 		if isNumber(opts.SelectorArg) {
 			url += "/issues/" + opts.SelectorArg
 		} else {
-			arr, err := parseFileArg(opts.SelectorArg)
+			fileArg, err := parseFileArg(opts.SelectorArg)
 			if err != nil {
 				return err
 			}
@@ -147,33 +147,28 @@ func runBrowse(opts *BrowseOptions) error {
 				}
 				url += "/tree/" + branchName + "/"
 			}
-			if opts.SelectorArg != "" {
-				if len(arr) > 1 {
-					url += arr[0] + "#L" + arr[1]
-				} else {
-					url += arr[0]
-				}
-			}
+			url += fileArg
 		}
 	}
 
-	err = opts.Browser.Browse(url)
-	if opts.IO.IsStdoutTTY() && err == nil {
+	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
 	}
-
-	return err
+	return opts.Browser.Browse(url)
 }
 
-func parseFileArg(fileArg string) ([]string, error) {
+func parseFileArg(fileArg string) (string, error) {
 	arr := strings.Split(fileArg, ":")
 	if len(arr) > 2 {
-		return arr, fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
+		return "", fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
 	}
-	if len(arr) > 1 && !isNumber(arr[1]) {
-		return arr, fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
+	if len(arr) > 1 {
+		if !isNumber(arr[1]) {
+			return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
+		}
+		return arr[0] + "#L" + arr[1], nil
 	}
-	return arr, nil
+	return arr[0], nil
 }
 
 func isNumber(arg string) bool {
