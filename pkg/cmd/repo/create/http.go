@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/cli/cli/internal/ghrepo"
 	"net/http"
 
 	"github.com/cli/cli/api"
@@ -36,7 +35,7 @@ type repoTemplateInput struct {
 }
 
 // repoCreate creates a new GitHub repository
-func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (ghrepo.Interface, error) {
+func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if input.TeamID != "" {
@@ -115,12 +114,11 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 		if err := enc.Encode(input); err != nil {
 			return nil, err
 		}
-		var responseV3 api.RepositoryV3
-		err := apiClient.REST(hostname, "POST", "user/repos", body, &responseV3)
+		repo, err := api.CreateRepoTransformToV4(apiClient, hostname, "POST", "user/repos", body)
 		if err != nil {
 			return nil, err
 		}
-		return api.InitRepoV3Hostname(&responseV3, hostname), nil
+		return api.InitRepoHostname(repo, hostname), nil
 	}
 
 	err := apiClient.GraphQL(hostname, `

@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -503,7 +504,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 	}
 }
 
-func TestRepoCreate_withoutNameArgWithGitIgnoreLicense(t *testing.T) {
+func TestRepoCreate_WithGitIgnoreLicense(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -515,14 +516,6 @@ func TestRepoCreate_withoutNameArgWithGitIgnoreLicense(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:  "repoName",
-			Value: "OWNER/REPO",
-		},
-		{
-			Name:  "repoDescription",
-			Value: "DESCRIPTION",
-		},
-		{
 			Name:  "repoVisibility",
 			Value: "PRIVATE",
 		},
@@ -530,22 +523,22 @@ func TestRepoCreate_withoutNameArgWithGitIgnoreLicense(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:  "addGitIgnoreLicense",
+			Name:  "addGitIgnore",
 			Value: true,
 		},
 	})
 
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:  "gitIgnoreLicense",
-			Value: []string{"license"},
+			Name:  "chooseGitIgnore",
+			Value: "Go",
 		},
 	})
 
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:  "repoLicense",
-			Value: "Apache License 2.0",
+			Name:  "addLicense",
+			Value: false,
 		},
 	})
 
@@ -561,14 +554,14 @@ func TestRepoCreate_withoutNameArgWithGitIgnoreLicense(t *testing.T) {
 		httpmock.REST("GET", "users/OWNER"),
 		httpmock.StringResponse(`{ "node_id": "OWNERID" }`))
 	reg.Register(
-		httpmock.REST("GET", "licenses"),
-		httpmock.StringResponse(`[{"key":"apache-2.0", "name":"Apache License 2.0"}]`))
+		httpmock.REST("GET", "gitignore/templates"),
+		httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
 	reg.Register(
 		httpmock.REST("POST", "user/repos"),
 		httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
 	httpClient := &http.Client{Transport: reg}
 
-	output, err := runCommand(httpClient, "", true)
+	output, err := runCommand(httpClient, "REPO", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -583,12 +576,13 @@ func TestRepoCreate_withoutNameArgWithGitIgnoreLicense(t *testing.T) {
 		LicenseTemplate string
 	}
 
-	if len(reg.Requests) != 3 {
-		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
+	if len(reg.Requests) != 2 {
+		t.Fatalf("expected 2 HTTP request, got %d", len(reg.Requests))
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
 	_ = json.Unmarshal(bodyBytes, &reqBody)
+	fmt.Println(reqBody, "==========")
 	if repoName := reqBody.Name; repoName != "REPO" {
 		t.Errorf("expected %q, got %q", "REPO", repoName)
 	}

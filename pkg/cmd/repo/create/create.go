@@ -94,6 +94,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.Name = args[0]
 			}
 
+			if len(args) == 0 && (opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
+				return &cmdutil.FlagError{Err: errors.New(".gitignore and license templates are added only when a specific repository name is passed")}
+			}
+
 			if !opts.IO.CanPrompt() {
 				if opts.Name == "" {
 					return &cmdutil.FlagError{Err: errors.New("name argument required when not running interactively")}
@@ -192,6 +196,17 @@ func createRun(opts *CreateOptions) error {
 		if newVisibility != "" {
 			visibility = newVisibility
 		}
+
+	} else {
+		// Go for a prompt only if visibility isn't passed
+		if !isVisibilityPassed {
+			newVisibility, err := getVisibility()
+			if err != nil {
+				return nil
+			}
+			visibility = newVisibility
+		}
+
 		httpClient, err := opts.HttpClient()
 		if err != nil {
 			return err
@@ -202,21 +217,20 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		gt, lt, err := interactiveGitIgnoreLicense(api.NewClientFromHTTP(httpClient), host)
-		if err != nil {
-			return err
+		if gitIgnoreTemplate == "" {
+			gt, err := interactiveGitIgnore(api.NewClientFromHTTP(httpClient), host)
+			if err != nil {
+				return err
+			}
+			gitIgnoreTemplate = gt
 		}
 
-		gitIgnoreTemplate = gt
-		repoLicenseTemplate = lt
-	} else {
-		// Go for a prompt only if visibility isn't passed
-		if !isVisibilityPassed {
-			newVisibility, err := getVisibility()
+		if repoLicenseTemplate == "" {
+			lt, err := interactiveLicense(api.NewClientFromHTTP(httpClient), host)
 			if err != nil {
-				return nil
+				return err
 			}
-			visibility = newVisibility
+			repoLicenseTemplate = lt
 		}
 	}
 
@@ -359,109 +373,99 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func interactiveGitIgnoreLicense(client *api.Client, hostname string) (string, string, error) {
+func interactiveGitIgnore(client *api.Client, hostname string) (string, error) {
 
-	var addBoth bool
-	var initialQs []*survey.Question
+	var addGitIgnore bool
+	var addGitIgnoreSurvey []*survey.Question
 
-	addGitIgnoreLicense := &survey.Question{
-		Name: "addGitIgnoreLicense",
+	addGitIgnoreQuestion := &survey.Question{
+		Name: "addGitIgnore",
 		Prompt: &survey.Confirm{
-			Message: "Would you like to add a .gitignore or a license?",
+			Message: "Would you like to add a .gitignore?",
 			Default: false,
 		},
 	}
 
-	initialQs = append(initialQs, addGitIgnoreLicense)
-	err := prompt.SurveyAsk(initialQs, &addBoth)
+	addGitIgnoreSurvey = append(addGitIgnoreSurvey, addGitIgnoreQuestion)
+	err := prompt.SurveyAsk(addGitIgnoreSurvey, &addGitIgnore)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	if addBoth {
-		var addQs []*survey.Question
+	var wantedIgnoreTemplate string
 
-		gitIgnoreLicenseQuestion := &survey.Question{
-			Name: "gitIgnoreLicense",
-			Prompt: &survey.MultiSelect{
-				Message: "What do you want to add?",
-				Options: []string{".gitignore", "license"},
+	if addGitIgnore {
+		var gitIg []*survey.Question
+
+		gitIgnoretemplates, err := ListGitIgnoreTemplates(client, hostname)
+		if err != nil {
+			return "", err
+		}
+		gitIgnoreQuestion := &survey.Question{
+			Name: "chooseGitIgnore",
+			Prompt: &survey.Select{
+				Message: "Choose a .gitignore template",
+				Options: gitIgnoretemplates,
 			},
 		}
-		addQs = append(addQs, gitIgnoreLicenseQuestion)
-
-		var answers []string
-		err = prompt.SurveyAsk(addQs, &answers)
+		gitIg = append(gitIg, gitIgnoreQuestion)
+		err = prompt.SurveyAsk(gitIg, &wantedIgnoreTemplate)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
-
-		wantGitIgnore, wantLicense := false, false
-
-		if len(answers) > 0 {
-			if len(answers) > 1 {
-				wantGitIgnore, wantLicense = answers[0] == ".gitignore", answers[1] == "license"
-			} else if answers[0] == ".gitignore" {
-				wantGitIgnore = true
-			} else if answers[0] == "license" {
-				wantLicense = true
-			}
-
-			qs := []*survey.Question{}
-
-			if wantGitIgnore {
-				gitIgnoretemplates, err := ListGitIgnoreTemplates(client, hostname)
-				if err != nil {
-					fmt.Println(err)
-				}
-				gitIgnoreQuestion := &survey.Question{
-					Name: "repoGitIgnore",
-					Prompt: &survey.Select{
-						Message: "Choose a .gitignore template",
-						Options: gitIgnoretemplates,
-					},
-				}
-				qs = append(qs, gitIgnoreQuestion)
-			}
-
-			licenseKey := map[string]string{}
-
-			if wantLicense {
-				licenseTemplates, err := ListLicenseTemplates(client, hostname)
-				if err != nil {
-					fmt.Println(err)
-				}
-				var licenseNames []string
-				for _, l := range licenseTemplates {
-					licenseNames = append(licenseNames, l.Name)
-					licenseKey[l.Name] = l.Key
-				}
-				licenseQuestion := &survey.Question{
-					Name: "repoLicense",
-					Prompt: &survey.Select{
-						Message: "Choose a license",
-						Options: licenseNames,
-					},
-				}
-				qs = append(qs, licenseQuestion)
-			}
-
-			templateAnswers := struct {
-				RepoGitIgnore string
-				RepoLicense   string
-			}{}
-
-			err = prompt.SurveyAsk(qs, &templateAnswers)
-			if err != nil {
-				return "", "", err
-			}
-			return templateAnswers.RepoGitIgnore, licenseKey[templateAnswers.RepoLicense], nil
-
-		}
-		return "", "", nil
 	}
 
-	return "", "", nil
+	return wantedIgnoreTemplate, nil
+}
+
+func interactiveLicense(client *api.Client, hostname string) (string, error) {
+	var addLicense bool
+	var addLicenseSurvey []*survey.Question
+	var wantedLicense string
+
+	addLicenseQuestion := &survey.Question{
+		Name: "addLicense",
+		Prompt: &survey.Confirm{
+			Message: "Would you like to add a license?",
+			Default: false,
+		},
+	}
+
+	addLicenseSurvey = append(addLicenseSurvey, addLicenseQuestion)
+	err := prompt.SurveyAsk(addLicenseSurvey, &addLicense)
+	if err != nil {
+		return "", err
+	}
+
+	licenseKey := map[string]string{}
+
+	if addLicense {
+		licenseTemplates, err := ListLicenseTemplates(client, hostname)
+		if err != nil {
+			return "", err
+		}
+		var licenseNames []string
+		for _, l := range licenseTemplates {
+			licenseNames = append(licenseNames, l.Name)
+			licenseKey[l.Name] = l.Key
+		}
+		var licenseQs []*survey.Question
+
+		licenseQuestion := &survey.Question{
+			Name: "chooseLicense",
+			Prompt: &survey.Select{
+				Message: "Choose a license",
+				Options: licenseNames,
+			},
+		}
+		licenseQs = append(licenseQs, licenseQuestion)
+		err = prompt.SurveyAsk(licenseQs, &wantedLicense)
+		if err != nil {
+			return "", err
+		}
+		return licenseKey[wantedLicense], nil
+	}
+	return "", nil
 }
 
 func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -439,16 +440,8 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	return repo
 }
 
-func InitRepoV3Hostname(repo *RepositoryV3, hostname string) *RepositoryV3 {
-	repo.hostname = hostname
-	if repo.Parent != nil {
-		repo.Parent.hostname = hostname
-	}
-	return repo
-}
-
 // RepositoryV3 is the repository result from GitHub API v3
-type RepositoryV3 struct {
+type repositoryV3 struct {
 	NodeID    string
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
@@ -457,20 +450,8 @@ type RepositoryV3 struct {
 	}
 	Private  bool
 	HTMLUrl  string `json:"html_url"`
-	Parent   *RepositoryV3
+	Parent   *repositoryV3
 	hostname string
-}
-
-func (r RepositoryV3) RepoOwner() string {
-	return r.Owner.Login
-}
-
-func (r RepositoryV3) RepoHost() string {
-	return r.hostname
-}
-
-func (r RepositoryV3) RepoName() string {
-	return r.Name
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
@@ -488,7 +469,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		return nil, err
 	}
 
-	result := RepositoryV3{}
+	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
 		return nil, err
@@ -1137,4 +1118,24 @@ func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []s
 		return paths, err
 	}
 	return ProjectsToPaths(projects, projectNames)
+}
+
+func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
+	var responsev3 repositoryV3
+	err := apiClient.REST(hostname, method, path, body, &responsev3)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		Name:      responsev3.Name,
+		CreatedAt: responsev3.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: responsev3.Owner.Login,
+		},
+		hostname:  responsev3.hostname,
+		URL:       responsev3.HTMLUrl,
+		IsPrivate: responsev3.Private,
+	}, nil
 }
