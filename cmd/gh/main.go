@@ -169,21 +169,18 @@ func mainRun() exitCode {
 	cs := cmdFactory.IOStreams.ColorScheme()
 
 	if cmd != nil && cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-
 		// Print help only if you explicitly ask for help.
 		lastArgument := expandedArgs[len(expandedArgs)-1]
 		askingForHelp := lastArgument == "--help" || lastArgument == "-h"
 		if askingForHelp {
-			fmt.Fprintln(stderr)
-
-			helpHeading := fmt.Sprintf("Printing help for `%s`...\n", cmd.UseLine())
-			fmt.Fprintf(stderr, cs.Bold(helpHeading))
-
 			cmd.Help()
+			return exitOK
 		}
+
+		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+
 		return exitAuth
 	}
 
