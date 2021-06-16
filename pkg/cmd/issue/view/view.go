@@ -160,6 +160,7 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 		milestoneTitle = issue.Milestone.Title
 	}
 	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
@@ -172,7 +173,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(issue.Title))
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue.State),

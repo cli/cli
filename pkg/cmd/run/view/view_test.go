@@ -927,6 +927,17 @@ func Test_attachRunLog(t *testing.T) {
 			wantMatch: false,
 		},
 		{
+			name: "escape metacharacters in job name",
+			job: shared.Job{
+				Name: "metacharacters .+*?()|[]{}^$ job",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 0,
+				}},
+			},
+			wantMatch: false,
+		},
+		{
 			name: "mismatching job name",
 			job: shared.Job{
 				Name: "mismatch",

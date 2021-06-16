@@ -75,7 +75,7 @@ and talk through which code gets run in order.
 This task might be tricky. Typically, gh commands do things like look up information from the git repository
 in the current directory, query the GitHub API, scan the user's `~/.ssh/config` file, clone or fetch git
 repositories, etc. Naturally, none of these things should ever happen for real when running tests, unless
-you are sure that any filesystem operations are stricly scoped to a location made for and maintained by the
+you are sure that any filesystem operations are strictly scoped to a location made for and maintained by the
 test itself. To avoid actually running things like making real API requests or shelling out to `git`
 commands, we stub them. You should look at how that's done within some existing tests.
 

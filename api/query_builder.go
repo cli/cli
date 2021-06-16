@@ -216,6 +216,8 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, `commits(last:1){nodes{commit{oid}}}`)
 		case "commitsCount": // pseudo-field
 			q = append(q, `commits{totalCount}`)
+		case "requiresStrictStatusChecks": // pseudo-field
+			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
 			q = append(q, StatusCheckRollupGraphQL(""))
 		default:

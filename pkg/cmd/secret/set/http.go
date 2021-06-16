@@ -55,6 +55,11 @@ func getRepoPubKey(client *api.Client, repo ghrepo.Interface) (*PubKey, error) {
 		ghrepo.FullName(repo)))
 }
 
+func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*PubKey, error) {
+	return getPubKey(client, repo.RepoHost(), fmt.Sprintf("repos/%s/environments/%s/secrets/public-key",
+		ghrepo.FullName(repo), envName))
+}
+
 func putSecret(client *api.Client, host, path string, payload SecretPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -88,6 +93,15 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	path := fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, secretName)
 
 	return putSecret(client, host, path, payload)
+}
+
+func putEnvSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, envName string, secretName, eValue string) error {
+	payload := SecretPayload{
+		EncryptedValue: eValue,
+		KeyID:          pk.ID,
+	}
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(repo), envName, secretName)
+	return putSecret(client, repo.RepoHost(), path, payload)
 }
 
 func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string) error {

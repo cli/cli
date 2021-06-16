@@ -33,6 +33,7 @@ type SetOptions struct {
 
 	SecretName      string
 	OrgName         string
+	EnvName         string
 	Body            string
 	Visibility      string
 	RepositoryNames []string
@@ -48,7 +49,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
-		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
+		Long:  "Locally encrypt a new or updated secret at either the repository, environment, or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
 			Paste secret in prompt
 			$ gh secret set MYSECRET
@@ -58,6 +59,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			Use file as secret value
 			$ gh secret set MYSECRET < file.json
+
+			Set environment level secret
+			$ gh secret set MYSECRET -bval --env=anEnv
 
 			Set organization level secret visible to entire organization
 			$ gh secret set MYSECRET -bval --org=anOrg --visibility=all
@@ -74,6 +78,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+				return err
+			}
 
 			opts.SecretName = args[0]
 
@@ -115,7 +123,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			return setRun(opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
@@ -136,6 +145,7 @@ func setRun(opts *SetOptions) error {
 	client := api.NewClientFromHTTP(c)
 
 	orgName := opts.OrgName
+	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
@@ -158,6 +168,8 @@ func setRun(opts *SetOptions) error {
 	var pk *PubKey
 	if orgName != "" {
 		pk, err = getOrgPublicKey(client, host, orgName)
+	} else if envName != "" {
+		pk, err = getEnvPubKey(client, baseRepo, envName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -174,6 +186,8 @@ func setRun(opts *SetOptions) error {
 
 	if orgName != "" {
 		err = putOrgSecret(client, host, pk, *opts, encoded)
+	} else if envName != "" {
+		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
