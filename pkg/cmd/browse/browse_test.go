@@ -271,27 +271,25 @@ func Test_runBrowse(t *testing.T) {
 	}
 }
 
-func TestFileArgParsing(t *testing.T) {
+func Test_parseFileArg(t *testing.T) {
 	tests := []struct {
-		name           string
-		arg            string
-		errorExpected  bool
-		fileArg        string
-		lineArg        string
-		stderrExpected string
+		name            string
+		arg             string
+		errorExpected   bool
+		expectedFileArg string
+		stderrExpected  string
 	}{
 		{
-			name:          "non line number",
-			arg:           "main.go",
-			errorExpected: false,
-			fileArg:       "main.go",
+			name:            "non line number",
+			arg:             "main.go",
+			errorExpected:   false,
+			expectedFileArg: "main.go",
 		},
 		{
-			name:          "line number",
-			arg:           "main.go:32",
-			errorExpected: false,
-			fileArg:       "main.go",
-			lineArg:       "32",
+			name:            "line number",
+			arg:             "main.go:32",
+			errorExpected:   false,
+			expectedFileArg: "main.go#L32",
 		},
 		{
 			name:           "non line number error",
@@ -301,15 +299,12 @@ func TestFileArgParsing(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		arr, err := parseFileArg(tt.arg)
+		fileArg, err := parseFileArg(tt.arg)
 		if tt.errorExpected {
 			assert.Equal(t, err.Error(), tt.stderrExpected)
 		} else {
 			assert.Equal(t, err, nil)
-			if len(arr) > 1 {
-				assert.Equal(t, tt.lineArg, arr[1])
-			}
-			assert.Equal(t, tt.fileArg, arr[0])
+			assert.Equal(t, tt.expectedFileArg, fileArg)
 		}
 	}
 }
