@@ -169,12 +169,6 @@ func mainRun() exitCode {
 			return authError
 		}
 
-		// enable `--repo` override
-		if cmd.Flags().Lookup("repo") != nil {
-			repoOverride, _ := cmd.Flags().GetString("repo")
-			cmdFactory.BaseRepo = cmdutil.OverrideBaseRepoFunc(cmdFactory, repoOverride)
-		}
-
 		return nil
 	}
 
