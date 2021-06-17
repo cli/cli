@@ -168,24 +168,31 @@ func mainRun() exitCode {
 
 	cs := cmdFactory.IOStreams.ColorScheme()
 
-	if cmd != nil && cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-		// Print help only if you explicitly ask for help.
-		lastArgument := expandedArgs[len(expandedArgs)-1]
-		askingForHelp := lastArgument == "--help" || lastArgument == "-h"
-		if askingForHelp {
-			// Even though cmd.Help() returns an error, the error value is
-			// always nil.  The inner function HelpFunc() prints an error
-			// directly if something's wrong with the text template, rather than
-			// returning the error value.
-			cmd.Help()
-			return exitOK
+	authError := errors.New("authError")
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// require that the user is authenticated before running most commands
+		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
+			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
+			fmt.Fprintln(stderr)
+			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+			return authError
 		}
 
-		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+		// enable `--repo` override
+		if cmd.Flags().Lookup("repo") != nil {
+			repoOverride, _ := cmd.Flags().GetString("repo")
+			if repoFromEnv := os.Getenv("GH_REPO"); repoOverride == "" && repoFromEnv != "" {
+				repoOverride = repoFromEnv
+			}
+			if repoOverride != "" {
+				// FIXME: reimplement the repo override to avoid having to mutate the factory
+				cmdFactory.BaseRepo = func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName(repoOverride)
+				}
+			}
+		}
 
-		return exitAuth
+		return nil
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -199,6 +206,8 @@ func mainRun() exitCode {
 				fmt.Fprint(stderr, "\n")
 			}
 			return exitCancel
+		} else if errors.Is(err, authError) {
+			return exitAuth
 		}
 
 		printError(stderr, err, cmd, hasDebug)
