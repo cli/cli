@@ -9,26 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ActionsOptions struct {
-	IO *iostreams.IOStreams
-}
-
 func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
-	opts := ActionsOptions{
-		IO: f.IOStreams,
-	}
-
 	cmd := &cobra.Command{
 		Use:   "actions",
 		Short: "Learn about working with GitHub actions",
-		Long:  actionsExplainer(nil),
-		Run: func(cmd *cobra.Command, args []string) {
-			actionsRun(opts)
-		},
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},
 	}
+
+	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		cs := f.IOStreams.ColorScheme()
+		fmt.Fprintln(f.IOStreams.Out, actionsExplainer(cs))
+	})
 
 	return cmd
 }
@@ -69,9 +62,4 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 			For more in depth help including examples, see online documentation at:
 			<https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli>
 		`, header, runHeader, workflowHeader)
-}
-
-func actionsRun(opts ActionsOptions) {
-	cs := opts.IO.ColorScheme()
-	fmt.Fprintln(opts.IO.Out, actionsExplainer(cs))
 }
