@@ -248,7 +248,6 @@ func createRun(opts *CreateOptions) error {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	} else {
-		fmt.Println("came inside")
 		host, err := cfg.DefaultHost()
 		if err != nil {
 			return err
