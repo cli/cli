@@ -168,6 +168,8 @@ func setRun(opts *SetOptions) error {
 	var pk *PubKey
 	if orgName != "" {
 		pk, err = getOrgPublicKey(client, host, orgName)
+	} else if envName != "" {
+		pk, err = getEnvPubKey(client, baseRepo, envName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}

@@ -302,10 +302,6 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-
-		if state.Body == "" {
-			state.Body = templateContent
-		}
 	}
 
 	openURL, err = generateCompareURL(*ctx, *state)
