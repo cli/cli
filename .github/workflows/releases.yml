@@ -208,7 +208,7 @@ jobs:
           $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
           iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
 
-          wingetcreate.exe update --id GitHub.cli --url $url --version $version
+          wingetcreate.exe update GitHub.cli --url $url --version $version
           if ($version -Match "-") {
             cat .\manifests\g\GitHub\cli\${version}\*
           } else {
