@@ -107,12 +107,12 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 func runBrowse(opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("unable to determine base repository: %w\n", err)
+		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
-		return fmt.Errorf("unable to create an http client: %w\n", err)
+		return fmt.Errorf("unable to create an http client: %w", err)
 	}
 	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
