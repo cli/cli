@@ -447,7 +447,6 @@ type repositoryV3 struct {
 	CreatedAt time.Time `json:"created_at"`
 	Owner     struct {
 		Login string
-		ID    string
 	}
 	Private  bool
 	HTMLUrl  string `json:"html_url"`
@@ -1133,7 +1132,6 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		CreatedAt: responsev3.CreatedAt,
 		Owner: RepositoryOwner{
 			Login: responsev3.Owner.Login,
-			ID:    responsev3.Owner.ID,
 		},
 		ID:        responsev3.NodeID,
 		hostname:  hostname,
