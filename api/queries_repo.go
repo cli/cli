@@ -448,9 +448,9 @@ type repositoryV3 struct {
 	Owner     struct {
 		Login string
 	}
-	Private  bool
-	HTMLUrl  string `json:"html_url"`
-	Parent   *repositoryV3
+	Private bool
+	HTMLUrl string `json:"html_url"`
+	Parent  *repositoryV3
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
