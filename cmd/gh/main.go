@@ -93,15 +93,6 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
-		cmdFactory.IOStreams.SetNeverPrompt(true)
-	}
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		cmdFactory.IOStreams.SetPager(ghPager)
-	} else if pager, _ := cfg.Get("", "pager"); pager != "" {
-		cmdFactory.IOStreams.SetPager(pager)
-	}
-
 	// TODO: remove after FromFullName has been revisited
 	if host, err := cfg.DefaultHost(); err == nil {
 		ghrepo.SetDefaultHost(host)
@@ -181,15 +172,7 @@ func mainRun() exitCode {
 		// enable `--repo` override
 		if cmd.Flags().Lookup("repo") != nil {
 			repoOverride, _ := cmd.Flags().GetString("repo")
-			if repoFromEnv := os.Getenv("GH_REPO"); repoOverride == "" && repoFromEnv != "" {
-				repoOverride = repoFromEnv
-			}
-			if repoOverride != "" {
-				// FIXME: reimplement the repo override to avoid having to mutate the factory
-				cmdFactory.BaseRepo = func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName(repoOverride)
-				}
-			}
+			cmdFactory.BaseRepo = cmdutil.OverrideBaseRepoFunc(cmdFactory, repoOverride)
 		}
 
 		return nil
