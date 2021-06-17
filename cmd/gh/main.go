@@ -173,6 +173,10 @@ func mainRun() exitCode {
 		lastArgument := expandedArgs[len(expandedArgs)-1]
 		askingForHelp := lastArgument == "--help" || lastArgument == "-h"
 		if askingForHelp {
+			// Even though cmd.Help() returns an error, the error value is
+			// always nil.  The inner function HelpFunc() prints an error
+			// directly if something's wrong with the text template, rather than
+			// returning the error value.
 			cmd.Help()
 			return exitOK
 		}
