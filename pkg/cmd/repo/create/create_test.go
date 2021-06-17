@@ -3,7 +3,6 @@ package create
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -98,6 +97,21 @@ func TestRepoCreate(t *testing.T) {
 			Value: "PRIVATE",
 		},
 	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addGitIgnore",
+			Value: false,
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addLicense",
+			Value: false,
+		},
+	})
+
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmSubmit",
@@ -231,6 +245,21 @@ func TestRepoCreate_org(t *testing.T) {
 			Value: "PRIVATE",
 		},
 	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addGitIgnore",
+			Value: false,
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addLicense",
+			Value: false,
+		},
+	})
+
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmSubmit",
@@ -307,6 +336,21 @@ func TestRepoCreate_orgWithTeam(t *testing.T) {
 			Value: "PRIVATE",
 		},
 	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addGitIgnore",
+			Value: false,
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addLicense",
+			Value: false,
+		},
+	})
+
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirmSubmit",
@@ -460,13 +504,6 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 
 	as.Stub([]*prompt.QuestionStub{
 		{
-			Name:  "addGitIgnoreLicense",
-			Value: false,
-		},
-	})
-
-	as.Stub([]*prompt.QuestionStub{
-		{
 			Name:  "confirmSubmit",
 			Value: true,
 		},
@@ -504,7 +541,7 @@ func TestRepoCreate_withoutNameArg(t *testing.T) {
 	}
 }
 
-func TestRepoCreate_WithGitIgnoreLicense(t *testing.T) {
+func TestRepoCreate_WithGitIgnore(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -561,7 +598,7 @@ func TestRepoCreate_WithGitIgnoreLicense(t *testing.T) {
 		httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
 	httpClient := &http.Client{Transport: reg}
 
-	output, err := runCommand(httpClient, "REPO", true)
+	output, err := runCommand(httpClient, "OWNER/REPO", true)
 	if err != nil {
 		t.Errorf("error running command `repo create`: %v", err)
 	}
@@ -576,13 +613,111 @@ func TestRepoCreate_WithGitIgnoreLicense(t *testing.T) {
 		LicenseTemplate string
 	}
 
-	if len(reg.Requests) != 2 {
-		t.Fatalf("expected 2 HTTP request, got %d", len(reg.Requests))
+	if len(reg.Requests) != 3 {
+		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
 	_ = json.Unmarshal(bodyBytes, &reqBody)
-	fmt.Println(reqBody, "==========")
+	if repoName := reqBody.Name; repoName != "REPO" {
+		t.Errorf("expected %q, got %q", "REPO", repoName)
+	}
+	if repoVisibility := reqBody.Visibility; repoVisibility != "PRIVATE" {
+		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
+	}
+	if ownerId := reqBody.OwnerId; ownerId != "OWNERID" {
+		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
+	}
+}
+
+func TestRepoCreate_WithBothGitIgnoreLicense(t *testing.T) {
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+
+	as, surveyTearDown := prompt.InitAskStubber()
+	defer surveyTearDown()
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "repoVisibility",
+			Value: "PRIVATE",
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addGitIgnore",
+			Value: true,
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "chooseGitIgnore",
+			Value: "Go",
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "addLicense",
+			Value: true,
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "chooseLicense",
+			Value: "GNU Affero General Public License v3.0",
+		},
+	})
+
+	as.Stub([]*prompt.QuestionStub{
+		{
+			Name:  "confirmSubmit",
+			Value: true,
+		},
+	})
+
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.REST("GET", "users/OWNER"),
+		httpmock.StringResponse(`{ "node_id": "OWNERID" }`))
+	reg.Register(
+		httpmock.REST("GET", "gitignore/templates"),
+		httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
+	reg.Register(
+		httpmock.REST("GET", "licenses"),
+		httpmock.StringResponse(`[{"key": "mit","name": "MIT License"},{"key": "lgpl-3.0","name": "GNU Lesser General Public License v3.0"}]`))
+	reg.Register(
+		httpmock.REST("POST", "user/repos"),
+		httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
+	httpClient := &http.Client{Transport: reg}
+
+	output, err := runCommand(httpClient, "OWNER/REPO", true)
+	if err != nil {
+		t.Errorf("error running command `repo create`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+
+	var reqBody struct {
+		Name            string
+		Visibility      string
+		OwnerId         string
+		LicenseTemplate string
+	}
+
+	if len(reg.Requests) != 4 {
+		t.Fatalf("expected 4 HTTP request, got %d", len(reg.Requests))
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[3].Body)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if repoName := reqBody.Name; repoName != "REPO" {
 		t.Errorf("expected %q, got %q", "REPO", repoName)
 	}

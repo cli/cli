@@ -442,11 +442,12 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 
 // RepositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID    string
+	NodeID    string `json:"node_id"`
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
 	Owner     struct {
 		Login string
+		ID    string
 	}
 	Private  bool
 	HTMLUrl  string `json:"html_url"`
@@ -1133,8 +1134,10 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		CreatedAt: responsev3.CreatedAt,
 		Owner: RepositoryOwner{
 			Login: responsev3.Owner.Login,
+			ID:    responsev3.Owner.ID,
 		},
-		hostname:  responsev3.hostname,
+		ID:        responsev3.NodeID,
+		hostname:  hostname,
 		URL:       responsev3.HTMLUrl,
 		IsPrivate: responsev3.Private,
 	}, nil
