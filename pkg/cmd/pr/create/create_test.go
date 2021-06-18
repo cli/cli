@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/create/mocks"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -27,7 +26,6 @@ import (
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,20 +160,15 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-var mockWriterArg = mock.MatchedBy(func(w io.Writer) bool { return true })
-
 /*** LEGACY TESTS ***/
 
-var mockGitClient *mocks.GitClient
+var mockGitClient *gitClientMock
 
 // This function exists to provide access to the `opts.Git` mock for `runCommand` tests. It should be
 // removed after tests are rewritten to exercise `createRun` or other methods directly.
-func runCommandMockGit(t *testing.T) *mocks.GitClient {
+func runCommandMockGit() *gitClientMock {
 	if mockGitClient == nil {
-		mockGitClient = &mocks.GitClient{}
-		if t != nil {
-			mockGitClient.Test(t)
-		}
+		mockGitClient = &gitClientMock{}
 	}
 	return mockGitClient
 }
@@ -221,7 +214,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
-		opts.Git = runCommandMockGit(nil)
+		opts.Git = runCommandMockGit()
 		mockGitClient = nil // avoid reusing the mocked object between runCommand calls
 		return createRun(opts)
 	})
@@ -423,12 +416,16 @@ func TestPRCreate(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	git := runCommandMockGit()
+	git.PushFunc = func(args []string, stdout, stderr io.Writer) error {
+		assert.Equal(t, []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, args)
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body"`)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, len(git.PushCalls()))
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
 }
@@ -470,12 +467,16 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	git := runCommandMockGit()
+	git.PushFunc = func(args []string, stdout, stderr io.Writer) error {
+		assert.Equal(t, []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, args)
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" --no-maintainer-edit`)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, len(git.PushCalls()))
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
 }
@@ -522,12 +523,16 @@ func TestPRCreate_createFork(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(1)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "fork", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	git := runCommandMockGit()
+	git.PushFunc = func(args []string, stdout, stderr io.Writer) error {
+		assert.Equal(t, []string{"--set-upstream", "--progress", "fork", "HEAD:feature"}, args)
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, len(git.PushCalls()))
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
@@ -807,12 +812,16 @@ func TestPRCreate_web(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	git := runCommandMockGit()
+	git.PushFunc = func(args []string, stdout, stderr io.Writer) error {
+		assert.Equal(t, []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, args)
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `--web`)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, len(git.PushCalls()))
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
@@ -880,12 +889,16 @@ func TestPRCreate_webProject(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	git := runCommandMockGit()
+	git.PushFunc = func(args []string, stdout, stderr io.Writer) error {
+		assert.Equal(t, []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, args)
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
 	require.NoError(t, err)
 
+	assert.Equal(t, 1, len(git.PushCalls()))
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)

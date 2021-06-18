@@ -28,7 +28,7 @@ type browser interface {
 	Browse(string) error
 }
 
-//go:generate mockery --name gitClient --structname GitClient
+//go:generate go run github.com/matryer/moq -out create_mocks_test.go . gitClient
 type gitClient interface {
 	Push(args []string, stdout io.Writer, stderr io.Writer) error
 }
