@@ -209,8 +209,6 @@ jobs:
           iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
 
           .\wingetcreate.exe update GitHub.cli --url $url --version $version
-          if ($version -Match "-") {
-            cat .\manifests\g\GitHub\cli\${version}\*
-          } else {
+          if ($version -notmatch "-") {
             .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
           }
