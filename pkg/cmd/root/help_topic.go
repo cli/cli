@@ -6,6 +6,25 @@ import (
 )
 
 var HelpTopics = map[string]map[string]string{
+	"mintty": {
+		"short": "Information about using gh with MinTTY",
+		"long": heredoc.Doc(`
+			MinTTY is the terminal emulator that comes by default with Git
+			for Windows.  It has known issues with gh's ability to prompt a
+			user for input.
+
+			There are a few workarounds to make gh work with MinTTY:
+
+			- Reinstall Git for Windows, checking "Enable experimental support for pseudo consoles".
+
+			- Use a different terminal emulator with Git for Windows like Windows Terminal.
+			  You can run "C:\Program Files\Git\bin\bash.exe" from any terminal emulator to continue
+			  using all of the tooling in Git For Windows without MinTTY.
+
+			- Prefix invocations of gh with winpty, eg: "winpty gh auth login".
+			  NOTE: this can lead to some UI bugs.
+		`),
+	},
 	"environment": {
 		"short": "Environment variables that can be used with gh",
 		"long": heredoc.Doc(`
@@ -45,6 +64,12 @@ var HelpTopics = map[string]map[string]string{
 			GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.
+
+			GH_CONFIG_DIR, XDG_CONFIG_HOME (in order of precedence): the directory where gh will store configuration files.
+
+			XDG_STATE_HOME: the directory where gh will store state files.
+
+			XDG_DATA_HOME: the directory where gh will store data files.
 		`),
 	},
 	"reference": {

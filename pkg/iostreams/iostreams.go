@@ -17,7 +17,7 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/muesli/termenv"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 type IOStreams struct {
@@ -140,6 +140,10 @@ func (s *IOStreams) SetPager(cmd string) {
 	s.pagerCommand = cmd
 }
 
+func (s *IOStreams) GetPager() string {
+	return s.pagerCommand
+}
+
 func (s *IOStreams) StartPager() error {
 	if s.pagerCommand == "" || s.pagerCommand == "cat" || !s.IsStdoutTTY() {
 		return nil
@@ -200,6 +204,10 @@ func (s *IOStreams) CanPrompt() bool {
 	}
 
 	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
+func (s *IOStreams) GetNeverPrompt() bool {
+	return s.neverPrompt
 }
 
 func (s *IOStreams) SetNeverPrompt(v bool) {
@@ -281,13 +289,6 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	var pagerCommand string
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		pagerCommand = ghPager
-	} else {
-		pagerCommand = os.Getenv("PAGER")
-	}
-
 	io := &IOStreams{
 		In:           os.Stdin,
 		originalOut:  os.Stdout,
@@ -295,7 +296,7 @@ func System() *IOStreams {
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
-		pagerCommand: pagerCommand,
+		pagerCommand: os.Getenv("PAGER"),
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -332,7 +333,7 @@ func isCygwinTerminal(w io.Writer) bool {
 
 func terminalSize(w io.Writer) (int, int, error) {
 	if f, isFile := w.(*os.File); isFile {
-		return terminal.GetSize(int(f.Fd()))
+		return term.GetSize(int(f.Fd()))
 	}
 	return 0, 0, fmt.Errorf("%v is not a file", w)
 }

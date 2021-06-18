@@ -12,14 +12,18 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		repoOverride, _ := cmd.Flags().GetString("repo")
-		if repoFromEnv := os.Getenv("GH_REPO"); repoOverride == "" && repoFromEnv != "" {
-			repoOverride = repoFromEnv
-		}
-		if repoOverride != "" {
-			// NOTE: this mutates the factory
-			f.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName(repoOverride)
-			}
+		f.BaseRepo = OverrideBaseRepoFunc(f, repoOverride)
+	}
+}
+
+func OverrideBaseRepoFunc(f *Factory, override string) func() (ghrepo.Interface, error) {
+	if override == "" {
+		override = os.Getenv("GH_REPO")
+	}
+	if override != "" {
+		return func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName(override)
 		}
 	}
+	return f.BaseRepo
 }

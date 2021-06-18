@@ -22,12 +22,15 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const defaultRemoteName = "origin"
+
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
+	Since      func(time.Time) time.Duration
 
 	GitArgs      []string
 	Repository   string
@@ -36,12 +39,13 @@ type ForkOptions struct {
 	PromptClone  bool
 	PromptRemote bool
 	RemoteName   string
+	Organization string
 	Rename       bool
 }
 
-var Since = func(t time.Time) time.Duration {
-	return time.Since(t)
-}
+// TODO warn about useless flags (--remote, --remote-name) when running from outside a repository
+// TODO output over STDOUT not STDERR
+// TODO remote-name has no effect on its own; error that or change behavior
 
 func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Command {
 	opts := &ForkOptions{
@@ -50,6 +54,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
+		Since:      time.Since,
 	}
 
 	cmd := &cobra.Command{
@@ -109,7 +114,8 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
-	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", "origin", "Specify a name for a fork's new remote.")
+	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify a name for a fork's new remote.")
+	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 
 	return cmd
 }
@@ -169,7 +175,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -180,7 +186,7 @@ func forkRun(opts *ForkOptions) error {
 	// returns the fork repo data even if it already exists -- with no change in status code or
 	// anything. We thus check the created time to see if the repo is brand new or not; if it's not,
 	// we assume the fork already existed and report an error.
-	createdAgo := Since(forkedRepo.CreatedAt)
+	createdAgo := opts.Since(forkedRepo.CreatedAt)
 	if createdAgo > time.Minute {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s %s %s\n",

@@ -42,6 +42,7 @@ type CreateOptions struct {
 	Branch     func() (string, error)
 	Browser    browser
 	Git        gitClient
+	Finder     shared.PRFinder
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -113,7 +114,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
 			will automatically get closed when the pull request gets merged.
 
-			By default, users with write access to the base respository can push new commits to the
+			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
@@ -124,6 +125,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Finder = shared.NewFinder(f)
+
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
@@ -227,9 +230,13 @@ func createRun(opts *CreateOptions) (err error) {
 		state.Body = opts.Body
 	}
 
-	existingPR, err := api.PullRequestForBranch(
-		client, ctx.BaseRepo, ctx.BaseBranch, ctx.HeadBranchLabel, []string{"OPEN"})
-	var notFound *api.NotFoundError
+	existingPR, _, err := opts.Finder.Find(shared.FindOptions{
+		Selector:   ctx.HeadBranchLabel,
+		BaseBranch: ctx.BaseBranch,
+		States:     []string{"OPEN"},
+		Fields:     []string{"url"},
+	})
+	var notFound *shared.NotFoundError
 	if err != nil && !errors.As(err, &notFound) {
 		return fmt.Errorf("error checking for existing pull request: %w", err)
 	}
@@ -301,10 +308,6 @@ func createRun(opts *CreateOptions) (err error) {
 		err = shared.BodySurvey(state, templateContent, editorCommand)
 		if err != nil {
 			return
-		}
-
-		if state.Body == "" {
-			state.Body = templateContent
 		}
 	}
 
@@ -681,7 +684,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo)
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)

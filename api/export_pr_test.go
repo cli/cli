@@ -32,6 +32,24 @@ func TestIssue_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			name:   "milestone",
+			fields: []string{"number", "milestone"},
+			inputJSON: heredoc.Doc(`
+				{ "number": 2345, "milestone": {"title": "The next big thing"} }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"milestone": {
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
+					},
+					"number": 2345
+				}
+			`),
+		},
+		{
 			name:   "project cards",
 			fields: []string{"projectCards"},
 			inputJSON: heredoc.Doc(`
@@ -96,10 +114,28 @@ func TestPullRequest_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			name:   "milestone",
+			fields: []string{"number", "milestone"},
+			inputJSON: heredoc.Doc(`
+				{ "number": 2345, "milestone": {"title": "The next big thing"} }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"milestone": {
+						"number": 0,
+						"title": "The next big thing",
+						"description": "",
+						"dueOn": null
+					},
+					"number": 2345
+				}
+			`),
+		},
+		{
 			name:   "status checks",
 			fields: []string{"statusCheckRollup"},
 			inputJSON: heredoc.Doc(`
-				{ "commits": { "nodes": [
+				{ "statusCheckRollup": { "nodes": [
 					{ "commit": { "statusCheckRollup": { "contexts": { "nodes": [
 						{
 							"__typename": "CheckRun",

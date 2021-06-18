@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -115,6 +114,8 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
@@ -169,7 +170,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:   true,
 				Assignees: []string{"monalisa"},
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa&body=",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
@@ -186,7 +187,7 @@ func Test_createRun(t *testing.T) {
 						"viewer": { "login": "MonaLisa" }
 					} }`))
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
@@ -215,7 +216,7 @@ func Test_createRun(t *testing.T) {
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
@@ -422,8 +423,9 @@ func TestIssueCreate_recover(t *testing.T) {
 		},
 	})
 
-	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
+	defer tmpfile.Close()
 
 	state := prShared.IssueMetadataState{
 		Title:  "recovered title",

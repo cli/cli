@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,12 +50,6 @@ func TestNewCmdSet(t *testing.T) {
 		{
 			name:     "multiple names",
 			cli:      "cool_secret good_secret",
-			wantsErr: true,
-		},
-		{
-			name:     "no body, stdin is terminal",
-			cli:      "cool_secret",
-			stdinTTY: true,
 			wantsErr: true,
 		},
 		{
@@ -103,6 +98,17 @@ func TestNewCmdSet(t *testing.T) {
 				Visibility: shared.Private,
 				Body:       "a secret",
 				OrgName:    "",
+			},
+		},
+		{
+			name: "env",
+			cli:  `cool_secret -b"a secret" -eRelease`,
+			wants: SetOptions{
+				SecretName: "cool_secret",
+				Visibility: shared.Private,
+				Body:       "a secret",
+				OrgName:    "",
+				EnvName:    "Release",
 			},
 		},
 		{
@@ -165,6 +171,7 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.Body, gotOpts.Body)
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
+			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
 		})
 	}
@@ -188,6 +195,46 @@ func Test_setRun_repo(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
+		IO:         io,
+		SecretName: "cool_secret",
+		Body:       "a secret",
+		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
+		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+	}
+
+	err := setRun(opts)
+	assert.NoError(t, err)
+
+	reg.Verify(t)
+
+	data, err := ioutil.ReadAll(reg.Requests[1].Body)
+	assert.NoError(t, err)
+	var payload SecretPayload
+	err = json.Unmarshal(data, &payload)
+	assert.NoError(t, err)
+	assert.Equal(t, payload.KeyID, "123")
+	assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+}
+
+func Test_setRun_env(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	reg.Register(httpmock.REST("GET", "repos/owner/repo/environments/development/secrets/public-key"),
+		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+	reg.Register(httpmock.REST("PUT", "repos/owner/repo/environments/development/secrets/cool_secret"), httpmock.StatusStringResponse(201, `{}`))
+
+	io, _, _, _ := iostreams.Test()
+
+	opts := &SetOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		},
+		EnvName:    "development",
 		IO:         io,
 		SecretName: "cool_secret",
 		Body:       "a secret",
@@ -325,4 +372,22 @@ func Test_getBody(t *testing.T) {
 			assert.Equal(t, string(body), tt.want)
 		})
 	}
+}
+
+func Test_getBodyPrompt(t *testing.T) {
+	io, _, _, _ := iostreams.Test()
+
+	io.SetStdinTTY(true)
+	io.SetStdoutTTY(true)
+
+	as, teardown := prompt.InitAskStubber()
+	defer teardown()
+
+	as.StubOne("cool secret")
+
+	body, err := getBody(&SetOptions{
+		IO: io,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, string(body), "cool secret")
 }

@@ -50,8 +50,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
+			List PRs authored by you
+			$ gh pr list --author @me
+
+			List PRs assigned to you
+			$ gh pr list --assignee @me
+
+			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
+
+			List PRs using search syntax
 			$ gh pr list --search "status:success review:required"
+
+			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -105,9 +116,14 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	prState := strings.ToLower(opts.State)
+	if prState == "open" && shared.QueryHasStateClause(opts.Search) {
+		prState = ""
+	}
+
 	filters := shared.FilterOptions{
 		Entity:     "pr",
-		State:      strings.ToLower(opts.State),
+		State:      prState,
 		Author:     opts.Author,
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
@@ -144,8 +160,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		data := api.ExportPRs(listResult.PullRequests, opts.Exporter.Fields())
-		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO.Out, listResult.PullRequests, opts.IO.ColorEnabled())
 	}
 
 	if opts.IO.IsStdoutTTY() {

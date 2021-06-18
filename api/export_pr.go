@@ -11,12 +11,6 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "milestone":
-			if issue.Milestone.Title != "" {
-				data[f] = &issue.Milestone
-			} else {
-				data[f] = nil
-			}
 		case "comments":
 			data[f] = issue.Comments.Nodes
 		case "assignees":
@@ -41,19 +35,36 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 	for _, f := range fields {
 		switch f {
 		case "headRepository":
-			data[f] = map[string]string{"name": pr.HeadRepository.Name}
-		case "milestone":
-			if pr.Milestone.Title != "" {
-				data[f] = &pr.Milestone
-			} else {
-				data[f] = nil
-			}
+			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
-			if n := pr.Commits.Nodes; len(n) > 0 {
+			if n := pr.StatusCheckRollup.Nodes; len(n) > 0 {
 				data[f] = n[0].Commit.StatusCheckRollup.Contexts.Nodes
 			} else {
 				data[f] = nil
 			}
+		case "commits":
+			commits := make([]interface{}, 0, len(pr.Commits.Nodes))
+			for _, c := range pr.Commits.Nodes {
+				commit := c.Commit
+				authors := make([]interface{}, 0, len(commit.Authors.Nodes))
+				for _, author := range commit.Authors.Nodes {
+					authors = append(authors, map[string]interface{}{
+						"name":  author.Name,
+						"email": author.Email,
+						"id":    author.User.ID,
+						"login": author.User.Login,
+					})
+				}
+				commits = append(commits, map[string]interface{}{
+					"oid":             commit.OID,
+					"messageHeadline": commit.MessageHeadline,
+					"messageBody":     commit.MessageBody,
+					"committedDate":   commit.CommittedDate,
+					"authoredDate":    commit.AuthoredDate,
+					"authors":         authors,
+				})
+			}
+			data[f] = commits
 		case "comments":
 			data[f] = pr.Comments.Nodes
 		case "assignees":
@@ -69,10 +80,20 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 		case "reviewRequests":
 			requests := make([]interface{}, 0, len(pr.ReviewRequests.Nodes))
 			for _, req := range pr.ReviewRequests.Nodes {
-				if req.RequestedReviewer.TypeName == "" {
-					continue
+				r := req.RequestedReviewer
+				switch r.TypeName {
+				case "User":
+					requests = append(requests, map[string]string{
+						"__typename": r.TypeName,
+						"login":      r.Login,
+					})
+				case "Team":
+					requests = append(requests, map[string]string{
+						"__typename": r.TypeName,
+						"name":       r.Name,
+						"slug":       r.LoginOrSlug(),
+					})
 				}
-				requests = append(requests, req.RequestedReviewer)
 			}
 			data[f] = &requests
 		default:
@@ -81,22 +102,6 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
-}
-
-func ExportIssues(issues []Issue, fields []string) *[]interface{} {
-	data := make([]interface{}, len(issues))
-	for i, issue := range issues {
-		data[i] = issue.ExportData(fields)
-	}
-	return &data
-}
-
-func ExportPRs(prs []PullRequest, fields []string) *[]interface{} {
-	data := make([]interface{}, len(prs))
-	for i, pr := range prs {
-		data[i] = pr.ExportData(fields)
-	}
 	return &data
 }
 

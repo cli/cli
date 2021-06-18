@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmd/pr/create/mocks"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -266,7 +266,7 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_recover(t *testing.T) {
@@ -274,12 +274,7 @@ func TestPRCreate_recover(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -336,8 +331,9 @@ func TestPRCreate_recover(t *testing.T) {
 		},
 	})
 
-	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
+	defer tmpfile.Close()
 
 	state := prShared.IssueMetadataState{
 		Title:     "recovered title",
@@ -364,12 +360,7 @@ func TestPRCreate_nontty(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes" : [
-			] } } } }`),
-	)
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -406,12 +397,7 @@ func TestPRCreate(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -457,12 +443,7 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -508,12 +489,7 @@ func TestPRCreate_createFork(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 		httpmock.StatusStringResponse(201, `
@@ -577,12 +553,7 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -621,12 +592,7 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -667,12 +633,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -717,12 +678,7 @@ func TestPRCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -823,15 +779,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "url": "https://github.com/OWNER/REPO/pull/123",
-				  "headRefName": "feature",
-					"baseRefName": "master" }
-			] } } } }`),
-	)
+	shared.RunCommandFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
 
 	_, err := runCommand(http, nil, "feature", true, `-t title -b body -H feature`)
 	assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
@@ -867,7 +815,7 @@ func TestPRCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_webLongURL(t *testing.T) {
@@ -940,7 +888,7 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -1054,7 +1002,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main",
 				HeadBranchLabel: "feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1",
 			wantErr: false,
 		},
 		{
@@ -1067,7 +1015,7 @@ func Test_generateCompareURL(t *testing.T) {
 			state: prShared.IssueMetadataState{
 				Labels: []string{"one", "two three"},
 			},
-			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
+			want:    "https://github.com/OWNER/REPO/compare/a...b?body=&expand=1&labels=one%2Ctwo+three",
 			wantErr: false,
 		},
 		{
@@ -1077,7 +1025,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main/trunk",
 				HeadBranchLabel: "owner:feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?body=&expand=1",
 			wantErr: false,
 		},
 	}
