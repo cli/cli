@@ -24,7 +24,6 @@ type mergePayload struct {
 	pullRequestID    string
 	method           PullRequestMergeMethod
 	auto             bool
-	mergeStateStatus string
 	commitSubject    string
 	setCommitSubject bool
 	commitBody       string
@@ -68,7 +67,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(payload.repo.RepoHost()), client)
 
-	if payload.auto && payload.mergeStateStatus == "BLOCKED" {
+	if payload.auto {
 		var mutation struct {
 			EnablePullRequestAutoMerge struct {
 				ClientMutationId string
