@@ -23,14 +23,9 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 }
 
 func actionsExplainer(cs *iostreams.ColorScheme) string {
-	header := "Welcome to GitHub Actions on the command line."
-	runHeader := "Interacting with workflow runs"
-	workflowHeader := "Interacting with workflow files"
-	if cs != nil {
-		header = cs.Bold(header)
-		runHeader = cs.Bold(runHeader)
-		workflowHeader = cs.Bold(workflowHeader)
-	}
+	header := cs.Bold("Welcome to GitHub Actions on the command line.")
+	runHeader := cs.Bold("Interacting with workflow runs")
+	workflowHeader := cs.Bold("Interacting with workflow files")
 
 	return heredoc.Docf(`
 			%s
