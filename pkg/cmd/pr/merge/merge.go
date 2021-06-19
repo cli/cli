@@ -196,6 +196,14 @@ func mergeRun(opts *MergeOptions) error {
 		return cmdutil.SilentError
 	}
 
+	if !opts.AutoMergeEnable && pr.MergeStateStatus == "BLOCKED" {
+		fmt.Fprintf(
+			opts.IO.ErrOut,
+			"%s Merging is blocked. Enable auto-merge to automatically merge it when all requirements are met with: gh pr merge %d --auto\n",
+			cs.FailureIcon(), pr.Number)
+		return cmdutil.SilentError
+	}
+
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 	autoMerge := opts.AutoMergeEnable && pr.MergeStateStatus == "BLOCKED"
