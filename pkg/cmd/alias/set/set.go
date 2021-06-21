@@ -20,7 +20,8 @@ type SetOptions struct {
 	Name      string
 	Expansion string
 	IsShell   bool
-	RootCmd   *cobra.Command
+
+	validCommand func(string) bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -78,10 +79,28 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		`),
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.RootCmd = cmd.Root()
-
 			opts.Name = args[0]
 			opts.Expansion = args[1]
+
+			opts.validCommand = func(args string) bool {
+				split, err := shlex.Split(args)
+				if err != nil {
+					return false
+				}
+
+				rootCmd := cmd.Root()
+				cmd, _, err := rootCmd.Traverse(split)
+				if err == nil && cmd != rootCmd {
+					return true
+				}
+
+				for _, ext := range f.ExtensionManager.List() {
+					if ext.Name() == split[0] {
+						return true
+					}
+				}
+				return false
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -143,11 +162,11 @@ func setRun(opts *SetOptions) error {
 	}
 	isShell = strings.HasPrefix(expansion, "!")
 
-	if validCommand(opts.RootCmd, opts.Name) {
+	if opts.validCommand(opts.Name) {
 		return fmt.Errorf("could not create alias: %q is already a gh command", opts.Name)
 	}
 
-	if !isShell && !validCommand(opts.RootCmd, expansion) {
+	if !isShell && !opts.validCommand(expansion) {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
@@ -171,16 +190,6 @@ func setRun(opts *SetOptions) error {
 	}
 
 	return nil
-}
-
-func validCommand(rootCmd *cobra.Command, expansion string) bool {
-	split, err := shlex.Split(expansion)
-	if err != nil {
-		return false
-	}
-
-	cmd, _, err := rootCmd.Traverse(split)
-	return err == nil && cmd != rootCmd
 }
 
 func getExpansion(opts *SetOptions) (string, error) {
