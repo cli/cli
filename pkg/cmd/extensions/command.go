@@ -4,21 +4,32 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdExtensions(io *iostreams.IOStreams) *cobra.Command {
-	m := NewManager()
+func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
+	m := f.ExtensionManager
+	io := f.IOStreams
 
 	extCmd := cobra.Command{
 		Use:   "extensions",
 		Short: "Manage gh extensions",
+		Long: heredoc.Docf(`
+			GitHub CLI extensions are repositories that provide additional gh commands.
+
+			The name of the extension repository must start with "gh-" and it must contain an
+			executable of the same name. All arguments passed to the %[1]sgh <extname>%[1]s invocation
+			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
+
+			An extension cannot override any of the core gh commands.
+		`, "`"),
 	}
 
 	extCmd.AddCommand(
@@ -31,12 +42,23 @@ func NewCmdExtensions(io *iostreams.IOStreams) *cobra.Command {
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
+				// cs := io.ColorScheme()
+				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
-					name := filepath.Base(c)
-					parts := strings.SplitN(name, "-", 2)
-					fmt.Fprintf(io.Out, "%s %s\n", parts[0], parts[1])
+					var repo string
+					if u, err := git.ParseURL(c.URL()); err == nil {
+						if r, err := ghrepo.FromURL(u); err == nil {
+							repo = ghrepo.FullName(r)
+						}
+					}
+
+					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
+					t.AddField(repo, nil, nil)
+					// TODO: add notice about available update
+					//t.AddField("Update available", nil, cs.Green)
+					t.EndRow()
 				}
-				return nil
+				return t.Render()
 			},
 		},
 		&cobra.Command{
@@ -58,16 +80,48 @@ func NewCmdExtensions(io *iostreams.IOStreams) *cobra.Command {
 				if !strings.HasPrefix(repo.RepoName(), "gh-") {
 					return errors.New("the repository name must start with `gh-`")
 				}
-				protocol := "https" // TODO: respect user's preferred protocol
+				cfg, err := f.Config()
+				if err != nil {
+					return err
+				}
+				protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
 				return m.Install(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
 			},
 		},
+		func() *cobra.Command {
+			var flagAll bool
+			cmd := &cobra.Command{
+				Use:   "upgrade {<name> | --all}",
+				Short: "Upgrade installed extensions",
+				Args: func(cmd *cobra.Command, args []string) error {
+					if len(args) == 0 && !flagAll {
+						return &cmdutil.FlagError{Err: errors.New("must specify an extension to upgrade")}
+					}
+					if len(args) > 0 && flagAll {
+						return &cmdutil.FlagError{Err: errors.New("cannot use `--all` with extension name")}
+					}
+					if len(args) > 1 {
+						return &cmdutil.FlagError{Err: errors.New("too many arguments")}
+					}
+					return nil
+				},
+				RunE: func(cmd *cobra.Command, args []string) error {
+					var name string
+					if len(args) > 0 {
+						name = args[0]
+					}
+					return m.Upgrade(name, io.Out, io.ErrOut)
+				},
+			}
+			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
+			return cmd
+		}(),
 		&cobra.Command{
-			Use:   "upgrade",
-			Short: "Upgrade installed extensions",
-			Args:  cobra.NoArgs,
+			Use:   "remove",
+			Short: "Remove an installed extension",
+			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return m.Upgrade(io.Out, io.ErrOut)
+				return m.Remove(args[0])
 			},
 		},
 	)

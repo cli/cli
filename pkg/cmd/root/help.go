@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -80,7 +79,9 @@ func isRootCmd(command *cobra.Command) bool {
 	return command != nil && !command.HasParent()
 }
 
-func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []string) {
+func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	cs := f.IOStreams.ColorScheme()
+
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
 		nestedSuggestFunc(command, args[1])
 		hasFailed = true
@@ -141,6 +142,16 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 	}
 	if len(additionalCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
+	}
+
+	if isRootCmd(command) {
+		if exts := f.ExtensionManager.List(); len(exts) > 0 {
+			var names []string
+			for _, ext := range exts {
+				names = append(names, ext.Name())
+			}
+			helpEntries = append(helpEntries, helpEntry{"EXTENSION COMMANDS", strings.Join(names, "\n")})
+		}
 	}
 
 	flagUsages := command.LocalFlags().FlagUsages()
