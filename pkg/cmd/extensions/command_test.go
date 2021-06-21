@@ -16,7 +16,9 @@ import (
 
 func TestNewCmdExtensions(t *testing.T) {
 	tempDir := t.TempDir()
+	oldWd, _ := os.Getwd()
 	assert.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	tests := []struct {
 		name         string
