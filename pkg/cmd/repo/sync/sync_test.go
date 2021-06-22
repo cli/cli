@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/repo/sync/syncfakes"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -129,7 +128,7 @@ func Test_SyncRun(t *testing.T) {
 		opts       *SyncOptions
 		remotes    []*context.Remote
 		httpStubs  func(*httpmock.Registry)
-		gitStubs   func(*syncfakes.FakeGitClient)
+		gitStubs   func(*mockGitClient)
 		askStubs   func(*prompt.AskStubber)
 		wantStdout string
 		wantStderr string
@@ -145,6 +144,14 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+			},
 			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
 		},
@@ -158,6 +165,14 @@ func Test_SyncRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
 			askStubs:   stubConfirm,
 			wantStdout: "",
@@ -173,6 +188,14 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+			},
 			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:trunk from OWNER2/REPO2:trunk\n",
 		},
@@ -181,6 +204,14 @@ func Test_SyncRun(t *testing.T) {
 			tty:  true,
 			opts: &SyncOptions{
 				Branch: "test",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/test"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"test"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"test", "origin/test"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/test"}).Return(nil).Once()
 			},
 			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:test from OWNER/REPO:test\n",
@@ -196,9 +227,13 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
-			gitStubs: func(fgc *syncfakes.FakeGitClient) {
-				fgc.HasLocalBranchReturns(true)
-				fgc.IsAncestorReturns(false, nil)
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("Reset", []string{"--hard", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
 			askStubs:   stubConfirm,
 			wantStderr: "! Using --force will cause diverging commits on .:trunk to be discarded\n",
@@ -213,13 +248,55 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
-			gitStubs: func(fgc *syncfakes.FakeGitClient) {
-				fgc.HasLocalBranchReturns(true)
-				fgc.IsAncestorReturns(false, nil)
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
 			},
 			askStubs: stubConfirm,
 			wantErr:  true,
 			errMsg:   "can't sync because there are diverging commits, you can use `--force` to overwrite the commits on .:trunk",
+		},
+		{
+			name: "sync local repo with parent and local changes",
+			tty:  true,
+			opts: &SyncOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(true, nil).Once()
+			},
+			askStubs: stubConfirm,
+			wantErr:  true,
+			errMsg:   "can't sync because there are local changes, please commit or stash them then try again",
+		},
+		{
+			name: "sync local repo with parent not on default branch",
+			tty:  true,
+			opts: &SyncOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("Checkout", []string{"trunk"}).Return(nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+				mgc.On("Checkout", []string{"test"}).Return(nil).Once()
+			},
+			askStubs:   stubConfirm,
+			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
 		},
 		{
 			name: "sync remote fork with parent - tty",
@@ -406,11 +483,7 @@ func Test_SyncRun(t *testing.T) {
 			return tt.remotes, nil
 		}
 
-		var gitClient = &syncfakes.FakeGitClient{}
-		if tt.gitStubs != nil {
-			tt.gitStubs(gitClient)
-		}
-		tt.opts.Git = gitClient
+		tt.opts.Git = newMockGitClient(t, tt.gitStubs)
 
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
@@ -431,4 +504,16 @@ func Test_SyncRun(t *testing.T) {
 			assert.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
+}
+
+func newMockGitClient(t *testing.T, config func(*mockGitClient)) *mockGitClient {
+	m := &mockGitClient{}
+	m.Test(t)
+	t.Cleanup(func() {
+		m.AssertExpectations(t)
+	})
+	if config != nil {
+		config(m)
+	}
+	return m
 }

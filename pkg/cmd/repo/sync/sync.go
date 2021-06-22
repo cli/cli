@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -37,7 +36,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
-		Git:        &gitExecuter{gitCommand: git.GitCommand},
+		Git:        &gitExecuter{},
 	}
 
 	cmd := &cobra.Command{
@@ -222,16 +221,13 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	if err != nil {
 		return err
 	}
+	if dirtyRepo {
+		return fmt.Errorf("can't sync because there are local changes, please commit or stash them then try again")
+	}
+
 	startBranch, err := git.CurrentBranch()
 	if err != nil {
 		return err
-	}
-
-	if dirtyRepo {
-		err = git.Stash([]string{"push"})
-		if err != nil {
-			return err
-		}
 	}
 	if startBranch != branch {
 		err = git.Checkout([]string{branch})
@@ -254,12 +250,6 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	}
 	if startBranch != branch {
 		err = git.Checkout([]string{startBranch})
-		if err != nil {
-			return err
-		}
-	}
-	if dirtyRepo {
-		err = git.Stash([]string{"pop"})
 		if err != nil {
 			return err
 		}
