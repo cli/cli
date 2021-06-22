@@ -74,7 +74,13 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 			sort.Strings(fields)
 			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
 		}
-		return c.Parent().FlagErrorFunc()(c, e)
+		if c.Parent() != nil {
+			return c.Parent().FlagErrorFunc()(c, e)
+		}
+		if e == pflag.ErrHelp {
+			return e
+		}
+		return e
 	})
 }
 
