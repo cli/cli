@@ -159,11 +159,17 @@ func mainRun() exitCode {
 
 	cs := cmdFactory.IOStreams.ColorScheme()
 
-	if cmd != nil && cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-		fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
-		return exitAuth
+	authError := errors.New("authError")
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// require that the user is authenticated before running most commands
+		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
+			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
+			fmt.Fprintln(stderr)
+			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+			return authError
+		}
+
+		return nil
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -177,6 +183,8 @@ func mainRun() exitCode {
 				fmt.Fprint(stderr, "\n")
 			}
 			return exitCancel
+		} else if errors.Is(err, authError) {
+			return exitAuth
 		}
 
 		printError(stderr, err, cmd, hasDebug)
