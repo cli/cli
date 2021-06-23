@@ -7,12 +7,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func executeParentHooks(cmd *cobra.Command, args []string) error {
+	for cmd.HasParent() {
+		cmd = cmd.Parent()
+		if cmd.PersistentPreRunE != nil {
+			return cmd.PersistentPreRunE(cmd, args)
+		}
+	}
+	return nil
+}
+
 func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
 
-	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if err := executeParentHooks(cmd, args); err != nil {
+			return err
+		}
 		repoOverride, _ := cmd.Flags().GetString("repo")
 		f.BaseRepo = OverrideBaseRepoFunc(f, repoOverride)
+		return nil
 	}
 }
 

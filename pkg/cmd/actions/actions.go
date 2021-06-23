@@ -9,39 +9,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ActionsOptions struct {
-	IO *iostreams.IOStreams
-}
-
 func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
-	opts := ActionsOptions{
-		IO: f.IOStreams,
-	}
+	cs := f.IOStreams.ColorScheme()
 
 	cmd := &cobra.Command{
 		Use:   "actions",
 		Short: "Learn about working with GitHub actions",
-		Long:  actionsExplainer(nil),
+		Long:  actionsExplainer(cs),
 		Run: func(cmd *cobra.Command, args []string) {
-			actionsRun(opts)
+			fmt.Fprintln(f.IOStreams.Out, actionsExplainer(cs))
 		},
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},
 	}
 
+	cmdutil.DisableAuthCheck(cmd)
+
 	return cmd
 }
 
 func actionsExplainer(cs *iostreams.ColorScheme) string {
-	header := "Welcome to GitHub Actions on the command line."
-	runHeader := "Interacting with workflow runs"
-	workflowHeader := "Interacting with workflow files"
-	if cs != nil {
-		header = cs.Bold(header)
-		runHeader = cs.Bold(runHeader)
-		workflowHeader = cs.Bold(workflowHeader)
-	}
+	header := cs.Bold("Welcome to GitHub Actions on the command line.")
+	runHeader := cs.Bold("Interacting with workflow runs")
+	workflowHeader := cs.Bold("Interacting with workflow files")
 
 	return heredoc.Docf(`
 			%s
@@ -69,9 +60,4 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 			For more in depth help including examples, see online documentation at:
 			<https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli>
 		`, header, runHeader, workflowHeader)
-}
-
-func actionsRun(opts ActionsOptions) {
-	cs := opts.IO.ColorScheme()
-	fmt.Fprintln(opts.IO.Out, actionsExplainer(cs))
 }

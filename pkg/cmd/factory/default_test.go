@@ -333,8 +333,10 @@ func Test_ioStreams_pager(t *testing.T) {
 				}
 			}
 			f := New("1")
-			if tt.config != nil {
-				f.Config = func() (config.Config, error) {
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
 					return tt.config, nil
 				}
 			}
@@ -363,8 +365,10 @@ func Test_ioStreams_prompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := New("1")
-			if tt.config != nil {
-				f.Config = func() (config.Config, error) {
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
 					return tt.config, nil
 				}
 			}
