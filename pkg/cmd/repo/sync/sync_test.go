@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -64,21 +63,6 @@ func TestNewCmdSync(t *testing.T) {
 				Force: true,
 			},
 		},
-		{
-			name:  "confirm",
-			tty:   true,
-			input: "--confirm",
-			output: SyncOptions{
-				SkipConfirm: true,
-			},
-		},
-		{
-			name:    "notty without confirm",
-			tty:     false,
-			input:   "",
-			wantErr: true,
-			errMsg:  "`--confirm` required when not running interactively",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,16 +96,11 @@ func TestNewCmdSync(t *testing.T) {
 			assert.Equal(t, tt.output.SrcArg, gotOpts.SrcArg)
 			assert.Equal(t, tt.output.Branch, gotOpts.Branch)
 			assert.Equal(t, tt.output.Force, gotOpts.Force)
-			assert.Equal(t, tt.output.SkipConfirm, gotOpts.SkipConfirm)
 		})
 	}
 }
 
 func Test_SyncRun(t *testing.T) {
-	stubConfirm := func(as *prompt.AskStubber) {
-		as.StubOne(true)
-	}
-
 	tests := []struct {
 		name       string
 		tty        bool
@@ -129,9 +108,7 @@ func Test_SyncRun(t *testing.T) {
 		remotes    []*context.Remote
 		httpStubs  func(*httpmock.Registry)
 		gitStubs   func(*mockGitClient)
-		askStubs   func(*prompt.AskStubber)
 		wantStdout string
-		wantStderr string
 		wantErr    bool
 		errMsg     string
 	}{
@@ -152,15 +129,12 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
 		},
 		{
 			name: "sync local repo with parent - notty",
 			tty:  false,
-			opts: &SyncOptions{
-				SkipConfirm: true,
-			},
+			opts: &SyncOptions{},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -174,7 +148,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "",
 		},
 		{
@@ -196,7 +169,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:trunk from OWNER2/REPO2:trunk\n",
 		},
 		{
@@ -213,7 +185,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/test"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:test from OWNER/REPO:test\n",
 		},
 		{
@@ -235,8 +206,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Reset", []string{"--hard", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
-			wantStderr: "! Using --force will cause diverging commits on .:trunk to be discarded\n",
 			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
 		},
 		{
@@ -253,9 +222,8 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
 			},
-			askStubs: stubConfirm,
-			wantErr:  true,
-			errMsg:   "can't sync because there are diverging commits, you can use `--force` to overwrite the commits on .:trunk",
+			wantErr: true,
+			errMsg:  "can't sync because there are diverging changes, you can use `--force` to overwrite the changes",
 		},
 		{
 			name: "sync local repo with parent and local changes",
@@ -272,9 +240,8 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
 				mgc.On("IsDirty").Return(true, nil).Once()
 			},
-			askStubs: stubConfirm,
-			wantErr:  true,
-			errMsg:   "can't sync because there are local changes, please commit or stash them then try again",
+			wantErr: true,
+			errMsg:  "can't sync because there are local changes, please commit or stash them",
 		},
 		{
 			name: "sync local repo with parent not on default branch",
@@ -295,7 +262,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 				mgc.On("Checkout", []string{"test"}).Return(nil).Once()
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
 		},
 		{
@@ -318,15 +284,13 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced OWNER/REPO-FORK:trunk from OWNER/REPO:trunk\n",
 		},
 		{
 			name: "sync remote fork with parent - notty",
 			tty:  false,
 			opts: &SyncOptions{
-				DestArg:     "OWNER/REPO-FORK",
-				SkipConfirm: true,
+				DestArg: "OWNER/REPO-FORK",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -376,7 +340,6 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced OWNER/REPO:trunk from OWNER2/REPO2:trunk\n",
 		},
 		{
@@ -397,7 +360,6 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/test"),
 					httpmock.StringResponse(`{}`))
 			},
-			askStubs:   stubConfirm,
 			wantStdout: "✓ Synced OWNER/REPO-FORK:test from OWNER/REPO:test\n",
 		},
 		{
@@ -421,8 +383,6 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			askStubs:   stubConfirm,
-			wantStderr: "! Using --force will cause diverging commits on OWNER/REPO-FORK:trunk to be discarded\n",
 			wantStdout: "✓ Synced OWNER/REPO-FORK:trunk from OWNER/REPO:trunk\n",
 		},
 		{
@@ -452,9 +412,8 @@ func Test_SyncRun(t *testing.T) {
 						}, nil
 					})
 			},
-			askStubs: stubConfirm,
-			wantErr:  true,
-			errMsg:   "can't sync because there are diverging commits, you can use `--force` to overwrite the commits on OWNER/REPO-FORK:trunk",
+			wantErr: true,
+			errMsg:  "can't sync because there are diverging changes, you can use `--force` to overwrite the changes",
 		},
 	}
 	for _, tt := range tests {
@@ -466,7 +425,7 @@ func Test_SyncRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, stderr := iostreams.Test()
+		io, _, stdout, _ := iostreams.Test()
 		io.SetStdinTTY(tt.tty)
 		io.SetStdoutTTY(tt.tty)
 		tt.opts.IO = io
@@ -485,12 +444,6 @@ func Test_SyncRun(t *testing.T) {
 
 		tt.opts.Git = newMockGitClient(t, tt.gitStubs)
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
 			err := syncRun(tt.opts)
@@ -500,7 +453,6 @@ func Test_SyncRun(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}

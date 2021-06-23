@@ -6,28 +6,25 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
 type SyncOptions struct {
-	HttpClient  func() (*http.Client, error)
-	IO          *iostreams.IOStreams
-	BaseRepo    func() (ghrepo.Interface, error)
-	Remotes     func() (context.Remotes, error)
-	Git         gitClient
-	DestArg     string
-	SrcArg      string
-	Branch      string
-	Force       bool
-	SkipConfirm bool
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (context.Remotes, error)
+	Git        gitClient
+	DestArg    string
+	SrcArg     string
+	Branch     string
+	Force      bool
 }
 
 func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Command {
@@ -42,13 +39,21 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "sync [<destination-repository>]",
 		Short: "Sync a repository",
-		Long: heredoc.Doc(`
-			Sync destination repository from source repository.
+		Long: heredoc.Docf(`
+			Sync destination repository from source repository. Syncing will take a branch
+			on the source repository and merge it into the branch of the same name on the
+			destination repository. A fast forward merge will be used execept when the
+			%[1]s--force%[1]s flag is specified, then the two branches will by synced using
+			a hard reset.
 
 			Without an argument, the local repository is selected as the destination repository.
-			By default the source repository is the parent of the destination repository.
-			The source repository can be overridden with the --source flag.
-		`),
+
+			By default the source repository is the parent of the destination repository,
+			this can be overridden with the %[1]s--source%[1]s flag.
+
+			The source repository default branch is selected automatically, but can be
+			overridden with the %[1]s--branch%[1]s flag.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Sync local repository from remote parent
 			$ gh repo sync
@@ -67,9 +72,6 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 			if len(args) > 0 {
 				opts.DestArg = args[0]
 			}
-			if !opts.IO.CanPrompt() && !opts.SkipConfirm {
-				return &cmdutil.FlagError{Err: errors.New("`--confirm` required when not running interactively")}
-			}
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -80,46 +82,91 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.SrcArg, "source", "s", "", "Source repository")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "", false, "Discard destination repository changes")
-	cmd.Flags().BoolVarP(&opts.SkipConfirm, "confirm", "y", false, "Skip the confirmation prompt")
 	return cmd
 }
 
 func syncRun(opts *SyncOptions) error {
+	if opts.DestArg == "" {
+		return syncLocalRepo(opts)
+	} else {
+		return syncRemoteRepo(opts)
+	}
+}
+
+func syncLocalRepo(opts *SyncOptions) error {
+	var err error
+	var srcRepo ghrepo.Interface
+
+	if opts.SrcArg != "" {
+		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
+	} else {
+		srcRepo, err = opts.BaseRepo()
+	}
+	if err != nil {
+		return err
+	}
+
+	if opts.Branch == "" {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+		apiClient := api.NewClientFromHTTP(httpClient)
+		opts.IO.StartProgressIndicator()
+		opts.Branch, err = api.RepoDefaultBranch(apiClient, srcRepo)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+	}
+
+	opts.IO.StartProgressIndicator()
+	err = executeLocalRepoSync(srcRepo, opts)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		if errors.Is(err, divergingError) {
+			return fmt.Errorf("can't sync because there are diverging changes, you can use `--force` to overwrite the changes")
+		}
+		if errors.Is(err, dirtyRepoError) {
+			return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
+		}
+		return err
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		srcStr := fmt.Sprintf("%s:%s", ghrepo.FullName(srcRepo), opts.Branch)
+		destStr := fmt.Sprintf(".:%s", opts.Branch)
+		success := fmt.Sprintf("Synced %s from %s\n", cs.Bold(destStr), cs.Bold(srcStr))
+		fmt.Fprintf(opts.IO.Out, "%s %s", cs.SuccessIcon(), success)
+	}
+
+	return nil
+}
+
+func syncRemoteRepo(opts *SyncOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var local bool
 	var destRepo, srcRepo ghrepo.Interface
 
-	if opts.DestArg == "" {
-		local = true
-		destRepo, err = opts.BaseRepo()
-		if err != nil {
-			return err
-		}
-	} else {
-		destRepo, err = ghrepo.FromFullName(opts.DestArg)
-		if err != nil {
-			return err
-		}
+	destRepo, err = ghrepo.FromFullName(opts.DestArg)
+	if err != nil {
+		return err
 	}
 
 	if opts.SrcArg == "" {
-		if local {
-			srcRepo = destRepo
-		} else {
-			opts.IO.StartProgressIndicator()
-			srcRepo, err = api.RepoParent(apiClient, destRepo)
-			opts.IO.StopProgressIndicator()
-			if err != nil {
-				return err
-			}
-			if srcRepo == nil {
-				return fmt.Errorf("can't determine source repo for %s because repo is not fork", ghrepo.FullName(destRepo))
-			}
+		opts.IO.StartProgressIndicator()
+		srcRepo, err = api.RepoParent(apiClient, destRepo)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		if srcRepo == nil {
+			return fmt.Errorf("can't determine source repo for %s because repo is not fork", ghrepo.FullName(destRepo))
 		}
 	} else {
 		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
@@ -128,7 +175,7 @@ func syncRun(opts *SyncOptions) error {
 		}
 	}
 
-	if !local && destRepo.RepoHost() != srcRepo.RepoHost() {
+	if destRepo.RepoHost() != srcRepo.RepoHost() {
 		return fmt.Errorf("can't sync repos from different hosts")
 	}
 
@@ -141,52 +188,31 @@ func syncRun(opts *SyncOptions) error {
 		}
 	}
 
-	srcStr := fmt.Sprintf("%s:%s", ghrepo.FullName(srcRepo), opts.Branch)
-	destStr := fmt.Sprintf("%s:%s", ghrepo.FullName(destRepo), opts.Branch)
-	if local {
-		destStr = fmt.Sprintf(".:%s", opts.Branch)
-	}
-	cs := opts.IO.ColorScheme()
-	if !opts.SkipConfirm && opts.IO.CanPrompt() {
-		if opts.Force {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Using --force will cause diverging commits on %s to be discarded\n", cs.WarningIcon(), destStr)
-		}
-		var confirmed bool
-		confirmQuestion := &survey.Confirm{
-			Message: fmt.Sprintf("Sync %s from %s?", destStr, srcStr),
-			Default: false,
-		}
-		err := prompt.SurveyAskOne(confirmQuestion, &confirmed)
-		if err != nil {
-			return err
-		}
-
-		if !confirmed {
-			return cmdutil.CancelError
-		}
-	}
-
 	opts.IO.StartProgressIndicator()
-	if local {
-		err = syncLocalRepo(srcRepo, opts)
-	} else {
-		err = syncRemoteRepo(apiClient, destRepo, srcRepo, opts)
-	}
+	err = executeRemoteRepoSync(apiClient, destRepo, srcRepo, opts)
 	opts.IO.StopProgressIndicator()
-
 	if err != nil {
+		if errors.Is(err, divergingError) {
+			return fmt.Errorf("can't sync because there are diverging changes, you can use `--force` to overwrite the changes")
+		}
 		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		success := cs.Bold(fmt.Sprintf("Synced %s from %s\n", destStr, srcStr))
-		fmt.Fprintf(opts.IO.Out, "%s %s", cs.SuccessIconWithColor(cs.GreenBold), success)
+		cs := opts.IO.ColorScheme()
+		srcStr := fmt.Sprintf("%s:%s", ghrepo.FullName(srcRepo), opts.Branch)
+		destStr := fmt.Sprintf("%s:%s", ghrepo.FullName(destRepo), opts.Branch)
+		success := fmt.Sprintf("Synced %s from %s\n", cs.Bold(destStr), cs.Bold(srcStr))
+		fmt.Fprintf(opts.IO.Out, "%s %s", cs.SuccessIcon(), success)
 	}
 
 	return nil
 }
 
-func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
+var divergingError = errors.New("diverging commits")
+var dirtyRepoError = errors.New("dirty repo")
+
+func executeLocalRepoSync(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	// Remotes precedence by name
 	// 1. upstream
 	// 2. github
@@ -213,7 +239,7 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 		}
 
 		if !fastForward && !opts.Force {
-			return fmt.Errorf("can't sync because there are diverging commits, you can use `--force` to overwrite the commits on .:%s", branch)
+			return divergingError
 		}
 	}
 
@@ -222,7 +248,7 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 		return err
 	}
 	if dirtyRepo {
-		return fmt.Errorf("can't sync because there are local changes, please commit or stash them then try again")
+		return dirtyRepoError
 	}
 
 	startBranch, err := git.CurrentBranch()
@@ -258,7 +284,7 @@ func syncLocalRepo(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	return nil
 }
 
-func syncRemoteRepo(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) error {
+func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	commit, err := latestCommit(client, srcRepo, opts.Branch)
 	if err != nil {
 		return err
@@ -270,9 +296,7 @@ func syncRemoteRepo(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts
 	err = syncFork(client, destRepo, opts.Branch, commit.Object.SHA, opts.Force)
 	var httpErr api.HTTPError
 	if err != nil && errors.As(err, &httpErr) && notFastForwardErrorMessage.MatchString(httpErr.Message) {
-		destStr := fmt.Sprintf("%s:%s", ghrepo.FullName(destRepo), opts.Branch)
-		return fmt.Errorf("can't sync because there are diverging commits, you can use `--force` to overwrite the commits on %s",
-			destStr)
+		return divergingError
 	}
 
 	return err
