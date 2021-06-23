@@ -2,11 +2,13 @@ package edit
 
 import (
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
 	"net/http"
 	"path"
@@ -47,14 +49,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 		Long: heredoc.Docf(`
 			Edit your Github Repo settings
 
-			If the current repository is a local git repository and the currently authenticated user has WRITE/ADMIN access to the repository, the command will let the user make changes to the repo settings.
-
-		`, "`"),
+			If the current repository is a local git repository and the currently authenticated user has WRITE/ADMIN access to the repository, the command will let the user make changes to the repo settings.`),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			 # update repo description, allow squash merge and delete merged branches automatically
-			  $ gh repo edit --description="awesome description" --allow-squash-merge --delete-merged-branch
-	  `),
+			  $ gh repo edit --description="awesome description" --allow-squash-merge --delete-merged-branch`),
 		Annotations: map[string]string{
 			"help:arguments": heredoc.Doc(`
 				A repository can be supplied as an argument in any of the following formats:
@@ -104,6 +103,113 @@ func editRun(opts *EditOptions) error {
 		opts.Name = path.Base(projectDir)
 	}
 
-	fmt.Println(isNameAnArg)
+	if !isNameAnArg {
+		editOpts, err := interactiveRepoEdit()
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(editOpts)
+	}
+
 	return nil
+}
+
+func interactiveRepoEdit() (*EditOptions, error) {
+	qs := []*survey.Question{}
+
+	repoNameQuestion := &survey.Question{
+		Name: "repoName",
+		Prompt: &survey.Input{
+			Message: "Repository name",
+			Default: "cli",
+		},
+	}
+	qs = append(qs, repoNameQuestion)
+
+	repoDescriptionQuestion := &survey.Question{
+		Name: "repoDescription",
+		Prompt: &survey.Input{
+			Message: "Repository description",
+			Default: "Github's Official command line tool",
+		},
+	}
+
+	qs = append(qs, repoDescriptionQuestion)
+
+	repoHomePageURLQuestion := &survey.Question{
+		Name: "repoURL",
+		Prompt: &survey.Input{
+			Message: "Repository Homepage URL",
+			Default: "cli.github.com",
+		},
+	}
+
+	qs = append(qs, repoHomePageURLQuestion)
+
+	repoVisibilityQuestion := &survey.Question{
+		Name: "repoVisibility",
+		Prompt: &survey.Select{
+			Message: "Visibility",
+			Options: []string{"Public", "Private", "Internal"},
+		},
+	}
+	qs = append(qs, repoVisibilityQuestion)
+
+	mergeOptionsQuestion := &survey.Question{
+		Name: "mergeOption",
+		Prompt: &survey.Select{
+			Message: "Choose a merge option",
+			Options: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
+		},
+	}
+	qs = append(qs, mergeOptionsQuestion)
+
+	templateRepoQuestion := &survey.Question{
+		Name: "isTemplateRepo",
+		Prompt: &survey.Confirm{
+			Message: "Convert into a template repository?",
+			Default: false,
+		},
+	}
+
+	qs = append(qs, templateRepoQuestion)
+
+	autoDeleteBranchQuestion := &survey.Question{
+		Name: "autoDeleteBranch",
+		Prompt: &survey.Confirm{
+			Message: "Automatically delete head branches after merging?",
+			Default: false,
+		},
+	}
+
+	qs = append(qs, autoDeleteBranchQuestion)
+
+	archiveRepoQuestion := &survey.Question{
+		Name: "archiveRepo",
+		Prompt: &survey.Confirm{
+			Message: "Archive Repository",
+			Default: false,
+		},
+	}
+
+	qs = append(qs, archiveRepoQuestion)
+
+	answers := struct {
+		RepoName         string
+		RepoDescription  string
+		RepoURL          string
+		RepoVisibility   string
+		MergeOption      string
+		IsTemplateRepo   bool
+		AutoDeleteBranch bool
+		ArchiveRepo      bool
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answers)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
