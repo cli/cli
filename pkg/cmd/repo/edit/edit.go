@@ -32,6 +32,7 @@ type EditOptions struct {
 	AllowMergeCommit bool
 	AllowSquashMerge bool
 	AllowRebaseMerge bool
+	DeleteBranchOnMerge bool
 	Archive          bool
 	ConfirmSubmit    bool
 }
@@ -84,7 +85,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmd.Flags().BoolVar(&opts.AllowMergeCommit, "allow-merge-commit", true, "Enable merge commits")
 	cmd.Flags().BoolVar(&opts.AllowSquashMerge, "allow-squash-merge", true, "Enable squash merge")
 	cmd.Flags().BoolVar(&opts.AllowRebaseMerge, "allow-rebase-merge", true, "Enable rebase merge")
-
+	cmd.Flags().BoolVar(&opts.DeleteBranchOnMerge, "delete-branch-on-merge", false, "Delete head branch where PRs are merged")
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
 
 	return cmd
@@ -211,5 +212,22 @@ func interactiveRepoEdit() (*EditOptions, error) {
 		return nil, err
 	}
 
-	return nil, nil
+	return &EditOptions{
+		Name:             answers.RepoName,
+		Description:      answers.RepoDescription,
+		Homepage:         answers.RepoURL,
+		IsTemplate:       answers.IsTemplateRepo,
+		EnableIssues:     false,
+		EnableWiki:       false,
+		EnableProjects:   false,
+		Public:           false,
+		Private:          false,
+		Internal:         false,
+		AllowMergeCommit: true,
+		AllowSquashMerge: false,
+		AllowRebaseMerge: false,
+		DeleteBranchOnMerge: false,
+		Archive:          false,
+		ConfirmSubmit:    false,
+	}, nil
 }
