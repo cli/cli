@@ -87,32 +87,61 @@ func (m *Manager) list(includeMetadata bool) []extensions.Extension {
 	if err != nil {
 		return nil
 	}
-
-	var gitExe string
-	if includeMetadata {
-		gitExe, _ = m.lookPath("git")
-	}
-
 	var results []extensions.Extension
 	for _, f := range entries {
 		if !strings.HasPrefix(f.Name(), "gh-") || !(f.IsDir() || f.Mode()&os.ModeSymlink != 0) {
 			continue
 		}
-		var remoteURL string
-		if gitExe != "" {
-			stdout := bytes.Buffer{}
-			cmd := m.newCommand(gitExe, "--git-dir="+filepath.Join(dir, f.Name(), ".git"), "config", "remote.origin.url")
-			cmd.Stdout = &stdout
-			if err := cmd.Run(); err == nil {
-				remoteURL = strings.TrimSpace(stdout.String())
-			}
+		var remoteUrl string
+		var updateAvailable bool
+		if includeMetadata {
+			remoteUrl = m.getRemoteUrl(f.Name())
+			updateAvailable = m.checkUpdateAvailable(f.Name())
 		}
 		results = append(results, &Extension{
-			path: filepath.Join(dir, f.Name(), f.Name()),
-			url:  remoteURL,
+			path:            filepath.Join(dir, f.Name(), f.Name()),
+			url:             remoteUrl,
+			updateAvailable: updateAvailable,
 		})
 	}
 	return results
+}
+
+func (m *Manager) getRemoteUrl(extension string) string {
+	gitExe, err := m.lookPath("git")
+	if err != nil {
+		return ""
+	}
+	dir := m.installDir()
+	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
+	cmd := m.newCommand(gitExe, gitDir, "config", "remote.origin.url")
+	url, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(url))
+}
+
+func (m *Manager) checkUpdateAvailable(extension string) bool {
+	gitExe, err := m.lookPath("git")
+	if err != nil {
+		return false
+	}
+	dir := m.installDir()
+	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
+	cmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
+	lsRemote, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
+	cmd = m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
+	localSha, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	localSha = bytes.TrimSpace(localSha)
+	return !bytes.Equal(remoteSha, localSha)
 }
 
 func (m *Manager) InstallLocal(dir string) error {

@@ -43,7 +43,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
-				// cs := io.ColorScheme()
+				cs := io.ColorScheme()
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
 					var repo string
@@ -55,8 +55,11 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
-					// TODO: add notice about available update
-					//t.AddField("Update available", nil, cs.Green)
+					var updateAvailable string
+					if c.UpdateAvailable() {
+						updateAvailable = "Update available"
+					}
+					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
 				}
 				return t.Render()
