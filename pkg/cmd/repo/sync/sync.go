@@ -106,6 +106,14 @@ func syncLocalRepo(opts *SyncOptions) error {
 		return err
 	}
 
+	dirtyRepo, err := opts.Git.IsDirty()
+	if err != nil {
+		return err
+	}
+	if dirtyRepo {
+		return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
+	}
+
 	if opts.Branch == "" {
 		httpClient, err := opts.HttpClient()
 		if err != nil {
@@ -126,9 +134,6 @@ func syncLocalRepo(opts *SyncOptions) error {
 	if err != nil {
 		if errors.Is(err, divergingError) {
 			return fmt.Errorf("can't sync because there are diverging changes, you can use `--force` to overwrite the changes")
-		}
-		if errors.Is(err, dirtyRepoError) {
-			return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
 		}
 		return err
 	}
@@ -209,8 +214,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	return nil
 }
 
-var divergingError = errors.New("diverging commits")
-var dirtyRepoError = errors.New("dirty repo")
+var divergingError = errors.New("diverging changes")
 
 func executeLocalRepoSync(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 	// Remotes precedence by name
@@ -241,14 +245,6 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, opts *SyncOptions) error {
 		if !fastForward && !opts.Force {
 			return divergingError
 		}
-	}
-
-	dirtyRepo, err := git.IsDirty()
-	if err != nil {
-		return err
-	}
-	if dirtyRepo {
-		return dirtyRepoError
 	}
 
 	startBranch, err := git.CurrentBranch()

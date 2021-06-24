@@ -122,10 +122,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
@@ -141,10 +141,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
@@ -162,10 +162,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
@@ -178,10 +178,10 @@ func Test_SyncRun(t *testing.T) {
 				Branch: "test",
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/test"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"test"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"test", "origin/test"}).Return(true, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/test"}).Return(nil).Once()
 			},
@@ -199,10 +199,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Reset", []string{"--hard", "refs/remotes/origin/trunk"}).Return(nil).Once()
 			},
@@ -218,6 +218,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
@@ -229,15 +230,7 @@ func Test_SyncRun(t *testing.T) {
 			name: "sync local repo with parent and local changes",
 			tty:  true,
 			opts: &SyncOptions{},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
-			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
 				mgc.On("IsDirty").Return(true, nil).Once()
 			},
 			wantErr: true,
@@ -253,10 +246,10 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("Checkout", []string{"trunk"}).Return(nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
