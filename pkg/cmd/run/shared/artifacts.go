@@ -12,7 +12,7 @@ import (
 
 type Artifact struct {
 	Name        string `json:"name"`
-	Size        uint32 `json:"size_in_bytes"`
+	Size        uint64 `json:"size_in_bytes"`
 	DownloadURL string `json:"archive_download_url"`
 	Expired     bool   `json:"expired"`
 }
