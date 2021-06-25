@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 )
 
@@ -31,27 +32,28 @@ func NewAPI(configuration *Configuration) *API {
 }
 
 type WorkspaceAccessResponse struct {
-	SessionToken              string   `json:"sessionToken"`
-	CreatedAt                 string   `json:"createdAt"`
-	UpdatedAt                 string   `json:"updatedAt"`
-	Name                      string   `json:"name"`
-	OwnerID                   string   `json:"ownerId"`
-	JoinLink                  string   `json:"joinLink"`
-	ConnectLinks              []string `json:"connectLinks"`
-	RelayLink                 string   `json:"relayLink"`
-	RelaySas                  string   `json:"relaySas"`
-	HostPublicKeys            []string `json:"hostPublicKeys"`
-	ConversationID            string   `json:"conversationId"`
-	AssociatedUserIDs         []string `json:"associatedUserIds"`
-	AreAnonymousGuestsAllowed bool     `json:"areAnonymousGuestsAllowed"`
-	IsHostConnected           bool     `json:"isHostConnected"`
-	ExpiresAt                 string   `json:"expiresAt"`
-	InvitationLinks           []string `json:"invitationLinks"`
-	ID                        string   `json:"id"`
+	SessionToken              string            `json:"sessionToken"`
+	CreatedAt                 string            `json:"createdAt"`
+	UpdatedAt                 string            `json:"updatedAt"`
+	Name                      string            `json:"name"`
+	OwnerID                   string            `json:"ownerId"`
+	JoinLink                  string            `json:"joinLink"`
+	ConnectLinks              []string          `json:"connectLinks"`
+	RelayLink                 string            `json:"relayLink"`
+	RelaySas                  string            `json:"relaySas"`
+	HostPublicKeys            []string          `json:"hostPublicKeys"`
+	ConversationID            string            `json:"conversationId"`
+	AssociatedUserIDs         map[string]string `json:"associatedUserIds"`
+	AreAnonymousGuestsAllowed bool              `json:"areAnonymousGuestsAllowed"`
+	IsHostConnected           bool              `json:"isHostConnected"`
+	ExpiresAt                 string            `json:"expiresAt"`
+	InvitationLinks           []string          `json:"invitationLinks"`
+	ID                        string            `json:"id"`
 }
 
 func (a *API) WorkspaceAccess() (*WorkspaceAccessResponse, error) {
 	url := fmt.Sprintf("%s/workspace/%s/user", a.ServiceURI, a.WorkspaceID)
+	fmt.Println(url)
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {
@@ -69,6 +71,8 @@ func (a *API) WorkspaceAccess() (*WorkspaceAccessResponse, error) {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
+	d, _ := httputil.DumpResponse(resp, true)
+	fmt.Println(string(d))
 	var workspaceAccessResponse WorkspaceAccessResponse
 	if err := json.Unmarshal(b, &workspaceAccessResponse); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response into json: %v", err)
@@ -94,7 +98,7 @@ type WorkspaceInfoResponse struct {
 	RelaySas                  string   `json:"relaySas"`
 	HostPublicKeys            []string `json:"hostPublicKeys"`
 	ConversationID            string   `json:"conversationId"`
-	AssociatedUserIDs         []string `json:"associatedUserIds"`
+	AssociatedUserIDs         map[string]string
 	AreAnonymousGuestsAllowed bool     `json:"areAnonymousGuestsAllowed"`
 	IsHostConnected           bool     `json:"isHostConnected"`
 	ExpiresAt                 string   `json:"expiresAt"`

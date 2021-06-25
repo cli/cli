@@ -7,10 +7,11 @@ import (
 
 type Client struct {
 	Configuration *Configuration
+	SSHSession    *SSHSession
 }
 
 func NewClient(configuration *Configuration) *Client {
-	return &Client{configuration}
+	return &Client{Configuration: configuration}
 }
 
 func (c *Client) Join(ctx context.Context) error {
@@ -19,9 +20,9 @@ func (c *Client) Join(ctx context.Context) error {
 		return fmt.Errorf("error getting session: %v", err)
 	}
 
-	sshSession := NewSSHSession(session)
-	if err := sshSession.Connect(); err != nil {
-		return fmt.Errorf("error authenticating ssh session: %v", err)
+	c.SSHSession, err = NewSSH(session).NewSession()
+	if err != nil {
+		return fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
 	return nil
