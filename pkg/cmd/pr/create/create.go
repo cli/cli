@@ -61,6 +61,7 @@ type CreateOptions struct {
 	Milestone string
 
 	MaintainerCanModify bool
+	SkipEditPrompt      bool
 }
 
 type CreateContext struct {
@@ -165,6 +166,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	fl.BoolVarP(&opts.SkipEditPrompt, "editor", "e", false, "Open editor for issue body without prompting")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
@@ -298,7 +300,10 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		err = shared.BodySurvey(state, templateContent, editorCommand)
+		err = shared.BodySurvey(
+			state, templateContent, editorCommand,
+			opts.SkipEditPrompt,
+		)
 		if err != nil {
 			return
 		}

@@ -34,9 +34,10 @@ type CreateOptions struct {
 	WebMode         bool
 	RecoverFile     string
 
-	Title       string
-	Body        string
-	Interactive bool
+	Title          string
+	Body           string
+	Interactive    bool
+	SkipEditPrompt bool
 
 	Assignees []string
 	Labels    []string
@@ -102,6 +103,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().BoolVarP(&opts.SkipEditPrompt, "editor", "e", false, "Open editor for issue body without prompting")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
 	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -230,7 +232,10 @@ func createRun(opts *CreateOptions) (err error) {
 				}
 			}
 
-			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			err = prShared.BodySurvey(
+				&tb, templateContent, editorCommand,
+				opts.SkipEditPrompt,
+			)
 			if err != nil {
 				return
 			}

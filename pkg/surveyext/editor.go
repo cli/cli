@@ -33,8 +33,9 @@ func init() {
 // EXTENDED to enable different prompting behavior
 type GhEditor struct {
 	*survey.Editor
-	EditorCommand string
-	BlankAllowed  bool
+	EditorCommand  string
+	BlankAllowed   bool
+	SkipEditPrompt bool
 
 	lookPath func(string) ([]string, []string, error)
 }
@@ -73,68 +74,71 @@ type EditorTemplateData struct {
 
 // EXTENDED to augment prompt text and keypress handling
 func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (interface{}, error) {
-	err := e.Render(
-		EditorQuestionTemplate,
-		// EXTENDED to support printing editor in prompt and BlankAllowed
-		EditorTemplateData{
-			Editor:        *e.Editor,
-			BlankAllowed:  e.BlankAllowed,
-			EditorCommand: filepath.Base(e.editorCommand()),
-			Config:        config,
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	// start reading runes from the standard in
-	rr := e.NewRuneReader()
-	_ = rr.SetTermMode()
-	defer func() { _ = rr.RestoreTermMode() }()
-
 	cursor := e.NewCursor()
-	cursor.Hide()
-	defer cursor.Show()
 
-	for {
-		// EXTENDED to handle the e to edit / enter to skip behavior + BlankAllowed
-		r, _, err := rr.ReadRune()
+	if !e.SkipEditPrompt {
+		err := e.Render(
+			EditorQuestionTemplate,
+			// EXTENDED to support printing editor in prompt and BlankAllowed
+			EditorTemplateData{
+				Editor:        *e.Editor,
+				BlankAllowed:  e.BlankAllowed,
+				EditorCommand: filepath.Base(e.editorCommand()),
+				Config:        config,
+			},
+		)
 		if err != nil {
 			return "", err
 		}
-		if r == 'e' {
-			break
-		}
-		if r == '\r' || r == '\n' {
-			if e.BlankAllowed {
-				return initialValue, nil
-			} else {
-				continue
-			}
-		}
-		if r == terminal.KeyInterrupt {
-			return "", terminal.InterruptErr
-		}
-		if r == terminal.KeyEndTransmission {
-			break
-		}
-		if string(r) == config.HelpInput && e.Help != "" {
-			err = e.Render(
-				EditorQuestionTemplate,
-				EditorTemplateData{
-					// EXTENDED to support printing editor in prompt, BlankAllowed
-					Editor:        *e.Editor,
-					BlankAllowed:  e.BlankAllowed,
-					EditorCommand: filepath.Base(e.editorCommand()),
-					ShowHelp:      true,
-					Config:        config,
-				},
-			)
+
+		// start reading runes from the standard in
+		rr := e.NewRuneReader()
+		_ = rr.SetTermMode()
+		defer func() { _ = rr.RestoreTermMode() }()
+
+		cursor.Hide()
+		defer cursor.Show()
+
+		for {
+			// EXTENDED to handle the e to edit / enter to skip behavior + BlankAllowed
+			r, _, err := rr.ReadRune()
 			if err != nil {
 				return "", err
 			}
+			if r == 'e' {
+				break
+			}
+			if r == '\r' || r == '\n' {
+				if e.BlankAllowed {
+					return initialValue, nil
+				} else {
+					continue
+				}
+			}
+			if r == terminal.KeyInterrupt {
+				return "", terminal.InterruptErr
+			}
+			if r == terminal.KeyEndTransmission {
+				break
+			}
+			if string(r) == config.HelpInput && e.Help != "" {
+				err = e.Render(
+					EditorQuestionTemplate,
+					EditorTemplateData{
+						// EXTENDED to support printing editor in prompt, BlankAllowed
+						Editor:        *e.Editor,
+						BlankAllowed:  e.BlankAllowed,
+						EditorCommand: filepath.Base(e.editorCommand()),
+						ShowHelp:      true,
+						Config:        config,
+					},
+				)
+				if err != nil {
+					return "", err
+				}
+			}
+			continue
 		}
-		continue
 	}
 
 	stdio := e.Stdio()
@@ -142,7 +146,10 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	if lookPath == nil {
 		lookPath = defaultLookPath
 	}
-	text, err := edit(e.editorCommand(), e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, cursor, lookPath)
+	text, err := edit(
+		e.editorCommand(), e.FileName, initialValue,
+		stdio.In, stdio.Out, stdio.Err, cursor, lookPath,
+	)
 	if err != nil {
 		return "", err
 	}

@@ -75,7 +75,10 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 }
 
-func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string) error {
+func BodySurvey(
+	state *IssueMetadataState, templateContent, editorCommand string,
+	skipEditPrompt bool,
+) error {
 	if templateContent != "" {
 		if state.Body != "" {
 			// prevent excessive newlines between default body and template
@@ -92,8 +95,9 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		{
 			Name: "Body",
 			Prompt: &surveyext.GhEditor{
-				BlankAllowed:  true,
-				EditorCommand: editorCommand,
+				BlankAllowed:   true,
+				SkipEditPrompt: skipEditPrompt,
+				EditorCommand:  editorCommand,
 				Editor: &survey.Editor{
 					Message:       "Body",
 					FileName:      "*.md",
