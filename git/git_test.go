@@ -218,3 +218,15 @@ func TestAddUpstreamRemote(t *testing.T) {
 		})
 	}
 }
+
+func TestAddOriginRemote(t *testing.T) {
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git -C DIRECTORY remote add -f origin URL`, 0, "")
+
+	err := AddOriginRemote("URL", "DIRECTORY", []string{})
+	if err != nil {
+		t.Fatalf("error running command `git remote add -f`: %v", err)
+	}
+}
