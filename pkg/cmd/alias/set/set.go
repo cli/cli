@@ -111,26 +111,6 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 	cmd.Flags().BoolVarP(&opts.IsShell, "shell", "s", false, "Declare an alias to be passed through a shell interpreter")
 
-	opts.validCommand = func(args string) bool {
-		split, err := shlex.Split(args)
-		if err != nil {
-			return false
-		}
-
-		rootCmd := cmd.Root()
-		cmd, _, err := rootCmd.Traverse(split)
-		if err == nil && cmd != rootCmd {
-			return true
-		}
-
-		for _, ext := range f.ExtensionManager.List() {
-			if ext.Name() == split[0] {
-				return true
-			}
-		}
-		return false
-	}
-
 	return cmd
 }
 
