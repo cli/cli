@@ -83,20 +83,20 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 				opts.GitArgs = args[1:]
 			}
 
+			if cmd.Flags().Changed("org") && opts.Organization == "" {
+				return &cmdutil.FlagError{Err: errors.New("--org cannot be blank")}
+			}
+
 			if opts.RemoteName == "" {
 				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
+			} else if !cmd.Flags().Changed("remote-name") {
+				opts.Rename = true // Any existing 'origin' will be renamed to upstream
 			}
 
-			if promptOk && !cmd.Flags().Changed("clone") {
-				opts.PromptClone = true
-			}
-
-			if promptOk && !cmd.Flags().Changed("remote") {
-				opts.PromptRemote = true
-			}
-
-			if !cmd.Flags().Changed("remote-name") {
-				opts.Rename = true
+			if promptOk {
+				// We can prompt for these if they were not specified.
+				opts.PromptClone = !cmd.Flags().Changed("clone")
+				opts.PromptRemote = !cmd.Flags().Changed("remote")
 			}
 
 			if runF != nil {

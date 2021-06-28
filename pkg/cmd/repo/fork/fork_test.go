@@ -121,6 +121,12 @@ func TestNewCmdFork(t *testing.T) {
 			},
 		},
 		{
+			name:    "empty org",
+			cli:     " --org=''",
+			wantErr: true,
+			errMsg:  "--org cannot be blank",
+		},
+		{
 			name:    "git flags in wrong place",
 			cli:     "--depth 1 OWNER/REPO",
 			wantErr: true,
