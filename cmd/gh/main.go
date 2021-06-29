@@ -21,7 +21,6 @@ import (
 	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/internal/update"
 	"github.com/cli/cli/pkg/cmd/alias/expand"
-	"github.com/cli/cli/pkg/cmd/extensions"
 	"github.com/cli/cli/pkg/cmd/factory"
 	"github.com/cli/cli/pkg/cmd/root"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -143,7 +142,7 @@ func mainRun() exitCode {
 
 			return exitOK
 		} else if c, _, err := rootCmd.Traverse(expandedArgs); err == nil && c == rootCmd && len(expandedArgs) > 0 {
-			extensionManager := extensions.NewManager()
+			extensionManager := cmdFactory.ExtensionManager
 			if found, err := extensionManager.Dispatch(expandedArgs, os.Stdin, os.Stdout, os.Stderr); err != nil {
 				var execError *exec.ExitError
 				if errors.As(err, &execError) {
@@ -155,6 +154,24 @@ func mainRun() exitCode {
 				return exitOK
 			}
 		}
+	}
+
+	// provide completions for aliases and extensions
+	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var results []string
+		if aliases, err := cfg.Aliases(); err == nil {
+			for aliasName := range aliases.All() {
+				if strings.HasPrefix(aliasName, toComplete) {
+					results = append(results, aliasName)
+				}
+			}
+		}
+		for _, ext := range cmdFactory.ExtensionManager.List() {
+			if strings.HasPrefix(ext.Name(), toComplete) {
+				results = append(results, ext.Name())
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	cs := cmdFactory.IOStreams.ColorScheme()

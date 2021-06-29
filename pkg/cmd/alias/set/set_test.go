@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/test"
 	"github.com/google/shlex"
@@ -27,6 +28,11 @@ func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.Cmd
 		IOStreams: io,
 		Config: func() (config.Config, error) {
 			return cfg, nil
+		},
+		ExtensionManager: &extensions.ExtensionManagerMock{
+			ListFunc: func() []extensions.Extension {
+				return []extensions.Extension{}
+			},
 		},
 	}
 

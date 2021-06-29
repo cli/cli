@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/extensions"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -20,6 +21,8 @@ func New(appVersion string) *cmdutil.Factory {
 		Config:     configFunc(), // No factory dependencies
 		Branch:     branchFunc(), // No factory dependencies
 		Executable: executable(), // No factory dependencies
+
+		ExtensionManager: extensions.NewManager(),
 	}
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
