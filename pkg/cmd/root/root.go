@@ -8,6 +8,7 @@ import (
 	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
+	browseCmd "github.com/cli/cli/pkg/cmd/browse"
 	completionCmd "github.com/cli/cli/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
 	extensionsCmd "github.com/cli/cli/pkg/cmd/extensions"
@@ -88,6 +89,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	repoResolvingCmdFactory := *f
 	repoResolvingCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(f)
 
+	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
