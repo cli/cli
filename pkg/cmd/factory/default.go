@@ -85,7 +85,7 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
-		return NewHTTPClient(io, cfg, appVersion, true), nil
+		return NewHTTPClient(io, cfg, appVersion, true)
 	}
 }
 

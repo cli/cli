@@ -118,6 +118,6 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		return factory.NewHTTPClient(f.IOStreams, cfg, version, false), nil
+		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
 	}
 }

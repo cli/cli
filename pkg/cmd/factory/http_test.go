@@ -135,7 +135,8 @@ func TestNewHTTPClient(t *testing.T) {
 			})
 
 			io, _, _, stderr := iostreams.Test()
-			client := NewHTTPClient(io, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			client, err := NewHTTPClient(io, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			req.Host = tt.host
