@@ -163,11 +163,11 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("Fetch", []string{"upstream", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", []string{"trunk", "upstream/trunk"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+				mgc.On("Merge", []string{"--ff-only", "refs/remotes/upstream/trunk"}).Return(nil).Once()
 			},
 			wantStdout: "✓ Synced .:trunk from OWNER2/REPO2:trunk\n",
 		},
@@ -423,14 +423,24 @@ func Test_SyncRun(t *testing.T) {
 		io.SetStdoutTTY(tt.tty)
 		tt.opts.IO = io
 
+		repo1, _ := ghrepo.FromFullName("OWNER/REPO")
+		repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			repo, _ := ghrepo.FromFullName("OWNER/REPO")
-			return repo, nil
+			return repo1, nil
 		}
 
 		tt.opts.Remotes = func() (context.Remotes, error) {
 			if tt.remotes == nil {
-				return []*context.Remote{{Remote: &git.Remote{Name: "origin"}}}, nil
+				return []*context.Remote{
+					{
+						Remote: &git.Remote{Name: "origin"},
+						Repo:   repo1,
+					},
+					{
+						Remote: &git.Remote{Name: "upstream"},
+						Repo:   repo2,
+					},
+				}, nil
 			}
 			return tt.remotes, nil
 		}

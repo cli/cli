@@ -97,6 +97,14 @@ func syncLocalRepo(opts *SyncOptions) error {
 	var err error
 	var srcRepo ghrepo.Interface
 
+	dirtyRepo, err := opts.Git.IsDirty()
+	if err != nil {
+		return err
+	}
+	if dirtyRepo {
+		return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
+	}
+
 	if opts.SrcArg != "" {
 		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
 	} else {
@@ -106,12 +114,21 @@ func syncLocalRepo(opts *SyncOptions) error {
 		return err
 	}
 
-	dirtyRepo, err := opts.Git.IsDirty()
+	// Find remote that matches the srcRepo
+	var remote string
+	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
 	}
-	if dirtyRepo {
-		return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
+	for _, r := range remotes {
+		if r.RepoName() == srcRepo.RepoName() &&
+			r.RepoOwner() == srcRepo.RepoOwner() &&
+			r.RepoHost() == srcRepo.RepoHost() {
+			remote = r.Name
+		}
+	}
+	if remote == "" {
+		return fmt.Errorf("can't find corresponding remote for %s", ghrepo.FullName(srcRepo))
 	}
 
 	if opts.Branch == "" {
@@ -129,7 +146,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = executeLocalRepoSync(srcRepo, opts)
+	err = executeLocalRepoSync(srcRepo, remote, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, divergingError) {
@@ -216,28 +233,18 @@ func syncRemoteRepo(opts *SyncOptions) error {
 
 var divergingError = errors.New("diverging changes")
 
-func executeLocalRepoSync(srcRepo ghrepo.Interface, opts *SyncOptions) error {
-	// Remotes precedence by name
-	// 1. upstream
-	// 2. github
-	// 3. origin
-	// 4. other
-	remotes, err := opts.Remotes()
-	if err != nil {
-		return err
-	}
-	remote := remotes[0]
-	branch := opts.Branch
+func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOptions) error {
 	git := opts.Git
+	branch := opts.Branch
 
-	err = git.Fetch([]string{remote.Name, fmt.Sprintf("+refs/heads/%s", branch)})
+	err := git.Fetch([]string{remote, fmt.Sprintf("+refs/heads/%s", branch)})
 	if err != nil {
 		return err
 	}
 
 	hasLocalBranch := git.HasLocalBranch([]string{branch})
 	if hasLocalBranch {
-		fastForward, err := git.IsAncestor([]string{branch, fmt.Sprintf("%s/%s", remote.Name, branch)})
+		fastForward, err := git.IsAncestor([]string{branch, fmt.Sprintf("%s/%s", remote, branch)})
 		if err != nil {
 			return err
 		}
