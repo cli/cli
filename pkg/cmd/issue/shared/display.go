@@ -63,7 +63,7 @@ func IssueLabelList(issue api.Issue) string {
 
 	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
-		labelNames = append(labelNames, iostreams.RGB(label.Color, label.Name))
+		labelNames = append(labelNames, iostreams.HexToRGB(label.Color, label.Name))
 	}
 
 	return strings.Join(labelNames, ", ")
