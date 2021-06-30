@@ -113,6 +113,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 		opts = append(opts,
 			api.AddHeaderFunc("Accept", func(req *http.Request) (string, error) {
 				accept := "application/vnd.github.merge-info-preview+json" // PullRequest.mergeStateStatus
+				accept += ", application/vnd.github.nebula-preview"        // visibility when RESTing repos into an org
 				if ghinstance.IsEnterprise(getHost(req)) {
 					accept += ", application/vnd.github.antiope-preview"    // Commit.statusCheckRollup
 					accept += ", application/vnd.github.shadow-cat-preview" // PullRequest.isDraft
