@@ -8,6 +8,11 @@ type mockGitClient struct {
 	mock.Mock
 }
 
+func (g *mockGitClient) BranchRemote(a string) (string, error) {
+	args := g.Called(a)
+	return args.String(0), args.Error(1)
+}
+
 func (g *mockGitClient) Checkout(a []string) error {
 	args := g.Called(a)
 	return args.Error(0)

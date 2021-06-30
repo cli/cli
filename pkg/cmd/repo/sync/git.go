@@ -1,10 +1,14 @@
 package sync
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/cli/cli/git"
 )
 
 type gitClient interface {
+	BranchRemote(string) (string, error)
 	Checkout([]string) error
 	CurrentBranch() (string, error)
 	Fetch([]string) error
@@ -17,8 +21,27 @@ type gitClient interface {
 
 type gitExecuter struct{}
 
+func (g *gitExecuter) BranchRemote(branch string) (string, error) {
+	args := append([]string{"rev-parse", "--symbolic-full-name", "--abbrev-ref", fmt.Sprintf("%s@{u}", branch)})
+	cmd, err := git.GitCommand(args...)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	parts := strings.SplitN(string(out), "/", 2)
+	return parts[0], nil
+}
+
 func (g *gitExecuter) Checkout(args []string) error {
-	return git.CheckoutBranch(args[0])
+	args = append([]string{"checkout"}, args...)
+	cmd, err := git.GitCommand(args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
 }
 
 func (g *gitExecuter) CurrentBranch() (string, error) {

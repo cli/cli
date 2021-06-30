@@ -125,6 +125,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
@@ -144,6 +145,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
@@ -165,6 +167,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"upstream", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "upstream/trunk"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/upstream/trunk"}).Return(nil).Once()
@@ -181,6 +184,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/test"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"test"}).Return(true).Once()
+				mgc.On("BranchRemote", "test").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"test", "origin/test"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/test"}).Return(nil).Once()
@@ -202,6 +206,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("Reset", []string{"--hard", "refs/remotes/origin/trunk"}).Return(nil).Once()
@@ -221,10 +226,29 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
 			},
 			wantErr: true,
 			errMsg:  "can't sync because there are diverging changes, you can use `--force` to overwrite the changes",
+		},
+		{
+			name: "sync local repo with parent and mismatching branch remotes",
+			tty:  true,
+			opts: &SyncOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
+				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync because trunk is not tracking OWNER/REPO",
 		},
 		{
 			name: "sync local repo with parent and local changes",
@@ -249,6 +273,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
 				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("Checkout", []string{"trunk"}).Return(nil).Once()
