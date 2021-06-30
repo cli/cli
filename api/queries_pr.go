@@ -533,10 +533,13 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
-		"requiresStrictStatusChecks", "headRefName", "headRepositoryOwner", "mergeStateStatus",
+		"headRefName", "headRepositoryOwner", "mergeStateStatus",
 	}
 	if prFeatures.HasStatusCheckRollup {
 		fields = append(fields, "statusCheckRollup")
+	}
+	if prFeatures.HasBranchProtectionRule {
+		fields = append(fields, "requiresStrictStatusChecks")
 	}
 
 	var reviewFields []string
