@@ -54,10 +54,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.SetOut(f.IOStreams.Out)
 	cmd.SetErr(f.IOStreams.ErrOut)
 
+	cs := f.IOStreams.ColorScheme()
+
+	helpHelper := func(command *cobra.Command, args []string) {
+		rootHelpFunc(cs, command, args)
+	}
+
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		rootHelpFunc(f, cmd, args)
-	})
+	cmd.SetHelpFunc(helpHelper)
 	cmd.SetUsageFunc(rootUsageFunc)
 	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
@@ -75,7 +79,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(extensionsCmd.NewCmdExtensions(f))
+	cmd.AddCommand(extensionsCmd.NewCmdExtensions(f.IOStreams))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 
