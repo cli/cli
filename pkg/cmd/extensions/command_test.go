@@ -102,6 +102,7 @@ func TestNewCmdExtensions(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			wantStdout: "✓ Removed extension hello\n",
 		},
 	}
 
