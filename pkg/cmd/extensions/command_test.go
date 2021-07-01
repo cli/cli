@@ -2,7 +2,6 @@ package extensions
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -25,22 +24,42 @@ func TestNewCmdExtensions(t *testing.T) {
 		args         []string
 		managerStubs func(em *extensions.ExtensionManagerMock) func(*testing.T)
 		wantErr      bool
-		wantStdout   string
-		wantStderr   string
+		errMsg       string
 	}{
 		{
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
 				em.InstallFunc = func(s string, out, errOut io.Writer) error {
 					return nil
 				}
 				return func(t *testing.T) {
-					calls := em.InstallCalls()
-					assert.Equal(t, 1, len(calls))
-					assert.Equal(t, "https://github.com/owner/gh-some-ext.git", calls[0].URL)
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 1, len(installCalls))
+					assert.Equal(t, "https://github.com/owner/gh-some-ext.git", installCalls[0].URL)
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
 				}
 			},
+		},
+		{
+			name: "install an extension with same name as existing extension",
+			args: []string{"install", "owner/gh-existing-ext"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					e := &Extension{path: "owner2/gh-existing-ext"}
+					return []extensions.Extension{e}
+				}
+				return func(t *testing.T) {
+					calls := em.ListCalls()
+					assert.Equal(t, 1, len(calls))
+				}
+			},
+			wantErr: true,
+			errMsg:  "could not install owner/gh-existing-ext: existing-ext is already an installed extension",
 		},
 		{
 			name: "install local extension",
@@ -60,6 +79,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name:    "upgrade error",
 			args:    []string{"upgrade"},
 			wantErr: true,
+			errMsg:  "must specify an extension to upgrade",
 		},
 		{
 			name: "upgrade an extension",
@@ -107,7 +127,7 @@ func TestNewCmdExtensions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, stderr := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
 			var assertFunc func(*testing.T)
 			em := &extensions.ExtensionManagerMock{}
@@ -125,12 +145,12 @@ func TestNewCmdExtensions(t *testing.T) {
 
 			cmd := NewCmdExtensions(&f)
 			cmd.SetArgs(tt.args)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err := cmd.ExecuteC()
 			if tt.wantErr {
-				assert.Error(t, err)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -138,9 +158,6 @@ func TestNewCmdExtensions(t *testing.T) {
 			if assertFunc != nil {
 				assertFunc(t)
 			}
-
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }

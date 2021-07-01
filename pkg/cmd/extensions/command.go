@@ -88,7 +88,12 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 				if c != rootCmd {
-					return fmt.Errorf("could not install %s: %s is already a gh command", args[0], commandName)
+					return fmt.Errorf("could not install %s: %s is already a command", args[0], commandName)
+				}
+				for _, ext := range m.List() {
+					if ext.Name() == commandName {
+						return fmt.Errorf("could not install %s: %s is already an installed extension", args[0], commandName)
+					}
 				}
 
 				cfg, err := f.Config()
