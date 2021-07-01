@@ -80,6 +80,17 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 				if !strings.HasPrefix(repo.RepoName(), "gh-") {
 					return errors.New("the repository name must start with `gh-`")
 				}
+
+				commandName := strings.TrimPrefix(repo.RepoName(), "gh-")
+				rootCmd := cmd.Root()
+				c, _, err := rootCmd.Traverse([]string{commandName})
+				if err != nil {
+					return err
+				}
+				if c != rootCmd {
+					return fmt.Errorf("could not install %s: %s is already a gh command", args[0], commandName)
+				}
+
 				cfg, err := f.Config()
 				if err != nil {
 					return err
