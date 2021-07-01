@@ -249,6 +249,9 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	hasLocalBranch := git.HasLocalBranch([]string{branch})
 	if hasLocalBranch {
 		branchRemote, err := git.BranchRemote(branch)
+		if err != nil {
+			return err
+		}
 		if branchRemote != remote {
 			return mismatchRemotesError
 		}

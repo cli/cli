@@ -22,7 +22,7 @@ type gitClient interface {
 type gitExecuter struct{}
 
 func (g *gitExecuter) BranchRemote(branch string) (string, error) {
-	args := append([]string{"rev-parse", "--symbolic-full-name", "--abbrev-ref", fmt.Sprintf("%s@{u}", branch)})
+	args := []string{"rev-parse", "--symbolic-full-name", "--abbrev-ref", fmt.Sprintf("%s@{u}", branch)}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return "", err
