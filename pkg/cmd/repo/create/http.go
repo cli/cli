@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/cli/cli/api"
 )
@@ -39,9 +38,6 @@ type repoTemplateInput struct {
 func repoCreate(client *http.Client, hostname string, input repoCreateInput, templateRepositoryID string) (*api.Repository, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
-	ownerName := input.OwnerID
-	isOrg := false
-
 	if input.TeamID != "" {
 		orgID, teamID, err := resolveOrganizationTeam(apiClient, hostname, input.OwnerID, input.TeamID)
 		if err != nil {
@@ -50,9 +46,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 		input.TeamID = teamID
 		input.OwnerID = orgID
 	} else if input.OwnerID != "" {
-		var orgID string
-		var err error
-		orgID, isOrg, err = resolveOrganization(apiClient, hostname, input.OwnerID)
+		orgID, err := resolveOrganization(apiClient, hostname, input.OwnerID)
 		if err != nil {
 			return nil, err
 		}
@@ -115,19 +109,12 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 	}
 
 	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" {
-		input.Visibility = strings.ToLower(input.Visibility)
 		body := &bytes.Buffer{}
 		enc := json.NewEncoder(body)
 		if err := enc.Encode(input); err != nil {
 			return nil, err
 		}
-
-		path := "user/repos"
-		if isOrg {
-			path = fmt.Sprintf("orgs/%s/repos", ownerName)
-		}
-
-		repo, err := api.CreateRepoTransformToV4(apiClient, hostname, "POST", path, body)
+		repo, err := api.CreateRepoTransformToV4(apiClient, hostname, "POST", "user/repos", body)
 		if err != nil {
 			return nil, err
 		}
@@ -154,13 +141,12 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
-func resolveOrganization(client *api.Client, hostname, orgName string) (string, bool, error) {
+func resolveOrganization(client *api.Client, hostname, orgName string) (string, error) {
 	var response struct {
 		NodeID string `json:"node_id"`
-		Type   string
 	}
 	err := client.REST(hostname, "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
-	return response.NodeID, response.Type == "Organization", err
+	return response.NodeID, err
 }
 
 // using API v3 here because the equivalent in GraphQL needs `read:org` scope
