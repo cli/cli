@@ -166,7 +166,7 @@ func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
 			}
 			continue
 		}
-		if fileInfo.Mode().Type() == os.ModeSymlink {
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			err = localExtensionUpgradeError
 			if name == "" {
 				fmt.Fprintf(stdout, "%s\n", err)
