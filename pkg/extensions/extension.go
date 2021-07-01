@@ -9,6 +9,7 @@ type Extension interface {
 	Name() string
 	Path() string
 	URL() string
+	IsLocal() bool
 }
 
 //go:generate moq -out manager_mock.go . ExtensionManager

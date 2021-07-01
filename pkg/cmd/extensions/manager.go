@@ -157,30 +157,16 @@ func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
 			continue
 		}
 
-		dir := filepath.Dir(f.Path())
-		fileInfo, e := os.Lstat(dir)
-		if e != nil {
-			err = e
+		if f.IsLocal() {
 			if name == "" {
-				fmt.Fprintf(stdout, "%s\n", err)
-			}
-			continue
-		}
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			err = localExtensionUpgradeError
-			if name == "" {
-				fmt.Fprintf(stdout, "%s\n", err)
-			}
-			continue
-		}
-		if _, err = os.Stat(filepath.Join(dir, ".git")); err != nil {
-			err = localExtensionUpgradeError
-			if name == "" {
-				fmt.Fprintf(stdout, "%s\n", err)
+				fmt.Fprintf(stdout, "%s\n", localExtensionUpgradeError)
+			} else {
+				err = localExtensionUpgradeError
 			}
 			continue
 		}
 
+		dir := filepath.Dir(f.Path())
 		externalCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
 		externalCmd.Stdout = stdout
 		externalCmd.Stderr = stderr
