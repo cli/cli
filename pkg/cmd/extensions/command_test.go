@@ -2,6 +2,7 @@ package extensions
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -145,8 +146,8 @@ func TestNewCmdExtensions(t *testing.T) {
 
 			cmd := NewCmdExtensions(&f)
 			cmd.SetArgs(tt.args)
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
 
 			_, err := cmd.ExecuteC()
 			if tt.wantErr {
