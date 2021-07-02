@@ -2,6 +2,8 @@ package cmdutil
 
 import (
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/spf13/cobra"
@@ -19,6 +21,30 @@ func executeParentHooks(cmd *cobra.Command, args []string) error {
 
 func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
+	_ = cmd.RegisterFlagCompletionFunc("repo", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var results []string
+		remotes, err := f.Remotes()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		config, err := f.Config()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		gh_host,err := config.DefaultHost()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		for _, remote := range remotes.FilterByHosts([]string{gh_host}) {
+			repo := remote.RepoOwner() + "/" + remote.RepoName()
+			if strings.HasPrefix(repo, toComplete) {
+				results = append(results, repo)
+			}
+		}
+		sort.Strings(results)
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := executeParentHooks(cmd, args); err != nil {
