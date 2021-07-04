@@ -125,7 +125,7 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue)
+	return printRawIssuePreview(opts.IO.Out, issue, opts.IO.ColorScheme())
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
@@ -141,9 +141,9 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	return issue, err
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue, cs *iostreams.ColorScheme) error {
 	assignees := issueAssigneeList(*issue)
-	labels := shared.IssueLabelList(*issue)
+	labels := shared.IssueLabelList(*issue, cs)
 	projects := issueProjectList(*issue)
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
@@ -193,7 +193,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue); labels != "" {
+	if labels := shared.IssueLabelList(*issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}

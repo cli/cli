@@ -139,7 +139,7 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 	reviewers := prReviewerList(*pr, cs)
 	assignees := prAssigneeList(*pr)
-	labels := prLabelList(*pr)
+	labels := prLabelList(*pr, cs)
 	projects := prProjectList(*pr)
 
 	fmt.Fprintf(out, "title:\t%s\n", pr.Title)
@@ -197,7 +197,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := prLabelList(*pr); labels != "" {
+	if labels := prLabelList(*pr, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -367,14 +367,14 @@ func prAssigneeList(pr api.PullRequest) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequest) string {
+func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, iostreams.HexToRGB(label.Color, label.Name))
+		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")
