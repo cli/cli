@@ -59,6 +59,19 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "SHA flag",
+			cli:  "--sha e32e640",
+			wants: BrowseOptions{
+				SHA: "e32e640",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "SHA flag no arg",
+			cli:      "-a",
+			wantsErr: true,
+		},
+		{
 			name: "branch flag",
 			cli:  "--branch main",
 			wants: BrowseOptions{
@@ -253,6 +266,25 @@ func Test_runBrowse(t *testing.T) {
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+		},
+		{
+			name: "opening browser with SHA hash no args",
+			opts: BrowseOptions{
+				SHA: "162a1b2",
+			},
+			baseRepo:    ghrepo.New("torvalds", "linux"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/torvalds/linux/tree/162a1b2/",
+		},
+		{
+			name: "opening browser with SHA hash file arg",
+			opts: BrowseOptions{
+				SHA:         "162a1b2",
+				SelectorArg: "api/cache.go:32",
+			},
+			baseRepo:    ghrepo.New("cli", "cli"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/cli/cli/tree/162a1b2/api/cache.go#L32",
 		},
 	}
 
