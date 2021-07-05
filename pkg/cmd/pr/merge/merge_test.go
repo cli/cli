@@ -257,10 +257,11 @@ func TestPrMerge(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -295,10 +296,11 @@ func TestPrMerge_nontty(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -330,10 +332,11 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -368,11 +371,12 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "PR_10",
-			Number:      10,
-			State:       "OPEN",
-			Title:       "Blueberries are a good fruit",
-			HeadRefName: "blueberries",
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -414,11 +418,12 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"blueberries",
 		&api.PullRequest{
-			ID:          "PR_10",
-			Number:      10,
-			State:       "OPEN",
-			Title:       "Blueberries are a good fruit",
-			HeadRefName: "blueberries",
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -457,10 +462,11 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	defer http.Verify(t)
 
 	pr := &api.PullRequest{
-		ID:     "PR_10",
-		Number: 10,
-		Title:  "Blueberries are a good fruit",
-		State:  "OPEN",
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
@@ -495,10 +501,11 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	defer http.Verify(t)
 
 	pr := &api.PullRequest{
-		ID:     "PR_10",
-		Number: 10,
-		Title:  "Blueberries are a good fruit",
-		State:  "OPEN",
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
@@ -536,10 +543,11 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:     "PR_10",
-			Number: 10,
-			Title:  "Blueberries are a good fruit",
-			State:  "OPEN",
+			ID:               "PR_10",
+			Number:           10,
+			Title:            "Blueberries are a good fruit",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -572,10 +580,11 @@ func TestPrMerge_rebase(t *testing.T) {
 	shared.RunCommandFinder(
 		"2",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 2,
-			Title:  "The title of the PR",
-			State:  "OPEN",
+			ID:               "THE-ID",
+			Number:           2,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -610,10 +619,11 @@ func TestPrMerge_squash(t *testing.T) {
 	shared.RunCommandFinder(
 		"3",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 3,
-			Title:  "The title of the PR",
-			State:  "OPEN",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -647,11 +657,12 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	shared.RunCommandFinder(
 		"4",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      4,
-			State:       "MERGED",
-			HeadRefName: "blueberries",
-			BaseRefName: "master",
+			ID:               "THE-ID",
+			Number:           4,
+			State:            "MERGED",
+			HeadRefName:      "blueberries",
+			BaseRefName:      "master",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -684,6 +695,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 			Number:              4,
 			State:               "MERGED",
 			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
+			MergeStateStatus:    "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -707,10 +719,11 @@ func TestPRMerge_interactive(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      3,
-			Title:       "It was the best of times",
-			HeadRefName: "blueberries",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -757,10 +770,11 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      3,
-			Title:       "It was the best of times",
-			HeadRefName: "blueberries",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -859,7 +873,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		InteractiveMode: true,
 		Finder: shared.NewMockFinder(
 			"https://github.com/OWNER/REPO/pull/123",
-			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title"},
+			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
 			ghrepo.New("OWNER", "REPO"),
 		),
 	})
@@ -875,7 +889,7 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 
 	shared.RunCommandFinder(
 		"",
-		&api.PullRequest{ID: "THE-ID", Number: 123},
+		&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
 		ghrepo.New("OWNER", "REPO"),
 	)
 
