@@ -3,42 +3,58 @@ package liveshare
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 )
 
-type Session struct {
-	WorkspaceAccess *WorkspaceAccessResponse
-	WorkspaceInfo   *WorkspaceInfoResponse
+type session struct {
+	api *api
+
+	workspaceAccess *workspaceAccessResponse
+	workspaceInfo   *workspaceInfoResponse
 }
 
-func GetSession(ctx context.Context, configuration *Configuration) (*Session, error) {
-	api := NewAPI(configuration)
-	session := new(Session)
+func newSession(api *api) *session {
+	return &session{api: api}
+}
 
+func (s *session) init(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		workspaceAccess, err := api.WorkspaceAccess()
+		workspaceAccess, err := s.api.workspaceAccess()
 		if err != nil {
 			return fmt.Errorf("error getting workspace access: %v", err)
 		}
-		session.WorkspaceAccess = workspaceAccess
+		s.workspaceAccess = workspaceAccess
 		return nil
 	})
 
 	g.Go(func() error {
-		workspaceInfo, err := api.WorkspaceInfo()
+		workspaceInfo, err := s.api.workspaceInfo()
 		if err != nil {
 			return fmt.Errorf("error getting workspace info: %v", err)
 		}
-		session.WorkspaceInfo = workspaceInfo
+		s.workspaceInfo = workspaceInfo
 		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return session, nil
+	return nil
+}
+
+// Reference:
+// https://github.com/Azure/azure-relay-node/blob/7b57225365df3010163bf4b9e640868a02737eb6/hyco-ws/index.js#L107-L137
+func (s *session) relayURI(action string) string {
+	relaySas := url.QueryEscape(s.workspaceAccess.RelaySas)
+	relayURI := s.workspaceAccess.RelayLink
+	relayURI = strings.Replace(relayURI, "sb:", "wss:", -1)
+	relayURI = strings.Replace(relayURI, ".net/", ".net:443/$hc/", 1)
+	relayURI = relayURI + "?sb-hc-action=" + action + "&sb-hc-token=" + relaySas
+	return relayURI
 }

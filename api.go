@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 )
 
-type API struct {
-	Configuration *Configuration
-	HttpClient    *http.Client
-	ServiceURI    string
-	WorkspaceID   string
+type api struct {
+	client      *Client
+	httpClient  *http.Client
+	serviceURI  string
+	workspaceID string
 }
 
-func NewAPI(configuration *Configuration) *API {
-	serviceURI := configuration.LiveShareEndpoint
-	if !strings.HasSuffix(configuration.LiveShareEndpoint, "/") {
-		serviceURI = configuration.LiveShareEndpoint + "/"
+func newAPI(client *Client) *api {
+	serviceURI := client.liveShare.Configuration.LiveShareEndpoint
+	if !strings.HasSuffix(client.liveShare.Configuration.LiveShareEndpoint, "/") {
+		serviceURI = client.liveShare.Configuration.LiveShareEndpoint + "/"
 	}
 
 	if !strings.Contains(serviceURI, "api/v1.2") {
@@ -28,10 +27,10 @@ func NewAPI(configuration *Configuration) *API {
 
 	serviceURI = strings.TrimSuffix(serviceURI, "/")
 
-	return &API{configuration, &http.Client{}, serviceURI, strings.ToUpper(configuration.WorkspaceID)}
+	return &api{client, &http.Client{}, serviceURI, strings.ToUpper(client.liveShare.Configuration.WorkspaceID)}
 }
 
-type WorkspaceAccessResponse struct {
+type workspaceAccessResponse struct {
 	SessionToken              string            `json:"sessionToken"`
 	CreatedAt                 string            `json:"createdAt"`
 	UpdatedAt                 string            `json:"updatedAt"`
@@ -51,8 +50,8 @@ type WorkspaceAccessResponse struct {
 	ID                        string            `json:"id"`
 }
 
-func (a *API) WorkspaceAccess() (*WorkspaceAccessResponse, error) {
-	url := fmt.Sprintf("%s/workspace/%s/user", a.ServiceURI, a.WorkspaceID)
+func (a *api) workspaceAccess() (*workspaceAccessResponse, error) {
+	url := fmt.Sprintf("%s/workspace/%s/user", a.serviceURI, a.workspaceID)
 	fmt.Println(url)
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
@@ -61,7 +60,7 @@ func (a *API) WorkspaceAccess() (*WorkspaceAccessResponse, error) {
 	}
 
 	a.setDefaultHeaders(req)
-	resp, err := a.HttpClient.Do(req)
+	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -71,23 +70,21 @@ func (a *API) WorkspaceAccess() (*WorkspaceAccessResponse, error) {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
-	d, _ := httputil.DumpResponse(resp, true)
-	fmt.Println(string(d))
-	var workspaceAccessResponse WorkspaceAccessResponse
-	if err := json.Unmarshal(b, &workspaceAccessResponse); err != nil {
+	var response workspaceAccessResponse
+	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response into json: %v", err)
 	}
 
-	return &workspaceAccessResponse, nil
+	return &response, nil
 }
 
-func (a *API) setDefaultHeaders(req *http.Request) {
-	req.Header.Set("Authorization", "Bearer "+a.Configuration.Token)
+func (a *api) setDefaultHeaders(req *http.Request) {
+	req.Header.Set("Authorization", "Bearer "+a.client.liveShare.Configuration.Token)
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Content-Type", "application/json")
 }
 
-type WorkspaceInfoResponse struct {
+type workspaceInfoResponse struct {
 	CreatedAt                 string   `json:"createdAt"`
 	UpdatedAt                 string   `json:"updatedAt"`
 	Name                      string   `json:"name"`
@@ -106,8 +103,8 @@ type WorkspaceInfoResponse struct {
 	ID                        string   `json:"id"`
 }
 
-func (a *API) WorkspaceInfo() (*WorkspaceInfoResponse, error) {
-	url := fmt.Sprintf("%s/workspace/%s", a.ServiceURI, a.WorkspaceID)
+func (a *api) workspaceInfo() (*workspaceInfoResponse, error) {
+	url := fmt.Sprintf("%s/workspace/%s", a.serviceURI, a.workspaceID)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -115,7 +112,7 @@ func (a *API) WorkspaceInfo() (*WorkspaceInfoResponse, error) {
 	}
 
 	a.setDefaultHeaders(req)
-	resp, err := a.HttpClient.Do(req)
+	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -125,10 +122,10 @@ func (a *API) WorkspaceInfo() (*WorkspaceInfoResponse, error) {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
-	var workspaceInfoResponse WorkspaceInfoResponse
-	if err := json.Unmarshal(b, &workspaceInfoResponse); err != nil {
+	var response workspaceInfoResponse
+	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response into json: %v", err)
 	}
 
-	return &workspaceInfoResponse, nil
+	return &response, nil
 }
