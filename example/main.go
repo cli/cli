@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/github/go-liveshare"
 )
@@ -87,6 +88,8 @@ func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID str
 	if err := stream.Close(); err != nil {
 		return fmt.Errorf("error closing stream: %v", err)
 	}
+
+	time.Sleep(2 * time.Second)
 
 	return nil
 }
