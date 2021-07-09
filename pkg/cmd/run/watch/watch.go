@@ -123,6 +123,9 @@ func watchRun(opts *WatchOptions) error {
 
 	if run.Status == shared.Completed {
 		fmt.Fprintf(out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
+		if opts.ExitStatus && run.Conclusion != shared.Success {
+			return cmdutil.SilentError
+		}
 		return nil
 	}
 
