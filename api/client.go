@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,10 @@ import (
 	"github.com/henvic/httpretty"
 	"github.com/shurcooL/graphql"
 )
+
+// The Search API returns a max of 1000 results for each search.
+// (https://docs.github.com/en/rest/reference/search#about-the-search-api)
+var ErrSearchAPIMaxLimit = errors.New("limit was set to >1000 but Github search API returns max 1000 results")
 
 // ClientOption represents an argument to NewClient
 type ClientOption = func(http.RoundTripper) http.RoundTripper

@@ -151,9 +151,9 @@ func listRun(opts *ListOptions) error {
 		filterOptions.Fields = opts.Exporter.Fields()
 	}
 
-	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
-	if err != nil {
-		return err
+	listResult, listErr := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
+	if listErr != nil && listErr != api.ErrSearchAPIMaxLimit {
+		return listErr
 	}
 
 	err = opts.IO.StartPager()
@@ -168,7 +168,14 @@ func listRun(opts *ListOptions) error {
 
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
-		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
+		out := fmt.Sprintf("\n%s\n", title)
+
+		if listErr == api.ErrSearchAPIMaxLimit {
+			icon := opts.IO.ColorScheme().WarningIcon()
+			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
+		}
+
+		fmt.Fprintf(opts.IO.Out, "%s\n", out)
 	}
 
 	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)

@@ -175,6 +175,10 @@ pagination:
 		variables["endCursor"] = githubv4.String(result.Search.PageInfo.EndCursor)
 	}
 
+	if limit > 1000 {
+		return &listResult, api.ErrSearchAPIMaxLimit
+	}
+
 	return &listResult, nil
 }
 

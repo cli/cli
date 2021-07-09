@@ -130,9 +130,9 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	listResult, err := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
-	if err != nil {
-		return err
+	listResult, listErr := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
+	if listErr != nil {
+		return listErr
 	}
 
 	if err := opts.IO.StartPager(); err != nil {
@@ -174,7 +174,14 @@ func listRun(opts *ListOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
-		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
+		out := fmt.Sprintf("\n%s\n", title)
+
+		if listErr == api.ErrSearchAPIMaxLimit {
+			icon := opts.IO.ColorScheme().WarningIcon()
+			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
+		}
+
+		fmt.Fprintln(opts.IO.Out, out)
 	}
 
 	return tp.Render()

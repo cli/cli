@@ -126,6 +126,11 @@ loop:
 	}
 
 	res := api.IssuesAndTotalCount{Issues: issues, TotalCount: totalCount}
+
+	if limit > 1000 {
+		return &res, api.ErrSearchAPIMaxLimit
+	}
+
 	return &res, nil
 }
 
