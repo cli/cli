@@ -17,9 +17,9 @@ type repoCreateInput struct {
 	HomepageURL string `json:"homepageUrl,omitempty"`
 	Description string `json:"description,omitempty"`
 
-	OwnerID string `json:"ownerId,omitempty"`
-	TeamID  string `json:"teamId,omitempty"`
-	Private bool `json:"private,omitempty"`
+	OwnerID           string `json:"ownerId,omitempty"`
+	TeamID            string `json:"teamId,omitempty"`
+	Private           bool   `json:"private,omitempty"`
 	HasIssuesEnabled  bool   `json:"hasIssuesEnabled"`
 	HasWikiEnabled    bool   `json:"hasWikiEnabled"`
 	GitIgnoreTemplate string `json:"gitignore_template,omitempty"`
