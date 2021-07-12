@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -46,6 +47,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:  "--wiki",
 			wants: BrowseOptions{
 				WikiFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "no browser flag",
+			cli:  "--no-browser",
+			wants: BrowseOptions{
+				NoBrowserFlag: true,
 			},
 			wantsErr: false,
 		},
@@ -118,6 +127,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.wants.ProjectsFlag, opts.ProjectsFlag)
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
+			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
 		})
 	}
@@ -233,6 +243,17 @@ func Test_runBrowse(t *testing.T) {
 			wantsErr:    false,
 			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
 		},
+		{
+			name: "no browser with branch file and line number",
+			opts: BrowseOptions{
+				Branch:        "3-0-stable",
+				SelectorArg:   "init.rb:6",
+				NoBrowserFlag: true,
+			},
+			baseRepo:    ghrepo.New("mislav", "will_paginate"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+		},
 	}
 
 	for _, tt := range tests {
@@ -263,9 +284,15 @@ func Test_runBrowse(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, "", stdout.String())
-			assert.Equal(t, "", stderr.String())
-			browser.Verify(t, tt.expectedURL)
+			if opts.NoBrowserFlag {
+				assert.Equal(t, fmt.Sprintf("%s\n", tt.expectedURL), stdout.String())
+				assert.Equal(t, "", stderr.String())
+				browser.Verify(t, "")
+			} else {
+				assert.Equal(t, "", stdout.String())
+				assert.Equal(t, "", stderr.String())
+				browser.Verify(t, tt.expectedURL)
+			}
 		})
 	}
 }
