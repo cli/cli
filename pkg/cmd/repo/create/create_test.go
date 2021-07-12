@@ -606,27 +606,19 @@ func TestRepoCreate_WithGitIgnore(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
-	var reqBody struct {
-		Name            string
-		Visibility      string
-		OwnerId         string
-		LicenseTemplate string
-	}
-
 	if len(reg.Requests) != 3 {
 		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if repoName := reqBody.Name; repoName != "REPO" {
-		t.Errorf("expected %q, got %q", "REPO", repoName)
+	reqBody := make(map[string]interface{})
+	dec := json.NewDecoder(reg.Requests[2].Body)
+	assert.NoError(t, dec.Decode(&reqBody))
+
+	if gitignore := reqBody["gitignore_template"]; gitignore != "Go" {
+		t.Errorf("expected %q, got %q", "Go", gitignore)
 	}
-	if repoVisibility := reqBody.Visibility; repoVisibility != "private" {
-		t.Errorf("expected %q, got %q", "private", repoVisibility)
-	}
-	if ownerId := reqBody.OwnerId; ownerId != "OWNERID" {
-		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
+	if license := reqBody["license_template"]; license != nil {
+		t.Errorf("expected %v, got %v", nil, license)
 	}
 }
 
@@ -671,7 +663,7 @@ func TestRepoCreate_WithBothGitIgnoreLicense(t *testing.T) {
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "chooseLicense",
-			Value: "GNU Affero General Public License v3.0",
+			Value: "GNU Lesser General Public License v3.0",
 		},
 	})
 
@@ -705,115 +697,18 @@ func TestRepoCreate_WithBothGitIgnoreLicense(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
 
-	var reqBody struct {
-		Name            string
-		Visibility      string
-		OwnerId         string
-		LicenseTemplate string
-	}
-
 	if len(reg.Requests) != 4 {
 		t.Fatalf("expected 4 HTTP request, got %d", len(reg.Requests))
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[3].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if repoName := reqBody.Name; repoName != "REPO" {
-		t.Errorf("expected %q, got %q", "REPO", repoName)
+	reqBody := make(map[string]interface{})
+	dec := json.NewDecoder(reg.Requests[3].Body)
+	assert.NoError(t, dec.Decode(&reqBody))
+
+	if gitignore := reqBody["gitignore_template"]; gitignore != "Go" {
+		t.Errorf("expected %q, got %q", "Go", gitignore)
 	}
-	if repoVisibility := reqBody.Visibility; repoVisibility != "private" {
-		t.Errorf("expected %q, got %q", "private", repoVisibility)
-	}
-	if ownerId := reqBody.OwnerId; ownerId != "OWNERID" {
-		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
-	}
-}
-
-func TestRepoCreate_WithGitIgnore_Org(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
-	cs.Register(`git rev-parse --show-toplevel`, 0, "")
-
-	as, surveyTearDown := prompt.InitAskStubber()
-	defer surveyTearDown()
-
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "repoVisibility",
-			Value: "PRIVATE",
-		},
-	})
-
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "addGitIgnore",
-			Value: true,
-		},
-	})
-
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "chooseGitIgnore",
-			Value: "Go",
-		},
-	})
-
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "addLicense",
-			Value: false,
-		},
-	})
-
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmSubmit",
-			Value: true,
-		},
-	})
-
-	reg := &httpmock.Registry{}
-	reg.Register(
-		httpmock.REST("GET", "users/OWNER"),
-		httpmock.StringResponse(`{ "node_id": "OWNERID", "type":"Organization" }`))
-	reg.Register(
-		httpmock.REST("GET", "gitignore/templates"),
-		httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
-	reg.Register(
-		httpmock.REST("POST", "orgs/OWNER/repos"),
-		httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
-	httpClient := &http.Client{Transport: reg}
-
-	output, err := runCommand(httpClient, "OWNER/REPO", true)
-	if err != nil {
-		t.Errorf("error running command `repo create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
-
-	var reqBody struct {
-		Name            string
-		Visibility      string
-		OwnerId         string
-		LicenseTemplate string
-	}
-
-	if len(reg.Requests) != 3 {
-		t.Fatalf("expected 3 HTTP request, got %d", len(reg.Requests))
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-	if repoName := reqBody.Name; repoName != "REPO" {
-		t.Errorf("expected %q, got %q", "REPO", repoName)
-	}
-	if repoVisibility := reqBody.Visibility; repoVisibility != "private" {
-		t.Errorf("expected %q, got %q", "private", repoVisibility)
-	}
-	if ownerId := reqBody.OwnerId; ownerId != "OWNERID" {
-		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
+	if license := reqBody["license_template"]; license != "lgpl-3.0" {
+		t.Errorf("expected %q, got %q", "lgpl-3.0", license)
 	}
 }
