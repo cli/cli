@@ -3,7 +3,7 @@ module github.com/cli/cli
 go 1.13
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.2.9
+	github.com/AlecAivazis/survey/v2 v2.2.14
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.11.1
 	github.com/charmbracelet/glamour v0.3.0
@@ -34,7 +34,7 @@ require (
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44
-	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed
+	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	golang.org/x/text v0.3.4 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
