@@ -157,8 +157,8 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.NoBrowserFlag {
-		_, err := fmt.Fprintf(opts.IO.Out, "%s\n", url)
-		return err
+		fmt.Fprintf(opts.IO.Out, "%s\n", url)
+		return nil
 	} else {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
