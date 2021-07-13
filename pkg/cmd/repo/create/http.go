@@ -79,6 +79,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput, tem
 			Visibility:   input.Visibility,
 			OwnerID:      input.OwnerID,
 			RepositoryID: templateRepositoryID,
+			Description:  input.Description,
 		}
 
 		variables := map[string]interface{}{
