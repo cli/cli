@@ -26,10 +26,11 @@ type BrowseOptions struct {
 
 	SelectorArg string
 
-	Branch       string
-	ProjectsFlag bool
-	SettingsFlag bool
-	WikiFlag     bool
+	Branch        string
+	ProjectsFlag  bool
+	SettingsFlag  bool
+	WikiFlag      bool
+	NoBrowserFlag bool
 }
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
@@ -99,6 +100,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
+	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
 
 	return cmd
@@ -151,10 +153,15 @@ func runBrowse(opts *BrowseOptions) error {
 		}
 	}
 
-	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
+	if opts.NoBrowserFlag {
+		fmt.Fprintf(opts.IO.Out, "%s\n", url)
+		return nil
+	} else {
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
+		}
+		return opts.Browser.Browse(url)
 	}
-	return opts.Browser.Browse(url)
 }
 
 func parseFileArg(fileArg string) (string, error) {
