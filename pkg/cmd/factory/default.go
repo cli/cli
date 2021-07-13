@@ -89,8 +89,21 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
+// browser returns the path to the browser. Attempts to read a path from Config,
+// and falls back to the $BROWSER env var if Config value is blank.
 func browser(f *cmdutil.Factory) cmdutil.Browser {
 	io := f.IOStreams
+
+	cfg, err := f.Config()
+	if err != nil {
+		fmt.Fprintf(io.ErrOut, "problem loading config %s", err)
+	}
+
+	fromConfig, err := cfg.Get("", "browser")
+	if err == nil && fromConfig != "" {
+		return cmdutil.NewBrowser(fromConfig, io.Out, io.ErrOut)
+	}
+
 	return cmdutil.NewBrowser(os.Getenv("BROWSER"), io.Out, io.ErrOut)
 }
 
