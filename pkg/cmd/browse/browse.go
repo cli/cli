@@ -30,6 +30,10 @@ type BrowseOptions struct {
 	ProjectsFlag bool
 	SettingsFlag bool
 	WikiFlag     bool
+	// URLFlag is true to print the URL to stdout instead of opening in browser.
+	URLFlag bool
+	// Commit is the commit SHA to browse.
+	Commit string
 }
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
@@ -59,6 +63,12 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 
 			$ gh browse main.go --branch main
 			#=> Open main.go in the main branch
+
+			$ gh browse --commit 666ed2f
+			#=> Open commit 666ed2f
+
+			$ gh browse --url
+			#=> Print the URL for the repo
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",
@@ -79,11 +89,12 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--projects`, `--wiki`, `--commit` or `--settings`",
 				opts.Branch != "",
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
+				opts.Commit != "",
 			); err != nil {
 				return err
 			}
@@ -100,6 +111,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
+	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Open commit by passing the SHA")
+	cmd.Flags().BoolVarP(&opts.URLFlag, "url", "u", false, "Print the URL to stdout instead of opening in browser")
 
 	return cmd
 }
@@ -117,17 +130,17 @@ func runBrowse(opts *BrowseOptions) error {
 	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
 	if opts.SelectorArg == "" {
+		// These are mutually exclusive options. Only one may be used.
 		if opts.ProjectsFlag {
 			url += "/projects"
-		}
-		if opts.SettingsFlag {
+		} else if opts.SettingsFlag {
 			url += "/settings"
-		}
-		if opts.WikiFlag {
+		} else if opts.WikiFlag {
 			url += "/wiki"
-		}
-		if opts.Branch != "" {
+		} else if opts.Branch != "" {
 			url += "/tree/" + opts.Branch + "/"
+		} else if opts.Commit != "" {
+			url += "/commit/" + opts.Commit
 		}
 	} else {
 		if isNumber(opts.SelectorArg) {
@@ -152,8 +165,14 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
+		if opts.URLFlag {
+			fmt.Fprintf(opts.IO.Out, "%s\n", url)
+			return nil
+		} else {
+			fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
+		}
 	}
+
 	return opts.Browser.Browse(url)
 }
 

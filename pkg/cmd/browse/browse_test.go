@@ -93,6 +93,22 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "main.go main.go",
 			wantsErr: true,
 		},
+		{
+			name: "commit flag",
+			cli:  "--commit 666ed2f",
+			wants: BrowseOptions{
+				Commit: "666ed2f",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "url flag",
+			cli:  "--url",
+			wants: BrowseOptions{
+				URLFlag: true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -232,6 +248,24 @@ func Test_runBrowse(t *testing.T) {
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
+		},
+		{
+			name: "opening commit",
+			opts: BrowseOptions{
+				Commit: "666ed2f",
+			},
+			baseRepo:    ghrepo.New("despreston", "frombostonwithlove"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/despreston/frombostonwithlove/commit/666ed2f",
+		},
+		{
+			name: "with url flag",
+			opts: BrowseOptions{
+				URLFlag: true,
+			},
+			baseRepo:    ghrepo.New("despreston", "go-craq"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/despreston/go-craq",
 		},
 	}
 
