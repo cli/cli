@@ -817,3 +817,64 @@ func TestRepoCreate_WithGitIgnore_Org(t *testing.T) {
 		t.Errorf("expected %q, got %q", "OWNERID", ownerId)
 	}
 }
+
+func TestRepoCreate_WithConfirmFlag(t *testing.T) {
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git remote add -f origin https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+
+	reg := &httpmock.Registry{}
+
+	reg.Register(
+		httpmock.GraphQL(`mutation RepositoryCreate\b`),
+		httpmock.StringResponse(`
+		{ "data": { "createRepository": {
+			"repository": {
+				"id": "REPOID",
+				"url": "https://github.com/OWNER/REPO",
+				"name": "REPO",
+				"owner": {
+					"login": "OWNER"
+				}
+			}
+		} } }`),
+	)
+
+	reg.Register(
+		httpmock.REST("GET", "users/OWNER"),
+		httpmock.StringResponse(`{ "node_id": "OWNERID" }`),
+	)
+
+	httpClient := &http.Client{Transport: reg}
+
+	in := "OWNER/REPO --confirm --private"
+	output, err := runCommand(httpClient, in, true)
+	if err != nil {
+		t.Errorf("error running command `repo create %v`: %v", in, err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n", output.Stderr())
+
+	var reqBody struct {
+		Query     string
+		Variables struct {
+			Input map[string]interface{}
+		}
+	}
+
+	if len(reg.Requests) != 2 {
+		t.Fatalf("expected 2 HTTP request, got %d", len(reg.Requests))
+	}
+
+	bodyBytes, _ := ioutil.ReadAll(reg.Requests[1].Body)
+	_ = json.Unmarshal(bodyBytes, &reqBody)
+	if repoName := reqBody.Variables.Input["name"].(string); repoName != "REPO" {
+		t.Errorf("expected %q, got %q", "REPO", repoName)
+	}
+	if repoVisibility := reqBody.Variables.Input["visibility"].(string); repoVisibility != "PRIVATE" {
+		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
+	}
+}
