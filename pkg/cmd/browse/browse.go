@@ -27,7 +27,7 @@ type BrowseOptions struct {
 	SelectorArg string
 
 	Branch        string
-	SHA           string
+	Commit        string
 	ProjectsFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
@@ -81,8 +81,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
+				opts.Commit != "",
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -103,7 +104,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
-	cmd.Flags().StringVarP(&opts.SHA, "sha", "a", "", "Select a commit by passing in the SHA hash")
+	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select a commit by passing in the SHA hash")
 
 	return cmd
 }
@@ -129,8 +130,8 @@ func runBrowse(opts *BrowseOptions) error {
 			url += "/wiki"
 		} else if opts.Branch != "" {
 			url += "/tree/" + opts.Branch + "/"
-		} else if opts.SHA != "" {
-			url += "/tree/" + opts.SHA + "/"
+		} else if opts.Commit != "" {
+			url += "/tree/" + opts.Commit + "/"
 		}
 	} else {
 		if isNumber(opts.SelectorArg) {
@@ -142,8 +143,8 @@ func runBrowse(opts *BrowseOptions) error {
 			}
 			if opts.Branch != "" {
 				url += "/tree/" + opts.Branch + "/"
-			} else if opts.SHA != "" {
-				url += "/tree/" + opts.SHA + "/"
+			} else if opts.Commit != "" {
+				url += "/tree/" + opts.Commit + "/"
 			} else {
 				apiClient := api.NewClientFromHTTP(httpClient)
 				branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
