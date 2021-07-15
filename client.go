@@ -3,7 +3,6 @@ package liveshare
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -100,11 +99,10 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 	go c.processChannelRequests(ctx, reqs)
 
 	requestType := fmt.Sprintf("stream-transport-%s", streamID)
-	acked, err := channel.SendRequest(requestType, true, nil)
+	_, err = channel.SendRequest(requestType, true, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error sending channel request: %v", err)
 	}
-	fmt.Println("ACKED: ", acked)
 
 	return channel, nil
 }
@@ -114,8 +112,7 @@ func (c *Client) processChannelRequests(ctx context.Context, reqs <-chan *ssh.Re
 		select {
 		case req := <-reqs:
 			if req != nil {
-				fmt.Printf("REQ: %+v\n\n", req)
-				log.Println("streaming channel requests are not supported")
+				// TODO(josebalius): Handle
 			}
 		case <-ctx.Done():
 			break

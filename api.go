@@ -52,7 +52,6 @@ type workspaceAccessResponse struct {
 
 func (a *api) workspaceAccess() (*workspaceAccessResponse, error) {
 	url := fmt.Sprintf("%s/workspace/%s/user", a.serviceURI, a.workspaceID)
-	fmt.Println(url)
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {

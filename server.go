@@ -36,14 +36,12 @@ type serverSharingResponse struct {
 func (s *Server) StartSharing(ctx context.Context, protocol string, port int) error {
 	s.port = port
 
-	sharingStarted := s.client.rpc.handler.registerEventHandler("serverSharing.sharingStarted")
 	var response serverSharingResponse
 	if err := s.client.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
 		port, protocol, fmt.Sprintf("http://localhost:%s", strconv.Itoa(port)),
 	}, &response); err != nil {
 		return err
 	}
-	<-sharingStarted
 
 	s.streamName = response.StreamName
 	s.streamCondition = response.StreamCondition

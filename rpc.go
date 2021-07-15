@@ -2,7 +2,6 @@ package liveshare
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -26,8 +25,6 @@ func (r *rpc) connect(ctx context.Context) {
 }
 
 func (r *rpc) do(ctx context.Context, method string, args interface{}, result interface{}) error {
-	b, _ := json.Marshal(args)
-	fmt.Println("rpc sent: ", method, string(b))
 	waiter, err := r.Conn.DispatchCall(ctx, method, args)
 	if err != nil {
 		return fmt.Errorf("error on dispatch call: %v", err)
@@ -69,12 +66,6 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	fmt.Println("REQUEST")
-	fmt.Println("Method:", req.Method)
-	b, _ := req.MarshalJSON()
-	fmt.Println(string(b))
-	fmt.Println("----")
-	fmt.Printf("%+v\n\n", r.eventHandlers)
 	if handlers, ok := r.eventHandlers[req.Method]; ok {
 		go func() {
 			for _, handler := range handlers {
@@ -88,10 +79,6 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 			r.eventHandlers[req.Method] = []chan *jsonrpc2.Request{}
 		}()
 	} else {
-		fmt.Println("UNHANDLED REQUEST")
-		fmt.Println("Method:", req.Method)
-		b, _ := req.MarshalJSON()
-		fmt.Println(string(b))
-		fmt.Println("----")
+		// TODO(josebalius): Handle
 	}
 }
