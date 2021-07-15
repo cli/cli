@@ -221,21 +221,23 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		// GitIgnore and License templates not added when a template repository is passed.
-		if gitIgnoreTemplate == "" && opts.Template == "" && opts.IO.CanPrompt() {
-			gt, err := interactiveGitIgnore(api.NewClientFromHTTP(httpClient), host)
-			if err != nil {
-				return err
+		// GitIgnore and License templates not added when a template repository
+		// is passed, or when the confirm flag is set.
+		if opts.Template == "" && opts.IO.CanPrompt() && !opts.ConfirmSubmit {
+			if gitIgnoreTemplate == "" {
+				gt, err := interactiveGitIgnore(api.NewClientFromHTTP(httpClient), host)
+				if err != nil {
+					return err
+				}
+				gitIgnoreTemplate = gt
 			}
-			gitIgnoreTemplate = gt
-		}
-
-		if repoLicenseTemplate == "" && opts.Template == "" && opts.IO.CanPrompt() {
-			lt, err := interactiveLicense(api.NewClientFromHTTP(httpClient), host)
-			if err != nil {
-				return err
+			if repoLicenseTemplate == "" {
+				lt, err := interactiveLicense(api.NewClientFromHTTP(httpClient), host)
+				if err != nil {
+					return err
+				}
+				repoLicenseTemplate = lt
 			}
-			repoLicenseTemplate = lt
 		}
 	}
 
