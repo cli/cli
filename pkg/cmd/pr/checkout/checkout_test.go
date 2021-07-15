@@ -100,6 +100,66 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 			},
 		},
+		{
+			name: "with local branch rename",
+			opts: &CheckoutOptions{
+				SelectorArg: "123",
+				BranchName:  "foobar",
+				Finder: func() shared.PRFinder {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					pr.HeadRepository = nil
+					finder := shared.NewMockFinder("123", pr, baseRepo)
+					return finder
+				}(),
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
+				cs.Register(`git config branch\.feature\.merge`, 1, "")
+				cs.Register(`git checkout -b foobar --track feature`, 0, "")
+				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
+			},
+		},
+		{
+			name: "with local branch name, no existing git remote",
+			opts: &CheckoutOptions{
+				SelectorArg: "123",
+				BranchName:  "foobar",
+				Finder: func() shared.PRFinder {
+					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
+					pr.MaintainerCanModify = true
+					pr.HeadRepository = nil
+					finder := shared.NewMockFinder("123", pr, baseRepo)
+					return finder
+				}(),
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Branch: func() (string, error) {
+					return "main", nil
+				},
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
+				cs.Register(`git config branch\.feature\.merge`, 1, "")
+				cs.Register(`git checkout -b foobar --track feature`, 0, "")
+				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
