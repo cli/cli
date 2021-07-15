@@ -110,8 +110,8 @@ func SSH(sshProfile string) error {
 			time.Sleep(1 * time.Second)
 		}
 
-		if retries == 20 {
-			return errors.New("Timed out waiting for Codespace to start. Try again.")
+		if retries == 30 {
+			return errors.New("timed out while waiting for the codespace to start")
 		}
 
 		codespace, err = apiClient.GetCodespace(ctx, token, codespace.OwnerLogin, codespace.Name)
