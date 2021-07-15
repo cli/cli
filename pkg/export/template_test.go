@@ -179,10 +179,10 @@ func Test_executeTemplate(t *testing.T) {
 		{
 			name: "table with header and footer",
 			args: args{
-				json: strings.NewReader((heredoc.Doc(`[
+				json: strings.NewReader(heredoc.Doc(`[
 					{"number": 1, "title": "One"},
 					{"number": 2, "title": "Two"}
-				]`))),
+				]`)),
 				template: heredoc.Doc(`HEADER
 				{{range .}}{{row .number .title}}{{end}}FOOTER
 				`),
@@ -196,10 +196,10 @@ func Test_executeTemplate(t *testing.T) {
 		{
 			name: "table with header and footer (TTY)",
 			args: args{
-				json: strings.NewReader((heredoc.Doc(`[
+				json: strings.NewReader(heredoc.Doc(`[
 					{"number": 1, "title": "One"},
 					{"number": 2, "title": "Two"}
-				]`))),
+				]`)),
 				template: heredoc.Doc(`HEADER
 				{{range .}}{{row .number .title}}{{end}}FOOTER
 				`),
@@ -214,10 +214,10 @@ func Test_executeTemplate(t *testing.T) {
 		{
 			name: "table with header and footer using endtable (TTY)",
 			args: args{
-				json: strings.NewReader((heredoc.Doc(`[
+				json: strings.NewReader(heredoc.Doc(`[
 					{"number": 1, "title": "One"},
 					{"number": 2, "title": "Two"}
-				]`))),
+				]`)),
 				template: heredoc.Doc(`HEADER
 				{{range .}}{{row .number .title}}{{end}}{{endtable}}FOOTER
 				`),
@@ -227,6 +227,32 @@ func Test_executeTemplate(t *testing.T) {
 			1  One
 			2  Two
 			FOOTER
+			`),
+		},
+		{
+			name: "multiple tables with different columns",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`{
+					"issues": [
+						{"number": 1, "title": "One"},
+						{"number": 2, "title": "Two"}
+					],
+					"prs": [
+						{"number": 3, "title": "Three", "reviewDecision": "REVIEW_REQUESTED"},
+						{"number": 4, "title": "Four", "reviewDecision": "CHANGES_REQUESTED"}
+					]
+				}`)),
+				template: heredoc.Doc(`{{row "ISSUE" "TITLE"}}{{range .issues}}{{row .number .title}}{{end}}{{endtable}}
+				{{row "PR" "TITLE" "DECISION"}}{{range .prs}}{{row .number .title .reviewDecision}}{{end}}`),
+				tty: true,
+			},
+			wantW: heredoc.Docf(`ISSUE  TITLE
+			1      One
+			2      Two
+
+			PR  TITLE  DECISION
+			3   Three  REVIEW_REQUESTED
+			4   Four   CHANGES_REQUESTED
 			`),
 		},
 	}

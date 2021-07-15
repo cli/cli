@@ -110,7 +110,7 @@ var HelpTopics = map[string]map[string]string{
 
 			    {{.body}}
 
-				{{row "ASSIGNEE" "NAME"}}{{range .assignees}}{{row .login .name}}{{end}}{{endtable}}
+			    {{row "ASSIGNEE" "NAME"}}{{range .assignees}}{{row .login .name}}{{end}}{{endtable}}
 			    {{row "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{row .author.login .state .body}}{{end}}
 			    '
 		`, "`"),
