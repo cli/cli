@@ -147,6 +147,7 @@ func SSH(sshProfile string) error {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
 	}
 
+	fmt.Println("Preparing SSH...")
 	if sshProfile == "" {
 		containerID, err := getContainerID(ctx, terminal)
 		if err != nil {
@@ -176,6 +177,7 @@ func SSH(sshProfile string) error {
 		}
 	}()
 
+	fmt.Println("Ready...")
 	if err := connect(ctx, port, sshProfile); err != nil {
 		return fmt.Errorf("error connecting via SSH: %v", err)
 	}
@@ -240,9 +242,10 @@ func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, re
 	getUsernameCmd := "GITHUB_USERNAME=\"$(jq .CODESPACE_NAME /workspaces/.codespaces/shared/environment-variables.json -r | cut -f1 -d -)\""
 	makeSSHDirCmd := "mkdir /home/codespace/.ssh"
 	getUserKeysCmd := "curl --silent --fail \"https://github.com/$(echo $GITHUB_USERNAME).keys\" > /home/codespace/.ssh/authorized_keys"
-	setupLoginDirCmd := fmt.Sprintf("echo \"cd /workspaces/%v\" > /home/codespace/.bash_profile", repositoryName)
+	setupSecretsCmd := `cat /workspaces/.codespaces/shared/.user-secrets.json | jq -r ".[] | select (.type==\"EnvironmentVariable\") | .name+\"=\"+.value" > /home/codespace/.zshenv`
+	setupLoginDirCmd := fmt.Sprintf("echo \"cd /workspaces/%v; exec /bin/zsh;\" > /home/codespace/.bash_profile", repositoryName)
 
-	compositeCommand := []string{getUsernameCmd, makeSSHDirCmd, getUserKeysCmd, setupLoginDirCmd}
+	compositeCommand := []string{getUsernameCmd, makeSSHDirCmd, getUserKeysCmd, setupSecretsCmd, setupLoginDirCmd}
 	cmd := terminal.NewCommand(
 		"/",
 		fmt.Sprintf("/usr/bin/docker exec -t %s /bin/bash -c '"+strings.Join(compositeCommand, "; ")+"'", containerID),
