@@ -124,7 +124,15 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			Short: "Remove an installed extension",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return m.Remove(args[0])
+				extName := args[0]
+				if err := m.Remove(extName); err != nil {
+					return err
+				}
+				if io.IsStdoutTTY() {
+					cs := io.ColorScheme()
+					fmt.Fprintf(io.Out, "%s Removed extension %s\n", cs.SuccessIcon(), extName)
+				}
+				return nil
 			},
 		},
 	)

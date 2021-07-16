@@ -25,8 +25,11 @@ func TestNewCmdExtensions(t *testing.T) {
 		name         string
 		args         []string
 		managerStubs func(em *extensions.ExtensionManagerMock) func(*testing.T)
+		isTTY        bool
 		wantErr      bool
 		errMsg       string
+		wantStdout   string
+		wantStderr   string
 	}{
 		{
 			name: "install an extension",
@@ -112,7 +115,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			},
 		},
 		{
-			name: "remove extension",
+			name: "remove extension tty",
 			args: []string{"remove", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.RemoveFunc = func(name string) error {
@@ -124,12 +127,32 @@ func TestNewCmdExtensions(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Removed extension hello\n",
+		},
+		{
+			name: "remove extension nontty",
+			args: []string{"remove", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.RemoveCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			var assertFunc func(*testing.T)
 			em := &extensions.ExtensionManagerMock{}
@@ -160,6 +183,9 @@ func TestNewCmdExtensions(t *testing.T) {
 			if assertFunc != nil {
 				assertFunc(t)
 			}
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
