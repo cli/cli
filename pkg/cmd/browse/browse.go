@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -139,6 +140,11 @@ func runBrowse(opts *BrowseOptions) error {
 			if err != nil {
 				return err
 			}
+			path, err := git.PathFromRepoRoot()
+			if err != nil {
+				return err
+			}
+			fileArg = getRelativePath(path, fileArg)
 			if opts.Branch != "" {
 				url += "/tree/" + opts.Branch + "/"
 			} else {
@@ -181,4 +187,23 @@ func parseFileArg(fileArg string) (string, error) {
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
+}
+
+func getRelativePath(path, fileArg string) string {
+	if !strings.HasPrefix(fileArg, "../") && !strings.HasPrefix(fileArg, "..\\") {
+		if fileArg == "" {
+			return path
+		}
+		if path == "" {
+			return fileArg
+		}
+		return path + "/" + fileArg
+	}
+	if i := strings.LastIndex(path, "/"); i > 0 {
+		path = path[:i]
+	} else {
+		path = ""
+
+	}
+	return getRelativePath(path, fileArg[3:])
 }

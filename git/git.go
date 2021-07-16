@@ -351,6 +351,22 @@ func ToplevelDir() (string, error) {
 
 }
 
+func PathFromRepoRoot() (string, error) {
+	showCmd, err := GitCommand("rev-parse", "--show-prefix")
+	if err != nil {
+		return "", err
+	}
+	output, err := run.PrepareCmd(showCmd).Output()
+	if err != nil {
+		return "", err
+	}
+	path := firstLine(output)
+	if path != "" {
+		return path[:len(path)-1], nil
+	}
+	return "", nil
+}
+
 func outputLines(output []byte) []string {
 	lines := strings.TrimSuffix(string(output), "\n")
 	return strings.Split(lines, "\n")

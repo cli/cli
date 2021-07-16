@@ -179,7 +179,7 @@ func Test_runBrowse(t *testing.T) {
 			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
 			baseRepo:      ghrepo.New("ken", "mrprofessor"),
 			defaultBranch: "main",
-			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/path/to/file.txt",
+			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/pkg/cmd/browse/path/to/file.txt",
 		},
 		{
 			name: "issue argument",
@@ -204,7 +204,7 @@ func Test_runBrowse(t *testing.T) {
 				SelectorArg: "main.go",
 			},
 			baseRepo:    ghrepo.New("bchadwic", "LedZeppelinIV"),
-			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/main.go",
+			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/pkg/cmd/browse/main.go",
 		},
 		{
 			name: "file with line number",
@@ -213,7 +213,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/pkg/cmd/browse/path/to/file.txt#L32",
 		},
 		{
 			name: "file with invalid line number",
@@ -241,7 +241,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
+			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/pkg/cmd/browse/browse.go#L32",
 		},
 		{
 			name: "no browser with branch file and line number",
@@ -252,7 +252,16 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/pkg/cmd/browse/init.rb#L6",
+		},
+		{
+			name: "relative path from browse_test.go",
+			opts: BrowseOptions{
+				SelectorArg: "browse_test.go",
+			},
+			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/pkg/cmd/browse/browse_test.go",
 		},
 	}
 
@@ -331,6 +340,74 @@ func Test_parseFileArg(t *testing.T) {
 		} else {
 			assert.Equal(t, err, nil)
 			assert.Equal(t, tt.expectedFileArg, fileArg)
+		}
+	}
+}
+
+func Test_getRelativePath(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		fileArg       string
+		expectedPath  string
+		expectedError bool
+	}{
+		{
+			name:         "file in current folder",
+			fileArg:      "main.go",
+			path:         "cmd/gh",
+			expectedPath: "cmd/gh/main.go",
+		},
+		{
+			name:          "invalid file in current folder",
+			fileArg:       "main.go",
+			path:          "cmd/gh",
+			expectedPath:  "cmd/gh/main.go/hello",
+			expectedError: true,
+		},
+		{
+			name:         "folder in parent folder",
+			fileArg:      "../gen-docs/main.go",
+			path:         "cmd/gh",
+			expectedPath: "cmd/gen-docs/main.go",
+		},
+		{
+			name:         "folder in several folders up",
+			fileArg:      "../../../api/cache.go",
+			path:         "/pkg/cmd/browse",
+			expectedPath: "api/cache.go",
+		},
+		{
+			name:         "going to root of repository",
+			fileArg:      "../../../",
+			path:         "/pkg/cmd/browse",
+			expectedPath: "",
+		},
+		{
+			name:         "trying to go past root of repository",
+			fileArg:      "../../../../../../../../",
+			path:         "/pkg/cmd/browse",
+			expectedPath: "",
+		},
+		{
+			name:         "windows users",
+			fileArg:      "..\\",
+			path:         "/pkg/cmd/browse",
+			expectedPath: "/pkg/cmd",
+		},
+		{
+			name:         "combination users",
+			fileArg:      "..\\../..\\",
+			path:         "/pkg/cmd/pr/checkout",
+			expectedPath: "/pkg",
+		},
+	}
+	for _, tt := range tests {
+		path := getRelativePath(tt.path, tt.fileArg)
+		if tt.expectedError {
+			assert.NotEqual(t, tt.expectedPath, path)
+		} else {
+			assert.Equal(t, tt.expectedPath, path)
 		}
 	}
 }
