@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -73,13 +74,15 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 					}
 					return m.InstallLocal(wd)
 				}
+
 				repo, err := ghrepo.FromFullName(args[0])
 				if err != nil {
 					return err
 				}
-				if !strings.HasPrefix(repo.RepoName(), "gh-") {
-					return errors.New("the repository name must start with `gh-`")
+				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					return err
 				}
+
 				cfg, err := f.Config()
 				if err != nil {
 					return err
@@ -136,4 +139,25 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 
 	extCmd.Hidden = true
 	return &extCmd
+}
+
+func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) error {
+	if !strings.HasPrefix(extName, "gh-") {
+		return errors.New("extension repository name must start with `gh-`")
+	}
+
+	commandName := strings.TrimPrefix(extName, "gh-")
+	if c, _, err := rootCmd.Traverse([]string{commandName}); err != nil {
+		return err
+	} else if c != rootCmd {
+		return fmt.Errorf("%q matches the name of a built-in command", commandName)
+	}
+
+	for _, ext := range m.List() {
+		if ext.Name() == commandName {
+			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
+		}
+	}
+
+	return nil
 }

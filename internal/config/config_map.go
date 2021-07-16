@@ -68,13 +68,18 @@ func (cm *ConfigMap) FindEntry(key string) (ce *ConfigEntry, err error) {
 
 	ce = &ConfigEntry{}
 
-	topLevelKeys := cm.Root.Content
-	for i, v := range topLevelKeys {
+	// Content slice goes [key1, value1, key2, value2, ...]
+	topLevelPairs := cm.Root.Content
+	for i, v := range topLevelPairs {
+		// Skip every other slice item since we only want to check against keys
+		if i%2 != 0 {
+			continue
+		}
 		if v.Value == key {
 			ce.KeyNode = v
 			ce.Index = i
-			if i+1 < len(topLevelKeys) {
-				ce.ValueNode = topLevelKeys[i+1]
+			if i+1 < len(topLevelPairs) {
+				ce.ValueNode = topLevelPairs[i+1]
 			}
 			return
 		}
