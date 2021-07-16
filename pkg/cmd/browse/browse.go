@@ -199,11 +199,12 @@ func getRelativePath(path, fileArg string) string {
 		}
 		return path + "/" + fileArg
 	}
+
 	if i := strings.LastIndex(path, "/"); i > 0 {
 		path = path[:i]
 	} else {
 		path = ""
-
 	}
+	// recursively remove leading ../ or ..\
 	return getRelativePath(path, fileArg[3:])
 }

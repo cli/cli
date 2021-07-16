@@ -360,11 +360,11 @@ func PathFromRepoRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	path := firstLine(output)
-	if path != "" {
+	if path := firstLine(output); path != "" {
 		return path[:len(path)-1], nil
 	}
 	return "", nil
+
 }
 
 func outputLines(output []byte) []string {
