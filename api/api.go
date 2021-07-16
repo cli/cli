@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,7 +106,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 
 type Codespaces []*Codespace
 
-func (c Codespaces) SortByRecent() {
+func (c Codespaces) SortByCreatedAt() {
 	sort.Slice(c, func(i, j int) bool {
 		return c[i].CreatedAt > c[j].CreatedAt
 	})
@@ -395,6 +396,52 @@ func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceN
 	}
 
 	return nil
+}
+
+type getCodespaceRepositoryContentsResponse struct {
+	Content string `json:"content"`
+}
+
+func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Codespace, path string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+
+	q := req.URL.Query()
+	q.Add("ref", codespace.Branch)
+	req.URL.RawQuery = q.Encode()
+
+	a.setHeaders(req)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %v", err)
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, a.errorResponse(b)
+	}
+
+	var response getCodespaceRepositoryContentsResponse
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding content: %v", err)
+	}
+
+	return decoded, nil
 }
 
 func (a *API) setHeaders(req *http.Request) {

@@ -58,7 +58,7 @@ func SSH(sshProfile string) error {
 		return nil
 	}
 
-	codespaces.SortByRecent()
+	codespaces.SortByCreatedAt()
 
 	codespacesByName := make(map[string]*api.Codespace)
 	codespacesNames := make([]string, 0, len(codespaces))
