@@ -21,7 +21,7 @@ func (c *Client) NewServer() (*Server, error) {
 	return &Server{client: c}, nil
 }
 
-type serverSharingResponse struct {
+type Port struct {
 	SourcePort                       int    `json:"sourcePort"`
 	DestinationPort                  int    `json:"destinationPort"`
 	SessionName                      string `json:"sessionName"`
@@ -36,7 +36,7 @@ type serverSharingResponse struct {
 func (s *Server) StartSharing(ctx context.Context, protocol string, port int) error {
 	s.port = port
 
-	var response serverSharingResponse
+	var response Port
 	if err := s.client.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
 		port, protocol, fmt.Sprintf("http://localhost:%s", strconv.Itoa(port)),
 	}, &response); err != nil {
@@ -47,4 +47,15 @@ func (s *Server) StartSharing(ctx context.Context, protocol string, port int) er
 	s.streamCondition = response.StreamCondition
 
 	return nil
+}
+
+type Ports []*Port
+
+func (s *Server) GetSharedServers(ctx context.Context) (Ports, error) {
+	var response Ports
+	if err := s.client.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
