@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,7 +61,7 @@ func TestNewCmdExtensions(t *testing.T) {
 				}
 			},
 			wantErr: true,
-			errMsg:  "could not install owner/gh-existing-ext: existing-ext is already an installed extension",
+			errMsg:  "there is already an installed extension that provides the \"existing-ext\" command",
 		},
 		{
 			name: "install local extension",
@@ -165,4 +166,80 @@ func TestNewCmdExtensions(t *testing.T) {
 
 func normalizeDir(d string) string {
 	return strings.TrimPrefix(d, "/private")
+}
+
+func Test_checkValidExtension(t *testing.T) {
+	rootCmd := &cobra.Command{}
+	rootCmd.AddCommand(&cobra.Command{Use: "help"})
+	rootCmd.AddCommand(&cobra.Command{Use: "auth"})
+
+	m := &extensions.ExtensionManagerMock{
+		ListFunc: func() []extensions.Extension {
+			return []extensions.Extension{
+				&extensions.ExtensionMock{
+					NameFunc: func() string { return "screensaver" },
+				},
+				&extensions.ExtensionMock{
+					NameFunc: func() string { return "triage" },
+				},
+			}
+		},
+	}
+
+	type args struct {
+		rootCmd *cobra.Command
+		manager extensions.ExtensionManager
+		extName string
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantError string
+	}{
+		{
+			name: "valid extension",
+			args: args{
+				rootCmd: rootCmd,
+				manager: m,
+				extName: "gh-hello",
+			},
+		},
+		{
+			name: "invalid extension name",
+			args: args{
+				rootCmd: rootCmd,
+				manager: m,
+				extName: "gherkins",
+			},
+			wantError: "extension repository name must start with `gh-`",
+		},
+		{
+			name: "clashes with built-in command",
+			args: args{
+				rootCmd: rootCmd,
+				manager: m,
+				extName: "gh-auth",
+			},
+			wantError: "\"auth\" matches the name of a built-in command",
+		},
+		{
+			name: "clashes with an installed extension",
+			args: args{
+				rootCmd: rootCmd,
+				manager: m,
+				extName: "gh-triage",
+			},
+			wantError: "there is already an installed extension that provides the \"triage\" command",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName)
+			if tt.wantError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantError)
+			}
+		})
+	}
 }
