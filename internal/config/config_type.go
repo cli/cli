@@ -8,8 +8,8 @@ import (
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
-	Get(string, string) (string, error)
-	GetWithSource(string, string) (string, string, error)
+	Get(hostname string, key string) (string, error)
+	GetWithSource(hostname string, key string) (string, string, error)
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)
@@ -53,6 +53,11 @@ var configOptions = []ConfigOption{
 	{
 		Key:          "http_unix_socket",
 		Description:  "the path to a unix socket through which to make HTTP connection",
+		DefaultValue: "",
+	},
+	{
+		Key:          "browser",
+		Description:  "the path to the browser to use when opening URLs",
 		DefaultValue: "",
 	},
 }
