@@ -36,9 +36,11 @@ type MergeOptions struct {
 	AutoMergeEnable  bool
 	AutoMergeDisable bool
 
-	Body    string
-	BodySet bool
-	Editor  editor
+	Body       string
+	BodySet    bool
+	Subject    string
+	SubjectSet bool
+	Editor     editor
 
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
@@ -106,6 +108,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 
+			if opts.Subject != "" {
+				opts.SubjectSet = true
+			}
+
 			bodyProvided := cmd.Flags().Changed("body")
 			bodyFileProvided := bodyFile != ""
 
@@ -143,6 +149,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&opts.Subject, "subject", "", "", "Subject `text` for the merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -202,12 +209,13 @@ func mergeRun(opts *MergeOptions) error {
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
-			repo:          baseRepo,
-			pullRequestID: pr.ID,
-			method:        opts.MergeMethod,
-			auto:          opts.AutoMergeEnable,
-			commitBody:    opts.Body,
-			setCommitBody: opts.BodySet,
+			repo:             baseRepo,
+			pullRequestID:    pr.ID,
+			method:           opts.MergeMethod,
+			auto:             opts.AutoMergeEnable,
+			commitBody:       opts.Body,
+			setCommitBody:    opts.BodySet,
+			setCommitSubject: opts.SubjectSet,
 		}
 
 		if opts.InteractiveMode {
@@ -224,35 +232,27 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			allowEditMsg := payload.method != PullRequestMergeMethodRebase
+			allowEdit := payload.method != PullRequestMergeMethodRebase
 
-			action, err := confirmSurvey(allowEditMsg)
-			if err != nil {
-				return fmt.Errorf("unable to confirm: %w", err)
-			}
+			allowEditMsg := allowEdit && !payload.setCommitBody
+			allowEditSubject := allowEdit && !payload.setCommitSubject
 
-			if action == shared.EditCommitMessageAction {
-				if !payload.setCommitBody {
-					payload.commitBody, err = getMergeText(httpClient, baseRepo, pr.ID, payload.method)
-					if err != nil {
-						return err
-					}
-				}
-
-				payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
-				if err != nil {
-					return err
-				}
-				payload.setCommitBody = true
-
-				action, err = confirmSurvey(false)
+			for {
+				action, err := confirmSurvey(allowEditMsg, allowEditSubject)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
-			}
-			if action == shared.CancelAction {
-				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-				return cmdutil.CancelError
+
+				submit, err := confirmSubmission(httpClient, opts, action, &payload)
+				if err != nil {
+					return err
+				}
+				if submit {
+					break
+				}
+
+				allowEditMsg = !payload.setCommitBody
+				allowEditSubject = !payload.setCommitSubject
 			}
 		}
 
@@ -405,14 +405,18 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 	return opts.DeleteBranch, nil
 }
 
-func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
+func confirmSurvey(allowEditMsg, allowEditSubject bool) (shared.Action, error) {
 	const (
-		submitLabel        = "Submit"
-		editCommitMsgLabel = "Edit commit message"
-		cancelLabel        = "Cancel"
+		submitLabel            = "Submit"
+		editCommitSubjectLabel = "Edit commit subject"
+		editCommitMsgLabel     = "Edit commit message"
+		cancelLabel            = "Cancel"
 	)
 
 	options := []string{submitLabel}
+	if allowEditSubject {
+		options = append(options, editCommitSubjectLabel)
+	}
 	if allowEditMsg {
 		options = append(options, editCommitMsgLabel)
 	}
@@ -431,10 +435,60 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	switch result {
 	case submitLabel:
 		return shared.SubmitAction, nil
+	case editCommitSubjectLabel:
+		return shared.EditCommitSubjectAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
 	default:
 		return shared.CancelAction, nil
+	}
+}
+
+func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Action, payload *mergePayload) (bool, error) {
+	var err error
+
+	switch action {
+	case shared.EditCommitMessageAction:
+		if !payload.setCommitBody {
+			payload.commitBody, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
+		if err != nil {
+			return false, err
+		}
+		payload.setCommitBody = true
+
+		return false, nil
+
+	case shared.EditCommitSubjectAction:
+		if !payload.setCommitSubject {
+			payload.commitSubject, err = getMergeHeadlineText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitSubject, err = opts.Editor.Edit("*.md", payload.commitSubject)
+		if err != nil {
+			return false, err
+		}
+		payload.setCommitSubject = true
+
+		return false, nil
+
+	case shared.CancelAction:
+		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+		return false, cmdutil.CancelError
+
+	case shared.SubmitAction:
+		return true, nil
+
+	default:
+		return false, fmt.Errorf("unable to confirm: %w", err)
 	}
 }
 

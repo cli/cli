@@ -809,7 +809,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
-func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
+func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(true)
 	io.SetStderrTTY(true)
@@ -831,10 +831,17 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 			"viewerMergeBodyText": "default body text"
 		} } }`))
 	tr.Register(
+		httpmock.GraphQL(`query PullRequestMergeHeadlineText\b`),
+		httpmock.StringResponse(`
+		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text"
+		} } }`))
+	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "DEFAULT HEADLINE TEXT", input["commitHeadline"].(string))
 			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
@@ -846,6 +853,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 
 	as.StubOne(2)                     // Merge method survey
 	as.StubOne(false)                 // Delete branch survey
+	as.StubOne("Edit commit subject") // Confirm submit survey
 	as.StubOne("Edit commit message") // Confirm submit survey
 	as.StubOne("Submit")              // Confirm submit survey
 
