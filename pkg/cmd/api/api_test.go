@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
+	"github.com/cli/cli/pkg/export"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -593,6 +594,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 
 func Test_apiRun_paginationGraphQL(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
 
 	requestCount := 0
 	responses := []*http.Response{
@@ -601,7 +603,12 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
 			Body: ioutil.NopCloser(bytes.NewBufferString(`{
 				"data": {
-					"nodes": ["page one"],
+					"nodes": [
+						{
+							"page": 1,
+							"caption": "page one"
+						}
+					],
 					"pageInfo": {
 						"endCursor": "PAGE1_END",
 						"hasNextPage": true
@@ -614,9 +621,14 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
 			Body: ioutil.NopCloser(bytes.NewBufferString(`{
 				"data": {
-					"nodes": ["page two"],
+					"nodes": [
+						{
+							"page": 20,
+							"caption": "page twenty"
+						}
+					],
 					"pageInfo": {
-						"endCursor": "PAGE2_END",
+						"endCursor": "PAGE20_END",
 						"hasNextPage": false
 					}
 				}
@@ -642,13 +654,17 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
 		Paginate:      true,
+		// test that templates executed per page properly render a table.
+		Template: `{{range .data.nodes}}{{row .page .caption}}{{end}}`,
 	}
 
 	err := apiRun(&options)
 	require.NoError(t, err)
 
-	assert.Contains(t, stdout.String(), `"page one"`)
-	assert.Contains(t, stdout.String(), `"page two"`)
+	assert.Equal(t, heredoc.Doc(`
+	1   page one
+	20  page twenty
+	`), stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
@@ -1167,10 +1183,14 @@ func Test_processResponse_template(t *testing.T) {
 		]`)),
 	}
 
+	template := export.NewTemplate(io)
 	_, err := processResponse(&resp, &ApiOptions{
 		IO:       io,
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
-	}, ioutil.Discard)
+	}, ioutil.Discard, &template)
+	require.NoError(t, err)
+
+	err = template.End()
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`

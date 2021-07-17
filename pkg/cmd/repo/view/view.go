@@ -138,7 +138,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, repo, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, repo)
 	}
 
 	fullName := ghrepo.FullName(toView)
