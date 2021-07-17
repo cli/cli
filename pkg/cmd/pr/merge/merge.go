@@ -156,7 +156,7 @@ func mergeRun(opts *MergeOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -196,8 +196,18 @@ func mergeRun(opts *MergeOptions) error {
 		return cmdutil.SilentError
 	}
 
+	approved := pr.MergeStateStatus == "CLEAN" || pr.MergeStateStatus == "HAS_HOOKS" || pr.MergeStateStatus == "UNSTABLE"
+	if !opts.AutoMergeEnable && !approved {
+		fmt.Fprintf(
+			opts.IO.ErrOut,
+			"%s Merging is blocked. Enable auto-merge to automatically merge it when all requirements are met with: gh pr merge %d --auto\n",
+			cs.FailureIcon(), pr.Number)
+		return cmdutil.SilentError
+	}
+
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+	autoMerge := opts.AutoMergeEnable && !approved
 
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
@@ -205,7 +215,7 @@ func mergeRun(opts *MergeOptions) error {
 			repo:          baseRepo,
 			pullRequestID: pr.ID,
 			method:        opts.MergeMethod,
-			auto:          opts.AutoMergeEnable,
+			auto:          autoMerge,
 			commitBody:    opts.Body,
 			setCommitBody: opts.BodySet,
 		}
@@ -282,7 +292,7 @@ func mergeRun(opts *MergeOptions) error {
 				fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
 			}
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMergeEnable {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !autoMerge {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
@@ -294,7 +304,7 @@ func mergeRun(opts *MergeOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch || crossRepoPR || opts.AutoMergeEnable {
+	if !deleteBranch || crossRepoPR || autoMerge {
 		return nil
 	}
 
