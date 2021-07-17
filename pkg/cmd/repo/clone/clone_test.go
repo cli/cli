@@ -216,38 +216,69 @@ func Test_RepoClone(t *testing.T) {
 }
 
 func Test_RepoClone_hasParent(t *testing.T) {
-	reg := &httpmock.Registry{}
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`
-				{ "data": { "repository": {
-					"name": "REPO",
-					"owner": {
-						"login": "OWNER"
-					},
-					"parent": {
-						"name": "ORIG",
-						"owner": {
-							"login": "hubot"
-						},
-						"defaultBranchRef": {
-							"name": "trunk"
-						}
-					}
-				} } }
-				`))
+	tests := []struct {
+		name string
+		args string
+		want []string
+	}{
+		{
+			name: "clone origin",
+			args: "OWNER/REPO",
+			want: []string{
+				"git clone https://github.com/OWNER/REPO.git",
+				"git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git",
+			},
+		},
+		{
+			name: "clone upstream",
+			args: "--upstream OWNER/REPO",
+			want: []string{
+				"git clone -o upstream https://github.com/hubot/ORIG.git REPO",
+				"git -C REPO remote add -f origin https://github.com/OWNER/REPO.git",
+			},
+		},
+	}
 
-	httpClient := &http.Client{Transport: reg}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.Register(
+				httpmock.GraphQL(`query RepositoryInfo\b`),
+				httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"name": "REPO",
+							"owner": {
+								"login": "OWNER"
+							},
+							"parent": {
+								"name": "ORIG",
+								"owner": {
+									"login": "hubot"
+								},
+								"defaultBranchRef": {
+									"name": "trunk"
+								}
+							}
+						} } }
+						`))
 
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
+			httpClient := &http.Client{Transport: reg}
 
-	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
 
-	_, err := runCloneCommand(httpClient, "OWNER/REPO")
-	if err != nil {
-		t.Fatalf("error running command `repo clone`: %v", err)
+			// cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+			// cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
+
+			for _, w := range tt.want {
+				cs.Register(w, 0, "")
+			}
+
+			_, err := runCloneCommand(httpClient, tt.args)
+			if err != nil {
+				t.Fatalf("error running command `repo clone`: %v", err)
+			}
+		})
 	}
 }
 

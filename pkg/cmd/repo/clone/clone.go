@@ -3,6 +3,7 @@ package clone
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -21,8 +22,9 @@ type CloneOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	GitArgs    []string
-	Repository string
+	GitArgs       []string
+	Repository    string
+	CloneUpstream bool
 }
 
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
@@ -57,6 +59,8 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			return cloneRun(opts)
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.CloneUpstream, "upstream", false, "If the repository is a fork, track the default branch of the upstream repository")
 
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
@@ -139,7 +143,22 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil {
 		return err
 	}
-	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+	canonicalRepoURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+	canonicalCloneURL := canonicalRepoURL
+
+	cloneArgs := opts.GitArgs
+
+	cloneUpstream := opts.CloneUpstream || os.Getenv("GH_CLONE_UPSTREAM") != ""
+
+	// Clone the upstream repo if requested
+	if canonicalRepo.Parent != nil && cloneUpstream {
+		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
+		if err != nil {
+			return err
+		}
+		canonicalCloneURL = ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
+		cloneArgs = append([]string{repo.RepoName()}, append(cloneArgs, "-o", "upstream")...)
+	}
 
 	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
 	if wantsWiki {
@@ -149,22 +168,31 @@ func cloneRun(opts *CloneOptions) error {
 		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
 	}
 
-	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
+	cloneDir, err := git.RunClone(canonicalCloneURL, cloneArgs)
 	if err != nil {
 		return err
 	}
 
-	// If the repo is a fork, add the parent as an upstream
+	// If the repo is a fork...
 	if canonicalRepo.Parent != nil {
-		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
+		if cloneUpstream {
+			// Set the origin if an upstream repo was cloned
+			err = git.AddOriginRemote(canonicalRepoURL, cloneDir, []string{})
+			if err != nil {
+				return err
+			}
+		} else {
+			// Or else, add the parent as an upstream
+			protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
+			if err != nil {
+				return err
+			}
+			upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
-		err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
-		if err != nil {
-			return err
+			err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+			if err != nil {
+				return err
+			}
 		}
 	}
 
