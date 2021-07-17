@@ -151,13 +151,12 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
-	if err != nil {
-		return err
+	listResult, listErr := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
+	if listErr != nil && listErr != errSearchAPIMaxLimit {
+		return listErr
 	}
 
-	err = opts.IO.StartPager()
-	if err != nil {
+	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
@@ -167,8 +166,22 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
-		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
+		title := shared.ListHeader(
+			ghrepo.FullName(baseRepo),
+			"pull request",
+			len(listResult.PullRequests),
+			listResult.TotalCount,
+			!filters.IsDefault(),
+		)
+
+		out := fmt.Sprintf("\n%s\n", title)
+
+		if listErr == errSearchAPIMaxLimit {
+			icon := opts.IO.ColorScheme().WarningIcon()
+			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
+		}
+
+		fmt.Fprintln(opts.IO.Out, out)
 	}
 
 	cs := opts.IO.ColorScheme()

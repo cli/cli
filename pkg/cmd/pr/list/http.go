@@ -1,6 +1,7 @@
 package list
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,7 +11,16 @@ import (
 	"github.com/cli/cli/pkg/githubsearch"
 )
 
-func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
+// The Search API returns a max of 1000 results for each search.
+// (https://docs.github.com/en/rest/reference/search#about-the-search-api)
+var errSearchAPIMaxLimit = errors.New("limit was set to >1000 but Github search API returns max 1000 results")
+
+func listPullRequests(
+	httpClient *http.Client,
+	repo ghrepo.Interface,
+	filters prShared.FilterOptions,
+	limit int,
+) (*api.PullRequestAndTotalCount, error) {
 	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0 {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
@@ -119,7 +129,12 @@ loop:
 	return &res, nil
 }
 
-func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
+func searchPullRequests(
+	httpClient *http.Client,
+	repo ghrepo.Interface,
+	filters prShared.FilterOptions,
+	limit int,
+) (*api.PullRequestAndTotalCount, error) {
 	type response struct {
 		Search struct {
 			Nodes    []api.PullRequest
@@ -215,6 +230,10 @@ loop:
 		} else {
 			break
 		}
+	}
+
+	if limit > 1000 {
+		return &res, errSearchAPIMaxLimit
 	}
 
 	return &res, nil
