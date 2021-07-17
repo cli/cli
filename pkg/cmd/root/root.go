@@ -14,6 +14,7 @@ import (
 	extensionsCmd "github.com/cli/cli/pkg/cmd/extensions"
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
+	gpgKeyCmd "github.com/cli/cli/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
@@ -74,6 +75,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
+	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(extensionsCmd.NewCmdExtensions(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
