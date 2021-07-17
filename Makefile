@@ -66,8 +66,8 @@ mandir  := ${prefix}/share/man
 install: bin/gh manpages
 	install -d ${DESTDIR}${bindir}
 	install -m755 bin/gh ${DESTDIR}${bindir}/
-	install -d ${DESTDIR}${mandir}/man1
-	install -m644 ./share/man/man1/* ${DESTDIR}${mandir}/man1/
+#	install -d ${DESTDIR}${mandir}/man1
+#	install -m644 ./share/man/man1/* ${DESTDIR}${mandir}/man1/
 
 .PHONY: uninstall
 uninstall:

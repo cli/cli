@@ -309,9 +309,68 @@
                   }
                 }
               ]
+            },
+            {
+              "author": {
+                "login": "g14a"
+              },
+              "authorAssociation": "CONTRIBUTOR",
+              "body": "@vilmibm @ampinsk  I tried solving this. Issues and PRs look like the following respectively. Does it look okay or can it be better from a design perspective?\n## Issues: \n<img width=\"854\" alt=\"image\" src=\"https://user-images.githubusercontent.com/17702388/113286902-6ea20500-930a-11eb-8860-754107c67b22.png\">\n## PRs:\n<img width=\"854\" alt=\"image\" src=\"https://user-images.githubusercontent.com/17702388/113286974-8c6f6a00-930a-11eb-98da-41e159056438.png\">\nDo you want to take a look at the PR which fixes this?",
+              "createdAt": "2021-04-01T11:23:43Z",
+              "includesCreatedEdit": true,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
             }
           ],
-          "totalCount": 6
+          "totalCount": 7
         }
       }
   }
