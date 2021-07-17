@@ -14,7 +14,12 @@
                   "name": "cool tests",
                   "completedAt": "2020-08-27T19:00:12Z",
                   "startedAt": "2020-08-27T18:58:46Z",
-                  "detailsUrl": "sweet link"
+                  "detailsUrl": "sweet link",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "databaseId": 456
+                    }
+                  }
                 },
                 {
                   "conclusion": "SUCCESS",
@@ -22,7 +27,12 @@
                   "name": "rad tests",
                   "completedAt": "2020-08-27T19:00:12Z",
                   "startedAt": "2020-08-27T18:58:46Z",
-                  "detailsUrl": "sweet link"
+                  "detailsUrl": "sweet link",
+                  "checkSuite": {
+                    "workflowRun": {
+                      "databaseId": 456
+                    }
+                  }
                 },
                 {
                   "state": "FAILURE",

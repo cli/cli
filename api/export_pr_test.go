@@ -144,7 +144,12 @@ func TestPullRequest_ExportData(t *testing.T) {
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
-							"detailsUrl": "http://example.com/details"
+							"detailsUrl": "http://example.com/details",
+							"checkSuite": {
+								"workflowRun": {
+									"databaseId": 123
+								}
+							}
 						}
 					] } } } }
 				] } }
@@ -159,7 +164,12 @@ func TestPullRequest_ExportData(t *testing.T) {
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
-							"detailsUrl": "http://example.com/details"
+							"detailsUrl": "http://example.com/details",
+							"checkSuite": {
+								"workflowRun": {
+									"databaseId": 123
+								}
+							}
 						}
 					]
 				}

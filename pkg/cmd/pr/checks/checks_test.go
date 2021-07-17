@@ -90,25 +90,25 @@ func Test_checksRun(t *testing.T) {
 		{
 			name:    "some failing",
 			fixture: "./fixtures/someFailing.json",
-			wantOut: "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nSTATUS  NAME        ELAPSED  LINK        ID   COMPLETED\nX       sad tests   1m26s    sweet link  456  2020-08-27T19:00:12Z\n✓       cool tests  1m26s    sweet link  456  2020-08-27T19:00:12Z\n-       slow tests  1m26s    sweet link  456  2020-08-27T19:00:12Z\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "some pending",
 			fixture: "./fixtures/somePending.json",
-			wantOut: "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\nSTATUS  NAME        ELAPSED  LINK        ID   COMPLETED\n✓       cool tests  1m26s    sweet link  456  2020-08-27T19:00:12Z\n✓       rad tests   1m26s    sweet link  456  2020-08-27T19:00:12Z\n-       slow tests  1m26s    sweet link  456  2020-08-27T19:00:12Z\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
 			fixture: "./fixtures/allPassing.json",
-			wantOut: "All checks were successful\n0 failing, 3 successful, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "All checks were successful\n0 failing, 3 successful, and 0 pending checks\n\nSTATUS  NAME           ELAPSED  LINK        ID   COMPLETED\n✓       awesome tests  1m26s    sweet link       2020-08-27T19:00:12Z\n✓       cool tests     1m26s    sweet link  456  2020-08-27T19:00:12Z\n✓       rad tests      1m26s    sweet link  456  2020-08-27T19:00:12Z\n",
 			wantErr: "",
 		},
 		{
 			name:    "with statuses",
 			fixture: "./fixtures/withStatuses.json",
-			wantOut: "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nSTATUS  NAME        ELAPSED  LINK        ID   COMPLETED\nX       a status             sweet link       \n✓       cool tests  1m26s    sweet link  456  2020-08-27T19:00:12Z\n✓       rad tests   1m26s    sweet link  456  2020-08-27T19:00:12Z\n",
 			wantErr: "SilentError",
 		},
 		{

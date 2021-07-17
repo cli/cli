@@ -81,16 +81,17 @@ type PullRequest struct {
 				StatusCheckRollup struct {
 					Contexts struct {
 						Nodes []struct {
-							TypeName    string    `json:"__typename"`
-							Name        string    `json:"name"`
-							Context     string    `json:"context,omitempty"`
-							State       string    `json:"state,omitempty"`
-							Status      string    `json:"status"`
-							Conclusion  string    `json:"conclusion"`
-							StartedAt   time.Time `json:"startedAt"`
-							CompletedAt time.Time `json:"completedAt"`
-							DetailsURL  string    `json:"detailsUrl"`
-							TargetURL   string    `json:"targetUrl,omitempty"`
+							TypeName    string     `json:"__typename"`
+							Name        string     `json:"name"`
+							Context     string     `json:"context,omitempty"`
+							State       string     `json:"state,omitempty"`
+							Status      string     `json:"status"`
+							Conclusion  string     `json:"conclusion"`
+							StartedAt   time.Time  `json:"startedAt"`
+							CompletedAt time.Time  `json:"completedAt"`
+							DetailsURL  string     `json:"detailsUrl"`
+							TargetURL   string     `json:"targetUrl,omitempty"`
+							CheckSuite  CheckSuite `json:"checkSuite"`
 						}
 						PageInfo struct {
 							HasNextPage bool
@@ -110,6 +111,14 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type CheckSuite struct {
+	WorkflowRun `json:"workflowRun"`
+}
+
+type WorkflowRun struct {
+	DatabaseId int `json:"databaseId,omitempty"`
 }
 
 type PRRepository struct {

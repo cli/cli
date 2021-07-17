@@ -120,7 +120,12 @@ func StatusCheckRollupGraphQL(after string) string {
 								conclusion,
 								startedAt,
 								completedAt,
-								detailsUrl
+								detailsUrl,
+								checkSuite {
+									workflowRun {
+										databaseId
+									}
+								}
 							}
 						},
 						pageInfo{hasNextPage,endCursor}

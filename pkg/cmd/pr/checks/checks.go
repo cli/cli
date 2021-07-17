@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -106,12 +107,14 @@ func checksRun(opts *ChecksOptions) error {
 	pending := 0
 
 	type output struct {
-		mark      string
-		bucket    string
-		name      string
-		elapsed   string
-		link      string
-		markColor func(string) string
+		mark        string
+		bucket      string
+		name        string
+		elapsed     string
+		link        string
+		completedAt string
+		runId       string
+		markColor   func(string) string
 	}
 
 	cs := opts.IO.ColorScheme()
@@ -146,10 +149,13 @@ func checksRun(opts *ChecksOptions) error {
 		}
 
 		elapsed := ""
+		completedAt := ""
+		runId := ""
 		zeroTime := time.Time{}
 
 		if c.StartedAt != zeroTime && c.CompletedAt != zeroTime {
 			e := c.CompletedAt.Sub(c.StartedAt)
+			completedAt = c.CompletedAt.Format(time.RFC3339)
 			if e > 0 {
 				elapsed = e.String()
 			}
@@ -165,7 +171,11 @@ func checksRun(opts *ChecksOptions) error {
 			name = c.Context
 		}
 
-		outputs = append(outputs, output{mark, bucket, name, elapsed, link, markColor})
+		if c.CheckSuite.WorkflowRun.DatabaseId != 0 {
+			runId = strconv.Itoa(c.CheckSuite.WorkflowRun.DatabaseId)
+		}
+
+		outputs = append(outputs, output{mark, bucket, name, elapsed, link, completedAt, runId, markColor})
 	}
 
 	sort.Slice(outputs, func(i, j int) bool {
@@ -187,6 +197,15 @@ func checksRun(opts *ChecksOptions) error {
 	})
 
 	tp := utils.NewTablePrinter(opts.IO)
+	if isTerminal {
+		tp.AddField("STATUS", nil, nil)
+		tp.AddField("NAME", nil, nil)
+		tp.AddField("ELAPSED", nil, nil)
+		tp.AddField("LINK", nil, nil)
+		tp.AddField("ID", nil, nil)
+		tp.AddField("COMPLETED", nil, nil)
+		tp.EndRow()
+	}
 
 	for _, o := range outputs {
 		if isTerminal {
@@ -194,6 +213,8 @@ func checksRun(opts *ChecksOptions) error {
 			tp.AddField(o.name, nil, nil)
 			tp.AddField(o.elapsed, nil, nil)
 			tp.AddField(o.link, nil, nil)
+			tp.AddField(o.runId, nil, nil)
+			tp.AddField(o.completedAt, nil, nil)
 		} else {
 			tp.AddField(o.name, nil, nil)
 			tp.AddField(o.bucket, nil, nil)
