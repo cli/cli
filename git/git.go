@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -204,17 +203,6 @@ func LastCommit() (*Commit, error) {
 func CommitBody(sha string) (string, error) {
 	output, err := lookupCommit(sha, "%b")
 	return string(output), err
-}
-
-// Push publishes a git ref to a remote and sets up upstream configuration
-func Push(remote string, ref string, cmdOut, cmdErr io.Writer) error {
-	pushCmd, err := GitCommand("push", "--set-upstream", remote, ref)
-	if err != nil {
-		return err
-	}
-	pushCmd.Stdout = cmdOut
-	pushCmd.Stderr = cmdErr
-	return run.PrepareCmd(pushCmd).Run()
 }
 
 type BranchConfig struct {
