@@ -39,8 +39,7 @@ func Delete(codespaceName string) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace := api.Codespace{OwnerLogin: user.Login, Name: codespaceName}
-	token, err := apiClient.GetCodespaceToken(ctx, &codespace)
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 	if err != nil {
 		return fmt.Errorf("error getting codespace token: %v", err)
 	}

@@ -177,7 +177,7 @@ type getCodespaceTokenResponse struct {
 	RepositoryToken string `json:"repository_token"`
 }
 
-func (a *API) GetCodespaceToken(ctx context.Context, codespace *Codespace) (string, error) {
+func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
 	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
 	if err != nil {
 		return "", fmt.Errorf("error preparing request body: %v", err)
@@ -185,7 +185,7 @@ func (a *API) GetCodespaceToken(ctx context.Context, codespace *Codespace) (stri
 
 	req, err := http.NewRequest(
 		http.MethodPost,
-		githubAPI+"/vscs_internal/user/"+codespace.OwnerLogin+"/codespaces/"+codespace.Name+"/token",
+		githubAPI+"/vscs_internal/user/"+ownerLogin+"/codespaces/"+codespaceName+"/token",
 		bytes.NewBuffer(reqBody),
 	)
 	if err != nil {

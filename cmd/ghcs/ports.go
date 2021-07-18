@@ -8,10 +8,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/olekukonko/tablewriter"
@@ -28,6 +27,9 @@ func NewPortsCmd() *cobra.Command {
 		},
 	}
 
+	portsCmd.AddCommand(NewPortsPublicCmd())
+	portsCmd.AddCommand(NewPortsPrivateCmd())
+	portsCmd.AddCommand(NewPortsForwardCmd())
 	return portsCmd
 }
 
@@ -44,104 +46,36 @@ func Ports() error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
+	codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		if err == codespaces.ErrNoCodespaces {
+			fmt.Println(err.Error())
+			return nil
+		}
+		return fmt.Errorf("error choosing codespace: %v", err)
 	}
 
-	if len(codespaces) == 0 {
-		fmt.Println("You have no codespaces.")
-		return nil
-	}
-
-	codespaces.SortByCreatedAt()
-
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
-	}
-
-	portsSurvey := []*survey.Question{
-		{
-			Name: "codespace",
-			Prompt: &survey.Select{
-				Message: "Choose Codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	answers := struct {
-		Codespace string
-	}{}
-	if err := survey.Ask(portsSurvey, &answers); err != nil {
-		return fmt.Errorf("error getting answers: %v", err)
-	}
-
-	codespace := codespacesByName[answers.Codespace]
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
-	token, err := apiClient.GetCodespaceToken(ctx, codespace)
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
 		return fmt.Errorf("error getting codespace token: %v", err)
 	}
 
-	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		fmt.Println("Starting your codespace...")
-		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
-			return fmt.Errorf("error starting codespace: %v", err)
-		}
-	}
-
-	retries := 0
-	for codespace.Environment.Connection.SessionID == "" || codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		if retries > 1 {
-			if retries%2 == 0 {
-				fmt.Print(".")
-			}
-
-			time.Sleep(1 * time.Second)
-		}
-
-		if retries == 30 {
-			return errors.New("timed out while waiting for the codespace to start")
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, codespace.OwnerLogin, codespace.Name)
-		if err != nil {
-			return fmt.Errorf("error getting codespace: %v", err)
-		}
-
-		retries += 1
-	}
-
-	if retries >= 2 {
-		fmt.Print("\n")
-	}
-
-	fmt.Println("Connecting to your codespace...")
-
-	liveShare, err := liveshare.New(
-		liveshare.WithWorkspaceID(codespace.Environment.Connection.SessionID),
-		liveshare.WithToken(codespace.Environment.Connection.SessionToken),
-	)
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error creating live share: %v", err)
-	}
-
-	liveShareClient := liveShare.NewClient()
-	if err := liveShareClient.Join(ctx); err != nil {
-		return fmt.Errorf("error joining liveshare client: %v", err)
+		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
 	fmt.Println("Loading ports...")
 	ports, err := getPorts(ctx, liveShareClient)
 	if err != nil {
 		return fmt.Errorf("error getting ports: %v", err)
+	}
+
+	if len(ports) == 0 {
+		fmt.Println("This codespace has no open ports")
+		return nil
 	}
 
 	devContainerResult := <-devContainerCh
@@ -230,4 +164,148 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 		ch <- devContainerResult{&container, nil}
 	}()
 	return ch
+}
+
+func NewPortsPublicCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "public",
+		Short: "public",
+		Long:  "public",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 2 {
+				return errors.New("[codespace_name] [source] port number are required.")
+			}
+
+			return updatePortVisibility(args[0], args[1], true)
+		},
+	}
+}
+
+func NewPortsPrivateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "private",
+		Short: "private",
+		Long:  "private",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 2 {
+				return errors.New("[codespace_name] [source] port number are required.")
+			}
+
+			return updatePortVisibility(args[0], args[1], false)
+		},
+	}
+}
+
+func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
+	ctx := context.Background()
+	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+
+	user, err := apiClient.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %v", err)
+	}
+
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace token: %v", err)
+	}
+
+	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace: %v", err)
+	}
+
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	if err != nil {
+		return fmt.Errorf("error connecting to liveshare: %v", err)
+	}
+
+	server, err := liveShareClient.NewServer()
+	if err != nil {
+		return fmt.Errorf("error creating server: %v", err)
+	}
+
+	port, err := strconv.Atoi(sourcePort)
+	if err != nil {
+		return fmt.Errorf("error reading port number: %v", err)
+	}
+
+	if err := server.UpdateSharedVisibility(ctx, port, public); err != nil {
+		return fmt.Errorf("error update port to public: %v", err)
+	}
+
+	state := "PUBLIC"
+	if public == false {
+		state = "PRIVATE"
+	}
+
+	fmt.Println(fmt.Sprintf("Port %s is now %s.", sourcePort, state))
+
+	return nil
+}
+
+func NewPortsForwardCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "forward",
+		Short: "forward",
+		Long:  "forward",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 3 {
+				return errors.New("[codespace_name] [source] [dst] port number are required.")
+			}
+			return forwardPort(args[0], args[1], args[2])
+		},
+	}
+}
+
+func forwardPort(codespaceName, sourcePort, destPort string) error {
+	ctx := context.Background()
+	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+
+	user, err := apiClient.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %v", err)
+	}
+
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace token: %v", err)
+	}
+
+	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace: %v", err)
+	}
+
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	if err != nil {
+		return fmt.Errorf("error connecting to liveshare: %v", err)
+	}
+
+	server, err := liveShareClient.NewServer()
+	if err != nil {
+		return fmt.Errorf("error creating server: %v", err)
+	}
+
+	sourcePortInt, err := strconv.Atoi(sourcePort)
+	if err != nil {
+		return fmt.Errorf("error reading source port: %v", err)
+	}
+
+	dstPortInt, err := strconv.Atoi(destPort)
+	if err != nil {
+		return fmt.Errorf("error reading destination port: %v", err)
+	}
+
+	if err := server.StartSharing(ctx, "share-"+sourcePort, sourcePortInt); err != nil {
+		return fmt.Errorf("error sharing source port: %v", err)
+	}
+
+	fmt.Println("Forwarding port: " + sourcePort + " -> " + destPort)
+	portForwarder := liveshare.NewLocalPortForwarder(liveShareClient, server, dstPortInt)
+	if err := portForwarder.Start(ctx); err != nil {
+		return fmt.Errorf("error forwarding port: %v", err)
+	}
+
+	return nil
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
 )
@@ -48,97 +47,24 @@ func SSH(sshProfile string) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
+	codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		if err == codespaces.ErrNoCodespaces {
+			fmt.Println(err.Error())
+			return nil
+		}
+
+		return fmt.Errorf("error choosing codespace: %v", err)
 	}
 
-	if len(codespaces) == 0 {
-		fmt.Println("You have no codespaces.")
-		return nil
-	}
-
-	codespaces.SortByCreatedAt()
-
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
-	}
-
-	sshSurvey := []*survey.Question{
-		{
-			Name: "codespace",
-			Prompt: &survey.Select{
-				Message: "Choose Codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	answers := struct {
-		Codespace string
-	}{}
-	if err := survey.Ask(sshSurvey, &answers); err != nil {
-		return fmt.Errorf("error getting answers: %v", err)
-	}
-
-	codespace := codespacesByName[answers.Codespace]
-
-	token, err := apiClient.GetCodespaceToken(ctx, codespace)
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
 		return fmt.Errorf("error getting codespace token: %v", err)
 	}
 
-	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		fmt.Println("Starting your codespace...")
-		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
-			return fmt.Errorf("error starting codespace: %v", err)
-		}
-	}
-
-	retries := 0
-	for codespace.Environment.Connection.SessionID == "" || codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		if retries > 1 {
-			if retries%2 == 0 {
-				fmt.Print(".")
-			}
-
-			time.Sleep(1 * time.Second)
-		}
-
-		if retries == 30 {
-			return errors.New("timed out while waiting for the codespace to start")
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, codespace.OwnerLogin, codespace.Name)
-		if err != nil {
-			return fmt.Errorf("error getting codespace: %v", err)
-		}
-
-		retries += 1
-	}
-
-	if retries >= 2 {
-		fmt.Print("\n")
-	}
-
-	fmt.Println("Connecting to your codespace...")
-
-	liveShare, err := liveshare.New(
-		liveshare.WithWorkspaceID(codespace.Environment.Connection.SessionID),
-		liveshare.WithToken(codespace.Environment.Connection.SessionToken),
-	)
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error creating live share: %v", err)
-	}
-
-	liveShareClient := liveShare.NewClient()
-	if err := liveShareClient.Join(ctx); err != nil {
-		return fmt.Errorf("error joining liveshare client: %v", err)
+		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
 	terminal, err := liveShareClient.NewTerminal()
