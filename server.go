@@ -59,3 +59,11 @@ func (s *Server) GetSharedServers(ctx context.Context) (Ports, error) {
 
 	return response, nil
 }
+
+func (s *Server) UpdateSharedVisibility(ctx context.Context, port int, public bool) error {
+	if err := s.client.rpc.do(ctx, "serverSharing.updateSharedServerVisibility", []interface{}{port, public}, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
