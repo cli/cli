@@ -19,6 +19,12 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
+---
+**NOTE**
+
+For the Apple Silicon M1 chip, we don't provide a downloadable binary. Use one of the below install methods instead.
+---
+
 `gh` is available via [Homebrew][], [MacPorts][], [Conda][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
