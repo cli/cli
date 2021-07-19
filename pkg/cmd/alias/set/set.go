@@ -47,17 +47,24 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			will not be automatically passed to the expanded expression. To have a shell alias receive
 			arguments, you must explicitly accept them using "$1", "$2", etc., or "$@" to accept all of them.
 
-			Platform note: on Windows, shell aliases are executed via "sh" as installed by Git For Windows. If
-			you have installed git on Windows in some other way, shell aliases may not work for you.
-
 			Quotes must always be used when defining a command as in the examples unless you pass '-'
 			as the expansion parameter and pipe your command to 'gh alias set'.
+
+			**Platform notes for Windows:**
+
+			- Shell aliases are executed via 'sh' as installed by Git For Windows.
+			  If you have installed git in some other way, shell aliases may not work for you.
+			- If you are using a shell that is *not* Unix-like (e.g. Command Prompt, cmd.exe),
+			  make sure to *double quote* when defining an alias.
+			  For instance, use ` + "`gh alias set pv \"pr view\"`" + ` instead of ` + "`gh alias set pv 'pr view'`.  " +
+			`
+			  All the examples assume a Unix-like shell.
 		`),
 		Example: heredoc.Doc(`
 			$ gh alias set pv 'pr view'
 			$ gh pv -w 123
 			#=> gh pr view -w 123
-			
+
 			$ gh alias set bugs 'issue list --label="bugs"'
 			$ gh bugs
 
