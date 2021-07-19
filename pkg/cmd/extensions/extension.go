@@ -1,6 +1,7 @@
 package extensions
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,7 @@ func (e *Extension) IsLocal() bool {
 		return true
 	}
 	// Check if extension does not have a git directory
-	if _, err = os.Stat(filepath.Join(dir, ".git")); err != nil {
+	if _, err = os.Stat(filepath.Join(dir, ".git")); errors.Is(err, os.ErrNotExist) {
 		return true
 	}
 	return false
