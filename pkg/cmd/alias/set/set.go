@@ -50,14 +50,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			Quotes must always be used when defining a command as in the examples unless you pass '-'
 			as the expansion parameter and pipe your command to 'gh alias set'.
 
-			**Platform notes for Windows:**
+			Platform notes for Windows:
 
-			- If you are using a shell that is *not* Unix-like (e.g. Command Prompt, cmd.exe),
-			  make sure to *double quote* when defining an alias.
-			  For instance, use ` + "`gh alias set pv \"pr view\"`" + ` instead of ` + "`gh alias set pv 'pr view'`.  " +
-			`
-			  All the examples assume a Unix-like shell.
-		`),
+			- If you are using the Command Prompt (cmd.exe), use *double* quotes instead of single quotes.
+			  For instance, use` + " `gh alias set pv \"pr view\"` instead of `gh alias set pv 'pr view'`.  "),
 		Example: heredoc.Doc(`
 			$ gh alias set pv 'pr view'
 			$ gh pv -w 123
