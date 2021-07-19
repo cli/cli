@@ -43,9 +43,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			for commands with mixed quotes or multiple lines.
 
 			If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
-			to compose commands with "|" or redirect with ">". Note that extra arguments following the alias
+			to compose commands with '|' or redirect with '>'. Note that extra arguments following the alias
 			will not be automatically passed to the expanded expression. To have a shell alias receive
-			arguments, you must explicitly accept them using "$1", "$2", etc., or "$@" to accept all of them.
+			arguments, you must explicitly accept them using '$1', '$2', etc., or '$@' to accept all of them.
 
 			Quotes must always be used when defining a command as in the examples unless you pass '-'
 			as the expansion parameter and pipe your command to 'gh alias set'.
