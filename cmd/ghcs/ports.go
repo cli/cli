@@ -80,7 +80,7 @@ func Ports() error {
 
 	devContainerResult := <-devContainerCh
 	if devContainerResult.Err != nil {
-		fmt.Println("Failed to get port names: %v", devContainerResult.Err.Error())
+		fmt.Printf("Failed to get port names: %v\n", devContainerResult.Err.Error())
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
