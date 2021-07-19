@@ -16,9 +16,10 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "ghcs",
-	Short: "Codespaces",
-	Long:  "Codespaces",
+	Use:     "ghcs",
+	Short:   "Codespaces",
+	Long:    "Codespaces",
+	Version: "0.5.0",
 }
 
 func Execute() {
