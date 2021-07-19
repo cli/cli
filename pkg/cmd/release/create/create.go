@@ -32,6 +32,7 @@ type CreateOptions struct {
 	Target       string
 	Name         string
 	Body         string
+	Current      bool
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
@@ -92,6 +93,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
+
+			Create a release on current branch
+			$ gh release create v1.2.3 --current
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -128,6 +132,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
+	cmd.Flags().BoolVarP(&opts.Current, "current", "c", false, "Release in current branch")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
@@ -274,9 +279,18 @@ func createRun(opts *CreateOptions) error {
 		"prerelease": opts.Prerelease,
 		"name":       opts.Name,
 		"body":       opts.Body,
+		"current":    opts.Current,
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
+	}
+
+	if opts.Current {
+		currentBranch, err := git.CurrentBranch()
+		if err != nil {
+			return fmt.Errorf("could not determine current branch: %w", err)
+		}
+		params["target_commitish"] = currentBranch
 	}
 
 	hasAssets := len(opts.Assets) > 0

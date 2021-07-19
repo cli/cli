@@ -54,6 +54,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        false,
 				Prerelease:   false,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -71,6 +72,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        false,
 				Prerelease:   false,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets: []*shared.AssetForUpload{
@@ -97,6 +99,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        false,
 				Prerelease:   false,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -114,6 +117,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        false,
 				Prerelease:   false,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -132,6 +136,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        false,
 				Prerelease:   false,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -149,6 +154,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        true,
 				Prerelease:   true,
+				Current:      false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -206,6 +212,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodyProvided, opts.BodyProvided)
 			assert.Equal(t, tt.want.Draft, opts.Draft)
+			assert.Equal(t, tt.want.Current, opts.Current)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
@@ -244,6 +251,7 @@ func Test_createRun(t *testing.T) {
 				"name":       "The Big 1.2",
 				"body":       "* Fixed bugs",
 				"draft":      false,
+				"current":    false,
 				"prerelease": false,
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
@@ -265,6 +273,7 @@ func Test_createRun(t *testing.T) {
 				"body":             "",
 				"draft":            false,
 				"prerelease":       false,
+				"current":          false,
 				"target_commitish": "main",
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
@@ -279,6 +288,7 @@ func Test_createRun(t *testing.T) {
 				Body:         "",
 				BodyProvided: true,
 				Draft:        true,
+				Current:      false,
 				Target:       "",
 			},
 			wantParams: map[string]interface{}{
@@ -286,6 +296,7 @@ func Test_createRun(t *testing.T) {
 				"name":       "",
 				"body":       "",
 				"draft":      true,
+				"current":    false,
 				"prerelease": false,
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
@@ -300,6 +311,7 @@ func Test_createRun(t *testing.T) {
 				Body:         "",
 				BodyProvided: true,
 				Draft:        false,
+				Current:      false,
 				Target:       "",
 				Assets: []*shared.AssetForUpload{
 					{
@@ -316,9 +328,33 @@ func Test_createRun(t *testing.T) {
 				"name":       "",
 				"body":       "",
 				"draft":      true,
+				"current":    false,
 				"prerelease": false,
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "on current branch",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				Current:      true,
+				Target:       "",
+			},
+			wantParams: map[string]interface{}{
+				"tag_name":   "v1.2.3",
+				"name":       "",
+				"body":       "",
+				"draft":      false,
+				"current":    true,
+				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
 		},
 	}
