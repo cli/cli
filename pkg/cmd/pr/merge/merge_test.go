@@ -289,6 +289,35 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_blocked(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "BLOCKED",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	assert.EqualError(t, err, "SilentError")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+	`, "`"), output.Stderr())
+}
+
 func TestPrMerge_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -471,7 +500,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -510,7 +539,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),

@@ -156,7 +156,7 @@ func mergeRun(opts *MergeOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeable", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -191,25 +191,17 @@ func mergeRun(opts *MergeOptions) error {
 		}
 	}
 
-	if pr.Mergeable == "CONFLICTING" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has conflicts and isn't mergeable\n", cs.Red("!"), pr.Number, pr.Title)
-		return cmdutil.SilentError
-	}
-
-	approved := pr.MergeStateStatus == "CLEAN" || pr.MergeStateStatus == "HAS_HOOKS" || pr.MergeStateStatus == "UNSTABLE"
-	if !opts.AutoMergeEnable && !approved {
-		fmt.Fprintf(
-			opts.IO.ErrOut,
-			"%s Merging is blocked. Enable auto-merge to automatically merge it when all requirements are met with: gh pr merge %d --auto\n",
-			cs.FailureIcon(), pr.Number)
+	isPRAlreadyMerged := pr.State == "MERGED"
+	if blocked := blockedReason(pr.MergeStateStatus); !opts.AutoMergeEnable && !isPRAlreadyMerged && blocked != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, blocked)
+		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
 		return cmdutil.SilentError
 	}
 
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
-	autoMerge := opts.AutoMergeEnable && !approved
+	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
 
-	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
 			repo:          baseRepo,
@@ -460,4 +452,27 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 	}
 
 	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
+}
+
+// blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
+func blockedReason(status string) string {
+	switch status {
+	case "BLOCKED":
+		return "the base branch policy prohibits the merge"
+	case "BEHIND":
+		return "the head branch is not up to date with the base branch"
+	case "DIRTY":
+		return "the merge commit cannot be cleanly created"
+	default:
+		return ""
+	}
+}
+
+func isImmediatelyMergeable(status string) bool {
+	switch status {
+	case "CLEAN", "HAS_HOOKS":
+		return true
+	default:
+		return false
+	}
 }
