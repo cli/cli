@@ -470,7 +470,7 @@ func blockedReason(status string) string {
 
 func isImmediatelyMergeable(status string) bool {
 	switch status {
-	case "CLEAN", "HAS_HOOKS":
+	case "CLEAN", "HAS_HOOKS", "UNSTABLE":
 		return true
 	default:
 		return false
