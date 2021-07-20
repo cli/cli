@@ -44,8 +44,8 @@ func newTestManager(dir string) *Manager {
 
 func TestManager_List(t *testing.T) {
 	tempDir := t.TempDir()
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 
 	m := newTestManager(tempDir)
 	exts := m.List()
@@ -57,7 +57,7 @@ func TestManager_List(t *testing.T) {
 func TestManager_Dispatch(t *testing.T) {
 	tempDir := t.TempDir()
 	extPath := filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")
-	assert.NoError(t, stubExecutable(extPath))
+	assert.NoError(t, stubExtension(extPath))
 
 	m := newTestManager(tempDir)
 
@@ -77,8 +77,8 @@ func TestManager_Dispatch(t *testing.T) {
 
 func TestManager_Remove(t *testing.T) {
 	tempDir := t.TempDir()
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 
 	m := newTestManager(tempDir)
 	err := m.Remove("hello")
@@ -90,10 +90,11 @@ func TestManager_Remove(t *testing.T) {
 	assert.Equal(t, "gh-two", items[0].Name())
 }
 
-func TestManager_Upgrade(t *testing.T) {
+func TestManager_Upgrade_AllExtensions(t *testing.T) {
 	tempDir := t.TempDir()
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
-	assert.NoError(t, stubExecutable(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
+	assert.NoError(t, stubLocalExtension(filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
 	m := newTestManager(tempDir)
 
@@ -105,6 +106,7 @@ func TestManager_Upgrade(t *testing.T) {
 	assert.Equal(t, heredoc.Docf(
 		`
 		[hello]: [git -C %s --git-dir=%s pull --ff-only]
+		[local]: local extensions can not be upgraded
 		[two]: [git -C %s --git-dir=%s pull --ff-only]
 		`,
 		filepath.Join(tempDir, "extensions", "gh-hello"),
@@ -112,6 +114,53 @@ func TestManager_Upgrade(t *testing.T) {
 		filepath.Join(tempDir, "extensions", "gh-two"),
 		filepath.Join(tempDir, "extensions", "gh-two", ".git"),
 	), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_RemoteExtension(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
+
+	m := newTestManager(tempDir)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	err := m.Upgrade("remote", stdout, stderr)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Docf(
+		`
+		[git -C %s --git-dir=%s pull --ff-only]
+		`,
+		filepath.Join(tempDir, "extensions", "gh-remote"),
+		filepath.Join(tempDir, "extensions", "gh-remote", ".git"),
+	), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_LocalExtension(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubLocalExtension(filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
+
+	m := newTestManager(tempDir)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	err := m.Upgrade("local", stdout, stderr)
+	assert.EqualError(t, err, "local extensions can not be upgraded")
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_NoExtensions(t *testing.T) {
+	tempDir := t.TempDir()
+
+	m := newTestManager(tempDir)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	err := m.Upgrade("", stdout, stderr)
+	assert.EqualError(t, err, "no extensions installed")
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
@@ -127,7 +176,23 @@ func TestManager_Install(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
-func stubExecutable(path string) error {
+func stubExtension(path string) error {
+	dir := filepath.Dir(path)
+	gitDir := filepath.Join(dir, ".git")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	if err := os.Mkdir(gitDir, 0755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func stubLocalExtension(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}

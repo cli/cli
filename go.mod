@@ -13,14 +13,14 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/creack/pty v1.1.13
 	github.com/gabriel-vasile/mimetype v1.1.2
-	github.com/google/go-cmp v0.5.2
+	github.com/google/go-cmp v0.5.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.1
 	github.com/henvic/httpretty v0.0.6
-	github.com/itchyny/gojq v0.12.1
+	github.com/itchyny/gojq v0.12.4
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.8
-	github.com/mattn/go-isatty v0.0.12
+	github.com/mattn/go-isatty v0.0.13
 	github.com/mattn/go-runewidth v0.0.10
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/go-homedir v1.1.0
@@ -33,7 +33,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44
+	golang.org/x/sys v0.0.0-20210601080250-7ecdf8ef093b
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	golang.org/x/text v0.3.4 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b

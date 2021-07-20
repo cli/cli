@@ -136,6 +136,8 @@ func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
 	return externalCmd.Run()
 }
 
+var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
+
 func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
@@ -154,6 +156,16 @@ func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
 		} else if f.Name() != name {
 			continue
 		}
+
+		if f.IsLocal() {
+			if name == "" {
+				fmt.Fprintf(stdout, "%s\n", localExtensionUpgradeError)
+			} else {
+				err = localExtensionUpgradeError
+			}
+			continue
+		}
+
 		dir := filepath.Dir(f.Path())
 		externalCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
 		externalCmd.Stdout = stdout
