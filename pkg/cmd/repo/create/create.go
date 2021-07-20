@@ -280,15 +280,15 @@ func createRun(opts *CreateOptions) error {
 		var templateRepo ghrepo.Interface
 		apiClient := api.NewClientFromHTTP(httpClient)
 
-		cloneURL := opts.Template
-		if !strings.Contains(cloneURL, "/") {
+		templateRepoName := opts.Template
+		if !strings.Contains(templateRepoName, "/") {
 			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 			if err != nil {
 				return err
 			}
-			cloneURL = currentUser + "/" + cloneURL
+			templateRepoName = currentUser + "/" + templateRepoName
 		}
-		templateRepo, err = ghrepo.FromFullName(cloneURL)
+		templateRepo, err = ghrepo.FromFullName(templateRepoName)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}

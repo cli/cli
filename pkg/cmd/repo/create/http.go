@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/api"
 )
 
+// repoCreateInput is input parameters for the repoCreate method
 type repoCreateInput struct {
 	Name                 string
 	HomepageURL          string
@@ -24,6 +25,7 @@ type repoCreateInput struct {
 	LicenseTemplate      string
 }
 
+// createRepositoryInputV3 is the payload for the repo create REST API
 type createRepositoryInputV3 struct {
 	Name              string `json:"name"`
 	HomepageURL       string `json:"homepage,omitempty"`
@@ -37,6 +39,7 @@ type createRepositoryInputV3 struct {
 	LicenseTemplate   string `json:"license_template,omitempty"`
 }
 
+// createRepositoryInput is the payload for the repo create GraphQL mutation
 type createRepositoryInput struct {
 	Name             string `json:"name"`
 	HomepageURL      string `json:"homepageUrl,omitempty"`
@@ -48,6 +51,7 @@ type createRepositoryInput struct {
 	HasWikiEnabled   bool   `json:"hasWikiEnabled"`
 }
 
+// cloneTemplateRepositoryInput is the payload for creating a repo from a template using GraphQL
 type cloneTemplateRepositoryInput struct {
 	Name         string `json:"name"`
 	Visibility   string `json:"visibility"`
