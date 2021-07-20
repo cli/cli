@@ -64,6 +64,5 @@ nfpms:
     formats:
       - deb
       - rpm
-    contents:
-      - src: "/share/man/man1/gh*.1"
-        dst: "/usr/share/man/man1"
+    files:
+      "./share/man/man1/gh*.1": "/usr/share/man/man1"
