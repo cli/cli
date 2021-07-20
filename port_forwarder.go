@@ -53,8 +53,8 @@ func (l *LocalPortForwarder) handleConnection(ctx context.Context, conn net.Conn
 	copyConn := func(writer io.Writer, reader io.Reader) {
 		_, err := io.Copy(writer, reader)
 		if err != nil {
-			log.Println("errrrr copyConn")
-			log.Println(err) //TODO(josebalius): handle this somehow
+			channel.Close()
+			conn.Close()
 		}
 	}
 
