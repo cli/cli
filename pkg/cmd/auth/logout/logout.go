@@ -74,6 +74,9 @@ func logoutRun(opts *LogoutOptions) error {
 
 	candidates, err := cfg.Hosts()
 	if err != nil {
+		return err
+	}
+	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
 
