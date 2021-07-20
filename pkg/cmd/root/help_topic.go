@@ -33,13 +33,13 @@ var HelpTopics = map[string]map[string]string{
 			previously stored credentials.
 
 			GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication
-			token for API requests to GitHub Enterprise.
+			token for API requests to GitHub Enterprise. When setting this, also set GH_HOST.
+
+			GH_HOST: specify the GitHub hostname for commands that would otherwise assume the
+			"github.com" host when not in a context of an existing repository.
 
 			GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
 			that otherwise operate on a local repository.
-
-			GH_HOST: specify the GitHub hostname for commands that would otherwise assume
-			the "github.com" host when not in a context of an existing repository.
 
 			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
 			for authoring text.
