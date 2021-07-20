@@ -82,6 +82,8 @@ func SSH(sshProfile string) error {
 		if err := setupSSH(ctx, terminal, containerID, codespace.RepositoryName); err != nil {
 			return fmt.Errorf("error creating ssh server: %v", err)
 		}
+
+		fmt.Printf("\n")
 	}
 
 	server, err := liveShareClient.NewServer()
@@ -124,6 +126,7 @@ func connect(ctx context.Context, port int, destination string) error {
 }
 
 func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, error) {
+	fmt.Print(".")
 	cmd := terminal.NewCommand(
 		"/",
 		"/usr/bin/docker ps -aq --filter label=Type=codespaces --filter status=running",
@@ -133,14 +136,17 @@ func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, 
 		return "", fmt.Errorf("error running command: %v", err)
 	}
 
+	fmt.Print(".")
 	scanner := bufio.NewScanner(stream)
 	scanner.Scan()
 
+	fmt.Print(".")
 	containerID := scanner.Text()
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("error scanning stream: %v", err)
 	}
 
+	fmt.Print(".")
 	if err := stream.Close(); err != nil {
 		return "", fmt.Errorf("error closing stream: %v", err)
 	}
@@ -149,13 +155,11 @@ func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, 
 }
 
 func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, repositoryName string) error {
-	getUsernameCmd := "GITHUB_USERNAME=\"$(jq .CODESPACE_NAME /workspaces/.codespaces/shared/environment-variables.json -r | cut -f1 -d -)\""
-	makeSSHDirCmd := "mkdir /home/codespace/.ssh"
-	getUserKeysCmd := "curl --silent --fail \"https://github.com/$(echo $GITHUB_USERNAME).keys\" > /home/codespace/.ssh/authorized_keys"
-	setupSecretsCmd := `cat /workspaces/.codespaces/shared/.user-secrets.json | jq -r ".[] | select (.type==\"EnvironmentVariable\") | .name+\"=\"+.value" > /home/codespace/.zshenv`
+	setupSecretsCmd := `cp /workspaces/.codespaces/shared/.env /home/codespace/.zshenv`
 	setupLoginDirCmd := fmt.Sprintf("echo \"cd /workspaces/%v; exec /bin/zsh;\" > /home/codespace/.bash_profile", repositoryName)
 
-	compositeCommand := []string{getUsernameCmd, makeSSHDirCmd, getUserKeysCmd, setupSecretsCmd, setupLoginDirCmd}
+	fmt.Print(".")
+	compositeCommand := []string{setupSecretsCmd, setupLoginDirCmd}
 	cmd := terminal.NewCommand(
 		"/",
 		fmt.Sprintf("/usr/bin/docker exec -t %s /bin/bash -c '"+strings.Join(compositeCommand, "; ")+"'", containerID),
@@ -165,6 +169,7 @@ func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, re
 		return fmt.Errorf("error running command: %v", err)
 	}
 
+	fmt.Print(".")
 	if err := stream.Close(); err != nil {
 		return fmt.Errorf("error closing stream: %v", err)
 	}
