@@ -40,8 +40,9 @@ func ConfigDir() string {
 		path = filepath.Join(d, ".config", "gh")
 	}
 
-	// If the path does not exist try migrating config from default paths
-	if !dirExists(path) {
+	// If the path does not exist and the GH_CONFIG_DIR flag is not set try
+	// migrating config from default paths.
+	if !dirExists(path) && os.Getenv(GH_CONFIG_DIR) == "" {
 		_ = autoMigrateConfigDir(path)
 	}
 
