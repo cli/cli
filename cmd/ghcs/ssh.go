@@ -19,17 +19,19 @@ import (
 
 func NewSSHCmd() *cobra.Command {
 	var sshProfile string
+	var sshServerPort int
 
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
 		Short: "ssh",
 		Long:  "ssh",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return SSH(sshProfile)
+			return SSH(sshProfile, sshServerPort)
 		},
 	}
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "SSH Profile")
+	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH Server Port")
 
 	return sshCmd
 }
@@ -38,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(NewSSHCmd())
 }
 
-func SSH(sshProfile string) error {
+func SSH(sshProfile string, sshServerPort int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -93,6 +95,10 @@ func SSH(sshProfile string) error {
 
 	rand.Seed(time.Now().Unix())
 	port := rand.Intn(9999-2000) + 2000 // improve this obviously
+	if sshServerPort != 0 {
+		port = sshServerPort
+	}
+
 	if err := server.StartSharing(ctx, "sshd", 2222); err != nil {
 		return fmt.Errorf("error sharing sshd port: %v", err)
 	}
@@ -110,15 +116,21 @@ func SSH(sshProfile string) error {
 	}
 
 	fmt.Println("Ready...")
-	if err := connect(ctx, port, connectDestination); err != nil {
+	if err := connect(ctx, port, connectDestination, port == sshServerPort); err != nil {
 		return fmt.Errorf("error connecting via SSH: %v", err)
 	}
 
 	return nil
 }
 
-func connect(ctx context.Context, port int, destination string) error {
-	cmd := exec.CommandContext(ctx, "ssh", destination, "-C", "-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes")
+func connect(ctx context.Context, port int, destination string, setServerPort bool) error {
+	cmdArgs := []string{destination, "-C", "-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+
+	if setServerPort {
+		fmt.Println("Connection Details: ssh " + strings.Join(cmdArgs, " "))
+	}
+
+	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -155,11 +167,10 @@ func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, 
 }
 
 func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, repositoryName string) error {
-	setupSecretsCmd := `cp /workspaces/.codespaces/shared/.env /home/codespace/.zshenv`
-	setupLoginDirCmd := fmt.Sprintf("echo \"cd /workspaces/%v; exec /bin/zsh;\" > /home/codespace/.bash_profile", repositoryName)
+	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/codespace/.bash_profile`, repositoryName)
 
 	fmt.Print(".")
-	compositeCommand := []string{setupSecretsCmd, setupLoginDirCmd}
+	compositeCommand := []string{setupBashProfileCmd}
 	cmd := terminal.NewCommand(
 		"/",
 		fmt.Sprintf("/usr/bin/docker exec -t %s /bin/bash -c '"+strings.Join(compositeCommand, "; ")+"'", containerID),
