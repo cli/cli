@@ -146,6 +146,21 @@ func TestNewCmdExtensions(t *testing.T) {
 			isTTY:      false,
 			wantStdout: "",
 		},
+		{
+			name: "list extensions",
+			args: []string{"list"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", updateAvailable: false}
+					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", updateAvailable: true}
+					return []extensions.Extension{ex1, ex2}
+				}
+				return func(t *testing.T) {
+					assert.Equal(t, 1, len(em.ListCalls()))
+				}
+			},
+			wantStdout: "gh test\tcli/gh-test\t\ngh test2\tcli/gh-test2\tUpdate available\n",
+		},
 	}
 
 	for _, tt := range tests {

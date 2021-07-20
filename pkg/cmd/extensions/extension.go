@@ -8,8 +8,9 @@ import (
 )
 
 type Extension struct {
-	path string
-	url  string
+	path            string
+	url             string
+	updateAvailable bool
 }
 
 func (e *Extension) Name() string {
@@ -39,4 +40,8 @@ func (e *Extension) IsLocal() bool {
 		return true
 	}
 	return false
+}
+
+func (e *Extension) UpdateAvailable() bool {
+	return e.updateAvailable
 }
