@@ -150,18 +150,33 @@ type PullRequestFile struct {
 
 type ReviewRequests struct {
 	Nodes []struct {
-		RequestedReviewer struct {
-			TypeName string `json:"__typename"`
-			Login    string `json:"login"`
-			Name     string `json:"name"`
-		}
+		RequestedReviewer RequestedReviewer
 	}
 }
 
+type RequestedReviewer struct {
+	TypeName     string `json:"__typename"`
+	Login        string `json:"login"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	Organization struct {
+		Login string `json:"login"`
+	} `json:"organization"`
+}
+
+func (r RequestedReviewer) LoginOrSlug() string {
+	if r.TypeName == teamTypeName {
+		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
+	}
+	return r.Login
+}
+
+const teamTypeName = "Team"
+
 func (r ReviewRequests) Logins() []string {
 	logins := make([]string, len(r.Nodes))
-	for i, a := range r.Nodes {
-		logins[i] = a.RequestedReviewer.Login
+	for i, r := range r.Nodes {
+		logins[i] = r.RequestedReviewer.LoginOrSlug()
 	}
 	return logins
 }
@@ -381,7 +396,7 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
 		gr := PullRequestGraphQL(fields.ToSlice())
-		fragments = fmt.Sprintf("fragment pr on PullRequest{%[1]s}fragment prWithReviews on PullRequest{%[1]s}", gr)
+		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
 		fragments, err = pullRequestFragment(client.http, repo.RepoHost())
@@ -393,8 +408,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 	queryPrefix := `
 	query PullRequestStatus($owner: String!, $repo: String!, $headRefName: String!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
-			defaultBranchRef { 
-				name 
+			defaultBranchRef {
+				name
 			}
 			pullRequests(headRefName: $headRefName, first: $per_page, orderBy: { field: CREATED_AT, direction: DESC }) {
 				totalCount
@@ -410,8 +425,8 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 		queryPrefix = `
 		query PullRequestStatus($owner: String!, $repo: String!, $number: Int!, $viewerQuery: String!, $reviewerQuery: String!, $per_page: Int = 10) {
 			repository(owner: $owner, name: $repo) {
-				defaultBranchRef { 
-					name 
+				defaultBranchRef {
+					name
 				}
 				pullRequest(number: $number) {
 					...prWithReviews
@@ -516,67 +531,26 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 		return "", err
 	}
 
-	var reviewsFragment string
-	if prFeatures.HasReviewDecision {
-		reviewsFragment = "reviewDecision"
+	fields := []string{
+		"number", "title", "state", "url", "isDraft", "isCrossRepository",
+		"headRefName", "headRepositoryOwner", "mergeStateStatus",
 	}
-
-	var statusesFragment string
 	if prFeatures.HasStatusCheckRollup {
-		statusesFragment = `
-		commits(last: 1) {
-			nodes {
-				commit {
-					statusCheckRollup {
-						contexts(last: 100) {
-							nodes {
-								...on StatusContext {
-									state
-								}
-								...on CheckRun {
-									conclusion
-									status
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		`
+		fields = append(fields, "statusCheckRollup")
+	}
+	if prFeatures.HasBranchProtectionRule {
+		fields = append(fields, "requiresStrictStatusChecks")
 	}
 
-	var requiresStrictStatusChecks string
-	if prFeatures.HasBranchProtectionRule {
-		requiresStrictStatusChecks = `
-		baseRef {
-			branchProtectionRule {
-				requiresStrictStatusChecks
-			}
-		}`
+	var reviewFields []string
+	if prFeatures.HasReviewDecision {
+		reviewFields = append(reviewFields, "reviewDecision")
 	}
 
 	fragments := fmt.Sprintf(`
-	fragment pr on PullRequest {
-		number
-		title
-		state
-		url
-		headRefName
-		mergeStateStatus
-		headRepositoryOwner {
-			login
-		}
-		%s
-		isCrossRepository
-		isDraft
-		%s
-	}
-	fragment prWithReviews on PullRequest {
-		...pr
-		%s
-	}
-	`, requiresStrictStatusChecks, statusesFragment, reviewsFragment)
+	fragment pr on PullRequest {%s}
+	fragment prWithReviews on PullRequest {...pr,%s}
+	`, PullRequestGraphQL(fields), PullRequestGraphQL(reviewFields))
 	return fragments, nil
 }
 

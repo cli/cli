@@ -139,7 +139,7 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 	reviewers := prReviewerList(*pr, cs)
 	assignees := prAssigneeList(*pr)
-	labels := prLabelList(*pr)
+	labels := prLabelList(*pr, cs)
 	projects := prProjectList(*pr)
 
 	fmt.Fprintf(out, "title:\t%s\n", pr.Title)
@@ -170,7 +170,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(pr.Title))
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
@@ -197,7 +197,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := prLabelList(*pr); labels != "" {
+	if labels := prLabelList(*pr, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -294,8 +294,6 @@ func prReviewerList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	return reviewerList
 }
 
-const teamTypeName = "Team"
-
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
@@ -317,10 +315,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.Login
-		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
-			name = reviewRequest.RequestedReviewer.Name
-		}
+		name := reviewRequest.RequestedReviewer.LoginOrSlug()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,
@@ -372,14 +367,14 @@ func prAssigneeList(pr api.PullRequest) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequest) string {
+func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, label.Name)
+		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")

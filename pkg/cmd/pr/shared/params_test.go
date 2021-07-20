@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_listURLWithQuery(t *testing.T) {
@@ -147,6 +148,99 @@ func TestMeReplacer_Replace(t *testing.T) {
 
 			if tt.verify != nil {
 				tt.verify(t)
+			}
+		})
+	}
+}
+
+func Test_QueryHasStateClause(t *testing.T) {
+	tests := []struct {
+		searchQuery string
+		hasState    bool
+	}{
+		{
+			searchQuery: "is:closed is:merged",
+			hasState:    true,
+		},
+		{
+			searchQuery: "author:mislav",
+			hasState:    false,
+		},
+		{
+			searchQuery: "assignee:g14a mentions:vilmibm",
+			hasState:    false,
+		},
+		{
+			searchQuery: "merged:>2021-05-20",
+			hasState:    true,
+		},
+		{
+			searchQuery: "state:merged state:open",
+			hasState:    true,
+		},
+		{
+			searchQuery: "assignee:g14a is:closed",
+			hasState:    true,
+		},
+		{
+			searchQuery: "state:closed label:bug",
+			hasState:    true,
+		},
+	}
+	for _, tt := range tests {
+		gotState := QueryHasStateClause(tt.searchQuery)
+		assert.Equal(t, tt.hasState, gotState)
+	}
+}
+
+func Test_WithPrAndIssueQueryParams(t *testing.T) {
+	type args struct {
+		baseURL string
+		state   IssueMetadataState
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "blank",
+			args: args{
+				baseURL: "",
+				state:   IssueMetadataState{},
+			},
+			want: "?body=",
+		},
+		{
+			name: "no values",
+			args: args{
+				baseURL: "http://example.com/hey",
+				state:   IssueMetadataState{},
+			},
+			want: "http://example.com/hey?body=",
+		},
+		{
+			name: "title and body",
+			args: args{
+				baseURL: "http://example.com/hey",
+				state: IssueMetadataState{
+					Title: "my title",
+					Body:  "my bodeh",
+				},
+			},
+			want: "http://example.com/hey?body=my+bodeh&title=my+title",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := WithPrAndIssueQueryParams(nil, nil, tt.args.baseURL, tt.args.state)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("WithPrAndIssueQueryParams() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("WithPrAndIssueQueryParams() = %v, want %v", got, tt.want)
 			}
 		})
 	}

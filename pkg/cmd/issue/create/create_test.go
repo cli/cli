@@ -114,6 +114,8 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
@@ -168,7 +170,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:   true,
 				Assignees: []string{"monalisa"},
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa&body=",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
@@ -185,7 +187,7 @@ func Test_createRun(t *testing.T) {
 						"viewer": { "login": "MonaLisa" }
 					} }`))
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
@@ -214,7 +216,7 @@ func Test_createRun(t *testing.T) {
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
 			},
-			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?projects=OWNER%2FREPO%2F1",
+			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{

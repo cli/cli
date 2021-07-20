@@ -239,7 +239,7 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_recover(t *testing.T) {
@@ -780,7 +780,7 @@ func TestPRCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_webLongURL(t *testing.T) {
@@ -851,7 +851,7 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", output.BrowsedURL)
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -965,7 +965,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main",
 				HeadBranchLabel: "feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1",
 			wantErr: false,
 		},
 		{
@@ -978,7 +978,7 @@ func Test_generateCompareURL(t *testing.T) {
 			state: prShared.IssueMetadataState{
 				Labels: []string{"one", "two three"},
 			},
-			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
+			want:    "https://github.com/OWNER/REPO/compare/a...b?body=&expand=1&labels=one%2Ctwo+three",
 			wantErr: false,
 		},
 		{
@@ -988,7 +988,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main/trunk",
 				HeadBranchLabel: "owner:feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?body=&expand=1",
 			wantErr: false,
 		},
 	}
