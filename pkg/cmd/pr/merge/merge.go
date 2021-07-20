@@ -284,7 +284,7 @@ func mergeRun(opts *MergeOptions) error {
 				fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
 			}
 		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !autoMerge {
+	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMergeEnable {
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
 			Default: false,
