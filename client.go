@@ -96,7 +96,7 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 	if err != nil {
 		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
 	}
-	go c.processChannelRequests(ctx, reqs)
+	go ssh.DiscardRequests(reqs)
 
 	requestType := fmt.Sprintf("stream-transport-%s", streamID)
 	_, err = channel.SendRequest(requestType, true, nil)
@@ -105,17 +105,4 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 	}
 
 	return channel, nil
-}
-
-func (c *Client) processChannelRequests(ctx context.Context, reqs <-chan *ssh.Request) {
-	for {
-		select {
-		case req := <-reqs:
-			if req != nil {
-				// TODO(josebalius): Handle
-			}
-		case <-ctx.Done():
-			break
-		}
-	}
 }
