@@ -29,13 +29,15 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
-		if idx := strings.IndexRune(toComplete, ','); idx >= 0 {
+		var prefix string
+		if idx := strings.LastIndexByte(toComplete, ','); idx >= 0 {
+			prefix = toComplete[:idx+1]
 			toComplete = toComplete[idx+1:]
 		}
 		toComplete = strings.ToLower(toComplete)
 		for _, f := range fields {
 			if strings.HasPrefix(strings.ToLower(f), toComplete) {
-				results = append(results, f)
+				results = append(results, prefix+f)
 			}
 		}
 		sort.Strings(results)
