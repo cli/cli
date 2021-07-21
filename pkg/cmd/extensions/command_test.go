@@ -90,7 +90,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name: "upgrade an extension",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name: "upgrade all",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
 					return nil
 				}
 				return func(t *testing.T) {

@@ -96,6 +96,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 		},
 		func() *cobra.Command {
 			var flagAll bool
+			var flagForce bool
 			cmd := &cobra.Command{
 				Use:   "upgrade {<name> | --all}",
 				Short: "Upgrade installed extensions",
@@ -116,10 +117,11 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 {
 						name = args[0]
 					}
-					return m.Upgrade(name, io.Out, io.ErrOut)
+					return m.Upgrade(name, flagForce, io.Out, io.ErrOut)
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
+			cmd.Flags().BoolVar(&flagForce, "force", false, "Force upgrade extension")
 			return cmd
 		}(),
 		&cobra.Command{

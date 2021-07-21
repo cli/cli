@@ -167,7 +167,7 @@ func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
 
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
 
-func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
+func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
@@ -195,11 +195,17 @@ func (m *Manager) Upgrade(name string, stdout, stderr io.Writer) error {
 			continue
 		}
 
+		var cmds []*exec.Cmd
 		dir := filepath.Dir(f.Path())
-		externalCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
-		externalCmd.Stdout = stdout
-		externalCmd.Stderr = stderr
-		if e := externalCmd.Run(); e != nil {
+		if force {
+			fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
+			resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
+			cmds = []*exec.Cmd{fetchCmd, resetCmd}
+		} else {
+			pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
+			cmds = []*exec.Cmd{pullCmd}
+		}
+		if e := runCmds(cmds, stdout, stderr); e != nil {
 			err = e
 		}
 		someUpgraded = true
@@ -220,4 +226,15 @@ func (m *Manager) Remove(name string) error {
 
 func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
+}
+
+func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {
+	for _, cmd := range cmds {
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

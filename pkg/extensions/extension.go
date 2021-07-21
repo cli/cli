@@ -18,7 +18,7 @@ type ExtensionManager interface {
 	List() []Extension
 	Install(url string, stdout, stderr io.Writer) error
 	InstallLocal(dir string) error
-	Upgrade(name string, stdout, stderr io.Writer) error
+	Upgrade(name string, force bool, stdout, stderr io.Writer) error
 	Remove(name string) error
 	Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error)
 }

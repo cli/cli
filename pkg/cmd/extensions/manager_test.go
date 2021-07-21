@@ -100,7 +100,7 @@ func TestManager_Upgrade_AllExtensions(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", stdout, stderr)
+	err := m.Upgrade("", false, stdout, stderr)
 	assert.NoError(t, err)
 
 	assert.Equal(t, heredoc.Docf(
@@ -125,7 +125,7 @@ func TestManager_Upgrade_RemoteExtension(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	err := m.Upgrade("remote", stdout, stderr)
+	err := m.Upgrade("remote", false, stdout, stderr)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
@@ -145,9 +145,35 @@ func TestManager_Upgrade_LocalExtension(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	err := m.Upgrade("local", stdout, stderr)
+	err := m.Upgrade("local", false, stdout, stderr)
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_Force(t *testing.T) {
+	tempDir := t.TempDir()
+	extensionDir := filepath.Join(tempDir, "extensions", "gh-remote")
+	gitDir := filepath.Join(tempDir, "extensions", "gh-remote", ".git")
+
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
+
+	m := newTestManager(tempDir)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	err := m.Upgrade("remote", true, stdout, stderr)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Docf(
+		`
+		[git -C %s --git-dir=%s fetch origin HEAD]
+		[git -C %s --git-dir=%s reset --hard origin/HEAD]
+		`,
+		extensionDir,
+		gitDir,
+		extensionDir,
+		gitDir,
+	), stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
@@ -158,7 +184,7 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", stdout, stderr)
+	err := m.Upgrade("", false, stdout, stderr)
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
