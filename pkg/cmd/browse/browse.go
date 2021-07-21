@@ -47,7 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		Short: "Open the repository in the browser",
 		Use:   "browse [<number> | <path>]",
 		Args:  cobra.MaximumNArgs(1),
-		Example: heredoc.Doc(` 
+		Example: heredoc.Doc(`
 			$ gh browse
 			#=> Open the home page of the current repository
 
