@@ -7,10 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ghcs create
-// ghcs connect
-// ghcs delete
-// ghcs list
 func main() {
 	Execute()
 }
@@ -19,7 +15,7 @@ var rootCmd = &cobra.Command{
 	Use:     "ghcs",
 	Short:   "Codespaces",
 	Long:    "Codespaces",
-	Version: "0.5.1",
+	Version: "0.6.0",
 }
 
 func Execute() {
