@@ -12,17 +12,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var createCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create",
-	Long:  "Create",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return Create()
-	},
+var repo, branch, machine string
+
+type machineType string
+
+const (
+	basicMachine    machineType = "basic"
+	standardMachine machineType = "standard"
+	premiumMachine  machineType = "premium"
+	ExtremeMachine  machineType = "extreme"
+)
+
+func newCreateCmd() *cobra.Command {
+	createCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a codespace",
+		Long: `Create a codespace for a given repository and branch.
+You must also choose the type of machine to use.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if machine != "" {
+				switch machineType(machine) {
+				case basicMachine, standardMachine, premiumMachine, ExtremeMachine:
+					break
+				default:
+					return fmt.Errorf("invalid machine type: %s", machine)
+				}
+			}
+			return Create()
+		},
+	}
+
+	createCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&machine, "machine", "m", "", "hardware specifications for the VM. Can be: basic, standard, premium, extreme")
+
+	return createCmd
 }
 
 func init() {
-	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(newCreateCmd())
 }
 
 var createSurvey = []*survey.Question{
