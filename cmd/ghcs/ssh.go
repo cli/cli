@@ -124,13 +124,15 @@ func SSH(sshProfile string, sshServerPort int) error {
 }
 
 func connect(ctx context.Context, port int, destination string, setServerPort bool) error {
-	cmdArgs := []string{destination, "-C", "-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+	connectionDetailArgs := []string{destination, "-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
 
 	if setServerPort {
-		fmt.Println("Connection Details: ssh " + strings.Join(cmdArgs, " "))
+		fmt.Println("Connection Details: ssh " + strings.Join(connectionDetailArgs, " "))
 	}
 
-	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
+	cmdArgs := []string{"-X", "-Y", "-C"} // X11, X11Trust, Compression
+
+	cmd := exec.CommandContext(ctx, "ssh", append(cmdArgs, connectionDetailArgs...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
