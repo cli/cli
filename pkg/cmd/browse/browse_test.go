@@ -3,6 +3,7 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -59,24 +60,6 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name: "Commit flag",
-			cli:  "--commit e32e640",
-			wants: BrowseOptions{
-				Commit: "e32e640",
-			},
-			wantsErr: false,
-		},
-		{
-			name:     "Commit flag no arg",
-			cli:      "-c",
-			wantsErr: true,
-		},
-		{
-			name:     "Multi flags",
-			cli:      "-c 1a2b3c -b trunk",
-			wantsErr: true,
-		},
-		{
 			name: "branch flag",
 			cli:  "--branch main",
 			wants: BrowseOptions{
@@ -120,6 +103,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "main.go main.go",
 			wantsErr: true,
 		},
+		{
+			name: "last commit flag",
+			cli:  "-c",
+			wants: BrowseOptions{
+				CommitFlag: true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,7 +142,17 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
+func setGitDir(t *testing.T, dir string) {
+	// taken from git_test.go
+	old_GIT_DIR := os.Getenv("GIT_DIR")
+	os.Setenv("GIT_DIR", dir)
+	t.Cleanup(func() {
+		os.Setenv("GIT_DIR", old_GIT_DIR)
+	})
+}
+
 func Test_runBrowse(t *testing.T) {
+	setGitDir(t, "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -273,23 +274,23 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
 		},
 		{
-			name: "opening browser with Commit hash no args",
+			name: "open last commit",
 			opts: BrowseOptions{
-				Commit: "162a1b2",
+				CommitFlag: true,
 			},
-			baseRepo:    ghrepo.New("torvalds", "linux"),
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/torvalds/linux/tree/162a1b2/",
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/",
 		},
 		{
-			name: "opening browser with commit hash file arg",
+			name: "open last commit with a file",
 			opts: BrowseOptions{
-				Commit:      "162a1b2",
-				SelectorArg: "api/cache.go:32",
+				CommitFlag:  true,
+				SelectorArg: "main.go",
 			},
-			baseRepo:    ghrepo.New("cli", "cli"),
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/cli/cli/tree/162a1b2/api/cache.go#L32",
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
 		},
 	}
 

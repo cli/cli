@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -27,7 +28,7 @@ type BrowseOptions struct {
 	SelectorArg string
 
 	Branch        string
-	Commit        string
+	CommitFlag    bool
 	ProjectsFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
@@ -46,7 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		Short: "Open the repository in the browser",
 		Use:   "browse [<number> | <path>]",
 		Args:  cobra.MaximumNArgs(1),
-		Example: heredoc.Doc(`
+		Example: heredoc.Doc(` 
 			$ gh browse
 			#=> Open the home page of the current repository
 
@@ -83,7 +84,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
-				opts.Commit != "",
+				opts.CommitFlag,
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -103,8 +104,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
+	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
-	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select a commit by passing in the SHA hash")
 
 	return cmd
 }
@@ -130,8 +131,9 @@ func runBrowse(opts *BrowseOptions) error {
 			url += "/wiki"
 		} else if opts.Branch != "" {
 			url += "/tree/" + opts.Branch + "/"
-		} else if opts.Commit != "" {
-			url += "/tree/" + opts.Commit + "/"
+		} else if opts.CommitFlag {
+			commit, _ := git.LastCommit()
+			url += "/tree/" + commit.Sha + "/"
 		}
 	} else {
 		if isNumber(opts.SelectorArg) {
@@ -141,10 +143,11 @@ func runBrowse(opts *BrowseOptions) error {
 			if err != nil {
 				return err
 			}
-			if opts.Branch != "" {
+			if opts.CommitFlag {
+				commit, _ := git.LastCommit()
+				url += "/tree/" + commit.Sha + "/"
+			} else if opts.Branch != "" {
 				url += "/tree/" + opts.Branch + "/"
-			} else if opts.Commit != "" {
-				url += "/tree/" + opts.Commit + "/"
 			} else {
 				apiClient := api.NewClientFromHTTP(httpClient)
 				branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
