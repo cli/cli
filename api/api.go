@@ -341,8 +341,8 @@ type createCodespaceRequest struct {
 	SkuName      string `json:"sku_name"`
 }
 
-func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku *Sku, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku.Name})
+func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
+	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %v", err)
 	}

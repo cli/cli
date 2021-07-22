@@ -15,7 +15,7 @@ var rootCmd = &cobra.Command{
 	Use:     "ghcs",
 	Short:   "Unofficial GitHub Codespaces CLI.",
 	Long:    "Unofficial CLI tool to manage and interact with GitHub Codespaces.",
-	Version: "0.6.0",
+	Version: "0.7.0",
 }
 
 func Execute() {
