@@ -10,8 +10,8 @@ import (
 type Client struct {
 	connection Connection
 
-	sshSession *sshSession
-	rpc        *rpc
+	ssh *sshSession
+	rpc *rpcClient
 }
 
 type ClientOption func(*Client) error
@@ -45,12 +45,12 @@ func (c *Client) Join(ctx context.Context) (err error) {
 		return fmt.Errorf("error connecting websocket: %v", err)
 	}
 
-	c.sshSession = newSSH(c.connection.SessionToken, clientSocket)
-	if err := c.sshSession.connect(ctx); err != nil {
+	c.ssh = newSshSession(c.connection.SessionToken, clientSocket)
+	if err := c.ssh.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
-	c.rpc = newRPC(c.sshSession)
+	c.rpc = newRpcClient(c.ssh)
 	c.rpc.connect(ctx)
 
 	_, err = c.joinWorkspace(ctx)
@@ -62,7 +62,7 @@ func (c *Client) Join(ctx context.Context) (err error) {
 }
 
 func (c *Client) hasJoined() bool {
-	return c.sshSession != nil && c.rpc != nil
+	return c.ssh != nil && c.rpc != nil
 }
 
 type clientCapabilities struct {
@@ -105,7 +105,7 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 		return nil, fmt.Errorf("error getting stream id: %v", err)
 	}
 
-	channel, reqs, err := c.sshSession.conn.OpenChannel("session", nil)
+	channel, reqs, err := c.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
 	}

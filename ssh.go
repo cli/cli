@@ -19,7 +19,7 @@ type sshSession struct {
 	writer io.Writer
 }
 
-func newSSH(token string, socket net.Conn) *sshSession {
+func newSshSession(token string, socket net.Conn) *sshSession {
 	return &sshSession{token: token, socket: socket}
 }
 
