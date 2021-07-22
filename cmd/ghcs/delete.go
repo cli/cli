@@ -13,8 +13,7 @@ import (
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:   "delete CODESPACE_NAME",
-		Short: "delete",
-		Long:  "delete",
+		Short: "Delete a GitHub Codespace.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return errors.New("A Codespace name is required.")

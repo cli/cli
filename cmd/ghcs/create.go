@@ -14,8 +14,7 @@ import (
 
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create",
-	Long:  "Create",
+	Short: "Create a GitHub Codespace.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return Create()
 	},

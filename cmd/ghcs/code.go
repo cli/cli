@@ -15,8 +15,7 @@ import (
 func NewCodeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "code",
-		Short: "code",
-		Long:  "code",
+		Short: "Open a GitHub Codespace in VSCode.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
 			if len(args) > 0 {
