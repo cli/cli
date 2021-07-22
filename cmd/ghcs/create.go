@@ -17,9 +17,7 @@ var repo, branch, machine string
 func newCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a codespace",
-		Long: `Create a codespace for a given repository and branch.
-You must also choose the type of machine to use.`,
+    Short: "Create a GitHub Codespace.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Create()
 		},

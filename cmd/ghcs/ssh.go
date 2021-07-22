@@ -23,8 +23,7 @@ func NewSSHCmd() *cobra.Command {
 
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
-		Short: "ssh",
-		Long:  "ssh",
+		Short: "SSH into a GitHub Codespace, for use with running tests/editing in vim, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return SSH(sshProfile, sshServerPort)
 		},

@@ -20,8 +20,7 @@ import (
 func NewPortsCmd() *cobra.Command {
 	portsCmd := &cobra.Command{
 		Use:   "ports",
-		Short: "ports",
-		Long:  "ports",
+		Short: "Forward ports from a GitHub Codespace.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Ports()
 		},
