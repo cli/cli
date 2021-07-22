@@ -11,18 +11,18 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type LocalPortForwarder struct {
+type PortForwarder struct {
 	client   *Client
 	server   *Server
 	port     int
 	channels []ssh.Channel
 }
 
-func NewLocalPortForwarder(client *Client, server *Server, port int) *LocalPortForwarder {
-	return &LocalPortForwarder{client, server, port, []ssh.Channel{}}
+func NewPortForwarder(client *Client, server *Server, port int) *PortForwarder {
+	return &PortForwarder{client, server, port, []ssh.Channel{}}
 }
 
-func (l *LocalPortForwarder) Start(ctx context.Context) error {
+func (l *PortForwarder) Start(ctx context.Context) error {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(l.port))
 	if err != nil {
 		return fmt.Errorf("error listening on tcp port: %v", err)
@@ -42,7 +42,7 @@ func (l *LocalPortForwarder) Start(ctx context.Context) error {
 	return nil
 }
 
-func (l *LocalPortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
+func (l *PortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
 	channel, err := l.client.openStreamingChannel(ctx, l.server.streamName, l.server.streamCondition)
 	if err != nil {
 		log.Println("errrr handle Connect")

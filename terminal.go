@@ -13,13 +13,13 @@ type Terminal struct {
 	client *Client
 }
 
-func (c *Client) NewTerminal() (*Terminal, error) {
-	if !c.hasJoined() {
-		return nil, errors.New("LiveShareClient must join before creating terminal")
+func NewTerminal(client *Client) (*Terminal, error) {
+	if !client.hasJoined() {
+		return nil, errors.New("client must join before creating terminal")
 	}
 
 	return &Terminal{
-		client: c,
+		client: client,
 	}, nil
 }
 

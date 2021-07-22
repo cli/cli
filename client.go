@@ -8,31 +8,44 @@ import (
 )
 
 type Client struct {
-	liveShare  *LiveShare
-	session    *session
+	connection Connection
+
 	sshSession *sshSession
 	rpc        *rpc
 }
 
-// NewClient is a function ...
-func (l *LiveShare) NewClient() *Client {
-	return &Client{liveShare: l}
+type ClientOption func(*Client) error
+
+func NewClient(opts ...ClientOption) (*Client, error) {
+	client := new(Client)
+
+	for _, o := range opts {
+		if err := o(client); err != nil {
+			return nil, err
+		}
+	}
+
+	return client, nil
+}
+
+func WithConnection(connection Connection) ClientOption {
+	return func(c *Client) error {
+		if err := connection.validate(); err != nil {
+			return err
+		}
+
+		c.connection = connection
+		return nil
+	}
 }
 
 func (c *Client) Join(ctx context.Context) (err error) {
-	api := newAPI(c)
-
-	c.session = newSession(api)
-	if err := c.session.init(ctx); err != nil {
-		return fmt.Errorf("error creating session: %v", err)
-	}
-
-	websocket := newWebsocket(c.session)
-	if err := websocket.connect(ctx); err != nil {
+	clientSocket := newSocket(c.connection)
+	if err := clientSocket.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting websocket: %v", err)
 	}
 
-	c.sshSession = newSSH(c.session, websocket)
+	c.sshSession = newSSH(c.connection.SessionToken, clientSocket)
 	if err := c.sshSession.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting to ssh session: %v", err)
 	}
@@ -69,9 +82,9 @@ type joinWorkspaceResult struct {
 
 func (c *Client) joinWorkspace(ctx context.Context) (*joinWorkspaceResult, error) {
 	args := joinWorkspaceArgs{
-		ID:                      c.session.workspaceInfo.ID,
+		ID:                      c.connection.SessionID,
 		ConnectionMode:          "local",
-		JoiningUserSessionToken: c.session.workspaceAccess.SessionToken,
+		JoiningUserSessionToken: c.connection.SessionToken,
 		ClientCapabilities: clientCapabilities{
 			IsNonInteractive: false,
 		},
@@ -99,8 +112,7 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 	go ssh.DiscardRequests(reqs)
 
 	requestType := fmt.Sprintf("stream-transport-%s", streamID)
-	_, err = channel.SendRequest(requestType, true, nil)
-	if err != nil {
+	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
 		return nil, fmt.Errorf("error sending channel request: %v", err)
 	}
 

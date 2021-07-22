@@ -78,7 +78,5 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 
 			r.eventHandlers[req.Method] = []chan *jsonrpc2.Request{}
 		}()
-	} else {
-		// TODO(josebalius): Handle
 	}
 }

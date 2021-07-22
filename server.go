@@ -13,12 +13,12 @@ type Server struct {
 	streamName, streamCondition string
 }
 
-func (c *Client) NewServer() (*Server, error) {
-	if !c.hasJoined() {
-		return nil, errors.New("LiveShareClient must join before creating server")
+func NewServer(client *Client) (*Server, error) {
+	if !client.hasJoined() {
+		return nil, errors.New("client must join before creating server")
 	}
 
-	return &Server{client: c}, nil
+	return &Server{client: client}, nil
 }
 
 type Port struct {
