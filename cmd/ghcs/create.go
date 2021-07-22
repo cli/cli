@@ -36,37 +36,19 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-var repoSurvey = []*survey.Question{
-	{
-		Name:     "repository",
-		Prompt:   &survey.Input{Message: "Repository"},
-		Validate: survey.Required,
-	},
-}
-var branchSurvey = []*survey.Question{
-	{
-		Name:     "branch",
-		Prompt:   &survey.Input{Message: "Branch"},
-		Validate: survey.Required,
-	},
-}
-
 func Create() error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 
-	if repo == "" {
-		if err := survey.Ask(repoSurvey, &repo); err != nil {
-			return fmt.Errorf("error getting repository name: %v", err)
-		}
+	repo, err := getRepoName()
+	if err != nil {
+		return fmt.Errorf("error getting repository name: %v", err)
 	}
-
-	if branch == "" {
-		if err := survey.Ask(branchSurvey, &branch); err != nil {
-			return fmt.Errorf("error getting branch name: %v", err)
-		}
+	branch, err := getBranchName()
+	if err != nil {
+		return fmt.Errorf("error getting branch name: %v", err)
 	}
 
 	repository, err := apiClient.GetRepository(ctx, repo)
@@ -84,46 +66,13 @@ func Create() error {
 		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
 	}
 
-	skus, err := apiClient.GetCodespacesSkus(ctx, userResult.User, repository, locationResult.Location)
+	machine, err := getMachineName(ctx, userResult.User, repository, locationResult.Location, apiClient)
 	if err != nil {
-		return fmt.Errorf("error getting codespace skus: %v", err)
+		return fmt.Errorf("error getting machine type: %v", err)
 	}
-
-	if len(skus) == 0 {
+	if machine == "" {
 		fmt.Println("There are no available machine types for this repository")
 		return nil
-	}
-
-	if machine == "" {
-		skuNames := make([]string, 0, len(skus))
-		skuByName := make(map[string]*api.Sku)
-		for _, sku := range skus {
-			nameParts := camelcase.Split(sku.Name)
-			machineName := strings.Title(strings.ToLower(nameParts[0]))
-			skuName := fmt.Sprintf("%s - %s", machineName, sku.DisplayName)
-			skuNames = append(skuNames, skuName)
-			skuByName[skuName] = sku
-		}
-
-		skuSurvey := []*survey.Question{
-			{
-				Name: "sku",
-				Prompt: &survey.Select{
-					Message: "Choose Machine Type:",
-					Options: skuNames,
-					Default: skuNames[0],
-				},
-				Validate: survey.Required,
-			},
-		}
-
-		skuAnswers := struct{ SKU string }{}
-		if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
-			return fmt.Errorf("error getting SKU: %v", err)
-		}
-
-		sku := skuByName[skuAnswers.SKU]
-		machine = sku.Name
 	}
 
 	fmt.Println("Creating your codespace...")
@@ -164,4 +113,88 @@ func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult 
 		ch <- locationResult{location, err}
 	}()
 	return ch
+}
+
+func getRepoName() (string, error) {
+	if repo != "" {
+		return repo, nil
+	}
+
+	repoSurvey := []*survey.Question{
+		{
+			Name:     "repository",
+			Prompt:   &survey.Input{Message: "Repository"},
+			Validate: survey.Required,
+		},
+	}
+	err := survey.Ask(repoSurvey, &repo)
+	return repo, err
+}
+
+func getBranchName() (string, error) {
+	if branch != "" {
+		return branch, nil
+	}
+
+	branchSurvey := []*survey.Question{
+		{
+			Name:     "branch",
+			Prompt:   &survey.Input{Message: "Branch"},
+			Validate: survey.Required,
+		},
+	}
+	err := survey.Ask(branchSurvey, &branch)
+	return branch, err
+}
+
+func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
+	skus, err := apiClient.GetCodespacesSkus(ctx, user, repo, location)
+	if err != nil {
+		return "", fmt.Errorf("error getting codespace skus: %v", err)
+	}
+
+	// if user supplied a machine type, it must be valid
+	// if no machine type was supplied, we don't error if there are no machine types for the current repo
+	if machine != "" {
+		for _, sku := range skus {
+			if machine == sku.Name {
+				return machine, nil
+			}
+		}
+		return "", fmt.Errorf("there are is no such machine for the repository: %s", machine)
+	} else if len(skus) == 0 {
+		return "", nil
+	}
+
+	skuNames := make([]string, 0, len(skus))
+	skuByName := make(map[string]*api.Sku)
+	for _, sku := range skus {
+		nameParts := camelcase.Split(sku.Name)
+		machineName := strings.Title(strings.ToLower(nameParts[0]))
+		skuName := fmt.Sprintf("%s - %s", machineName, sku.DisplayName)
+		skuNames = append(skuNames, skuName)
+		skuByName[skuName] = sku
+	}
+
+	skuSurvey := []*survey.Question{
+		{
+			Name: "sku",
+			Prompt: &survey.Select{
+				Message: "Choose Machine Type:",
+				Options: skuNames,
+				Default: skuNames[0],
+			},
+			Validate: survey.Required,
+		},
+	}
+
+	skuAnswers := struct{ SKU string }{}
+	if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
+		return "", fmt.Errorf("error getting SKU: %v", err)
+	}
+
+	sku := skuByName[skuAnswers.SKU]
+	machine = sku.Name
+
+	return machine, nil
 }
