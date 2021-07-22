@@ -14,15 +14,6 @@ import (
 
 var repo, branch, machine string
 
-type machineType string
-
-const (
-	basicMachine    machineType = "basic"
-	standardMachine machineType = "standard"
-	premiumMachine  machineType = "premium"
-	ExtremeMachine  machineType = "extreme"
-)
-
 func newCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
@@ -30,21 +21,13 @@ func newCreateCmd() *cobra.Command {
 		Long: `Create a codespace for a given repository and branch.
 You must also choose the type of machine to use.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if machine != "" {
-				switch machineType(machine) {
-				case basicMachine, standardMachine, premiumMachine, ExtremeMachine:
-					break
-				default:
-					return fmt.Errorf("invalid machine type: %s", machine)
-				}
-			}
 			return Create()
 		},
 	}
 
 	createCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&machine, "machine", "m", "", "hardware specifications for the VM. Can be: basic, standard, premium, extreme")
+	createCmd.Flags().StringVarP(&machine, "machine", "m", "", "hardware specifications for the VM")
 
 	return createCmd
 }
@@ -111,37 +94,41 @@ func Create() error {
 		return nil
 	}
 
-	skuNames := make([]string, 0, len(skus))
-	skuByName := make(map[string]*api.Sku)
-	for _, sku := range skus {
-		nameParts := camelcase.Split(sku.Name)
-		machineName := strings.Title(strings.ToLower(nameParts[0]))
-		skuName := fmt.Sprintf("%s - %s", machineName, sku.DisplayName)
-		skuNames = append(skuNames, skuName)
-		skuByName[skuName] = sku
-	}
+	if machine == "" {
+		skuNames := make([]string, 0, len(skus))
+		skuByName := make(map[string]*api.Sku)
+		for _, sku := range skus {
+			nameParts := camelcase.Split(sku.Name)
+			machineName := strings.Title(strings.ToLower(nameParts[0]))
+			skuName := fmt.Sprintf("%s - %s", machineName, sku.DisplayName)
+			skuNames = append(skuNames, skuName)
+			skuByName[skuName] = sku
+		}
 
-	skuSurvey := []*survey.Question{
-		{
-			Name: "sku",
-			Prompt: &survey.Select{
-				Message: "Choose Machine Type:",
-				Options: skuNames,
-				Default: skuNames[0],
+		skuSurvey := []*survey.Question{
+			{
+				Name: "sku",
+				Prompt: &survey.Select{
+					Message: "Choose Machine Type:",
+					Options: skuNames,
+					Default: skuNames[0],
+				},
+				Validate: survey.Required,
 			},
-			Validate: survey.Required,
-		},
+		}
+
+		skuAnswers := struct{ SKU string }{}
+		if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
+			return fmt.Errorf("error getting SKU: %v", err)
+		}
+
+		sku := skuByName[skuAnswers.SKU]
+		machine = sku.Name
 	}
 
-	skuAnswers := struct{ SKU string }{}
-	if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
-		return fmt.Errorf("error getting SKU: %v", err)
-	}
-
-	sku := skuByName[skuAnswers.SKU]
 	fmt.Println("Creating your codespace...")
 
-	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, sku, branch, locationResult.Location)
+	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
