@@ -161,7 +161,13 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 				return machine, nil
 			}
 		}
-		return "", fmt.Errorf("there are is no such machine for the repository: %s", machine)
+
+		availableSkus := make([]string, len(skus))
+		for i := 0; i < len(skus); i++ {
+			availableSkus[i] = skus[i].Name
+		}
+
+		return "", fmt.Errorf("there are is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSkus)
 	} else if len(skus) == 0 {
 		return "", nil
 	}
