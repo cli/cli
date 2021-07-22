@@ -53,12 +53,14 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-var createSurvey = []*survey.Question{
+var repoSurvey = []*survey.Question{
 	{
 		Name:     "repository",
 		Prompt:   &survey.Input{Message: "Repository"},
 		Validate: survey.Required,
 	},
+}
+var branchSurvey = []*survey.Question{
 	{
 		Name:     "branch",
 		Prompt:   &survey.Input{Message: "Branch"},
@@ -72,16 +74,19 @@ func Create() error {
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 
-	answers := struct {
-		Repository string
-		Branch     string
-	}{}
-
-	if err := survey.Ask(createSurvey, &answers); err != nil {
-		return fmt.Errorf("error getting answers: %v", err)
+	if repo == "" {
+		if err := survey.Ask(repoSurvey, &repo); err != nil {
+			return fmt.Errorf("error getting repository name: %v", err)
+		}
 	}
 
-	repository, err := apiClient.GetRepository(ctx, answers.Repository)
+	if branch == "" {
+		if err := survey.Ask(branchSurvey, &branch); err != nil {
+			return fmt.Errorf("error getting branch name: %v", err)
+		}
+	}
+
+	repository, err := apiClient.GetRepository(ctx, repo)
 	if err != nil {
 		return fmt.Errorf("error getting repository: %v", err)
 	}
@@ -136,7 +141,7 @@ func Create() error {
 	sku := skuByName[skuAnswers.SKU]
 	fmt.Println("Creating your codespace...")
 
-	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, sku, answers.Branch, locationResult.Location)
+	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, sku, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
