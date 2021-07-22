@@ -7,27 +7,27 @@ import (
 )
 
 type Connection struct {
-	SessionID     string `json:"sessionId"`
-	SessionToken  string `json:"sessionToken"`
-	RelaySAS      string `json:"relaySas"`
-	RelayEndpoint string `json:"relayEndpoint"`
+	SessionID     string
+	SessionToken  string
+	RelaySAS      string
+	RelayEndpoint string
 }
 
 func (r Connection) validate() error {
 	if r.SessionID == "" {
-		return errors.New("connection sessionID is required")
+		return errors.New("connection SessionID is required")
 	}
 
 	if r.SessionToken == "" {
-		return errors.New("connection sessionToken is required")
+		return errors.New("connection SessionToken is required")
 	}
 
 	if r.RelaySAS == "" {
-		return errors.New("connection relaySas is required")
+		return errors.New("connection RelaySAS is required")
 	}
 
 	if r.RelayEndpoint == "" {
-		return errors.New("connection relayEndpoint is required")
+		return errors.New("connection RelayEndpoint is required")
 	}
 
 	return nil
