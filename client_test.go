@@ -42,27 +42,26 @@ func TestNewClientWithInvalidConnection(t *testing.T) {
 }
 
 func TestClientJoin(t *testing.T) {
-	sessionToken := "session-token"
+	connection := Connection{
+		SessionID:    "session-id",
+		SessionToken: "session-token",
+		RelaySAS:     "relay-sas",
+	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
-		return 1, nil
+		return joinWorkspaceResult{1}, nil
 	}
 
 	server, err := livesharetest.NewServer(
-		livesharetest.WithPassword(sessionToken),
+		livesharetest.WithPassword(connection.SessionToken),
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
 	)
 	if err != nil {
 		t.Errorf("error creating liveshare server: %v", err)
 	}
 	defer server.Close()
+	connection.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
 
 	ctx := context.Background()
-	connection := Connection{
-		SessionID:     "session-id",
-		SessionToken:  sessionToken,
-		RelaySAS:      "relay-sas",
-		RelayEndpoint: "sb" + strings.TrimPrefix(server.URL(), "https"),
-	}
 
 	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
 	client, err := NewClient(WithConnection(connection), tlsConfig)
@@ -70,22 +69,22 @@ func TestClientJoin(t *testing.T) {
 		t.Errorf("error creating new client: %v", err)
 	}
 
-	clientErr := make(chan error)
+	done := make(chan error)
 	go func() {
 		if err := client.Join(ctx); err != nil {
-			clientErr <- fmt.Errorf("error joining client: %v", err)
+			done <- fmt.Errorf("error joining client: %v", err)
 			return
 		}
 
-		ctx.Done()
+		done <- nil
 	}()
 
 	select {
 	case err := <-server.Err():
 		t.Errorf("error from server: %v", err)
-	case err := <-clientErr:
-		t.Errorf("error from client: %v", err)
-	case <-ctx.Done():
-		return
+	case err := <-done:
+		if err != nil {
+			t.Errorf("error from client: %v", err)
+		}
 	}
 }
