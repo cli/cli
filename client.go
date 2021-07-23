@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// A Client capable of joining a liveshare connection
 type Client struct {
 	connection Connection
 
@@ -14,8 +15,10 @@ type Client struct {
 	rpc *rpcClient
 }
 
+// A ClientOption is a function that modifies a client
 type ClientOption func(*Client) error
 
+// NewClient accepts a range of options, applies them and returns a client
 func NewClient(opts ...ClientOption) (*Client, error) {
 	client := new(Client)
 
@@ -28,6 +31,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
+// WithConnection is a ClientOption that accepts a Connection
 func WithConnection(connection Connection) ClientOption {
 	return func(c *Client) error {
 		if err := connection.validate(); err != nil {
@@ -39,6 +43,7 @@ func WithConnection(connection Connection) ClientOption {
 	}
 }
 
+// Join is a method that joins the client to the liveshare session
 func (c *Client) Join(ctx context.Context) (err error) {
 	clientSocket := newSocket(c.connection)
 	if err := clientSocket.connect(ctx); err != nil {

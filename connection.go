@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// A Connection represents a set of values necessary to join a liveshare connection
 type Connection struct {
 	SessionID     string
 	SessionToken  string

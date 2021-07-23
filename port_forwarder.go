@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// A PortForwader can forward ports from a remote liveshare host to localhost
 type PortForwarder struct {
 	client *Client
 	server *Server
@@ -15,6 +16,7 @@ type PortForwarder struct {
 	errCh  chan error
 }
 
+// NewPortForwarder creates a new PortForwader with a given client, server and port
 func NewPortForwarder(client *Client, server *Server, port int) *PortForwarder {
 	return &PortForwarder{
 		client: client,
@@ -24,6 +26,7 @@ func NewPortForwarder(client *Client, server *Server, port int) *PortForwarder {
 	}
 }
 
+// Start is a method to start forwarding the server to a localhost port
 func (l *PortForwarder) Start(ctx context.Context) error {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(l.port))
 	if err != nil {
