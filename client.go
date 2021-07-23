@@ -2,6 +2,7 @@ package liveshare
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 
 	"golang.org/x/crypto/ssh"
@@ -10,6 +11,7 @@ import (
 // A Client capable of joining a liveshare connection
 type Client struct {
 	connection Connection
+	tlsConfig  *tls.Config
 
 	ssh *sshSession
 	rpc *rpcClient
@@ -43,9 +45,16 @@ func WithConnection(connection Connection) ClientOption {
 	}
 }
 
+func WithTLSConfig(tlsConfig *tls.Config) ClientOption {
+	return func(c *Client) error {
+		c.tlsConfig = tlsConfig
+		return nil
+	}
+}
+
 // Join is a method that joins the client to the liveshare session
 func (c *Client) Join(ctx context.Context) (err error) {
-	clientSocket := newSocket(c.connection)
+	clientSocket := newSocket(c.connection, c.tlsConfig)
 	if err := clientSocket.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting websocket: %v", err)
 	}

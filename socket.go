@@ -2,9 +2,11 @@ package liveshare
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -12,19 +14,26 @@ import (
 )
 
 type socket struct {
-	addr       string
+	addr      string
+	tlsConfig *tls.Config
+
 	conn       *websocket.Conn
 	readMutex  sync.Mutex
 	writeMutex sync.Mutex
 	reader     io.Reader
 }
 
-func newSocket(clientConn Connection) *socket {
-	return &socket{addr: clientConn.uri("connect")}
+func newSocket(clientConn Connection, tlsConfig *tls.Config) *socket {
+	return &socket{addr: clientConn.uri("connect"), tlsConfig: tlsConfig}
 }
 
 func (s *socket) connect(ctx context.Context) error {
-	ws, _, err := websocket.DefaultDialer.Dial(s.addr, nil)
+	dialer := websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 45 * time.Second,
+		TLSClientConfig:  s.tlsConfig,
+	}
+	ws, _, err := dialer.Dial(s.addr, nil)
 	if err != nil {
 		return err
 	}
