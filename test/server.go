@@ -20,6 +20,7 @@ import (
 type Server struct {
 	password string
 	services map[string]RpcHandleFunc
+	relaySAS string
 
 	sshConfig      *ssh.ServerConfig
 	httptestServer *httptest.Server
@@ -73,6 +74,13 @@ func WithService(serviceName string, handler RpcHandleFunc) ServerOption {
 	}
 }
 
+func WithRelaySAS(sas string) ServerOption {
+	return func(s *Server) error {
+		s.relaySAS = sas
+		return nil
+	}
+}
+
 func sshPasswordCallback(serverPassword string) func(ssh.ConnMetadata, []byte) (*ssh.Permissions, error) {
 	return func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		if string(password) == serverPassword {
@@ -98,6 +106,14 @@ var upgrader = websocket.Upgrader{}
 
 func newConnection(server *Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		if server.relaySAS != "" {
+			// validate the sas key
+			sasParam := req.URL.Query().Get("sb-hc-token")
+			if sasParam != server.relaySAS {
+				server.errCh <- errors.New("error validating sas")
+				return
+			}
+		}
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
 			server.errCh <- fmt.Errorf("error upgrading connection: %v", err)

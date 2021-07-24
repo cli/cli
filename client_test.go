@@ -3,6 +3,8 @@ package liveshare
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -48,12 +50,29 @@ func TestClientJoin(t *testing.T) {
 		RelaySAS:     "relay-sas",
 	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+		var joinWorkspaceReq joinWorkspaceArgs
+		if err := json.Unmarshal(*req.Params, &joinWorkspaceReq); err != nil {
+			return nil, fmt.Errorf("error unmarshaling req: %v", err)
+		}
+		if joinWorkspaceReq.ID != connection.SessionID {
+			return nil, errors.New("connection session id does not match")
+		}
+		if joinWorkspaceReq.ConnectionMode != "local" {
+			return nil, errors.New("connection mode is not local")
+		}
+		if joinWorkspaceReq.JoiningUserSessionToken != connection.SessionToken {
+			return nil, errors.New("connection user token does not match")
+		}
+		if joinWorkspaceReq.ClientCapabilities.IsNonInteractive != false {
+			return nil, errors.New("non interactive is not false")
+		}
 		return joinWorkspaceResult{1}, nil
 	}
 
 	server, err := livesharetest.NewServer(
 		livesharetest.WithPassword(connection.SessionToken),
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
+		livesharetest.WithRelaySAS(connection.RelaySAS),
 	)
 	if err != nil {
 		t.Errorf("error creating liveshare server: %v", err)
