@@ -182,8 +182,29 @@ func TestServerGetSharedServers(t *testing.T) {
 }
 
 func TestServerUpdateSharedVisibility(t *testing.T) {
-	updateSharedVisibility := func(req *jsonrpc2.Request) error {
-		return nil
+	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		var req []interface{}
+		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal req: %v", err)
+		}
+		if len(req) < 2 {
+			return nil, errors.New("request arguments is less than 2")
+		}
+		if port, ok := req[0].(float64); ok {
+			if port != 80.0 {
+				return nil, errors.New("port param is not expected value")
+			}
+		} else {
+			return nil, errors.New("port param is not a float64")
+		}
+		if public, ok := req[1].(bool); ok {
+			if public != true {
+				return nil, errors.New("pulic param is not expected value")
+			}
+		} else {
+			return nil, errors.New("public param is not a bool")
+		}
+		return nil, nil
 	}
 	testServer, client, err := newMockJoinedClient(
 		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
