@@ -351,20 +351,19 @@ func ToplevelDir() (string, error) {
 
 }
 
-func PathFromRepoRoot() (string, error) {
+func PathFromRepoRoot() string {
 	showCmd, err := GitCommand("rev-parse", "--show-prefix")
 	if err != nil {
-		return "", err
+		return ""
 	}
 	output, err := run.PrepareCmd(showCmd).Output()
 	if err != nil {
-		return "", err
+		return ""
 	}
 	if path := firstLine(output); path != "" {
-		return path[:len(path)-1], nil
+		return path[:len(path)-1]
 	}
-	return "", nil
-
+	return ""
 }
 
 func outputLines(output []byte) []string {

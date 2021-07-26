@@ -179,7 +179,7 @@ func Test_runBrowse(t *testing.T) {
 			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
 			baseRepo:      ghrepo.New("ken", "mrprofessor"),
 			defaultBranch: "main",
-			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/pkg/cmd/browse/path/to/file.txt",
+			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/path/to/file.txt",
 		},
 		{
 			name: "issue argument",
@@ -204,7 +204,7 @@ func Test_runBrowse(t *testing.T) {
 				SelectorArg: "main.go",
 			},
 			baseRepo:    ghrepo.New("bchadwic", "LedZeppelinIV"),
-			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/pkg/cmd/browse/main.go",
+			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/main.go",
 		},
 		{
 			name: "file with line number",
@@ -213,7 +213,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/pkg/cmd/browse/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
 		},
 		{
 			name: "file with invalid line number",
@@ -241,7 +241,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/pkg/cmd/browse/browse.go#L32",
+			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
 		},
 		{
 			name: "no browser with branch file and line number",
@@ -252,16 +252,26 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/pkg/cmd/browse/init.rb#L6",
+			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
 		},
 		{
 			name: "relative path from browse_test.go",
 			opts: BrowseOptions{
-				SelectorArg: "browse_test.go",
+				SelectorArg: "./browse_test.go",
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
 			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/pkg/cmd/browse/browse_test.go",
+			wantsErr:      false,
+		},
+		{
+			name: "relative path to file in parent folder from browse_test.go",
+			opts: BrowseOptions{
+				SelectorArg: "../pr",
+			},
+			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/pkg/cmd/pr",
 			wantsErr:      false,
 		},
 	}
@@ -345,77 +355,62 @@ func Test_parseFileArg(t *testing.T) {
 	}
 }
 
-func Test_getRelativePath(t *testing.T) {
+func Test_parsePathFromFileArg(t *testing.T) {
+
+	// tests assume path is pkg/cmd/browse
 	tests := []struct {
-		name          string
-		path          string
-		fileArg       string
-		expectedPath  string
-		expectedError bool
+		name         string
+		fileArg      string
+		expectedPath string
 	}{
 		{
-			name:          "file in current folder",
-			path:          "cmd/gh",
-			fileArg:       "main.go",
-			expectedPath:  "cmd/gh/main.go",
-			expectedError: false,
+			name:         "go to parent folder",
+			fileArg:      "../",
+			expectedPath: "pkg/cmd",
 		},
 		{
-			name:          "invalid file in current folder",
-			path:          "cmd/gh",
-			fileArg:       "main.go",
-			expectedPath:  "cmd/gh/main.go/hello",
-			expectedError: true,
+			name:         "file in current folder",
+			fileArg:      "./browse.go",
+			expectedPath: "pkg/cmd/browse/browse.go",
 		},
 		{
-			name:          "folder in parent folder",
-			path:          "cmd/gh",
-			fileArg:       "../gen-docs/main.go",
-			expectedPath:  "cmd/gen-docs/main.go",
-			expectedError: false,
+			name:         "file within parent folder",
+			fileArg:      "../browse.go",
+			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
-			name:          "folder in several folders up",
-			path:          "/pkg/cmd/browse",
-			fileArg:       "../../../api/cache.go",
-			expectedPath:  "api/cache.go",
-			expectedError: false,
+			name:         "file within parent folder uncleaned",
+			fileArg:      ".././//browse.go",
+			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
-			name:          "going to root of repository",
-			path:          "/pkg/cmd/browse",
-			fileArg:       "../../../",
-			expectedPath:  "",
-			expectedError: false,
+			name:         "different path from root directory",
+			fileArg:      "../../../internal/build/build.go",
+			expectedPath: "internal/build/build.go",
 		},
 		{
-			name:          "trying to go past root of repository",
-			path:          "/pkg/cmd/browse",
-			fileArg:       "../../../../../../../../",
-			expectedPath:  "",
-			expectedError: false,
+			name:         "folder in root folder",
+			fileArg:      "pkg",
+			expectedPath: "pkg",
 		},
 		{
-			name:          "windows users",
-			path:          "/pkg/cmd/browse",
-			fileArg:       "..\\",
-			expectedPath:  "/pkg/cmd",
-			expectedError: false,
+			name:         "subfolder in root folder",
+			fileArg:      "pkg/cmd",
+			expectedPath: "pkg/cmd",
 		},
 		{
-			name:          "possible combination users",
-			path:          "/pkg/cmd/pr/checkout",
-			fileArg:       "..\\../..\\",
-			expectedPath:  "/pkg",
-			expectedError: false,
+			name:         "go out of repository",
+			fileArg:      "../../../../../../",
+			expectedPath: "",
+		},
+		{
+			name:         "go to root of repository",
+			fileArg:      "../../../",
+			expectedPath: "",
 		},
 	}
 	for _, tt := range tests {
-		path := getRelativePath(tt.path, tt.fileArg)
-		if tt.expectedError {
-			assert.NotEqual(t, tt.expectedPath, path)
-		} else {
-			assert.Equal(t, tt.expectedPath, path)
-		}
+		path := parsePathFromFileArg(tt.fileArg)
+		assert.Equal(t, tt.expectedPath, path)
 	}
 }

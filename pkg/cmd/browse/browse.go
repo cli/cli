@@ -3,6 +3,9 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -136,15 +139,6 @@ func runBrowse(opts *BrowseOptions) error {
 		if isNumber(opts.SelectorArg) {
 			url += "/issues/" + opts.SelectorArg
 		} else {
-			fileArg, err := parseFileArg(opts.SelectorArg)
-			if err != nil {
-				return err
-			}
-			path, err := git.PathFromRepoRoot()
-			if err != nil {
-				return err
-			}
-			fileArg = getRelativePath(path, fileArg)
 			if opts.Branch != "" {
 				url += "/tree/" + opts.Branch + "/"
 			} else {
@@ -155,7 +149,12 @@ func runBrowse(opts *BrowseOptions) error {
 				}
 				url += "/tree/" + branchName + "/"
 			}
-			url += fileArg
+			fileArg, err := parseFileArg(opts.SelectorArg)
+			if err != nil {
+				return err
+			}
+			path := parsePathFromFileArg(fileArg)
+			url += path
 		}
 	}
 
@@ -189,22 +188,19 @@ func isNumber(arg string) bool {
 	return err == nil
 }
 
-func getRelativePath(path, fileArg string) string {
-	if !strings.HasPrefix(fileArg, "../") && !strings.HasPrefix(fileArg, "..\\") {
-		if fileArg == "" {
-			return path
-		}
-		if path == "" {
-			return fileArg
-		}
-		return path + "/" + fileArg
+func parsePathFromFileArg(fileArg string) string {
+	if !hasRelativePrefix(fileArg) {
+		return fileArg
 	}
+	path := filepath.Join(git.PathFromRepoRoot(), fileArg)
+	match, _ := regexp.Match("(^\\.$)|(^\\.\\./)", []byte(path))
+	if match {
+		return ""
+	}
+	return path
+}
 
-	if i := strings.LastIndex(path, "/"); i > 0 {
-		path = path[:i]
-	} else {
-		path = ""
-	}
-	// recursively remove leading ../ or ..\
-	return getRelativePath(path, fileArg[3:])
+func hasRelativePrefix(fileArg string) bool {
+	return strings.HasPrefix(fileArg, ".."+string(os.PathSeparator)) ||
+		strings.HasPrefix(fileArg, "."+string(os.PathSeparator))
 }
