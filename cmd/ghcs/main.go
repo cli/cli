@@ -11,11 +11,13 @@ func main() {
 	Execute()
 }
 
+var Version = "DEV"
+
 var rootCmd = &cobra.Command{
 	Use:     "ghcs",
 	Short:   "Unofficial GitHub Codespaces CLI.",
 	Long:    "Unofficial CLI tool to manage and interact with GitHub Codespaces.",
-	Version: "0.7.1",
+	Version: Version,
 }
 
 func Execute() {
