@@ -30,11 +30,6 @@ func (r *rpcClient) do(ctx context.Context, method string, args interface{}, res
 		return fmt.Errorf("error on dispatch call: %v", err)
 	}
 
-	// caller doesn't care about result, so lets ignore it
-	if result == nil {
-		return nil
-	}
-
 	return waiter.Wait(ctx, result)
 }
 

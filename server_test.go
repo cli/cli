@@ -182,5 +182,35 @@ func TestServerGetSharedServers(t *testing.T) {
 }
 
 func TestServerUpdateSharedVisibility(t *testing.T) {
-
+	updateSharedVisibility := func(req *jsonrpc2.Request) error {
+		return nil
+	}
+	testServer, client, err := newMockJoinedClient(
+		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
+	)
+	if err != nil {
+		t.Errorf("creating new mock client: %v", err)
+	}
+	defer testServer.Close()
+	server, err := NewServer(client)
+	if err != nil {
+		t.Errorf("creating server: %v", err)
+	}
+	ctx := context.Background()
+	done := make(chan error)
+	go func() {
+		if err := server.UpdateSharedVisibility(ctx, 80, true); err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+	select {
+	case err := <-testServer.Err():
+		t.Errorf("error from server: %v", err)
+	case err := <-done:
+		if err != nil {
+			t.Errorf("error from client: %v", err)
+		}
+	}
 }
