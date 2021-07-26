@@ -18,19 +18,20 @@ import (
 )
 
 func NewSSHCmd() *cobra.Command {
-	var sshProfile string
+	var sshProfile, codespaceName string
 	var sshServerPort int
 
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
 		Short: "SSH into a GitHub Codespace, for use with running tests/editing in vim, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return SSH(sshProfile, sshServerPort)
+			return SSH(sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "SSH Profile")
 	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH Server Port")
+	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "Codespace Name")
 
 	return sshCmd
 }
@@ -39,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(NewSSHCmd())
 }
 
-func SSH(sshProfile string, sshServerPort int) error {
+func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -48,19 +49,37 @@ func SSH(sshProfile string, sshServerPort int) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
-	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
-			fmt.Println(err.Error())
-			return nil
+	var (
+		codespace *api.Codespace
+		token     string
+	)
+
+	if codespaceName == "" {
+		codespace, err = codespaces.ChooseCodespace(ctx, apiClient, user)
+		if err != nil {
+			if err == codespaces.ErrNoCodespaces {
+				fmt.Println(err.Error())
+				return nil
+			}
+
+			return fmt.Errorf("error choosing codespace: %v", err)
+		}
+		codespaceName = codespace.Name
+
+		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		if err != nil {
+			return fmt.Errorf("error getting codespace token: %v", err)
+		}
+	} else {
+		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		if err != nil {
+			return fmt.Errorf("error getting codespace token: %v", err)
 		}
 
-		return fmt.Errorf("error choosing codespace: %v", err)
-	}
-
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
-	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
+		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
+		if err != nil {
+			return fmt.Errorf("error getting full codespace details: %v", err)
+		}
 	}
 
 	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
