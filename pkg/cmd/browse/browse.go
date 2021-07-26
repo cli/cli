@@ -193,7 +193,7 @@ func parsePathFromFileArg(fileArg string) string {
 		return fileArg
 	}
 	path := filepath.Join(git.PathFromRepoRoot(), fileArg)
-	match, _ := regexp.Match("(^\\.$)|(^\\.\\./)", []byte(path))
+	match, _ := regexp.Match("(^\\.$)|(^\\.\\."+string(os.PathSeparator)+")", []byte(path))
 	if match {
 		return ""
 	}
