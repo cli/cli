@@ -29,7 +29,9 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 			### bash
 
-			Add this to your %[1]s~/.bash_profile%[1]s:
+			First, ensure that you install %[1]sbash-completion%[1]s using your package manager.
+
+			After, add this to your %[1]s~/.bash_profile%[1]s:
 
 				eval "$(gh completion -s bash)"
 			
@@ -65,7 +67,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 			switch shellType {
 			case "bash":
-				return rootCmd.GenBashCompletion(w)
+				return rootCmd.GenBashCompletionV2(w, true)
 			case "zsh":
 				return rootCmd.GenZshCompletion(w)
 			case "powershell":

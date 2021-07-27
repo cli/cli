@@ -135,6 +135,51 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
 	cmd.Flags().StringVarP(&opts.GitIgnoreTemplate, "gitignore", "g", "", "Specify a gitignore template for the repository")
 	cmd.Flags().StringVarP(&opts.LicenseTemplate, "license", "l", "", "Specify an Open Source License for the repository")
+
+	_ = cmd.RegisterFlagCompletionFunc("gitignore", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		cfg, err := opts.Config()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		hostname, err := cfg.DefaultHost()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		results, err := listGitIgnoreTemplates(httpClient, hostname)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	_ = cmd.RegisterFlagCompletionFunc("license", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		cfg, err := opts.Config()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		hostname, err := cfg.DefaultHost()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		licenses, err := listLicenseTemplates(httpClient, hostname)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var results []string
+		for _, license := range licenses {
+			results = append(results, fmt.Sprintf("%s\t%s", license.Key, license.Name))
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+
 	return cmd
 }
 
@@ -225,14 +270,14 @@ func createRun(opts *CreateOptions) error {
 		// is passed, or when the confirm flag is set.
 		if opts.Template == "" && opts.IO.CanPrompt() && !opts.ConfirmSubmit {
 			if gitIgnoreTemplate == "" {
-				gt, err := interactiveGitIgnore(api.NewClientFromHTTP(httpClient), host)
+				gt, err := interactiveGitIgnore(httpClient, host)
 				if err != nil {
 					return err
 				}
 				gitIgnoreTemplate = gt
 			}
 			if repoLicenseTemplate == "" {
-				lt, err := interactiveLicense(api.NewClientFromHTTP(httpClient), host)
+				lt, err := interactiveLicense(httpClient, host)
 				if err != nil {
 					return err
 				}
@@ -384,7 +429,7 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func interactiveGitIgnore(client *api.Client, hostname string) (string, error) {
+func interactiveGitIgnore(client *http.Client, hostname string) (string, error) {
 
 	var addGitIgnore bool
 	var addGitIgnoreSurvey []*survey.Question
@@ -408,7 +453,7 @@ func interactiveGitIgnore(client *api.Client, hostname string) (string, error) {
 	if addGitIgnore {
 		var gitIg []*survey.Question
 
-		gitIgnoretemplates, err := ListGitIgnoreTemplates(client, hostname)
+		gitIgnoretemplates, err := listGitIgnoreTemplates(client, hostname)
 		if err != nil {
 			return "", err
 		}
@@ -429,7 +474,7 @@ func interactiveGitIgnore(client *api.Client, hostname string) (string, error) {
 	return wantedIgnoreTemplate, nil
 }
 
-func interactiveLicense(client *api.Client, hostname string) (string, error) {
+func interactiveLicense(client *http.Client, hostname string) (string, error) {
 	var addLicense bool
 	var addLicenseSurvey []*survey.Question
 	var wantedLicense string
@@ -451,7 +496,7 @@ func interactiveLicense(client *api.Client, hostname string) (string, error) {
 	licenseKey := map[string]string{}
 
 	if addLicense {
-		licenseTemplates, err := ListLicenseTemplates(client, hostname)
+		licenseTemplates, err := listLicenseTemplates(client, hostname)
 		if err != nil {
 			return "", err
 		}

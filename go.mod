@@ -13,7 +13,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/creack/pty v1.1.13
 	github.com/gabriel-vasile/mimetype v1.1.2
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.5
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-version v1.2.1
 	github.com/henvic/httpretty v0.0.6
@@ -28,14 +28,14 @@ require (
 	github.com/rivo/uniseg v0.2.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
-	github.com/spf13/cobra v1.1.3
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/objx v0.1.1 // indirect
+	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210601080250-7ecdf8ef093b
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
-	golang.org/x/text v0.3.4 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
