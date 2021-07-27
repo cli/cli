@@ -4,25 +4,30 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
-
-	"golang.org/x/crypto/ssh"
 )
 
-type LocalPortForwarder struct {
-	client   *Client
-	server   *Server
-	port     int
-	channels []ssh.Channel
+// A PortForwader can forward ports from a remote liveshare host to localhost
+type PortForwarder struct {
+	client *Client
+	server *Server
+	port   int
+	errCh  chan error
 }
 
-func NewLocalPortForwarder(client *Client, server *Server, port int) *LocalPortForwarder {
-	return &LocalPortForwarder{client, server, port, []ssh.Channel{}}
+// NewPortForwarder creates a new PortForwader with a given client, server and port
+func NewPortForwarder(client *Client, server *Server, port int) *PortForwarder {
+	return &PortForwarder{
+		client: client,
+		server: server,
+		port:   port,
+		errCh:  make(chan error),
+	}
 }
 
-func (l *LocalPortForwarder) Start(ctx context.Context) error {
+// Start is a method to start forwarding the server to a localhost port
+func (l *PortForwarder) Start(ctx context.Context) error {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(l.port))
 	if err != nil {
 		return fmt.Errorf("error listening on tcp port: %v", err)
@@ -37,24 +42,24 @@ func (l *LocalPortForwarder) Start(ctx context.Context) error {
 		go l.handleConnection(ctx, conn)
 	}
 
-	// clean up after ourselves
-
 	return nil
 }
 
-func (l *LocalPortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
+func (l *PortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
 	channel, err := l.client.openStreamingChannel(ctx, l.server.streamName, l.server.streamCondition)
 	if err != nil {
-		log.Println("errrr handle Connect")
-		log.Println(err) // TODO(josebalius) handle this somehow
+		l.errCh <- fmt.Errorf("error opening streaming channel for new connection: %v", err)
+		return
 	}
-	l.channels = append(l.channels, channel)
 
 	copyConn := func(writer io.Writer, reader io.Reader) {
-		_, err := io.Copy(writer, reader)
-		if err != nil {
+		if _, err := io.Copy(writer, reader); err != nil {
+			fmt.Println(err)
 			channel.Close()
 			conn.Close()
+			if err != io.EOF {
+				l.errCh <- fmt.Errorf("tunnel connection: %v", err)
+			}
 		}
 	}
 

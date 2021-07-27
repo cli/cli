@@ -2,42 +2,69 @@ package liveshare
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 
 	"golang.org/x/crypto/ssh"
 )
 
+// A Client capable of joining a liveshare connection
 type Client struct {
-	liveShare  *LiveShare
-	session    *session
-	sshSession *sshSession
-	rpc        *rpc
+	connection Connection
+	tlsConfig  *tls.Config
+
+	ssh *sshSession
+	rpc *rpcClient
 }
 
-// NewClient is a function ...
-func (l *LiveShare) NewClient() *Client {
-	return &Client{liveShare: l}
-}
+// A ClientOption is a function that modifies a client
+type ClientOption func(*Client) error
 
-func (c *Client) Join(ctx context.Context) (err error) {
-	api := newAPI(c)
+// NewClient accepts a range of options, applies them and returns a client
+func NewClient(opts ...ClientOption) (*Client, error) {
+	client := new(Client)
 
-	c.session = newSession(api)
-	if err := c.session.init(ctx); err != nil {
-		return fmt.Errorf("error creating session: %v", err)
+	for _, o := range opts {
+		if err := o(client); err != nil {
+			return nil, err
+		}
 	}
 
-	websocket := newWebsocket(c.session)
-	if err := websocket.connect(ctx); err != nil {
+	return client, nil
+}
+
+// WithConnection is a ClientOption that accepts a Connection
+func WithConnection(connection Connection) ClientOption {
+	return func(c *Client) error {
+		if err := connection.validate(); err != nil {
+			return err
+		}
+
+		c.connection = connection
+		return nil
+	}
+}
+
+func WithTLSConfig(tlsConfig *tls.Config) ClientOption {
+	return func(c *Client) error {
+		c.tlsConfig = tlsConfig
+		return nil
+	}
+}
+
+// Join is a method that joins the client to the liveshare session
+func (c *Client) Join(ctx context.Context) (err error) {
+	clientSocket := newSocket(c.connection, c.tlsConfig)
+	if err := clientSocket.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting websocket: %v", err)
 	}
 
-	c.sshSession = newSSH(c.session, websocket)
-	if err := c.sshSession.connect(ctx); err != nil {
+	c.ssh = newSshSession(c.connection.SessionToken, clientSocket)
+	if err := c.ssh.connect(ctx); err != nil {
 		return fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
-	c.rpc = newRPC(c.sshSession)
+	c.rpc = newRpcClient(c.ssh)
 	c.rpc.connect(ctx)
 
 	_, err = c.joinWorkspace(ctx)
@@ -49,7 +76,7 @@ func (c *Client) Join(ctx context.Context) (err error) {
 }
 
 func (c *Client) hasJoined() bool {
-	return c.sshSession != nil && c.rpc != nil
+	return c.ssh != nil && c.rpc != nil
 }
 
 type clientCapabilities struct {
@@ -69,9 +96,9 @@ type joinWorkspaceResult struct {
 
 func (c *Client) joinWorkspace(ctx context.Context) (*joinWorkspaceResult, error) {
 	args := joinWorkspaceArgs{
-		ID:                      c.session.workspaceInfo.ID,
+		ID:                      c.connection.SessionID,
 		ConnectionMode:          "local",
-		JoiningUserSessionToken: c.session.workspaceAccess.SessionToken,
+		JoiningUserSessionToken: c.connection.SessionToken,
 		ClientCapabilities: clientCapabilities{
 			IsNonInteractive: false,
 		},
@@ -92,15 +119,14 @@ func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition
 		return nil, fmt.Errorf("error getting stream id: %v", err)
 	}
 
-	channel, reqs, err := c.sshSession.conn.OpenChannel("session", nil)
+	channel, reqs, err := c.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
 	}
 	go ssh.DiscardRequests(reqs)
 
 	requestType := fmt.Sprintf("stream-transport-%s", streamID)
-	_, err = channel.SendRequest(requestType, true, nil)
-	if err != nil {
+	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
 		return nil, fmt.Errorf("error sending channel request: %v", err)
 	}
 

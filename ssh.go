@@ -12,22 +12,22 @@ import (
 
 type sshSession struct {
 	*ssh.Session
-	session *session
-	socket  net.Conn
-	conn    ssh.Conn
-	reader  io.Reader
-	writer  io.Writer
+	token  string
+	socket net.Conn
+	conn   ssh.Conn
+	reader io.Reader
+	writer io.Writer
 }
 
-func newSSH(session *session, socket net.Conn) *sshSession {
-	return &sshSession{session: session, socket: socket}
+func newSshSession(token string, socket net.Conn) *sshSession {
+	return &sshSession{token: token, socket: socket}
 }
 
 func (s *sshSession) connect(ctx context.Context) error {
 	clientConfig := ssh.ClientConfig{
 		User: "",
 		Auth: []ssh.AuthMethod{
-			ssh.Password(s.session.workspaceAccess.SessionToken),
+			ssh.Password(s.token),
 		},
 		HostKeyAlgorithms: []string{"rsa-sha2-512", "rsa-sha2-256"},
 		HostKeyCallback:   ssh.InsecureIgnoreHostKey(),
