@@ -3,11 +3,9 @@ package liveshare
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"io"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -17,10 +15,8 @@ type socket struct {
 	addr      string
 	tlsConfig *tls.Config
 
-	conn       *websocket.Conn
-	readMutex  sync.Mutex
-	writeMutex sync.Mutex
-	reader     io.Reader
+	conn   *websocket.Conn
+	reader io.Reader
 }
 
 func newSocket(clientConn Connection, tlsConfig *tls.Config) *socket {
@@ -42,17 +38,10 @@ func (s *socket) connect(ctx context.Context) error {
 }
 
 func (s *socket) Read(b []byte) (int, error) {
-	s.readMutex.Lock()
-	defer s.readMutex.Unlock()
-
 	if s.reader == nil {
-		messageType, reader, err := s.conn.NextReader()
+		_, reader, err := s.conn.NextReader()
 		if err != nil {
 			return 0, err
-		}
-
-		if messageType != websocket.BinaryMessage {
-			return 0, errors.New("unexpected websocket message type")
 		}
 
 		s.reader = reader
@@ -71,9 +60,6 @@ func (s *socket) Read(b []byte) (int, error) {
 }
 
 func (s *socket) Write(b []byte) (int, error) {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
 	nextWriter, err := s.conn.NextWriter(websocket.BinaryMessage)
 	if err != nil {
 		return 0, err

@@ -23,7 +23,7 @@ func TestNewServerWithNotJoinedClient(t *testing.T) {
 	}
 }
 
-func newMockJoinedClient(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Client, error) {
+func makeMockJoinedClient(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Client, error) {
 	connection := Connection{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
@@ -54,7 +54,7 @@ func newMockJoinedClient(opts ...livesharetest.ServerOption) (*livesharetest.Ser
 }
 
 func TestNewServer(t *testing.T) {
-	testServer, client, err := newMockJoinedClient()
+	testServer, client, err := makeMockJoinedClient()
 	defer testServer.Close()
 	if err != nil {
 		t.Errorf("error creating mock joined client: %v", err)
@@ -95,7 +95,7 @@ func TestServerStartSharing(t *testing.T) {
 		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
 	}
-	testServer, client, err := newMockJoinedClient(
+	testServer, client, err := makeMockJoinedClient(
 		livesharetest.WithService("serverSharing.startSharing", startSharing),
 	)
 	defer testServer.Close()
@@ -138,7 +138,7 @@ func TestServerGetSharedServers(t *testing.T) {
 	getSharedServers := func(req *jsonrpc2.Request) (interface{}, error) {
 		return Ports{&sharedServer}, nil
 	}
-	testServer, client, err := newMockJoinedClient(
+	testServer, client, err := makeMockJoinedClient(
 		livesharetest.WithService("serverSharing.getSharedServers", getSharedServers),
 	)
 	if err != nil {
@@ -206,7 +206,7 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		}
 		return nil, nil
 	}
-	testServer, client, err := newMockJoinedClient(
+	testServer, client, err := makeMockJoinedClient(
 		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
 	)
 	if err != nil {
