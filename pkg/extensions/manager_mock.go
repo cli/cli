@@ -33,7 +33,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			RemoveFunc: func(name string) error {
 // 				panic("mock out the Remove method")
 // 			},
-// 			UpgradeFunc: func(name string, stdout io.Writer, stderr io.Writer) error {
+// 			UpgradeFunc: func(name string, force bool, stdout io.Writer, stderr io.Writer) error {
 // 				panic("mock out the Upgrade method")
 // 			},
 // 		}
@@ -59,7 +59,7 @@ type ExtensionManagerMock struct {
 	RemoveFunc func(name string) error
 
 	// UpgradeFunc mocks the Upgrade method.
-	UpgradeFunc func(name string, stdout io.Writer, stderr io.Writer) error
+	UpgradeFunc func(name string, force bool, stdout io.Writer, stderr io.Writer) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -100,6 +100,8 @@ type ExtensionManagerMock struct {
 		Upgrade []struct {
 			// Name is the name argument value.
 			Name string
+			// Force is the force argument value.
+			Force bool
 			// Stdout is the stdout argument value.
 			Stdout io.Writer
 			// Stderr is the stderr argument value.
@@ -285,23 +287,25 @@ func (mock *ExtensionManagerMock) RemoveCalls() []struct {
 }
 
 // Upgrade calls UpgradeFunc.
-func (mock *ExtensionManagerMock) Upgrade(name string, stdout io.Writer, stderr io.Writer) error {
+func (mock *ExtensionManagerMock) Upgrade(name string, force bool, stdout io.Writer, stderr io.Writer) error {
 	if mock.UpgradeFunc == nil {
 		panic("ExtensionManagerMock.UpgradeFunc: method is nil but ExtensionManager.Upgrade was just called")
 	}
 	callInfo := struct {
 		Name   string
+		Force  bool
 		Stdout io.Writer
 		Stderr io.Writer
 	}{
 		Name:   name,
+		Force:  force,
 		Stdout: stdout,
 		Stderr: stderr,
 	}
 	mock.lockUpgrade.Lock()
 	mock.calls.Upgrade = append(mock.calls.Upgrade, callInfo)
 	mock.lockUpgrade.Unlock()
-	return mock.UpgradeFunc(name, stdout, stderr)
+	return mock.UpgradeFunc(name, force, stdout, stderr)
 }
 
 // UpgradeCalls gets all the calls that were made to Upgrade.
@@ -309,11 +313,13 @@ func (mock *ExtensionManagerMock) Upgrade(name string, stdout io.Writer, stderr 
 //     len(mockedExtensionManager.UpgradeCalls())
 func (mock *ExtensionManagerMock) UpgradeCalls() []struct {
 	Name   string
+	Force  bool
 	Stdout io.Writer
 	Stderr io.Writer
 } {
 	var calls []struct {
 		Name   string
+		Force  bool
 		Stdout io.Writer
 		Stderr io.Writer
 	}
