@@ -83,6 +83,9 @@ func refreshRun(opts *RefreshOptions) error {
 
 	candidates, err := cfg.Hosts()
 	if err != nil {
+		return err
+	}
+	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts. Use 'gh auth login' to authenticate with a host")
 	}
 

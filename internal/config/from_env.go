@@ -106,3 +106,11 @@ func AuthTokenProvidedFromEnv() bool {
 		os.Getenv(GH_TOKEN) != "" ||
 		os.Getenv(GITHUB_TOKEN) != ""
 }
+
+func IsHostEnv(src string) bool {
+	return src == GH_HOST
+}
+
+func IsEnterpriseEnv(src string) bool {
+	return src == GH_ENTERPRISE_TOKEN || src == GITHUB_ENTERPRISE_TOKEN
+}

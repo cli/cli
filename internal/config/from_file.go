@@ -104,7 +104,7 @@ func (c *fileConfig) UnsetHost(hostname string) {
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 	hosts, err := c.hostEntries()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse hosts config: %w", err)
+		return nil, err
 	}
 
 	for _, hc := range hosts {
@@ -209,7 +209,7 @@ func (c *fileConfig) Aliases() (*AliasConfig, error) {
 func (c *fileConfig) hostEntries() ([]*HostConfig, error) {
 	entry, err := c.FindEntry("hosts")
 	if err != nil {
-		return nil, fmt.Errorf("could not find hosts config: %w", err)
+		return []*HostConfig{}, nil
 	}
 
 	hostConfigs, err := c.parseHosts(entry.ValueNode)
