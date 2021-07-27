@@ -3,6 +3,7 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/internal/ghrepo"
@@ -134,6 +135,7 @@ func TestNewCmdBrowse(t *testing.T) {
 }
 
 func Test_runBrowse(t *testing.T) {
+	s := string(os.PathSeparator)
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -257,7 +259,7 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "relative path from browse_test.go",
 			opts: BrowseOptions{
-				SelectorArg: "./browse_test.go",
+				SelectorArg: "." + s + "browse_test.go",
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -267,7 +269,7 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "relative path to file in parent folder from browse_test.go",
 			opts: BrowseOptions{
-				SelectorArg: "../pr",
+				SelectorArg: ".." + s + "pr",
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -357,6 +359,7 @@ func Test_parseFileArg(t *testing.T) {
 
 func Test_parsePathFromFileArg(t *testing.T) {
 
+	s := string(os.PathSeparator)
 	// tests assume path is pkg/cmd/browse
 	tests := []struct {
 		name         string
@@ -365,27 +368,27 @@ func Test_parsePathFromFileArg(t *testing.T) {
 	}{
 		{
 			name:         "go to parent folder",
-			fileArg:      "../",
+			fileArg:      ".." + s,
 			expectedPath: "pkg/cmd",
 		},
 		{
 			name:         "file in current folder",
-			fileArg:      "./browse.go",
+			fileArg:      "." + s + "browse.go",
 			expectedPath: "pkg/cmd/browse/browse.go",
 		},
 		{
 			name:         "file within parent folder",
-			fileArg:      "../browse.go",
+			fileArg:      ".." + s + "browse.go",
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "file within parent folder uncleaned",
-			fileArg:      ".././//browse.go",
+			fileArg:      ".." + s + "." + s + s + s + "browse.go",
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "different path from root directory",
-			fileArg:      "../../../internal/build/build.go",
+			fileArg:      ".." + s + ".." + s + ".." + s + "internal/build/build.go",
 			expectedPath: "internal/build/build.go",
 		},
 		{
@@ -400,12 +403,12 @@ func Test_parsePathFromFileArg(t *testing.T) {
 		},
 		{
 			name:         "go out of repository",
-			fileArg:      "../../../../../../",
+			fileArg:      ".." + s + ".." + s + ".." + s + ".." + s + ".." + s + ".." + s + "",
 			expectedPath: "",
 		},
 		{
 			name:         "go to root of repository",
-			fileArg:      "../../../",
+			fileArg:      ".." + s + ".." + s + ".." + s + "",
 			expectedPath: "",
 		},
 	}
