@@ -170,7 +170,7 @@ nix-env -iA nixos.gitAndTools.gh
 
 ### openSUSE Tumbleweed
 
-openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+openSUSE Tumbleweed users can install from the [official distribution repo](https://software.opensuse.org/package/gh):
 ```bash
 sudo zypper in gh
 ```
