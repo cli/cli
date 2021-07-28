@@ -107,8 +107,8 @@ func Ports() error {
 
 }
 
-func getPorts(ctx context.Context, liveShareClient *liveshare.Client) (liveshare.Ports, error) {
-	server, err := liveShareClient.NewServer()
+func getPorts(ctx context.Context, lsclient *liveshare.Client) (liveshare.Ports, error) {
+	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return nil, fmt.Errorf("error creating server: %v", err)
 	}
@@ -214,12 +214,12 @@ func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
-	server, err := liveShareClient.NewServer()
+	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return fmt.Errorf("error creating server: %v", err)
 	}
@@ -276,12 +276,12 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
-	server, err := liveShareClient.NewServer()
+	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return fmt.Errorf("error creating server: %v", err)
 	}
@@ -301,7 +301,7 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 	}
 
 	fmt.Println("Forwarding port: " + sourcePort + " -> " + destPort)
-	portForwarder := liveshare.NewLocalPortForwarder(liveShareClient, server, dstPortInt)
+	portForwarder := liveshare.NewPortForwarder(lsclient, server, dstPortInt)
 	if err := portForwarder.Start(ctx); err != nil {
 		return fmt.Errorf("error forwarding port: %v", err)
 	}

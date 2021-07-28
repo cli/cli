@@ -133,8 +133,10 @@ const (
 )
 
 type CodespaceEnvironmentConnection struct {
-	SessionID    string `json:"sessionId"`
-	SessionToken string `json:"sessionToken"`
+	SessionID     string `json:"sessionId"`
+	SessionToken  string `json:"sessionToken"`
+	RelayEndpoint string `json:"relayEndpoint"`
+	RelaySAS      string `json:"relaySas"`
 }
 
 func (a *API) ListCodespaces(ctx context.Context, user *User) (Codespaces, error) {
