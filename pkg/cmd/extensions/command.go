@@ -39,7 +39,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			Short: "List installed extension commands",
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cmds := m.List()
+				cmds := m.List(true)
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
@@ -158,7 +158,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 		return fmt.Errorf("%q matches the name of a built-in command", commandName)
 	}
 
-	for _, ext := range m.List() {
+	for _, ext := range m.List(false) {
 		if ext.Name() == commandName {
 			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}

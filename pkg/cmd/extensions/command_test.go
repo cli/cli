@@ -35,7 +35,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func() []extensions.Extension {
+				em.ListFunc = func(bool) []extensions.Extension {
 					return []extensions.Extension{}
 				}
 				em.InstallFunc = func(s string, out, errOut io.Writer) error {
@@ -54,7 +54,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name: "install an extension with same name as existing extension",
 			args: []string{"install", "owner/gh-existing-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func() []extensions.Extension {
+				em.ListFunc = func(bool) []extensions.Extension {
 					e := &Extension{path: "owner2/gh-existing-ext"}
 					return []extensions.Extension{e}
 				}
@@ -150,7 +150,7 @@ func TestNewCmdExtensions(t *testing.T) {
 			name: "list extensions",
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func() []extensions.Extension {
+				em.ListFunc = func(bool) []extensions.Extension {
 					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", updateAvailable: false}
 					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", updateAvailable: true}
 					return []extensions.Extension{ex1, ex2}
@@ -215,7 +215,7 @@ func Test_checkValidExtension(t *testing.T) {
 	rootCmd.AddCommand(&cobra.Command{Use: "auth"})
 
 	m := &extensions.ExtensionManagerMock{
-		ListFunc: func() []extensions.Extension {
+		ListFunc: func(bool) []extensions.Extension {
 			return []extensions.Extension{
 				&extensions.ExtensionMock{
 					NameFunc: func() string { return "screensaver" },

@@ -30,7 +30,7 @@ func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.Cmd
 			return cfg, nil
 		},
 		ExtensionManager: &extensions.ExtensionManagerMock{
-			ListFunc: func() []extensions.Extension {
+			ListFunc: func(bool) []extensions.Extension {
 				return []extensions.Extension{}
 			},
 		},

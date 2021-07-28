@@ -44,7 +44,8 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	extName := args[0]
 	forwardArgs := args[1:]
 
-	for _, e := range m.list(false) {
+	exts, _ := m.list(false)
+	for _, e := range exts {
 		if e.Name() == extName {
 			exe = e.Path()
 			break
@@ -77,34 +78,56 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	return true, externalCmd.Run()
 }
 
-func (m *Manager) List() []extensions.Extension {
-	return m.list(true)
+func (m *Manager) List(includeMetadata bool) []extensions.Extension {
+	exts, _ := m.list(includeMetadata)
+	return exts
 }
 
-func (m *Manager) list(includeMetadata bool) []extensions.Extension {
+func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
 	dir := m.installDir()
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil
+		return nil, err
 	}
+
 	var results []extensions.Extension
 	for _, f := range entries {
-		if !strings.HasPrefix(f.Name(), "gh-") || !(f.IsDir() || f.Mode()&os.ModeSymlink != 0) {
+		if !strings.HasPrefix(f.Name(), "gh-") {
 			continue
 		}
 		var remoteUrl string
-		var updateAvailable bool
-		if includeMetadata {
-			remoteUrl = m.getRemoteUrl(f.Name())
-			updateAvailable = m.checkUpdateAvailable(f.Name())
+		updateAvailable := false
+		isLocal := false
+		exePath := filepath.Join(dir, f.Name(), f.Name())
+		if f.IsDir() {
+			if includeMetadata {
+				remoteUrl = m.getRemoteUrl(f.Name())
+				updateAvailable = m.checkUpdateAvailable(f.Name())
+			}
+		} else {
+			isLocal = true
+			if f.Mode()&os.ModeSymlink == 0 {
+				// if this is a regular file, its contents is the local directory of the extension
+				exeFile, err := os.Open(filepath.Join(dir, f.Name()))
+				if err != nil {
+					return nil, err
+				}
+				b := make([]byte, 1024)
+				n, err := exeFile.Read(b)
+				if err != nil {
+					return nil, err
+				}
+				exePath = filepath.Join(strings.TrimSpace(string(b[:n])), f.Name())
+			}
 		}
 		results = append(results, &Extension{
-			path:            filepath.Join(dir, f.Name(), f.Name()),
+			path:            exePath,
 			url:             remoteUrl,
+			isLocal:         isLocal,
 			updateAvailable: updateAvailable,
 		})
 	}
-	return results
+	return results, nil
 }
 
 func (m *Manager) getRemoteUrl(extension string) string {
@@ -146,8 +169,19 @@ func (m *Manager) checkUpdateAvailable(extension string) bool {
 
 func (m *Manager) InstallLocal(dir string) error {
 	name := filepath.Base(dir)
-	targetDir := filepath.Join(m.installDir(), name)
-	return os.Symlink(dir, targetDir)
+	targetLink := filepath.Join(m.installDir(), name)
+	if err := os.MkdirAll(filepath.Dir(targetLink), 0755); err != nil {
+		return err
+	}
+	// Create a regular file that contains the location of the directory where to find this extension. We
+	// avoid relying on symlinks because creating them on Windows requires administrator privileges.
+	f, err := os.OpenFile(targetLink, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(dir)
+	return err
 }
 
 func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
@@ -173,7 +207,7 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 		return err
 	}
 
-	exts := m.List()
+	exts := m.List(false)
 	if len(exts) == 0 {
 		return errors.New("no extensions installed")
 	}

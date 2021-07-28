@@ -82,7 +82,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					return true
 				}
 
-				for _, ext := range f.ExtensionManager.List() {
+				for _, ext := range f.ExtensionManager.List(false) {
 					if ext.Name() == split[0] {
 						return true
 					}
