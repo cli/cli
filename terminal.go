@@ -106,7 +106,7 @@ func (t terminalReadCloser) Close() error {
 		return fmt.Errorf("error making terminal.stopTerminal call: %v", err)
 	}
 
-	if err := t.channel.Close(); err != nil {
+	if err := t.channel.Close(); err != nil && err != io.EOF {
 		return fmt.Errorf("error closing channel: %v", err)
 	}
 
