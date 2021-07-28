@@ -82,12 +82,12 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		}
 	}
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
-	terminal, err := liveShareClient.NewTerminal()
+	terminal, err := liveshare.NewTerminal(lsclient)
 	if err != nil {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
 	}
@@ -106,7 +106,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		fmt.Printf("\n")
 	}
 
-	server, err := liveShareClient.NewServer()
+	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return fmt.Errorf("error creating server: %v", err)
 	}
@@ -121,7 +121,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error sharing sshd port: %v", err)
 	}
 
-	portForwarder := liveshare.NewLocalPortForwarder(liveShareClient, server, port)
+	portForwarder := liveshare.NewPortForwarder(lsclient, server, port)
 	go func() {
 		if err := portForwarder.Start(ctx); err != nil {
 			panic(fmt.Errorf("error forwarding port: %v", err))
