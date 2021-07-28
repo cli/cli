@@ -214,7 +214,7 @@ func stubExtension(path string) error {
 }
 
 func stubLocalExtension(tempDir, path string) error {
-	extDir, err := os.MkdirTemp(tempDir, "local-ext")
+	extDir, err := ioutil.TempDir(tempDir, "local-ext")
 	if err != nil {
 		return err
 	}
