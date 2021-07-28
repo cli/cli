@@ -93,18 +93,21 @@ func ConnectToLiveshare(ctx context.Context, apiClient *api.API, token string, c
 
 	fmt.Println("Connecting to your codespace...")
 
-	liveShare, err := liveshare.New(
-		liveshare.WithWorkspaceID(codespace.Environment.Connection.SessionID),
-		liveshare.WithToken(codespace.Environment.Connection.SessionToken),
+	lsclient, err := liveshare.NewClient(
+		liveshare.WithConnection(liveshare.Connection{
+			SessionID:     codespace.Environment.Connection.SessionID,
+			SessionToken:  codespace.Environment.Connection.SessionToken,
+			RelaySAS:      codespace.Environment.Connection.RelaySAS,
+			RelayEndpoint: codespace.Environment.Connection.RelayEndpoint,
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating live share: %v", err)
 	}
 
-	liveShareClient := liveShare.NewClient()
-	if err := liveShareClient.Join(ctx); err != nil {
+	if err := lsclient.Join(ctx); err != nil {
 		return nil, fmt.Errorf("error joining liveshare client: %v", err)
 	}
 
-	return liveShareClient, nil
+	return lsclient, nil
 }
