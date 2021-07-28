@@ -22,22 +22,26 @@ func executeParentHooks(cmd *cobra.Command, args []string) error {
 func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
 	_ = cmd.RegisterFlagCompletionFunc("repo", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		var results []string
 		remotes, err := f.Remotes()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
+
 		config, err := f.Config()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		gh_host,err := config.DefaultHost()
+		defaultHost, err := config.DefaultHost()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 
-		for _, remote := range remotes.FilterByHosts([]string{gh_host}) {
+		var results []string
+		for _, remote := range remotes {
 			repo := remote.RepoOwner() + "/" + remote.RepoName()
+			if !strings.EqualFold(remote.RepoHost(), defaultHost) {
+				repo = remote.RepoHost() + "/" + repo
+			}
 			if strings.HasPrefix(repo, toComplete) {
 				results = append(results, repo)
 			}
