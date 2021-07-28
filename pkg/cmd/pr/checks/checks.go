@@ -3,12 +3,10 @@ package checks
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -17,34 +15,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ChecksOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Branch     func() (string, error)
-	Remotes    func() (context.Remotes, error)
+type browser interface {
+	Browse(string) error
+}
 
-	WebMode bool
+type ChecksOptions struct {
+	IO      *iostreams.IOStreams
+	Browser browser
+
+	Finder shared.PRFinder
 
 	SelectorArg string
+	WebMode     bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	opts := &ChecksOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Branch:     f.Branch,
-		Remotes:    f.Remotes,
-		BaseRepo:   f.BaseRepo,
+		IO:      f.IOStreams,
+		Browser: f.Browser,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			Show CI status for a single pull request.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
@@ -68,24 +70,16 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 }
 
 func checksRun(opts *ChecksOptions) error {
-	httpClient, err := opts.HttpClient()
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
+	}
+	if opts.WebMode {
+		findOptions.Fields = []string{"number"}
+	}
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
-	if err != nil {
-		return err
-	}
-
-	if len(pr.Commits.Nodes) == 0 {
-		return fmt.Errorf("no commit found on the pull request")
-	}
-
-	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	if len(rollup) == 0 {
-		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -95,7 +89,16 @@ func checksRun(opts *ChecksOptions) error {
 		if isTerminal {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
+	}
+
+	if len(pr.StatusCheckRollup.Nodes) == 0 {
+		return fmt.Errorf("no commit found on the pull request")
+	}
+
+	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	if len(rollup) == 0 {
+		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
 	passing := 0
@@ -115,7 +118,7 @@ func checksRun(opts *ChecksOptions) error {
 
 	outputs := []output{}
 
-	for _, c := range pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+	for _, c := range pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 		mark := "✓"
 		bucket := "pass"
 		state := c.State
@@ -135,13 +138,11 @@ func checksRun(opts *ChecksOptions) error {
 			markColor = cs.Red
 			failing++
 			bucket = "fail"
-		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
+		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 			mark = "-"
 			markColor = cs.Yellow
 			pending++
 			bucket = "pending"
-		default:
-			panic(fmt.Errorf("unsupported status: %q", state))
 		}
 
 		elapsed := ""

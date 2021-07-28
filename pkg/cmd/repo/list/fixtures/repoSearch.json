@@ -1,0 +1,37 @@
+{
+  "data": {
+    "search": {
+      "repositoryCount": 3,
+      "nodes": [
+        {
+          "nameWithOwner": "octocat/hello-world",
+          "description": "My first repository",
+          "isFork": false,
+          "isPrivate": false,
+          "isArchived": false,
+          "pushedAt": "2021-02-19T06:34:58Z"
+        },
+        {
+          "nameWithOwner": "octocat/cli",
+          "description": "GitHub CLI",
+          "isFork": true,
+          "isPrivate": false,
+          "isArchived": false,
+          "pushedAt": "2021-02-19T06:06:06Z"
+        },
+        {
+          "nameWithOwner": "octocat/testing",
+          "description": null,
+          "isFork": false,
+          "isPrivate": true,
+          "isArchived": false,
+          "pushedAt": "2021-02-11T22:32:05Z"
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": ""
+      }
+    }
+  }
+}

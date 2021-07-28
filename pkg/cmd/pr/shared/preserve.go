@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 )
 
@@ -15,6 +16,11 @@ func PreserveInput(io *iostreams.IOStreams, state *IssueMetadataState, createErr
 		}
 
 		if *createErr == nil {
+			return
+		}
+
+		if cmdutil.IsUserCancellation(*createErr) {
+			// these errors are user-initiated cancellations
 			return
 		}
 

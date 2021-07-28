@@ -17,7 +17,7 @@
             "url": "https://github.com/cli/cli/pull/8",
             "headRefName": "strawberries",
             "reviewDecision": "CHANGES_REQUESTED",
-            "commits": {
+            "statusCheckRollup": {
               "nodes": [
                 {
                   "commit": {
@@ -44,7 +44,7 @@
             "url": "https://github.com/cli/cli/pull/7",
             "headRefName": "banananana",
             "reviewDecision": "APPROVED",
-            "commits": {
+            "statusCheckRollup": {
               "nodes": [
                 {
                   "commit": {
@@ -72,7 +72,7 @@
             "url": "https://github.com/cli/cli/pull/6",
             "headRefName": "avo",
             "reviewDecision": "REVIEW_REQUIRED",
-            "commits": {
+            "statusCheckRollup": {
               "nodes": [
                 {
                   "commit": {

@@ -7,9 +7,11 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/google/shlex"
 )
 
-func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string, error) {
+func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
@@ -18,9 +20,10 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 	if state.Title != "" {
 		q.Set("title", state.Title)
 	}
-	if state.Body != "" {
-		q.Set("body", state.Body)
-	}
+	// We always want to send the body parameter, even if it's empty, to prevent the web interface from
+	// applying the default template. Since the user has the option to select a template in the terminal,
+	// assume that empty body here means that the user either skipped it or erased its contents.
+	q.Set("body", state.Body)
 	if len(state.Assignees) > 0 {
 		q.Set("assignees", strings.Join(state.Assignees, ","))
 	}
@@ -28,7 +31,11 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
 	if len(state.Projects) > 0 {
-		q.Set("projects", strings.Join(state.Projects, ","))
+		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects)
+		if err != nil {
+			return "", fmt.Errorf("could not add to project: %w", err)
+		}
+		q.Set("projects", strings.Join(projectPaths, ","))
 	}
 	if len(state.Milestones) > 0 {
 		q.Set("milestone", state.Milestones[0])
@@ -149,6 +156,37 @@ type FilterOptions struct {
 	BaseBranch string
 	Mention    string
 	Milestone  string
+	Search     string
+
+	Fields []string
+}
+
+func (opts *FilterOptions) IsDefault() bool {
+	if opts.State != "open" {
+		return false
+	}
+	if len(opts.Labels) > 0 {
+		return false
+	}
+	if opts.Assignee != "" {
+		return false
+	}
+	if opts.Author != "" {
+		return false
+	}
+	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.Mention != "" {
+		return false
+	}
+	if opts.Milestone != "" {
+		return false
+	}
+	if opts.Search != "" {
+		return false
+	}
+	return true
 }
 
 func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
@@ -156,39 +194,70 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	query := fmt.Sprintf("is:%s ", options.Entity)
-	if options.State != "all" {
-		query += fmt.Sprintf("is:%s ", options.State)
-	}
-	if options.Assignee != "" {
-		query += fmt.Sprintf("assignee:%s ", options.Assignee)
-	}
-	for _, label := range options.Labels {
-		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
-	}
-	if options.Author != "" {
-		query += fmt.Sprintf("author:%s ", options.Author)
-	}
-	if options.BaseBranch != "" {
-		query += fmt.Sprintf("base:%s ", options.BaseBranch)
-	}
-	if options.Mention != "" {
-		query += fmt.Sprintf("mentions:%s ", options.Mention)
-	}
-	if options.Milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.Milestone))
-	}
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
+
+	params := u.Query()
+	params.Set("q", SearchQueryBuild(options))
+	u.RawQuery = params.Encode()
+
 	return u.String(), nil
 }
 
-func quoteValueForQuery(v string) string {
-	if strings.ContainsAny(v, " \"\t\r\n") {
-		return fmt.Sprintf("%q", v)
+func SearchQueryBuild(options FilterOptions) string {
+	q := githubsearch.NewQuery()
+	switch options.Entity {
+	case "issue":
+		q.SetType(githubsearch.Issue)
+	case "pr":
+		q.SetType(githubsearch.PullRequest)
 	}
-	return v
+
+	switch options.State {
+	case "open":
+		q.SetState(githubsearch.Open)
+	case "closed":
+		q.SetState(githubsearch.Closed)
+	case "merged":
+		q.SetState(githubsearch.Merged)
+	}
+
+	if options.Assignee != "" {
+		q.AssignedTo(options.Assignee)
+	}
+	for _, label := range options.Labels {
+		q.AddLabel(label)
+	}
+	if options.Author != "" {
+		q.AuthoredBy(options.Author)
+	}
+	if options.BaseBranch != "" {
+		q.SetBaseBranch(options.BaseBranch)
+	}
+	if options.Mention != "" {
+		q.Mentions(options.Mention)
+	}
+	if options.Milestone != "" {
+		q.InMilestone(options.Milestone)
+	}
+	if options.Search != "" {
+		q.AddQuery(options.Search)
+	}
+
+	return q.String()
+}
+
+func QueryHasStateClause(searchQuery string) bool {
+	argv, err := shlex.Split(searchQuery)
+	if err != nil {
+		return false
+	}
+
+	for _, arg := range argv {
+		if arg == "is:closed" || arg == "is:merged" || arg == "state:closed" || arg == "state:merged" || strings.HasPrefix(arg, "merged:") || strings.HasPrefix(arg, "closed:") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MeReplacer resolves usages of `@me` to the handle of the currently logged in user.

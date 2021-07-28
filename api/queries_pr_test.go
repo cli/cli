@@ -1,12 +1,13 @@
 package api
 
 import (
-	"reflect"
+	"encoding/json"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBranchDeleteRemote(t *testing.T) {
@@ -148,42 +149,94 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 			}
 
 			gotPrFeatures, err := determinePullRequestFeatures(httpClient, tt.hostname)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("determinePullRequestFeatures() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
+			} else {
+				assert.NoError(t, err)
 			}
-			if !reflect.DeepEqual(gotPrFeatures, tt.wantPrFeatures) {
-				t.Errorf("determinePullRequestFeatures() = %v, want %v", gotPrFeatures, tt.wantPrFeatures)
-			}
+			assert.Equal(t, tt.wantPrFeatures, gotPrFeatures)
 		})
 	}
 }
 
-func Test_sortPullRequestsByState(t *testing.T) {
-	prs := []PullRequest{
+func Test_Logins(t *testing.T) {
+	rr := ReviewRequests{}
+	var tests = []struct {
+		name             string
+		requestedReviews string
+		want             []string
+	}{
 		{
-			BaseRefName: "test1",
-			State:       "MERGED",
+			name:             "no requested reviewers",
+			requestedReviews: `{"nodes": []}`,
+			want:             []string{},
 		},
 		{
-			BaseRefName: "test2",
-			State:       "CLOSED",
+			name: "user",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "testuser"
+					}
+				}
+			]}`,
+			want: []string{"testuser"},
 		},
 		{
-			BaseRefName: "test3",
-			State:       "OPEN",
+			name: "team",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Test Team",
+						"slug": "test-team",
+						"organization": {"login": "myorg"}
+					}
+				}
+			]}`,
+			want: []string{"myorg/test-team"},
+		},
+		{
+			name: "multiple users and teams",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "user1"
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "user2"
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Test Team",
+						"slug": "test-team",
+						"organization": {"login": "myorg"}
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Dev Team",
+						"slug": "dev-team",
+						"organization": {"login": "myorg"}
+					}
+				}
+			]}`,
+			want: []string{"user1", "user2", "myorg/test-team", "myorg/dev-team"},
 		},
 	}
 
-	sortPullRequestsByState(prs)
-
-	if prs[0].BaseRefName != "test3" {
-		t.Errorf("prs[0]: got %s, want %q", prs[0].BaseRefName, "test3")
-	}
-	if prs[1].BaseRefName != "test1" {
-		t.Errorf("prs[1]: got %s, want %q", prs[1].BaseRefName, "test1")
-	}
-	if prs[2].BaseRefName != "test2" {
-		t.Errorf("prs[2]: got %s, want %q", prs[2].BaseRefName, "test2")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tt.requestedReviews), &rr)
+			assert.NoError(t, err, "Failed to unmarshal json string as ReviewRequests")
+			logins := rr.Logins()
+			assert.Equal(t, tt.want, logins)
+		})
 	}
 }

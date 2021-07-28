@@ -5,22 +5,27 @@ export CGO_CFLAGS
 CGO_LDFLAGS ?= $(filter -g -L% -l% -O%,${LDFLAGS})
 export CGO_LDFLAGS
 
+EXE =
+ifeq ($(GOOS),windows)
+EXE = .exe
+endif
+
 ## The following tasks delegate to `script/build.go` so they can be run cross-platform.
 
-.PHONY: bin/gh
-bin/gh: script/build
-	@script/build bin/gh
+.PHONY: bin/gh$(EXE)
+bin/gh$(EXE): script/build
+	@script/build $@
 
 script/build: script/build.go
-	go build -o script/build script/build.go
+	GOOS= GOARCH= GOARM= GOFLAGS= CGO_ENABLED= go build -o $@ $<
 
 .PHONY: clean
 clean: script/build
-	@script/build clean
+	@script/build $@
 
 .PHONY: manpages
 manpages: script/build
-	@script/build manpages
+	@script/build $@
 
 # just a convenience task around `go test`
 .PHONY: test

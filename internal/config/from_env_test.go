@@ -13,11 +13,13 @@ func TestInheritEnv(t *testing.T) {
 	orig_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
 	orig_GH_TOKEN := os.Getenv("GH_TOKEN")
 	orig_GH_ENTERPRISE_TOKEN := os.Getenv("GH_ENTERPRISE_TOKEN")
+	orig_AppData := os.Getenv("AppData")
 	t.Cleanup(func() {
 		os.Setenv("GITHUB_TOKEN", orig_GITHUB_TOKEN)
 		os.Setenv("GITHUB_ENTERPRISE_TOKEN", orig_GITHUB_ENTERPRISE_TOKEN)
 		os.Setenv("GH_TOKEN", orig_GH_TOKEN)
 		os.Setenv("GH_ENTERPRISE_TOKEN", orig_GH_ENTERPRISE_TOKEN)
+		os.Setenv("AppData", orig_AppData)
 	})
 
 	type wants struct {
@@ -42,7 +44,7 @@ func TestInheritEnv(t *testing.T) {
 			baseConfig: ``,
 			hostname:   "github.com",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "",
 				source:    ".config.gh.config.yml",
 				writeable: true,
@@ -102,7 +104,7 @@ func TestInheritEnv(t *testing.T) {
 			GITHUB_ENTERPRISE_TOKEN: "ENTOKEN",
 			hostname:                "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "ENTOKEN",
 				source:    "GITHUB_ENTERPRISE_TOKEN",
 				writeable: false,
@@ -114,7 +116,7 @@ func TestInheritEnv(t *testing.T) {
 			GH_ENTERPRISE_TOKEN: "ENTOKEN",
 			hostname:            "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "ENTOKEN",
 				source:    "GH_ENTERPRISE_TOKEN",
 				writeable: false,
@@ -219,7 +221,7 @@ func TestInheritEnv(t *testing.T) {
 			GITHUB_ENTERPRISE_TOKEN: "GITHUBTOKEN",
 			hostname:                "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "GHTOKEN",
 				source:    "GH_ENTERPRISE_TOKEN",
 				writeable: false,
@@ -264,6 +266,7 @@ func TestInheritEnv(t *testing.T) {
 			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
 			os.Setenv("GH_TOKEN", tt.GH_TOKEN)
 			os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
+			os.Setenv("AppData", "")
 
 			baseCfg := NewFromString(tt.baseConfig)
 			cfg := InheritEnv(baseCfg)

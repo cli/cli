@@ -19,6 +19,8 @@ type RefreshOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (config.Config, error)
 
+	MainExecutable string
+
 	Hostname string
 	Scopes   []string
 	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
@@ -34,6 +36,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
 			return err
 		},
+		MainExecutable: f.Executable,
 	}
 
 	cmd := &cobra.Command{
@@ -80,6 +83,9 @@ func refreshRun(opts *RefreshOptions) error {
 
 	candidates, err := cfg.Hosts()
 	if err != nil {
+		return err
+	}
+	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts. Use 'gh auth login' to authenticate with a host")
 	}
 

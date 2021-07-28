@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -59,65 +58,45 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 }
 
 func TestIssueView_web(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+	browser := &cmdutil.TestBrowser{}
 
-	http.Register(
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 				"number": 123,
 				"url": "https://github.com/OWNER/REPO/issues/123"
 			} } } }
-			`),
-	)
+		`))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
+	err := viewRun(&ViewOptions{
+		IO:      io,
+		Browser: browser,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		WebMode:     true,
+		SelectorArg: "123",
 	})
-
-	output, err := runCommand(http, true, "-w 123")
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
-}
-
-func TestIssueView_web_numberArgWithHash(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issues/123"
-			} } } }
-			`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
-	})
-
-	output, err := runCommand(http, true, "-w \"#123\"")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", output.Stderr())
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
 }
 
 func TestIssueView_nontty_Preview(t *testing.T) {
@@ -133,6 +112,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`comments:\t9`,
 				`author:\tmarseilles`,
 				`assignees:`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -147,6 +127,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`labels:\tone, two, three, four, five`,
 				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`milestone:\tuluru\n`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -157,6 +138,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`state:\tOPEN`,
 				`author:\tmarseilles`,
 				`labels:\ttarot`,
+				`number:\t123\n`,
 			},
 		},
 		"Closed issue": {
@@ -167,6 +149,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`\*\*bold story\*\*`,
 				`author:\tmarseilles`,
 				`labels:\ttarot`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -199,7 +182,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue without metadata": {
 			fixture: "./fixtures/issueView_preview.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -208,7 +191,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with metadata": {
 			fixture: "./fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`8 \x{1f615} • 7 \x{1f440} • 6 \x{2764}\x{fe0f} • 5 \x{1f389} • 4 \x{1f604} • 3 \x{1f680} • 2 \x{1f44e} • 1 \x{1f44d}`,
 				`Assignees:.*marseilles, monaco\n`,
@@ -222,7 +205,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with empty body": {
 			fixture: "./fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`No description provided`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -231,7 +214,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Closed issue": {
 			fixture: "./fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Closed.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -318,36 +301,6 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	}
 }
 
-func TestIssueView_web_urlArg(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issues/123"
-			} } } }
-			`),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/issues/123", url)
-	})
-
-	output, err := runCommand(http, true, "-w https://github.com/OWNER/REPO/issues/123")
-	if err != nil {
-		t.Errorf("error running command `issue view`: %v", err)
-	}
-
-	assert.Equal(t, "", output.String())
-}
-
 func TestIssueView_tty_Comments(t *testing.T) {
 	tests := map[string]struct {
 		cli             string
@@ -361,7 +314,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
 			},
 			expectedOutputs: []string{
-				`some title`,
+				`some title #123`,
 				`some body`,
 				`———————— Not showing 5 comments ————————`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
@@ -377,7 +330,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
 			},
 			expectedOutputs: []string{
-				`some title`,
+				`some title #123`,
 				`some body`,
 				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,
@@ -437,6 +390,7 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`state:\tOPEN`,
 				`author:\tmarseilles`,
 				`comments:\t6`,
+				`number:\t123`,
 				`some body`,
 			},
 		},

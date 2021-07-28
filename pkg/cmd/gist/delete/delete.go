@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmd/gist/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -15,6 +15,7 @@ import (
 
 type DeleteOptions struct {
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 
 	Selector string
@@ -23,6 +24,7 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := DeleteOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
@@ -58,11 +60,21 @@ func deleteRun(opts *DeleteOptions) error {
 
 	apiClient := api.NewClientFromHTTP(client)
 
-	gist, err := shared.GetGist(client, ghinstance.OverridableDefault(), gistID)
+	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
-	username, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	gist, err := shared.GetGist(client, host, gistID)
+	if err != nil {
+		return err
+	}
+	username, err := api.CurrentLoginName(apiClient, host)
 	if err != nil {
 		return err
 	}
@@ -71,7 +83,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return fmt.Errorf("You do not own this gist.")
 	}
 
-	err = deleteGist(apiClient, ghinstance.OverridableDefault(), gistID)
+	err = deleteGist(apiClient, host, gistID)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package set
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -19,7 +20,8 @@ type SetOptions struct {
 	Name      string
 	Expansion string
 	IsShell   bool
-	RootCmd   *cobra.Command
+
+	validCommand func(string) bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -32,47 +34,61 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Use:   "set <alias> <expansion>",
 		Short: "Create a shortcut for a gh command",
 		Long: heredoc.Doc(`
-			Declare a word as a command alias that will expand to the specified command(s).
+			Define a word that will expand to a full gh command when invoked.
 
-			The expansion may specify additional arguments and flags. If the expansion
-			includes positional placeholders such as '$1', '$2', etc., any extra arguments
-			that follow the invocation of an alias will be inserted appropriately.
+			The expansion may specify additional arguments and flags. If the expansion includes
+			positional placeholders such as "$1", extra arguments that follow the alias will be
+			inserted appropriately. Otherwise, extra arguments will be appended to the expanded
+			command.
 
-			If '--shell' is specified, the alias will be run through a shell interpreter (sh). This allows you
-			to compose commands with "|" or redirect with ">". Note that extra arguments following the alias
-			will not be automatically passed to the expanded expression. To have a shell alias receive
-			arguments, you must explicitly accept them using "$1", "$2", etc., or "$@" to accept all of them.
+			Use "-" as expansion argument to read the expansion string from standard input. This
+			is useful to avoid quoting issues when defining expansions.
 
-			Platform note: on Windows, shell aliases are executed via "sh" as installed by Git For Windows. If
-			you have installed git on Windows in some other way, shell aliases may not work for you.
-
-			Quotes must always be used when defining a command as in the examples.
+			If the expansion starts with "!" or if "--shell" was given, the expansion is a shell
+			expression that will be evaluated through the "sh" interpreter when the alias is
+			invoked. This allows for chaining multiple commands via piping and redirection.
 		`),
 		Example: heredoc.Doc(`
+			# note: Command Prompt on Windows requires using double quotes for arguments
 			$ gh alias set pv 'pr view'
-			$ gh pv -w 123
-			#=> gh pr view -w 123
-			
-			$ gh alias set bugs 'issue list --label="bugs"'
+			$ gh pv -w 123  #=> gh pr view -w 123
+
+			$ gh alias set bugs 'issue list --label=bugs'
 			$ gh bugs
 
-			$ gh alias set homework 'issue list --assigned @me'
+			$ gh alias set homework 'issue list --assignee @me'
 			$ gh homework
 
 			$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
-			$ gh epicsBy vilmibm
-			#=> gh issue list --author="vilmibm" --label="epic"
+			$ gh epicsBy vilmibm  #=> gh issue list --author="vilmibm" --label="epic"
 
-			$ gh alias set --shell igrep 'gh issue list --label="$1" | grep $2'
-			$ gh igrep epic foo
-			#=> gh issue list --label="epic" | grep "foo"
+			$ gh alias set --shell igrep 'gh issue list --label="$1" | grep "$2"'
+			$ gh igrep epic foo  #=> gh issue list --label="epic" | grep "foo"
 		`),
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.RootCmd = cmd.Root()
-
 			opts.Name = args[0]
 			opts.Expansion = args[1]
+
+			opts.validCommand = func(args string) bool {
+				split, err := shlex.Split(args)
+				if err != nil {
+					return false
+				}
+
+				rootCmd := cmd.Root()
+				cmd, _, err := rootCmd.Traverse(split)
+				if err == nil && cmd != rootCmd {
+					return true
+				}
+
+				for _, ext := range f.ExtensionManager.List() {
+					if ext.Name() == split[0] {
+						return true
+					}
+				}
+				return false
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -98,23 +114,27 @@ func setRun(opts *SetOptions) error {
 		return err
 	}
 
-	isTerminal := opts.IO.IsStdoutTTY()
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(opts.Expansion))
+	expansion, err := getExpansion(opts)
+	if err != nil {
+		return fmt.Errorf("did not understand expansion: %w", err)
 	}
 
-	expansion := opts.Expansion
+	isTerminal := opts.IO.IsStdoutTTY()
+	if isTerminal {
+		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(expansion))
+	}
+
 	isShell := opts.IsShell
 	if isShell && !strings.HasPrefix(expansion, "!") {
 		expansion = "!" + expansion
 	}
 	isShell = strings.HasPrefix(expansion, "!")
 
-	if validCommand(opts.RootCmd, opts.Name) {
+	if opts.validCommand(opts.Name) {
 		return fmt.Errorf("could not create alias: %q is already a gh command", opts.Name)
 	}
 
-	if !isShell && !validCommand(opts.RootCmd, expansion) {
+	if !isShell && !opts.validCommand(expansion) {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
@@ -140,12 +160,15 @@ func setRun(opts *SetOptions) error {
 	return nil
 }
 
-func validCommand(rootCmd *cobra.Command, expansion string) bool {
-	split, err := shlex.Split(expansion)
-	if err != nil {
-		return false
+func getExpansion(opts *SetOptions) (string, error) {
+	if opts.Expansion == "-" {
+		stdin, err := ioutil.ReadAll(opts.IO.In)
+		if err != nil {
+			return "", fmt.Errorf("failed to read from STDIN: %w", err)
+		}
+
+		return string(stdin), nil
 	}
 
-	cmd, _, err := rootCmd.Traverse(split)
-	return err == nil && cmd != rootCmd
+	return opts.Expansion, nil
 }

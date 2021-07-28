@@ -3,7 +3,6 @@ package create
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -79,13 +78,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			git, push the tag to GitHub, then run this command.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# use release notes from a file
+			Interactively create a release
+			$ gh release create v1.2.3
+
+			Non-interactively create a release
+			$ gh release create v1.2.3 --notes "bugfix release"
+
+			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
 
-			# upload all tarballs in a directory as release assets
+			Upload all tarballs in a directory as release assets
 			$ gh release create v1.2.3 ./dist/*.tgz
 
-			# upload a release asset with a display label
+			Upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
@@ -106,12 +111,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.BodyProvided = cmd.Flags().Changed("notes")
 			if notesFile != "" {
-				var b []byte
-				if notesFile == "-" {
-					b, err = ioutil.ReadAll(opts.IO.In)
-				} else {
-					b, err = ioutil.ReadFile(notesFile)
-				}
+				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
@@ -262,7 +262,7 @@ func createRun(opts *CreateOptions) error {
 		case "Save as draft":
 			opts.Draft = true
 		case "Cancel":
-			return cmdutil.SilentError
+			return cmdutil.CancelError
 		default:
 			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}
@@ -313,7 +313,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.HTMLURL)
+	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
 
 	return nil
 }

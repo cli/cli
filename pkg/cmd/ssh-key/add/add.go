@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -15,6 +15,7 @@ import (
 
 type AddOptions struct {
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	HTTPClient func() (*http.Client, error)
 
 	KeyFile string
@@ -24,6 +25,7 @@ type AddOptions struct {
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
 	opts := &AddOptions{
 		HTTPClient: f.HttpClient,
+		Config:     f.Config,
 		IO:         f.IOStreams,
 	}
 
@@ -71,7 +73,16 @@ func runAdd(opts *AddOptions) error {
 		keyReader = f
 	}
 
-	hostname := ghinstance.OverridableDefault()
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	hostname, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {
 		if errors.Is(err, scopesError) {

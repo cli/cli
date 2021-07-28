@@ -10,12 +10,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -23,12 +26,14 @@ import (
 type SetOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	RandomOverride io.Reader
 
 	SecretName      string
 	OrgName         string
+	EnvName         string
 	Body            string
 	Visibility      string
 	RepositoryNames []string
@@ -37,32 +42,46 @@ type SetOptions struct {
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
 	opts := &SetOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
-		Long:  "Locally encrypt a new or updated secret at either the repository or organization level and send it to GitHub for storage.",
+		Long:  "Locally encrypt a new or updated secret at either the repository, environment, or organization level and send it to GitHub for storage.",
 		Example: heredoc.Doc(`
-			$ gh secret set FROM_FLAG  -b"some literal value"
-			$ gh secret set FROM_ENV  -b"${ENV_VALUE}"
-			$ gh secret set FROM_FILE < file.json
-			$ gh secret set ORG_SECRET -bval --org=anOrg --visibility=all
-			$ gh secret set ORG_SECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
+			Paste secret in prompt
+			$ gh secret set MYSECRET
+
+			Use environment variable as secret value
+			$ gh secret set MYSECRET  -b"${ENV_VALUE}"
+
+			Use file as secret value
+			$ gh secret set MYSECRET < file.json
+
+			Set environment level secret
+			$ gh secret set MYSECRET -bval --env=anEnv
+
+			Set organization level secret visible to entire organization
+			$ gh secret set MYSECRET -bval --org=anOrg --visibility=all
+
+			Set organization level secret visible only to certain repositories
+			$ gh secret set MYSECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return &cmdutil.FlagError{Err: errors.New("must pass single secret name")}
-			}
-			if !cmd.Flags().Changed("body") && opts.IO.IsStdinTTY() {
-				return &cmdutil.FlagError{Err: errors.New("no --body specified but nothing on STIDN")}
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+				return err
+			}
 
 			opts.SecretName = args[0]
 
@@ -104,7 +123,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			return setRun(opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
@@ -125,6 +145,7 @@ func setRun(opts *SetOptions) error {
 	client := api.NewClientFromHTTP(c)
 
 	orgName := opts.OrgName
+	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
@@ -134,9 +155,21 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
 	var pk *PubKey
 	if orgName != "" {
-		pk, err = getOrgPublicKey(client, orgName)
+		pk, err = getOrgPublicKey(client, host, orgName)
+	} else if envName != "" {
+		pk, err = getEnvPubKey(client, baseRepo, envName)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -152,7 +185,9 @@ func setRun(opts *SetOptions) error {
 	encoded := base64.StdEncoding.EncodeToString(eBody)
 
 	if orgName != "" {
-		err = putOrgSecret(client, pk, *opts, encoded)
+		err = putOrgSecret(client, host, pk, *opts, encoded)
+	} else if envName != "" {
+		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
@@ -196,12 +231,22 @@ func validSecretName(name string) error {
 
 func getBody(opts *SetOptions) ([]byte, error) {
 	if opts.Body == "" {
-		body, err := ioutil.ReadAll(opts.IO.In)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read from STDIN: %w", err)
-		}
+		if opts.IO.CanPrompt() {
+			err := prompt.SurveyAskOne(&survey.Password{
+				Message: "Paste your secret",
+			}, &opts.Body)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Fprintln(opts.IO.Out)
+		} else {
+			body, err := ioutil.ReadAll(opts.IO.In)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read from STDIN: %w", err)
+			}
 
-		return body, nil
+			return body, nil
+		}
 	}
 
 	return []byte(opts.Body), nil

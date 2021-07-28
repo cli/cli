@@ -3,40 +3,34 @@
     "repository": {
       "pullRequests": {
         "totalCount": 3,
-        "edges": [
+        "nodes": [
           {
-            "node": {
-              "number": 32,
-              "title": "New feature",
-              "url": "https://github.com/monalisa/hello/pull/32",
-              "headRefName": "feature",
-              "state": "OPEN",
-              "isDraft": true
+            "number": 32,
+            "title": "New feature",
+            "url": "https://github.com/monalisa/hello/pull/32",
+            "headRefName": "feature",
+            "state": "OPEN",
+            "isDraft": true
+          },
+          {
+            "number": 29,
+            "title": "Fixed bad bug",
+            "url": "https://github.com/monalisa/hello/pull/29",
+            "headRefName": "bug-fix",
+            "state": "OPEN",
+            "isDraft": false,
+            "isCrossRepository": true,
+            "headRepositoryOwner": {
+              "login": "hubot"
             }
           },
           {
-            "node": {
-              "number": 29,
-              "title": "Fixed bad bug",
-              "url": "https://github.com/monalisa/hello/pull/29",
-              "headRefName": "bug-fix",
-              "state": "OPEN",
-              "isDraft": false,
-              "isCrossRepository": true,
-              "headRepositoryOwner": {
-                "login": "hubot"
-              }
-            }
-          },
-          {
-            "node": {
-              "number": 28,
-              "state": "MERGED",
-              "isDraft": false,
-              "title": "Improve documentation",
-              "url": "https://github.com/monalisa/hello/pull/28",
-              "headRefName": "docs"
-            }
+            "number": 28,
+            "state": "MERGED",
+            "isDraft": false,
+            "title": "Improve documentation",
+            "url": "https://github.com/monalisa/hello/pull/28",
+            "headRefName": "docs"
           }
         ],
         "pageInfo": {

@@ -2,10 +2,13 @@ package comment
 
 import (
 	"bytes"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/context"
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -13,12 +16,18 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdComment(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name     string
 		input    string
+		stdin    string
 		output   shared.CommentableOptions
 		wantsErr bool
 	}{
@@ -31,6 +40,12 @@ func TestNewCmdComment(t *testing.T) {
 				Body:        "",
 			},
 			wantsErr: false,
+		},
+		{
+			name:     "two arguments",
+			input:    "1 2",
+			output:   shared.CommentableOptions{},
+			wantsErr: true,
 		},
 		{
 			name:  "pr number",
@@ -73,6 +88,27 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:  "body from stdin",
+			input: "1 --body-file -",
+			stdin: "this is on standard input",
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "this is on standard input",
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "body from file",
+			input: fmt.Sprintf("1 --body-file '%s'", tmpFile),
+			output: shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "a body from file",
+			},
+			wantsErr: false,
+		},
+		{
 			name:  "editor flag",
 			input: "1 --editor",
 			output: shared.CommentableOptions{
@@ -91,6 +127,12 @@ func TestNewCmdComment(t *testing.T) {
 				Body:        "",
 			},
 			wantsErr: false,
+		},
+		{
+			name:     "body and body-file flags",
+			input:    "1 --body 'test' --body-file 'test-file.txt'",
+			output:   shared.CommentableOptions{},
+			wantsErr: true,
 		},
 		{
 			name:     "editor and web flags",
@@ -120,13 +162,18 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			io, stdin, _, _ := iostreams.Test()
 			io.SetStdoutTTY(true)
 			io.SetStdinTTY(true)
 			io.SetStderrTTY(true)
 
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			}
+
 			f := &cmdutil.Factory{
 				IOStreams: io,
+				Browser:   &cmdutil.TestBrowser{},
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -177,7 +224,6 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -191,9 +237,6 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
-			},
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
@@ -206,7 +249,6 @@ func Test_commentRun(t *testing.T) {
 				EditSurvey: func() (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -219,7 +261,6 @@ func Test_commentRun(t *testing.T) {
 				Body:        "comment body",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockPullRequestFromNumber(t, reg)
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
@@ -233,16 +274,20 @@ func Test_commentRun(t *testing.T) {
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
-		tt.httpStubs(t, reg)
+		if tt.httpStubs != nil {
+			tt.httpStubs(t, reg)
+		}
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-		branch := func() (string, error) { return "", nil }
-		remotes := func() (context.Remotes, error) { return nil, nil }
 
 		tt.input.IO = io
 		tt.input.HttpClient = httpClient
-		tt.input.RetrieveCommentable = retrievePR(httpClient, baseRepo, branch, remotes, "123")
+		tt.input.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
+			return &api.PullRequest{
+				Number: 123,
+				URL:    "https://github.com/OWNER/REPO/pull/123",
+			}, ghrepo.New("OWNER", "REPO"), nil
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
@@ -251,17 +296,6 @@ func Test_commentRun(t *testing.T) {
 			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
-}
-
-func mockPullRequestFromNumber(_ *testing.T, reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequest": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/pull/123"
-			} } } }`),
-	)
 }
 
 func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {

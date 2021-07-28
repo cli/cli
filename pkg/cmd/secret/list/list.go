@@ -1,13 +1,15 @@
 package list
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
+	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmd/secret/shared"
@@ -20,25 +22,32 @@ import (
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	OrgName string
+	EnvName string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
+		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List secrets",
-		Long:  "List secrets for a repository or organization",
+		Long:  "List secrets for a repository, environment, or organization",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+				return err
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -49,18 +58,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List secrets for an environment")
 
 	return cmd
 }
 
 func listRun(opts *ListOptions) error {
-	c, err := opts.HttpClient()
+	client, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
 	}
-	client := api.NewClientFromHTTP(c)
 
 	orgName := opts.OrgName
+	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
@@ -72,9 +82,26 @@ func listRun(opts *ListOptions) error {
 
 	var secrets []*Secret
 	if orgName == "" {
-		secrets, err = getRepoSecrets(client, baseRepo)
+		if envName == "" {
+			secrets, err = getRepoSecrets(client, baseRepo)
+		} else {
+			secrets, err = getEnvSecrets(client, baseRepo, envName)
+		}
 	} else {
-		secrets, err = getOrgSecrets(client, orgName)
+		var cfg config.Config
+		var host string
+
+		cfg, err = opts.Config()
+		if err != nil {
+			return err
+		}
+
+		host, err = cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+
+		secrets, err = getOrgSecrets(client, host, orgName)
 	}
 
 	if err != nil {
@@ -131,8 +158,7 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client *api.Client, orgName string) ([]*Secret, error) {
-	host := ghinstance.OverridableDefault()
+func getOrgSecrets(client httpClient, host, orgName string) ([]*Secret, error) {
 	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
 	if err != nil {
 		return nil, err
@@ -146,14 +172,8 @@ func getOrgSecrets(client *api.Client, orgName string) ([]*Secret, error) {
 		if secret.SelectedReposURL == "" {
 			continue
 		}
-		u, err := url.Parse(secret.SelectedReposURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
-		}
-
 		var result responseData
-		err = client.REST(u.Host, "GET", u.Path[1:], nil, &result)
-		if err != nil {
+		if _, err := apiGet(client, secret.SelectedReposURL, &result); err != nil {
 			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
 		}
 		secret.NumSelectedRepos = result.TotalCount
@@ -162,7 +182,12 @@ func getOrgSecrets(client *api.Client, orgName string) ([]*Secret, error) {
 	return secrets, nil
 }
 
-func getRepoSecrets(client *api.Client, repo ghrepo.Interface) ([]*Secret, error) {
+func getEnvSecrets(client httpClient, repo ghrepo.Interface, envName string) ([]*Secret, error) {
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), envName)
+	return getSecrets(client, repo.RepoHost(), path)
+}
+
+func getRepoSecrets(client httpClient, repo ghrepo.Interface) ([]*Secret, error) {
 	return getSecrets(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/secrets",
 		ghrepo.FullName(repo)))
 }
@@ -171,13 +196,63 @@ type secretsPayload struct {
 	Secrets []*Secret
 }
 
-func getSecrets(client *api.Client, host, path string) ([]*Secret, error) {
-	result := secretsPayload{}
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
 
-	err := client.REST(host, "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
+func getSecrets(client httpClient, host, path string) ([]*Secret, error) {
+	var results []*Secret
+	url := fmt.Sprintf("%s%s?per_page=100", ghinstance.RESTPrefix(host), path)
+
+	for {
+		var payload secretsPayload
+		nextURL, err := apiGet(client, url, &payload)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, payload.Secrets...)
+
+		if nextURL == "" {
+			break
+		}
+		url = nextURL
 	}
 
-	return result.Secrets, nil
+	return results, nil
+}
+
+func apiGet(client httpClient, url string, data interface{}) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return "", api.HandleHTTPError(resp)
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(data); err != nil {
+		return "", err
+	}
+
+	return findNextPage(resp.Header.Get("Link")), nil
+}
+
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+
+func findNextPage(link string) string {
+	for _, m := range linkRE.FindAllStringSubmatch(link, -1) {
+		if len(m) >= 2 && m[2] == "next" {
+			return m[1]
+		}
+	}
+	return ""
 }

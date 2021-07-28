@@ -69,7 +69,10 @@ func statusRun(opts *StatusOptions) error {
 	statusInfo := map[string][]string{}
 
 	hostnames, err := cfg.Hosts()
-	if len(hostnames) == 0 || err != nil {
+	if err != nil {
+		return err
+	}
+	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
 			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
 		return cmdutil.SilentError

@@ -16,18 +16,25 @@ import (
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
+	"github.com/cli/cli/pkg/set"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
+
+type browser interface {
+	Browse(string) error
+}
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	SelectorArg string
 	WebMode     bool
 	Comments    bool
+	Exporter    cmdutil.Exporter
 
 	Now func() time.Time
 }
@@ -36,6 +43,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 		Now:        time.Now,
 	}
 
@@ -46,7 +54,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Display the title, body, and other information about an issue.
 
 			With '--web', open the issue in a web browser instead.
-    `),
+		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -65,6 +73,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
 }
@@ -74,9 +83,17 @@ func viewRun(opts *ViewOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, repo, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	loadComments := opts.Comments
+	if !loadComments && opts.Exporter != nil {
+		fields := set.NewStringSet()
+		fields.AddValues(opts.Exporter.Fields())
+		loadComments = fields.Contains("comments")
+	}
+
+	opts.IO.StartProgressIndicator()
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
@@ -86,26 +103,18 @@ func viewRun(opts *ViewOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
-	}
-
-	if opts.Comments {
-		opts.IO.StartProgressIndicator()
-		comments, err := api.CommentsForIssue(apiClient, repo, issue)
-		opts.IO.StopProgressIndicator()
-		if err != nil {
-			return err
-		}
-		issue.Comments = *comments
+		return opts.Browser.Browse(openURL)
 	}
 
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO.Out, issue, opts.IO.ColorEnabled())
+	}
 
 	if opts.IO.IsStdoutTTY() {
 		return printHumanIssuePreview(opts, issue)
@@ -116,12 +125,25 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue)
+	return printRawIssuePreview(opts.IO.Out, issue, opts.IO.ColorScheme())
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
+	apiClient := api.NewClientFromHTTP(client)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepoFn, selector)
+	if err != nil {
+		return issue, err
+	}
+
+	if loadComments {
+		err = preloadIssueComments(client, repo, issue)
+	}
+	return issue, err
+}
+
+func printRawIssuePreview(out io.Writer, issue *api.Issue, cs *iostreams.ColorScheme) error {
 	assignees := issueAssigneeList(*issue)
-	labels := shared.IssueLabelList(*issue)
+	labels := shared.IssueLabelList(*issue, cs)
 	projects := issueProjectList(*issue)
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
@@ -133,7 +155,12 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
+	var milestoneTitle string
+	if issue.Milestone != nil {
+		milestoneTitle = issue.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
@@ -146,7 +173,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(issue.Title))
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue.State),
@@ -166,7 +193,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue); labels != "" {
+	if labels := shared.IssueLabelList(*issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -174,7 +201,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if issue.Milestone.Title != "" {
+	if issue.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
@@ -186,7 +213,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(issue.Body, style, "")
+		md, err = markdown.Render(issue.Body, style)
 		if err != nil {
 			return err
 		}

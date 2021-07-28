@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -17,6 +16,7 @@ import (
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
@@ -28,6 +28,133 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCmdCreate(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		tty       bool
+		stdin     string
+		cli       string
+		wantsErr  bool
+		wantsOpts CreateOptions
+	}{
+		{
+			name:     "empty non-tty",
+			tty:      false,
+			cli:      "",
+			wantsErr: true,
+		},
+		{
+			name:     "empty tty",
+			tty:      true,
+			cli:      "",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "",
+				TitleProvided:       false,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "body from stdin",
+			tty:      false,
+			stdin:    "this is on standard input",
+			cli:      "-t mytitle -F -",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "this is on standard input",
+				BodyProvided:        true,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "body from file",
+			tty:      false,
+			cli:      fmt.Sprintf("-t mytitle -F '%s'", tmpFile),
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "a body from file",
+				BodyProvided:        true,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, stdout, stderr := iostreams.Test()
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			} else if tt.tty {
+				io.SetStdinTTY(true)
+				io.SetStdoutTTY(true)
+			}
+
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+
+			var opts *CreateOptions
+			cmd := NewCmdCreate(f, func(o *CreateOptions) error {
+				opts = o
+				return nil
+			})
+
+			args, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+			cmd.SetArgs(args)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, "", stderr.String())
+
+			assert.Equal(t, tt.wantsOpts.Body, opts.Body)
+			assert.Equal(t, tt.wantsOpts.BodyProvided, opts.BodyProvided)
+			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
+			assert.Equal(t, tt.wantsOpts.TitleProvided, opts.TitleProvided)
+			assert.Equal(t, tt.wantsOpts.Autofill, opts.Autofill)
+			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
+			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
+			assert.Equal(t, tt.wantsOpts.IsDraft, opts.IsDraft)
+			assert.Equal(t, tt.wantsOpts.MaintainerCanModify, opts.MaintainerCanModify)
+			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
+			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
+		})
+	}
+}
+
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
 }
@@ -38,8 +165,10 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 	io.SetStdinTTY(isTTY)
 	io.SetStderrTTY(isTTY)
 
+	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
 		IOStreams: io,
+		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -83,8 +212,9 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
 	}, err
 }
 
@@ -103,26 +233,13 @@ func TestPRCreate_nontty_web(t *testing.T) {
 
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
-	})
 
 	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-}
-
-func TestPRCreate_nontty_insufficient_flags(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	output, err := runCommand(http, nil, "feature", false, "")
-	assert.EqualError(t, err, "`--title` or `--fill` required when not running interactively")
-
-	assert.Equal(t, "", output.String())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
 func TestPRCreate_recover(t *testing.T) {
@@ -130,12 +247,7 @@ func TestPRCreate_recover(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -192,8 +304,9 @@ func TestPRCreate_recover(t *testing.T) {
 		},
 	})
 
-	tmpfile, err := ioutil.TempFile(os.TempDir(), "testrecover*")
+	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
+	defer tmpfile.Close()
 
 	state := prShared.IssueMetadataState{
 		Title:     "recovered title",
@@ -220,12 +333,7 @@ func TestPRCreate_nontty(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes" : [
-			] } } } }`),
-	)
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -262,12 +370,7 @@ func TestPRCreate(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -311,12 +414,7 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -360,12 +458,7 @@ func TestPRCreate_createFork(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 		httpmock.StatusStringResponse(201, `
@@ -427,12 +520,7 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -471,12 +559,7 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -517,12 +600,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes" : [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -567,12 +645,7 @@ func TestPRCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [
-		] } } } }
-		`))
+	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -673,15 +746,7 @@ func TestPRCreate_alreadyExists(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequests": { "nodes": [
-				{ "url": "https://github.com/OWNER/REPO/pull/123",
-				  "headRefName": "feature",
-					"baseRefName": "master" }
-			] } } } }`),
-	)
+	shared.RunCommandFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
 
 	_, err := runCommand(http, nil, "feature", true, `-t title -b body -H feature`)
 	assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
@@ -705,10 +770,6 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1", url)
-	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -719,6 +780,27 @@ func TestPRCreate_web(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
+}
+
+func TestPRCreate_webLongURL(t *testing.T) {
+	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
+	err := ioutil.WriteFile(longBodyFile, make([]byte, 9216), 0600)
+	require.NoError(t, err)
+
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+
+	_, err = runCommand(http, nil, "feature", false, fmt.Sprintf("--body-file '%s' --web --head=feature", longBodyFile))
+	require.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
 }
 
 func TestPRCreate_webProject(t *testing.T) {
@@ -759,10 +841,6 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-	cs.Register(`https://github\.com`, 0, "", func(args []string) {
-		url := strings.ReplaceAll(args[len(args)-1], "^", "")
-		assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?expand=1&projects=ORG%2F1", url)
-	})
 
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
@@ -773,6 +851,7 @@ func TestPRCreate_webProject(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -886,7 +965,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main",
 				HeadBranchLabel: "feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main...feature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1",
 			wantErr: false,
 		},
 		{
@@ -899,7 +978,7 @@ func Test_generateCompareURL(t *testing.T) {
 			state: prShared.IssueMetadataState{
 				Labels: []string{"one", "two three"},
 			},
-			want:    "https://github.com/OWNER/REPO/compare/a...b?expand=1&labels=one%2Ctwo+three",
+			want:    "https://github.com/OWNER/REPO/compare/a...b?body=&expand=1&labels=one%2Ctwo+three",
 			wantErr: false,
 		},
 		{
@@ -909,7 +988,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "main/trunk",
 				HeadBranchLabel: "owner:feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?body=&expand=1",
 			wantErr: false,
 		},
 	}

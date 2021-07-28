@@ -36,7 +36,7 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 			break
 		}
 		result := Result{}
-		resp, err := getResponse(client, pathF(page), &result)
+		resp, err := getResponse(client, repo.RepoHost(), pathF(page), &result)
 		if err != nil {
 			return nil, err
 		}
@@ -68,8 +68,8 @@ func getCommits(client *http.Client, repo ghrepo.Interface, maxCommits int) ([]*
 	return commits, nil
 }
 
-func getResponse(client *http.Client, path string, data interface{}) (*http.Response, error) {
-	url := ghinstance.RESTPrefix(ghinstance.OverridableDefault()) + path
+func getResponse(client *http.Client, host, path string, data interface{}) (*http.Response, error) {
+	url := ghinstance.RESTPrefix(host) + path
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

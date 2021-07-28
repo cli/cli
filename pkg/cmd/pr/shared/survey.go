@@ -110,7 +110,7 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		return err
 	}
 
-	if state.Body != "" && preBody != state.Body {
+	if preBody != state.Body {
 		state.MarkDirty()
 	}
 

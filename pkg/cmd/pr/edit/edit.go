@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
 	shared "github.com/cli/cli/pkg/cmd/pr/shared"
@@ -20,10 +19,8 @@ import (
 type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Branch     func() (string, error)
 
+	Finder          shared.PRFinder
 	Surveyor        Surveyor
 	Fetcher         EditableOptionsFetcher
 	EditorRetriever EditorRetriever
@@ -38,16 +35,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
-		Remotes:         f.Remotes,
-		Branch:          f.Branch,
 		Surveyor:        surveyor{},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
 	}
 
+	var bodyFile string
+
 	cmd := &cobra.Command{
-		Use:   "edit {<number> | <url>}",
+		Use:   "edit [<number> | <url> | <branch>]",
 		Short: "Edit a pull request",
+		Long: heredoc.Doc(`
+			Edit a pull request.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.
+		`),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
@@ -56,14 +59,37 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
-			opts.SelectorArg = args[0]
+			if len(args) > 0 {
+				opts.SelectorArg = args[0]
+			}
 
 			flags := cmd.Flags()
+
+			bodyProvided := flags.Changed("body")
+			bodyFileProvided := bodyFile != ""
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--body` or `--body-file`",
+				bodyProvided,
+				bodyFileProvided,
+			); err != nil {
+				return err
+			}
+			if bodyProvided || bodyFileProvided {
+				opts.Editable.Body.Edited = true
+				if bodyFileProvided {
+					b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
+					if err != nil {
+						return err
+					}
+					opts.Editable.Body.Value = string(b)
+				}
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
 			}
@@ -107,6 +133,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
 	cmd.Flags().StringVarP(&opts.Editable.Base.Value, "base", "B", "", "Change the base `branch` for this pull request")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add reviewers by their `login`.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`.")
@@ -122,13 +149,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 }
 
 func editRun(opts *EditOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "milestone"},
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -142,7 +167,9 @@ func editRun(opts *EditOptions) error {
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
 	editable.Projects.Default = pr.ProjectCards.ProjectNames()
-	editable.Milestone.Default = pr.Milestone.Title
+	if pr.Milestone != nil {
+		editable.Milestone.Default = pr.Milestone.Title
+	}
 
 	if opts.Interactive {
 		err = opts.Surveyor.FieldsToEdit(&editable)
@@ -150,6 +177,12 @@ func editRun(opts *EditOptions) error {
 			return err
 		}
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
 	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable)
