@@ -192,8 +192,9 @@ func parsePathFromFileArg(fileArg string) string {
 	if !hasRelativePrefix(fileArg) {
 		return fileArg
 	}
-	path := filepath.Join(git.PathFromRepoRoot(), fileArg)
-	match, _ := regexp.Match("(^\\.$)|(^\\.\\."+string(os.PathSeparator)+")", []byte(path))
+	path := filepath.Clean(filepath.Join(git.PathFromRepoRoot(), fileArg))
+	path = strings.ReplaceAll(path, "\\", "/")
+	match, _ := regexp.Match("(^\\.$)|(^\\.\\./)", []byte(path))
 	if match {
 		return ""
 	}

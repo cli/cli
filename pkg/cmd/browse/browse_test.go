@@ -360,7 +360,6 @@ func Test_parseFileArg(t *testing.T) {
 func Test_parsePathFromFileArg(t *testing.T) {
 
 	s := string(os.PathSeparator)
-	// tests assume path is pkg/cmd/browse
 	tests := []struct {
 		name         string
 		fileArg      string
