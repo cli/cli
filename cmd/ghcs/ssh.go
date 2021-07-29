@@ -48,7 +48,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v")
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)

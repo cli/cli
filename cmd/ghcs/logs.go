@@ -12,7 +12,9 @@ import (
 )
 
 func NewLogsCmd() *cobra.Command {
-	return &cobra.Command{
+	var tail bool
+
+	logsCmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Access Codespace logs",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -20,16 +22,20 @@ func NewLogsCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Logs(codespaceName)
+			return Logs(tail, codespaceName)
 		},
 	}
+
+	logsCmd.Flags().BoolVarP(&tail, "tail", "t", false, "Tail the logs")
+
+	return logsCmd
 }
 
 func init() {
 	rootCmd.AddCommand(NewLogsCmd())
 }
 
-func Logs(codespaceName string) error {
+func Logs(tail bool, codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -53,9 +59,14 @@ func Logs(codespaceName string) error {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
 
+	cmdType := "cat"
+	if tail {
+		cmdType = "tail -f"
+	}
+
 	dst := fmt.Sprintf("%s@localhost", getSSHUser(codespace))
 	stdout, err := codespaces.RunCommand(
-		ctx, tunnelPort, dst, "cat /workspaces/.codespaces/.persistedshare/creation.log",
+		ctx, tunnelPort, dst, fmt.Sprintf("%v /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 	if err != nil {
 		return fmt.Errorf("run command: %v", err)
