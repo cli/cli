@@ -7,6 +7,7 @@ import (
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/pr/close"
 	cmdComment "github.com/cli/cli/v2/pkg/cmd/pr/comment"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/pr/create"
+	cmdDif "github.com/cli/cli/v2/pkg/cmd/pr/dif"
 	cmdDiff "github.com/cli/cli/v2/pkg/cmd/pr/diff"
 	cmdEdit "github.com/cli/cli/v2/pkg/cmd/pr/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/pr/list"
@@ -47,6 +48,7 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
 	cmd.AddCommand(cmdDiff.NewCmdDiff(f, nil))
+	cmd.AddCommand(cmdDif.NewCmdDif(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdMerge.NewCmdMerge(f, nil))
 	cmd.AddCommand(cmdReady.NewCmdReady(f, nil))
