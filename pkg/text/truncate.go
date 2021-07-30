@@ -1,6 +1,8 @@
 package text
 
 import (
+	"regexp"
+
 	runewidth "github.com/mattn/go-runewidth"
 	"github.com/rivo/uniseg"
 )
@@ -10,8 +12,11 @@ const (
 	minWidthForEllipsis = 5
 )
 
+var reColorSequence = regexp.MustCompile(`\x1B\[(:?\d+;)*\d+m`)
+
 // DisplayWidth calculates what the rendered width of a string may be
 func DisplayWidth(s string) int {
+	s = reColorSequence.ReplaceAllString(s, "")
 	g := uniseg.NewGraphemes(s)
 	w := 0
 	for g.Next() {

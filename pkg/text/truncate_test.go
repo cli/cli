@@ -149,6 +149,16 @@ func TestDisplayWidth(t *testing.T) {
 			text: `é́́`,
 			want: 1,
 		},
+		{
+			name: "256 bit color sequence",
+			text: "\x1b[38;2;215;58;74mbug\x1b[0m",
+			want: 3,
+		},
+		{
+			name: "4 bit color sequence",
+			text: "\x1b[31mbug\x1b[0m",
+			want: 3,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
