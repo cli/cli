@@ -33,7 +33,7 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 			table.AddField(issue.State, nil, nil)
 		}
 		table.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
-		table.AddField(labels, truncateLabels, cs.Gray)
+		table.AddField(labels, truncateLabels, nil)
 		if table.IsTTY() {
 			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
 		} else {
