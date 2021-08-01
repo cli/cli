@@ -32,7 +32,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "close {<number> | <url>}",
 		Short: "Close issue",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -53,6 +53,14 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 
 func closeRun(opts *CloseOptions) error {
 	cs := opts.IO.ColorScheme()
+
+	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
+		issueNumber, err := shared.SelectFrecent()
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = issueNumber
+	}
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
