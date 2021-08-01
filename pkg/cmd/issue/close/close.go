@@ -32,7 +32,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "close {<number> | <url>}",
 		Short: "Close issue",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -58,6 +58,15 @@ func closeRun(opts *CloseOptions) error {
 	if err != nil {
 		return err
 	}
+	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
+		baseRepo, err := opts.BaseRepo()
+		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = issueNumber
+	}
+
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
@@ -68,6 +77,12 @@ func closeRun(opts *CloseOptions) error {
 	if issue.State == "CLOSED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
+	}
+
+	err = shared.UpdateFrecent(issue.Number)
+	if err != nil {
+		// TODO just warn or ignore or whatever
+		return err
 	}
 
 	err = api.IssueClose(apiClient, baseRepo, *issue)

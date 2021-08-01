@@ -35,7 +35,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "delete {<number> | <url>}",
 		Short: "Delete issue",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -62,9 +62,23 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
+	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
+		baseRepo, err := opts.BaseRepo()
+		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = issueNumber
+	}
 
 	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
+		return err
+	}
+
+	err = shared.UpdateFrecent(issue.Number)
+	if err != nil {
+		// TODO just warn or ignore or whatever
 		return err
 	}
 
