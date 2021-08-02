@@ -79,6 +79,12 @@ func closeRun(opts *CloseOptions) error {
 		return nil
 	}
 
+	err = shared.UpdateFrecent(issue.Number)
+	if err != nil {
+		// TODO just warn or ignore or whatever
+		return err
+	}
+
 	err = api.IssueClose(apiClient, baseRepo, *issue)
 	if err != nil {
 		return err

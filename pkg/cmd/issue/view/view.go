@@ -55,7 +55,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			With '--web', open the issue in a web browser instead.
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -83,6 +83,14 @@ func viewRun(opts *ViewOptions) error {
 	if err != nil {
 		return err
 	}
+	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
+		baseRepo, err := opts.BaseRepo()
+		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = issueNumber
+	}
 
 	loadComments := opts.Comments
 	if !loadComments && opts.Exporter != nil {
@@ -95,6 +103,12 @@ func viewRun(opts *ViewOptions) error {
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		return err
+	}
+
+	err = shared.UpdateFrecent(issue.Number)
+	if err != nil {
+		// TODO just warn or ignore or whatever
 		return err
 	}
 
