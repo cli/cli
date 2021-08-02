@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -15,15 +16,53 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func sortByFrecent(issues []api.Issue, frecent map[string]CountEntry) []string {
-	return []string{"1234", "4567"}
+type ByFrecency []issueWithStats
 
+func (f ByFrecency) Len() int {
+	return len(f)
+}
+func (f ByFrecency) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+func (f ByFrecency) Less(i, j int) bool {
+	iScore := f[i].CountEntry.Score()
+	jScore := f[j].CountEntry.Score()
+	return iScore > jScore
+}
+
+type issueWithStats struct {
+	api.Issue
+	CountEntry
+}
+
+func sortByFrecent(issues []api.Issue, frecent map[int]CountEntry) []string {
+	withStats := []issueWithStats{}
+	for _, i := range issues {
+		entry, ok := frecent[i.Number]
+		if !ok {
+			entry = CountEntry{}
+		}
+		withStats = append(withStats, issueWithStats{
+			Issue:      i,
+			CountEntry: entry,
+		})
+	}
+	sort.Stable(ByFrecency(withStats))
+	choices := []string{}
+	for _, ws := range withStats {
+		choices = append(choices, fmt.Sprintf("%d", ws.Number))
+	}
+	return choices
 }
 
 func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
 	client := api.NewCachedClient(c, time.Hour*6)
 
 	issues, err := getIssues(client, repo)
+	if err != nil {
+		return "", err
+	}
+
 	frecent, err := getFrecentEntry(defaultFrecentPath())
 	if err != nil {
 		return "", err
@@ -48,8 +87,29 @@ type CountEntry struct {
 	Count int
 }
 
+func (c CountEntry) Score() int {
+	if c.Count == 0 {
+		return 0
+	}
+	duration := c.Last
+	recencyScore := 10
+	if duration < 1*time.Hour {
+		recencyScore = 100
+	} else if duration < 6*time.Hour {
+		recencyScore = 80
+	} else if duration < 24*time.Hour {
+		recencyScore = 60
+	} else if duration < 3*24*time.Hour {
+		recencyScore = 40
+	} else if duration < 7*24*time.Hour {
+		recencyScore = 20
+	}
+
+	return c.Count * recencyScore
+}
+
 type FrecentEntry struct {
-	Issues map[string]CountEntry
+	Issues map[int]CountEntry
 }
 
 func defaultFrecentPath() string {
@@ -135,13 +195,11 @@ func getIssues(c *http.Client, repo ghrepo.Interface) ([]api.Issue, error) {
 	query := `query GetIssueNumbers($owner: String!, $repo: String!) {
 		repository(owner: $owner, name: $repo) {
 			issues(first:100, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN]) {
-				nodes {
-				  edge {
-					  number
+			    nodes {
+					 number
 					}
 				}
 			}
-		}
   }`
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
