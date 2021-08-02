@@ -55,7 +55,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --body-file body.txt
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -137,9 +137,22 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
+	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
+		baseRepo, err := opts.BaseRepo()
+		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = issueNumber
+	}
 
 	issue, repo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
 	if err != nil {
+		return err
+	}
+	err = shared.UpdateFrecent(issue.Number)
+	if err != nil {
+		// TODO just warn or ignore or whatever
 		return err
 	}
 
