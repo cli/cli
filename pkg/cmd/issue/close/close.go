@@ -54,18 +54,19 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 func closeRun(opts *CloseOptions) error {
 	cs := opts.IO.ColorScheme()
 
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
 	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
-		issueNumber, err := shared.SelectFrecent()
+		baseRepo, err := opts.BaseRepo()
+		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
 		if err != nil {
 			return err
 		}
 		opts.SelectorArg = issueNumber
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
