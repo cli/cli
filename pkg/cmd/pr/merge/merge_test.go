@@ -315,7 +315,7 @@ func TestPrMerge_blocked(t *testing.T) {
 	assert.Equal(t, heredoc.Docf(`
 		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
-		To use administrator privileges to merge the pull request, add the %[1]s--admin%[1]s flag.
+		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
 		`, "`"), output.Stderr())
 }
 
