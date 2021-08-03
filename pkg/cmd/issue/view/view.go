@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -143,7 +142,7 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue, cs *iostreams.ColorScheme) error {
 	assignees := issueAssigneeList(*issue)
-	labels := shared.IssueLabelList(*issue, cs)
+	labels := issueShared.IssueLabelList(*issue, cs, false)
 	projects := issueProjectList(*issue)
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
@@ -193,7 +192,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue, cs); labels != "" {
+	if labels := issueShared.IssueLabelList(*issue, cs, false); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}

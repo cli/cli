@@ -22,7 +22,7 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		labels := IssueLabelList(issue, cs)
+		labels := IssueLabelList(issue, cs, true)
 		if labels != "" && table.IsTTY() {
 			labels = fmt.Sprintf("(%s)", labels)
 		}
@@ -56,14 +56,18 @@ func truncateLabels(w int, t string) string {
 	return fmt.Sprintf("(%s)", truncated)
 }
 
-func IssueLabelList(issue api.Issue, cs *iostreams.ColorScheme) string {
+func IssueLabelList(issue api.Issue, cs *iostreams.ColorScheme, insideCol bool) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
 	}
 
 	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
-		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+		labelName := label.Name
+		if !insideCol {
+			labelName = cs.HexToRGB(label.Color, label.Name)
+		}
+		labelNames = append(labelNames, labelName)
 	}
 
 	return strings.Join(labelNames, ", ")
