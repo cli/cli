@@ -40,6 +40,7 @@ type MergeOptions struct {
 	BodySet bool
 	Editor  editor
 
+	UseAdmin                bool
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
 	InteractiveMode         bool
@@ -110,6 +111,15 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			bodyFileProvided := bodyFile != ""
 
 			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--auto`, `--disable-auto`, or `--admin`",
+				opts.AutoMergeEnable,
+				opts.AutoMergeDisable,
+				opts.UseAdmin,
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--body` or `--body-file`",
 				bodyProvided,
 				bodyFileProvided,
@@ -140,6 +150,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.UseAdmin, "admin", false, "Use administrator privileges to merge a pull request that does not meet requirements")
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
@@ -192,9 +203,13 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	isPRAlreadyMerged := pr.State == "MERGED"
-	if blocked := blockedReason(pr.MergeStateStatus); !opts.AutoMergeEnable && !isPRAlreadyMerged && blocked != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, blocked)
+	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
 		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
+			// TODO: show this flag only to repo admins
+			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
+		}
 		return cmdutil.SilentError
 	}
 
@@ -455,16 +470,31 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 }
 
 // blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
-func blockedReason(status string) string {
+func blockedReason(status string, useAdmin bool) string {
 	switch status {
 	case "BLOCKED":
+		if useAdmin {
+			return ""
+		}
 		return "the base branch policy prohibits the merge"
 	case "BEHIND":
+		if useAdmin {
+			return ""
+		}
 		return "the head branch is not up to date with the base branch"
 	case "DIRTY":
 		return "the merge commit cannot be cleanly created"
 	default:
 		return ""
+	}
+}
+
+func allowsAdminOverride(status string) bool {
+	switch status {
+	case "BLOCKED", "BEHIND":
+		return true
+	default:
+		return false
 	}
 }
 
