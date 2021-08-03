@@ -108,16 +108,11 @@ func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
 			isLocal = true
 			if f.Mode()&os.ModeSymlink == 0 {
 				// if this is a regular file, its contents is the local directory of the extension
-				exeFile, err := os.Open(filepath.Join(dir, f.Name()))
+				p, err := readPathFromFile(filepath.Join(dir, f.Name()))
 				if err != nil {
 					return nil, err
 				}
-				b := make([]byte, 1024)
-				n, err := exeFile.Read(b)
-				if err != nil {
-					return nil, err
-				}
-				exePath = filepath.Join(strings.TrimSpace(string(b[:n])), f.Name())
+				exePath = filepath.Join(p, f.Name())
 			}
 		}
 		results = append(results, &Extension{
@@ -271,4 +266,15 @@ func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func readPathFromFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	b := make([]byte, 1024)
+	n, err := f.Read(b)
+	return strings.TrimSpace(string(b[:n])), err
 }
