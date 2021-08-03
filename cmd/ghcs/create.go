@@ -9,6 +9,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/camelcase"
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,7 @@ var repo, branch, machine string
 func newCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
-    Short: "Create a GitHub Codespace.",
+		Short: "Create a GitHub Codespace.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Create()
 		},
@@ -78,6 +79,36 @@ func Create() error {
 	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %v", err)
+	}
+
+	states, err := codespaces.PollPostCreateStates(ctx, apiClient, userResult.User, codespace)
+	if err != nil {
+		return fmt.Errorf("poll post create states: %v", err)
+	}
+
+	for {
+		select {
+		case stateUpdate := <-states:
+			if stateUpdate.Err != nil {
+				return fmt.Errorf("receive state update: %v", err)
+			}
+
+			var inProgress bool
+			for _, state := range stateUpdate.PostCreateStates {
+				fmt.Print(state.Name)
+				switch state.Status {
+				case codespaces.PostCreateStateRunning:
+					inProgress = true
+				case codespaces.PostCreateStateFailed:
+					fmt.Print("...Failed")
+				}
+				fmt.Print("\n")
+			}
+
+			if !inProgress {
+				break
+			}
+		}
 	}
 
 	fmt.Println("Codespace created: " + codespace.Name)
