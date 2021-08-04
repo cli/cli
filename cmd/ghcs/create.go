@@ -86,6 +86,10 @@ func Create() error {
 		return fmt.Errorf("poll post create states: %v", err)
 	}
 
+	var lastState codespaces.PostCreateState
+	var breakNextState bool
+
+PollStates:
 	for {
 		select {
 		case stateUpdate := <-states:
@@ -95,18 +99,35 @@ func Create() error {
 
 			var inProgress bool
 			for _, state := range stateUpdate.PostCreateStates {
-				fmt.Print(state.Name)
 				switch state.Status {
 				case codespaces.PostCreateStateRunning:
+					if lastState != state {
+						lastState = state
+						fmt.Print(state.Name)
+					} else {
+						fmt.Print(".")
+					}
+
 					inProgress = true
+					break
 				case codespaces.PostCreateStateFailed:
-					fmt.Print("...Failed")
+					if lastState.Name == state.Name && lastState.Status != state.Status {
+						lastState = state
+						fmt.Print(".Failed\n")
+					}
+				case codespaces.PostCreateStateSuccess:
+					if lastState.Name == state.Name && lastState.Status != state.Status {
+						lastState = state
+						fmt.Print(".Success\n")
+					}
 				}
-				fmt.Print("\n")
 			}
 
-			if !inProgress {
-				break
+			switch {
+			case !inProgress && !breakNextState:
+				breakNextState = true
+			case !inProgress && breakNextState:
+				break PollStates
 			}
 		}
 	}

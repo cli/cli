@@ -23,7 +23,7 @@ type PostCreateStatesResult struct {
 	Err              error
 }
 
-type PostCreateStates []*PostCreateState
+type PostCreateStates []PostCreateState
 
 type PostCreateState struct {
 	Name   string                `json:"name"`
@@ -38,7 +38,7 @@ func PollPostCreateStates(ctx context.Context, apiClient *api.API, user *api.Use
 		return nil, fmt.Errorf("getting codespace token: %v", err)
 	}
 
-	lsclient, err := ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return nil, fmt.Errorf("connect to liveshare: %v", err)
 	}

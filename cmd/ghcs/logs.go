@@ -49,7 +49,7 @@ func Logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}

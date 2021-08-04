@@ -61,7 +61,7 @@ func Ports() error {
 		return fmt.Errorf("error getting codespace token: %v", err)
 	}
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -214,7 +214,7 @@ func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -276,7 +276,7 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
