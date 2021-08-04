@@ -71,7 +71,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 			case "zsh":
 				return rootCmd.GenZshCompletion(w)
 			case "powershell":
-				return rootCmd.GenPowerShellCompletion(w)
+				return rootCmd.GenPowerShellCompletionWithDesc(w)
 			case "fish":
 				return rootCmd.GenFishCompletion(w, true)
 			default:
