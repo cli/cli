@@ -40,31 +40,28 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		Use:   "sync [<destination-repository>]",
 		Short: "Sync a repository",
 		Long: heredoc.Docf(`
-			Sync destination repository from source repository. Syncing will take a branch
-			on the source repository and merge it into the branch of the same name on the
-			destination repository. A fast forward merge will be used execept when the
-			%[1]s--force%[1]s flag is specified, then the two branches will by synced using
-			a hard reset.
+			Sync destination repository from source repository. Syncing uses the main branch
+			of the source repository to update the matching branch on the destination
+			repository so they are equal. A fast forward update will be used execept when the
+			%[1]s--force%[1]s flag is specified, then the two branches will
+			by synced using a hard reset.
 
 			Without an argument, the local repository is selected as the destination repository.
 
-			By default the source repository is the parent of the destination repository,
-			this can be overridden with the %[1]s--source%[1]s flag.
-
-			The source repository default branch is selected automatically, but can be
-			overridden with the %[1]s--branch%[1]s flag.
+			The source repository is the parent of the destination repository by default.
+			This can be overridden with the %[1]s--source%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Sync local repository from remote parent
 			$ gh repo sync
 
-			# Sync local repository from remote parent on non-default branch
+			# Sync local repository from remote parent on specific branch
 			$ gh repo sync --branch v1
 
-			# Sync remote fork from remote parent
+			# Sync remote fork from its parent
 			$ gh repo sync owner/cli-fork
 
-			# Sync remote repo from another remote repo
+			# Sync remote repository from another remote repository
 			$ gh repo sync owner/repo --source owner2/repo2
 		`),
 		Args: cobra.MaximumNArgs(1),
@@ -80,8 +77,8 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.SrcArg, "source", "s", "", "Source repository")
-	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "", false, "Discard destination repository changes")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync (default: main branch)")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "", false, "Hard reset the branch of the destination repository to match the source repository")
 	return cmd
 }
 
@@ -150,7 +147,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, divergingError) {
-			return fmt.Errorf("can't sync because there are diverging changes, you can use `--force` to overwrite the changes")
+			return fmt.Errorf("can't sync because there are diverging changes; use `--force` to overwrite the destination branch")
 		}
 		if errors.Is(err, mismatchRemotesError) {
 			return fmt.Errorf("can't sync because %s is not tracking %s", opts.Branch, ghrepo.FullName(srcRepo))
@@ -160,10 +157,10 @@ func syncLocalRepo(opts *SyncOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		srcStr := fmt.Sprintf("%s:%s", ghrepo.FullName(srcRepo), opts.Branch)
-		destStr := fmt.Sprintf(".:%s", opts.Branch)
-		success := fmt.Sprintf("Synced %s from %s\n", cs.Bold(destStr), cs.Bold(srcStr))
-		fmt.Fprintf(opts.IO.Out, "%s %s", cs.SuccessIcon(), success)
+		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from %s to local repository\n",
+			cs.SuccessIcon(),
+			opts.Branch,
+			ghrepo.FullName(srcRepo))
 	}
 
 	return nil
@@ -191,7 +188,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 			return err
 		}
 		if srcRepo == nil {
-			return fmt.Errorf("can't determine source repo for %s because repo is not fork", ghrepo.FullName(destRepo))
+			return fmt.Errorf("can't determine source repository for %s because repository is not fork", ghrepo.FullName(destRepo))
 		}
 	} else {
 		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
@@ -201,7 +198,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	}
 
 	if destRepo.RepoHost() != srcRepo.RepoHost() {
-		return fmt.Errorf("can't sync repos from different hosts")
+		return fmt.Errorf("can't sync repositories from different hosts")
 	}
 
 	if opts.Branch == "" {
@@ -225,10 +222,11 @@ func syncRemoteRepo(opts *SyncOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		srcStr := fmt.Sprintf("%s:%s", ghrepo.FullName(srcRepo), opts.Branch)
-		destStr := fmt.Sprintf("%s:%s", ghrepo.FullName(destRepo), opts.Branch)
-		success := fmt.Sprintf("Synced %s from %s\n", cs.Bold(destStr), cs.Bold(srcStr))
-		fmt.Fprintf(opts.IO.Out, "%s %s", cs.SuccessIcon(), success)
+		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from %s to %s\n",
+			cs.SuccessIcon(),
+			opts.Branch,
+			ghrepo.FullName(srcRepo),
+			ghrepo.FullName(destRepo))
 	}
 
 	return nil
