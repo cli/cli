@@ -73,7 +73,7 @@ func Delete(codespaceName string) error {
 
 	fmt.Println("Codespace deleted.")
 
-	return List()
+	return List(&ListOptions{})
 }
 
 func DeleteAll() error {
@@ -103,7 +103,7 @@ func DeleteAll() error {
 		fmt.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
-	return List()
+	return List(&ListOptions{})
 }
 
 func DeleteByRepo(repo string) error {
@@ -143,5 +143,5 @@ func DeleteByRepo(repo string) error {
 		fmt.Printf("No codespace was found for repository: %s\n", repo)
 	}
 
-	return List()
+	return List(&ListOptions{})
 }
