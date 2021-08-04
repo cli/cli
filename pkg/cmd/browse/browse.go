@@ -203,5 +203,6 @@ func parsePathFromFileArg(fileArg string) string {
 
 func hasRelativePrefix(fileArg string) bool {
 	return strings.HasPrefix(fileArg, ".."+string(os.PathSeparator)) ||
-		strings.HasPrefix(fileArg, "."+string(os.PathSeparator))
+		strings.HasPrefix(fileArg, "."+string(os.PathSeparator)) ||
+		fileArg == "."
 }

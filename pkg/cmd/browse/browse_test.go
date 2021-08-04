@@ -371,6 +371,21 @@ func Test_parsePathFromFileArg(t *testing.T) {
 			expectedPath: "pkg/cmd",
 		},
 		{
+			name:         "current folder",
+			fileArg:      ".",
+			expectedPath: "pkg/cmd/browse",
+		},
+		{
+			name:         "current folder (alternative)",
+			fileArg:      "./",
+			expectedPath: "pkg/cmd/browse",
+		},
+		{
+			name:         "file that starts with '.'",
+			fileArg:      ".gitignore",
+			expectedPath: ".gitignore",
+		},
+		{
 			name:         "file in current folder",
 			fileArg:      "." + s + "browse.go",
 			expectedPath: "pkg/cmd/browse/browse.go",
