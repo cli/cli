@@ -377,7 +377,7 @@ func Test_parsePathFromFileArg(t *testing.T) {
 		},
 		{
 			name:         "current folder (alternative)",
-			fileArg:      "./",
+			fileArg:      "." + s,
 			expectedPath: "pkg/cmd/browse",
 		},
 		{
