@@ -123,14 +123,14 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", "trunk", "origin/trunk").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+				mgc.On("MergeFastForward", "refs/remotes/origin/trunk").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
 		},
 		{
 			name: "sync local repo with parent - notty",
@@ -143,12 +143,12 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", "trunk", "origin/trunk").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
+				mgc.On("MergeFastForward", "refs/remotes/origin/trunk").Return(nil).Once()
 			},
 			wantStdout: "",
 		},
@@ -165,14 +165,14 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"upstream", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "upstream", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "upstream/trunk"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", "trunk", "upstream/trunk").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/upstream/trunk"}).Return(nil).Once()
+				mgc.On("MergeFastForward", "refs/remotes/upstream/trunk").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced .:trunk from OWNER2/REPO2:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and specified branch",
@@ -182,14 +182,14 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/test"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"test"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/test").Return(nil).Once()
+				mgc.On("HasLocalBranch", "test").Return(true).Once()
 				mgc.On("BranchRemote", "test").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"test", "origin/test"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", "test", "origin/test").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/test"}).Return(nil).Once()
+				mgc.On("MergeFastForward", "refs/remotes/origin/test").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced .:test from OWNER/REPO:test\n",
+			wantStdout: "✓ Synced the \"test\" branch from OWNER/REPO to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and force specified",
@@ -204,14 +204,14 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
+				mgc.On("IsAncestor", "trunk", "origin/trunk").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("Reset", []string{"--hard", "refs/remotes/origin/trunk"}).Return(nil).Once()
+				mgc.On("ResetHard", "refs/remotes/origin/trunk").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and not fast forward merge",
@@ -224,13 +224,13 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(false, nil).Once()
+				mgc.On("IsAncestor", "trunk", "origin/trunk").Return(false, nil).Once()
 			},
 			wantErr: true,
-			errMsg:  "can't sync because there are diverging changes, you can use `--force` to overwrite the changes",
+			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
 		},
 		{
 			name: "sync local repo with parent and mismatching branch remotes",
@@ -243,8 +243,8 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
 			},
 			wantErr: true,
@@ -271,16 +271,16 @@ func Test_SyncRun(t *testing.T) {
 			},
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("Fetch", []string{"origin", "+refs/heads/trunk"}).Return(nil).Once()
-				mgc.On("HasLocalBranch", []string{"trunk"}).Return(true).Once()
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
-				mgc.On("IsAncestor", []string{"trunk", "origin/trunk"}).Return(true, nil).Once()
+				mgc.On("IsAncestor", "trunk", "origin/trunk").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
-				mgc.On("Checkout", []string{"trunk"}).Return(nil).Once()
-				mgc.On("Merge", []string{"--ff-only", "refs/remotes/origin/trunk"}).Return(nil).Once()
-				mgc.On("Checkout", []string{"test"}).Return(nil).Once()
+				mgc.On("CheckoutLocal", "trunk").Return(nil).Once()
+				mgc.On("MergeFastForward", "refs/remotes/origin/trunk").Return(nil).Once()
+				mgc.On("CheckoutLocal", "test").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced .:trunk from OWNER/REPO:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
 		},
 		{
 			name: "sync remote fork with parent - tty",
@@ -302,7 +302,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced OWNER/REPO-FORK:trunk from OWNER/REPO:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
 		},
 		{
 			name: "sync remote fork with parent - notty",
@@ -338,7 +338,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{}}}`))
 			},
 			wantErr: true,
-			errMsg:  "can't determine source repo for OWNER/REPO because repo is not fork",
+			errMsg:  "can't determine source repository for OWNER/REPO because repository is not fork",
 		},
 		{
 			name: "sync remote repo with specified source repo",
@@ -358,7 +358,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced OWNER/REPO:trunk from OWNER2/REPO2:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to OWNER/REPO\n",
 		},
 		{
 			name: "sync remote fork with parent and specified branch",
@@ -378,7 +378,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/test"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced OWNER/REPO-FORK:test from OWNER/REPO:test\n",
+			wantStdout: "✓ Synced the \"test\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
 		},
 		{
 			name: "sync remote fork with parent and force specified",
@@ -401,7 +401,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced OWNER/REPO-FORK:trunk from OWNER/REPO:trunk\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
 		},
 		{
 			name: "sync remote fork with parent and not fast forward merge",
@@ -431,7 +431,7 @@ func Test_SyncRun(t *testing.T) {
 					})
 			},
 			wantErr: true,
-			errMsg:  "can't sync because there are diverging changes, you can use `--force` to overwrite the changes",
+			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
 		},
 	}
 	for _, tt := range tests {

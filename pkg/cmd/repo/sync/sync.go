@@ -215,7 +215,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, divergingError) {
-			return fmt.Errorf("can't sync because there are diverging changes, you can use `--force` to overwrite the changes")
+			return fmt.Errorf("can't sync because there are diverging changes; use `--force` to overwrite the destination branch")
 		}
 		return err
 	}
