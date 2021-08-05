@@ -239,7 +239,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	git := opts.Git
 	branch := opts.Branch
 
-	if err := git.Fetch([]string{remote, fmt.Sprintf("+refs/heads/%s", branch)}); err != nil {
+	if err := git.Fetch([]string{remote, fmt.Sprintf("refs/heads/%s", branch)}); err != nil {
 		return err
 	}
 
