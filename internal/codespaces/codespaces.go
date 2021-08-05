@@ -111,3 +111,35 @@ func ConnectToLiveshare(ctx context.Context, apiClient *api.API, token string, c
 
 	return lsclient, nil
 }
+
+func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
+	if codespaceName == "" {
+		codespace, err = ChooseCodespace(ctx, apiClient, user)
+		if err != nil {
+			if err == ErrNoCodespaces {
+				fmt.Println(err.Error())
+				return nil, "", nil
+			}
+
+			return nil, "", fmt.Errorf("choosing codespace: %v", err)
+		}
+		codespaceName = codespace.Name
+
+		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		if err != nil {
+			return nil, "", fmt.Errorf("getting codespace token: %v", err)
+		}
+	} else {
+		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		if err != nil {
+			return nil, "", fmt.Errorf("getting codespace token for given codespace: %v", err)
+		}
+
+		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
+		if err != nil {
+			return nil, "", fmt.Errorf("getting full codespace details: %v", err)
+		}
+	}
+
+	return codespace, token, nil
+}
