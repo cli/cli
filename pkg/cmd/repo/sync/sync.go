@@ -239,8 +239,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	git := opts.Git
 	branch := opts.Branch
 
-	err := git.Fetch([]string{remote, fmt.Sprintf("+refs/heads/%s", branch)})
-	if err != nil {
+	if err := git.Fetch([]string{remote, fmt.Sprintf("+refs/heads/%s", branch)}); err != nil {
 		return err
 	}
 
@@ -270,33 +269,28 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	}
 	if startBranch != branch {
 		if hasLocalBranch {
-			err = git.Checkout([]string{branch})
-			if err != nil {
+			if err := git.Checkout([]string{branch}); err != nil {
 				return err
 			}
 		} else {
-			err = git.Checkout([]string{"--track", fmt.Sprintf("%s/%s", remote, branch)})
-			if err != nil {
+			if err := git.Checkout([]string{"--track", fmt.Sprintf("%s/%s", remote, branch)}); err != nil {
 				return err
 			}
 		}
 	}
 	if hasLocalBranch {
 		if opts.Force {
-			err = git.Reset([]string{"--hard", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
-			if err != nil {
+			if err := git.Reset([]string{"--hard", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)}); err != nil {
 				return err
 			}
 		} else {
-			err = git.Merge([]string{"--ff-only", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)})
-			if err != nil {
+			if err := git.Merge([]string{"--ff-only", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)}); err != nil {
 				return err
 			}
 		}
 	}
 	if startBranch != branch {
-		err = git.Checkout([]string{startBranch})
-		if err != nil {
+		if err := git.Checkout([]string{startBranch}); err != nil {
 			return err
 		}
 	}
