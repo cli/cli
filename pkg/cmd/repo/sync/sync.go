@@ -239,11 +239,11 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	git := opts.Git
 	branch := opts.Branch
 
-	if err := git.Fetch([]string{remote, fmt.Sprintf("refs/heads/%s", branch)}); err != nil {
+	if err := git.Fetch(remote, fmt.Sprintf("refs/heads/%s", branch)); err != nil {
 		return err
 	}
 
-	hasLocalBranch := git.HasLocalBranch([]string{branch})
+	hasLocalBranch := git.HasLocalBranch(branch)
 	if hasLocalBranch {
 		branchRemote, err := git.BranchRemote(branch)
 		if err != nil {
@@ -253,7 +253,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 			return mismatchRemotesError
 		}
 
-		fastForward, err := git.IsAncestor([]string{branch, fmt.Sprintf("%s/%s", remote, branch)})
+		fastForward, err := git.IsAncestor(branch, fmt.Sprintf("%s/%s", remote, branch))
 		if err != nil {
 			return err
 		}
@@ -269,28 +269,28 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	}
 	if startBranch != branch {
 		if hasLocalBranch {
-			if err := git.Checkout([]string{branch}); err != nil {
+			if err := git.CheckoutLocal(branch); err != nil {
 				return err
 			}
 		} else {
-			if err := git.Checkout([]string{"--track", fmt.Sprintf("%s/%s", remote, branch)}); err != nil {
+			if err := git.CheckoutRemote(remote, branch); err != nil {
 				return err
 			}
 		}
 	}
 	if hasLocalBranch {
 		if opts.Force {
-			if err := git.Reset([]string{"--hard", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)}); err != nil {
+			if err := git.ResetHard(fmt.Sprintf("refs/remotes/%s/%s", remote, branch)); err != nil {
 				return err
 			}
 		} else {
-			if err := git.Merge([]string{"--ff-only", fmt.Sprintf("refs/remotes/%s/%s", remote, branch)}); err != nil {
+			if err := git.MergeFastForward(fmt.Sprintf("refs/remotes/%s/%s", remote, branch)); err != nil {
 				return err
 			}
 		}
 	}
 	if startBranch != branch {
-		if err := git.Checkout([]string{startBranch}); err != nil {
+		if err := git.CheckoutLocal(startBranch); err != nil {
 			return err
 		}
 	}

@@ -9,14 +9,15 @@ import (
 
 type gitClient interface {
 	BranchRemote(string) (string, error)
-	Checkout([]string) error
+	CheckoutLocal(string) error
+	CheckoutRemote(string, string) error
 	CurrentBranch() (string, error)
-	Fetch([]string) error
-	HasLocalBranch([]string) bool
-	IsAncestor([]string) (bool, error)
+	Fetch(string, string) error
+	HasLocalBranch(string) bool
+	IsAncestor(string, string) (bool, error)
 	IsDirty() (bool, error)
-	Merge([]string) error
-	Reset([]string) error
+	MergeFastForward(string) error
+	ResetHard(string) error
 }
 
 type gitExecuter struct{}
@@ -35,8 +36,17 @@ func (g *gitExecuter) BranchRemote(branch string) (string, error) {
 	return parts[0], nil
 }
 
-func (g *gitExecuter) Checkout(args []string) error {
-	args = append([]string{"checkout"}, args...)
+func (g *gitExecuter) CheckoutLocal(branch string) error {
+	args := []string{"checkout", branch}
+	cmd, err := git.GitCommand(args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
+}
+
+func (g *gitExecuter) CheckoutRemote(remote, branch string) error {
+	args := []string{"checkout", "--track", fmt.Sprintf("%s/%s", remote, branch)}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err
@@ -48,8 +58,8 @@ func (g *gitExecuter) CurrentBranch() (string, error) {
 	return git.CurrentBranch()
 }
 
-func (g *gitExecuter) Fetch(args []string) error {
-	args = append([]string{"fetch"}, args...)
+func (g *gitExecuter) Fetch(remote, ref string) error {
+	args := []string{"fetch", remote, ref}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err
@@ -57,12 +67,12 @@ func (g *gitExecuter) Fetch(args []string) error {
 	return cmd.Run()
 }
 
-func (g *gitExecuter) HasLocalBranch(args []string) bool {
-	return git.HasLocalBranch(args[0])
+func (g *gitExecuter) HasLocalBranch(branch string) bool {
+	return git.HasLocalBranch(branch)
 }
 
-func (g *gitExecuter) IsAncestor(args []string) (bool, error) {
-	args = append([]string{"merge-base", "--is-ancestor"}, args...)
+func (g *gitExecuter) IsAncestor(ancestor, progeny string) (bool, error) {
+	args := []string{"merge-base", "--is-ancestor", ancestor, progeny}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return false, err
@@ -86,8 +96,8 @@ func (g *gitExecuter) IsDirty() (bool, error) {
 	return false, nil
 }
 
-func (g *gitExecuter) Merge(args []string) error {
-	args = append([]string{"merge"}, args...)
+func (g *gitExecuter) MergeFastForward(ref string) error {
+	args := []string{"merge", "--ff-only", ref}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err
@@ -95,17 +105,8 @@ func (g *gitExecuter) Merge(args []string) error {
 	return cmd.Run()
 }
 
-func (g *gitExecuter) Reset(args []string) error {
-	args = append([]string{"reset"}, args...)
-	cmd, err := git.GitCommand(args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
-}
-
-func (g *gitExecuter) Stash(args []string) error {
-	args = append([]string{"stash"}, args...)
+func (g *gitExecuter) ResetHard(ref string) error {
+	args := []string{"reset", "--hard", ref}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err

@@ -13,8 +13,13 @@ func (g *mockGitClient) BranchRemote(a string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (g *mockGitClient) Checkout(a []string) error {
+func (g *mockGitClient) CheckoutLocal(a string) error {
 	args := g.Called(a)
+	return args.Error(0)
+}
+
+func (g *mockGitClient) CheckoutRemote(a, b string) error {
+	args := g.Called(a, b)
 	return args.Error(0)
 }
 
@@ -23,18 +28,18 @@ func (g *mockGitClient) CurrentBranch() (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (g *mockGitClient) Fetch(a []string) error {
-	args := g.Called(a)
+func (g *mockGitClient) Fetch(a, b string) error {
+	args := g.Called(a, b)
 	return args.Error(0)
 }
 
-func (g *mockGitClient) HasLocalBranch(a []string) bool {
+func (g *mockGitClient) HasLocalBranch(a string) bool {
 	args := g.Called(a)
 	return args.Bool(0)
 }
 
-func (g *mockGitClient) IsAncestor(a []string) (bool, error) {
-	args := g.Called(a)
+func (g *mockGitClient) IsAncestor(a, b string) (bool, error) {
+	args := g.Called(a, b)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -43,12 +48,12 @@ func (g *mockGitClient) IsDirty() (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (g *mockGitClient) Merge(a []string) error {
+func (g *mockGitClient) MergeFastForward(a string) error {
 	args := g.Called(a)
 	return args.Error(0)
 }
 
-func (g *mockGitClient) Reset(a []string) error {
+func (g *mockGitClient) ResetHard(a string) error {
 	args := g.Called(a)
 	return args.Error(0)
 }
