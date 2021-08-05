@@ -167,12 +167,7 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 			cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		}
 	default:
-		cmds = append(
-			cmds,
-			[]string{"git", "checkout", "-b", localBranch, "--no-track", remoteBranch},
-			[]string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote.Name},
-			[]string{"git", "config", fmt.Sprintf("branch.%s.merge", pr.HeadRefName), "refs/heads/" + pr.HeadRefName},
-		)
+		cmds = append(cmds, []string{"git", "checkout", "-b", localBranch, "--track", remoteBranch})
 	}
 
 	return cmds
@@ -180,13 +175,6 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 
 func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultBranch, protocol string, opts *CheckoutOptions) [][]string {
 	var cmds [][]string
-
-	newBranchName := pr.HeadRefName
-	// avoid naming the new branch the same as the default branch
-	if newBranchName == defaultBranch {
-		newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
-	}
-
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
@@ -195,8 +183,16 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		return cmds
 	}
 
+	localBranch := pr.HeadRefName
+	if opts.BranchName != "" {
+		localBranch = opts.BranchName
+	} else if pr.HeadRefName == defaultBranch {
+		// avoid naming the new branch the same as the default branch
+		localBranch = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, localBranch)
+	}
+
 	currentBranch, _ := opts.Branch()
-	if newBranchName == currentBranch {
+	if localBranch == currentBranch {
 		// PR head matches currently checked out branch
 		cmds = append(cmds, []string{"git", "fetch", baseURLOrName, ref})
 		if opts.Force {
@@ -206,19 +202,14 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			cmds = append(cmds, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
 		}
 	} else {
-		// create a new branch
 		if opts.Force {
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName), "--force"})
+			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
 		} else {
 			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
+			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
 		}
 
-		if opts.BranchName != "" {
-			cmds = append(cmds, []string{"git", "checkout", "-b", opts.BranchName, "--track", newBranchName})
-		} else {
-			cmds = append(cmds, []string{"git", "checkout", newBranchName})
-		}
+		cmds = append(cmds, []string{"git", "checkout", localBranch})
 	}
 
 	remote := baseURLOrName
@@ -228,9 +219,9 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
-	if missingMergeConfigForBranch(newBranchName) {
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
+	if missingMergeConfigForBranch(localBranch) {
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
 	}
 
 	return cmds

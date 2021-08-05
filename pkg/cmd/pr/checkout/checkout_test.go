@@ -101,14 +101,12 @@ func Test_checkoutRun(t *testing.T) {
 			},
 		},
 		{
-			name: "with local branch rename",
+			name: "with local branch rename and existing git remote",
 			opts: &CheckoutOptions{
 				SelectorArg: "123",
 				BranchName:  "foobar",
 				Finder: func() shared.PRFinder {
-					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-					pr.MaintainerCanModify = true
-					pr.HeadRepository = nil
+					baseRepo, pr := stubPR("OWNER/REPO:master", "OWNER/REPO:feature")
 					finder := shared.NewMockFinder("123", pr, baseRepo)
 					return finder
 				}(),
@@ -123,11 +121,9 @@ func Test_checkoutRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-				cs.Register(`git config branch\.feature\.merge`, 1, "")
-				cs.Register(`git checkout -b foobar --track feature`, 0, "")
-				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/foobar`, 1, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git checkout -b foobar --track origin/feature`, 0, "")
 			},
 		},
 		{
@@ -138,7 +134,6 @@ func Test_checkoutRun(t *testing.T) {
 				Finder: func() shared.PRFinder {
 					baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
 					pr.MaintainerCanModify = true
-					pr.HeadRepository = nil
 					finder := shared.NewMockFinder("123", pr, baseRepo)
 					return finder
 				}(),
@@ -153,11 +148,11 @@ func Test_checkoutRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
-				cs.Register(`git config branch\.feature\.merge`, 1, "")
-				cs.Register(`git checkout -b foobar --track feature`, 0, "")
-				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
+				cs.Register(`git config branch\.foobar\.merge`, 1, "")
+				cs.Register(`git fetch origin refs/pull/123/head:foobar`, 0, "")
+				cs.Register(`git checkout foobar`, 0, "")
+				cs.Register(`git config branch\.foobar\.remote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.foobar\.merge refs/heads/feature`, 0, "")
 			},
 		},
 	}
@@ -272,9 +267,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
-	cs.Register(`git checkout -b feature --no-track origin/feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
+	cs.Register(`git checkout -b feature --track origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -327,9 +320,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 
 	cs.Register(`git fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
-	cs.Register(`git checkout -b feature --no-track robot-fork/feature`, 0, "")
-	cs.Register(`git config branch\.feature\.remote robot-fork`, 0, "")
-	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
+	cs.Register(`git checkout -b feature --track robot-fork/feature`, 0, "")
 
 	output, err := runCommand(http, remotes, "master", `123`)
 	assert.NoError(t, err)
