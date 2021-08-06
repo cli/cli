@@ -18,14 +18,15 @@ import (
 
 type Template struct {
 	io           *iostreams.IOStreams
-	tablePrinter utils.TablePrinter
+	tablePrinter *utils.TablePrinter
 	template     *template.Template
+	templateStr  string
 }
 
-func NewTemplate(io *iostreams.IOStreams) Template {
+func NewTemplate(io *iostreams.IOStreams, template string) Template {
 	return Template{
-		io:           io,
-		tablePrinter: utils.NewTablePrinter(io),
+		io:          io,
+		templateStr: template,
 	}
 }
 
@@ -51,9 +52,10 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 			return timeAgo(now.Sub(t)), nil
 		},
 
-		"pluck": templatePluck,
-		"join":  templateJoin,
-		"row":   t.row,
+		"pluck":    templatePluck,
+		"join":     templateJoin,
+		"row":      t.row,
+		"endtable": t.endTable,
 	}
 
 	if !t.io.ColorEnabled() {
@@ -65,11 +67,11 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 	return template.New("").Funcs(templateFuncs).Parse(tpl)
 }
 
-func (t *Template) Execute(input io.Reader, templateStr string) error {
+func (t *Template) Execute(input io.Reader) error {
 	w := t.io.Out
 
 	if t.template == nil {
-		template, err := t.parseTemplate(templateStr)
+		template, err := t.parseTemplate(t.templateStr)
 		if err != nil {
 			return err
 		}
@@ -90,9 +92,9 @@ func (t *Template) Execute(input io.Reader, templateStr string) error {
 	return t.template.Execute(w, data)
 }
 
-func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, templateStr string) error {
-	t := NewTemplate(io)
-	if err := t.Execute(input, templateStr); err != nil {
+func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, template string) error {
+	t := NewTemplate(io, template)
+	if err := t.Execute(input); err != nil {
 		return err
 	}
 	return t.End()
@@ -147,20 +149,36 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 }
 
 func (t *Template) row(fields ...interface{}) (string, error) {
+	if t.tablePrinter == nil {
+		tablePrinter := utils.NewTablePrinter(t.io)
+		t.tablePrinter = &tablePrinter
+	}
 	for _, e := range fields {
 		s, err := jsonScalarToString(e)
 		if err != nil {
 			return "", fmt.Errorf("failed to write row: %v", err)
 		}
-		t.tablePrinter.AddField(s, nil, nil)
+		(*t.tablePrinter).AddField(s, nil, nil)
 	}
-	t.tablePrinter.EndRow()
+	(*t.tablePrinter).EndRow()
+	return "", nil
+}
+
+func (t *Template) endTable() (string, error) {
+	if t.tablePrinter != nil {
+		err := (*t.tablePrinter).Render()
+		t.tablePrinter = nil
+		if err != nil {
+			return "", fmt.Errorf("failed to render template table: %v", err)
+		}
+	}
 	return "", nil
 }
 
 func (t *Template) End() error {
-	if err := t.tablePrinter.Render(); err != nil {
-		return fmt.Errorf("failed to render template table: %v", err)
+	// Finalize any template actions.
+	if _, err := t.endTable(); err != nil {
+		return err
 	}
 	return nil
 }

@@ -594,6 +594,86 @@ func Test_apiRun_paginationREST(t *testing.T) {
 
 func Test_apiRun_paginationGraphQL(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+				"data": {
+					"nodes": ["page one"],
+					"pageInfo": {
+						"endCursor": "PAGE1_END",
+						"hasNextPage": true
+					}
+				}
+			}`)),
+		},
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+				"data": {
+					"nodes": ["page two"],
+					"pageInfo": {
+						"endCursor": "PAGE2_END",
+						"hasNextPage": false
+					}
+				}
+			}`)),
+		},
+	}
+
+	options := ApiOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestMethod: "POST",
+		RequestPath:   "graphql",
+		Paginate:      true,
+	}
+
+	err := apiRun(&options)
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout.String(), `"page one"`)
+	assert.Contains(t, stdout.String(), `"page two"`)
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	var requestData struct {
+		Variables map[string]interface{}
+	}
+
+	bb, err := ioutil.ReadAll(responses[0].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	_, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, false, hasCursor)
+
+	bb, err = ioutil.ReadAll(responses[1].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, true, hasCursor)
+	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_paginated_template(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(true)
 
 	requestCount := 0
@@ -1183,11 +1263,12 @@ func Test_processResponse_template(t *testing.T) {
 		]`)),
 	}
 
-	template := export.NewTemplate(io)
-	_, err := processResponse(&resp, &ApiOptions{
+	opts := ApiOptions{
 		IO:       io,
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
-	}, ioutil.Discard, &template)
+	}
+	template := export.NewTemplate(io, opts.Template)
+	_, err := processResponse(&resp, &opts, ioutil.Discard, &template)
 	require.NoError(t, err)
 
 	err = template.End()

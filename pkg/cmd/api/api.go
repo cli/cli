@@ -294,7 +294,7 @@ func apiRun(opts *ApiOptions) error {
 		host = opts.Hostname
 	}
 
-	template := export.NewTemplate(opts.IO)
+	template := export.NewTemplate(opts.IO, opts.Template)
 
 	hasNextPage := true
 	for hasNextPage {
@@ -367,7 +367,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = template.Execute(responseBody, opts.Template)
+		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}
