@@ -63,7 +63,6 @@ func (l *PortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
 
 	copyConn := func(writer io.Writer, reader io.Reader) {
 		if _, err := io.Copy(writer, reader); err != nil {
-			fmt.Println(err)
 			channel.Close()
 			conn.Close()
 			if err != io.EOF {
