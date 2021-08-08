@@ -29,6 +29,8 @@ type ListOptions struct {
 
 	Limit            int
 	WorkflowSelector string
+	Branch           string
+	Actor            string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -62,6 +64,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
+	cmd.Flags().StringVarP(&opts.Actor, "actor", "a", "", "Filter runs by user who triggered the run")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
 	return cmd
@@ -82,16 +86,21 @@ func listRun(opts *ListOptions) error {
 	var runs []shared.Run
 	var workflow *workflowShared.Workflow
 
+	filters := &shared.FilterOptions{
+		Branch: opts.Branch,
+		Actor:  opts.Actor,
+	}
+
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
 		workflow, err = workflowShared.ResolveWorkflow(
 			opts.IO, client, baseRepo, false, opts.WorkflowSelector, states)
 		if err == nil {
-			runs, err = shared.GetRunsByWorkflow(client, baseRepo, opts.Limit, workflow.ID)
+			runs, err = shared.GetRunsByWorkflow(client, baseRepo, filters, opts.Limit, workflow.ID)
 		}
 	} else {
-		runs, err = shared.GetRuns(client, baseRepo, opts.Limit)
+		runs, err = shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	}
 	opts.IO.StopProgressIndicator()
 	if err != nil {

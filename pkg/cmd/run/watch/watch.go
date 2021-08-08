@@ -93,7 +93,7 @@ func watchRun(opts *WatchOptions) error {
 	var run *shared.Run
 
 	if opts.Prompt {
-		runs, err := shared.GetRunsWithFilter(client, repo, 10, func(run shared.Run) bool {
+		runs, err := shared.GetRunsWithFilter(client, repo, shared.EmptyFilters(), 10, func(run shared.Run) bool {
 			return run.Status != shared.Completed
 		})
 		if err != nil {

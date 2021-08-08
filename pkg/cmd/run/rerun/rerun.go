@@ -71,7 +71,7 @@ func runRerun(opts *RerunOptions) error {
 
 	if opts.Prompt {
 		cs := opts.IO.ColorScheme()
-		runs, err := shared.GetRunsWithFilter(client, repo, 10, func(run shared.Run) bool {
+		runs, err := shared.GetRunsWithFilter(client, repo, shared.EmptyFilters(), 10, func(run shared.Run) bool {
 			if run.Status != shared.Completed {
 				return false
 			}
