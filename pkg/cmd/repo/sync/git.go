@@ -9,9 +9,9 @@ import (
 
 type gitClient interface {
 	BranchRemote(string) (string, error)
-	CheckoutLocal(string) error
-	CheckoutRemote(string, string) error
 	CurrentBranch() (string, error)
+	UpdateBranch(string, string) error
+	CreateBranch(string, string, string) error
 	Fetch(string, string) error
 	HasLocalBranch(string) bool
 	IsAncestor(string, string) (bool, error)
@@ -36,18 +36,23 @@ func (g *gitExecuter) BranchRemote(branch string) (string, error) {
 	return parts[0], nil
 }
 
-func (g *gitExecuter) CheckoutLocal(branch string) error {
-	args := []string{"checkout", branch}
-	cmd, err := git.GitCommand(args...)
+func (g *gitExecuter) UpdateBranch(branch, ref string) error {
+	cmd, err := git.GitCommand("update-ref", fmt.Sprintf("refs/heads/%s", branch), ref)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (g *gitExecuter) CheckoutRemote(remote, branch string) error {
-	args := []string{"checkout", "--track", fmt.Sprintf("%s/%s", remote, branch)}
-	cmd, err := git.GitCommand(args...)
+func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {
+	cmd, err := git.GitCommand("branch", branch, ref)
+	if err != nil {
+		return err
+	}
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	cmd, err = git.GitCommand("branch", "--set-upstream-to", upstream, branch)
 	if err != nil {
 		return err
 	}
@@ -97,7 +102,7 @@ func (g *gitExecuter) IsDirty() (bool, error) {
 }
 
 func (g *gitExecuter) MergeFastForward(ref string) error {
-	args := []string{"merge", "--ff-only", ref}
+	args := []string{"merge", "--ff-only", "--quiet", ref}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err

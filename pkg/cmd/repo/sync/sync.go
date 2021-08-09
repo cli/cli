@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
+	gitpkg "github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -238,6 +239,7 @@ var mismatchRemotesError = errors.New("branch remote does not match specified so
 func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOptions) error {
 	git := opts.Git
 	branch := opts.Branch
+	useForce := opts.Force
 
 	if err := git.Fetch(remote, fmt.Sprintf("refs/heads/%s", branch)); err != nil {
 		return err
@@ -253,45 +255,42 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 			return mismatchRemotesError
 		}
 
-		fastForward, err := git.IsAncestor(branch, fmt.Sprintf("%s/%s", remote, branch))
+		fastForward, err := git.IsAncestor(branch, "FETCH_HEAD")
 		if err != nil {
 			return err
 		}
 
-		if !fastForward && !opts.Force {
+		if !fastForward && !useForce {
 			return divergingError
+		}
+		if fastForward && useForce {
+			useForce = false
 		}
 	}
 
-	startBranch, err := git.CurrentBranch()
-	if err != nil {
+	currentBranch, err := git.CurrentBranch()
+	if err != nil && !errors.Is(err, gitpkg.ErrNotOnAnyBranch) {
 		return err
 	}
-	if startBranch != branch {
+	if currentBranch == branch {
+		if useForce {
+			if err := git.ResetHard("FETCH_HEAD"); err != nil {
+				return err
+			}
+		} else {
+			if err := git.MergeFastForward("FETCH_HEAD"); err != nil {
+				return err
+			}
+		}
+	} else {
 		if hasLocalBranch {
-			if err := git.CheckoutLocal(branch); err != nil {
+			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
 				return err
 			}
 		} else {
-			if err := git.CheckoutRemote(remote, branch); err != nil {
+			if err := git.CreateBranch(branch, "FETCH_HEAD", fmt.Sprintf("%s/%s", remote, branch)); err != nil {
 				return err
 			}
-		}
-	}
-	if hasLocalBranch {
-		if opts.Force {
-			if err := git.ResetHard(fmt.Sprintf("refs/remotes/%s/%s", remote, branch)); err != nil {
-				return err
-			}
-		} else {
-			if err := git.MergeFastForward(fmt.Sprintf("refs/remotes/%s/%s", remote, branch)); err != nil {
-				return err
-			}
-		}
-	}
-	if startBranch != branch {
-		if err := git.CheckoutLocal(startBranch); err != nil {
-			return err
 		}
 	}
 
