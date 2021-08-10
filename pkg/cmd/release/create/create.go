@@ -50,7 +50,7 @@ type CreateOptions struct {
 	// maximum number of simultaneous uploads
 	Concurrency int
 
-	DiscussionCategoryName string
+	DiscussionCategory string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -142,7 +142,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file`")
-	cmd.Flags().StringVarP(&opts.DiscussionCategoryName, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
 
 	return cmd
 }
@@ -279,7 +279,7 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	if opts.Draft && len(opts.DiscussionCategoryName) > 0 {
+	if opts.Draft && len(opts.DiscussionCategory) > 0 {
 		return fmt.Errorf(
 			"%s Discussions not supported with draft releases",
 			opts.IO.ColorScheme().FailureIcon(),
@@ -287,15 +287,17 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	params := map[string]interface{}{
-		"tag_name":                 opts.TagName,
-		"draft":                    opts.Draft,
-		"prerelease":               opts.Prerelease,
-		"name":                     opts.Name,
-		"body":                     opts.Body,
-		"discussion_category_name": opts.DiscussionCategoryName,
+		"tag_name":   opts.TagName,
+		"draft":      opts.Draft,
+		"prerelease": opts.Prerelease,
+		"name":       opts.Name,
+		"body":       opts.Body,
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
+	}
+	if opts.DiscussionCategory != "" {
+		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 
 	hasAssets := len(opts.Assets) > 0
