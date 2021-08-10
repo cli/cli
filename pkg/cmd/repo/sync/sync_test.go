@@ -465,9 +465,11 @@ func Test_SyncRun(t *testing.T) {
 }
 
 func newMockGitClient(t *testing.T, config func(*mockGitClient)) *mockGitClient {
+	t.Helper()
 	m := &mockGitClient{}
 	m.Test(t)
 	t.Cleanup(func() {
+		t.Helper()
 		m.AssertExpectations(t)
 	})
 	if config != nil {
