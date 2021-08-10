@@ -114,14 +114,9 @@ func syncLocalRepo(opts *SyncOptions) error {
 	if err != nil {
 		return err
 	}
-	for _, r := range remotes {
-		if r.RepoName() == srcRepo.RepoName() &&
-			r.RepoOwner() == srcRepo.RepoOwner() &&
-			r.RepoHost() == srcRepo.RepoHost() {
-			remote = r.Name
-		}
-	}
-	if remote == "" {
+	if r, err := remotes.FindByRepo(srcRepo.RepoOwner(), srcRepo.RepoName()); err == nil {
+		remote = r.Name
+	} else {
 		return fmt.Errorf("can't find corresponding remote for %s", ghrepo.FullName(srcRepo))
 	}
 
