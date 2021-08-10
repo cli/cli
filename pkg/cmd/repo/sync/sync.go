@@ -92,24 +92,20 @@ func syncRun(opts *SyncOptions) error {
 }
 
 func syncLocalRepo(opts *SyncOptions) error {
-	var err error
 	var srcRepo ghrepo.Interface
 
-	dirtyRepo, err := opts.Git.IsDirty()
-	if err != nil {
-		return err
-	}
-	if dirtyRepo {
-		return fmt.Errorf("can't sync because there are local changes, please commit or stash them")
-	}
-
 	if opts.SrcArg != "" {
+		var err error
 		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
+		if err != nil {
+			return err
+		}
 	} else {
+		var err error
 		srcRepo, err = opts.BaseRepo()
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	// Find remote that matches the srcRepo
@@ -273,6 +269,11 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 		return err
 	}
 	if currentBranch == branch {
+		if isDirty, err := git.IsDirty(); err == nil && isDirty {
+			return fmt.Errorf("can't sync because there are local changes; please stash them before trying again")
+		} else if err != nil {
+			return err
+		}
 		if useForce {
 			if err := git.ResetHard("FETCH_HEAD"); err != nil {
 				return err
