@@ -7,18 +7,20 @@ import (
 	"os"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:   "delete CODESPACE_NAME",
+		Use:   "delete",
 		Short: "Delete a GitHub Codespace.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return errors.New("A Codespace name is required.")
+			var codespaceName string
+			if len(args) > 0 {
+				codespaceName = args[0]
 			}
-			return Delete(args[0])
+			return Delete(codespaceName)
 		},
 	}
 
@@ -62,12 +64,12 @@ func Delete(codespaceName string) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	if err := apiClient.DeleteCodespace(ctx, user, token, codespaceName); err != nil {
+	if err := apiClient.DeleteCodespace(ctx, user, token, codespace.Name); err != nil {
 		return fmt.Errorf("error deleting codespace: %v", err)
 	}
 

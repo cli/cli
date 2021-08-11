@@ -4,10 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,37 +46,9 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	var (
-		codespace *api.Codespace
-		token     string
-	)
-
-	if codespaceName == "" {
-		codespace, err = codespaces.ChooseCodespace(ctx, apiClient, user)
-		if err != nil {
-			if err == codespaces.ErrNoCodespaces {
-				fmt.Println(err.Error())
-				return nil
-			}
-
-			return fmt.Errorf("error choosing codespace: %v", err)
-		}
-		codespaceName = codespace.Name
-
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
-		}
-	} else {
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-		if err != nil {
-			return fmt.Errorf("error getting full codespace details: %v", err)
-		}
+	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
@@ -106,54 +75,32 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		fmt.Printf("\n")
 	}
 
-	server, err := liveshare.NewServer(lsclient)
+	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort)
 	if err != nil {
-		return fmt.Errorf("error creating server: %v", err)
+		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
-
-	rand.Seed(time.Now().Unix())
-	port := rand.Intn(9999-2000) + 2000 // improve this obviously
-	if sshServerPort != 0 {
-		port = sshServerPort
-	}
-
-	if err := server.StartSharing(ctx, "sshd", 2222); err != nil {
-		return fmt.Errorf("error sharing sshd port: %v", err)
-	}
-
-	portForwarder := liveshare.NewPortForwarder(lsclient, server, port)
-	go func() {
-		if err := portForwarder.Start(ctx); err != nil {
-			panic(fmt.Errorf("error forwarding port: %v", err))
-		}
-	}()
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
 		connectDestination = fmt.Sprintf("%s@localhost", getSSHUser(codespace))
 	}
 
+	usingCustomPort := tunnelPort == sshServerPort
+	connClosed := codespaces.ConnectToTunnel(ctx, tunnelPort, connectDestination, usingCustomPort)
+
 	fmt.Println("Ready...")
-	if err := connect(ctx, port, connectDestination, port == sshServerPort); err != nil {
-		return fmt.Errorf("error connecting via SSH: %v", err)
+	select {
+	case err := <-tunnelClosed:
+		if err != nil {
+			return fmt.Errorf("tunnel closed: %v", err)
+		}
+	case err := <-connClosed:
+		if err != nil {
+			return fmt.Errorf("connection closed: %v", err)
+		}
 	}
 
 	return nil
-}
-
-func connect(ctx context.Context, port int, destination string, setServerPort bool) error {
-	connectionDetailArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
-
-	if setServerPort {
-		fmt.Println("Connection Details: ssh " + destination + " " + strings.Join(connectionDetailArgs, " "))
-	}
-
-	args := []string{destination, "-X", "-Y", "-C"} // X11, X11Trust, Compression
-	cmd := exec.CommandContext(ctx, "ssh", append(args, connectionDetailArgs...)...)
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, error) {
