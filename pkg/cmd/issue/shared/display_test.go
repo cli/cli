@@ -1,8 +1,15 @@
 package shared
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/cli/cli/pkg/iostreams"
+)
 
 func Test_truncateLabels(t *testing.T) {
+	cs := iostreams.ColorScheme{}
+	truncateLabels := truncateLabelsFunc(&cs)
+
 	got := truncateLabels(12, "(one, two, three)")
 	expected := "(one, tw...)"
 	if got != expected {
