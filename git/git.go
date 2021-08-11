@@ -107,14 +107,29 @@ func Config(name string) (string, error) {
 
 }
 
-var GitCommand = func(args ...string) (*exec.Cmd, error) {
+type NotInstalled struct {
+	message string
+	error
+}
+
+func (e *NotInstalled) Error() string {
+	return e.message
+}
+
+func GitCommand(args ...string) (*exec.Cmd, error) {
 	gitExe, err := safeexec.LookPath("git")
 	if err != nil {
-		programName := "git"
-		if runtime.GOOS == "windows" {
-			programName = "Git for Windows"
+		if errors.Is(err, exec.ErrNotFound) {
+			programName := "git"
+			if runtime.GOOS == "windows" {
+				programName = "Git for Windows"
+			}
+			return nil, &NotInstalled{
+				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
+				error:   err,
+			}
 		}
-		return nil, fmt.Errorf("unable to find git executable in PATH; please install %s before retrying", programName)
+		return nil, err
 	}
 	return exec.Command(gitExe, args...), nil
 }
