@@ -69,5 +69,5 @@ func IssueLabelList(issue api.Issue, cs *iostreams.ColorScheme) string {
 		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
 	}
 
-	return strings.Join(labelNames, ", ")
+	return strings.Join(labelNames, cs.Gray(", "))
 }
