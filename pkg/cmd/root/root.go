@@ -11,7 +11,7 @@ import (
 	browseCmd "github.com/cli/cli/pkg/cmd/browse"
 	completionCmd "github.com/cli/cli/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
-	extensionsCmd "github.com/cli/cli/pkg/cmd/extensions"
+	extensionCmd "github.com/cli/cli/pkg/cmd/extension"
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
@@ -75,7 +75,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(extensionsCmd.NewCmdExtensions(f))
+	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 
