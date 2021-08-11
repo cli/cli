@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -71,10 +70,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !isGitInPath() {
-				return errors.New("git executable not found in $PATH")
-			}
-
 			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
 				return &cmdutil.FlagError{Err: errors.New("--web or --with-token required when not running interactively")}
 			}
@@ -122,11 +117,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 
 	return cmd
-}
-
-func isGitInPath() bool {
-	_, err := exec.LookPath("git")
-	return err == nil
 }
 
 func loginRun(opts *LoginOptions) error {
