@@ -106,7 +106,7 @@ func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
 			}
 		} else {
 			isLocal = true
-			if f.Mode()&os.ModeSymlink == 0 {
+			if !isSymlink(f.Mode()) {
 				// if this is a regular file, its contents is the local directory of the extension
 				p, err := readPathFromFile(filepath.Join(dir, f.Name()))
 				if err != nil {
@@ -168,15 +168,7 @@ func (m *Manager) InstallLocal(dir string) error {
 	if err := os.MkdirAll(filepath.Dir(targetLink), 0755); err != nil {
 		return err
 	}
-	// Create a regular file that contains the location of the directory where to find this extension. We
-	// avoid relying on symlinks because creating them on Windows requires administrator privileges.
-	f, err := os.OpenFile(targetLink, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(dir)
-	return err
+	return makeSymlink(dir, targetLink)
 }
 
 func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
@@ -247,7 +239,7 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 
 func (m *Manager) Remove(name string) error {
 	targetDir := filepath.Join(m.installDir(), "gh-"+name)
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("no extension found: %q", targetDir)
 	}
 	return os.RemoveAll(targetDir)
@@ -268,6 +260,11 @@ func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {
 	return nil
 }
 
+func isSymlink(m os.FileMode) bool {
+	return m&os.ModeSymlink != 0
+}
+
+// reads the product of makeSymlink on Windows
 func readPathFromFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
