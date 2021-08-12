@@ -1,6 +1,6 @@
 // +build !windows
 
-package extensions
+package extension
 
 import "os"
 

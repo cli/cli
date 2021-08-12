@@ -1,4 +1,4 @@
-package extensions
+package extension
 
 import (
 	"errors"
@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
+func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
 
 	extCmd := cobra.Command{
-		Use:   "extensions",
+		Use:   "extension",
 		Short: "Manage gh extensions",
 		Long: heredoc.Docf(`
 			GitHub CLI extensions are repositories that provide additional gh commands.
@@ -31,6 +31,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 
 			An extension cannot override any of the core gh commands.
 		`, "`"),
+		Aliases: []string{"extensions"},
 	}
 
 	extCmd.AddCommand(

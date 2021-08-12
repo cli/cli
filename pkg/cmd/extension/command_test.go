@@ -1,4 +1,4 @@
-package extensions
+package extension
 
 import (
 	"io"
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdExtensions(t *testing.T) {
+func TestNewCmdExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	assert.NoError(t, os.Chdir(tempDir))
@@ -183,7 +183,7 @@ func TestNewCmdExtensions(t *testing.T) {
 				ExtensionManager: em,
 			}
 
-			cmd := NewCmdExtensions(&f)
+			cmd := NewCmdExtension(&f)
 			cmd.SetArgs(tt.args)
 			cmd.SetOut(ioutil.Discard)
 			cmd.SetErr(ioutil.Discard)
