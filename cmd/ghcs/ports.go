@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -149,7 +150,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 			return
 		}
 
-		convertedJSON := jsonc.ToJSON(contents)
+		convertedJSON := normalizeJSON(jsonc.ToJSON(contents))
 		if !jsonc.Valid(convertedJSON) {
 			ch <- devContainerResult{nil, errors.New("failed to convert json to standard json")}
 			return
@@ -308,4 +309,9 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 	}
 
 	return nil
+}
+
+func normalizeJSON(j []byte) []byte {
+	// remove trailing commas
+	return bytes.ReplaceAll(j, []byte("},}"), []byte("}}"))
 }
