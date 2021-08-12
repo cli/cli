@@ -27,7 +27,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			InstallLocalFunc: func(dir string) error {
 // 				panic("mock out the InstallLocal method")
 // 			},
-// 			ListFunc: func() []Extension {
+// 			ListFunc: func(includeMetadata bool) []Extension {
 // 				panic("mock out the List method")
 // 			},
 // 			RemoveFunc: func(name string) error {
@@ -53,7 +53,7 @@ type ExtensionManagerMock struct {
 	InstallLocalFunc func(dir string) error
 
 	// ListFunc mocks the List method.
-	ListFunc func() []Extension
+	ListFunc func(includeMetadata bool) []Extension
 
 	// RemoveFunc mocks the Remove method.
 	RemoveFunc func(name string) error
@@ -90,6 +90,8 @@ type ExtensionManagerMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// IncludeMetadata is the includeMetadata argument value.
+			IncludeMetadata bool
 		}
 		// Remove holds details about calls to the Remove method.
 		Remove []struct {
@@ -230,24 +232,29 @@ func (mock *ExtensionManagerMock) InstallLocalCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *ExtensionManagerMock) List() []Extension {
+func (mock *ExtensionManagerMock) List(includeMetadata bool) []Extension {
 	if mock.ListFunc == nil {
 		panic("ExtensionManagerMock.ListFunc: method is nil but ExtensionManager.List was just called")
 	}
 	callInfo := struct {
-	}{}
+		IncludeMetadata bool
+	}{
+		IncludeMetadata: includeMetadata,
+	}
 	mock.lockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
 	mock.lockList.Unlock()
-	return mock.ListFunc()
+	return mock.ListFunc(includeMetadata)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //     len(mockedExtensionManager.ListCalls())
 func (mock *ExtensionManagerMock) ListCalls() []struct {
+	IncludeMetadata bool
 } {
 	var calls []struct {
+		IncludeMetadata bool
 	}
 	mock.lockList.RLock()
 	calls = mock.calls.List
