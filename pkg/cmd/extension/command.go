@@ -58,7 +58,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					t.AddField(repo, nil, nil)
 					var updateAvailable string
 					if c.UpdateAvailable() {
-						updateAvailable = "Update available"
+						updateAvailable = "Upgrade available"
 					}
 					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
