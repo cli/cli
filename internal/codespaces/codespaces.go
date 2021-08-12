@@ -57,9 +57,14 @@ func ChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 	return codespace, nil
 }
 
-func ConnectToLiveshare(ctx context.Context, apiClient *api.API, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
+type logger interface {
+	Print(v ...interface{}) (int, error)
+	Println(v ...interface{}) (int, error)
+}
+
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		fmt.Println("Starting your codespace...") // TODO(josebalius): better way of notifying of events
+		log.Println("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %v", err)
 		}
@@ -69,7 +74,7 @@ func ConnectToLiveshare(ctx context.Context, apiClient *api.API, token string, c
 	for codespace.Environment.Connection.SessionID == "" || codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		if retries > 1 {
 			if retries%2 == 0 {
-				fmt.Print(".")
+				log.Print(".")
 			}
 
 			time.Sleep(1 * time.Second)
@@ -88,10 +93,10 @@ func ConnectToLiveshare(ctx context.Context, apiClient *api.API, token string, c
 	}
 
 	if retries >= 2 {
-		fmt.Print("\n")
+		log.Print("\n")
 	}
 
-	fmt.Println("Connecting to your codespace...")
+	log.Println("Connecting to your codespace...")
 
 	lsclient, err := liveshare.NewClient(
 		liveshare.WithConnection(liveshare.Connection{
@@ -117,10 +122,8 @@ func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 		codespace, err = ChooseCodespace(ctx, apiClient, user)
 		if err != nil {
 			if err == ErrNoCodespaces {
-				fmt.Println(err.Error())
-				return nil, "", nil
+				return nil, "", err
 			}
-
 			return nil, "", fmt.Errorf("choosing codespace: %v", err)
 		}
 		codespaceName = codespace.Name

@@ -61,15 +61,14 @@ func Ports(opts *PortsOptions) error {
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, opts.CodespaceName)
 	if err != nil {
 		if err == codespaces.ErrNoCodespaces {
-			fmt.Println(err.Error())
-			return nil
+			return err
 		}
 		return fmt.Errorf("error choosing codespace: %v", err)
 	}
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -177,7 +176,8 @@ func NewPortsPublicCmd() *cobra.Command {
 				return errors.New("[codespace_name] [source] port number are required.")
 			}
 
-			return updatePortVisibility(args[0], args[1], true)
+			log := output.NewLogger(os.Stdout, os.Stderr, false)
+			return updatePortVisibility(log, args[0], args[1], true)
 		},
 	}
 }
@@ -192,12 +192,13 @@ func NewPortsPrivateCmd() *cobra.Command {
 				return errors.New("[codespace_name] [source] port number are required.")
 			}
 
-			return updatePortVisibility(args[0], args[1], false)
+			log := output.NewLogger(os.Stdout, os.Stderr, false)
+			return updatePortVisibility(log, args[0], args[1], false)
 		},
 	}
 }
 
-func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
+func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 
@@ -216,7 +217,7 @@ func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -236,11 +237,10 @@ func updatePortVisibility(codespaceName, sourcePort string, public bool) error {
 	}
 
 	state := "PUBLIC"
-	if public == false {
+	if !public {
 		state = "PRIVATE"
 	}
-
-	fmt.Println(fmt.Sprintf("Port %s is now %s.", sourcePort, state))
+	log.Printf("Port %s is now %s.\n", sourcePort, state)
 
 	return nil
 }
@@ -254,12 +254,14 @@ func NewPortsForwardCmd() *cobra.Command {
 			if len(args) < 3 {
 				return errors.New("[codespace_name] [source] [dst] port number are required.")
 			}
-			return forwardPort(args[0], args[1], args[2])
+
+			log := output.NewLogger(os.Stdout, os.Stderr, false)
+			return forwardPort(log, args[0], args[1], args[2])
 		},
 	}
 }
 
-func forwardPort(codespaceName, sourcePort, destPort string) error {
+func forwardPort(log *output.Logger, codespaceName, sourcePort, destPort string) error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 
@@ -278,7 +280,7 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -302,7 +304,7 @@ func forwardPort(codespaceName, sourcePort, destPort string) error {
 		return fmt.Errorf("error sharing source port: %v", err)
 	}
 
-	fmt.Println("Forwarding port: " + sourcePort + " -> " + destPort)
+	log.Println("Forwarding port: " + sourcePort + " -> " + destPort)
 	portForwarder := liveshare.NewPortForwarder(lsclient, server, dstPortInt)
 	if err := portForwarder.Start(ctx); err != nil {
 		return fmt.Errorf("error forwarding port: %v", err)

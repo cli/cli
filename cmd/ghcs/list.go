@@ -48,11 +48,6 @@ func List(opts *ListOptions) error {
 		return fmt.Errorf("error getting codespaces: %v", err)
 	}
 
-	if len(codespaces) == 0 {
-		fmt.Println("You have no codespaces.")
-		return nil
-	}
-
 	table := output.NewTable(os.Stdout, opts.AsJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, codespace := range codespaces {

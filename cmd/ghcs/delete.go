@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
@@ -58,6 +59,7 @@ func init() {
 func Delete(codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -73,7 +75,7 @@ func Delete(codespaceName string) error {
 		return fmt.Errorf("error deleting codespace: %v", err)
 	}
 
-	fmt.Println("Codespace deleted.")
+	log.Println("Codespace deleted.")
 
 	return List(&ListOptions{})
 }
@@ -81,6 +83,7 @@ func Delete(codespaceName string) error {
 func DeleteAll() error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -102,7 +105,7 @@ func DeleteAll() error {
 			return fmt.Errorf("error deleting codespace: %v", err)
 		}
 
-		fmt.Printf("Codespace deleted: %s\n", c.Name)
+		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
 	return List(&ListOptions{})
@@ -111,6 +114,7 @@ func DeleteAll() error {
 func DeleteByRepo(repo string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -138,11 +142,11 @@ func DeleteByRepo(repo string) error {
 			return fmt.Errorf("error deleting codespace: %v", err)
 		}
 
-		fmt.Printf("Codespace deleted: %s\n", c.Name)
+		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
 	if !deleted {
-		fmt.Printf("No codespace was found for repository: %s\n", repo)
+		return fmt.Errorf("No codespace was found for repository: %s", repo)
 	}
 
 	return List(&ListOptions{})
