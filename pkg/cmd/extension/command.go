@@ -141,6 +141,15 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
+		&cobra.Command{
+			Use:   "create",
+			Short: "Initialize a new extension",
+			Args:  cobra.MaximumNArgs(1),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				fmt.Println("TODO")
+				return nil
+			},
+		},
 	)
 
 	extCmd.Hidden = true
