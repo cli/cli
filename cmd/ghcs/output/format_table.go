@@ -15,9 +15,7 @@ type Table interface {
 }
 
 func NewTable(w io.Writer, asJSON bool) Table {
-	f, ok := w.(*os.File)
-	isTTY := ok && term.IsTerminal(int(f.Fd()))
-
+	isTTY := isTTY(w)
 	if asJSON {
 		return &jsonwriter{w: w, pretty: isTTY}
 	}
@@ -25,4 +23,9 @@ func NewTable(w io.Writer, asJSON bool) Table {
 		return tablewriter.NewWriter(w)
 	}
 	return &tabwriter{w: w}
+}
+
+func isTTY(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
 }
