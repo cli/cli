@@ -33,13 +33,22 @@ func (l *PortForwarder) Start(ctx context.Context) error {
 		return fmt.Errorf("error listening on tcp port: %v", err)
 	}
 
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			return fmt.Errorf("error accepting incoming connection: %v", err)
-		}
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				l.errCh <- fmt.Errorf("error accepting incoming connection: %v", err)
+			}
 
-		go l.handleConnection(ctx, conn)
+			go l.handleConnection(ctx, conn)
+		}
+	}()
+
+	select {
+	case err := <-l.errCh:
+		return err
+	case <-ctx.Done():
+		return ln.Close()
 	}
 
 	return nil
@@ -54,7 +63,6 @@ func (l *PortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
 
 	copyConn := func(writer io.Writer, reader io.Reader) {
 		if _, err := io.Copy(writer, reader); err != nil {
-			fmt.Println(err)
 			channel.Close()
 			conn.Close()
 			if err != io.EOF {

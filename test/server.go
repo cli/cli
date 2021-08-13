@@ -5,18 +5,42 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sourcegraph/jsonrpc2"
 	"golang.org/x/crypto/ssh"
 )
+
+const sshPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAp/Jmzy/HaPNx5Bug09FX5Q/KGY4G9c4DfplhWrn31OQCqNiT
+ZSLd46rdXC75liHzE7e5Ic0RJN61cYN9SNArjvEXx2vvs7szhwO7LonwPOvpYpUf
+daayrgbr6S46plpx+hEZ1kO/6BqMgFuvnkIVThrEyx5b48ll8zgDABsYrKF8/p1V
+SjGfb+bLwjn1NtnZF2prBG5P4ZtMR06HaPglLqBJhmc0ZMG5IZGUE7ew/VrPDqdC
+f1v4XvvGiU4BLoKYy4QOhyrCGh9Uk/9u0Ea56M2bh4RqwhbpR8m7TYJZ0DVMLbGW
+8C+4lCWp+xRyBNxAQh8qeQVCxYl02hPE4bXLGQIDAQABAoIBAEoVPk6UZ+UexhV2
+LnphNOFhFqgxI1bYWmhE5lHsCKuLLLUoW9RYDgL4gw6/1e7o6N3AxFRpre9Soj0B
+YIl28k/qf6/DKAhjQnaDKdV8mVF2Swvmdesi7lyfxv6kGtD4wqApXPlMB2IuG94f
+E5e+1MEQQ9DJgoU3eNZR1dj9GuRC3PyzPcNNJ2R/MMGFw3sOOVcLOgAukotoicuL
+0SiL51rHPQu8a5/darH9EltN1GFeceJSDDhgqMP5T8Tp7g/c3//H6szon4H9W+uN
+Z3UrImJ+teJjFOaVDqN93+J2eQSUk0lCPGQCd4U9I4AGDGyU6ucdcLQ58Aha9gmU
+uQwkfKUCgYEA0UkuPOSDE9dbXe+yhsbOwMb1kKzJYgFDKjRTSP7D9BOMZu4YyASo
+J95R4DWjePlDopafG2tNJoWX+CwUl7Uld1R3Ex6xHBa2B7hwZj860GZtr7D4mdWc
+DTVjczAjp4P0K1MIFYQui1mVJterkjKuePiI6q/27L1c2jIa/39BWBcCgYEAzW8R
+MFZamVw3eA2JYSpBuqhQgE5gX5IWrmVJZSUhpAQTNG/A4nxf7WGtjy9p99tm0RMb
+ld05+sOmNLrzw8Pq8SBpFOd+MAca7lPLS1A2CoaAHbOqRqrzVcZ4EZ2jB3WjoLoq
+yctwslGb9KmrhBCdcwT48aPAYUIJCZdqEen2xE8CgYBoMowvywGrvjwCH9X9njvP
+5P7cAfrdrY04FQcmP5lmCtmLYZ267/6couaWv33dPBU9fMpIh3rI5BiOebvi8FBw
+AgCq50v8lR4Z5+0mKvLoUSbpIy4SwTRJqzwRXHVT8LF/ZH6Q39egj4Bf716/kjYl
+im/4kJVatsjk5a9lZ4EsDwKBgERkJ3rKJNtNggHrr8KzSLKVekdc0GTAw+BHRAny
+NKLf4Gzij3pXIbBrhlZW2JZ1amNMUzCvN7AuFlUTsDeKL9saiSE2eCIRG3wgVVu7
+VmJmqJw6xgNEwkHaEvr6Wd4P4euOTtRjcB9NX/gxzDHpPiGelCoN8+vtCgkxaVSR
+aV+tAoGAO4HtLOfBAVDNbVXa27aJAjQSUq8qfkwUNJNz+rwgpVQahfiVkyqAPCQM
+IfRJxKWb0Wbt9ojw3AowK/k0d3LZA7FS41JSiiGKIllSGb+i7JKqKW7RHLA3VJ/E
+Bq5TLNIbUzPVNVwRcGjUYpOhKU6EIw8phTJOvxnUC+g6MVqBP8U=
+-----END RSA PRIVATE KEY-----`
 
 type Server struct {
 	password string
@@ -41,11 +65,7 @@ func NewServer(opts ...ServerOption) (*Server, error) {
 	server.sshConfig = &ssh.ServerConfig{
 		PasswordCallback: sshPasswordCallback(server.password),
 	}
-	b, err := ioutil.ReadFile(filepath.Join("test", "private.key"))
-	if err != nil {
-		return nil, fmt.Errorf("error reading private.key: %v", err)
-	}
-	privateKey, err := ssh.ParsePrivateKey(b)
+	privateKey, err := ssh.ParsePrivateKey([]byte(sshPrivateKey))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing key: %v", err)
 	}
@@ -220,71 +240,4 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 	if err := conn.Reply(ctx, req.ID, result); err != nil {
 		r.server.errCh <- fmt.Errorf("error replying: %v", err)
 	}
-}
-
-type socketConn struct {
-	*websocket.Conn
-
-	reader     io.Reader
-	writeMutex sync.Mutex
-	readMutex  sync.Mutex
-}
-
-func newSocketConn(conn *websocket.Conn) *socketConn {
-	return &socketConn{Conn: conn}
-}
-
-func (s *socketConn) Read(b []byte) (int, error) {
-	s.readMutex.Lock()
-	defer s.readMutex.Unlock()
-
-	if s.reader == nil {
-		msgType, r, err := s.Conn.NextReader()
-		if err != nil {
-			return 0, fmt.Errorf("error getting next reader: %v", err)
-		}
-		if msgType != websocket.BinaryMessage {
-			return 0, fmt.Errorf("invalid message type")
-		}
-		s.reader = r
-	}
-
-	bytesRead, err := s.reader.Read(b)
-	if err != nil {
-		s.reader = nil
-
-		if err == io.EOF {
-			err = nil
-		}
-	}
-
-	return bytesRead, err
-}
-
-func (s *socketConn) Write(b []byte) (int, error) {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
-	w, err := s.Conn.NextWriter(websocket.BinaryMessage)
-	if err != nil {
-		return 0, fmt.Errorf("error getting next writer: %v", err)
-	}
-
-	n, err := w.Write(b)
-	if err != nil {
-		return 0, fmt.Errorf("error writing: %v", err)
-	}
-
-	if err := w.Close(); err != nil {
-		return 0, fmt.Errorf("error closing writer: %v", err)
-	}
-
-	return n, nil
-}
-
-func (s *socketConn) SetDeadline(deadline time.Time) error {
-	if err := s.Conn.SetReadDeadline(deadline); err != nil {
-		return err
-	}
-	return s.Conn.SetWriteDeadline(deadline)
 }
