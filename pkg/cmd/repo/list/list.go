@@ -28,6 +28,7 @@ type ListOptions struct {
 	Fork        bool
 	Source      bool
 	Language    string
+	Topic       string
 	Archived    bool
 	NonArchived bool
 
@@ -89,6 +90,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
+	cmd.Flags().StringVar(&opts.Topic, "topic", "", "Filter by topic")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
@@ -109,6 +111,7 @@ func listRun(opts *ListOptions) error {
 		Fork:        opts.Fork,
 		Source:      opts.Source,
 		Language:    opts.Language,
+		Topic:       opts.Topic,
 		Archived:    opts.Archived,
 		NonArchived: opts.NonArchived,
 		Fields:      defaultFields,
@@ -169,7 +172,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != ""
+		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
