@@ -29,7 +29,7 @@ func NewSSHCmd() *cobra.Command {
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "SSH Profile")
 	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH Server Port")
-	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "Codespace Name")
+	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
 
 	return sshCmd
 }

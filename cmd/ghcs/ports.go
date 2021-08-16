@@ -34,7 +34,7 @@ func NewPortsCmd() *cobra.Command {
 		},
 	}
 
-	portsCmd.Flags().StringVarP(&opts.CodespaceName, "name", "n", "", "Name of Codespace to use")
+	portsCmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
 	portsCmd.Flags().BoolVar(&opts.AsJSON, "json", false, "Output as JSON")
 
 	portsCmd.AddCommand(NewPortsPublicCmd())
