@@ -159,7 +159,7 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, 1, len(em.ListCalls()))
 				}
 			},
-			wantStdout: "gh test\tcli/gh-test\t\ngh test2\tcli/gh-test2\tUpdate available\n",
+			wantStdout: "gh test\tcli/gh-test\t\ngh test2\tcli/gh-test2\tUpgrade available\n",
 		},
 	}
 
