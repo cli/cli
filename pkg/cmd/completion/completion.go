@@ -53,6 +53,17 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 			Generate a %[1]sgh.fish%[1]s completion script:
 
 				gh completion -s fish > ~/.config/fish/completions/gh.fish
+
+			### PowerShell
+
+			Open your profile script with:
+
+				mkdir -Path (Split-Path -Parent $profile) -ErrorAction SilentlyContinue
+				notepad $profile
+			
+			Add the line and save the file:
+
+				Invoke-Expression -Command $(gh completion -s powershell | Out-String)
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if shellType == "" {
