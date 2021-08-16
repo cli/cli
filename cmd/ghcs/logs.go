@@ -78,7 +78,7 @@ func Logs(tail bool, codespaceName string) error {
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			fmt.Println(scanner.Text())
+			log.Println(scanner.Text())
 		}
 
 		if err := scanner.Err(); err != nil {
