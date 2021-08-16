@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -13,8 +12,9 @@ import (
 
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete a GitHub Codespace.",
+		Use:   "delete [<codespace>]",
+		Short: "Delete a Codespace",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
 			if len(args) > 0 {
@@ -26,22 +26,18 @@ func NewDeleteCmd() *cobra.Command {
 
 	deleteAllCmd := &cobra.Command{
 		Use:   "all",
-		Short: "delete all codespaces",
-		Long:  "delete all codespaces for the user with the current token",
+		Short: "Delete all Codespaces for the current user",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return DeleteAll()
 		},
 	}
 
 	deleteByRepoCmd := &cobra.Command{
-		Use:   "repo REPO_NAME",
-		Short: "delete all codespaces for the repo",
-		Long: `delete all the codespaces that the user with the current token has in this repo.
-This includes all codespaces in all states.`,
+		Use:   "repo <repo>",
+		Short: "Delete all Codespaces for a repository",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return errors.New("A Repository name is required.")
-			}
 			return DeleteByRepo(args[0])
 		},
 	}

@@ -14,7 +14,8 @@ import (
 func NewListCmd() *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List GitHub Codespaces you have on your account.",
+		Short: "List your Codespaces",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return List()
 		},

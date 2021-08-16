@@ -17,7 +17,8 @@ var repo, branch, machine string
 func newCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
-    Short: "Create a GitHub Codespace.",
+		Short: "Create a Codespace",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Create()
 		},
