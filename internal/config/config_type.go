@@ -8,8 +8,8 @@ import (
 
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
-	Get(hostname string, key string) (string, error)
-	GetWithSource(hostname string, key string) (string, string, error)
+	Get(string, string) (string, error)
+	GetWithSource(string, string) (string, string, error)
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)
@@ -57,7 +57,7 @@ var configOptions = []ConfigOption{
 	},
 	{
 		Key:          "browser",
-		Description:  "the path to the browser to use when opening URLs",
+		Description:  "the web browser to use for opening URLs",
 		DefaultValue: "",
 	},
 }
@@ -193,6 +193,15 @@ func NewBlankRoot() *yaml.Node {
 						HeadComment: "The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.",
 						Kind:        yaml.ScalarNode,
 						Value:       "http_unix_socket",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "",
+					},
+					{
+						HeadComment: "What web browser gh should use when opening URLs. If blank, will refer to environment.",
+						Kind:        yaml.ScalarNode,
+						Value:       "browser",
 					},
 					{
 						Kind:  yaml.ScalarNode,

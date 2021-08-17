@@ -29,7 +29,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Browser = browser(f)                       // Depends on IOStreams
+	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 
 	return f
 }
@@ -89,22 +89,22 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-// browser returns the path to the browser. Attempts to read a path from Config,
-// and falls back to the $BROWSER env var if Config value is blank.
 func browser(f *cmdutil.Factory) cmdutil.Browser {
 	io := f.IOStreams
+	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+}
 
+// Browser precedence
+// 1. browser from config
+// 2. BROWSER
+func browserLauncher(f *cmdutil.Factory) string {
 	cfg, err := f.Config()
-	if err != nil {
-		fmt.Fprintf(io.ErrOut, "problem loading config %s", err)
+	if err == nil {
+		if browser, _ := cfg.Get("", "browser"); browser != "" {
+			return browser
+		}
 	}
-
-	fromConfig, err := cfg.Get("", "browser")
-	if err == nil && fromConfig != "" {
-		return cmdutil.NewBrowser(fromConfig, io.Out, io.ErrOut)
-	}
-
-	return cmdutil.NewBrowser(os.Getenv("BROWSER"), io.Out, io.ErrOut)
+	return os.Getenv("BROWSER")
 }
 
 func executable() string {

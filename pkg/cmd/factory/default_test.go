@@ -378,6 +378,57 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
+func Test_browserLauncher(t *testing.T) {
+	tests := []struct {
+		name        string
+		env         map[string]string
+		config      config.Config
+		wantBrowser string
+	}{
+		{
+			name: "BROWSER set",
+			env: map[string]string{
+				"BROWSER": "BROWSER",
+			},
+			wantBrowser: "BROWSER",
+		},
+		{
+			name:        "config browser set",
+			config:      browserConfig(),
+			wantBrowser: "CONFIG_BROWSER",
+		},
+		{
+			name: "config browser and BROWSER set",
+			env: map[string]string{
+				"BROWSER": "BROWSER",
+			},
+			config:      browserConfig(),
+			wantBrowser: "CONFIG_BROWSER",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, v)
+					defer os.Setenv(k, old)
+				}
+			}
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			browser := browserLauncher(f)
+			assert.Equal(t, tt.wantBrowser, browser)
+		})
+	}
+}
+
 func defaultConfig() config.Config {
 	return config.InheritEnv(config.NewFromString(heredoc.Doc(`
     hosts:
@@ -392,4 +443,8 @@ func pagerConfig() config.Config {
 
 func disablePromptConfig() config.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func browserConfig() config.Config {
+	return config.NewFromString("browser: CONFIG_BROWSER")
 }
