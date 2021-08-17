@@ -7,15 +7,9 @@ the following CPU architectures: `i386`, `amd64`, `arm64`, `armhf`.
 Other sources for installation are community-maintained and thus might lag behind
 our release schedule.
 
-If none of our official binaries, packages, repositories, nor community sources work for you, we recommend using our `Makefile` to build `gh` from source. It's quick and easy.
-
 ## Official sources
 
 ### Debian, Ubuntu Linux (apt)
-
-:warning: This will only work for the [architectures we officially support](/.goreleaser.yml#L27).
-
-The below should work for any debian-based distribution. You can change `stable` to a specific codename [we support](/.github/workflows/releases.yml#L83) if that is your preference.
 
 Install:
 
@@ -26,7 +20,7 @@ sudo apt update
 sudo apt install gh
 ```
 
-**Note**: If you get _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_ error, try installing the `dirmngr` package. Run `sudo apt-get install dirmngr` and repeat the steps above.  
+**Note**: If you get the error _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_, try installing the `dirmngr` package: `sudo apt install dirmngr`.
 
 Upgrade:
 
@@ -72,16 +66,9 @@ sudo zypper update gh
 * [Download release binaries][releases page] that match your platform; or
 * [Build from source](./source.md).
 
-### openSUSE/SUSE Linux (zypper)
- 
-Install and upgrade:
+## Unofficial, community-supported methods
 
-1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
-
-## Unofficial, Community-supported methods
-
-The core GitHub CLI team does not maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them. They are linked here as a convenience and their presence does not imply continued oversight from the CLI core team. Users who choose to use them do so at their own risk.
+The GitHub CLI team does not maintain the following packages or repositories and thus we are unable to provide support for those installation methods.
 
 ### Snap (do not use)
 
@@ -103,13 +90,6 @@ Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page
 
 ```bash
 pkg install gh
-```
-
-### Homebrew (Linuxbrew)
-
-Linuxbrew users can install it as a [brew package](https://formulae.brew.sh/formula/gh#default):
-```bash
-brew install gh
 ```
 
 ### FreeBSD
