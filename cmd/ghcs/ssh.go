@@ -21,14 +21,15 @@ func NewSSHCmd() *cobra.Command {
 
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
-		Short: "SSH into a GitHub Codespace, for use with running tests/editing in vim, etc.",
+		Short: "SSH into a Codespace",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return SSH(sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
-	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "SSH Profile")
-	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH Server Port")
+	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "The `name` of the SSH profile to use")
+	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number")
 	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
 
 	return sshCmd

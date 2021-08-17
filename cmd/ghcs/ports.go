@@ -28,7 +28,8 @@ func NewPortsCmd() *cobra.Command {
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
-		Short: "Forward ports from a GitHub Codespace.",
+		Short: "List ports in a Codespace",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Ports(opts)
 		},
@@ -168,14 +169,10 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 
 func NewPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "public",
-		Short: "public",
-		Long:  "public",
+		Use:   "public <codespace> <port>",
+		Short: "Mark port as public",
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 2 {
-				return errors.New("[codespace_name] [source] port number are required.")
-			}
-
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
 			return updatePortVisibility(log, args[0], args[1], true)
 		},
@@ -184,14 +181,10 @@ func NewPortsPublicCmd() *cobra.Command {
 
 func NewPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "private",
-		Short: "private",
-		Long:  "private",
+		Use:   "private <codespace> <port>",
+		Short: "Mark port as private",
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 2 {
-				return errors.New("[codespace_name] [source] port number are required.")
-			}
-
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
 			return updatePortVisibility(log, args[0], args[1], false)
 		},
@@ -247,14 +240,10 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 
 func NewPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "forward",
-		Short: "forward",
-		Long:  "forward",
+		Use:   "forward <codespace> <source-port> <destination-port>",
+		Short: "Forward port",
+		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 3 {
-				return errors.New("[codespace_name] [source] [dst] port number are required.")
-			}
-
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
 			return forwardPort(log, args[0], args[1], args[2])
 		},

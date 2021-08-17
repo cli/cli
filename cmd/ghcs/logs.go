@@ -16,8 +16,9 @@ func NewLogsCmd() *cobra.Command {
 	var tail bool
 
 	logsCmd := &cobra.Command{
-		Use:   "logs",
+		Use:   "logs [<codespace>]",
 		Short: "Access Codespace logs",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
 			if len(args) > 0 {
