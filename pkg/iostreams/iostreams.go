@@ -40,6 +40,7 @@ type IOStreams struct {
 	stdoutIsTTY       bool
 	stderrTTYOverride bool
 	stderrIsTTY       bool
+	termWidthOverride int
 
 	pagerCommand string
 	pagerProcess *os.Process
@@ -232,6 +233,10 @@ func (s *IOStreams) StopProgressIndicator() {
 }
 
 func (s *IOStreams) TerminalWidth() int {
+	if s.termWidthOverride > 0 {
+		return s.termWidthOverride
+	}
+
 	defaultWidth := 80
 	out := s.Out
 	if s.originalOut != nil {
@@ -257,6 +262,29 @@ func (s *IOStreams) TerminalWidth() int {
 	}
 
 	return defaultWidth
+}
+
+func (s *IOStreams) ForceTerminal(spec string) {
+	s.colorEnabled = !EnvColorDisabled()
+	s.SetStdoutTTY(true)
+
+	if w, err := strconv.Atoi(spec); err == nil {
+		s.termWidthOverride = w
+		return
+	}
+
+	ttyWidth, _, err := ttySize()
+	if err != nil {
+		return
+	}
+	s.termWidthOverride = ttyWidth
+
+	if strings.HasSuffix(spec, "%") {
+		if p, err := strconv.Atoi(spec[:len(spec)-1]); err == nil {
+			s.termWidthOverride = int(float64(s.termWidthOverride) * (float64(p) / 100))
+		}
+	}
+
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
