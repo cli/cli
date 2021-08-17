@@ -44,8 +44,7 @@ func Code(codespaceName string) error {
 		codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
 		if err != nil {
 			if err == codespaces.ErrNoCodespaces {
-				fmt.Println(err.Error())
-				return nil
+				return err
 			}
 			return fmt.Errorf("error choosing codespace: %v", err)
 		}

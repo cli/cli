@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/camelcase"
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +42,7 @@ func Create() error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	repo, err := getRepoName()
 	if err != nil {
@@ -70,18 +73,17 @@ func Create() error {
 		return fmt.Errorf("error getting machine type: %v", err)
 	}
 	if machine == "" {
-		fmt.Println("There are no available machine types for this repository")
-		return nil
+		return errors.New("There are no available machine types for this repository")
 	}
 
-	fmt.Println("Creating your codespace...")
+	log.Println("Creating your codespace...")
 
 	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
-	fmt.Println("Codespace created: " + codespace.Name)
+	log.Printf("Codespace created: %s\n", codespace.Name)
 
 	return nil
 }

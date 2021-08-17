@@ -5,21 +5,28 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/olekukonko/tablewriter"
-
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/spf13/cobra"
 )
 
+type ListOptions struct {
+	AsJSON bool
+}
+
 func NewListCmd() *cobra.Command {
+	opts := &ListOptions{}
+
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your Codespaces",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return List()
+			return List(opts)
 		},
 	}
+
+	listCmd.Flags().BoolVar(&opts.AsJSON, "json", false, "Output as JSON")
 
 	return listCmd
 }
@@ -28,7 +35,7 @@ func init() {
 	rootCmd.AddCommand(NewListCmd())
 }
 
-func List() error {
+func List(opts *ListOptions) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -42,12 +49,7 @@ func List() error {
 		return fmt.Errorf("error getting codespaces: %v", err)
 	}
 
-	if len(codespaces) == 0 {
-		fmt.Println("You have no codespaces.")
-		return nil
-	}
-
-	table := tablewriter.NewWriter(os.Stdout)
+	table := output.NewTable(os.Stdout, opts.AsJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, codespace := range codespaces {
 		table.Append([]string{

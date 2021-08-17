@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,7 @@ func init() {
 func Logs(tail bool, codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -50,7 +52,7 @@ func Logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}
