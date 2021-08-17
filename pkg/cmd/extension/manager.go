@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/pkg/findsh"
 	"github.com/cli/safeexec"
@@ -237,12 +238,71 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 	return err
 }
 
-func (m *Manager) Create(name, repoName string) error {
-	// TODO create repo
-	//   - would a template repo be useful?
-	// TODO prompt for local install
-	// TODO print helpful information
-	// TODO cd?
+// GraphQL ID for cli/extension-template repository
+const templateRepositoryID = "MDEwOlJlcG9zaXRvcnkzOTc2OTc3OTk="
+
+func (m *Manager) Create(opts *extensions.CreateOptions) error {
+	if !strings.HasPrefix(opts.Name, "gh-") {
+		opts.Name = "gh-" + opts.Name
+	}
+
+	input := extensionCreateInput{
+		Name:         opts.Name,
+		Description:  opts.Description,
+		Visibility:   opts.Visibility,
+		Organization: opts.Organization,
+		RepositoryID: templateRepositoryID,
+	}
+
+	repo, err := extensionCreate(opts.Client, opts.Host, input)
+	if err != nil {
+		return err
+	}
+
+	io := opts.IO
+	isTTY := io.IsStdoutTTY()
+	cs := io.ColorScheme()
+
+	if isTTY {
+		fmt.Fprintf(io.Out, "%s Created extension %s on GitHub\n", cs.SuccessIconWithColor(cs.Green), ghrepo.FullName(repo))
+	}
+
+	exe, err := m.lookPath("git")
+	if err != nil {
+		return err
+	}
+
+	externalCmd := m.newCommand(exe, "clone", repo.SSHURL)
+	err = externalCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	if isTTY {
+		fmt.Fprintf(io.Out, "%s Cloned extension into %s\n", cs.SuccessIconWithColor(cs.Green), opts.Name)
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	extensionPath := filepath.Join(wd, opts.Name)
+
+	err = os.Rename(filepath.Join(extensionPath, "extension-template"), filepath.Join(extensionPath, opts.Name))
+	if err != nil {
+		return err
+	}
+
+	err = m.InstallLocal(extensionPath)
+	if err != nil {
+		return err
+	}
+
+	if isTTY {
+		fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIconWithColor(cs.Green), opts.Name)
+		fmt.Fprintf(io.Out, "To use the extension, try: gh %s\n", strings.TrimPrefix(opts.Name, "gh-"))
+	}
+
 	return nil
 }
 

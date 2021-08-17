@@ -2,7 +2,20 @@ package extensions
 
 import (
 	"io"
+	"net/http"
+
+	"github.com/cli/cli/pkg/iostreams"
 )
+
+type CreateOptions struct {
+	IO           *iostreams.IOStreams
+	Client       *http.Client
+	Host         string
+	Name         string
+	Description  string
+	Visibility   string
+	Organization string
+}
 
 //go:generate moq -rm -out extension_mock.go . Extension
 type Extension interface {
@@ -21,4 +34,5 @@ type ExtensionManager interface {
 	Upgrade(name string, force bool, stdout, stderr io.Writer) error
 	Remove(name string) error
 	Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error)
+	Create(*CreateOptions) error
 }

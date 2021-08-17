@@ -143,35 +143,86 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
-		&cobra.Command{
-			Use:   "create",
-			Short: "Initialize a new extension",
-			Args:  cobra.MaximumNArgs(1),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				name := ""
-				repoName := ""
-				if len(args) == 0 {
-					if !io.CanPrompt() {
-						return errors.New("must pass extension name")
-					}
-					err := prompt.SurveyAskOne(&survey.Input{
-						Message: "Extension name:",
-					}, &name)
+		func() *cobra.Command {
+			var flagPublic, flagPrivate, flagInternal bool
+			var opts extensions.CreateOptions
+			cmd := &cobra.Command{
+				Use:   "create",
+				Short: "Create a new extension",
+				Args:  cobra.MaximumNArgs(1),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					opts.IO = io
+
+					client, err := f.HttpClient()
 					if err != nil {
 						return err
 					}
-				} else {
-					name = args[0]
-				}
-				if strings.HasPrefix(name, "gh-") {
-					repoName = name
-				} else {
-					repoName = "gh-" + name
+					opts.Client = client
 
-				}
-				return m.Create(name, repoName)
-			},
-		},
+					cfg, err := f.Config()
+					if err != nil {
+						return err
+					}
+					host, err := cfg.DefaultHost()
+					if err != nil {
+						return err
+					}
+					opts.Host = host
+
+					if len(args) == 0 {
+						if !io.CanPrompt() {
+							return errors.New("must specify extension name")
+						}
+						err := prompt.SurveyAskOne(&survey.Input{
+							Message: "Extension name:",
+						}, &opts.Name)
+						if err != nil {
+							return err
+						}
+					} else {
+						opts.Name = args[0]
+					}
+
+					if err := cmdutil.MutuallyExclusive(
+						"specify only one of `--public`, `--private`, or `--internal`",
+						flagPublic,
+						flagPrivate,
+						flagInternal,
+					); err != nil {
+						return err
+					}
+
+					if flagPublic {
+						opts.Visibility = "public"
+					} else if flagPrivate {
+						opts.Visibility = "private"
+					} else if flagInternal {
+						opts.Visibility = "internal"
+					} else {
+						var visibility string
+						if !io.CanPrompt() {
+							return &cmdutil.FlagError{Err: errors.New("`--public`, `--private`, or `--internal` required when not running interactively")}
+						}
+						err := prompt.SurveyAskOne(&survey.Select{
+							Message: "Visibility:",
+							Options: []string{"Public", "Private", "Internal"},
+						}, &visibility)
+						if err != nil {
+							return err
+						}
+						opts.Visibility = strings.ToLower(visibility)
+					}
+
+					return m.Create(&opts)
+				},
+			}
+			cmd.Flags().BoolVar(&flagPublic, "public", false, "Make the new extension public")
+			cmd.Flags().BoolVar(&flagPrivate, "private", false, "Make the new extension private")
+			cmd.Flags().BoolVar(&flagInternal, "internal", false, "Make the new extension internal")
+			cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the extension in an organization")
+			cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the extension")
+			return cmd
+		}(),
 	)
 
 	extCmd.Hidden = true
