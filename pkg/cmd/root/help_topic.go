@@ -44,7 +44,7 @@ var HelpTopics = map[string]map[string]string{
 			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
 			for authoring text.
 
-			BROWSER: the web browser to use for opening links.
+			GH_BROWSER, BROWSER (in order of precedence): the web browser to use for opening links.
 
 			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
 			or "oauth" to print detailed information about HTTP requests or authentication flow.
