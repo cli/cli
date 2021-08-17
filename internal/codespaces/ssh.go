@@ -56,12 +56,12 @@ func makeSSHArgs(port int, dst, cmd string) ([]string, []string) {
 	return cmdArgs, connArgs
 }
 
-func ConnectToTunnel(ctx context.Context, port int, destination string, usingCustomPort bool) <-chan error {
+func ConnectToTunnel(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) <-chan error {
 	connClosed := make(chan error)
 	args, connArgs := makeSSHArgs(port, destination, "")
 
 	if usingCustomPort {
-		fmt.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
+		log.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
 	}
 
 	cmd := exec.CommandContext(ctx, "ssh", args...)
