@@ -735,7 +735,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 		RequestPath:   "graphql",
 		Paginate:      true,
 		// test that templates executed per page properly render a table.
-		Template: `{{range .data.nodes}}{{row .page .caption}}{{end}}`,
+		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
 	}
 
 	err := apiRun(&options)

@@ -150,7 +150,7 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 20, "title": "Twenty"},
 					{"number": 3000, "title": "Three thousand"}
 				]`)),
-				template: `{{range .}}{{row (.number | printf "#%v") .title}}{{end}}`,
+				template: `{{range .}}{{tablerow (.number | printf "#%v") .title}}{{end}}`,
 			},
 			wantW: "#1\tOne\n#20\tTwenty\n#3000\tThree thousand\n",
 		},
@@ -162,7 +162,7 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 20.1, "title": "Twenty-ish", "float": true},
 					{"number": 3000, "title": "Three thousand", "float": false}
 				]`)),
-				template: `{{range .}}{{row .number .title .float}}{{end}}`,
+				template: `{{range .}}{{tablerow .number .title .float}}{{end}}`,
 			},
 			wantW: "1\t\t\n20.10\tTwenty-ish\ttrue\n3000\tThree thousand\tfalse\n",
 		},
@@ -172,7 +172,7 @@ func Test_executeTemplate(t *testing.T) {
 				json: strings.NewReader(heredoc.Doc(`[
 					{"number": 1, "title": "One"}
 				]`)),
-				template: `{{range .}}{{row (.number | color "green") .title}}{{end}}`,
+				template: `{{range .}}{{tablerow (.number | color "green") .title}}{{end}}`,
 			},
 			wantW: "\x1b[0;32m1\x1b[0m\tOne\n",
 		},
@@ -184,7 +184,7 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 2, "title": "Two"}
 				]`)),
 				template: heredoc.Doc(`HEADER
-				{{range .}}{{row .number .title}}{{end}}FOOTER
+				{{range .}}{{tablerow .number .title}}{{end}}FOOTER
 				`),
 			},
 			wantW: heredoc.Docf(`HEADER
@@ -201,7 +201,7 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 2, "title": "Two"}
 				]`)),
 				template: heredoc.Doc(`HEADER
-				{{range .}}{{row .number .title}}{{end}}FOOTER
+				{{range .}}{{tablerow .number .title}}{{end}}FOOTER
 				`),
 				tty: true,
 			},
@@ -219,7 +219,7 @@ func Test_executeTemplate(t *testing.T) {
 					{"number": 2, "title": "Two"}
 				]`)),
 				template: heredoc.Doc(`HEADER
-				{{range .}}{{row .number .title}}{{end}}{{endtable}}FOOTER
+				{{range .}}{{tablerow .number .title}}{{end}}{{tablerender}}FOOTER
 				`),
 				tty: true,
 			},
@@ -242,8 +242,8 @@ func Test_executeTemplate(t *testing.T) {
 						{"number": 4, "title": "Four", "reviewDecision": "CHANGES_REQUESTED"}
 					]
 				}`)),
-				template: heredoc.Doc(`{{row "ISSUE" "TITLE"}}{{range .issues}}{{row .number .title}}{{end}}{{endtable}}
-				{{row "PR" "TITLE" "DECISION"}}{{range .prs}}{{row .number .title .reviewDecision}}{{end}}`),
+				template: heredoc.Doc(`{{tablerow "ISSUE" "TITLE"}}{{range .issues}}{{tablerow .number .title}}{{end}}{{tablerender}}
+				{{tablerow "PR" "TITLE" "DECISION"}}{{range .prs}}{{tablerow .number .title .reviewDecision}}{{end}}`),
 				tty: true,
 			},
 			wantW: heredoc.Docf(`ISSUE  TITLE

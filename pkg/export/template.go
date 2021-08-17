@@ -52,10 +52,10 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 			return timeAgo(now.Sub(t)), nil
 		},
 
-		"pluck":    templatePluck,
-		"join":     templateJoin,
-		"row":      t.row,
-		"endtable": t.endTable,
+		"pluck":       templatePluck,
+		"join":        templateJoin,
+		"tablerow":    t.tableRow,
+		"tablerender": t.tableRender,
 	}
 
 	if !t.io.ColorEnabled() {
@@ -148,7 +148,7 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 	return strings.Join(results, sep), nil
 }
 
-func (t *Template) row(fields ...interface{}) (string, error) {
+func (t *Template) tableRow(fields ...interface{}) (string, error) {
 	if t.tablePrinter == nil {
 		tablePrinter := utils.NewTablePrinter(t.io)
 		t.tablePrinter = &tablePrinter
@@ -156,7 +156,7 @@ func (t *Template) row(fields ...interface{}) (string, error) {
 	for _, e := range fields {
 		s, err := jsonScalarToString(e)
 		if err != nil {
-			return "", fmt.Errorf("failed to write row: %v", err)
+			return "", fmt.Errorf("failed to write table row: %v", err)
 		}
 		(*t.tablePrinter).AddField(s, nil, nil)
 	}
@@ -164,12 +164,12 @@ func (t *Template) row(fields ...interface{}) (string, error) {
 	return "", nil
 }
 
-func (t *Template) endTable() (string, error) {
+func (t *Template) tableRender() (string, error) {
 	if t.tablePrinter != nil {
 		err := (*t.tablePrinter).Render()
 		t.tablePrinter = nil
 		if err != nil {
-			return "", fmt.Errorf("failed to render template table: %v", err)
+			return "", fmt.Errorf("failed to render table: %v", err)
 		}
 	}
 	return "", nil
@@ -177,7 +177,7 @@ func (t *Template) endTable() (string, error) {
 
 func (t *Template) End() error {
 	// Finalize any template actions.
-	if _, err := t.endTable(); err != nil {
+	if _, err := t.tableRender(); err != nil {
 		return err
 	}
 	return nil

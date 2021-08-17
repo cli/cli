@@ -96,13 +96,13 @@ var HelpTopics = map[string]map[string]string{
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
 			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
 			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
-			- %[1]srow <fields>%[1]s: writes fields in table columns like built-in commands
-			- %[1]sendtable%[1]s: renders the table immediately before any subsequent template
+			- %[1]stablerow <fields>%[1]s: writes fields in table columns like built-in commands
+			- %[1]stablerender%[1]s: renders the table immediately before any subsequent template
 
 			EXAMPLES
 			  # format issues as table
 			  $ gh issue list --json number,title --template \
-			    '{{range .}}{{row (printf "#%%v" .number | autocolor "green") .title}}{{end}}'
+			    '{{range .}}{{tablerow (printf "#%%v" .number | autocolor "green") .title}}{{end}}'
 			
 			  # format a pull request using multiple tables with headers
 			  $ gh pr view 3519 --json number,title,body,reviews,assignees --template \
@@ -110,8 +110,8 @@ var HelpTopics = map[string]map[string]string{
 
 			    {{.body}}
 
-			    {{row "ASSIGNEE" "NAME"}}{{range .assignees}}{{row .login .name}}{{end}}{{endtable}}
-			    {{row "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{row .author.login .state .body}}{{end}}
+			    {{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
+			    {{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
 			    '
 		`, "`"),
 	},
