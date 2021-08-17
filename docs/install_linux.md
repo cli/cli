@@ -1,4 +1,4 @@
-# Installing gh on Linux and FreeBSD
+# Installing gh on Linux and BSD
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
@@ -124,6 +124,14 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 
 ```bash
 pkg install gh
+```
+
+### OpenBSD
+
+In -current, or in releases starting from 7.0, OpenBSD users can install from packages:
+
+```
+pkg_add github-cli
 ```
 
 ### Funtoo
