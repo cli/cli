@@ -9,7 +9,7 @@ our release schedule.
 
 ## Official sources
 
-### Debian, Ubuntu Linux (apt)
+### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
 
 Install:
 
