@@ -240,6 +240,14 @@ func Test_executeTemplate(t *testing.T) {
 			4   Four   CHANGES_REQUESTED
 			`),
 		},
+		{
+			name: "truncate",
+			args: args{
+				json:     strings.NewReader(`{"title": "This is a long title"}`),
+				template: `{{truncate 13 .title}}`,
+			},
+			wantW: "This is a ...",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

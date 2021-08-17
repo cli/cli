@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/pkg/text"
 	"github.com/cli/cli/utils"
 	"github.com/mgutz/ansi"
 )
@@ -56,6 +57,7 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 		"join":        templateJoin,
 		"tablerow":    t.tableRow,
 		"tablerender": t.tableRender,
+		"truncate":    text.Truncate,
 	}
 
 	if !t.io.ColorEnabled() {
