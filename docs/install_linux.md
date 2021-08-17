@@ -83,6 +83,10 @@ Install and upgrade:
 
 The core GitHub CLI team does not maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them. They are linked here as a convenience and their presence does not imply continued oversight from the CLI core team. Users who choose to use them do so at their own risk.
 
+### Snap (do not use)
+
+There are [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) as a runtime mechanism for apps like GitHub CLI that our team suggests _never installing gh as a snap_.
+
 ### Arch Linux
 
 Arch Linux users can install from the [community repo][arch linux repo]:
@@ -174,18 +178,6 @@ openSUSE Tumbleweed users can install from the [official distribution repo](http
 ```bash
 sudo zypper in gh
 ```
-
-### Snaps
-
-Many Linux distro users can install using Snapd from the [Snap Store](https://snapcraft.io/gh) or the associated [repo](https://github.com/casperdcl/cli/tree/snap)
-
-```bash
-sudo snap install --edge gh && snap connect gh:ssh-keys
-```
-> Snaps are auto-updated every 6 hours. `Snapd` is required and is available on a wide range of Linux distros.
-> Find out which distros have Snapd pre-installed and how to install it in the [Snapcraft Installation Docs](https://snapcraft.io/docs/installing-snapd)
->
-> **Note:** `snap connect gh:ssh-keys` is needed for all authentication and SSH needs.
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
