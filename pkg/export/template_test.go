@@ -73,7 +73,6 @@ func Test_executeTemplate(t *testing.T) {
 		json     io.Reader
 		template string
 		colorize bool
-		tty      bool
 	}
 	tests := []struct {
 		name    string
@@ -152,19 +151,25 @@ func Test_executeTemplate(t *testing.T) {
 				]`)),
 				template: `{{range .}}{{tablerow (.number | printf "#%v") .title}}{{end}}`,
 			},
-			wantW: "#1\tOne\n#20\tTwenty\n#3000\tThree thousand\n",
+			wantW: heredoc.Doc(`#1     One
+			#20    Twenty
+			#3000  Three thousand
+			`),
 		},
 		{
 			name: "table with mixed value types",
 			args: args{
 				json: strings.NewReader(heredoc.Doc(`[
-					{"number": 1, "title": null},
+					{"number": 1, "title": null, "float": false},
 					{"number": 20.1, "title": "Twenty-ish", "float": true},
 					{"number": 3000, "title": "Three thousand", "float": false}
 				]`)),
 				template: `{{range .}}{{tablerow .number .title .float}}{{end}}`,
 			},
-			wantW: "1\t\t\n20.10\tTwenty-ish\ttrue\n3000\tThree thousand\tfalse\n",
+			wantW: heredoc.Doc(`1                      false
+			20.10  Twenty-ish      true
+			3000   Three thousand  false
+			`),
 		},
 		{
 			name: "table with color",
@@ -174,7 +179,7 @@ func Test_executeTemplate(t *testing.T) {
 				]`)),
 				template: `{{range .}}{{tablerow (.number | color "green") .title}}{{end}}`,
 			},
-			wantW: "\x1b[0;32m1\x1b[0m\tOne\n",
+			wantW: "\x1b[0;32m1\x1b[0m  One\n",
 		},
 		{
 			name: "table with header and footer",
@@ -187,24 +192,6 @@ func Test_executeTemplate(t *testing.T) {
 				{{range .}}{{tablerow .number .title}}{{end}}FOOTER
 				`),
 			},
-			wantW: heredoc.Docf(`HEADER
-			1%[1]sOne
-			2%[1]sTwo
-			FOOTER
-			`, "\t"),
-		},
-		{
-			name: "table with header and footer (TTY)",
-			args: args{
-				json: strings.NewReader(heredoc.Doc(`[
-					{"number": 1, "title": "One"},
-					{"number": 2, "title": "Two"}
-				]`)),
-				template: heredoc.Doc(`HEADER
-				{{range .}}{{tablerow .number .title}}{{end}}FOOTER
-				`),
-				tty: true,
-			},
 			wantW: heredoc.Doc(`HEADER
 			FOOTER
 			1  One
@@ -212,7 +199,7 @@ func Test_executeTemplate(t *testing.T) {
 			`),
 		},
 		{
-			name: "table with header and footer using endtable (TTY)",
+			name: "table with header and footer using endtable",
 			args: args{
 				json: strings.NewReader(heredoc.Doc(`[
 					{"number": 1, "title": "One"},
@@ -221,7 +208,6 @@ func Test_executeTemplate(t *testing.T) {
 				template: heredoc.Doc(`HEADER
 				{{range .}}{{tablerow .number .title}}{{end}}{{tablerender}}FOOTER
 				`),
-				tty: true,
 			},
 			wantW: heredoc.Doc(`HEADER
 			1  One
@@ -244,7 +230,6 @@ func Test_executeTemplate(t *testing.T) {
 				}`)),
 				template: heredoc.Doc(`{{tablerow "ISSUE" "TITLE"}}{{range .issues}}{{tablerow .number .title}}{{end}}{{tablerender}}
 				{{tablerow "PR" "TITLE" "DECISION"}}{{range .prs}}{{tablerow .number .title .reviewDecision}}{{end}}`),
-				tty: true,
 			},
 			wantW: heredoc.Docf(`ISSUE  TITLE
 			1      One
@@ -260,7 +245,6 @@ func Test_executeTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, w, _ := iostreams.Test()
 			io.SetColorEnabled(tt.args.colorize)
-			io.SetStdoutTTY(tt.args.tty)
 			if err := ExecuteTemplate(io, tt.args.json, tt.args.template); (err != nil) != tt.wantErr {
 				t.Errorf("executeTemplate() error = %v, wantErr %v", err, tt.wantErr)
 				return

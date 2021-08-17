@@ -150,7 +150,7 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 
 func (t *Template) tableRow(fields ...interface{}) (string, error) {
 	if t.tablePrinter == nil {
-		tablePrinter := utils.NewTablePrinter(t.io)
+		tablePrinter := utils.NewTtyTablePrinter(t.io, utils.MaxInt)
 		t.tablePrinter = &tablePrinter
 	}
 	for _, e := range fields {

@@ -10,6 +10,13 @@ import (
 	"github.com/cli/cli/pkg/text"
 )
 
+const (
+	// Copied from "math" in Go 1.17.
+	intSize = 32 << (^uint(0) >> 63) // 32 or 64
+
+	MaxInt = 1<<(intSize-1) - 1
+)
+
 type TablePrinter interface {
 	IsTTY() bool
 	AddField(string, func(int, string) string, func(string) string)
@@ -26,6 +33,13 @@ func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 	}
 	return &tsvTablePrinter{
 		out: io.Out,
+	}
+}
+
+func NewTtyTablePrinter(io *iostreams.IOStreams, maxWidth int) TablePrinter {
+	return &ttyTablePrinter{
+		out:      io.Out,
+		maxWidth: maxWidth,
 	}
 }
 
