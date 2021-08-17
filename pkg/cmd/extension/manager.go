@@ -237,6 +237,15 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 	return err
 }
 
+func (m *Manager) Create(name, repoName string) error {
+	// TODO create repo
+	//   - would a template repo be useful?
+	// TODO prompt for local install
+	// TODO print helpful information
+	// TODO cd?
+	return nil
+}
+
 func (m *Manager) Remove(name string) error {
 	targetDir := filepath.Join(m.installDir(), "gh-"+name)
 	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {

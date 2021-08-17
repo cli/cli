@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/extensions"
+	"github.com/cli/cli/pkg/prompt"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -148,11 +149,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Args:  cobra.MaximumNArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				name := ""
+				repoName := ""
 				if len(args) == 0 {
 					if !io.CanPrompt() {
 						return errors.New("must pass extension name")
 					}
-					err := SurveyAskOne(&survey.Input{
+					err := prompt.SurveyAskOne(&survey.Input{
 						Message: "Extension name:",
 					}, &name)
 					if err != nil {
@@ -161,11 +163,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				} else {
 					name = args[0]
 				}
-				fmt.Println(name)
-				// TODO collect name
-				// TODO create repository
-				// TODO cd to repository
-				return nil
+				if strings.HasPrefix(name, "gh-") {
+					repoName = name
+				} else {
+					repoName = "gh-" + name
+
+				}
+				return m.Create(name, repoName)
 			},
 		},
 	)
