@@ -242,7 +242,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 func NewPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <codespace> <source-port> <destination-port>",
-		Short: "Forward port",
+		Short: "Forward ports",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
