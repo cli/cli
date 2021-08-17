@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
@@ -146,7 +147,24 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Short: "Initialize a new extension",
 			Args:  cobra.MaximumNArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				fmt.Println("TODO")
+				name := ""
+				if len(args) == 0 {
+					if !io.CanPrompt() {
+						return errors.New("must pass extension name")
+					}
+					err := SurveyAskOne(&survey.Input{
+						Message: "Extension name:",
+					}, &name)
+					if err != nil {
+						return err
+					}
+				} else {
+					name = args[0]
+				}
+				fmt.Println(name)
+				// TODO collect name
+				// TODO create repository
+				// TODO cd to repository
 				return nil
 			},
 		},
