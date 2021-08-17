@@ -287,16 +287,16 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	g, gctx := errgroup.WithContext(ctx)
 	for _, portPair := range portPairs {
-		portPair := portPair
+		pp := portPair
 
 		srcstr := strconv.Itoa(portPair.Src)
-		if err := server.StartSharing(gctx, "share-"+srcstr, portPair.Src); err != nil {
+		if err := server.StartSharing(gctx, "share-"+srcstr, pp.Src); err != nil {
 			return fmt.Errorf("start sharing port: %v", err)
 		}
 
 		g.Go(func() error {
-			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(portPair.Dst))
-			portForwarder := liveshare.NewPortForwarder(lsclient, server, portPair.Dst)
+			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.Dst))
+			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.Dst)
 			if err := portForwarder.Start(gctx); err != nil {
 				return fmt.Errorf("error forwarding port: %v", err)
 			}
