@@ -386,6 +386,18 @@ func Test_browserLauncher(t *testing.T) {
 		wantBrowser string
 	}{
 		{
+			name: "GH_BROWSER set",
+			env: map[string]string{
+				"GH_BROWSER": "GH_BROWSER",
+			},
+			wantBrowser: "GH_BROWSER",
+		},
+		{
+			name:        "config browser set",
+			config:      config.NewFromString("browser: CONFIG_BROWSER"),
+			wantBrowser: "CONFIG_BROWSER",
+		},
+		{
 			name: "BROWSER set",
 			env: map[string]string{
 				"BROWSER": "BROWSER",
@@ -393,17 +405,28 @@ func Test_browserLauncher(t *testing.T) {
 			wantBrowser: "BROWSER",
 		},
 		{
-			name:        "config browser set",
-			config:      browserConfig(),
-			wantBrowser: "CONFIG_BROWSER",
+			name: "GH_BROWSER and config browser set",
+			env: map[string]string{
+				"GH_BROWSER": "GH_BROWSER",
+			},
+			config:      config.NewFromString("browser: CONFIG_BROWSER"),
+			wantBrowser: "GH_BROWSER",
 		},
 		{
 			name: "config browser and BROWSER set",
 			env: map[string]string{
 				"BROWSER": "BROWSER",
 			},
-			config:      browserConfig(),
+			config:      config.NewFromString("browser: CONFIG_BROWSER"),
 			wantBrowser: "CONFIG_BROWSER",
+		},
+		{
+			name: "GH_BROWSER and BROWSER set",
+			env: map[string]string{
+				"BROWSER":    "BROWSER",
+				"GH_BROWSER": "GH_BROWSER",
+			},
+			wantBrowser: "GH_BROWSER",
 		},
 	}
 	for _, tt := range tests {
@@ -443,8 +466,4 @@ func pagerConfig() config.Config {
 
 func disablePromptConfig() config.Config {
 	return config.NewFromString("prompt: disabled")
-}
-
-func browserConfig() config.Config {
-	return config.NewFromString("browser: CONFIG_BROWSER")
 }

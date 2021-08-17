@@ -95,15 +95,21 @@ func browser(f *cmdutil.Factory) cmdutil.Browser {
 }
 
 // Browser precedence
-// 1. browser from config
-// 2. BROWSER
+// 1. GH_BROWSER
+// 2. browser from config
+// 3. BROWSER
 func browserLauncher(f *cmdutil.Factory) string {
+	if ghBrowser := os.Getenv("GH_BROWSER"); ghBrowser != "" {
+		return ghBrowser
+	}
+
 	cfg, err := f.Config()
 	if err == nil {
-		if browser, _ := cfg.Get("", "browser"); browser != "" {
-			return browser
+		if cfgBrowser, _ := cfg.Get("", "browser"); cfgBrowser != "" {
+			return cfgBrowser
 		}
 	}
+
 	return os.Getenv("BROWSER")
 }
 
