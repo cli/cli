@@ -1,33 +1,46 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	Execute()
+	if err := rootCmd.Execute(); err != nil {
+		explainError(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
 var Version = "DEV"
 
 var rootCmd = &cobra.Command{
-	Use:     "ghcs",
-	Short:   "Unofficial GitHub Codespaces CLI.",
-	Long:    "Unofficial CLI tool to manage and interact with GitHub Codespaces.",
+	Use: "ghcs",
+	Long: `Unofficial CLI tool to manage GitHub Codespaces.
+
+Running commands requires the GITHUB_TOKEN environment variable to be set to a
+token to access the GitHub API with.`,
 	Version: Version,
+
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if os.Getenv("GITHUB_TOKEN") == "" {
+			return tokenError
+		}
+		return nil
+	},
 }
 
-func Execute() {
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		fmt.Println("The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo and make sure to enable SSO for the GitHub organization after creating the token.")
-		os.Exit(1)
-	}
+var tokenError = errors.New("GITHUB_TOKEN is missing")
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+func explainError(w io.Writer, err error) {
+	if errors.Is(err, tokenError) {
+		fmt.Fprintln(w, "The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo")
+		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
+		return
 	}
+	// fmt.Fprintf(w, "%v\n", err)
 }

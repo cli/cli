@@ -14,8 +14,9 @@ import (
 
 func NewCodeCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "code",
-		Short: "Open a GitHub Codespace in VSCode.",
+		Use:   "code [<codespace>]",
+		Short: "Open a Codespace in VS Code",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
 			if len(args) > 0 {
@@ -43,8 +44,7 @@ func Code(codespaceName string) error {
 		codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
 		if err != nil {
 			if err == codespaces.ErrNoCodespaces {
-				fmt.Println(err.Error())
-				return nil
+				return err
 			}
 			return fmt.Errorf("error choosing codespace: %v", err)
 		}
