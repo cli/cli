@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
@@ -28,7 +29,7 @@ func NewSSHCmd() *cobra.Command {
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "SSH Profile")
 	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH Server Port")
-	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "Codespace Name")
+	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
 
 	return sshCmd
 }
@@ -40,6 +41,7 @@ func init() {
 func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -51,7 +53,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -61,18 +63,18 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
 	}
 
-	fmt.Println("Preparing SSH...")
+	log.Println("Preparing SSH...")
 	if sshProfile == "" {
-		containerID, err := getContainerID(ctx, terminal)
+		containerID, err := getContainerID(ctx, log, terminal)
 		if err != nil {
 			return fmt.Errorf("error getting container id: %v", err)
 		}
 
-		if err := setupSSH(ctx, terminal, containerID, codespace.RepositoryName); err != nil {
+		if err := setupSSH(ctx, log, terminal, containerID, codespace.RepositoryName); err != nil {
 			return fmt.Errorf("error creating ssh server: %v", err)
 		}
 
-		fmt.Printf("\n")
+		log.Print("\n")
 	}
 
 	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort)
@@ -86,9 +88,9 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 	}
 
 	usingCustomPort := tunnelPort == sshServerPort
-	connClosed := codespaces.ConnectToTunnel(ctx, tunnelPort, connectDestination, usingCustomPort)
+	connClosed := codespaces.ConnectToTunnel(ctx, log, tunnelPort, connectDestination, usingCustomPort)
 
-	fmt.Println("Ready...")
+	log.Println("Ready...")
 	select {
 	case err := <-tunnelClosed:
 		if err != nil {
@@ -103,28 +105,30 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 	return nil
 }
 
-func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, error) {
-	fmt.Print(".")
+func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {
+	logger.Print(".")
+
 	cmd := terminal.NewCommand(
 		"/",
 		"/usr/bin/docker ps -aq --filter label=Type=codespaces --filter status=running",
 	)
+
 	stream, err := cmd.Run(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error running command: %v", err)
 	}
 
-	fmt.Print(".")
+	logger.Print(".")
 	scanner := bufio.NewScanner(stream)
 	scanner.Scan()
 
-	fmt.Print(".")
+	logger.Print(".")
 	containerID := scanner.Text()
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("error scanning stream: %v", err)
 	}
 
-	fmt.Print(".")
+	logger.Print(".")
 	if err := stream.Close(); err != nil {
 		return "", fmt.Errorf("error closing stream: %v", err)
 	}
@@ -132,10 +136,10 @@ func getContainerID(ctx context.Context, terminal *liveshare.Terminal) (string, 
 	return containerID, nil
 }
 
-func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, repositoryName string) error {
+func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName string) error {
 	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/codespace/.bash_profile`, repositoryName)
 
-	fmt.Print(".")
+	logger.Print(".")
 	compositeCommand := []string{setupBashProfileCmd}
 	cmd := terminal.NewCommand(
 		"/",
@@ -146,7 +150,7 @@ func setupSSH(ctx context.Context, terminal *liveshare.Terminal, containerID, re
 		return fmt.Errorf("error running command: %v", err)
 	}
 
-	fmt.Print(".")
+	logger.Print(".")
 	if err := stream.Close(); err != nil {
 		return fmt.Errorf("error closing stream: %v", err)
 	}

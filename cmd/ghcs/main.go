@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if os.Getenv("GITHUB_TOKEN") == "" {
-		fmt.Println("The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo and make sure to enable SSO for the GitHub organization after creating the token.")
+		fmt.Fprintln(os.Stderr, "The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo and make sure to enable SSO for the GitHub organization after creating the token.")
 		os.Exit(1)
 	}
 
