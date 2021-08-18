@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -125,7 +124,7 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue, opts.IO.ColorScheme())
+	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
@@ -141,7 +140,7 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	return issue, err
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue, cs *iostreams.ColorScheme) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	assignees := issueAssigneeList(*issue)
 	labels := issueLabelList(issue, nil)
 	projects := issueProjectList(*issue)
@@ -193,7 +192,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue, cs); labels != "" {
+	if labels := issueLabelList(issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
