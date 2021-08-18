@@ -148,51 +148,37 @@ func TestEnvColorForced(t *testing.T) {
 
 func Test_HextoRGB(t *testing.T) {
 	tests := []struct {
-		name           string
-		hex            string
-		arg            string
-		expectedOutput string
-		expectedError  bool
-		cs             *ColorScheme
+		name  string
+		hex   string
+		text  string
+		wants string
+		cs    *ColorScheme
 	}{
 		{
-			name:           "Colored red enabled color",
-			hex:            "fc0303",
-			arg:            "red",
-			expectedOutput: "\033[38;2;252;3;3mred\033[0m",
-			cs:             NewColorScheme(true, true),
+			name:  "truecolor",
+			hex:   "fc0303",
+			text:  "red",
+			wants: "\033[38;2;252;3;3mred\033[0m",
+			cs:    NewColorScheme(true, true, true),
 		},
 		{
-			name:           "Failed colored red enabled color",
-			hex:            "fc0303",
-			arg:            "red",
-			expectedOutput: "\033[38;2;252;2;3mred\033[0m",
-			expectedError:  true,
-			cs:             NewColorScheme(true, true),
+			name:  "no truecolor",
+			hex:   "fc0303",
+			text:  "red",
+			wants: "red",
+			cs:    NewColorScheme(true, true, false),
 		},
 		{
-			name:           "Colored red disabled color",
-			hex:            "fc0303",
-			arg:            "red",
-			expectedOutput: "red",
-			cs:             NewColorScheme(false, false),
-		},
-		{
-			name:           "Failed colored red disabled color",
-			hex:            "fc0303",
-			arg:            "red",
-			expectedOutput: "\033[38;2;252;3;3mred\033[0m",
-			expectedError:  true,
-			cs:             NewColorScheme(false, false),
+			name:  "no color",
+			hex:   "fc0303",
+			text:  "red",
+			wants: "red",
+			cs:    NewColorScheme(false, false, false),
 		},
 	}
 
 	for _, tt := range tests {
-		output := tt.cs.HexToRGB(tt.hex, tt.arg)
-		if tt.expectedError {
-			assert.NotEqual(t, tt.expectedOutput, output)
-		} else {
-			assert.Equal(t, tt.expectedOutput, output)
-		}
+		output := tt.cs.HexToRGB(tt.hex, tt.text)
+		assert.Equal(t, tt.wants, output)
 	}
 }
