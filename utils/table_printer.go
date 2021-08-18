@@ -37,6 +37,9 @@ func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 }
 
 func NewTtyTablePrinter(io *iostreams.IOStreams, maxWidth int) TablePrinter {
+	if io.IsStdoutTTY() && io.TerminalWidth() < maxWidth {
+		maxWidth = io.TerminalWidth()
+	}
 	return &ttyTablePrinter{
 		out:      io.Out,
 		maxWidth: maxWidth,
