@@ -125,7 +125,7 @@ func DeleteByRepo(repo string) error {
 
 	var deleted bool
 	for _, c := range codespaces {
-		if strings.ToLower(c.RepositoryNWO) != strings.ToLower(repo) {
+		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
 		}
 		deleted = true
