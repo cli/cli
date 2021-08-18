@@ -135,9 +135,10 @@ func watchRun(opts *WatchOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
-	opts.IO.EnableVirtualTerminalProcessing()
-	// clear entire screen
-	fmt.Fprintf(out, "\x1b[2J")
+	if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
+		// clear entire screen
+		fmt.Fprintf(out, "\x1b[2J")
+	}
 
 	annotationCache := map[int64][]shared.Annotation{}
 

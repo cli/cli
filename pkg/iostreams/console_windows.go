@@ -8,14 +8,18 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func (s *IOStreams) EnableVirtualTerminalProcessing() {
+func (s *IOStreams) EnableVirtualTerminalProcessing() error {
 	if !s.IsStdoutTTY() {
-		return
+		return nil
 	}
 
-	stdout := windows.Handle(s.originalOut.(*os.File).Fd())
+	return enableVirtualTerminalProcessing(s.originalOut.(*os.File))
+}
+
+func enableVirtualTerminalProcessing(f *os.File) error {
+	stdout := windows.Handle(f.Fd())
 
 	var originalMode uint32
 	windows.GetConsoleMode(stdout, &originalMode)
-	windows.SetConsoleMode(stdout, originalMode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+	return windows.SetConsoleMode(stdout, originalMode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 }
