@@ -54,7 +54,12 @@ func (l *PortForwarder) Start(ctx context.Context) error {
 	return nil
 }
 
-func (l *PortForwarder) handleConnection(ctx context.Context, conn net.Conn) {
+func (l *PortForwarder) StartWithConn(ctx context.Context, conn io.ReadWriteCloser) error {
+	go l.handleConnection(ctx, conn)
+	return <-l.errCh
+}
+
+func (l *PortForwarder) handleConnection(ctx context.Context, conn io.ReadWriteCloser) {
 	channel, err := l.client.openStreamingChannel(ctx, l.server.streamName, l.server.streamCondition)
 	if err != nil {
 		l.errCh <- fmt.Errorf("error opening streaming channel for new connection: %v", err)
