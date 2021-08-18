@@ -144,7 +144,7 @@ func (t *ttyTablePrinter) calculateColumnWidths(delimSize int) []int {
 		for col := 0; col < numCols; col++ {
 			setWidths += colWidths[col]
 		}
-		return t.maxWidth - delimSize*(numCols-1) - setWidths
+		return t.availableWidth() - delimSize*(numCols-1) - setWidths
 	}
 	numFixedCols := func() int {
 		fixedCols := 0
