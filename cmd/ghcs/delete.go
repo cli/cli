@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
@@ -124,7 +125,7 @@ func DeleteByRepo(repo string) error {
 
 	var deleted bool
 	for _, c := range codespaces {
-		if c.RepositoryNWO != repo {
+		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
 		}
 		deleted = true
