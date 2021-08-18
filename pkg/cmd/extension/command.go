@@ -1,4 +1,4 @@
-package extensions
+package extension
 
 import (
 	"errors"
@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
+func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
 
 	extCmd := cobra.Command{
-		Use:   "extensions",
+		Use:   "extension",
 		Short: "Manage gh extensions",
 		Long: heredoc.Docf(`
 			GitHub CLI extensions are repositories that provide additional gh commands.
@@ -31,6 +31,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 
 			An extension cannot override any of the core gh commands.
 		`, "`"),
+		Aliases: []string{"extensions"},
 	}
 
 	extCmd.AddCommand(
@@ -39,7 +40,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			Short: "List installed extension commands",
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cmds := m.List()
+				cmds := m.List(true)
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
@@ -57,7 +58,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 					t.AddField(repo, nil, nil)
 					var updateAvailable string
 					if c.UpdateAvailable() {
-						updateAvailable = "Update available"
+						updateAvailable = "Upgrade available"
 					}
 					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
@@ -125,7 +126,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			return cmd
 		}(),
 		&cobra.Command{
-			Use:   "remove",
+			Use:   "remove <name>",
 			Short: "Remove an installed extension",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
@@ -158,7 +159,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 		return fmt.Errorf("%q matches the name of a built-in command", commandName)
 	}
 
-	for _, ext := range m.List() {
+	for _, ext := range m.List(false) {
 		if ext.Name() == commandName {
 			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}

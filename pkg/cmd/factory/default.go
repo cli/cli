@@ -11,7 +11,7 @@ import (
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/extensions"
+	"github.com/cli/cli/pkg/cmd/extension"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 )
@@ -22,14 +22,14 @@ func New(appVersion string) *cmdutil.Factory {
 		Branch:     branchFunc(), // No factory dependencies
 		Executable: executable(), // No factory dependencies
 
-		ExtensionManager: extensions.NewManager(),
+		ExtensionManager: extension.NewManager(),
 	}
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Browser = browser(f)                       // Depends on IOStreams
+	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 
 	return f
 }
@@ -91,7 +91,26 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 
 func browser(f *cmdutil.Factory) cmdutil.Browser {
 	io := f.IOStreams
-	return cmdutil.NewBrowser(os.Getenv("BROWSER"), io.Out, io.ErrOut)
+	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+}
+
+// Browser precedence
+// 1. GH_BROWSER
+// 2. browser from config
+// 3. BROWSER
+func browserLauncher(f *cmdutil.Factory) string {
+	if ghBrowser := os.Getenv("GH_BROWSER"); ghBrowser != "" {
+		return ghBrowser
+	}
+
+	cfg, err := f.Config()
+	if err == nil {
+		if cfgBrowser, _ := cfg.Get("", "browser"); cfgBrowser != "" {
+			return cfgBrowser
+		}
+	}
+
+	return os.Getenv("BROWSER")
 }
 
 func executable() string {

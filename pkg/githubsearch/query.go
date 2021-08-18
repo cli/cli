@@ -50,6 +50,7 @@ type Query struct {
 	milestone  string
 
 	language   string
+	topic      string
 	forkState  string
 	visibility string
 	isArchived *bool
@@ -118,6 +119,10 @@ func (q *Query) SetLanguage(name string) {
 	q.language = name
 }
 
+func (q *Query) SetTopic(name string) {
+	q.topic = name
+}
+
 func (q *Query) SetVisibility(visibility RepoVisibility) {
 	q.visibility = string(visibility)
 }
@@ -158,6 +163,9 @@ func (q *Query) String() string {
 	}
 	if q.language != "" {
 		qs += fmt.Sprintf("language:%s ", quote(q.language))
+	}
+	if q.topic != "" {
+		qs += fmt.Sprintf("topic:%s ", quote(q.topic))
 	}
 	if q.forkState != "" {
 		qs += fmt.Sprintf("fork:%s ", q.forkState)
