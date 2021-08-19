@@ -2,44 +2,44 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:   "delete CODESPACE_NAME",
-		Short: "Delete a GitHub Codespace.",
+		Use:   "delete [<codespace>]",
+		Short: "Delete a Codespace",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return errors.New("A Codespace name is required.")
+			var codespaceName string
+			if len(args) > 0 {
+				codespaceName = args[0]
 			}
-			return Delete(args[0])
+			return Delete(codespaceName)
 		},
 	}
 
 	deleteAllCmd := &cobra.Command{
 		Use:   "all",
-		Short: "delete all codespaces",
-		Long:  "delete all codespaces for the user with the current token",
+		Short: "Delete all Codespaces for the current user",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return DeleteAll()
 		},
 	}
 
 	deleteByRepoCmd := &cobra.Command{
-		Use:   "repo REPO_NAME",
-		Short: "delete all codespaces for the repo",
-		Long: `delete all the codespaces that the user with the current token has in this repo.
-This includes all codespaces in all states.`,
+		Use:   "repo <repo>",
+		Short: "Delete all Codespaces for a repository",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return errors.New("A Repository name is required.")
-			}
 			return DeleteByRepo(args[0])
 		},
 	}
@@ -56,29 +56,31 @@ func init() {
 func Delete(codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	if err := apiClient.DeleteCodespace(ctx, user, token, codespaceName); err != nil {
+	if err := apiClient.DeleteCodespace(ctx, user, token, codespace.Name); err != nil {
 		return fmt.Errorf("error deleting codespace: %v", err)
 	}
 
-	fmt.Println("Codespace deleted.")
+	log.Println("Codespace deleted.")
 
-	return List()
+	return List(&ListOptions{})
 }
 
 func DeleteAll() error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -100,15 +102,16 @@ func DeleteAll() error {
 			return fmt.Errorf("error deleting codespace: %v", err)
 		}
 
-		fmt.Printf("Codespace deleted: %s\n", c.Name)
+		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
-	return List()
+	return List(&ListOptions{})
 }
 
 func DeleteByRepo(repo string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -122,7 +125,7 @@ func DeleteByRepo(repo string) error {
 
 	var deleted bool
 	for _, c := range codespaces {
-		if c.RepositoryNWO != repo {
+		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
 		}
 		deleted = true
@@ -136,12 +139,12 @@ func DeleteByRepo(repo string) error {
 			return fmt.Errorf("error deleting codespace: %v", err)
 		}
 
-		fmt.Printf("Codespace deleted: %s\n", c.Name)
+		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
 	if !deleted {
-		fmt.Printf("No codespace was found for repository: %s\n", repo)
+		return fmt.Errorf("No codespace was found for repository: %s", repo)
 	}
 
-	return List()
+	return List(&ListOptions{})
 }

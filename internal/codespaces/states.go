@@ -30,7 +30,7 @@ type PostCreateState struct {
 	Status PostCreateStateStatus `json:"status"`
 }
 
-func PollPostCreateStates(ctx context.Context, apiClient *api.API, user *api.User, codespace *api.Codespace) (<-chan PostCreateStatesResult, error) {
+func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace) (<-chan PostCreateStatesResult, error) {
 	pollch := make(chan PostCreateStatesResult)
 
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
@@ -38,7 +38,7 @@ func PollPostCreateStates(ctx context.Context, apiClient *api.API, user *api.Use
 		return nil, fmt.Errorf("getting codespace token: %v", err)
 	}
 
-	lsclient, err := ConnectToLiveshare(ctx, apiClient, user.Login, token, codespace)
+	lsclient, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return nil, fmt.Errorf("connect to liveshare: %v", err)
 	}
