@@ -101,6 +101,34 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
+			name: "upgrade an extension gh-prefix",
+			args: []string{"upgrade", "gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+		},
+		{
+			name: "upgrade an extension full name",
+			args: []string{"upgrade", "monalisa/gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+		},
+		{
 			name: "upgrade all",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
@@ -133,6 +161,38 @@ func TestNewCmdExtension(t *testing.T) {
 		{
 			name: "remove extension nontty",
 			args: []string{"remove", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.RemoveCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
+		},
+		{
+			name: "remove extension gh-prefix",
+			args: []string{"remove", "gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.RemoveCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
+		},
+		{
+			name: "remove extension full name",
+			args: []string{"remove", "monalisa/gh-hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.RemoveFunc = func(name string) error {
 					return nil
