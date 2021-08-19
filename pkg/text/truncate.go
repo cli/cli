@@ -1,13 +1,15 @@
 package text
 
 import (
+	"strings"
+
 	"github.com/muesli/reflow/ansi"
 	"github.com/muesli/reflow/truncate"
 )
 
 const (
 	ellipsis            = "..."
-	minWidthForEllipsis = 5
+	minWidthForEllipsis = len(ellipsis) + 2
 )
 
 // DisplayWidth calculates what the rendered width of a string may be
@@ -33,4 +35,13 @@ func Truncate(maxWidth int, s string) string {
 	}
 
 	return r
+}
+
+// TruncateColumn replaces the first new line character with an ellipsis
+// and shortens a string to fit the maximum display width
+func TruncateColumn(maxWidth int, s string) string {
+	if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+		s = s[:i] + ellipsis
+	}
+	return Truncate(maxWidth, s)
 }

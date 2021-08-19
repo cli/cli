@@ -160,7 +160,7 @@ func (t *Template) tableRow(fields ...interface{}) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to write table row: %v", err)
 		}
-		(*t.tablePrinter).AddField(s, nil, nil)
+		(*t.tablePrinter).AddField(s, text.TruncateColumn, nil)
 	}
 	(*t.tablePrinter).EndRow()
 	return "", nil

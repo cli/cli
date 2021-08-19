@@ -157,6 +157,21 @@ func Test_executeTemplate(t *testing.T) {
 			`),
 		},
 		{
+			name: "table with multiline text",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{"number": 1, "title": "One\ranother line of text"},
+					{"number": 20, "title": "Twenty\nanother line of text"},
+					{"number": 3000, "title": "Three thousand\r\nanother line of text"}
+				]`)),
+				template: `{{range .}}{{tablerow (.number | printf "#%v") .title}}{{end}}`,
+			},
+			wantW: heredoc.Doc(`#1     One...
+			#20    Twenty...
+			#3000  Three thousand...
+			`),
+		},
+		{
 			name: "table with mixed value types",
 			args: args{
 				json: strings.NewReader(heredoc.Doc(`[
