@@ -154,7 +154,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 				if io.IsStdoutTTY() {
-					link := "https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions"
+					link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
 					cs := io.ColorScheme()
 					out := heredoc.Docf(`
 						%[1]s Created directory %[2]s

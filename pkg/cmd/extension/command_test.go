@@ -187,7 +187,7 @@ func TestNewCmdExtension(t *testing.T) {
 
 				Publish to GitHub with: gh repo create gh-test
 
-				For more information on writing extensions: https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions
+				For more information on writing extensions: https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
 			`),
 		},
 		{
