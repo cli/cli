@@ -144,7 +144,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		&cobra.Command{
 			Use:   "create <name>",
 			Short: "Create a new extension",
-			Args:  cobra.ExactArgs(1),
+			Args:  cmdutil.ExactArgs(1, "must specify a name for the extension"),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				extName := args[0]
 				if !strings.HasPrefix(extName, "gh-") {
