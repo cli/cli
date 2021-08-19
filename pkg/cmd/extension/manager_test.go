@@ -202,6 +202,26 @@ func TestManager_Install(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_Create(t *testing.T) {
+	tempDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	assert.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	m := newTestManager(tempDir)
+	err := m.Create("gh-test")
+	assert.NoError(t, err)
+	files, err := ioutil.ReadDir(filepath.Join(tempDir, "gh-test"))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(files))
+	extFile := files[0]
+	assert.Equal(t, "gh-test", extFile.Name())
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, os.FileMode(0666), extFile.Mode())
+	} else {
+		assert.Equal(t, os.FileMode(0755), extFile.Mode())
+	}
+}
+
 func stubExtension(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err

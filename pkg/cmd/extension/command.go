@@ -141,6 +141,39 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
+		&cobra.Command{
+			Use:   "create <name>",
+			Short: "Create a new extension",
+			Args:  cobra.ExactArgs(1),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				extName := args[0]
+				if !strings.HasPrefix(extName, "gh-") {
+					extName = "gh-" + extName
+				}
+				if err := m.Create(extName); err != nil {
+					return err
+				}
+				if io.IsStdoutTTY() {
+					link := "https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions"
+					cs := io.ColorScheme()
+					out := heredoc.Docf(`
+						%[1]s Created directory %[2]s
+						%[1]s Initialized git repository
+						%[1]s Set up extension scaffolding
+
+						%[2]s is ready for development
+
+						Install locally with: cd %[2]s && gh extension install .
+
+						Publish to GitHub with: gh repo create %[2]s
+
+						For more information on writing extensions: %[3]s
+					`, cs.SuccessIcon(), extName, link)
+					fmt.Fprint(io.Out, out)
+				}
+				return nil
+			},
+		},
 	)
 
 	extCmd.Hidden = true

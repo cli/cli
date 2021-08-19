@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/pkg/findsh"
@@ -247,6 +248,32 @@ func (m *Manager) Remove(name string) error {
 
 func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
+}
+
+func (m *Manager) Create(name string) error {
+	exe, err := m.lookPath("git")
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir(name, 0755)
+	if err != nil {
+		return err
+	}
+
+	initCmd := m.newCommand(exe, "init", "-b", "main", "--quiet", name)
+	err = initCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	fileTmpl := heredoc.Docf(`
+		#!/bin/bash
+		echo "Hello %[1]s"
+	`, name)
+	filePath := filepath.Join(name, name)
+	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
+	return err
 }
 
 func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {
