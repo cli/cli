@@ -269,8 +269,40 @@ func (m *Manager) Create(name string) error {
 
 	fileTmpl := heredoc.Docf(`
 		#!/bin/bash
+		set -e
 		echo "Hello %[1]s"
-	`, name)
+
+		# Examples to help get started:
+
+		# Determine if an executable is in the PATH
+		# if [ "$(which go)" = "" ]; then
+		#   echo "go not found in PATH"
+		#   exit 1
+		# fi
+
+		# Pass arguments through to a new process
+		# exec gh issue list "$@" -R cli/cli
+
+		# Using the gh api command to retrieve and format information
+		# QUERY='
+		#   query($endCursor: String) {
+		#     viewer {
+		#       repositories(first: 100, after: $endCursor) {
+		#         nodes {
+		#           nameWithOwner
+		#           stargazerCount
+		#         }
+		#       }
+		#     }
+		#   }
+		# '
+		# TEMPLATE='
+		#   {{- range $repo := .data.viewer.repositories.nodes -}}
+		#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
+		#   {{- end -}}
+		# '
+		# exec gh api graphql --template="${TEMPLATE}" --paginate -f query="${QUERY}"
+	`, name, "%s", "%v")
 	filePath := filepath.Join(name, name)
 	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
 	return err
