@@ -167,7 +167,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 						Publish to GitHub with: gh repo create %[2]s
 
-						For more information on writing extensions: %[3]s
+						For more information on writing extensions:
+						%[3]s
 					`, cs.SuccessIcon(), extName, link)
 					fmt.Fprint(io.Out, out)
 				}
