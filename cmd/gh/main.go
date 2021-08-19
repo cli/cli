@@ -102,12 +102,17 @@ func mainRun() exitCode {
 		expandedArgs = os.Args[1:]
 	}
 
-	cmd, _, err := rootCmd.Traverse(expandedArgs)
-	if err != nil || cmd == rootCmd {
+	// translate `gh help <command>` to `gh <command> --help` for extensions
+	if len(expandedArgs) == 2 && expandedArgs[0] == "help" && !hasCommand(rootCmd, expandedArgs[1:]) {
+		expandedArgs = []string{expandedArgs[1], "--help"}
+	}
+
+	if !hasCommand(rootCmd, expandedArgs) {
 		originalArgs := expandedArgs
 		isShell := false
 
-		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
+		argsForExpansion := append([]string{"gh"}, expandedArgs...)
+		expandedArgs, isShell, err = expand.ExpandAlias(cfg, argsForExpansion, nil)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			return exitError
@@ -141,7 +146,7 @@ func mainRun() exitCode {
 			}
 
 			return exitOK
-		} else if c, _, err := rootCmd.Traverse(expandedArgs); err == nil && c == rootCmd && len(expandedArgs) > 0 {
+		} else if len(expandedArgs) > 0 && !hasCommand(rootCmd, expandedArgs) {
 			extensionManager := cmdFactory.ExtensionManager
 			if found, err := extensionManager.Dispatch(expandedArgs, os.Stdin, os.Stdout, os.Stderr); err != nil {
 				var execError *exec.ExitError
@@ -242,6 +247,12 @@ func mainRun() exitCode {
 	}
 
 	return exitOK
+}
+
+// hasCommand returns true if args resolve to a built-in command
+func hasCommand(rootCmd *cobra.Command, args []string) bool {
+	c, _, err := rootCmd.Traverse(args)
+	return err == nil && c != rootCmd
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
