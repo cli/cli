@@ -251,7 +251,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		if debug {
 			fmt.Fprintln(out, dnsError)
 		}
-		fmt.Fprintln(out, "check your internet connection or githubstatus.com")
+		fmt.Fprintln(out, "check your internet connection or https://githubstatus.com")
 		return
 	}
 
