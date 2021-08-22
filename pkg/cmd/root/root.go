@@ -4,17 +4,19 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/api"
+	"github.com/cli/cli/context"
+	"github.com/cli/cli/internal/ghrepo"
 	actionsCmd "github.com/cli/cli/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
-	browseCmd "github.com/cli/cli/pkg/cmd/browse"
 	completionCmd "github.com/cli/cli/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/pkg/cmd/config"
-	extensionCmd "github.com/cli/cli/pkg/cmd/extension"
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
+	jobCmd "github.com/cli/cli/pkg/cmd/job"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
@@ -23,7 +25,6 @@ import (
 	secretCmd "github.com/cli/cli/pkg/cmd/secret"
 	sshKeyCmd "github.com/cli/cli/pkg/cmd/ssh-key"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
-	workflowCmd "github.com/cli/cli/pkg/cmd/workflow"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -54,10 +55,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.SetOut(f.IOStreams.Out)
 	cmd.SetErr(f.IOStreams.ErrOut)
 
+	cs := f.IOStreams.ColorScheme()
+
+	helpHelper := func(command *cobra.Command, args []string) {
+		rootHelpFunc(cs, command, args)
+	}
+
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		rootHelpFunc(f, cmd, args)
-	})
+	cmd.SetHelpFunc(helpHelper)
 	cmd.SetUsageFunc(rootUsageFunc)
 	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
@@ -68,16 +73,18 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
-	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+
+	cmd.AddCommand(actionsCmd.NewCmdActions(f))
+	cmd.AddCommand(runCmd.NewCmdRun(f))
+	cmd.AddCommand(jobCmd.NewCmdJob(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -87,20 +94,15 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
-	repoResolvingCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(f)
+	repoResolvingCmdFactory.BaseRepo = resolvedBaseRepo(f)
 
-	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
-	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
-	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
-	cmd.AddCommand(NewHelpTopic("formatting"))
-	cmd.AddCommand(NewHelpTopic("mintty"))
 	referenceCmd := NewHelpTopic("reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)
@@ -118,6 +120,32 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
+		return factory.NewHTTPClient(f.IOStreams, cfg, version, false), nil
+	}
+}
+
+func resolvedBaseRepo(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
+	return func() (ghrepo.Interface, error) {
+		httpClient, err := f.HttpClient()
+		if err != nil {
+			return nil, err
+		}
+
+		apiClient := api.NewClientFromHTTP(httpClient)
+
+		remotes, err := f.Remotes()
+		if err != nil {
+			return nil, err
+		}
+		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+		if err != nil {
+			return nil, err
+		}
+		baseRepo, err := repoContext.BaseRepo(f.IOStreams)
+		if err != nil {
+			return nil, err
+		}
+
+		return baseRepo, nil
 	}
 }
