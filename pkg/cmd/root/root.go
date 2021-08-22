@@ -25,6 +25,7 @@ import (
 	secretCmd "github.com/cli/cli/pkg/cmd/secret"
 	sshKeyCmd "github.com/cli/cli/pkg/cmd/ssh-key"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
+	whatCmd "github.com/cli/cli/pkg/cmd/what"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -106,6 +107,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	referenceCmd := NewHelpTopic("reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)
+
+	cmd.AddCommand(whatCmd.NewCmdWhat(f, nil))
 
 	cmdutil.DisableAuthCheck(cmd)
 
