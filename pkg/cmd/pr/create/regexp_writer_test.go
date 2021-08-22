@@ -93,14 +93,14 @@ func Test_Write(t *testing.T) {
 		{
 			name: "multiple lines removed",
 			input: input{
-				in:   []string{"begining line\nremove this whole line\nremove this one also\nnot this one"},
+				in:   []string{"beginning line\nremove this whole line\nremove this one also\nnot this one"},
 				re:   regexp.MustCompile("(?s)^remove.*$"),
 				repl: "",
 			},
 			output: output{
 				wantsErr: false,
-				out:      "begining line\nnot this one",
-				length:   70,
+				out:      "beginning line\nnot this one",
+				length:   71,
 			},
 		},
 		{

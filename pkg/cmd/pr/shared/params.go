@@ -7,9 +7,11 @@ import (
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/google/shlex"
 )
 
-func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string, error) {
+func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
@@ -18,9 +20,10 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 	if state.Title != "" {
 		q.Set("title", state.Title)
 	}
-	if state.Body != "" {
-		q.Set("body", state.Body)
-	}
+	// We always want to send the body parameter, even if it's empty, to prevent the web interface from
+	// applying the default template. Since the user has the option to select a template in the terminal,
+	// assume that empty body here means that the user either skipped it or erased its contents.
+	q.Set("body", state.Body)
 	if len(state.Assignees) > 0 {
 		q.Set("assignees", strings.Join(state.Assignees, ","))
 	}
@@ -28,7 +31,11 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
 	if len(state.Projects) > 0 {
-		q.Set("projects", strings.Join(state.Projects, ","))
+		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects)
+		if err != nil {
+			return "", fmt.Errorf("could not add to project: %w", err)
+		}
+		q.Set("projects", strings.Join(projectPaths, ","))
 	}
 	if len(state.Milestones) > 0 {
 		q.Set("milestone", state.Milestones[0])
@@ -37,25 +44,52 @@ func WithPrAndIssueQueryParams(baseURL string, state IssueMetadataState) (string
 	return u.String(), nil
 }
 
+// Ensure that tb.MetadataResult object exists and contains enough pre-fetched API data to be able
+// to resolve all object listed in tb to GraphQL IDs.
+func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetadataState) error {
+	resolveInput := api.RepoResolveInput{}
+
+	if len(tb.Assignees) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.AssignableUsers) == 0) {
+		resolveInput.Assignees = tb.Assignees
+	}
+
+	if len(tb.Reviewers) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.AssignableUsers) == 0) {
+		resolveInput.Reviewers = tb.Reviewers
+	}
+
+	if len(tb.Labels) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.Labels) == 0) {
+		resolveInput.Labels = tb.Labels
+	}
+
+	if len(tb.Projects) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.Projects) == 0) {
+		resolveInput.Projects = tb.Projects
+	}
+
+	if len(tb.Milestones) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.Milestones) == 0) {
+		resolveInput.Milestones = tb.Milestones
+	}
+
+	metadataResult, err := api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
+	if err != nil {
+		return err
+	}
+
+	if tb.MetadataResult == nil {
+		tb.MetadataResult = metadataResult
+	} else {
+		tb.MetadataResult.Merge(metadataResult)
+	}
+
+	return nil
+}
+
 func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *IssueMetadataState) error {
 	if !tb.HasMetadata() {
 		return nil
 	}
 
-	if tb.MetadataResult == nil {
-		resolveInput := api.RepoResolveInput{
-			Reviewers:  tb.Reviewers,
-			Assignees:  tb.Assignees,
-			Labels:     tb.Labels,
-			Projects:   tb.Projects,
-			Milestones: tb.Milestones,
-		}
-
-		var err error
-		tb.MetadataResult, err = api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
-		if err != nil {
-			return err
-		}
+	if err := fillMetadata(client, baseRepo, tb); err != nil {
+		return err
 	}
 
 	assigneeIDs, err := tb.MetadataResult.MembersToIDs(tb.Assignees)
@@ -122,6 +156,37 @@ type FilterOptions struct {
 	BaseBranch string
 	Mention    string
 	Milestone  string
+	Search     string
+
+	Fields []string
+}
+
+func (opts *FilterOptions) IsDefault() bool {
+	if opts.State != "open" {
+		return false
+	}
+	if len(opts.Labels) > 0 {
+		return false
+	}
+	if opts.Assignee != "" {
+		return false
+	}
+	if opts.Author != "" {
+		return false
+	}
+	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.Mention != "" {
+		return false
+	}
+	if opts.Milestone != "" {
+		return false
+	}
+	if opts.Search != "" {
+		return false
+	}
+	return true
 }
 
 func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
@@ -129,37 +194,113 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	query := fmt.Sprintf("is:%s ", options.Entity)
-	if options.State != "all" {
-		query += fmt.Sprintf("is:%s ", options.State)
-	}
-	if options.Assignee != "" {
-		query += fmt.Sprintf("assignee:%s ", options.Assignee)
-	}
-	for _, label := range options.Labels {
-		query += fmt.Sprintf("label:%s ", quoteValueForQuery(label))
-	}
-	if options.Author != "" {
-		query += fmt.Sprintf("author:%s ", options.Author)
-	}
-	if options.BaseBranch != "" {
-		query += fmt.Sprintf("base:%s ", options.BaseBranch)
-	}
-	if options.Mention != "" {
-		query += fmt.Sprintf("mentions:%s ", options.Mention)
-	}
-	if options.Milestone != "" {
-		query += fmt.Sprintf("milestone:%s ", quoteValueForQuery(options.Milestone))
-	}
-	q := u.Query()
-	q.Set("q", strings.TrimSuffix(query, " "))
-	u.RawQuery = q.Encode()
+
+	params := u.Query()
+	params.Set("q", SearchQueryBuild(options))
+	u.RawQuery = params.Encode()
+
 	return u.String(), nil
 }
 
-func quoteValueForQuery(v string) string {
-	if strings.ContainsAny(v, " \"\t\r\n") {
-		return fmt.Sprintf("%q", v)
+func SearchQueryBuild(options FilterOptions) string {
+	q := githubsearch.NewQuery()
+	switch options.Entity {
+	case "issue":
+		q.SetType(githubsearch.Issue)
+	case "pr":
+		q.SetType(githubsearch.PullRequest)
 	}
-	return v
+
+	switch options.State {
+	case "open":
+		q.SetState(githubsearch.Open)
+	case "closed":
+		q.SetState(githubsearch.Closed)
+	case "merged":
+		q.SetState(githubsearch.Merged)
+	}
+
+	if options.Assignee != "" {
+		q.AssignedTo(options.Assignee)
+	}
+	for _, label := range options.Labels {
+		q.AddLabel(label)
+	}
+	if options.Author != "" {
+		q.AuthoredBy(options.Author)
+	}
+	if options.BaseBranch != "" {
+		q.SetBaseBranch(options.BaseBranch)
+	}
+	if options.Mention != "" {
+		q.Mentions(options.Mention)
+	}
+	if options.Milestone != "" {
+		q.InMilestone(options.Milestone)
+	}
+	if options.Search != "" {
+		q.AddQuery(options.Search)
+	}
+
+	return q.String()
+}
+
+func QueryHasStateClause(searchQuery string) bool {
+	argv, err := shlex.Split(searchQuery)
+	if err != nil {
+		return false
+	}
+
+	for _, arg := range argv {
+		if arg == "is:closed" || arg == "is:merged" || arg == "state:closed" || arg == "state:merged" || strings.HasPrefix(arg, "merged:") || strings.HasPrefix(arg, "closed:") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// MeReplacer resolves usages of `@me` to the handle of the currently logged in user.
+type MeReplacer struct {
+	apiClient *api.Client
+	hostname  string
+	login     string
+}
+
+func NewMeReplacer(apiClient *api.Client, hostname string) *MeReplacer {
+	return &MeReplacer{
+		apiClient: apiClient,
+		hostname:  hostname,
+	}
+}
+
+func (r *MeReplacer) currentLogin() (string, error) {
+	if r.login != "" {
+		return r.login, nil
+	}
+	login, err := api.CurrentLoginName(r.apiClient, r.hostname)
+	if err != nil {
+		return "", fmt.Errorf("failed resolving `@me` to your user handle: %w", err)
+	}
+	r.login = login
+	return login, nil
+}
+
+func (r *MeReplacer) Replace(handle string) (string, error) {
+	if handle == "@me" {
+		return r.currentLogin()
+	}
+	return handle, nil
+}
+
+func (r *MeReplacer) ReplaceSlice(handles []string) ([]string, error) {
+	res := make([]string, len(handles))
+	for i, h := range handles {
+		var err error
+		res[i], err = r.Replace(h)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }

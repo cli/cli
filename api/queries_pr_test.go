@@ -1,12 +1,13 @@
 package api
 
 import (
-	"reflect"
+	"encoding/json"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBranchDeleteRemote(t *testing.T) {
@@ -52,7 +53,7 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 	tests := []struct {
 		name           string
 		hostname       string
-		queryResponse  string
+		queryResponse  map[string]string
 		wantPrFeatures pullRequestFeature
 		wantErr        bool
 	}{
@@ -60,58 +61,80 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    true,
-				HasStatusCheckRollup: true,
+				HasReviewDecision:       true,
+				HasStatusCheckRollup:    true,
+				HasBranchProtectionRule: true,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE empty response",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {}}
-			`),
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`:  `{"data": {}}`,
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    false,
-				HasStatusCheckRollup: false,
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE has reviewDecision",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {
-				"PullRequest": {
-					"fields": [
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
 						{"name": "foo"},
 						{"name": "reviewDecision"}
-					]
-				}
-			} }
-			`),
+					] } } }
+				`),
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    true,
-				HasStatusCheckRollup: false,
+				HasReviewDecision:       true,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE has statusCheckRollup",
 			hostname: "git.my.org",
-			queryResponse: heredoc.Doc(`
-			{"data": {
-				"Commit": {
-					"fields": [
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "Commit": { "fields": [
 						{"name": "foo"},
 						{"name": "statusCheckRollup"}
-					]
-				}
-			} }
-			`),
+					] } } }
+				`),
+				`query PullRequest_fields2\b`: `{"data": {}}`,
+			},
 			wantPrFeatures: pullRequestFeature{
-				HasReviewDecision:    false,
-				HasStatusCheckRollup: true,
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    true,
+				HasBranchProtectionRule: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has branchProtectionRule",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: `{"data": {}}`,
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+					{ "data": { "Ref": { "fields": [
+						{"name": "foo"},
+						{"name": "branchProtectionRule"}
+					] } } }
+				`),
+			},
+			wantPrFeatures: pullRequestFeature{
+				HasReviewDecision:       false,
+				HasStatusCheckRollup:    false,
+				HasBranchProtectionRule: true,
 			},
 			wantErr: false,
 		},
@@ -121,49 +144,99 @@ func Test_determinePullRequestFeatures(t *testing.T) {
 			fakeHTTP := &httpmock.Registry{}
 			httpClient := NewHTTPClient(ReplaceTripper(fakeHTTP))
 
-			if tt.queryResponse != "" {
-				fakeHTTP.Register(
-					httpmock.GraphQL(`query PullRequest_fields\b`),
-					httpmock.StringResponse(tt.queryResponse))
+			for query, resp := range tt.queryResponse {
+				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 
 			gotPrFeatures, err := determinePullRequestFeatures(httpClient, tt.hostname)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("determinePullRequestFeatures() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
+			} else {
+				assert.NoError(t, err)
 			}
-			if !reflect.DeepEqual(gotPrFeatures, tt.wantPrFeatures) {
-				t.Errorf("determinePullRequestFeatures() = %v, want %v", gotPrFeatures, tt.wantPrFeatures)
-			}
+			assert.Equal(t, tt.wantPrFeatures, gotPrFeatures)
 		})
 	}
 }
 
-func Test_sortPullRequestsByState(t *testing.T) {
-	prs := []PullRequest{
+func Test_Logins(t *testing.T) {
+	rr := ReviewRequests{}
+	var tests = []struct {
+		name             string
+		requestedReviews string
+		want             []string
+	}{
 		{
-			BaseRefName: "test1",
-			State:       "MERGED",
+			name:             "no requested reviewers",
+			requestedReviews: `{"nodes": []}`,
+			want:             []string{},
 		},
 		{
-			BaseRefName: "test2",
-			State:       "CLOSED",
+			name: "user",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "testuser"
+					}
+				}
+			]}`,
+			want: []string{"testuser"},
 		},
 		{
-			BaseRefName: "test3",
-			State:       "OPEN",
+			name: "team",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Test Team",
+						"slug": "test-team",
+						"organization": {"login": "myorg"}
+					}
+				}
+			]}`,
+			want: []string{"myorg/test-team"},
+		},
+		{
+			name: "multiple users and teams",
+			requestedReviews: `{"nodes": [
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "user1"
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "User", "login": "user2"
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Test Team",
+						"slug": "test-team",
+						"organization": {"login": "myorg"}
+					}
+				},
+				{
+					"requestedreviewer": {
+						"__typename": "Team",
+						"name": "Dev Team",
+						"slug": "dev-team",
+						"organization": {"login": "myorg"}
+					}
+				}
+			]}`,
+			want: []string{"user1", "user2", "myorg/test-team", "myorg/dev-team"},
 		},
 	}
 
-	sortPullRequestsByState(prs)
-
-	if prs[0].BaseRefName != "test3" {
-		t.Errorf("prs[0]: got %s, want %q", prs[0].BaseRefName, "test3")
-	}
-	if prs[1].BaseRefName != "test1" {
-		t.Errorf("prs[1]: got %s, want %q", prs[1].BaseRefName, "test1")
-	}
-	if prs[2].BaseRefName != "test2" {
-		t.Errorf("prs[2]: got %s, want %q", prs[2].BaseRefName, "test2")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tt.requestedReviews), &rr)
+			assert.NoError(t, err, "Failed to unmarshal json string as ReviewRequests")
+			logins := rr.Logins()
+			assert.Equal(t, tt.want, logins)
+		})
 	}
 }

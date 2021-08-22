@@ -9,33 +9,41 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
+	"github.com/cli/cli/pkg/set"
 	"github.com/cli/cli/utils"
 	"github.com/spf13/cobra"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
 
 	SelectorArg string
 	WebMode     bool
+	Comments    bool
+	Exporter    cmdutil.Exporter
+
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
+		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -45,9 +53,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Display the title, body, and other information about an issue.
 
 			With '--web', open the issue in a web browser instead.
-    	`),
-		Example: heredoc.Doc(`
-    	`),
+		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -65,6 +71,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open an issue in the browser")
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View issue comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
 }
@@ -74,39 +82,67 @@ func viewRun(opts *ViewOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, _, err := issueShared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	loadComments := opts.Comments
+	if !loadComments && opts.Exporter != nil {
+		fields := set.NewStringSet()
+		fields.AddValues(opts.Exporter.Fields())
+		loadComments = fields.Contains("comments")
+	}
+
+	opts.IO.StartProgressIndicator()
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
-	openURL := issue.URL
-
 	if opts.WebMode {
+		openURL := issue.URL
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
+		return opts.Browser.Browse(openURL)
 	}
 
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 
-	if opts.IO.IsStdoutTTY() {
-		return printHumanIssuePreview(opts.IO, issue)
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO.Out, issue, opts.IO.ColorEnabled())
 	}
+
+	if opts.IO.IsStdoutTTY() {
+		return printHumanIssuePreview(opts, issue)
+	}
+
+	if opts.Comments {
+		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
+		return nil
+	}
+
 	return printRawIssuePreview(opts.IO.Out, issue)
+}
+
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
+	apiClient := api.NewClientFromHTTP(client)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepoFn, selector)
+	if err != nil {
+		return issue, err
+	}
+
+	if loadComments {
+		err = preloadIssueComments(client, repo, issue)
+	}
+	return issue, err
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	assignees := issueAssigneeList(*issue)
-	labels := shared.IssueLabelList(*issue)
+	labels := issueLabelList(issue, nil)
 	projects := issueProjectList(*issue)
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
@@ -118,36 +154,45 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", issue.Milestone.Title)
-
+	var milestoneTitle string
+	if issue.Milestone != nil {
+		milestoneTitle = issue.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
 	return nil
 }
 
-func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
-	out := io.Out
-	now := time.Now()
+func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
+	out := opts.IO.Out
+	now := opts.Now()
 	ago := now.Sub(issue.CreatedAt)
-	cs := io.ColorScheme()
+	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(issue.Title))
-	fmt.Fprint(out, issueStateTitleWithColor(cs, issue.State))
-	fmt.Fprintln(out, cs.Gray(fmt.Sprintf(
-		" • %s opened %s • %s",
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
+	fmt.Fprintf(out,
+		"%s • %s opened %s • %s\n",
+		issueStateTitleWithColor(cs, issue.State),
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
-	)))
+	)
+
+	// Reactions
+	if reactions := prShared.ReactionGroupList(issue.ReactionGroups); reactions != "" {
+		fmt.Fprint(out, reactions)
+		fmt.Fprintln(out)
+	}
 
 	// Metadata
-	fmt.Fprintln(out)
 	if assignees := issueAssigneeList(*issue); assignees != "" {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue); labels != "" {
+	if labels := issueLabelList(issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -155,25 +200,38 @@ func printHumanIssuePreview(io *iostreams.IOStreams, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if issue.Milestone.Title != "" {
+	if issue.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, issue.Milestone.Title)
 	}
 
 	// Body
-	if issue.Body != "" {
-		fmt.Fprintln(out)
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err := markdown.Render(issue.Body, style, "")
+	var md string
+	var err error
+	if issue.Body == "" {
+		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+	} else {
+		style := markdown.GetStyle(opts.IO.TerminalTheme())
+		md, err = markdown.Render(issue.Body, style)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(out, md)
 	}
-	fmt.Fprintln(out)
+	fmt.Fprintf(out, "\n%s\n", md)
+
+	// Comments
+	if issue.Comments.TotalCount > 0 {
+		preview := !opts.Comments
+		comments, err := prShared.CommentList(opts.IO, issue.Comments, api.PullRequestReviews{}, preview)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(out, comments)
+	}
 
 	// Footer
 	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
+
 	return nil
 }
 
@@ -218,4 +276,21 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
+	if len(issue.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := make([]string, len(issue.Labels.Nodes))
+	for i, label := range issue.Labels.Nodes {
+		if cs == nil {
+			labelNames[i] = label.Name
+		} else {
+			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
+		}
+	}
+
+	return strings.Join(labelNames, ", ")
 }

@@ -1,0 +1,147 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "some body",
+        "title": "some title",
+        "state": "OPEN",
+        "createdAt": "2020-01-01T12:00:00Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "assignees": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "reactionGroups": [
+          {
+            "content": "CONFUSED",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "EYES",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "HEART",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "HOORAY",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "LAUGH",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "ROCKET",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "THUMBS_DOWN",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 0
+            }
+          }
+        ],
+        "comments": {
+          "nodes": [
+            {
+              "author": {
+                "login": "marseilles"
+              },
+              "authorAssociation": "COLLABORATOR",
+              "body": "Comment 5",
+              "createdAt": "2020-01-01T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "totalCount": 6
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

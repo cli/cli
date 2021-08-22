@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -17,20 +17,100 @@ import (
 
 // Repository contains information about a GitHub repo
 type Repository struct {
-	ID          string
-	Name        string
-	Description string
-	URL         string
-	CloneURL    string
-	CreatedAt   time.Time
-	Owner       RepositoryOwner
+	ID                       string
+	Name                     string
+	NameWithOwner            string
+	Owner                    RepositoryOwner
+	Parent                   *Repository
+	TemplateRepository       *Repository
+	Description              string
+	HomepageURL              string
+	OpenGraphImageURL        string
+	UsesCustomOpenGraphImage bool
+	URL                      string
+	SSHURL                   string
+	MirrorURL                string
+	SecurityPolicyURL        string
 
-	IsPrivate        bool
-	HasIssuesEnabled bool
-	ViewerPermission string
-	DefaultBranchRef BranchRef
+	CreatedAt time.Time
+	PushedAt  *time.Time
+	UpdatedAt time.Time
 
-	Parent *Repository
+	IsBlankIssuesEnabled    bool
+	IsSecurityPolicyEnabled bool
+	HasIssuesEnabled        bool
+	HasProjectsEnabled      bool
+	HasWikiEnabled          bool
+	MergeCommitAllowed      bool
+	SquashMergeAllowed      bool
+	RebaseMergeAllowed      bool
+
+	ForkCount      int
+	StargazerCount int
+	Watchers       struct {
+		TotalCount int `json:"totalCount"`
+	}
+	Issues struct {
+		TotalCount int `json:"totalCount"`
+	}
+	PullRequests struct {
+		TotalCount int `json:"totalCount"`
+	}
+
+	CodeOfConduct                 *CodeOfConduct
+	ContactLinks                  []ContactLink
+	DefaultBranchRef              BranchRef
+	DeleteBranchOnMerge           bool
+	DiskUsage                     int
+	FundingLinks                  []FundingLink
+	IsArchived                    bool
+	IsEmpty                       bool
+	IsFork                        bool
+	IsInOrganization              bool
+	IsMirror                      bool
+	IsPrivate                     bool
+	IsTemplate                    bool
+	IsUserConfigurationRepository bool
+	LicenseInfo                   *RepositoryLicense
+	ViewerCanAdminister           bool
+	ViewerDefaultCommitEmail      string
+	ViewerDefaultMergeMethod      string
+	ViewerHasStarred              bool
+	ViewerPermission              string
+	ViewerPossibleCommitEmails    []string
+	ViewerSubscription            string
+
+	RepositoryTopics struct {
+		Nodes []struct {
+			Topic RepositoryTopic
+		}
+	}
+	PrimaryLanguage *CodingLanguage
+	Languages       struct {
+		Edges []struct {
+			Size int            `json:"size"`
+			Node CodingLanguage `json:"node"`
+		}
+	}
+	IssueTemplates       []IssueTemplate
+	PullRequestTemplates []PullRequestTemplate
+	Labels               struct {
+		Nodes []IssueLabel
+	}
+	Milestones struct {
+		Nodes []Milestone
+	}
+	LatestRelease *RepositoryRelease
+
+	AssignableUsers struct {
+		Nodes []GitHubUser
+	}
+	MentionableUsers struct {
+		Nodes []GitHubUser
+	}
+	Projects struct {
+		Nodes []RepoProject
+	}
 
 	// pseudo-field that keeps track of host name of this repo
 	hostname string
@@ -38,12 +118,81 @@ type Repository struct {
 
 // RepositoryOwner is the owner of a GitHub repository
 type RepositoryOwner struct {
-	Login string
+	ID    string `json:"id"`
+	Login string `json:"login"`
+}
+
+type GitHubUser struct {
+	ID    string `json:"id"`
+	Login string `json:"login"`
+	Name  string `json:"name"`
 }
 
 // BranchRef is the branch name in a GitHub repository
 type BranchRef struct {
-	Name string
+	Name string `json:"name"`
+}
+
+type CodeOfConduct struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type RepositoryLicense struct {
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Nickname string `json:"nickname"`
+}
+
+type ContactLink struct {
+	About string `json:"about"`
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+}
+
+type FundingLink struct {
+	Platform string `json:"platform"`
+	URL      string `json:"url"`
+}
+
+type CodingLanguage struct {
+	Name string `json:"name"`
+}
+
+type IssueTemplate struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	About string `json:"about"`
+}
+
+type PullRequestTemplate struct {
+	Filename string `json:"filename"`
+	Body     string `json:"body"`
+}
+
+type RepositoryTopic struct {
+	Name string `json:"name"`
+}
+
+type RepositoryRelease struct {
+	Name        string    `json:"name"`
+	TagName     string    `json:"tagName"`
+	URL         string    `json:"url"`
+	PublishedAt time.Time `json:"publishedAt"`
+}
+
+type IssueLabel struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+}
+
+type License struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // RepoOwner is the login name of the owner
@@ -59,11 +208,6 @@ func (r Repository) RepoName() string {
 // RepoHost is the GitHub hostname of the repository
 func (r Repository) RepoHost() string {
 	return r.hostname
-}
-
-// IsFork is true when this repository has a parent repository
-func (r Repository) IsFork() bool {
-	return r.Parent != nil
 }
 
 // ViewerCanPush is true when the requesting user has push access
@@ -94,6 +238,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		owner { login }
 		hasIssuesEnabled
 		description
+		hasWikiEnabled
 		viewerPermission
 		defaultBranchRef {
 			name
@@ -106,6 +251,9 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			parent {
 				...repo
 			}
+			mergeCommitAllowed
+			rebaseMergeAllowed
+			squashMergeAllowed
 		}
 	}`
 	variables := map[string]interface{}{
@@ -292,21 +440,34 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	return repo
 }
 
-// repositoryV3 is the repository result from GitHub API v3
+// RepositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID    string
+	NodeID    string `json:"node_id"`
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
-	CloneURL  string    `json:"clone_url"`
 	Owner     struct {
 		Login string
 	}
+	Private bool
+	HTMLUrl string `json:"html_url"`
+	Parent  *repositoryV3
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
-	body := bytes.NewBufferString(`{}`)
+
+	params := map[string]interface{}{}
+	if org != "" {
+		params["organization"] = org
+	}
+
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(params); err != nil {
+		return nil, err
+	}
+
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
 	if err != nil {
@@ -316,7 +477,6 @@ func ForkRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	return &Repository{
 		ID:        result.NodeID,
 		Name:      result.Name,
-		CloneURL:  result.CloneURL,
 		CreatedAt: result.CreatedAt,
 		Owner: RepositoryOwner{
 			Login: result.Owner.Login,
@@ -455,13 +615,62 @@ func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, error) {
 	return ids, nil
 }
 
+func ProjectsToPaths(projects []RepoProject, names []string) ([]string, error) {
+	var paths []string
+	for _, projectName := range names {
+		found := false
+		for _, p := range projects {
+			if strings.EqualFold(projectName, p.Name) {
+				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER
+				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER
+				var path string
+				pathParts := strings.Split(p.ResourcePath, "/")
+				if pathParts[1] == "orgs" {
+					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
+				} else {
+					path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
+				}
+				paths = append(paths, path)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("'%s' not found", projectName)
+		}
+	}
+	return paths, nil
+}
+
 func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
 	for _, m := range m.Milestones {
 		if strings.EqualFold(title, m.Title) {
 			return m.ID, nil
 		}
 	}
-	return "", errors.New("not found")
+	return "", fmt.Errorf("'%s' not found", title)
+}
+
+func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {
+	if len(m2.AssignableUsers) > 0 || len(m.AssignableUsers) == 0 {
+		m.AssignableUsers = m2.AssignableUsers
+	}
+
+	if len(m2.Teams) > 0 || len(m.Teams) == 0 {
+		m.Teams = m2.Teams
+	}
+
+	if len(m2.Labels) > 0 || len(m.Labels) == 0 {
+		m.Labels = m2.Labels
+	}
+
+	if len(m2.Projects) > 0 || len(m.Projects) == 0 {
+		m.Projects = m2.Projects
+	}
+
+	if len(m2.Milestones) > 0 || len(m.Milestones) == 0 {
+		m.Milestones = m2.Milestones
+	}
 }
 
 type RepoMetadataInput struct {
@@ -516,20 +725,12 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Projects {
 		count++
 		go func() {
-			projects, err := RepoProjects(client, repo)
+			projects, err := RepoAndOrgProjects(client, repo)
 			if err != nil {
-				errc <- fmt.Errorf("error fetching projects: %w", err)
+				errc <- err
 				return
 			}
 			result.Projects = projects
-
-			orgProjects, err := OrganizationProjects(client, repo)
-			// TODO: better detection of non-org repos
-			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
-				errc <- fmt.Errorf("error fetching organization projects: %w", err)
-				return
-			}
-			result.Projects = append(result.Projects, orgProjects...)
 			errc <- nil
 		}()
 	}
@@ -658,8 +859,10 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 }
 
 type RepoProject struct {
-	ID   string
-	Name string
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Number       int    `json:"number"`
+	ResourcePath string `json:"resourcePath"`
 }
 
 // RepoProjects fetches all open projects for a repository
@@ -698,6 +901,23 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		}
 		variables["endCursor"] = githubv4.String(query.Repository.Projects.PageInfo.EndCursor)
 	}
+
+	return projects, nil
+}
+
+// RepoAndOrgProjects fetches all open projects for a repository and its org
+func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
+	projects, err := RepoProjects(client, repo)
+	if err != nil {
+		return projects, fmt.Errorf("error fetching projects: %w", err)
+	}
+
+	orgProjects, err := OrganizationProjects(client, repo)
+	// TODO: better detection of non-org repos
+	if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+		return projects, fmt.Errorf("error fetching organization projects: %w", err)
+	}
+	projects = append(projects, orgProjects...)
 
 	return projects, nil
 }
@@ -888,4 +1108,34 @@ func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int32) (*Re
 	}
 
 	return query.Repository.Milestone, nil
+}
+
+func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
+	var paths []string
+	projects, err := RepoAndOrgProjects(client, repo)
+	if err != nil {
+		return paths, err
+	}
+	return ProjectsToPaths(projects, projectNames)
+}
+
+func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
+	var responsev3 repositoryV3
+	err := apiClient.REST(hostname, method, path, body, &responsev3)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		Name:      responsev3.Name,
+		CreatedAt: responsev3.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: responsev3.Owner.Login,
+		},
+		ID:        responsev3.NodeID,
+		hostname:  hostname,
+		URL:       responsev3.HTMLUrl,
+		IsPrivate: responsev3.Private,
+	}, nil
 }

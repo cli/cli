@@ -4,15 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/authflow"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/cmd/auth/client"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/prompt"
@@ -20,8 +19,11 @@ import (
 )
 
 type LoginOptions struct {
-	IO     *iostreams.IOStreams
-	Config func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
+	HttpClient func() (*http.Client, error)
+
+	MainExecutable string
 
 	Interactive bool
 
@@ -33,8 +35,11 @@ type LoginOptions struct {
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
-		IO:     f.IOStreams,
-		Config: f.Config,
+		IO:         f.IOStreams,
+		Config:     f.Config,
+		HttpClient: f.HttpClient,
+
+		MainExecutable: f.Executable,
 	}
 
 	var tokenStdin bool
@@ -120,200 +125,103 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 
+	hostname := opts.Hostname
+	if hostname == "" {
+		if opts.Interactive {
+			var err error
+			hostname, err = promptForHostname()
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("must specify --hostname")
+		}
+	}
+
+	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		var roErr *config.ReadOnlyEnvError
+		if errors.As(err, &roErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
+			fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
+			return cmdutil.SilentError
+		}
+		return err
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
 	if opts.Token != "" {
-		// I chose to not error on existing host here; my thinking is that for --with-token the user
-		// probably doesn't care if a token is overwritten since they have a token in hand they
-		// explicitly want to use.
-		if opts.Hostname == "" {
-			return errors.New("empty hostname would leak oauth_token")
-		}
-
-		err := cfg.Set(opts.Hostname, "oauth_token", opts.Token)
+		err := cfg.Set(hostname, "oauth_token", opts.Token)
 		if err != nil {
 			return err
 		}
 
-		err = client.ValidateHostCfg(opts.Hostname, cfg)
-		if err != nil {
-			return err
+		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
+			return fmt.Errorf("error validating token: %w", err)
 		}
 
 		return cfg.Write()
 	}
 
-	// TODO consider explicitly telling survey what io to use since it's implicit right now
-
-	hostname := opts.Hostname
-
-	if hostname == "" {
-		var hostType int
-		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "What account do you want to log into?",
-			Options: []string{
-				"GitHub.com",
-				"GitHub Enterprise Server",
-			},
-		}, &hostType)
-
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		isEnterprise := hostType == 1
-
-		hostname = ghinstance.Default()
-		if isEnterprise {
-			err := prompt.SurveyAskOne(&survey.Input{
-				Message: "GHE hostname:",
-			}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-		}
-	}
-
-	fmt.Fprintf(opts.IO.ErrOut, "- Logging into %s\n", hostname)
-
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
-
 	if existingToken != "" && opts.Interactive {
-		err := client.ValidateHostCfg(hostname, cfg)
-		if err == nil {
-			apiClient, err := client.ClientFromCfg(hostname, cfg)
-			if err != nil {
-				return err
-			}
-
-			username, err := api.CurrentLoginName(apiClient, hostname)
-			if err != nil {
-				return fmt.Errorf("error using api: %w", err)
-			}
+		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
 			var keepGoing bool
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: fmt.Sprintf(
-					"You're already logged into %s as %s. Do you want to re-authenticate?",
-					hostname,
-					username),
+					"You're already logged into %s. Do you want to re-authenticate?",
+					hostname),
 				Default: false,
 			}, &keepGoing)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
-
 			if !keepGoing {
 				return nil
 			}
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		return err
-	}
-
-	var authMode int
-	if opts.Web {
-		authMode = 0
-	} else {
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: "How would you like to authenticate?",
-			Options: []string{
-				"Login with a web browser",
-				"Paste an authentication token",
-			},
-		}, &authMode)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-	}
-
-	if authMode == 0 {
-		_, err := authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", opts.Scopes)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate via web browser: %w", err)
-		}
-	} else {
-		fmt.Fprintln(opts.IO.ErrOut)
-		fmt.Fprintln(opts.IO.ErrOut, heredoc.Doc(getAccessTokenTip(hostname)))
-		var token string
-		err := prompt.SurveyAskOne(&survey.Password{
-			Message: "Paste your authentication token:",
-		}, &token, survey.WithValidator(survey.Required))
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		if hostname == "" {
-			return errors.New("empty hostname would leak oauth_token")
-		}
-
-		err = cfg.Set(hostname, "oauth_token", token)
-		if err != nil {
-			return err
-		}
-
-		err = client.ValidateHostCfg(hostname, cfg)
-		if err != nil {
-			return err
-		}
-	}
-
-	cs := opts.IO.ColorScheme()
-
-	gitProtocol := "https"
-	if opts.Interactive {
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: "Choose default git protocol",
-			Options: []string{
-				"HTTPS",
-				"SSH",
-			},
-		}, &gitProtocol)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		gitProtocol = strings.ToLower(gitProtocol)
-
-		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
-		err = cfg.Set(hostname, "git_protocol", gitProtocol)
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
-	}
-
-	apiClient, err := client.ClientFromCfg(hostname, cfg)
-	if err != nil {
-		return err
-	}
-
-	username, err := api.CurrentLoginName(apiClient, hostname)
-	if err != nil {
-		return fmt.Errorf("error using api: %w", err)
-	}
-
-	err = cfg.Set(hostname, "user", username)
-	if err != nil {
-		return err
-	}
-
-	err = cfg.Write()
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
-
-	return nil
+	return shared.Login(&shared.LoginOptions{
+		IO:          opts.IO,
+		Config:      cfg,
+		HTTPClient:  httpClient,
+		Hostname:    hostname,
+		Interactive: opts.Interactive,
+		Web:         opts.Web,
+		Scopes:      opts.Scopes,
+		Executable:  opts.MainExecutable,
+	})
 }
 
-func getAccessTokenTip(hostname string) string {
-	ghHostname := hostname
-	if ghHostname == "" {
-		ghHostname = ghinstance.OverridableDefault()
+func promptForHostname() (string, error) {
+	var hostType int
+	err := prompt.SurveyAskOne(&survey.Select{
+		Message: "What account do you want to log into?",
+		Options: []string{
+			"GitHub.com",
+			"GitHub Enterprise Server",
+		},
+	}, &hostType)
+
+	if err != nil {
+		return "", fmt.Errorf("could not prompt: %w", err)
 	}
-	return fmt.Sprintf(`
-	Tip: you can generate a Personal Access Token here https://%s/settings/tokens
-	The minimum required scopes are 'repo' and 'read:org'.`, ghHostname)
+
+	isEnterprise := hostType == 1
+
+	hostname := ghinstance.Default()
+	if isEnterprise {
+		err := prompt.SurveyAskOne(&survey.Input{
+			Message: "GHE hostname:",
+		}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
+		if err != nil {
+			return "", fmt.Errorf("could not prompt: %w", err)
+		}
+	}
+
+	return hostname, nil
 }

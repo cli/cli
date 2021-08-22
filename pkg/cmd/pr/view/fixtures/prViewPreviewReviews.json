@@ -1,0 +1,318 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "sam"
+              },
+              "authorAssociation": "NONE",
+              "body": "Review 1",
+              "submittedAt": "2020-01-02T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 1
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 1
+                  }
+                }
+              ],
+              "state": "COMMENTED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-1"
+            },
+            {
+              "author": {
+                "login": "matt"
+              },
+              "authorAssociation": "OWNER",
+              "body": "Review 2",
+              "submittedAt": "2020-01-04T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 1
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 1
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ],
+              "state": "CHANGES_REQUESTED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-2"
+            },
+            {
+              "author": {
+                "login": "leah"
+              },
+              "authorAssociation": "MEMBER",
+              "body": "Review 3",
+              "submittedAt": "2020-01-06T12:00:00Z",
+              "includesCreatedEdit": true,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ],
+              "state": "APPROVED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-3"
+            },
+            {
+              "author": {
+                "login": "louise"
+              },
+              "authorAssociation": "NONE",
+              "body": "Review 4",
+              "submittedAt": "2020-01-08T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ],
+              "state": "DISMISSED",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-4"
+            },
+            {
+              "author": {
+                "login": "david"
+              },
+              "authorAssociation": "NONE",
+              "body": "Review 5",
+              "submittedAt": "2020-01-10T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ],
+              "state": "PENDING",
+              "url": "https://github.com/OWNER/REPO/pull/12#pullrequestreview-5"
+            }
+          ],
+          "totalCount": 5
+        }
+      }
+    }
+  }
+}

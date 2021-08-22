@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -119,27 +119,6 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		},
-		Remotes: func() (context.Remotes, error) {
-			if remotes == nil {
-				return context.Remotes{
-					{
-						Remote: &git.Remote{Name: "origin"},
-						Repo:   ghrepo.New("OWNER", "REPO"),
-					},
-				}, nil
-			}
-
-			return remotes, nil
-		},
-		Branch: func() (string, error) {
-			return "feature", nil
-		},
 	}
 
 	cmd := NewCmdDiff(factory, nil)
@@ -161,47 +140,16 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 	}, err
 }
 
-func TestPRDiff_no_current_pr(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [] } } } }
-	`))
-	_, err := runCommand(http, nil, false, "")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	assert.Equal(t, `no pull requests found for branch "feature"`, err.Error())
-}
-
-func TestPRDiff_argument_not_found(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": {
-		"pullRequest": { "number": 123 }
-	} } }
-`))
-	http.StubResponse(404, bytes.NewBufferString(""))
-	_, err := runCommand(http, nil, false, "123")
-	if err == nil {
-		t.Fatal("expected error", err)
-	}
-	assert.Equal(t, `could not find pull request diff: pull request not found`, err.Error())
-}
-
 func TestPRDiff_notty(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [
-			{ "url": "https://github.com/OWNER/REPO/pull/123",
-			  "number": 123,
-			  "id": "foobar123",
-			  "headRefName": "feature",
-				"baseRefName": "master" }
-		] } } } }`))
-	http.StubResponse(200, bytes.NewBufferString(testDiff))
+
+	shared.RunCommandFinder("", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
+		httpmock.StringResponse(testDiff))
+
 	output, err := runCommand(http, nil, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -214,16 +162,15 @@ func TestPRDiff_notty(t *testing.T) {
 func TestPRDiff_tty(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
-	http.StubResponse(200, bytes.NewBufferString(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [
-			{ "url": "https://github.com/OWNER/REPO/pull/123",
-			  "number": 123,
-			  "id": "foobar123",
-			  "headRefName": "feature",
-				"baseRefName": "master" }
-		] } } } }`))
-	http.StubResponse(200, bytes.NewBufferString(testDiff))
-	output, err := runCommand(http, nil, true, "")
+
+	shared.RunCommandFinder("123", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
+		httpmock.StringResponse(testDiff),
+	)
+
+	output, err := runCommand(http, nil, true, "123")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}

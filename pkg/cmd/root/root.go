@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
 	"github.com/cli/cli/internal/ghrepo"
+	actionsCmd "github.com/cli/cli/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/pkg/cmd/api"
 	authCmd "github.com/cli/cli/pkg/cmd/auth"
@@ -15,10 +16,14 @@ import (
 	"github.com/cli/cli/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/pkg/cmd/gist"
 	issueCmd "github.com/cli/cli/pkg/cmd/issue"
+	jobCmd "github.com/cli/cli/pkg/cmd/job"
 	prCmd "github.com/cli/cli/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
+	runCmd "github.com/cli/cli/pkg/cmd/run"
+	secretCmd "github.com/cli/cli/pkg/cmd/secret"
+	sshKeyCmd "github.com/cli/cli/pkg/cmd/ssh-key"
 	versionCmd "github.com/cli/cli/pkg/cmd/version"
 	whatCmd "github.com/cli/cli/pkg/cmd/what"
 	"github.com/cli/cli/pkg/cmdutil"
@@ -60,7 +65,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
 	cmd.SetHelpFunc(helpHelper)
 	cmd.SetUsageFunc(rootUsageFunc)
-	cmd.SetFlagErrorFunc(rootFlagErrrorFunc)
+	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
 	formattedVersion := versionCmd.Format(version, buildDate)
 	cmd.SetVersionTemplate(formattedVersion)
@@ -75,6 +80,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
+	cmd.AddCommand(secretCmd.NewCmdSecret(f))
+	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+
+	cmd.AddCommand(actionsCmd.NewCmdActions(f))
+	cmd.AddCommand(runCmd.NewCmdRun(f))
+	cmd.AddCommand(jobCmd.NewCmdJob(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -93,11 +104,16 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
+	referenceCmd := NewHelpTopic("reference")
+	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
+	cmd.AddCommand(referenceCmd)
 
 	cmd.AddCommand(whatCmd.NewCmdWhat(f, nil))
 
 	cmdutil.DisableAuthCheck(cmd)
 
+	// this needs to appear last:
+	referenceCmd.Long = referenceLong(cmd)
 	return cmd
 }
 

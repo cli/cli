@@ -3,17 +3,19 @@ package merge
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/pkg/cmd/pr/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -25,9 +27,14 @@ import (
 )
 
 func Test_NewCmdMerge(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name    string
 		args    string
+		stdin   string
 		isTTY   bool
 		want    MergeOptions
 		wantErr string
@@ -37,12 +44,82 @@ func Test_NewCmdMerge(t *testing.T) {
 			args:  "123",
 			isTTY: true,
 			want: MergeOptions{
-				SelectorArg:       "123",
-				DeleteBranch:      true,
-				DeleteLocalBranch: true,
-				MergeMethod:       api.PullRequestMergeMethodMerge,
-				InteractiveMode:   true,
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "",
+				BodySet:                 false,
 			},
+		},
+		{
+			name:  "delete-branch specified",
+			args:  "--delete-branch=false",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: true,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "",
+				BodySet:                 false,
+			},
+		},
+		{
+			name:  "body from file",
+			args:  fmt.Sprintf("123 --body-file '%s'", tmpFile),
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "a body from file",
+				BodySet:                 true,
+			},
+		},
+		{
+			name:  "body from stdin",
+			args:  "123 --body-file -",
+			stdin: "this is on standard input",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "this is on standard input",
+				BodySet:                 true,
+			},
+		},
+		{
+			name:  "body",
+			args:  "123 -bcool",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "cool",
+				BodySet:                 true,
+			},
+		},
+		{
+			name:    "body and body-file flags",
+			args:    "123 --body 'test' --body-file 'test-file.txt'",
+			isTTY:   true,
+			wantErr: "specify only one of `--body` or `--body-file`",
 		},
 		{
 			name:    "no argument with --repo override",
@@ -71,10 +148,14 @@ func Test_NewCmdMerge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			io, stdin, _, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.isTTY)
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
+
+			if tt.stdin != "" {
+				_, _ = stdin.WriteString(tt.stdin)
+			}
 
 			f := &cmdutil.Factory{
 				IOStreams: io,
@@ -105,11 +186,27 @@ func Test_NewCmdMerge(t *testing.T) {
 
 			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.want.DeleteBranch, opts.DeleteBranch)
-			assert.Equal(t, tt.want.DeleteLocalBranch, opts.DeleteLocalBranch)
+			assert.Equal(t, tt.want.CanDeleteLocalBranch, opts.CanDeleteLocalBranch)
 			assert.Equal(t, tt.want.MergeMethod, opts.MergeMethod)
 			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
+			assert.Equal(t, tt.want.Body, opts.Body)
+			assert.Equal(t, tt.want.BodySet, opts.BodySet)
 		})
 	}
+}
+
+func baseRepo(owner, repo, branch string) ghrepo.Interface {
+	return api.InitRepoHostname(&api.Repository{
+		Name:             repo,
+		Owner:            api.RepositoryOwner{Login: owner},
+		DefaultBranchRef: api.BranchRef{Name: branch},
+	}, "github.com")
+}
+
+func stubCommit(pr *api.PullRequest, oid string) {
+	pr.Commits.Nodes = append(pr.Commits.Nodes, api.PullRequestCommit{
+		Commit: api.PullRequestCommitCommit{OID: oid},
+	})
 }
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -122,24 +219,6 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		IOStreams: io,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return api.InitRepoHostname(&api.Repository{
-				Name:             "REPO",
-				Owner:            api.RepositoryOwner{Login: "OWNER"},
-				DefaultBranchRef: api.BranchRef{Name: "master"},
-			}, "github.com"), nil
-		},
-		Remotes: func() (context.Remotes, error) {
-			return context.Remotes{
-				{
-					Remote: &git.Remote{Name: "origin"},
-					Repo:   ghrepo.New("OWNER", "REPO"),
-				},
-			}, nil
 		},
 		Branch: func() (string, error) {
 			return branch, nil
@@ -174,17 +253,19 @@ func initFakeHTTP() *httpmock.Registry {
 func TestPrMerge(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "THE-ID",
-			"number": 1,
-			"title": "The title of the PR",
-			"state": "OPEN",
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"}
-		} } } }`))
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -192,18 +273,9 @@ func TestPrMerge(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	if err != nil {
@@ -217,20 +289,52 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_blocked(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "BLOCKED",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	assert.EqualError(t, err, "SilentError")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
+		`, "`"), output.Stderr())
+}
+
 func TestPrMerge_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "THE-ID",
-			"number": 1,
-			"title": "The title of the PR",
-			"state": "OPEN",
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"}
-		} } } }`))
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -238,18 +342,9 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
 	if err != nil {
@@ -263,17 +358,19 @@ func TestPrMerge_nontty(t *testing.T) {
 func TestPrMerge_withRepoFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "THE-ID",
-			"number": 1,
-			"title": "The title of the PR",
-			"state": "OPEN",
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"}
-		} } } }`))
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -281,19 +378,14 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
-
-	assert.Equal(t, 0, len(cs.Calls))
 
 	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
 
@@ -305,10 +397,20 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 func TestPrMerge_deleteBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		// FIXME: references fixture from another package
-		httpmock.FileResponse("../view/fixtures/prViewPreviewWithMetadataByBranch.json"))
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -320,30 +422,42 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git rev-parse --verify blueberries`
-	cs.Stub("") // git branch -d
-	cs.Stub("") // git push origin --delete blueberries
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), `Merged pull request #10 \(Blueberries are a good fruit\)`, `Deleted branch.*blueberries`)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries and switched to branch master
+	`), output.Stderr())
 }
 
 func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		// FIXME: references fixture from another package
-		httpmock.FileResponse("../view/fixtures/prViewPreviewWithMetadataByBranch.json"))
+
+	shared.RunCommandFinder(
+		"blueberries",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -355,29 +469,40 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	// We don't expect the default branch to be checked out, just that blueberries is deleted
-	cs.Stub("") // git rev-parse --verify blueberries
-	cs.Stub("") // git branch -d blueberries
-	cs.Stub("") // git push origin --delete blueberries
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, "master", true, `pr merge --merge --delete-branch blueberries`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), `Merged pull request #10 \(Blueberries are a good fruit\)`, `Deleted branch.*blueberries`)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries
+	`), output.Stderr())
 }
 
-func TestPrMerge_noPrNumberGiven(t *testing.T) {
+func Test_nonDivergingPullRequest(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
-		// FIXME: references fixture from another package
-		httpmock.FileResponse("../view/fixtures/prViewPreviewWithMetadataByBranch.json"))
+
+	pr := &api.PullRequest{
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
+	}
+	stubCommit(pr, "COMMITSHA1")
+
+	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -385,45 +510,115 @@ func TestPrMerge_noPrNumberGiven(t *testing.T) {
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("branch.blueberries.remote origin\nbranch.blueberries.merge refs/heads/blueberries") // git config --get-regexp ^branch\.master\.(remote|merge)
-	cs.Stub("")                                                                                  // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("")                                                                                  // git symbolic-ref --quiet --short HEAD
-	cs.Stub("")                                                                                  // git checkout master
-	cs.Stub("")                                                                                  // git branch -d
+	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA1,title")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #10 \(Blueberries are a good fruit\)`)
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+	`), output.Stderr())
+}
 
-	if !r.MatchString(output.Stderr()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+func Test_divergingPullRequestWarning(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	pr := &api.PullRequest{
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
 	}
+	stubCommit(pr, "COMMITSHA1")
+
+	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA2,title")
+
+	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, heredoc.Doc(`
+		! Pull request #10 (Blueberries are a good fruit) has diverged from local branch
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+	`), output.Stderr())
+}
+
+func Test_pullRequestWithoutCommits(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			Title:            "Blueberries are a good fruit",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+	`), output.Stderr())
 }
 
 func TestPrMerge_rebase(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "THE-ID",
-			"number": 2,
-			"title": "The title of the PR",
-			"state": "OPEN",
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"}
-		} } } }`))
+
+	shared.RunCommandFinder(
+		"2",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           2,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -431,17 +626,9 @@ func TestPrMerge_rebase(t *testing.T) {
 			assert.Equal(t, "REBASE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git branch -d
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
 	if err != nil {
@@ -458,86 +645,178 @@ func TestPrMerge_rebase(t *testing.T) {
 func TestPrMerge_squash(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequest": {
-			"id": "THE-ID",
-			"number": 3,
-			"title": "The title of the PR",
-			"state": "OPEN",
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"}
-		} } } }`))
+
+	shared.RunCommandFinder(
+		"3",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
-			assert.Equal(t, "The title of the PR (#3)", input["commitHeadline"].(string))
+			assert.NotContains(t, input, "commitHeadline")
 		}))
-	http.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
-		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git branch -d
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "Squashed and merged pull request #3", `Deleted branch.*blueberries`)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Squashed and merged pull request #3 (The title of the PR)
+	`), output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestByNumber\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"pullRequest": { "number": 4, "title": "The title of the PR", "state": "MERGED"}
-		} } }`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	shared.RunCommandFinder(
+		"4",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           4,
+			State:            "MERGED",
+			HeadRefName:      "blueberries",
+			BaseRefName:      "master",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git branch -d
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	output, err := runCommand(http, "master", true, "pr merge 4")
-	if err == nil {
-		t.Fatalf("expected an error running command `pr merge`: %v", err)
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+	as.StubOne(true)
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch master\n", output.Stderr())
+}
+
+func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"4",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              4,
+			State:               "MERGED",
+			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
+			MergeStateStatus:    "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	r := regexp.MustCompile(`Pull request #4 \(The title of the PR\) was already merged`)
-
-	if !r.MatchString(err.Error()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
-	}
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
 func TestPRMerge_interactive(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
 	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [{
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"},
-			"id": "THE-ID",
-			"number": 3
-		}] } } } }`))
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.StubOne(0)        // Merge method survey
+	as.StubOne(false)    // Delete branch survey
+	as.StubOne("Submit") // Confirm submit survey
+
+	output, err := runCommand(http, "blueberries", true, "")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	//nolint:staticcheck // prefer exact matchers over ExpectLines
+	test.ExpectLines(t, output.Stderr(), "Merged pull request #3")
+}
+
+func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -549,85 +828,254 @@ func TestPRMerge_interactive(t *testing.T) {
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git push origin --delete blueberries
-	cs.Stub("") // git branch -d
+	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "mergeMethod",
-			Value: 0,
-		},
-		{
-			Name:  "deleteBranch",
-			Value: true,
-		},
-		{
-			Name:  "isConfirmed",
-			Value: true,
-		},
-	})
+	as.StubOne(0)        // Merge method survey
+	as.StubOne("Submit") // Confirm submit survey
 
-	output, err := runCommand(http, "blueberries", true, "")
+	output, err := runCommand(http, "blueberries", true, "-d")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	test.ExpectLines(t, output.Stderr(), "Merged pull request #3", `Deleted branch.*blueberries`)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #3 (It was the best of times)
+		✓ Deleted branch blueberries and switched to branch master
+	`), output.Stderr())
+}
+
+func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestMergeText\b`),
+		httpmock.StringResponse(`
+		{ "data": { "node": {
+			"viewerMergeBodyText": "default body text"
+		} } }`))
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+
+	as.StubOne(2)                     // Merge method survey
+	as.StubOne(false)                 // Delete branch survey
+	as.StubOne("Edit commit message") // Confirm submit survey
+	as.StubOne("Submit")              // Confirm submit survey
+
+	err := mergeRun(&MergeOptions{
+		IO:     io,
+		Editor: testEditor{},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		InteractiveMode: true,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Squashed and merged pull request #123 (title)\n", stderr.String())
 }
 
 func TestPRMerge_interactiveCancelled(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
+		ghrepo.New("OWNER", "REPO"),
+	)
+
 	http.Register(
-		httpmock.GraphQL(`query PullRequestForBranch\b`),
+		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "pullRequests": { "nodes": [{
-			"headRefName": "blueberries",
-			"headRepositoryOwner": {"login": "OWNER"},
-			"id": "THE-ID",
-			"number": 3
-		}] } } } }`))
+		{ "data": { "repository": {
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": true
+		} } }`))
 
-	cs, cmdTeardown := test.InitCmdStubber()
-	defer cmdTeardown()
-
-	cs.Stub("") // git config --get-regexp ^branch\.blueberries\.(remote|merge)$
-	cs.Stub("") // git symbolic-ref --quiet --short HEAD
-	cs.Stub("") // git checkout master
-	cs.Stub("") // git push origin --delete blueberries
-	cs.Stub("") // git branch -d
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "mergeMethod",
-			Value: 0,
-		},
-		{
-			Name:  "deleteBranch",
-			Value: true,
-		},
-		{
-			Name:  "isConfirmed",
-			Value: false,
-		},
-	})
+	as.StubOne(0)        // Merge method survey
+	as.StubOne(true)     // Delete branch survey
+	as.StubOne("Cancel") // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
-	if !errors.Is(err, cmdutil.SilentError) {
+	if !errors.Is(err, cmdutil.CancelError) {
 		t.Fatalf("got error %v", err)
 	}
 
 	assert.Equal(t, "Cancelled.\n", output.Stderr())
+}
+
+func Test_mergeMethodSurvey(t *testing.T) {
+	repo := &api.Repository{
+		MergeCommitAllowed: false,
+		RebaseMergeAllowed: true,
+		SquashMergeAllowed: true,
+	}
+	as, surveyTeardown := prompt.InitAskStubber()
+	defer surveyTeardown()
+	as.StubOne(0) // Select first option which is rebase merge
+	method, err := mergeMethodSurvey(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, PullRequestMergeMethodRebase, method)
+}
+
+func TestMergeRun_autoMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeEnable: true,
+		MergeMethod:     PullRequestMergeMethodSquash,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "BLOCKED"},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+}
+
+func TestMergeRun_autoMerge_directMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeEnable: true,
+		MergeMethod:     PullRequestMergeMethodMerge,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Merged pull request #123 ()\n", stderr.String())
+}
+
+func TestMergeRun_disableAutoMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestAutoMergeDisable\b`),
+		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]interface{}) {
+			assert.Equal(t, map[string]interface{}{"prID": "THE-ID"}, m)
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:      "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeDisable: true,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
+}
+
+type testEditor struct{}
+
+func (e testEditor) Edit(filename, text string) (string, error) {
+	return strings.ToUpper(text), nil
 }

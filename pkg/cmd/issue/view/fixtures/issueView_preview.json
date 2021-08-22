@@ -7,21 +7,21 @@
         "body": "**bold story**",
         "title": "ix of coins",
         "state": "OPEN",
-        "created_at": "2011-01-26T19:01:12Z",
+        "createdAt": "2011-01-26T19:01:12Z",
         "author": {
           "login": "marseilles"
         },
         "assignees": {
           "nodes": [],
-          "totalcount": 0
+          "totalCount": 0
         },
         "labels": {
           "nodes": [],
-          "totalcount": 0
+          "totalCount": 0
         },
         "projectcards": {
           "nodes": [],
-          "totalcount": 0
+          "totalCount": 0
         },
         "milestone": {
           "title": ""

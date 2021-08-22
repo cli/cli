@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/internal/run"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
@@ -77,11 +78,11 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
-			if err != nil {
-				assert.Equal(t, tt.wantErr, err.Error())
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else if tt.wantErr != "" {
-				t.Errorf("expected error %q, got nil", tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, "", stdout.String())
@@ -168,10 +169,21 @@ func Test_RepoClone(t *testing.T) {
 			args: "Owner/Repo",
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
+		{
+			name: "clone wiki",
+			args: "Owner/Repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "wiki URL",
+			args: "https://github.com/owner/repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			reg.Register(
 				httpmock.GraphQL(`query RepositoryInfo\b`),
 				httpmock.StringResponse(`
@@ -179,16 +191,18 @@ func Test_RepoClone(t *testing.T) {
 					"name": "REPO",
 					"owner": {
 						"login": "OWNER"
-					}
+					},
+					"hasWikiEnabled": true
 				} } }
 				`))
 
 			httpClient := &http.Client{Transport: reg}
 
-			cs, restore := test.InitCmdStubber()
-			defer restore()
-
-			cs.Stub("") // git clone
+			cs, restore := run.Stub()
+			defer restore(t)
+			cs.Register(`git clone`, 0, "", func(s []string) {
+				assert.Equal(t, tt.want, strings.Join(s, " "))
+			})
 
 			output, err := runCloneCommand(httpClient, tt.args)
 			if err != nil {
@@ -197,9 +211,6 @@ func Test_RepoClone(t *testing.T) {
 
 			assert.Equal(t, "", output.String())
 			assert.Equal(t, "", output.Stderr())
-			assert.Equal(t, 1, cs.Count)
-			assert.Equal(t, tt.want, strings.Join(cs.Calls[0].Args, " "))
-			reg.Verify(t)
 		})
 	}
 }
@@ -218,6 +229,9 @@ func Test_RepoClone_hasParent(t *testing.T) {
 						"name": "ORIG",
 						"owner": {
 							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "trunk"
 						}
 					}
 				} } }
@@ -225,23 +239,21 @@ func Test_RepoClone_hasParent(t *testing.T) {
 
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
 
-	cs.Stub("") // git clone
-	cs.Stub("") // git remote add
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}
-
-	assert.Equal(t, 2, cs.Count)
-	assert.Equal(t, "git -C REPO remote add -f upstream https://github.com/hubot/ORIG.git", strings.Join(cs.Calls[1].Args, " "))
 }
 
 func Test_RepoClone_withoutUsername(t *testing.T) {
 	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
 	reg.Register(
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`
@@ -258,19 +270,12 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 					}
 				} } }
 				`))
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryFindParent\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": {
-			"parent": null
-		} } }`))
 
 	httpClient := &http.Client{Transport: reg}
 
-	cs, restore := test.InitCmdStubber()
-	defer restore()
-
-	cs.Stub("") // git clone
+	cs, restore := run.Stub()
+	defer restore(t)
+	cs.Register(`git clone https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	output, err := runCloneCommand(httpClient, "REPO")
 	if err != nil {
@@ -279,6 +284,4 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, 1, cs.Count)
-	assert.Equal(t, "git clone https://github.com/OWNER/REPO.git", strings.Join(cs.Calls[0].Args, " "))
 }

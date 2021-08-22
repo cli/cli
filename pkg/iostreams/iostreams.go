@@ -17,7 +17,7 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/muesli/termenv"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 type IOStreams struct {
@@ -45,6 +45,8 @@ type IOStreams struct {
 	pagerProcess *os.Process
 
 	neverPrompt bool
+
+	TempFileOverride *os.File
 }
 
 func (s *IOStreams) ColorEnabled() bool {
@@ -138,6 +140,10 @@ func (s *IOStreams) SetPager(cmd string) {
 	s.pagerCommand = cmd
 }
 
+func (s *IOStreams) GetPager() string {
+	return s.pagerCommand
+}
+
 func (s *IOStreams) StartPager() error {
 	if s.pagerCommand == "" || s.pagerCommand == "cat" || !s.IsStdoutTTY() {
 		return nil
@@ -187,7 +193,7 @@ func (s *IOStreams) StopPager() {
 		return
 	}
 
-	s.Out.(io.ReadCloser).Close()
+	_ = s.Out.(io.ReadCloser).Close()
 	_, _ = s.pagerProcess.Wait()
 	s.pagerProcess = nil
 }
@@ -198,6 +204,10 @@ func (s *IOStreams) CanPrompt() bool {
 	}
 
 	return s.IsStdinTTY() && s.IsStdoutTTY()
+}
+
+func (s *IOStreams) GetNeverPrompt() bool {
+	return s.neverPrompt
 }
 
 func (s *IOStreams) SetNeverPrompt(v bool) {
@@ -253,16 +263,31 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
 }
 
+func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
+	var r io.ReadCloser
+	if fn == "-" {
+		r = s.In
+	} else {
+		var err error
+		r, err = os.Open(fn)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer r.Close()
+	return ioutil.ReadAll(r)
+}
+
+func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
+	if s.TempFileOverride != nil {
+		return s.TempFileOverride, nil
+	}
+	return ioutil.TempFile(dir, pattern)
+}
+
 func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
-
-	var pagerCommand string
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		pagerCommand = ghPager
-	} else {
-		pagerCommand = os.Getenv("PAGER")
-	}
 
 	io := &IOStreams{
 		In:           os.Stdin,
@@ -271,7 +296,7 @@ func System() *IOStreams {
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
-		pagerCommand: pagerCommand,
+		pagerCommand: os.Getenv("PAGER"),
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -308,7 +333,7 @@ func isCygwinTerminal(w io.Writer) bool {
 
 func terminalSize(w io.Writer) (int, int, error) {
 	if f, isFile := w.(*os.File); isFile {
-		return terminal.GetSize(int(f.Fd()))
+		return term.GetSize(int(f.Fd()))
 	}
 	return 0, 0, fmt.Errorf("%v is not a file", w)
 }

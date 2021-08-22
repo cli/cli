@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/pkg/cmd/auth/shared"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -68,7 +69,10 @@ func statusRun(opts *StatusOptions) error {
 	statusInfo := map[string][]string{}
 
 	hostnames, err := cfg.Hosts()
-	if len(hostnames) == 0 || err != nil {
+	if err != nil {
+		return err
+	}
+	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
 			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
 		return cmdutil.SilentError
@@ -78,14 +82,15 @@ func statusRun(opts *StatusOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var failed bool
+	var isHostnameFound bool
 
 	for _, hostname := range hostnames {
 		if opts.Hostname != "" && opts.Hostname != hostname {
 			continue
 		}
+		isHostnameFound = true
 
 		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
 		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
@@ -95,9 +100,8 @@ func statusRun(opts *StatusOptions) error {
 			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
 		}
 
-		err = apiClient.HasMinimumScopes(hostname)
-		if err != nil {
-			var missingScopes *api.MissingScopesError
+		if err := shared.HasMinimumScopes(httpClient, hostname, token); err != nil {
+			var missingScopes *shared.MissingScopesError
 			if errors.As(err, &missingScopes) {
 				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
 				if tokenIsWriteable {
@@ -117,6 +121,7 @@ func statusRun(opts *StatusOptions) error {
 			}
 			failed = true
 		} else {
+			apiClient := api.NewClientFromHTTP(httpClient)
 			username, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
@@ -137,6 +142,12 @@ func statusRun(opts *StatusOptions) error {
 
 		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
 		// not to since I wanted this command to be read-only.
+	}
+
+	if !isHostnameFound {
+		fmt.Fprintf(stderr,
+			"Hostname %q not found among authenticated GitHub hosts\n", opts.Hostname)
+		return cmdutil.SilentError
 	}
 
 	for _, hostname := range hostnames {

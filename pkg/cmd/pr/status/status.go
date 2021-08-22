@@ -29,6 +29,7 @@ type StatusOptions struct {
 	Branch     func() (string, error)
 
 	HasRepoOverride bool
+	Exporter        cmdutil.Exporter
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -55,6 +56,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			return statusRun(opts)
 		},
 	}
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -88,18 +91,36 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	// the `@me` macro is available because the API lookup is ElasticSearch-based
-	currentUser := "@me"
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	options := api.StatusOptions{
+		Username:  "@me",
+		CurrentPR: currentPRNumber,
+		HeadRef:   currentPRHeadRef,
+	}
+	if opts.Exporter != nil {
+		options.Fields = opts.Exporter.Fields()
+	}
+	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		data := map[string]interface{}{
+			"currentBranch": nil,
+			"createdBy":     prPayload.ViewerCreated.PullRequests,
+			"needsReview":   prPayload.ReviewRequested.PullRequests,
+		}
+		if prPayload.CurrentPR != nil {
+			data["currentBranch"] = prPayload.CurrentPR
+		}
+		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+	}
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
@@ -205,7 +226,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 					if checks.Failing == checks.Total {
 						summary = cs.Red("× All checks failing")
 					} else {
-						summary = cs.Red(fmt.Sprintf("× %d/%d checks failing", checks.Failing, checks.Total))
+						summary = cs.Redf("× %d/%d checks failing", checks.Failing, checks.Total)
 					}
 				} else if checks.Pending > 0 {
 					summary = cs.Yellow("- Checks pending")
@@ -227,6 +248,18 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.Approved {
 				fmt.Fprint(w, cs.Green("✓ Approved"))
 			}
+
+			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {
+				switch pr.MergeStateStatus {
+				case "BEHIND":
+					fmt.Fprintf(w, " %s", cs.Yellow("- Not up to date"))
+				case "UNKNOWN", "DIRTY":
+					// do not print anything
+				default:
+					fmt.Fprintf(w, " %s", cs.Green("✓ Up to date"))
+				}
+			}
+
 		} else {
 			fmt.Fprintf(w, " - %s", shared.StateTitleWithColor(cs, pr))
 		}

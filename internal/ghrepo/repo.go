@@ -18,7 +18,7 @@ type Interface interface {
 
 // New instantiates a GitHub repository from owner and name arguments
 func New(owner, repo string) Interface {
-	return NewWithHost(owner, repo, ghinstance.OverridableDefault())
+	return NewWithHost(owner, repo, ghinstance.Default())
 }
 
 // NewWithHost is like New with an explicit host name
@@ -33,6 +33,21 @@ func NewWithHost(owner, repo, hostname string) Interface {
 // FullName serializes a GitHub repository into an "OWNER/REPO" string
 func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
+}
+
+var defaultHostOverride string
+
+func defaultHost() string {
+	if defaultHostOverride != "" {
+		return defaultHostOverride
+	}
+	return ghinstance.Default()
+}
+
+// SetDefaultHost overrides the default GitHub hostname for FromFullName.
+// TODO: remove after FromFullName approach is revisited
+func SetDefaultHost(host string) {
+	defaultHostOverride = host
 }
 
 // FromFullName extracts the GitHub repository information from the following
@@ -54,9 +69,9 @@ func FromFullName(nwo string) (Interface, error) {
 	}
 	switch len(parts) {
 	case 3:
-		return NewWithHost(parts[1], parts[2], normalizeHostname(parts[0])), nil
+		return NewWithHost(parts[1], parts[2], parts[0]), nil
 	case 2:
-		return New(parts[0], parts[1]), nil
+		return NewWithHost(parts[0], parts[1], defaultHost()), nil
 	default:
 		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
 	}

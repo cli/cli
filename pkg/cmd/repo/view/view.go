@@ -17,14 +17,19 @@ import (
 	"github.com/cli/cli/pkg/iostreams"
 	"github.com/cli/cli/pkg/markdown"
 	"github.com/cli/cli/utils"
-	"github.com/enescakir/emoji"
 	"github.com/spf13/cobra"
 )
+
+type browser interface {
+	Browse(string) error
+}
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
+	Exporter   cmdutil.Exporter
 
 	RepoArg string
 	Web     bool
@@ -36,6 +41,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -62,9 +68,12 @@ With '--branch', view a specific branch of the repository.`,
 
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a repository in the browser")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "View a specific branch of the repository")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 
 	return cmd
 }
+
+var defaultFields = []string{"name", "owner", "description"}
 
 func viewRun(opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
@@ -96,9 +105,22 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	repo, err := api.GitHubRepo(apiClient, toView)
+	var readme *RepoReadme
+	fields := defaultFields
+	if opts.Exporter != nil {
+		fields = opts.Exporter.Fields()
+	}
+
+	repo, err := fetchRepository(apiClient, toView, fields)
 	if err != nil {
 		return err
+	}
+
+	if !opts.Web && opts.Exporter == nil {
+		readme, err = RepositoryReadme(httpClient, toView, opts.Branch)
+		if err != nil && !errors.Is(err, NotFoundError) {
+			return err
+		}
 	}
 
 	openURL := generateBranchURL(toView, opts.Branch)
@@ -106,24 +128,20 @@ func viewRun(opts *ViewOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
-		return utils.OpenInBrowser(openURL)
-	}
-
-	fullName := ghrepo.FullName(toView)
-
-	readme, err := RepositoryReadme(httpClient, toView, opts.Branch)
-	if err != nil && err != NotFoundError {
-		return err
+		return opts.Browser.Browse(openURL)
 	}
 
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
+	if err := opts.IO.StartPager(); err != nil {
 		return err
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO.Out, repo, opts.IO.ColorEnabled())
+	}
+
+	fullName := ghrepo.FullName(toView)
 	stdout := opts.IO.Out
 
 	if !opts.IO.IsStdoutTTY() {
@@ -141,9 +159,9 @@ func viewRun(opts *ViewOptions) error {
 	repoTmpl := heredoc.Doc(`
 		{{.FullName}}
 		{{.Description}}
-		
+
 		{{.Readme}}
-		
+
 		{{.View}}
 	`)
 
@@ -160,13 +178,12 @@ func viewRun(opts *ViewOptions) error {
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		readmeContent, err = markdown.Render(readme.Content, style, readme.BaseURL)
+		readmeContent, err = markdown.RenderWithBaseURL(readme.Content, style, readme.BaseURL)
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}
-		readmeContent = emoji.Parse(readmeContent)
 	} else {
-		readmeContent = emoji.Parse(readme.Content)
+		readmeContent = readme.Content
 	}
 
 	description := repo.Description

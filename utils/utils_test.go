@@ -6,7 +6,6 @@ import (
 )
 
 func TestFuzzyAgo(t *testing.T) {
-
 	cases := map[string]string{
 		"1s":         "less than a minute ago",
 		"30s":        "less than a minute ago",
@@ -33,6 +32,32 @@ func TestFuzzyAgo(t *testing.T) {
 		fuzzy := FuzzyAgo(d)
 		if fuzzy != expected {
 			t.Errorf("unexpected fuzzy duration value: %s for %s", fuzzy, duration)
+		}
+	}
+}
+
+func TestFuzzyAgoAbbr(t *testing.T) {
+	const form = "2006-Jan-02 15:04:05"
+	now, _ := time.Parse(form, "2020-Nov-22 14:00:00")
+
+	cases := map[string]string{
+		"2020-Nov-22 14:00:00": "0m",
+		"2020-Nov-22 13:59:00": "1m",
+		"2020-Nov-22 13:30:00": "30m",
+		"2020-Nov-22 13:00:00": "1h",
+		"2020-Nov-22 02:00:00": "12h",
+		"2020-Nov-21 14:00:00": "1d",
+		"2020-Nov-07 14:00:00": "15d",
+		"2020-Oct-24 14:00:00": "29d",
+		"2020-Oct-23 14:00:00": "Oct 23, 2020",
+		"2019-Nov-22 14:00:00": "Nov 22, 2019",
+	}
+
+	for createdAt, expected := range cases {
+		d, _ := time.Parse(form, createdAt)
+		fuzzy := FuzzyAgoAbbr(now, d)
+		if fuzzy != expected {
+			t.Errorf("unexpected fuzzy duration abbr value: %s for %s", fuzzy, createdAt)
 		}
 	}
 }

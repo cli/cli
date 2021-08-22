@@ -51,6 +51,9 @@ func InitAskStubber() (*AskStubber, func()) {
 
 		// actually set response
 		stubbedQuestions := as.Stubs[count]
+		if len(stubbedQuestions) != len(qs) {
+			panic(fmt.Sprintf("asked questions: %d; stubbed questions: %d", len(qs), len(stubbedQuestions)))
+		}
 		for i, sq := range stubbedQuestions {
 			q := qs[i]
 			if q.Name != sq.Name {

@@ -1,0 +1,320 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "comments": {
+          "nodes": [
+            {
+              "author": {
+                "login": "monalisa"
+              },
+              "authorAssociation": "NONE",
+              "body": "Comment 1",
+              "createdAt": "2020-01-01T12:00:00Z",
+              "includesCreatedEdit": true,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 1
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 2
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 3
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 4
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 5
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 6
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 7
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 8
+                  }
+                }
+              ]
+            },
+            {
+              "author": {
+                "login": "johnnytest"
+              },
+              "authorAssociation": "CONTRIBUTOR",
+              "body": "Comment 2",
+              "createdAt": "2020-01-03T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            },
+            {
+              "author": {
+                "login": "elvisp"
+              },
+              "authorAssociation": "MEMBER",
+              "body": "Comment 3",
+              "createdAt": "2020-01-05T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            },
+            {
+              "author": {
+                "login": "loislane"
+              },
+              "authorAssociation": "OWNER",
+              "body": "Comment 4",
+              "createdAt": "2020-01-07T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            },
+            {
+              "author": {
+                "login": "sam-spam"
+              },
+              "authorAssociation": "NONE",
+              "body": "Spam comment",
+              "createdAt": "2020-01-09T12:00:00Z",
+              "includesCreatedEdit": true,
+              "isMinimized": true,
+              "minimizedReason": "spam",
+              "reactionGroups": []
+            },
+            {
+              "author": {
+                "login": "marseilles"
+              },
+              "authorAssociation": "COLLABORATOR",
+              "body": "Comment 5",
+              "createdAt": "2020-01-09T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "totalCount": 6
+        }
+      }
+    }
+  }
+}

@@ -16,10 +16,10 @@ import (
 	"time"
 )
 
-func makeCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
+func NewCachedClient(httpClient *http.Client, cacheTTL time.Duration) *http.Client {
 	cacheDir := filepath.Join(os.TempDir(), "gh-cli-cache")
 	return &http.Client{
-		Transport: CacheReponse(cacheTTL, cacheDir)(httpClient.Transport),
+		Transport: CacheResponse(cacheTTL, cacheDir)(httpClient.Transport),
 	}
 }
 
@@ -39,8 +39,8 @@ func isCacheableResponse(res *http.Response) bool {
 	return res.StatusCode < 500 && res.StatusCode != 403
 }
 
-// CacheReponse produces a RoundTripper that caches HTTP responses to disk for a specified amount of time
-func CacheReponse(ttl time.Duration, dir string) ClientOption {
+// CacheResponse produces a RoundTripper that caches HTTP responses to disk for a specified amount of time
+func CacheResponse(ttl time.Duration, dir string) ClientOption {
 	fs := fileStorage{
 		dir: dir,
 		ttl: ttl,
@@ -167,9 +167,13 @@ func (fs *fileStorage) store(key string, res *http.Response) error {
 	defer f.Close()
 
 	var origBody io.ReadCloser
-	origBody, res.Body = copyStream(res.Body)
-	defer res.Body.Close()
+	if res.Body != nil {
+		origBody, res.Body = copyStream(res.Body)
+		defer res.Body.Close()
+	}
 	err = res.Write(f)
-	res.Body = origBody
+	if origBody != nil {
+		res.Body = origBody
+	}
 	return err
 }

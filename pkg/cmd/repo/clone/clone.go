@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
 	"github.com/cli/cli/internal/ghrepo"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
@@ -87,6 +86,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	var repo ghrepo.Interface
 	var protocol string
+
 	if repositoryIsURL {
 		repoURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
@@ -105,7 +105,11 @@ func cloneRun(opts *CloneOptions) error {
 		if repositoryIsFullName {
 			fullName = opts.Repository
 		} else {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.OverridableDefault())
+			host, err := cfg.DefaultHost()
+			if err != nil {
+				return err
+			}
+			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err
 			}
@@ -123,6 +127,12 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 
+	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
+	if wantsWiki {
+		repoName := strings.TrimSuffix(repo.RepoName(), ".wiki")
+		repo = ghrepo.NewWithHost(repo.RepoOwner(), repoName, repo.RepoHost())
+	}
+
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
@@ -130,6 +140,14 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
+
+	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
+	if wantsWiki {
+		if !canonicalRepo.HasWikiEnabled {
+			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
+		}
+		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
+	}
 
 	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
 	if err != nil {
@@ -144,7 +162,7 @@ func cloneRun(opts *CloneOptions) error {
 		}
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
-		err = git.AddUpstreamRemote(upstreamURL, cloneDir)
+		err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
 		if err != nil {
 			return err
 		}

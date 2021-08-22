@@ -1,21 +1,13 @@
 package context
 
 import (
-	"errors"
 	"net/url"
-	"reflect"
 	"testing"
 
 	"github.com/cli/cli/git"
 	"github.com/cli/cli/internal/ghrepo"
+	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
@@ -25,15 +17,15 @@ func Test_Remotes_FindByName(t *testing.T) {
 	}
 
 	r, err := list.FindByName("upstream", "origin")
-	eq(t, err, nil)
-	eq(t, r.Name, "upstream")
+	assert.NoError(t, err)
+	assert.Equal(t, "upstream", r.Name)
 
-	r, err = list.FindByName("nonexist", "*")
-	eq(t, err, nil)
-	eq(t, r.Name, "mona")
+	r, err = list.FindByName("nonexistent", "*")
+	assert.NoError(t, err)
+	assert.Equal(t, "mona", r.Name)
 
-	_, err = list.FindByName("nonexist")
-	eq(t, err, errors.New(`no GitHub remotes found`))
+	_, err = list.FindByName("nonexistent")
+	assert.Error(t, err, "no GitHub remotes found")
 }
 
 func Test_translateRemotes(t *testing.T) {
@@ -65,4 +57,15 @@ func Test_translateRemotes(t *testing.T) {
 	if result[0].RepoName() != "hello" {
 		t.Errorf("got %q", result[0].RepoName())
 	}
+}
+
+func Test_FilterByHosts(t *testing.T) {
+	r1 := &Remote{Remote: &git.Remote{Name: "mona"}, Repo: ghrepo.NewWithHost("monalisa", "myfork", "test.com")}
+	r2 := &Remote{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.NewWithHost("monalisa", "octo-cat", "example.com")}
+	r3 := &Remote{Remote: &git.Remote{Name: "upstream"}, Repo: ghrepo.New("hubot", "tools")}
+	list := Remotes{r1, r2, r3}
+	f := list.FilterByHosts([]string{"example.com", "test.com"})
+	assert.Equal(t, 2, len(f))
+	assert.Equal(t, r1, f[0])
+	assert.Equal(t, r2, f[1])
 }

@@ -7,7 +7,7 @@
         "body": "**bold story**",
         "title": "ix of coins",
         "state": "CLOSED",
-        "created_at": "2011-01-26T19:01:12Z",
+        "createdAt": "2011-01-26T19:01:12Z",
         "author": {
           "login": "marseilles"
         },

@@ -67,22 +67,21 @@ func CurrentBranch() (string, error) {
 		return "", err
 	}
 
+	stderr := bytes.Buffer{}
+	refCmd.Stderr = &stderr
+
 	output, err := run.PrepareCmd(refCmd).Output()
 	if err == nil {
 		// Found the branch name
 		return getBranchShortName(output), nil
 	}
 
-	var cmdErr *run.CmdError
-	if errors.As(err, &cmdErr) {
-		if cmdErr.Stderr.Len() == 0 {
-			// Detached head
-			return "", ErrNotOnAnyBranch
-		}
+	if stderr.Len() == 0 {
+		// Detached head
+		return "", ErrNotOnAnyBranch
 	}
 
-	// Unknown error
-	return "", err
+	return "", fmt.Errorf("%sgit: %s", stderr.String(), err)
 }
 
 func listRemotes() ([]string, error) {
@@ -108,14 +107,29 @@ func Config(name string) (string, error) {
 
 }
 
-var GitCommand = func(args ...string) (*exec.Cmd, error) {
+type NotInstalled struct {
+	message string
+	error
+}
+
+func (e *NotInstalled) Error() string {
+	return e.message
+}
+
+func GitCommand(args ...string) (*exec.Cmd, error) {
 	gitExe, err := safeexec.LookPath("git")
 	if err != nil {
-		programName := "git"
-		if runtime.GOOS == "windows" {
-			programName = "Git for Windows"
+		if errors.Is(err, exec.ErrNotFound) {
+			programName := "git"
+			if runtime.GOOS == "windows" {
+				programName = "Git for Windows"
+			}
+			return nil, &NotInstalled{
+				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
+				error:   err,
+			}
 		}
-		return nil, fmt.Errorf("unable to find git executable in PATH; please install %s before retrying", programName)
+		return nil, err
 	}
 	return exec.Command(gitExe, args...), nil
 }
@@ -181,16 +195,30 @@ func Commits(baseRef, headRef string) ([]*Commit, error) {
 	return commits, nil
 }
 
+func lookupCommit(sha, format string) ([]byte, error) {
+	logCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:"+format, sha)
+	if err != nil {
+		return nil, err
+	}
+	return run.PrepareCmd(logCmd).Output()
+}
+
+func LastCommit() (*Commit, error) {
+	output, err := lookupCommit("HEAD", "%H,%s")
+	if err != nil {
+		return nil, err
+	}
+
+	idx := bytes.IndexByte(output, ',')
+	return &Commit{
+		Sha:   string(output[0:idx]),
+		Title: strings.TrimSpace(string(output[idx+1:])),
+	}, nil
+}
+
 func CommitBody(sha string) (string, error) {
-	showCmd, err := GitCommand("-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:%b", sha)
-	if err != nil {
-		return "", err
-	}
-	output, err := run.PrepareCmd(showCmd).Output()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
+	output, err := lookupCommit(sha, "%b")
+	return string(output), err
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration
@@ -308,8 +336,13 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 	return
 }
 
-func AddUpstreamRemote(upstreamURL, cloneDir string) error {
-	cloneCmd, err := GitCommand("-C", cloneDir, "remote", "add", "-f", "upstream", upstreamURL)
+func AddUpstreamRemote(upstreamURL, cloneDir string, branches []string) error {
+	args := []string{"-C", cloneDir, "remote", "add"}
+	for _, branch := range branches {
+		args = append(args, "-t", branch)
+	}
+	args = append(args, "-f", "upstream", upstreamURL)
+	cloneCmd, err := GitCommand(args...)
 	if err != nil {
 		return err
 	}

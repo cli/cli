@@ -74,6 +74,9 @@ func logoutRun(opts *LogoutOptions) error {
 
 	candidates, err := cfg.Hosts()
 	if err != nil {
+		return err
+	}
+	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
 
@@ -105,6 +108,12 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+		var roErr *config.ReadOnlyEnvError
+		if errors.As(err, &roErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
+			fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
+			return cmdutil.SilentError
+		}
 		return err
 	}
 

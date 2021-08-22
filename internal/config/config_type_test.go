@@ -50,23 +50,31 @@ func Test_defaultConfig(t *testing.T) {
 		# Aliases allow you to create nicknames for gh commands
 		aliases:
 		    co: pr checkout
+		# The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
+		http_unix_socket:
+		# What web browser gh should use when opening URLs. If blank, will refer to environment.
+		browser:
 	`)
 	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, "", hostsBuf.String())
 
 	proto, err := cfg.Get("", "git_protocol")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "https", proto)
 
 	editor, err := cfg.Get("", "editor")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", editor)
 
 	aliases, err := cfg.Aliases()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, len(aliases.All()), 1)
 	expansion, _ := aliases.Get("co")
 	assert.Equal(t, expansion, "pr checkout")
+
+	browser, err := cfg.Get("", "browser")
+	assert.NoError(t, err)
+	assert.Equal(t, "", browser)
 }
 
 func Test_ValidateValue(t *testing.T) {
@@ -74,13 +82,16 @@ func Test_ValidateValue(t *testing.T) {
 	assert.EqualError(t, err, "invalid value")
 
 	err = ValidateValue("git_protocol", "ssh")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = ValidateValue("editor", "vim")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = ValidateValue("got", "123")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+
+	err = ValidateValue("http_unix_socket", "really_anything/is/allowed/and/net.Dial\\(...\\)/will/ultimately/validate")
+	assert.NoError(t, err)
 }
 
 func Test_ValidateKey(t *testing.T) {
@@ -97,5 +108,11 @@ func Test_ValidateKey(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = ValidateKey("pager")
+	assert.NoError(t, err)
+
+	err = ValidateKey("http_unix_socket")
+	assert.NoError(t, err)
+
+	err = ValidateKey("browser")
 	assert.NoError(t, err)
 }

@@ -65,7 +65,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return err
 	}
 
-	if !issue.Closed {
+	if issue.State == "OPEN" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already open\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
 	}
@@ -75,7 +75,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", cs.SuccessIcon(), issue.Number, issue.Title)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", cs.SuccessIconWithColor(cs.Green), issue.Number, issue.Title)
 
 	return nil
 }
