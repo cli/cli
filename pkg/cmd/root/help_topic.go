@@ -100,6 +100,26 @@ var HelpTopics = map[string]map[string]string{
 	},
 }
 
+func NewHelpTopicFn(topic, short string, fn func() string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    topic,
+		Short:  short,
+		Long:   fn(),
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		Run:    helpTopicHelpFunc,
+		Annotations: map[string]string{
+			"markdown:generate": "true",
+			"markdown:basename": "gh_help_" + topic,
+		},
+	}
+
+	cmd.SetHelpFunc(helpTopicHelpFunc)
+	cmd.SetUsageFunc(helpTopicUsageFunc)
+
+	return cmd
+}
+
 func NewHelpTopic(topic string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    topic,

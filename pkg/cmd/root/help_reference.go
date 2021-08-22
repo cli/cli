@@ -1,9 +1,7 @@
 package root
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/cli/cli/pkg/iostreams"
@@ -11,59 +9,73 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
-	return func(cmd *cobra.Command, args []string) {
-		wrapWidth := 0
-		style := "notty"
-		if io.IsStdoutTTY() {
-			wrapWidth = io.TerminalWidth()
-			style = markdown.GetStyle(io.DetectTerminalTheme())
+func referenceHelpFn(cmd *cobra.Command, io *iostreams.IOStreams) func() string {
+	cs := io.ColorScheme()
+	return func() string {
+		reftext := "# gh reference\n\n"
+
+		for _, c := range cmd.Commands() {
+			reftext += cmdRef(cs, c, 0)
 		}
 
-		md, err := markdown.RenderWithWrap(cmd.Long, style, wrapWidth)
+		md, err := markdown.Render(reftext, "auto")
 		if err != nil {
-			fmt.Fprintln(io.ErrOut, err)
-			return
+			return reftext
 		}
 
-		if !io.IsStdoutTTY() {
-			fmt.Fprint(io.Out, dedent(md))
-			return
-		}
-
-		_ = io.StartPager()
-		defer io.StopPager()
-		fmt.Fprint(io.Out, md)
+		return md
 	}
 }
 
-func referenceLong(cmd *cobra.Command) string {
-	buf := bytes.NewBufferString("# gh reference\n\n")
-	for _, c := range cmd.Commands() {
-		if c.Hidden {
-			continue
-		}
-		cmdRef(buf, c, 2)
-	}
-	return buf.String()
-}
+func cmdRef(cs *iostreams.ColorScheme, cmd *cobra.Command, lvl int) string {
+	ref := ""
 
-func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
+	if cmd.Hidden {
+		return ref
+	}
+
+	cmdPrefix := "##"
+	if lvl > 0 {
+		cmdPrefix = "###"
+	}
+
 	// Name + Description
-	fmt.Fprintf(w, "%s `%s`\n\n", strings.Repeat("#", depth), cmd.UseLine())
-	fmt.Fprintf(w, "%s\n\n", cmd.Short)
+	escaped := strings.ReplaceAll(cmd.Use, "<", "〈")
+	escaped = strings.ReplaceAll(escaped, ">", "〉")
+	ref += fmt.Sprintf("%s %s\n\n", cmdPrefix, escaped)
+
+	ref += cmd.Short + "\n\n"
 
 	// Flags
-	// TODO: fold in InheritedFlags/PersistentFlags, but omit `--help` due to repetitiveness
-	if flagUsages := cmd.Flags().FlagUsages(); flagUsages != "" {
-		fmt.Fprintf(w, "```\n%s````\n\n", dedent(flagUsages))
+
+	// TODO glamour doesn't respect linebreaks (double space or backslash at end) at all, so there is
+	// no way to have the damn flags print without a whole newline in between.
+	for _, fu := range strings.Split(cmd.Flags().FlagUsages(), "\n") {
+		if fu == "" {
+			continue
+		}
+		ref += fu + "\n\n"
+	}
+	for _, fu := range strings.Split(cmd.PersistentFlags().FlagUsages(), "\n") {
+		if fu == "" {
+			continue
+		}
+		ref += fu + "\n\n"
+	}
+
+	if cmd.HasPersistentFlags() || cmd.HasFlags() || cmd.HasAvailableSubCommands() {
+		ref += "\n"
 	}
 
 	// Subcommands
-	for _, c := range cmd.Commands() {
-		if c.Hidden {
-			continue
-		}
-		cmdRef(w, c, depth+1)
+	subcommands := cmd.Commands()
+	for _, c := range subcommands {
+		ref += cmdRef(cs, c, lvl+1)
 	}
+
+	if len(subcommands) == 0 {
+		ref += "\n"
+	}
+
+	return ref
 }
