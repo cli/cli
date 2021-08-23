@@ -323,11 +323,10 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	hasTrueColor := false
+	assumeTrueColor := false
 	if stdoutIsTTY {
-		// also enables truecolor support for NewColorable below
 		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
-			hasTrueColor = true
+			assumeTrueColor = true
 		}
 	}
 
@@ -337,8 +336,8 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
-		is256enabled: hasTrueColor || Is256ColorSupported(),
-		hasTrueColor: hasTrueColor || IsTrueColorSupported(),
+		is256enabled: assumeTrueColor || Is256ColorSupported(),
+		hasTrueColor: assumeTrueColor || IsTrueColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
 		ttySize:      ttySize,
 	}

@@ -13,7 +13,12 @@ func (s *IOStreams) EnableVirtualTerminalProcessing() error {
 		return nil
 	}
 
-	return enableVirtualTerminalProcessing(s.originalOut.(*os.File))
+	f, ok := s.originalOut.(*os.File)
+	if !ok {
+		return nil
+	}
+
+	return enableVirtualTerminalProcessing(f)
 }
 
 func enableVirtualTerminalProcessing(f *os.File) error {

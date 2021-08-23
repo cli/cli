@@ -2,12 +2,15 @@
 
 package iostreams
 
-import "os"
+import (
+	"errors"
+	"os"
+)
 
 func (s *IOStreams) EnableVirtualTerminalProcessing() error {
 	return nil
 }
 
 func enableVirtualTerminalProcessing(f *os.File) error {
-	return nil
+	return errors.New("not implemented")
 }
