@@ -3,7 +3,6 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 
@@ -669,9 +668,9 @@ func (e *testExporter) Fields() []string {
 	return e.fields
 }
 
-func (e *testExporter) Write(w io.Writer, data interface{}, colorize bool) error {
+func (e *testExporter) Write(io *iostreams.IOStreams, data interface{}) error {
 	r := data.(*api.Repository)
-	fmt.Fprintf(w, "name: %s\n", r.Name)
-	fmt.Fprintf(w, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)
+	fmt.Fprintf(io.Out, "name: %s\n", r.Name)
+	fmt.Fprintf(io.Out, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)
 	return nil
 }
