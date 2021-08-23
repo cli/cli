@@ -10,13 +10,6 @@ import (
 	"github.com/cli/cli/pkg/text"
 )
 
-const (
-	// Copied from "math" in Go 1.17.
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-
-	MaxInt = 1<<(intSize-1) - 1
-)
-
 type TablePrinter interface {
 	IsTTY() bool
 	AddField(string, func(int, string) string, func(string) string)
@@ -24,25 +17,31 @@ type TablePrinter interface {
 	Render() error
 }
 
+type TablePrinterOptions struct {
+	IsTTY bool
+}
+
 func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
-	if io.IsStdoutTTY() {
+	return NewTablePrinterWithOptions(io, TablePrinterOptions{
+		IsTTY: io.IsStdoutTTY(),
+	})
+}
+
+func NewTablePrinterWithOptions(io *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
+	if opts.IsTTY {
+		var maxWidth int
+		if io.IsStdoutTTY() {
+			maxWidth = io.TerminalWidth()
+		} else {
+			maxWidth = io.ProcessTerminalWidth()
+		}
 		return &ttyTablePrinter{
 			out:      io.Out,
-			maxWidth: io.TerminalWidth(),
+			maxWidth: maxWidth,
 		}
 	}
 	return &tsvTablePrinter{
 		out: io.Out,
-	}
-}
-
-func NewTtyTablePrinter(io *iostreams.IOStreams, maxWidth int) TablePrinter {
-	if io.IsStdoutTTY() && io.TerminalWidth() < maxWidth {
-		maxWidth = io.TerminalWidth()
-	}
-	return &ttyTablePrinter{
-		out:      io.Out,
-		maxWidth: maxWidth,
 	}
 }
 
@@ -66,7 +65,6 @@ func (t ttyTablePrinter) IsTTY() bool {
 	return true
 }
 
-// Never pass pre-colorized text to AddField; always specify colorFunc. Otherwise, the table printer can't correctly compute the width of its columns.
 func (t *ttyTablePrinter) AddField(s string, truncateFunc func(int, string) string, colorFunc func(string) string) {
 	if truncateFunc == nil {
 		truncateFunc = text.Truncate

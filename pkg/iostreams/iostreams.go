@@ -21,6 +21,8 @@ import (
 	"golang.org/x/term"
 )
 
+const DefaultWidth = 80
+
 type IOStreams struct {
 	In     io.ReadCloser
 	Out    io.Writer
@@ -243,12 +245,14 @@ func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicator = nil
 }
 
+// TerminalWidth returns the width of the terminal that stdout is attached to.
+// TODO: investigate whether ProcessTerminalWidth could replace all this.
 func (s *IOStreams) TerminalWidth() int {
 	if s.termWidthOverride > 0 {
 		return s.termWidthOverride
 	}
 
-	defaultWidth := 80
+	defaultWidth := DefaultWidth
 	out := s.Out
 	if s.originalOut != nil {
 		out = s.originalOut
@@ -273,6 +277,15 @@ func (s *IOStreams) TerminalWidth() int {
 	}
 
 	return defaultWidth
+}
+
+// ProcessTerminalWidth returns the width of the terminal that the process is attached to.
+func (s *IOStreams) ProcessTerminalWidth() int {
+	w, _, err := s.ttySize()
+	if err != nil {
+		return DefaultWidth
+	}
+	return w
 }
 
 func (s *IOStreams) ForceTerminal(spec string) {
