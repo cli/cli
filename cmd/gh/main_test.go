@@ -43,7 +43,7 @@ func Test_printError(t *testing.T) {
 				debug: false,
 			},
 			wantOut: `error connecting to api.github.com
-check your internet connection or githubstatus.com
+check your internet connection or https://githubstatus.com
 `,
 		},
 		{

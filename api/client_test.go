@@ -129,3 +129,20 @@ func TestRESTError(t *testing.T) {
 
 	}
 }
+
+func TestHandleHTTPError_GraphQL502(t *testing.T) {
+	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := &http.Response{
+		Request:    req,
+		StatusCode: 502,
+		Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "data": null, "errors": [{ "message": "Something went wrong" }] }`)),
+		Header:     map[string][]string{"Content-Type": {"application/json"}},
+	}
+	err = HandleHTTPError(resp)
+	if err == nil || err.Error() != "HTTP 502: Something went wrong (https://api.github.com/user)" {
+		t.Errorf("got error: %v", err)
+	}
+}

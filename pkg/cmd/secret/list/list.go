@@ -250,7 +250,7 @@ var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
 func findNextPage(link string) string {
 	for _, m := range linkRE.FindAllStringSubmatch(link, -1) {
-		if len(m) >= 2 && m[2] == "next" {
+		if len(m) > 2 && m[2] == "next" {
 			return m[1]
 		}
 	}
