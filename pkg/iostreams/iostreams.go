@@ -30,6 +30,7 @@ type IOStreams struct {
 	originalOut   io.Writer
 	colorEnabled  bool
 	is256enabled  bool
+	hasTrueColor  bool
 	terminalTheme string
 
 	progressIndicatorEnabled bool
@@ -58,6 +59,10 @@ func (s *IOStreams) ColorEnabled() bool {
 
 func (s *IOStreams) ColorSupport256() bool {
 	return s.is256enabled
+}
+
+func (s *IOStreams) HasTrueColor() bool {
+	return s.hasTrueColor
 }
 
 func (s *IOStreams) DetectTerminalTheme() string {
@@ -289,7 +294,7 @@ func (s *IOStreams) ForceTerminal(spec string) {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor())
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
@@ -318,13 +323,21 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
+	assumeTrueColor := false
+	if stdoutIsTTY {
+		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
+			assumeTrueColor = true
+		}
+	}
+
 	io := &IOStreams{
 		In:           os.Stdin,
 		originalOut:  os.Stdout,
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
-		is256enabled: Is256ColorSupported(),
+		is256enabled: assumeTrueColor || Is256ColorSupported(),
+		hasTrueColor: assumeTrueColor || IsTrueColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
 		ttySize:      ttySize,
 	}
