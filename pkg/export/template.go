@@ -19,7 +19,7 @@ import (
 
 type Template struct {
 	io           *iostreams.IOStreams
-	tablePrinter *utils.TablePrinter
+	tablePrinter utils.TablePrinter
 	template     *template.Template
 	templateStr  string
 }
@@ -152,23 +152,22 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 
 func (t *Template) tableRow(fields ...interface{}) (string, error) {
 	if t.tablePrinter == nil {
-		tablePrinter := utils.NewTtyTablePrinter(t.io, utils.MaxInt)
-		t.tablePrinter = &tablePrinter
+		t.tablePrinter = utils.NewTtyTablePrinter(t.io, utils.MaxInt)
 	}
 	for _, e := range fields {
 		s, err := jsonScalarToString(e)
 		if err != nil {
 			return "", fmt.Errorf("failed to write table row: %v", err)
 		}
-		(*t.tablePrinter).AddField(s, text.TruncateColumn, nil)
+		t.tablePrinter.AddField(s, text.TruncateColumn, nil)
 	}
-	(*t.tablePrinter).EndRow()
+	t.tablePrinter.EndRow()
 	return "", nil
 }
 
 func (t *Template) tableRender() (string, error) {
 	if t.tablePrinter != nil {
-		err := (*t.tablePrinter).Render()
+		err := t.tablePrinter.Render()
 		t.tablePrinter = nil
 		if err != nil {
 			return "", fmt.Errorf("failed to render table: %v", err)
