@@ -62,6 +62,11 @@ var HelpTopics = map[string]map[string]string{
 			CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
 			even when the output is piped.
 
+			GH_FORCE_TTY: set to any value to force terminal-style output even when the output is
+			redirected. When the value is a number, it is interpreted as the number of columns
+			available in the viewport. When the value is a percentage, it will be applied against
+			the number of columns available in the current viewport.
+
 			GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.

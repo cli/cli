@@ -61,6 +61,10 @@ func mainRun() exitCode {
 
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
+
+	if spec := os.Getenv("GH_FORCE_TTY"); spec != "" {
+		cmdFactory.IOStreams.ForceTerminal(spec)
+	}
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
 	} else {
