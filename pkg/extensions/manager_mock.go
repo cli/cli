@@ -18,6 +18,9 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 //
 // 		// make and configure a mocked ExtensionManager
 // 		mockedExtensionManager := &ExtensionManagerMock{
+// 			CreateFunc: func(name string) error {
+// 				panic("mock out the Create method")
+// 			},
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
@@ -43,6 +46,9 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 //
 // 	}
 type ExtensionManagerMock struct {
+	// CreateFunc mocks the Create method.
+	CreateFunc func(name string) error
+
 	// DispatchFunc mocks the Dispatch method.
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
@@ -63,6 +69,11 @@ type ExtensionManagerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Create holds details about calls to the Create method.
+		Create []struct {
+			// Name is the name argument value.
+			Name string
+		}
 		// Dispatch holds details about calls to the Dispatch method.
 		Dispatch []struct {
 			// Args is the args argument value.
@@ -110,12 +121,44 @@ type ExtensionManagerMock struct {
 			Stderr io.Writer
 		}
 	}
+	lockCreate       sync.RWMutex
 	lockDispatch     sync.RWMutex
 	lockInstall      sync.RWMutex
 	lockInstallLocal sync.RWMutex
 	lockList         sync.RWMutex
 	lockRemove       sync.RWMutex
 	lockUpgrade      sync.RWMutex
+}
+
+// Create calls CreateFunc.
+func (mock *ExtensionManagerMock) Create(name string) error {
+	if mock.CreateFunc == nil {
+		panic("ExtensionManagerMock.CreateFunc: method is nil but ExtensionManager.Create was just called")
+	}
+	callInfo := struct {
+		Name string
+	}{
+		Name: name,
+	}
+	mock.lockCreate.Lock()
+	mock.calls.Create = append(mock.calls.Create, callInfo)
+	mock.lockCreate.Unlock()
+	return mock.CreateFunc(name)
+}
+
+// CreateCalls gets all the calls that were made to Create.
+// Check the length with:
+//     len(mockedExtensionManager.CreateCalls())
+func (mock *ExtensionManagerMock) CreateCalls() []struct {
+	Name string
+} {
+	var calls []struct {
+		Name string
+	}
+	mock.lockCreate.RLock()
+	calls = mock.calls.Create
+	mock.lockCreate.RUnlock()
+	return calls
 }
 
 // Dispatch calls DispatchFunc.

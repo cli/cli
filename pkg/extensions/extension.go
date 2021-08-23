@@ -21,4 +21,5 @@ type ExtensionManager interface {
 	Upgrade(name string, force bool, stdout, stderr io.Writer) error
 	Remove(name string) error
 	Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error)
+	Create(name string) error
 }
