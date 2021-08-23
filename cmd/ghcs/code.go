@@ -12,12 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type CodeOptions struct {
-	UseInsiders bool
-}
-
 func NewCodeCmd() *cobra.Command {
-	opts := &CodeOptions{}
+	useInsiders := false
 
 	codeCmd := &cobra.Command{
 		Use:   "code [<codespace>]",
@@ -28,11 +24,11 @@ func NewCodeCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Code(codespaceName, opts)
+			return Code(codespaceName, useInsiders)
 		},
 	}
 
-	codeCmd.Flags().BoolVar(&opts.UseInsiders, "insiders", false, "Use the insiders version of VS Code")
+	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of VS Code")
 
 	return codeCmd
 }
@@ -41,7 +37,7 @@ func init() {
 	rootCmd.AddCommand(NewCodeCmd())
 }
 
-func Code(codespaceName string, opts *CodeOptions) error {
+func Code(codespaceName string, useInsiders bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -61,7 +57,7 @@ func Code(codespaceName string, opts *CodeOptions) error {
 		codespaceName = codespace.Name
 	}
 
-	if err := open.Run(vscodeProtocolURL(codespaceName, opts.UseInsiders)); err != nil {
+	if err := open.Run(vscodeProtocolURL(codespaceName, useInsiders)); err != nil {
 		return fmt.Errorf("error opening vscode URL")
 	}
 
