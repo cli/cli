@@ -177,7 +177,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		},
 	)
 
-	extCmd.Hidden = true
 	return &extCmd
 }
 
