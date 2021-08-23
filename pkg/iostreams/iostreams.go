@@ -2,6 +2,7 @@ package iostreams
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -41,6 +42,7 @@ type IOStreams struct {
 	stderrTTYOverride bool
 	stderrIsTTY       bool
 	termWidthOverride int
+	ttySize           func() (int, int, error)
 
 	pagerCommand string
 	pagerProcess *os.Process
@@ -273,7 +275,7 @@ func (s *IOStreams) ForceTerminal(spec string) {
 		return
 	}
 
-	ttyWidth, _, err := ttySize()
+	ttyWidth, _, err := s.ttySize()
 	if err != nil {
 		return
 	}
@@ -284,7 +286,6 @@ func (s *IOStreams) ForceTerminal(spec string) {
 			s.termWidthOverride = int(float64(s.termWidthOverride) * (float64(p) / 100))
 		}
 	}
-
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
@@ -325,6 +326,7 @@ func System() *IOStreams {
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: Is256ColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
+		ttySize:      ttySize,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -345,6 +347,9 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		In:     ioutil.NopCloser(in),
 		Out:    out,
 		ErrOut: errOut,
+		ttySize: func() (int, int, error) {
+			return -1, -1, errors.New("ttySize not implemented in tests")
+		},
 	}, in, out, errOut
 }
 
@@ -359,6 +364,7 @@ func isCygwinTerminal(w io.Writer) bool {
 	return false
 }
 
+// terminalSize measures the viewport of the terminal that the output stream is connected to
 func terminalSize(w io.Writer) (int, int, error) {
 	if f, isFile := w.(*os.File); isFile {
 		return term.GetSize(int(f.Fd()))
