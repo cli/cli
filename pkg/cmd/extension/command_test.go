@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/extensions"
@@ -101,6 +102,34 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
+			name: "upgrade an extension gh-prefix",
+			args: []string{"upgrade", "gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+		},
+		{
+			name: "upgrade an extension full name",
+			args: []string{"upgrade", "monalisa/gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+		},
+		{
 			name: "upgrade all",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
@@ -147,6 +176,38 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: "",
 		},
 		{
+			name: "remove extension gh-prefix",
+			args: []string{"remove", "gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.RemoveCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
+		},
+		{
+			name: "remove extension full name",
+			args: []string{"remove", "monalisa/gh-hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.RemoveFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.RemoveCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
+		},
+		{
 			name: "list extensions",
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
@@ -160,6 +221,51 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			wantStdout: "gh test\tcli/gh-test\t\ngh test2\tcli/gh-test2\tUpgrade available\n",
+		},
+		{
+			name: "create extension tty",
+			args: []string{"create", "test"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.CreateFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.CreateCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "gh-test", calls[0].Name)
+				}
+			},
+			isTTY: true,
+			wantStdout: heredoc.Doc(`
+				✓ Created directory gh-test
+				✓ Initialized git repository
+				✓ Set up extension scaffolding
+
+				gh-test is ready for development
+
+				Install locally with: cd gh-test && gh extension install .
+
+				Publish to GitHub with: gh repo create gh-test
+
+				For more information on writing extensions:
+				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
+			`),
+		},
+		{
+			name: "create extension notty",
+			args: []string{"create", "gh-test"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.CreateFunc = func(name string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.CreateCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "gh-test", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantStdout: "",
 		},
 	}
 

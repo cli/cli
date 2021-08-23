@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/extensions"
 	"github.com/cli/cli/pkg/findsh"
@@ -247,6 +248,76 @@ func (m *Manager) Remove(name string) error {
 
 func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
+}
+
+func (m *Manager) Create(name string) error {
+	exe, err := m.lookPath("git")
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir(name, 0755)
+	if err != nil {
+		return err
+	}
+
+	initCmd := m.newCommand(exe, "init", "--quiet", name)
+	err = initCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	fileTmpl := heredoc.Docf(`
+		#!/bin/bash
+		set -e
+
+		echo "Hello %[1]s!"
+
+		# Snippets to help get started:
+
+		# Determine if an executable is in the PATH
+		# if ! type -p ruby >/dev/null; then
+		#   echo "Ruby not found on the system" >&2
+		#   exit 1
+		# fi
+
+		# Pass arguments through to another command
+		# gh issue list "$@" -R cli/cli
+
+		# Using the gh api command to retrieve and format information
+		# QUERY='
+		#   query($endCursor: String) {
+		#     viewer {
+		#       repositories(first: 100, after: $endCursor) {
+		#         nodes {
+		#           nameWithOwner
+		#           stargazerCount
+		#         }
+		#       }
+		#     }
+		#   }
+		# '
+		# TEMPLATE='
+		#   {{- range $repo := .data.viewer.repositories.nodes -}}
+		#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
+		#   {{- end -}}
+		# '
+		# exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
+	`, name, "%s", "%v")
+	filePath := filepath.Join(name, name)
+	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
+	if err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(wd, name)
+	addCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", name, "--chmod=+x")
+	err = addCmd.Run()
+	return err
 }
 
 func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {

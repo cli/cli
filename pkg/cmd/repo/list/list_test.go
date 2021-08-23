@@ -35,6 +35,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -49,6 +50,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -63,6 +65,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -77,6 +80,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -91,6 +95,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -105,6 +110,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        true,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -119,6 +125,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      true,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -133,6 +140,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "go",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: false,
 			},
@@ -147,6 +155,7 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    true,
 				NonArchived: false,
 			},
@@ -161,8 +170,24 @@ func TestNewCmdList(t *testing.T) {
 				Fork:        false,
 				Source:      false,
 				Language:    "",
+				Topic:       "",
 				Archived:    false,
 				NonArchived: true,
+			},
+		},
+		{
+			name: "with topic",
+			cli:  "--topic cli",
+			wants: ListOptions{
+				Limit:       30,
+				Owner:       "",
+				Visibility:  "",
+				Fork:        false,
+				Source:      false,
+				Language:    "",
+				Topic:       "cli",
+				Archived:    false,
+				NonArchived: false,
 			},
 		},
 		{
@@ -220,6 +245,7 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.Owner, gotOpts.Owner)
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.Fork, gotOpts.Fork)
+			assert.Equal(t, tt.wants.Topic, gotOpts.Topic)
 			assert.Equal(t, tt.wants.Source, gotOpts.Source)
 			assert.Equal(t, tt.wants.Archived, gotOpts.Archived)
 			assert.Equal(t, tt.wants.NonArchived, gotOpts.NonArchived)

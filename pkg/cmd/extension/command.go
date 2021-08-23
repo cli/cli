@@ -116,7 +116,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					var name string
 					if len(args) > 0 {
-						name = args[0]
+						name = normalizeExtensionSelector(args[0])
 					}
 					return m.Upgrade(name, flagForce, io.Out, io.ErrOut)
 				},
@@ -130,7 +130,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Short: "Remove an installed extension",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				extName := args[0]
+				extName := normalizeExtensionSelector(args[0])
 				if err := m.Remove(extName); err != nil {
 					return err
 				}
@@ -141,9 +141,43 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
+		&cobra.Command{
+			Use:   "create <name>",
+			Short: "Create a new extension",
+			Args:  cmdutil.ExactArgs(1, "must specify a name for the extension"),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				extName := args[0]
+				if !strings.HasPrefix(extName, "gh-") {
+					extName = "gh-" + extName
+				}
+				if err := m.Create(extName); err != nil {
+					return err
+				}
+				if !io.IsStdoutTTY() {
+					return nil
+				}
+				link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
+				cs := io.ColorScheme()
+				out := heredoc.Docf(`
+					%[1]s Created directory %[2]s
+					%[1]s Initialized git repository
+					%[1]s Set up extension scaffolding
+
+					%[2]s is ready for development
+
+					Install locally with: cd %[2]s && gh extension install .
+
+					Publish to GitHub with: gh repo create %[2]s
+
+					For more information on writing extensions:
+					%[3]s
+				`, cs.SuccessIcon(), extName, link)
+				fmt.Fprint(io.Out, out)
+				return nil
+			},
+		},
 	)
 
-	extCmd.Hidden = true
 	return &extCmd
 }
 
@@ -166,4 +200,11 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 	}
 
 	return nil
+}
+
+func normalizeExtensionSelector(n string) string {
+	if idx := strings.IndexRune(n, '/'); idx >= 0 {
+		n = n[idx+1:]
+	}
+	return strings.TrimPrefix(n, "gh-")
 }
