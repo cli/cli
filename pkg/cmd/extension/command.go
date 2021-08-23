@@ -116,7 +116,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					var name string
 					if len(args) > 0 {
-						name = args[0]
+						name = normalizeExtensionSelector(args[0])
 					}
 					return m.Upgrade(name, flagForce, io.Out, io.ErrOut)
 				},
@@ -130,7 +130,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Short: "Remove an installed extension",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				extName := args[0]
+				extName := normalizeExtensionSelector(args[0])
 				if err := m.Remove(extName); err != nil {
 					return err
 				}
@@ -166,4 +166,11 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 	}
 
 	return nil
+}
+
+func normalizeExtensionSelector(n string) string {
+	if idx := strings.IndexRune(n, '/'); idx >= 0 {
+		n = n[idx+1:]
+	}
+	return strings.TrimPrefix(n, "gh-")
 }
