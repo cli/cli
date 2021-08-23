@@ -285,7 +285,10 @@ func HandleHTTPError(resp *http.Response) error {
 		return httpError
 	}
 
-	messages := []string{parsedBody.Message}
+	var messages []string
+	if parsedBody.Message != "" {
+		messages = append(messages, parsedBody.Message)
+	}
 	for _, raw := range parsedBody.Errors {
 		switch raw[0] {
 		case '"':
@@ -297,7 +300,7 @@ func HandleHTTPError(resp *http.Response) error {
 			var errInfo HTTPErrorItem
 			_ = json.Unmarshal(raw, &errInfo)
 			msg := errInfo.Message
-			if errInfo.Code != "custom" {
+			if errInfo.Code != "" && errInfo.Code != "custom" {
 				msg = fmt.Sprintf("%s.%s %s", errInfo.Resource, errInfo.Field, errorCodeToMessage(errInfo.Code))
 			}
 			if msg != "" {
