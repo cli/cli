@@ -306,6 +306,17 @@ func (m *Manager) Create(name string) error {
 	`, name, "%s", "%v")
 	filePath := filepath.Join(name, name)
 	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
+	if err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(wd, name)
+	addCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", name, "--chmod=+x")
+	err = addCmd.Run()
 	return err
 }
 
