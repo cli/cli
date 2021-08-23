@@ -261,7 +261,7 @@ func (m *Manager) Create(name string) error {
 		return err
 	}
 
-	initCmd := m.newCommand(exe, "init", "-b", "main", "--quiet", name)
+	initCmd := m.newCommand(exe, "init", "--quiet", name)
 	err = initCmd.Run()
 	if err != nil {
 		return err
@@ -270,18 +270,19 @@ func (m *Manager) Create(name string) error {
 	fileTmpl := heredoc.Docf(`
 		#!/bin/bash
 		set -e
-		echo "Hello %[1]s"
 
-		# Examples to help get started:
+		echo "Hello %[1]s!"
+
+		# Snippets to help get started:
 
 		# Determine if an executable is in the PATH
-		# if [ "$(which go)" = "" ]; then
-		#   echo "go not found in PATH"
+		# if ! type -p ruby >/dev/null; then
+		#   echo "Ruby not found on the system" >&2
 		#   exit 1
 		# fi
 
-		# Pass arguments through to a new process
-		# exec gh issue list "$@" -R cli/cli
+		# Pass arguments through to another command
+		# gh issue list "$@" -R cli/cli
 
 		# Using the gh api command to retrieve and format information
 		# QUERY='
@@ -301,7 +302,7 @@ func (m *Manager) Create(name string) error {
 		#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
 		#   {{- end -}}
 		# '
-		# exec gh api graphql --template="${TEMPLATE}" --paginate -f query="${QUERY}"
+		# exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
 	`, name, "%s", "%v")
 	filePath := filepath.Join(name, name)
 	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)

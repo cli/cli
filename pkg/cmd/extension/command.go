@@ -153,25 +153,26 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if err := m.Create(extName); err != nil {
 					return err
 				}
-				if io.IsStdoutTTY() {
-					link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
-					cs := io.ColorScheme()
-					out := heredoc.Docf(`
-						%[1]s Created directory %[2]s
-						%[1]s Initialized git repository
-						%[1]s Set up extension scaffolding
-
-						%[2]s is ready for development
-
-						Install locally with: cd %[2]s && gh extension install .
-
-						Publish to GitHub with: gh repo create %[2]s
-
-						For more information on writing extensions:
-						%[3]s
-					`, cs.SuccessIcon(), extName, link)
-					fmt.Fprint(io.Out, out)
+				if !io.IsStdoutTTY() {
+					return nil
 				}
+				link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
+				cs := io.ColorScheme()
+				out := heredoc.Docf(`
+					%[1]s Created directory %[2]s
+					%[1]s Initialized git repository
+					%[1]s Set up extension scaffolding
+
+					%[2]s is ready for development
+
+					Install locally with: cd %[2]s && gh extension install .
+
+					Publish to GitHub with: gh repo create %[2]s
+
+					For more information on writing extensions:
+					%[3]s
+				`, cs.SuccessIcon(), extName, link)
+				fmt.Fprint(io.Out, out)
 				return nil
 			},
 		},
