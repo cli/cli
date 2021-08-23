@@ -96,14 +96,14 @@ var HelpTopics = map[string]map[string]string{
 
 			The following functions are available in templates:
 			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
+			- %[1]scolor <style> <input>%[1]s: colorize input using https://github.com/mgutz/ansi
 			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
 			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
-			- %[1]stablerender%[1]s: renders the table immediately before any subsequent template
-			- %[1]stablerow <fields>%[1]s: writes fields in table columns like built-in commands
+			- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
+			- %[1]stablerender%[1]s: renders fields added by tablerow in place
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
 			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-			- %[1]struncate <length> <input>%[1]s: truncates input longer than length and adds "..."
+			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
 
 			EXAMPLES
 			  # format issues as table
