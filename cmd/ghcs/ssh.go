@@ -64,7 +64,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
 	}
 
-	log.Println("Preparing SSH...")
+	log.Print("Preparing SSH...")
 	if sshProfile == "" {
 		containerID, err := getContainerID(ctx, log, terminal)
 		if err != nil {

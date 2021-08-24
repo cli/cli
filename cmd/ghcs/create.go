@@ -92,46 +92,42 @@ func Create() error {
 	var lastState codespaces.PostCreateState
 	var breakNextState bool
 
-PollStates:
 	for {
-		select {
-		case stateUpdate := <-states:
-			if stateUpdate.Err != nil {
-				return fmt.Errorf("receive state update: %v", err)
-			}
+		stateUpdate := <-states
+		if stateUpdate.Err != nil {
+			return fmt.Errorf("receive state update: %v", err)
+		}
 
-			var inProgress bool
-			for _, state := range stateUpdate.PostCreateStates {
-				switch state.Status {
-				case codespaces.PostCreateStateRunning:
-					if lastState != state {
-						lastState = state
-						fmt.Print(state.Name)
-					} else {
-						fmt.Print(".")
-					}
+		var inProgress bool
+		for _, state := range stateUpdate.PostCreateStates {
+			switch state.Status {
+			case codespaces.PostCreateStateRunning:
+				if lastState != state {
+					lastState = state
+					log.Print(state.Name)
+				} else {
+					log.Print(".")
+				}
 
-					inProgress = true
-					break
-				case codespaces.PostCreateStateFailed:
-					if lastState.Name == state.Name && lastState.Status != state.Status {
-						lastState = state
-						fmt.Print(".Failed\n")
-					}
-				case codespaces.PostCreateStateSuccess:
-					if lastState.Name == state.Name && lastState.Status != state.Status {
-						lastState = state
-						fmt.Print(".Success\n")
-					}
+				inProgress = true
+				break
+			case codespaces.PostCreateStateFailed:
+				if lastState.Name == state.Name && lastState.Status != state.Status {
+					lastState = state
+					log.Print(".Failed\n")
+				}
+			case codespaces.PostCreateStateSuccess:
+				if lastState.Name == state.Name && lastState.Status != state.Status {
+					lastState = state
+					log.Print(".Success\n")
 				}
 			}
+		}
 
-			switch {
-			case !inProgress && !breakNextState:
-				breakNextState = true
-			case !inProgress && breakNextState:
-				break PollStates
-			}
+		if !inProgress && !breakNextState {
+			breakNextState = true
+		} else if !inProgress && breakNextState {
+			break
 		}
 	}
 

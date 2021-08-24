@@ -66,7 +66,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
-		log.Println("Starting your codespace...")
+		log.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %v", err)
 		}
@@ -97,6 +97,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	if startedCodespace {
 		fmt.Print("\n")
 	}
+
 	log.Println("Connecting to your codespace...")
 
 	lsclient, err := liveshare.NewClient(
