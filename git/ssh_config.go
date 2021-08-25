@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/v2/internal/config"
 )
 
 var (
