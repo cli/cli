@@ -17,19 +17,29 @@ import (
 
 var repo, branch, machine string
 
+type CreateOptions struct {
+	Repo       string
+	Branch     string
+	Machine    string
+	ShowStatus bool
+}
+
 func newCreateCmd() *cobra.Command {
+	opts := &CreateOptions{}
+
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Create()
+			return Create(opts)
 		},
 	}
 
-	createCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name with owner: user/repo")
-	createCmd.Flags().StringVarP(&branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&opts.Machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().BoolVarP(&opts.ShowStatus, "status", "s", false, "show status of post-create command and dotfiles")
 
 	return createCmd
 }
@@ -38,18 +48,18 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-func Create() error {
+func Create(opts *CreateOptions) error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
-	repo, err := getRepoName()
+	repo, err := getRepoName(opts.Repo)
 	if err != nil {
 		return fmt.Errorf("error getting repository name: %v", err)
 	}
-	branch, err := getBranchName()
+	branch, err := getBranchName(opts.Branch)
 	if err != nil {
 		return fmt.Errorf("error getting branch name: %v", err)
 	}
@@ -69,7 +79,7 @@ func Create() error {
 		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, userResult.User, repository, locationResult.Location, apiClient)
+	machine, err := getMachineName(ctx, opts.Machine, userResult.User, repository, locationResult.Location, apiClient)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %v", err)
 	}
@@ -84,7 +94,19 @@ func Create() error {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
-	states, err := codespaces.PollPostCreateStates(ctx, log, apiClient, userResult.User, codespace)
+	if opts.ShowStatus {
+		if err := showStatus(ctx, log, apiClient, userResult.User, codespace); err != nil {
+			return fmt.Errorf("show status: %w", err)
+		}
+	}
+
+	log.Printf("Codespace created: %s\n", codespace.Name)
+
+	return nil
+}
+
+func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
+	states, err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace)
 	if err != nil {
 		return fmt.Errorf("poll post create states: %v", err)
 	}
@@ -131,8 +153,6 @@ func Create() error {
 		}
 	}
 
-	log.Printf("Codespace created: %s\n", codespace.Name)
-
 	return nil
 }
 
@@ -164,7 +184,7 @@ func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult 
 	return ch
 }
 
-func getRepoName() (string, error) {
+func getRepoName(repo string) (string, error) {
 	if repo != "" {
 		return repo, nil
 	}
@@ -180,7 +200,7 @@ func getRepoName() (string, error) {
 	return repo, err
 }
 
-func getBranchName() (string, error) {
+func getBranchName(branch string) (string, error) {
 	if branch != "" {
 		return branch, nil
 	}
@@ -196,7 +216,7 @@ func getBranchName() (string, error) {
 	return branch, err
 }
 
-func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
+func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSkus(ctx, user, repo, location)
 	if err != nil {
 		return "", fmt.Errorf("error getting codespace skus: %v", err)
