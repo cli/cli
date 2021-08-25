@@ -83,7 +83,9 @@ func Create() error {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
-	log.Printf("Codespace created: %s\n", codespace.Name)
+	log.Printf("Codespace created: ")
+
+	fmt.Fprintln(os.Stdout, codespace.Name)
 
 	return nil
 }
