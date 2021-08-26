@@ -15,8 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var repo, branch, machine string
-
 type CreateOptions struct {
 	Repo       string
 	Branch     string
@@ -132,7 +130,6 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 				}
 
 				inProgress = true
-				break
 			case codespaces.PostCreateStateFailed:
 				if lastState.Name == state.Name && lastState.Status != state.Status {
 					lastState = state
