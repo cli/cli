@@ -13,7 +13,9 @@ import (
 )
 
 func NewCodeCmd() *cobra.Command {
-	return &cobra.Command{
+	useInsiders := false
+
+	codeCmd := &cobra.Command{
 		Use:   "code [<codespace>]",
 		Short: "Open a Codespace in VS Code",
 		Args:  cobra.MaximumNArgs(1),
@@ -22,16 +24,20 @@ func NewCodeCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Code(codespaceName)
+			return Code(codespaceName, useInsiders)
 		},
 	}
+
+	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of VS Code")
+
+	return codeCmd
 }
 
 func init() {
 	rootCmd.AddCommand(NewCodeCmd())
 }
 
-func Code(codespaceName string) error {
+func Code(codespaceName string, useInsiders bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -51,13 +57,17 @@ func Code(codespaceName string) error {
 		codespaceName = codespace.Name
 	}
 
-	if err := open.Run(vscodeProtocolURL(codespaceName)); err != nil {
+	if err := open.Run(vscodeProtocolURL(codespaceName, useInsiders)); err != nil {
 		return fmt.Errorf("error opening vscode URL")
 	}
 
 	return nil
 }
 
-func vscodeProtocolURL(codespaceName string) string {
-	return fmt.Sprintf("vscode://github.codespaces/connect?name=%s", url.QueryEscape(codespaceName))
+func vscodeProtocolURL(codespaceName string, useInsiders bool) string {
+	application := "vscode"
+	if useInsiders {
+		application = "vscode-insiders"
+	}
+	return fmt.Sprintf("%s://github.codespaces/connect?name=%s", application, url.QueryEscape(codespaceName))
 }
