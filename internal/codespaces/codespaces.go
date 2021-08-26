@@ -119,26 +119,26 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, tok
 }
 
 func StartSSHServer(ctx context.Context, client *liveshare.Client) (result bool, serverPort int, user string, message string, err error) {
-	sshRpc, err := liveshare.NewSSHRpc(client)
+	sshServer, err := liveshare.NewSSHServer(client)
 	if err != nil {
 		return false, 0, "", "", fmt.Errorf("error creating live share: %v", err)
 	}
 
-	sshRpcResult, err := sshRpc.StartRemoteServer(ctx)
+	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
 	if err != nil {
 		return false, 0, "", "", fmt.Errorf("error creating live share: %v", err)
 	}
 
-	if !sshRpcResult.Result {
-		return false, 0, "", sshRpcResult.Message, nil
+	if !sshServerStartResult.Result {
+		return false, 0, "", sshServerStartResult.Message, nil
 	}
 
-	portInt, err := strconv.Atoi(sshRpcResult.ServerPort)
+	portInt, err := strconv.Atoi(sshServerStartResult.ServerPort)
 	if err != nil {
 		return false, 0, "", "", fmt.Errorf("error parsing port: %v", err)
 	}
 
-	return sshRpcResult.Result, portInt, sshRpcResult.User, sshRpcResult.Message, err
+	return sshServerStartResult.Result, portInt, sshServerStartResult.User, sshServerStartResult.Message, err
 }
 
 func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
