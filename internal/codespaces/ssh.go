@@ -14,7 +14,7 @@ import (
 	"github.com/github/go-liveshare"
 )
 
-func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort int) (int, <-chan error, error) {
+func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort int, remoteSSHPort int) (int, <-chan error, error) {
 	tunnelClosed := make(chan error)
 
 	server, err := liveshare.NewServer(lsclient)
@@ -29,7 +29,7 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort i
 	}
 
 	// TODO(josebalius): This port won't always be 2222
-	if err := server.StartSharing(ctx, "sshd", 2222); err != nil {
+	if err := server.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
 		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 

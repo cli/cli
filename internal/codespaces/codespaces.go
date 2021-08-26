@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -115,6 +116,29 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, tok
 	}
 
 	return lsclient, nil
+}
+
+func StartSSHServer(ctx context.Context, client *liveshare.Client) (result bool, serverPort int, user string, message string, err error) {
+	sshRpc, err := liveshare.NewSSHRpc(client)
+	if err != nil {
+		return false, 0, "", "", fmt.Errorf("error creating live share: %v", err)
+	}
+
+	sshRpcResult, err := sshRpc.StartRemoteServer(ctx)
+	if err != nil {
+		return false, 0, "", "", fmt.Errorf("error creating live share: %v", err)
+	}
+
+	if !sshRpcResult.Result {
+		return false, 0, "", sshRpcResult.Message, nil
+	}
+
+	portInt, err := strconv.Atoi(sshRpcResult.ServerPort)
+	if err != nil {
+		return false, 0, "", "", fmt.Errorf("error parsing port: %v", err)
+	}
+
+	return sshRpcResult.Result, portInt, sshRpcResult.User, sshRpcResult.Message, err
 }
 
 func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {

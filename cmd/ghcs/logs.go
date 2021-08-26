@@ -57,7 +57,16 @@ func Logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}
 
-	tunnelPort, connClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, 0)
+	result, remoteSSHServerPort, sshUser, _, err := codespaces.StartSSHServer(ctx, lsclient)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
+	}
+
+	if !result {
+		return fmt.Errorf("error starting ssh: %v", err)
+	}
+
+	tunnelPort, connClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, 0, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -67,7 +76,7 @@ func Logs(tail bool, codespaceName string) error {
 		cmdType = "tail -f"
 	}
 
-	dst := fmt.Sprintf("%s@localhost", getSSHUser(codespace))
+	dst := fmt.Sprintf("%s@localhost", sshUser)
 	stdout, err := codespaces.RunCommand(
 		ctx, tunnelPort, dst, fmt.Sprintf("%v /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
