@@ -24,11 +24,9 @@ const (
 )
 
 type PostCreateStatesResult struct {
-	PostCreateStates PostCreateStates
+	PostCreateStates []PostCreateState
 	Err              error
 }
-
-type PostCreateStates []PostCreateState
 
 type PostCreateState struct {
 	Name   string                `json:"name"`
@@ -81,7 +79,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	return pollch, nil
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) (PostCreateStates, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) ([]PostCreateState, error) {
 	stdout, err := RunCommand(
 		ctx, tunnelPort, sshDestination(codespace),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
@@ -95,9 +93,9 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 		return nil, fmt.Errorf("read output: %v", err)
 	}
 
-	output := struct {
-		Steps PostCreateStates `json:"steps"`
-	}{}
+	var output struct {
+		Steps []PostCreateState `json:"steps"`
+	}
 	if err := json.Unmarshal(b, &output); err != nil {
 		return nil, fmt.Errorf("unmarshal output: %v", err)
 	}

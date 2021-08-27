@@ -108,7 +108,7 @@ func create(opts *createOptions) error {
 func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
 	states, err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace)
 	if err != nil {
-		return fmt.Errorf("poll post create states: %v", err)
+		return fmt.Errorf("failed to subscribe to state changes from codespace: %v", err)
 	}
 
 	var lastState codespaces.PostCreateState
@@ -135,27 +135,28 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 					lastState = state
 					log.Print("...")
 					break
-				} else {
-					finishedStates[state.Name] = true
-					log.Println("..." + state.Status)
 				}
+
+				finishedStates[state.Name] = true
+				log.Println("..." + state.Status)
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					log.Print(".")
 					break
-				} else {
-					finishedStates[state.Name] = true
-					log.Println(state.Status)
-					lastState = codespaces.PostCreateState{} // reset the value
 				}
+
+				finishedStates[state.Name] = true
+				log.Println(state.Status)
+				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
 
-		if !inProgress && !breakNextState {
+		if !inProgress {
+			if breakNextState {
+				break
+			}
 			breakNextState = true
-		} else if !inProgress && breakNextState {
-			break
 		}
 	}
 

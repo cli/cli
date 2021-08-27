@@ -62,14 +62,12 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
-// TODO(josebalius): we should move some of this to the liveshare.Connection struct
 func connectionReady(codespace *api.Codespace) bool {
-	ready := codespace.Environment.Connection.SessionID != ""
-	ready = ready && codespace.Environment.Connection.SessionToken != ""
-	ready = ready && codespace.Environment.Connection.RelayEndpoint != ""
-	ready = ready && codespace.Environment.Connection.RelaySAS != ""
-	ready = ready && codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
-	return ready
+	return codespace.Environment.Connection.SessionID != "" &&
+		codespace.Environment.Connection.SessionToken != "" &&
+		codespace.Environment.Connection.RelayEndpoint != "" &&
+		codespace.Environment.Connection.RelaySAS != "" &&
+		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
 func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
@@ -82,8 +80,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		}
 	}
 
-	retries := 0
-	for !connectionReady(codespace) {
+	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
 			if retries%2 == 0 {
 				log.Print(".")
@@ -100,8 +97,6 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %v", err)
 		}
-
-		retries += 1
 	}
 
 	if startedCodespace {
