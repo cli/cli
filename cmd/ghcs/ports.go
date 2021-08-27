@@ -174,7 +174,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 }
 
 // NewPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
-// to make a given port public
+// to make a given port public.
 func NewPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "public <codespace> <port>",
