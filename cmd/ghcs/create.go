@@ -22,7 +22,7 @@ func newCreateCmd() *cobra.Command {
 		Short: "Create a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Create()
+			return create()
 		},
 	}
 
@@ -37,7 +37,7 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-func Create() error {
+func create() error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
@@ -176,7 +176,7 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 	}
 
 	skuNames := make([]string, 0, len(skus))
-	skuByName := make(map[string]*api.Sku)
+	skuByName := make(map[string]*api.SKU)
 	for _, sku := range skus {
 		nameParts := camelcase.Split(sku.Name)
 		machineName := strings.Title(strings.ToLower(nameParts[0]))

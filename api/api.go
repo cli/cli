@@ -1,3 +1,4 @@
+// TODO(adonovan): rename to package codespaces, and codespaces.Client?
 package api
 
 import (
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -27,10 +27,6 @@ func New(token string) *API {
 
 type User struct {
 	Login string `json:"login"`
-}
-
-type errResponse struct {
-	Message string `json:"message"`
 }
 
 func (a *API) GetUser(ctx context.Context) (*User, error) {
@@ -63,7 +59,9 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 }
 
 func (a *API) errorResponse(b []byte) error {
-	var response errResponse
+	var response struct {
+		Message string `json:"message"`
+	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return fmt.Errorf("error unmarshaling error response: %v", err)
 	}
@@ -104,14 +102,6 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	return &response, nil
 }
 
-type Codespaces []*Codespace
-
-func (c Codespaces) SortByCreatedAt() {
-	sort.Slice(c, func(i, j int) bool {
-		return c[i].CreatedAt > c[j].CreatedAt
-	})
-}
-
 type Codespace struct {
 	Name           string               `json:"name"`
 	GUID           string               `json:"guid"`
@@ -139,7 +129,7 @@ type CodespaceEnvironmentConnection struct {
 	RelaySAS      string `json:"relaySas"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context, user *User) (Codespaces, error) {
+func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
 	)
@@ -162,9 +152,9 @@ func (a *API) ListCodespaces(ctx context.Context, user *User) (Codespaces, error
 		return nil, a.errorResponse(b)
 	}
 
-	response := struct {
-		Codespaces Codespaces `json:"codespaces"`
-	}{}
+	var response struct {
+		Codespaces []*Codespace `json:"codespaces"`
+	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
@@ -297,14 +287,12 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	return response.Current, nil
 }
 
-type Skus []*Sku
-
-type Sku struct {
+type SKU struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 }
 
-func (a *API) GetCodespacesSkus(ctx context.Context, user *User, repository *Repository, location string) (Skus, error) {
+func (a *API) GetCodespacesSkus(ctx context.Context, user *User, repository *Repository, location string) ([]*SKU, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
 		return nil, fmt.Errorf("err creating request: %v", err)
@@ -326,14 +314,14 @@ func (a *API) GetCodespacesSkus(ctx context.Context, user *User, repository *Rep
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
-	response := struct {
-		Skus Skus `json:"skus"`
-	}{}
+	var response struct {
+		SKUs []*SKU `json:"skus"`
+	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return response.Skus, nil
+	return response.SKUs, nil
 }
 
 type createCodespaceRequest struct {
