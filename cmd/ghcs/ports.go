@@ -19,11 +19,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// portOptions represents the options accepted by the ports command.
 type portsOptions struct {
+	// CodespaceName is the name of the codespace, optional.
 	codespaceName string
-	asJSON        bool
+
+	// AsJSON dictates whether the command returns a json output or not, optional.
+	asJSON bool
 }
 
+// newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
+// according to the specified flags.
 func newPortsCmd() *cobra.Command {
 	opts := &portsOptions{}
 
@@ -88,7 +94,7 @@ func ports(opts *portsOptions) error {
 	}
 
 	table := output.NewTable(os.Stdout, opts.asJSON)
-	table.SetHeader([]string{"Label", "Source Port", "Destination Port", "Public", "Browse URL"})
+	table.SetHeader([]string{"Label", "Port", "Public", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
 		var portName string
@@ -101,7 +107,6 @@ func ports(opts *portsOptions) error {
 		table.Append([]string{
 			portName,
 			sourcePort,
-			strconv.Itoa(port.DestinationPort),
 			strings.ToUpper(strconv.FormatBool(port.IsPublic)),
 			fmt.Sprintf("https://%s-%s.githubpreview.dev/", codespace.Name, sourcePort),
 		})
@@ -169,6 +174,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 	return ch
 }
 
+// newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
 func newPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "public <codespace> <port>",
@@ -181,6 +187,7 @@ func newPortsPublicCmd() *cobra.Command {
 	}
 }
 
+// newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
 func newPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "private <codespace> <port>",
@@ -240,6 +247,8 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 	return nil
 }
 
+// NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
+// port pairs from the codespace to localhost.
 func newPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <codespace> <source-port>:<destination-port>",

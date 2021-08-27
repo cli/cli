@@ -57,8 +57,9 @@ func code(codespaceName string, useInsiders bool) error {
 		codespaceName = codespace.Name
 	}
 
-	if err := open.Run(vscodeProtocolURL(codespaceName, useInsiders)); err != nil {
-		return fmt.Errorf("error opening vscode URL")
+	url := vscodeProtocolURL(codespaceName, useInsiders)
+	if err := open.Run(url); err != nil {
+		return fmt.Errorf("error opening vscode URL %s: %s. (Is VSCode installed?)", url, err)
 	}
 
 	return nil
