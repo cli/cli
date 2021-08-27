@@ -115,48 +115,54 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 	finishedStates := make(map[string]bool)
 	var breakNextState bool
 
+PollStates:
 	for {
-		stateUpdate := <-states
-		if stateUpdate.Err != nil {
-			return fmt.Errorf("receive state update: %v", err)
-		}
+		select {
+		case <-ctx.Done():
+			return nil
 
-		var inProgress bool
-		for _, state := range stateUpdate.PostCreateStates {
-			if _, found := finishedStates[state.Name]; found {
-				continue // skip this state as we've processed it already
+		case stateUpdate := <-states:
+			if stateUpdate.Err != nil {
+				return fmt.Errorf("receive state update: %v", err)
 			}
 
-			if state.Name != lastState.Name {
-				log.Print(state.Name)
-
-				if state.Status == codespaces.PostCreateStateRunning {
-					inProgress = true
-					lastState = state
-					log.Print("...")
-					break
+			var inProgress bool
+			for _, state := range stateUpdate.PostCreateStates {
+				if _, found := finishedStates[state.Name]; found {
+					continue // skip this state as we've processed it already
 				}
 
-				finishedStates[state.Name] = true
-				log.Println("..." + state.Status)
-			} else {
-				if state.Status == codespaces.PostCreateStateRunning {
-					inProgress = true
-					log.Print(".")
-					break
+				if state.Name != lastState.Name {
+					log.Print(state.Name)
+
+					if state.Status == codespaces.PostCreateStateRunning {
+						inProgress = true
+						lastState = state
+						log.Print("...")
+						break
+					}
+
+					finishedStates[state.Name] = true
+					log.Println("..." + state.Status)
+				} else {
+					if state.Status == codespaces.PostCreateStateRunning {
+						inProgress = true
+						log.Print(".")
+						break
+					}
+
+					finishedStates[state.Name] = true
+					log.Println(state.Status)
+					lastState = codespaces.PostCreateState{} // reset the value
 				}
-
-				finishedStates[state.Name] = true
-				log.Println(state.Status)
-				lastState = codespaces.PostCreateState{} // reset the value
 			}
-		}
 
-		if !inProgress {
-			if breakNextState {
-				break
+			if !inProgress {
+				if breakNextState {
+					break PollStates
+				}
+				breakNextState = true
 			}
-			breakNextState = true
 		}
 	}
 
@@ -168,6 +174,7 @@ type getUserResult struct {
 	Err  error
 }
 
+// getUser fetches the user record associated with the GITHUB_TOKEN
 func getUser(ctx context.Context, apiClient *api.API) <-chan getUserResult {
 	ch := make(chan getUserResult)
 	go func() {
@@ -182,6 +189,7 @@ type locationResult struct {
 	Err      error
 }
 
+// getLocation fetches the closest Codespace datacenter region/location to the user.
 func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult {
 	ch := make(chan locationResult)
 	go func() {
@@ -191,6 +199,7 @@ func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult 
 	return ch
 }
 
+// getRepoName prompts the user for the name of the repository, or returns the repository if non-empty.
 func getRepoName(repo string) (string, error) {
 	if repo != "" {
 		return repo, nil
@@ -207,6 +216,7 @@ func getRepoName(repo string) (string, error) {
 	return repo, err
 }
 
+// getBranchName prompts the user for the name of the branch, or returns the branch if non-empty.
 func getBranchName(branch string) (string, error) {
 	if branch != "" {
 		return branch, nil
@@ -223,6 +233,7 @@ func getBranchName(branch string) (string, error) {
 	return branch, err
 }
 
+// getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
 func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSkus(ctx, user, repo, location)
 	if err != nil {
@@ -243,7 +254,7 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 			availableSkus[i] = skus[i].Name
 		}
 
-		return "", fmt.Errorf("there are is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSkus)
+		return "", fmt.Errorf("there is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSkus)
 	} else if len(skus) == 0 {
 		return "", nil
 	}
@@ -270,7 +281,7 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 		},
 	}
 
-	skuAnswers := struct{ SKU string }{}
+	var skuAnswers struct{ SKU string }
 	if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
 		return "", fmt.Errorf("error getting SKU: %v", err)
 	}
