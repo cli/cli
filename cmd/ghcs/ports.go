@@ -84,7 +84,7 @@ func ports(opts *portsOptions) error {
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
 		// Warn about failure to read the devcontainer file. Not a ghcs command error.
-		log.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
+		_, _ = log.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
 	table := output.NewTable(os.Stdout, opts.asJSON)
