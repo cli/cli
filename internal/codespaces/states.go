@@ -65,8 +65,6 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 			poller(states)
 		}
 	}
-
-	return nil
 }
 
 func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) ([]PostCreateState, error) {
