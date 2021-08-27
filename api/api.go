@@ -272,7 +272,17 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 	}
 	defer resp.Body.Close()
 
-	// TODO: check status code?
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response body: %v", err)
+	}
+
+	// TODO(adonovan): the status code proxied from VSCS may distinguish
+	// "already running" from "fresh start". Find out what code it uses
+	// and allow it too.
+	if resp.StatusCode != http.StatusOK {
+		return a.errorResponse(b)
+	}
 
 	return nil
 }
@@ -298,7 +308,9 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("error reading response body: %v", err)
 	}
 
-	// TODO: check status code?
+	if resp.StatusCode != http.StatusOK {
+		return "", a.errorResponse(b)
+	}
 
 	var response getCodespaceRegionLocationResponse
 	if err := json.Unmarshal(b, &response); err != nil {
@@ -338,7 +350,9 @@ func (a *API) GetCodespacesSkus(ctx context.Context, user *User, repository *Rep
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
-	// TODO: check status code?
+	if resp.StatusCode != http.StatusOK {
+		return nil, a.errorResponse(b)
+	}
 
 	response := struct {
 		Skus Skus `json:"skus"`
