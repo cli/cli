@@ -11,6 +11,7 @@ import (
 	"github.com/github/ghcs/api"
 )
 
+// PostCreateStateStatus is a string value representing the different statuses a state can have.
 type PostCreateStateStatus string
 
 func (p PostCreateStateStatus) String() string {
@@ -23,16 +24,15 @@ const (
 	PostCreateStateFailed  PostCreateStateStatus = "failed"
 )
 
-type PostCreateStatesResult struct {
-	PostCreateStates []PostCreateState
-	Err              error
-}
-
+// PostCreateState is a combination of a state and status value that is captured
+// during codespace creation.
 type PostCreateState struct {
 	Name   string                `json:"name"`
 	Status PostCreateStateStatus `json:"status"`
 }
 
+// PollPostCreateStates polls the state file in a codespace after creation and calls the poller
+// with a slice of states to be processed.
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
@@ -92,6 +92,7 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	return output.Steps, nil
 }
 
+// TODO(josebalius): this won't be needed soon
 func sshDestination(codespace *api.Codespace) string {
 	user := "codespace"
 	if codespace.RepositoryNWO == "github/github" {
