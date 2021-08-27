@@ -33,50 +33,40 @@ type PostCreateState struct {
 	Status PostCreateStateStatus `json:"status"`
 }
 
-func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace) (<-chan PostCreateStatesResult, error) {
-	pollch := make(chan PostCreateStatesResult)
-
+func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
-		return nil, fmt.Errorf("getting codespace token: %v", err)
+		return fmt.Errorf("getting codespace token: %v", err)
 	}
 
 	lsclient, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return nil, fmt.Errorf("connect to liveshare: %v", err)
+		return fmt.Errorf("connect to liveshare: %v", err)
 	}
 
 	tunnelPort, connClosed, err := MakeSSHTunnel(ctx, lsclient, 0)
 	if err != nil {
-		return nil, fmt.Errorf("make ssh tunnel: %v", err)
+		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
 
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case err := <-connClosed:
-				if err != nil {
-					pollch <- PostCreateStatesResult{Err: fmt.Errorf("connection closed: %v", err)}
-					return
-				}
-			case <-t.C:
-				states, err := getPostCreateOutput(ctx, tunnelPort, codespace)
-				if err != nil {
-					pollch <- PostCreateStatesResult{Err: fmt.Errorf("get post create output: %v", err)}
-					return
-				}
-
-				pollch <- PostCreateStatesResult{
-					PostCreateStates: states,
-				}
+	t := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-connClosed:
+			return fmt.Errorf("connection closed: %v", err)
+		case <-t.C:
+			states, err := getPostCreateOutput(ctx, tunnelPort, codespace)
+			if err != nil {
+				return fmt.Errorf("get post create output: %v", err)
 			}
-		}
-	}()
 
-	return pollch, nil
+			poller(states)
+		}
+	}
+
+	return nil
 }
 
 func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) ([]PostCreateState, error) {
@@ -87,6 +77,7 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	if err != nil {
 		return nil, fmt.Errorf("run command: %v", err)
 	}
+	defer stdout.Close()
 
 	b, err := ioutil.ReadAll(stdout)
 	if err != nil {

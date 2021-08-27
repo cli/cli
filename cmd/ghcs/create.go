@@ -106,64 +106,55 @@ func create(opts *createOptions) error {
 }
 
 func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
-	states, err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace)
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to state changes from codespace: %v", err)
-	}
-
 	var lastState codespaces.PostCreateState
-	finishedStates := make(map[string]bool)
 	var breakNextState bool
 
-PollStates:
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
+	finishedStates := make(map[string]bool)
+	ctx, stopPolling := context.WithCancel(ctx)
 
-		case stateUpdate := <-states:
-			if stateUpdate.Err != nil {
-				return fmt.Errorf("receive state update: %v", err)
+	poller := func(states []codespaces.PostCreateState) {
+		var inProgress bool
+		for _, state := range states {
+			if _, found := finishedStates[state.Name]; found {
+				continue // skip this state as we've processed it already
 			}
 
-			var inProgress bool
-			for _, state := range stateUpdate.PostCreateStates {
-				if _, found := finishedStates[state.Name]; found {
-					continue // skip this state as we've processed it already
+			if state.Name != lastState.Name {
+				log.Print(state.Name)
+
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
+					lastState = state
+					log.Print("...")
+					break
 				}
 
-				if state.Name != lastState.Name {
-					log.Print(state.Name)
-
-					if state.Status == codespaces.PostCreateStateRunning {
-						inProgress = true
-						lastState = state
-						log.Print("...")
-						break
-					}
-
-					finishedStates[state.Name] = true
-					log.Println("..." + state.Status)
-				} else {
-					if state.Status == codespaces.PostCreateStateRunning {
-						inProgress = true
-						log.Print(".")
-						break
-					}
-
-					finishedStates[state.Name] = true
-					log.Println(state.Status)
-					lastState = codespaces.PostCreateState{} // reset the value
+				finishedStates[state.Name] = true
+				log.Println("..." + state.Status)
+			} else {
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
+					log.Print(".")
+					break
 				}
-			}
 
-			if !inProgress {
-				if breakNextState {
-					break PollStates
-				}
-				breakNextState = true
+				finishedStates[state.Name] = true
+				log.Println(state.Status)
+				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
+
+		if !inProgress {
+			if breakNextState {
+				stopPolling()
+				return
+			}
+			breakNextState = true
+		}
+	}
+
+	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
+		return fmt.Errorf("failed to poll state changes from codespace: %v", err)
 	}
 
 	return nil
