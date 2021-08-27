@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDeleteCmd() *cobra.Command {
+func newDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:   "delete [<codespace>]",
 		Short: "Delete a Codespace",
@@ -22,7 +22,7 @@ func NewDeleteCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Delete(codespaceName)
+			return delete_(codespaceName)
 		},
 	}
 
@@ -31,7 +31,7 @@ func NewDeleteCmd() *cobra.Command {
 		Short: "Delete all Codespaces for the current user",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return DeleteAll()
+			return deleteAll()
 		},
 	}
 
@@ -40,7 +40,7 @@ func NewDeleteCmd() *cobra.Command {
 		Short: "Delete all Codespaces for a repository",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return DeleteByRepo(args[0])
+			return deleteByRepo(args[0])
 		},
 	}
 
@@ -50,10 +50,10 @@ func NewDeleteCmd() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewDeleteCmd())
+	rootCmd.AddCommand(newDeleteCmd())
 }
 
-func Delete(codespaceName string) error {
+func delete_(codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -74,10 +74,10 @@ func Delete(codespaceName string) error {
 
 	log.Println("Codespace deleted.")
 
-	return List(&ListOptions{})
+	return list(&listOptions{})
 }
 
-func DeleteAll() error {
+func deleteAll() error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -105,10 +105,10 @@ func DeleteAll() error {
 		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
-	return List(&ListOptions{})
+	return list(&listOptions{})
 }
 
-func DeleteByRepo(repo string) error {
+func deleteByRepo(repo string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -146,5 +146,5 @@ func DeleteByRepo(repo string) error {
 		return fmt.Errorf("No codespace was found for repository: %s", repo)
 	}
 
-	return List(&ListOptions{})
+	return list(&listOptions{})
 }
