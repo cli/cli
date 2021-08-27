@@ -15,29 +15,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type CreateOptions struct {
-	Repo       string
-	Branch     string
-	Machine    string
-	ShowStatus bool
+type createOptions struct {
+	repo       string
+	branch     string
+	machine    string
+	showStatus bool
 }
 
 func newCreateCmd() *cobra.Command {
-	opts := &CreateOptions{}
+	opts := &createOptions{}
 
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Create(opts)
+			return create(opts)
 		},
 	}
 
-	createCmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "repository name with owner: user/repo")
-	createCmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&opts.Machine, "machine", "m", "", "hardware specifications for the VM")
-	createCmd.Flags().BoolVarP(&opts.ShowStatus, "status", "s", false, "show status of post-create command and dotfiles")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 
 	return createCmd
 }
@@ -46,18 +46,18 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-func Create(opts *CreateOptions) error {
+func create(opts *createOptions) error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
-	repo, err := getRepoName(opts.Repo)
+	repo, err := getRepoName(opts.repo)
 	if err != nil {
 		return fmt.Errorf("error getting repository name: %v", err)
 	}
-	branch, err := getBranchName(opts.Branch)
+	branch, err := getBranchName(opts.branch)
 	if err != nil {
 		return fmt.Errorf("error getting branch name: %v", err)
 	}
@@ -77,7 +77,7 @@ func Create(opts *CreateOptions) error {
 		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, opts.Machine, userResult.User, repository, locationResult.Location, apiClient)
+	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, locationResult.Location, apiClient)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %v", err)
 	}
@@ -92,7 +92,7 @@ func Create(opts *CreateOptions) error {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
-	if opts.ShowStatus {
+	if opts.showStatus {
 		if err := showStatus(ctx, log, apiClient, userResult.User, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
