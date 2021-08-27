@@ -151,9 +151,9 @@ func getBranchName() (string, error) {
 }
 
 func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
-	skus, err := apiClient.GetCodespacesSkus(ctx, user, repo, location)
+	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, location)
 	if err != nil {
-		return "", fmt.Errorf("error getting codespace skus: %v", err)
+		return "", fmt.Errorf("error getting codespace SKUs: %v", err)
 	}
 
 	// if user supplied a machine type, it must be valid
@@ -165,12 +165,12 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 			}
 		}
 
-		availableSkus := make([]string, len(skus))
+		availableSKUs := make([]string, len(skus))
 		for i := 0; i < len(skus); i++ {
-			availableSkus[i] = skus[i].Name
+			availableSKUs[i] = skus[i].Name
 		}
 
-		return "", fmt.Errorf("there are is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSkus)
+		return "", fmt.Errorf("there is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSKUs)
 	} else if len(skus) == 0 {
 		return "", nil
 	}

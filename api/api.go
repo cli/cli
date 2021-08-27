@@ -292,7 +292,7 @@ type SKU struct {
 	DisplayName string `json:"display_name"`
 }
 
-func (a *API) GetCodespacesSkus(ctx context.Context, user *User, repository *Repository, location string) ([]*SKU, error) {
+func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, location string) ([]*SKU, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
 		return nil, fmt.Errorf("err creating request: %v", err)
