@@ -54,7 +54,7 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
@@ -64,7 +64,7 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
 	}
 
-	log.Println("Preparing SSH...")
+	log.Print("Preparing SSH...")
 	if sshProfile == "" {
 		containerID, err := getContainerID(ctx, log, terminal)
 		if err != nil {
@@ -74,9 +74,8 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		if err := setupSSH(ctx, log, terminal, containerID, codespace.RepositoryName); err != nil {
 			return fmt.Errorf("error creating ssh server: %v", err)
 		}
-
-		log.Print("\n")
 	}
+	log.Print("\n")
 
 	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort)
 	if err != nil {

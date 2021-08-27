@@ -11,24 +11,33 @@ import (
 	"github.com/fatih/camelcase"
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
-var repo, branch, machine string
+type createOptions struct {
+	repo       string
+	branch     string
+	machine    string
+	showStatus bool
+}
 
 func newCreateCmd() *cobra.Command {
+	opts := &createOptions{}
+
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return create()
+			return create(opts)
 		},
 	}
 
-	createCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name with owner: user/repo")
-	createCmd.Flags().StringVarP(&branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 
 	return createCmd
 }
@@ -37,18 +46,18 @@ func init() {
 	rootCmd.AddCommand(newCreateCmd())
 }
 
-func create() error {
+func create(opts *createOptions) error {
 	ctx := context.Background()
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
-	repo, err := getRepoName()
+	repo, err := getRepoName(opts.repo)
 	if err != nil {
 		return fmt.Errorf("error getting repository name: %v", err)
 	}
-	branch, err := getBranchName()
+	branch, err := getBranchName(opts.branch)
 	if err != nil {
 		return fmt.Errorf("error getting branch name: %v", err)
 	}
@@ -68,7 +77,7 @@ func create() error {
 		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, userResult.User, repository, locationResult.Location, apiClient)
+	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, locationResult.Location, apiClient)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %v", err)
 	}
@@ -83,9 +92,70 @@ func create() error {
 		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
+	if opts.showStatus {
+		if err := showStatus(ctx, log, apiClient, userResult.User, codespace); err != nil {
+			return fmt.Errorf("show status: %w", err)
+		}
+	}
+
 	log.Printf("Codespace created: ")
 
 	fmt.Fprintln(os.Stdout, codespace.Name)
+
+	return nil
+}
+
+func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
+	var lastState codespaces.PostCreateState
+	var breakNextState bool
+
+	finishedStates := make(map[string]bool)
+	ctx, stopPolling := context.WithCancel(ctx)
+
+	poller := func(states []codespaces.PostCreateState) {
+		var inProgress bool
+		for _, state := range states {
+			if _, found := finishedStates[state.Name]; found {
+				continue // skip this state as we've processed it already
+			}
+
+			if state.Name != lastState.Name {
+				log.Print(state.Name)
+
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
+					lastState = state
+					log.Print("...")
+					break
+				}
+
+				finishedStates[state.Name] = true
+				log.Println("..." + state.Status)
+			} else {
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
+					log.Print(".")
+					break
+				}
+
+				finishedStates[state.Name] = true
+				log.Println(state.Status)
+				lastState = codespaces.PostCreateState{} // reset the value
+			}
+		}
+
+		if !inProgress {
+			if breakNextState {
+				stopPolling()
+				return
+			}
+			breakNextState = true
+		}
+	}
+
+	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
+		return fmt.Errorf("failed to poll state changes from codespace: %v", err)
+	}
 
 	return nil
 }
@@ -95,6 +165,7 @@ type getUserResult struct {
 	Err  error
 }
 
+// getUser fetches the user record associated with the GITHUB_TOKEN
 func getUser(ctx context.Context, apiClient *api.API) <-chan getUserResult {
 	ch := make(chan getUserResult)
 	go func() {
@@ -109,6 +180,7 @@ type locationResult struct {
 	Err      error
 }
 
+// getLocation fetches the closest Codespace datacenter region/location to the user.
 func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult {
 	ch := make(chan locationResult)
 	go func() {
@@ -118,7 +190,8 @@ func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult 
 	return ch
 }
 
-func getRepoName() (string, error) {
+// getRepoName prompts the user for the name of the repository, or returns the repository if non-empty.
+func getRepoName(repo string) (string, error) {
 	if repo != "" {
 		return repo, nil
 	}
@@ -134,7 +207,8 @@ func getRepoName() (string, error) {
 	return repo, err
 }
 
-func getBranchName() (string, error) {
+// getBranchName prompts the user for the name of the branch, or returns the branch if non-empty.
+func getBranchName(branch string) (string, error) {
 	if branch != "" {
 		return branch, nil
 	}
@@ -150,7 +224,8 @@ func getBranchName() (string, error) {
 	return branch, err
 }
 
-func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
+// getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
+func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, location)
 	if err != nil {
 		return "", fmt.Errorf("error getting codespace SKUs: %v", err)
@@ -197,7 +272,7 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 		},
 	}
 
-	skuAnswers := struct{ SKU string }{}
+	var skuAnswers struct{ SKU string }
 	if err := ask(skuSurvey, &skuAnswers); err != nil {
 		return "", fmt.Errorf("error getting SKU: %v", err)
 	}
