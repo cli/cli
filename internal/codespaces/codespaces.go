@@ -62,6 +62,7 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
+// TODO(josebalius): we should move some of this to the liveshare.Connection struct
 func connectionReady(codespace *api.Codespace) bool {
 	ready := codespace.Environment.Connection.SessionID != ""
 	ready = ready && codespace.Environment.Connection.SessionToken != ""
