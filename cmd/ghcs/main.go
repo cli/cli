@@ -1,8 +1,5 @@
 package main
 
-// TODO(adonovan): write 'help' commands, in manner of the 'go' tool.
-// Document GITHUB_TOKEN.
-
 import (
 	"errors"
 	"fmt"

@@ -1,4 +1,4 @@
-// TODO(adonovan): rename to package codespaces, and codespaces.Client?
+// TODO(adonovan): rename to package codespaces, and codespaces.Client.
 package api
 
 import (
