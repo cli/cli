@@ -19,19 +19,19 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// PortOptions represents the options accepted by the ports command.
-type PortsOptions struct {
+// portOptions represents the options accepted by the ports command.
+type portsOptions struct {
 	// CodespaceName is the name of the codespace, optional.
-	CodespaceName string
+	codespaceName string
 
 	// AsJSON dictates whether the command returns a json output or not, optional.
-	AsJSON bool
+	asJSON bool
 }
 
-// NewPortsCmd returns a Cobra "ports" command that displays a table of available ports,
+// newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
-func NewPortsCmd() *cobra.Command {
-	opts := &PortsOptions{}
+func newPortsCmd() *cobra.Command {
+	opts := &portsOptions{}
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
@@ -42,31 +42,31 @@ func NewPortsCmd() *cobra.Command {
 		},
 	}
 
-	portsCmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
-	portsCmd.Flags().BoolVar(&opts.AsJSON, "json", false, "Output as JSON")
+	portsCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
+	portsCmd.Flags().BoolVar(&opts.asJSON, "json", false, "Output as JSON")
 
-	portsCmd.AddCommand(NewPortsPublicCmd())
-	portsCmd.AddCommand(NewPortsPrivateCmd())
-	portsCmd.AddCommand(NewPortsForwardCmd())
+	portsCmd.AddCommand(newPortsPublicCmd())
+	portsCmd.AddCommand(newPortsPrivateCmd())
+	portsCmd.AddCommand(newPortsForwardCmd())
 
 	return portsCmd
 }
 
 func init() {
-	rootCmd.AddCommand(NewPortsCmd())
+	rootCmd.AddCommand(newPortsCmd())
 }
 
-func ports(opts *PortsOptions) error {
+func ports(opts *portsOptions) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, opts.AsJSON)
+	log := output.NewLogger(os.Stdout, os.Stderr, opts.asJSON)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, opts.CodespaceName)
+	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, opts.codespaceName)
 	if err != nil {
 		if err == codespaces.ErrNoCodespaces {
 			return err
@@ -88,17 +88,18 @@ func ports(opts *PortsOptions) error {
 	}
 
 	devContainerResult := <-devContainerCh
-	if devContainerResult.Err != nil {
-		_, _ = log.Errorf("Failed to get port names: %v\n", devContainerResult.Err.Error())
+	if devContainerResult.err != nil {
+		// Warn about failure to read the devcontainer file. Not a ghcs command error.
+		_, _ = log.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
-	table := output.NewTable(os.Stdout, opts.AsJSON)
+	table := output.NewTable(os.Stdout, opts.asJSON)
 	table.SetHeader([]string{"Label", "Port", "Public", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
 		var portName string
-		if devContainerResult.DevContainer != nil {
-			if attributes, ok := devContainerResult.DevContainer.PortAttributes[sourcePort]; ok {
+		if devContainerResult.devContainer != nil {
+			if attributes, ok := devContainerResult.devContainer.PortAttributes[sourcePort]; ok {
 				portName = attributes.Label
 			}
 		}
@@ -130,8 +131,8 @@ func getPorts(ctx context.Context, lsclient *liveshare.Client) (liveshare.Ports,
 }
 
 type devContainerResult struct {
-	DevContainer *devContainer
-	Err          error
+	devContainer *devContainer
+	err          error
 }
 
 type devContainer struct {
@@ -173,9 +174,8 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 	return ch
 }
 
-// NewPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
-// to make a given port public.
-func NewPortsPublicCmd() *cobra.Command {
+// newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
+func newPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "public <codespace> <port>",
 		Short: "Mark port as public",
@@ -187,8 +187,8 @@ func NewPortsPublicCmd() *cobra.Command {
 	}
 }
 
-// NewPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
-func NewPortsPrivateCmd() *cobra.Command {
+// newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
+func newPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "private <codespace> <port>",
 		Short: "Mark port as private",
@@ -249,7 +249,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 
 // NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
 // port pairs from the codespace to localhost.
-func NewPortsForwardCmd() *cobra.Command {
+func newPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <codespace> <source-port>:<destination-port>",
 		Short: "Forward ports",
@@ -299,14 +299,14 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	for _, portPair := range portPairs {
 		pp := portPair
 
-		srcstr := strconv.Itoa(portPair.Src)
-		if err := server.StartSharing(gctx, "share-"+srcstr, pp.Src); err != nil {
+		srcstr := strconv.Itoa(portPair.src)
+		if err := server.StartSharing(gctx, "share-"+srcstr, pp.src); err != nil {
 			return fmt.Errorf("start sharing port: %v", err)
 		}
 
 		g.Go(func() error {
-			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.Dst))
-			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.Dst)
+			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.dst))
+			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.dst)
 			if err := portForwarder.Start(gctx); err != nil {
 				return fmt.Errorf("error forwarding port: %v", err)
 			}
@@ -323,16 +323,17 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 }
 
 type portPair struct {
-	Src, Dst int
+	src, dst int
 }
 
+// getPortPairs parses a list of strings of form "%d:%d" into pairs of numbers.
 func getPortPairs(ports []string) ([]portPair, error) {
 	pp := make([]portPair, 0, len(ports))
 
 	for _, portString := range ports {
 		parts := strings.Split(portString, ":")
 		if len(parts) < 2 {
-			return pp, fmt.Errorf("port pair: '%v' is not valid", portString)
+			return nil, fmt.Errorf("port pair: '%v' is not valid", portString)
 		}
 
 		srcp, err := strconv.Atoi(parts[0])

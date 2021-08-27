@@ -10,32 +10,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ListOptions struct {
-	AsJSON bool
+type listOptions struct {
+	asJSON bool
 }
 
-func NewListCmd() *cobra.Command {
-	opts := &ListOptions{}
+func newListCmd() *cobra.Command {
+	opts := &listOptions{}
 
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your Codespaces",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return List(opts)
+			return list(opts)
 		},
 	}
 
-	listCmd.Flags().BoolVar(&opts.AsJSON, "json", false, "Output as JSON")
+	listCmd.Flags().BoolVar(&opts.asJSON, "json", false, "Output as JSON")
 
 	return listCmd
 }
 
 func init() {
-	rootCmd.AddCommand(NewListCmd())
+	rootCmd.AddCommand(newListCmd())
 }
 
-func List(opts *ListOptions) error {
+func list(opts *listOptions) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -49,7 +49,7 @@ func List(opts *ListOptions) error {
 		return fmt.Errorf("error getting codespaces: %v", err)
 	}
 
-	table := output.NewTable(os.Stdout, opts.AsJSON)
+	table := output.NewTable(os.Stdout, opts.asJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, codespace := range codespaces {
 		table.Append([]string{

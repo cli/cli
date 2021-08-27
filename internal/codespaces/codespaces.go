@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -25,7 +26,9 @@ func ChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 		return nil, ErrNoCodespaces
 	}
 
-	codespaces.SortByCreatedAt()
+	sort.Slice(codespaces, func(i, j int) bool {
+		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
+	})
 
 	codespacesByName := make(map[string]*api.Codespace)
 	codespacesNames := make([]string, 0, len(codespaces))

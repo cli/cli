@@ -16,7 +16,7 @@ func main() {
 	}
 }
 
-var Version = "DEV"
+var version = "DEV"
 
 var rootCmd = &cobra.Command{
 	Use: "ghcs",
@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 
 Running commands requires the GITHUB_TOKEN environment variable to be set to a
 token to access the GitHub API with.`,
-	Version: Version,
+	Version: version,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if os.Getenv("GITHUB_TOKEN") == "" {
@@ -42,5 +42,5 @@ func explainError(w io.Writer, err error) {
 		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
 		return
 	}
-	// fmt.Fprintf(w, "%v\n", err)
+	fmt.Fprintf(w, "%v\n", err)
 }
