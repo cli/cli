@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/github/ghcs/api"
 )
 
 type PostCreateStateStatus string
+
+func (p PostCreateStateStatus) String() string {
+	return strings.Title(string(p))
+}
 
 const (
 	PostCreateStateRunning PostCreateStateStatus = "running"

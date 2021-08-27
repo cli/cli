@@ -112,6 +112,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 	}
 
 	var lastState codespaces.PostCreateState
+	finishedStates := make(map[string]bool)
 	var breakNextState bool
 
 	for {
@@ -122,25 +123,31 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 
 		var inProgress bool
 		for _, state := range stateUpdate.PostCreateStates {
-			switch state.Status {
-			case codespaces.PostCreateStateRunning:
-				if lastState != state {
-					lastState = state
-					log.Print(state.Name)
-				} else {
-					log.Print(".")
-				}
+			if _, found := finishedStates[state.Name]; found {
+				continue // skip this state as we've processed it already
+			}
 
-				inProgress = true
-			case codespaces.PostCreateStateFailed:
-				if lastState.Name == state.Name && lastState.Status != state.Status {
+			if state.Name != lastState.Name {
+				log.Print(state.Name)
+
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
 					lastState = state
-					log.Print(".Failed\n")
+					log.Print("...")
+					break
+				} else {
+					finishedStates[state.Name] = true
+					log.Println("..." + state.Status)
 				}
-			case codespaces.PostCreateStateSuccess:
-				if lastState.Name == state.Name && lastState.Status != state.Status {
-					lastState = state
-					log.Print(".Success\n")
+			} else {
+				if state.Status == codespaces.PostCreateStateRunning {
+					inProgress = true
+					log.Print(".")
+					break
+				} else {
+					finishedStates[state.Name] = true
+					log.Println(state.Status)
+					lastState = codespaces.PostCreateState{} // reset the value
 				}
 			}
 		}

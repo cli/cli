@@ -62,6 +62,15 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
+func connectionReady(codespace *api.Codespace) bool {
+	ready := codespace.Environment.Connection.SessionID != ""
+	ready = ready && codespace.Environment.Connection.SessionToken != ""
+	ready = ready && codespace.Environment.Connection.RelayEndpoint != ""
+	ready = ready && codespace.Environment.Connection.RelaySAS != ""
+	ready = ready && codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
+	return ready
+}
+
 func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
@@ -73,7 +82,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	}
 
 	retries := 0
-	for codespace.Environment.Connection.SessionID == "" || codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
+	for !connectionReady(codespace) {
 		if retries > 1 {
 			if retries%2 == 0 {
 				log.Print(".")
