@@ -126,11 +126,11 @@ func getRepoName() (string, error) {
 	repoSurvey := []*survey.Question{
 		{
 			Name:     "repository",
-			Prompt:   &survey.Input{Message: "Repository"},
+			Prompt:   &survey.Input{Message: "Repository:"},
 			Validate: survey.Required,
 		},
 	}
-	err := survey.Ask(repoSurvey, &repo)
+	err := ask(repoSurvey, &repo)
 	return repo, err
 }
 
@@ -142,11 +142,11 @@ func getBranchName() (string, error) {
 	branchSurvey := []*survey.Question{
 		{
 			Name:     "branch",
-			Prompt:   &survey.Input{Message: "Branch"},
+			Prompt:   &survey.Input{Message: "Branch:"},
 			Validate: survey.Required,
 		},
 	}
-	err := survey.Ask(branchSurvey, &branch)
+	err := ask(branchSurvey, &branch)
 	return branch, err
 }
 
@@ -198,7 +198,7 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 	}
 
 	skuAnswers := struct{ SKU string }{}
-	if err := survey.Ask(skuSurvey, &skuAnswers); err != nil {
+	if err := ask(skuSurvey, &skuAnswers); err != nil {
 		return "", fmt.Errorf("error getting SKU: %v", err)
 	}
 
@@ -206,4 +206,9 @@ func getMachineName(ctx context.Context, user *api.User, repo *api.Repository, l
 	machine = sku.Name
 
 	return machine, nil
+}
+
+// ask asks survery questions using standard options.
+func ask(qs []*survey.Question, response interface{}) error {
+	return survey.Ask(qs, response, survey.WithShowCursor(true))
 }
