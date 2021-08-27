@@ -31,8 +31,9 @@ type PostCreateState struct {
 	Status PostCreateStateStatus `json:"status"`
 }
 
-// PollPostCreateStates polls the state file in a codespace after creation and calls the poller
-// with a slice of states to be processed.
+// PollPostCreateStates watches for state changes in a codespace,
+// and calls the supplied poller for each batch of state changes.
+// It runs until the context is cancelled or SSH tunnel is closed.
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
@@ -50,6 +51,8 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 
 	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
