@@ -21,14 +21,15 @@ import (
 
 // PortOptions represents the options accepted by the ports command.
 type PortsOptions struct {
-	// CodespaceName is the name of the codespace, optional
+	// CodespaceName is the name of the codespace, optional.
 	CodespaceName string
 
-	// AsJSON dictates whether the command returns a json output or not, optional
+	// AsJSON dictates whether the command returns a json output or not, optional.
 	AsJSON bool
 }
 
-// NewPortsCmd returns a new cobra command representing the ports command and sub commands
+// NewPortsCmd returns a Cobra "ports" command that displays a table of available ports,
+// according to the specified flags.
 func NewPortsCmd() *cobra.Command {
 	opts := &PortsOptions{}
 
@@ -37,7 +38,7 @@ func NewPortsCmd() *cobra.Command {
 		Short: "List ports in a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Ports(opts)
+			return ports(opts)
 		},
 	}
 
@@ -55,8 +56,7 @@ func init() {
 	rootCmd.AddCommand(NewPortsCmd())
 }
 
-// Ports accepts a PortOptions pointer and logs a list the list of available open ports found in a codespace
-func Ports(opts *PortsOptions) error {
+func ports(opts *PortsOptions) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, opts.AsJSON)
@@ -173,7 +173,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 	return ch
 }
 
-// NewPortsPublicCmd returns a cobra command representing the ports subcommand used
+// NewPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
 // to make a given port public
 func NewPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
@@ -187,8 +187,7 @@ func NewPortsPublicCmd() *cobra.Command {
 	}
 }
 
-// NewPortsPrivateCmd rturns a cobra command representing the ports subcommand used
-// to make a given port private
+// NewPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
 func NewPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "private <codespace> <port>",
@@ -248,8 +247,8 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 	return nil
 }
 
-// NewPortsForwardCmd returns a cobra command representing the ports subcommand used to forward
-// ports from the codespace to localhost, it supports multiple ports to be forwarded at once
+// NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
+// port pairs from the codespace to localhost.
 func NewPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <codespace> <source-port>:<destination-port>",
