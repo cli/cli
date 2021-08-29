@@ -3,7 +3,6 @@ package codespaces
 import (
 	"context"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -14,27 +13,53 @@ import (
 	"github.com/github/go-liveshare"
 )
 
-func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort int) (int, <-chan error, error) {
-	tunnelClosed := make(chan error)
-
+// StartPortForwarding starts LiveShare port forwarding of traffic of
+// the specified protocol (e.g. "sshd") between the LiveShare client
+// and the specified local port, or, if zero, a port chosen at random;
+// the effective port number is returned.  Forwarding continues in the
+// background until an error is encountered (including cancellation of
+// the context). Therefore clients must cancel the context
+//
+// REVIEWERS: where is the set of legal values of protocol defined?
+// It appears to be: "whatever is supported by the LiveShare service's
+// serverSharing.startSharing method". Where is that defined?
+//
+// TODO(adonovan): simplify API concurrency from API. Either:
+// 1) return a stop function so that clients don't forget to stop forwarding.
+// 2) avoid creating a goroutine and returning a channel. Use approach of
+//    http.ListenAndServe, which runs until it encounters an error
+//    (incl. cancellation). But this means we can't return the port.
+//    Can we make the client responsible for supplying it?
+// 3) return a PortForwarding object that encapsulates the port,
+//    and has NewRemoteCommand as a method. It will need a Stop method,
+//    and an Error method for querying whether the session has failed
+//    asynchronously.
+func StartPortForwarding(ctx context.Context, lsclient *liveshare.Client, protocol string, localPort int) (int, <-chan error, error) {
 	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return 0, nil, fmt.Errorf("new liveshare server: %v", err)
 	}
 
-	rand.Seed(time.Now().Unix())
-	port := rand.Intn(9999-2000) + 2000 // improve this obviously
-	if serverPort != 0 {
-		port = serverPort
+	if localPort == 0 {
+		// improve this obviously
+		// REVIEWERS: any reason not to use the global PRNG?
+		rng := rand.New(rand.NewSource(time.Now().Unix()))
+		localPort = rng.Intn(9999-2000) + 2000
+		// TODO(adonovan): loop if port is taken?
 	}
 
 	// TODO(josebalius): This port won't always be 2222
-	if err := server.StartSharing(ctx, "sshd", 2222); err != nil {
+	if err := server.StartSharing(ctx, protocol, 2222); err != nil {
 		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
+	tunnelClosed := make(chan error)
 	go func() {
-		portForwarder := liveshare.NewPortForwarder(lsclient, server, port)
+		// TODO(adonovan): simplify liveshare API to combine NewPortForwarder and Start
+		// methods into a single ForwardPort call, like http.ListenAndServe.
+		// (Start is a misnomer: it runs the complete session.)
+		// Also document that it never returns a nil error.
+		portForwarder := liveshare.NewPortForwarder(lsclient, server, localPort)
 		if err := portForwarder.Start(ctx); err != nil {
 			tunnelClosed <- fmt.Errorf("forwarding port: %v", err)
 			return
@@ -42,75 +67,42 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort i
 		tunnelClosed <- nil
 	}()
 
-	return port, tunnelClosed, nil
+	return localPort, tunnelClosed, nil
 }
 
-func makeSSHArgs(port int, dst, cmd string) ([]string, []string) {
-	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
-	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
-
-	if cmd != "" {
-		cmdArgs = append(cmdArgs, cmd)
-	}
-
-	return cmdArgs, connArgs
-}
-
-func ConnectToTunnel(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) <-chan error {
-	connClosed := make(chan error)
-	args, connArgs := makeSSHArgs(port, destination, "")
+// Shell runs an interactive secure shell over an existing
+// port-forwarding session. It runs until the shell is terminated
+// (including by cancellation of the context).
+func Shell(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) error {
+	cmd, connArgs := newSSHCommand(ctx, port, destination, "")
 
 	if usingCustomPort {
 		log.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
 	}
 
-	cmd := exec.CommandContext(ctx, "ssh", args...)
+	return cmd.Run()
+}
+
+// NewRemoteCommand returns a partially populated exec.Cmd that will
+// securely run a shell command on the remote machine.
+func NewRemoteCommand(ctx context.Context, tunnelPort int, destination, command string) *exec.Cmd {
+	cmd, _ := newSSHCommand(ctx, tunnelPort, destination, command)
+	return cmd
+}
+
+func newSSHCommand(ctx context.Context, port int, dst, command string) (*exec.Cmd, []string) {
+	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
+
+	// An empty command enables port forwarding but not execution.
+	if command != "" {
+		cmdArgs = append(cmdArgs, command)
+	}
+
+	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
-	go func() {
-		connClosed <- cmd.Run()
-	}()
-
-	return connClosed
-}
-
-type command struct {
-	Cmd        *exec.Cmd
-	StdoutPipe io.ReadCloser
-}
-
-func newCommand(cmd *exec.Cmd) (*command, error) {
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("create stdout pipe: %v", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("cmd start: %v", err)
-	}
-
-	return &command{
-		Cmd:        cmd,
-		StdoutPipe: stdoutPipe,
-	}, nil
-}
-
-func (c *command) Read(p []byte) (int, error) {
-	return c.StdoutPipe.Read(p)
-}
-
-func (c *command) Close() error {
-	if err := c.StdoutPipe.Close(); err != nil {
-		return fmt.Errorf("close stdout: %v", err)
-	}
-
-	return c.Cmd.Wait()
-}
-
-func RunCommand(ctx context.Context, tunnelPort int, destination, cmdString string) (io.ReadCloser, error) {
-	args, _ := makeSSHArgs(tunnelPort, destination, cmdString)
-	cmd := exec.CommandContext(ctx, "ssh", args...)
-	return newCommand(cmd)
+	return cmd, connArgs
 }

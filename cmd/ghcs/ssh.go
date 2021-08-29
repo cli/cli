@@ -77,7 +77,7 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 	}
 	log.Print("\n")
 
-	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort)
+	tunnelPort, tunnelClosed, err := codespaces.StartPortForwarding(ctx, lsclient, "sshd", sshServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -88,7 +88,11 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 	}
 
 	usingCustomPort := tunnelPort == sshServerPort
-	connClosed := codespaces.ConnectToTunnel(ctx, log, tunnelPort, connectDestination, usingCustomPort)
+
+	shellClosed := make(chan error)
+	go func() {
+		shellClosed <- codespaces.Shell(ctx, log, tunnelPort, connectDestination, usingCustomPort)
+	}()
 
 	log.Println("Ready...")
 	select {
@@ -96,9 +100,9 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		if err != nil {
 			return fmt.Errorf("tunnel closed: %v", err)
 		}
-	case err := <-connClosed:
+	case err := <-shellClosed:
 		if err != nil {
-			return fmt.Errorf("connection closed: %v", err)
+			return fmt.Errorf("shell closed: %v", err)
 		}
 	}
 

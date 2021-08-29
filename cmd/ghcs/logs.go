@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -24,7 +23,7 @@ func newLogsCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return logs(tail, codespaceName)
+			return logs(context.Background(), tail, codespaceName)
 		},
 	}
 
@@ -37,9 +36,12 @@ func init() {
 	rootCmd.AddCommand(newLogsCmd())
 }
 
-func logs(tail bool, codespaceName string) error {
+func logs(ctx context.Context, tail bool, codespaceName string) error {
+	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
@@ -57,7 +59,7 @@ func logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}
 
-	tunnelPort, connClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, 0)
+	tunnelPort, connClosed, err := codespaces.StartPortForwarding(ctx, lsclient, "sshd", 0)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -68,31 +70,13 @@ func logs(tail bool, codespaceName string) error {
 	}
 
 	dst := fmt.Sprintf("%s@localhost", getSSHUser(codespace))
-	stdout, err := codespaces.RunCommand(
-		ctx, tunnelPort, dst, fmt.Sprintf("%v /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+	cmd := codespaces.NewRemoteCommand(
+		ctx, tunnelPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
-	if err != nil {
-		return fmt.Errorf("run command: %v", err)
-	}
 
-	done := make(chan error)
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			fmt.Println(scanner.Text())
-		}
-
-		if err := scanner.Err(); err != nil {
-			done <- fmt.Errorf("error scanning: %v", err)
-			return
-		}
-
-		if err := stdout.Close(); err != nil {
-			done <- fmt.Errorf("close stdout: %v", err)
-			return
-		}
-		done <- nil
-	}()
+	// Channel is buffered to avoid a goroutine leak when connClosed occurs before done.
+	done := make(chan error, 1)
+	go func() { done <- cmd.Run() }()
 
 	select {
 	case err := <-connClosed:
@@ -101,7 +85,7 @@ func logs(tail bool, codespaceName string) error {
 		}
 	case err := <-done:
 		if err != nil {
-			return err
+			return fmt.Errorf("error retrieving logs: %v", err)
 		}
 	}
 
