@@ -15,9 +15,6 @@ import (
 	"github.com/github/go-liveshare"
 )
 
-// MakeSSHTunnel This function initializes the liveshare tunnel
-// Creates the tunnel from a local port to a remote port.
-// Returns the local port that was used, the channel and the error if any.
 func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort int, remoteSSHPort int) (int, <-chan error, error) {
 	tunnelClosed := make(chan error)
 
@@ -48,9 +45,8 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort
 	return port, tunnelClosed, nil
 }
 
-// StartSSHServer starts and installs the SSH server in the codespace
-// returns the remote port where it is running, the user to use to login
-// or an error if something failed.
+// StartSSHServer installs (if necessary) and starts the SSH in the codespace.
+// It returns the remote port where it is running, the user to log in with, or an error if something failed.
 func StartSSHServer(ctx context.Context, client *liveshare.Client) (serverPort int, user string, err error) {
 	sshServer, err := liveshare.NewSSHServer(client)
 	if err != nil {

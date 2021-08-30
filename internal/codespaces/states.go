@@ -45,7 +45,12 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("connect to liveshare: %v", err)
 	}
 
-	tunnelPort, connClosed, err := MakeSSHTunnel(ctx, lsclient, 0, 2222)
+	remoteSSHServerPort, _, err := StartSSHServer(ctx, lsclient)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
+	}
+
+	tunnelPort, connClosed, err := MakeSSHTunnel(ctx, lsclient, 0, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
