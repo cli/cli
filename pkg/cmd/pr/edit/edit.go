@@ -55,7 +55,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
 			$ gh pr edit 23 --add-reviewer monalisa,hubot  --remove-reviewer myorg/team-name
-			$ gh pr edit 23 --add-assignee @me --remove-assignee monalisa,hubot
+			$ gh pr edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 		`),

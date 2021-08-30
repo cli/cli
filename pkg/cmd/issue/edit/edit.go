@@ -50,7 +50,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
-			$ gh issue edit 23 --add-assignee @me --remove-assignee monalisa,hubot
+			$ gh issue edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --body-file body.txt
