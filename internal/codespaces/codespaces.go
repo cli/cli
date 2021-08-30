@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -116,32 +115,6 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, tok
 	}
 
 	return lsclient, nil
-}
-
-// StartSSHServer starts and installs the SSH server in the codespace
-// returns the remote port where it is running, the user to use to login
-// or an error if something failed.
-func StartSSHServer(ctx context.Context, client *liveshare.Client) (serverPort int, user string, err error) {
-	sshServer, err := liveshare.NewSSHServer(client)
-	if err != nil {
-		return 0, "", fmt.Errorf("error creating live share: %v", err)
-	}
-
-	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
-	if err != nil {
-		return 0, "", fmt.Errorf("error starting live share: %v", err)
-	}
-
-	if !sshServerStartResult.Result {
-		return 0, "", errors.New(sshServerStartResult.Message)
-	}
-
-	portInt, err := strconv.Atoi(sshServerStartResult.ServerPort)
-	if err != nil {
-		return 0, "", fmt.Errorf("error parsing port: %v", err)
-	}
-
-	return portInt, sshServerStartResult.User, nil
 }
 
 func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
