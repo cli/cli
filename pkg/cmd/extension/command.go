@@ -1,4 +1,4 @@
-package extensions
+package extension
 
 import (
 	"errors"
@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
+func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
 
 	extCmd := cobra.Command{
-		Use:   "extensions",
+		Use:   "extension",
 		Short: "Manage gh extensions",
 		Long: heredoc.Docf(`
 			GitHub CLI extensions are repositories that provide additional gh commands.
@@ -31,6 +31,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 
 			An extension cannot override any of the core gh commands.
 		`, "`"),
+		Aliases: []string{"extensions"},
 	}
 
 	extCmd.AddCommand(
@@ -39,7 +40,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			Short: "List installed extension commands",
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cmds := m.List()
+				cmds := m.List(true)
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
@@ -57,7 +58,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 					t.AddField(repo, nil, nil)
 					var updateAvailable string
 					if c.UpdateAvailable() {
-						updateAvailable = "Update available"
+						updateAvailable = "Upgrade available"
 					}
 					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
@@ -115,7 +116,7 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					var name string
 					if len(args) > 0 {
-						name = args[0]
+						name = normalizeExtensionSelector(args[0])
 					}
 					return m.Upgrade(name, flagForce, io.Out, io.ErrOut)
 				},
@@ -125,11 +126,11 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 			return cmd
 		}(),
 		&cobra.Command{
-			Use:   "remove",
+			Use:   "remove <name>",
 			Short: "Remove an installed extension",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				extName := args[0]
+				extName := normalizeExtensionSelector(args[0])
 				if err := m.Remove(extName); err != nil {
 					return err
 				}
@@ -140,9 +141,43 @@ func NewCmdExtensions(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
+		&cobra.Command{
+			Use:   "create <name>",
+			Short: "Create a new extension",
+			Args:  cmdutil.ExactArgs(1, "must specify a name for the extension"),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				extName := args[0]
+				if !strings.HasPrefix(extName, "gh-") {
+					extName = "gh-" + extName
+				}
+				if err := m.Create(extName); err != nil {
+					return err
+				}
+				if !io.IsStdoutTTY() {
+					return nil
+				}
+				link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
+				cs := io.ColorScheme()
+				out := heredoc.Docf(`
+					%[1]s Created directory %[2]s
+					%[1]s Initialized git repository
+					%[1]s Set up extension scaffolding
+
+					%[2]s is ready for development
+
+					Install locally with: cd %[2]s && gh extension install .
+
+					Publish to GitHub with: gh repo create %[2]s
+
+					For more information on writing extensions:
+					%[3]s
+				`, cs.SuccessIcon(), extName, link)
+				fmt.Fprint(io.Out, out)
+				return nil
+			},
+		},
 	)
 
-	extCmd.Hidden = true
 	return &extCmd
 }
 
@@ -158,11 +193,18 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 		return fmt.Errorf("%q matches the name of a built-in command", commandName)
 	}
 
-	for _, ext := range m.List() {
+	for _, ext := range m.List(false) {
 		if ext.Name() == commandName {
 			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
 	}
 
 	return nil
+}
+
+func normalizeExtensionSelector(n string) string {
+	if idx := strings.IndexRune(n, '/'); idx >= 0 {
+		n = n[idx+1:]
+	}
+	return strings.TrimPrefix(n, "gh-")
 }

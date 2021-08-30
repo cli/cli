@@ -1,4 +1,4 @@
-package extensions
+package extension
 
 import (
 	"bytes"
@@ -48,7 +48,7 @@ func TestManager_List(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 
 	m := newTestManager(tempDir)
-	exts := m.List()
+	exts := m.List(false)
 	assert.Equal(t, 2, len(exts))
 	assert.Equal(t, "hello", exts[0].Name())
 	assert.Equal(t, "two", exts[1].Name())
@@ -94,7 +94,7 @@ func TestManager_Upgrade_AllExtensions(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
-	assert.NoError(t, stubLocalExtension(filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
+	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
 	m := newTestManager(tempDir)
 
@@ -139,7 +139,7 @@ func TestManager_Upgrade_RemoteExtension(t *testing.T) {
 
 func TestManager_Upgrade_LocalExtension(t *testing.T) {
 	tempDir := t.TempDir()
-	assert.NoError(t, stubLocalExtension(filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
+	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
 	m := newTestManager(tempDir)
 
@@ -202,13 +202,28 @@ func TestManager_Install(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
-func stubExtension(path string) error {
-	dir := filepath.Dir(path)
-	gitDir := filepath.Join(dir, ".git")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+func TestManager_Create(t *testing.T) {
+	tempDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	assert.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	m := newTestManager(tempDir)
+	err := m.Create("gh-test")
+	assert.NoError(t, err)
+	files, err := ioutil.ReadDir(filepath.Join(tempDir, "gh-test"))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(files))
+	extFile := files[0]
+	assert.Equal(t, "gh-test", extFile.Name())
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, os.FileMode(0666), extFile.Mode())
+	} else {
+		assert.Equal(t, os.FileMode(0755), extFile.Mode())
 	}
-	if err := os.Mkdir(gitDir, 0755); err != nil {
+}
+
+func stubExtension(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(path, os.O_CREATE, 0755)
@@ -218,11 +233,28 @@ func stubExtension(path string) error {
 	return f.Close()
 }
 
-func stubLocalExtension(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+func stubLocalExtension(tempDir, path string) error {
+	extDir, err := ioutil.TempDir(tempDir, "local-ext")
+	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	extFile, err := os.OpenFile(filepath.Join(extDir, filepath.Base(path)), os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	if err := extFile.Close(); err != nil {
+		return err
+	}
+
+	linkPath := filepath.Dir(path)
+	if err := os.MkdirAll(filepath.Dir(linkPath), 0755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(linkPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(extDir)
 	if err != nil {
 		return err
 	}

@@ -13,13 +13,13 @@ func (g *mockGitClient) BranchRemote(a string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (g *mockGitClient) CheckoutLocal(a string) error {
-	args := g.Called(a)
+func (g *mockGitClient) UpdateBranch(b, r string) error {
+	args := g.Called(b, r)
 	return args.Error(0)
 }
 
-func (g *mockGitClient) CheckoutRemote(a, b string) error {
-	args := g.Called(a, b)
+func (g *mockGitClient) CreateBranch(b, r, u string) error {
+	args := g.Called(b, r, u)
 	return args.Error(0)
 }
 

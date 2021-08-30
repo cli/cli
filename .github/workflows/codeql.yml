@@ -18,6 +18,7 @@ jobs:
         uses: github/codeql-action/init@v1
         with:
           languages: go
+          queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
