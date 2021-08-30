@@ -57,13 +57,9 @@ func Logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}
 
-	result, remoteSSHServerPort, sshUser, _, err := codespaces.StartSSHServer(ctx, lsclient)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
-	}
-
-	if !result {
-		return fmt.Errorf("error starting ssh: %v", err)
 	}
 
 	tunnelPort, connClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, 0, remoteSSHServerPort)
