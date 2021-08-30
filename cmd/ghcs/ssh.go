@@ -59,7 +59,7 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}

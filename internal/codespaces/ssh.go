@@ -47,7 +47,9 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort
 
 // StartSSHServer installs (if necessary) and starts the SSH in the codespace.
 // It returns the remote port where it is running, the user to log in with, or an error if something failed.
-func StartSSHServer(ctx context.Context, client *liveshare.Client) (serverPort int, user string, err error) {
+func StartSSHServer(ctx context.Context, client *liveshare.Client, log logger) (serverPort int, user string, err error) {
+	log.Println("Fetching SSH details...")
+
 	sshServer, err := liveshare.NewSSHServer(client)
 	if err != nil {
 		return 0, "", fmt.Errorf("error creating live share: %v", err)

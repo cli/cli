@@ -45,7 +45,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("connect to liveshare: %v", err)
 	}
 
-	remoteSSHServerPort, _, err := StartSSHServer(ctx, lsclient)
+	remoteSSHServerPort, sshUser, err := StartSSHServer(ctx, lsclient, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
@@ -65,7 +65,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		case err := <-connClosed:
 			return fmt.Errorf("connection closed: %v", err)
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, tunnelPort, codespace)
+			states, err := getPostCreateOutput(ctx, tunnelPort, codespace, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %v", err)
 			}
@@ -75,9 +75,9 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
 	stdout, err := RunCommand(
-		ctx, tunnelPort, sshDestination(codespace),
+		ctx, tunnelPort, sshDestination(codespace, user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
 	)
 	if err != nil {
@@ -101,10 +101,6 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 }
 
 // TODO(josebalius): this won't be needed soon
-func sshDestination(codespace *api.Codespace) string {
-	user := "codespace"
-	if codespace.RepositoryNWO == "github/github" {
-		user = "root"
-	}
+func sshDestination(codespace *api.Codespace, user string) string {
 	return user + "@localhost"
 }
