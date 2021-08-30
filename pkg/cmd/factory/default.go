@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/cli/cli/api"
 	"github.com/cli/cli/context"
@@ -14,6 +16,7 @@ import (
 	"github.com/cli/cli/pkg/cmd/extension"
 	"github.com/cli/cli/pkg/cmdutil"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/safeexec"
 )
 
 func New(appVersion string) *cmdutil.Factory {
@@ -114,10 +117,22 @@ func browserLauncher(f *cmdutil.Factory) string {
 }
 
 func executable() string {
-	gh := "gh"
-	if exe, err := os.Executable(); err == nil {
-		gh = exe
+	exe, _ := os.Executable()
+
+	path := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(path) {
+		if strings.HasSuffix(dir, "gh") {
+			if dir == exe {
+				return dir
+			}
+			if symlink, _ := os.Readlink(dir); symlink == exe {
+				return dir
+			}
+		}
 	}
+
+	gh, _ := safeexec.LookPath("gh")
+
 	return gh
 }
 
