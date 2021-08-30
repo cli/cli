@@ -19,7 +19,8 @@ func main() {
 var version = "DEV"
 
 var rootCmd = &cobra.Command{
-	Use: "ghcs",
+	Use:          "ghcs",
+	SilenceUsage: true, // don't print usage message after each error (see #80)
 	Long: `Unofficial CLI tool to manage GitHub Codespaces.
 
 Running commands requires the GITHUB_TOKEN environment variable to be set to a
