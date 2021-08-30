@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCodeCmd() *cobra.Command {
+func newCodeCmd() *cobra.Command {
 	useInsiders := false
 
 	codeCmd := &cobra.Command{
@@ -24,7 +24,7 @@ func NewCodeCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Code(codespaceName, useInsiders)
+			return code(codespaceName, useInsiders)
 		},
 	}
 
@@ -34,10 +34,10 @@ func NewCodeCmd() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewCodeCmd())
+	rootCmd.AddCommand(newCodeCmd())
 }
 
-func Code(codespaceName string, useInsiders bool) error {
+func code(codespaceName string, useInsiders bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -57,8 +57,9 @@ func Code(codespaceName string, useInsiders bool) error {
 		codespaceName = codespace.Name
 	}
 
-	if err := open.Run(vscodeProtocolURL(codespaceName, useInsiders)); err != nil {
-		return fmt.Errorf("error opening vscode URL")
+	url := vscodeProtocolURL(codespaceName, useInsiders)
+	if err := open.Run(url); err != nil {
+		return fmt.Errorf("error opening vscode URL %s: %s. (Is VSCode installed?)", url, err)
 	}
 
 	return nil

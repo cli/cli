@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewLogsCmd() *cobra.Command {
+func newLogsCmd() *cobra.Command {
 	var tail bool
 
 	logsCmd := &cobra.Command{
@@ -24,7 +24,7 @@ func NewLogsCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return Logs(tail, codespaceName)
+			return logs(tail, codespaceName)
 		},
 	}
 
@@ -34,10 +34,10 @@ func NewLogsCmd() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewLogsCmd())
+	rootCmd.AddCommand(newLogsCmd())
 }
 
-func Logs(tail bool, codespaceName string) error {
+func logs(tail bool, codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -52,7 +52,7 @@ func Logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}

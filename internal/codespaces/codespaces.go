@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -25,7 +26,9 @@ func ChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 		return nil, ErrNoCodespaces
 	}
 
-	codespaces.SortByCreatedAt()
+	sort.Slice(codespaces, func(i, j int) bool {
+		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
+	})
 
 	codespacesByName := make(map[string]*api.Codespace)
 	codespacesNames := make([]string, 0, len(codespaces))
@@ -62,16 +65,25 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
+func connectionReady(codespace *api.Codespace) bool {
+	return codespace.Environment.Connection.SessionID != "" &&
+		codespace.Environment.Connection.SessionToken != "" &&
+		codespace.Environment.Connection.RelayEndpoint != "" &&
+		codespace.Environment.Connection.RelaySAS != "" &&
+		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
+}
+
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
+	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		log.Println("Starting your codespace...")
+		startedCodespace = true
+		log.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %v", err)
 		}
 	}
 
-	retries := 0
-	for codespace.Environment.Connection.SessionID == "" || codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
+	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
 			if retries%2 == 0 {
 				log.Print(".")
@@ -84,16 +96,14 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, tok
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
-		codespace, err = apiClient.GetCodespace(ctx, token, codespace.OwnerLogin, codespace.Name)
+		codespace, err = apiClient.GetCodespace(ctx, token, userLogin, codespace.Name)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %v", err)
 		}
-
-		retries += 1
 	}
 
-	if retries >= 2 {
-		log.Print("\n")
+	if startedCodespace {
+		fmt.Print("\n")
 	}
 
 	log.Println("Connecting to your codespace...")

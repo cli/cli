@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewSSHCmd() *cobra.Command {
+func newSSHCmd() *cobra.Command {
 	var sshProfile, codespaceName string
 	var sshServerPort int
 
@@ -24,7 +24,7 @@ func NewSSHCmd() *cobra.Command {
 		Short: "SSH into a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return SSH(sshProfile, codespaceName, sshServerPort)
+			return ssh(sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
@@ -36,10 +36,10 @@ func NewSSHCmd() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(NewSSHCmd())
+	rootCmd.AddCommand(newSSHCmd())
 }
 
-func SSH(sshProfile, codespaceName string, sshServerPort int) error {
+func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -54,7 +54,7 @@ func SSH(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, token, codespace)
+	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
