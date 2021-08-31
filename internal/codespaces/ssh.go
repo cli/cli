@@ -20,7 +20,7 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort
 
 	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
-		return 0, nil, fmt.Errorf("new liveshare server: %v", err)
+		return 0, nil, fmt.Errorf("new Live Share server: %v", err)
 	}
 
 	rand.Seed(time.Now().Unix())

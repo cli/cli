@@ -49,12 +49,12 @@ func logs(tail bool, codespaceName string) error {
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connecting to liveshare: %v", err)
+		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
 
 	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)

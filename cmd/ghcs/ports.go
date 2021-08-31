@@ -71,14 +71,14 @@ func ports(opts *portsOptions) error {
 		if err == codespaces.ErrNoCodespaces {
 			return err
 		}
-		return fmt.Errorf("error choosing codespace: %v", err)
+		return fmt.Errorf("error choosing Codespace: %v", err)
 	}
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
 	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to liveshare: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
 	log.Println("Loading ports...")
@@ -211,17 +211,17 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
+		return fmt.Errorf("error getting Codespace token: %v", err)
 	}
 
 	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace: %v", err)
+		return fmt.Errorf("error getting Codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to liveshare: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
 	server, err := liveshare.NewServer(lsclient)
@@ -277,17 +277,17 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
+		return fmt.Errorf("error getting Codespace token: %v", err)
 	}
 
 	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace: %v", err)
+		return fmt.Errorf("error getting Codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to liveshare: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
 	server, err := liveshare.NewServer(lsclient)

@@ -278,12 +278,11 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 		if len(b) > 100 {
 			b = append(b[:97], "..."...)
 		}
-
 		if resp.StatusCode == http.StatusServiceUnavailable && strings.TrimSpace(string(b)) == "7" {
 			// HTTP 503 with error code 7 (EnvironmentNotShutdown) is benign.
 			// Ignore it.
 		} else {
-			return fmt.Errorf("failed to start codespace: %s", b)
+			return fmt.Errorf("failed to start Codespace: %s", b)
 		}
 	}
 
