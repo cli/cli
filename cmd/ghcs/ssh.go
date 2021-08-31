@@ -23,7 +23,7 @@ func newSSHCmd() *cobra.Command {
 		Short: "SSH into a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ssh(sshProfile, codespaceName, sshServerPort)
+			return ssh(context.Background(), sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
@@ -38,9 +38,12 @@ func init() {
 	rootCmd.AddCommand(newSSHCmd())
 }
 
-func ssh(sshProfile, codespaceName string, sshServerPort int) error {
+func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPort int) error {
+	// Ensure all child tasks (e.g. port forwarding) terminate before return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
@@ -81,7 +84,16 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 	}
 	log.Print("\n")
 
-	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort, remoteSSHServerPort)
+	usingCustomPort := true
+	if localSSHServerPort == 0 {
+		usingCustomPort = false // suppress log of command line in Shell
+		localSSHServerPort, err = codespaces.UnusedPort()
+		if err != nil {
+			return err
+		}
+	}
+
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHServerPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -91,22 +103,27 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	usingCustomPort := tunnelPort == sshServerPort
-	connClosed := codespaces.ConnectToTunnel(ctx, log, tunnelPort, connectDestination, usingCustomPort)
+	tunnelClosed := make(chan error)
+	go func() {
+		tunnelClosed <- tunnel.Start(ctx) // error is always non-nil
+	}()
+
+	shellClosed := make(chan error)
+	go func() {
+		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
+	}()
 
 	log.Println("Ready...")
 	select {
 	case err := <-tunnelClosed:
-		if err != nil {
-			return fmt.Errorf("tunnel closed: %v", err)
-		}
-	case err := <-connClosed:
-		if err != nil {
-			return fmt.Errorf("connection closed: %v", err)
-		}
-	}
+		return fmt.Errorf("tunnel closed: %v", err)
 
-	return nil
+	case err := <-shellClosed:
+		if err != nil {
+			return fmt.Errorf("shell closed: %v", err)
+		}
+		return nil // success
+	}
 }
 
 func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {

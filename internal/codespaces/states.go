@@ -1,10 +1,10 @@
 package codespaces
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -33,7 +33,7 @@ type PostCreateState struct {
 
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
-// It runs until the context is cancelled or SSH tunnel is closed.
+// It runs until it encounters an error, including cancellation of the context.
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
@@ -45,15 +45,25 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("connect to Live Share: %v", err)
 	}
 
+	localSSHPort, err := UnusedPort()
+	if err != nil {
+		return err
+	}
+
 	remoteSSHServerPort, sshUser, err := StartSSHServer(ctx, lsclient, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	tunnelPort, connClosed, err := MakeSSHTunnel(ctx, lsclient, 0, remoteSSHServerPort)
+	fwd, err := NewPortForwarder(ctx, lsclient, "sshd", localSSHPort, remoteSSHServerPort)
 	if err != nil {
-		return fmt.Errorf("make ssh tunnel: %v", err)
+		return fmt.Errorf("creating port forwarder: %v", err)
 	}
+
+	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
+	go func() {
+		tunnelClosed <- fwd.Start(ctx) // error is non-nil
+	}()
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
@@ -61,11 +71,13 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case err := <-connClosed:
-			return fmt.Errorf("connection closed: %v", err)
+			return ctx.Err()
+
+		case err := <-tunnelClosed:
+			return fmt.Errorf("connection failed: %v", err)
+
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, tunnelPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localSSHPort, codespace, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %v", err)
 			}
@@ -76,24 +88,19 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 }
 
 func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
-	stdout, err := RunCommand(
+	cmd := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
 	)
-	if err != nil {
+	stdout := new(bytes.Buffer)
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("run command: %v", err)
 	}
-	defer stdout.Close()
-
-	b, err := ioutil.ReadAll(stdout)
-	if err != nil {
-		return nil, fmt.Errorf("read output: %v", err)
-	}
-
 	var output struct {
 		Steps []PostCreateState `json:"steps"`
 	}
-	if err := json.Unmarshal(b, &output); err != nil {
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		return nil, fmt.Errorf("unmarshal output: %v", err)
 	}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -24,7 +23,7 @@ func newLogsCmd() *cobra.Command {
 			if len(args) > 0 {
 				codespaceName = args[0]
 			}
-			return logs(tail, codespaceName)
+			return logs(context.Background(), tail, codespaceName)
 		},
 	}
 
@@ -37,9 +36,12 @@ func init() {
 	rootCmd.AddCommand(newLogsCmd())
 }
 
-func logs(tail bool, codespaceName string) error {
+func logs(ctx context.Context, tail bool, codespaceName string) error {
+	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
@@ -57,12 +59,17 @@ func logs(tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
 
+	localSSHPort, err := codespaces.UnusedPort()
+	if err != nil {
+		return err
+	}
+
 	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	tunnelPort, connClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, 0, remoteSSHServerPort)
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -73,42 +80,30 @@ func logs(tail bool, codespaceName string) error {
 	}
 
 	dst := fmt.Sprintf("%s@localhost", sshUser)
-	stdout, err := codespaces.RunCommand(
-		ctx, tunnelPort, dst, fmt.Sprintf("%v /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+	cmd := codespaces.NewRemoteCommand(
+		ctx, localSSHPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
-	if err != nil {
-		return fmt.Errorf("run command: %v", err)
-	}
 
-	done := make(chan error)
+	// Error channels are buffered so that neither sending goroutine gets stuck.
+
+	tunnelClosed := make(chan error, 1)
 	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			fmt.Println(scanner.Text())
-		}
+		tunnelClosed <- tunnel.Start(ctx) // error is non-nil
+	}()
 
-		if err := scanner.Err(); err != nil {
-			done <- fmt.Errorf("error scanning: %v", err)
-			return
-		}
-
-		if err := stdout.Close(); err != nil {
-			done <- fmt.Errorf("close stdout: %v", err)
-			return
-		}
-		done <- nil
+	cmdDone := make(chan error, 1)
+	go func() {
+		cmdDone <- cmd.Run()
 	}()
 
 	select {
-	case err := <-connClosed:
-		if err != nil {
-			return fmt.Errorf("connection closed: %v", err)
-		}
-	case err := <-done:
-		if err != nil {
-			return err
-		}
-	}
+	case err := <-tunnelClosed:
+		return fmt.Errorf("connection closed: %v", err)
 
-	return nil
+	case err := <-cmdDone:
+		if err != nil {
+			return fmt.Errorf("error retrieving logs: %v", err)
+		}
+		return nil // success
+	}
 }

@@ -4,45 +4,54 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/github/go-liveshare"
 )
 
-func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort int, remoteSSHPort int) (int, <-chan error, error) {
-	tunnelClosed := make(chan error)
-
-	server, err := liveshare.NewServer(lsclient)
+// UnusedPort returns the number of a local TCP port that is currently
+// unbound, or an error if none was available.
+//
+// Use of this function carries an inherent risk of a time-of-check to
+// time-of-use race against other processes.
+func UnusedPort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return 0, nil, fmt.Errorf("new Live Share server: %v", err)
+		return 0, fmt.Errorf("internal error while choosing port: %v", err)
 	}
 
-	rand.Seed(time.Now().Unix())
-	port := rand.Intn(9999-2000) + 2000 // improve this obviously
-	if localSSHPort != 0 {
-		port = localSSHPort
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, fmt.Errorf("choosing available port: %v", err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// NewPortForwarder returns a new port forwarder for traffic between
+// the Live Share client and the specified local and remote ports.
+//
+// The session name is used (along with the port) to generate
+// names for streams, and may appear in error messages.
+func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName string, localSSHPort, remoteSSHPort int) (*liveshare.PortForwarder, error) {
+	if localSSHPort == 0 {
+		return nil, fmt.Errorf("a local port must be provided")
+	}
+
+	server, err := liveshare.NewServer(client)
+	if err != nil {
+		return nil, fmt.Errorf("new liveshare server: %v", err)
 	}
 
 	if err := server.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
-		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
+		return nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
-	go func() {
-		portForwarder := liveshare.NewPortForwarder(lsclient, server, port)
-		if err := portForwarder.Start(ctx); err != nil {
-			tunnelClosed <- fmt.Errorf("forwarding port: %v", err)
-			return
-		}
-		tunnelClosed <- nil
-	}()
-
-	return port, tunnelClosed, nil
+	return liveshare.NewPortForwarder(client, server, localSSHPort), nil
 }
 
 // StartSSHServer installs (if necessary) and starts the SSH in the codespace.
@@ -72,72 +81,41 @@ func StartSSHServer(ctx context.Context, client *liveshare.Client, log logger) (
 	return portInt, sshServerStartResult.User, nil
 }
 
-func makeSSHArgs(port int, dst, cmd string) ([]string, []string) {
-	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
-	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
-
-	if cmd != "" {
-		cmdArgs = append(cmdArgs, cmd)
-	}
-
-	return cmdArgs, connArgs
-}
-
-func ConnectToTunnel(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) <-chan error {
-	connClosed := make(chan error)
-	args, connArgs := makeSSHArgs(port, destination, "")
+// Shell runs an interactive secure shell over an existing
+// port-forwarding session. It runs until the shell is terminated
+// (including by cancellation of the context).
+func Shell(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) error {
+	cmd, connArgs := newSSHCommand(ctx, port, destination, "")
 
 	if usingCustomPort {
 		log.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
 	}
 
-	cmd := exec.CommandContext(ctx, "ssh", args...)
+	return cmd.Run()
+}
+
+// NewRemoteCommand returns an exec.Cmd that will securely run a shell
+// command on the remote machine.
+func NewRemoteCommand(ctx context.Context, tunnelPort int, destination, command string) *exec.Cmd {
+	cmd, _ := newSSHCommand(ctx, tunnelPort, destination, command)
+	return cmd
+}
+
+// newSSHCommand populates an exec.Cmd to run a command (or if blank,
+// an interactive shell) over ssh.
+func newSSHCommand(ctx context.Context, port int, dst, command string) (*exec.Cmd, []string) {
+	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+	// TODO(adonovan): eliminate X11 and X11Trust flags where unneeded.
+	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
+
+	if command != "" {
+		cmdArgs = append(cmdArgs, command)
+	}
+
+	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
-	go func() {
-		connClosed <- cmd.Run()
-	}()
-
-	return connClosed
-}
-
-type command struct {
-	Cmd        *exec.Cmd
-	StdoutPipe io.ReadCloser
-}
-
-func newCommand(cmd *exec.Cmd) (*command, error) {
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("create stdout pipe: %v", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("cmd start: %v", err)
-	}
-
-	return &command{
-		Cmd:        cmd,
-		StdoutPipe: stdoutPipe,
-	}, nil
-}
-
-func (c *command) Read(p []byte) (int, error) {
-	return c.StdoutPipe.Read(p)
-}
-
-func (c *command) Close() error {
-	if err := c.StdoutPipe.Close(); err != nil {
-		return fmt.Errorf("close stdout: %v", err)
-	}
-
-	return c.Cmd.Wait()
-}
-
-func RunCommand(ctx context.Context, tunnelPort int, destination, cmdString string) (io.ReadCloser, error) {
-	args, _ := makeSSHArgs(tunnelPort, destination, cmdString)
-	cmd := exec.CommandContext(ctx, "ssh", args...)
-	return newCommand(cmd)
+	return cmd, connArgs
 }
