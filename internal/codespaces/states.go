@@ -77,7 +77,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 
 func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
 	stdout, err := RunCommand(
-		ctx, tunnelPort, sshDestination(codespace, user),
+		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
 	)
 	if err != nil {
@@ -98,9 +98,4 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	}
 
 	return output.Steps, nil
-}
-
-// TODO(josebalius): this won't be needed soon
-func sshDestination(codespace *api.Codespace, user string) string {
-	return user + "@localhost"
 }
