@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
@@ -172,8 +171,6 @@ func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Te
 	if err := stream.Close(); err != nil {
 		return fmt.Errorf("error closing stream: %v", err)
 	}
-
-	time.Sleep(1 * time.Second)
 
 	return nil
 }
