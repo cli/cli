@@ -274,11 +274,16 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Error response is numeric code and/or string message, not JSON.
+		// Error response is typically a numeric code (not an error message, nor JSON).
 		if len(b) > 100 {
 			b = append(b[:97], "..."...)
 		}
-		return fmt.Errorf("failed to start Codespace: %s", b)
+		if resp.StatusCode == http.StatusServiceUnavailable && strings.TrimSpace(string(b)) == "7" {
+			// HTTP 503 with error code 7 (EnvironmentNotShutdown) is benign.
+			// Ignore it.
+		} else {
+			return fmt.Errorf("failed to start Codespace: %s", b)
+		}
 	}
 
 	return nil
