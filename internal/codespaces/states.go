@@ -33,7 +33,7 @@ type PostCreateState struct {
 
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
-// It runs until the context is cancelled or SSH tunnel is closed.
+// It runs until it encounters an error, including cancellation of the context.
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
@@ -71,7 +71,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	for {
 		select {
 		case <-ctx.Done():
-			return nil // canceled
+			return ctx.Err()
 
 		case err := <-tunnelClosed:
 			return fmt.Errorf("connection failed: %v", err)
