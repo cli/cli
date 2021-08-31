@@ -80,7 +80,17 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort in
 	}
 	log.Print("\n")
 
-	tunnelPort, tunnelClosed, err := codespaces.StartPortForwarding(ctx, lsclient, "sshd", sshServerPort)
+	usingCustomPort := true
+	if sshServerPort == 0 {
+		usingCustomPort = false // suppress log of command line in Shell
+		port, err := codespaces.UnusedPort()
+		if err != nil {
+			return err
+		}
+		sshServerPort = port
+	}
+
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", sshServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -90,26 +100,27 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort in
 		connectDestination = fmt.Sprintf("%s@localhost", getSSHUser(codespace))
 	}
 
-	usingCustomPort := tunnelPort == sshServerPort
+	tunnelClosed := make(chan error)
+	go func() {
+		tunnelClosed <- tunnel.Start(ctx) // error is always non-nil
+	}()
 
 	shellClosed := make(chan error)
 	go func() {
-		shellClosed <- codespaces.Shell(ctx, log, tunnelPort, connectDestination, usingCustomPort)
+		shellClosed <- codespaces.Shell(ctx, log, sshServerPort, connectDestination, usingCustomPort)
 	}()
 
 	log.Println("Ready...")
 	select {
 	case err := <-tunnelClosed:
-		if err != nil {
-			return fmt.Errorf("tunnel closed: %v", err)
-		}
+		return fmt.Errorf("tunnel closed: %v", err)
+
 	case err := <-shellClosed:
 		if err != nil {
 			return fmt.Errorf("shell closed: %v", err)
 		}
+		return nil // success
 	}
-
-	return nil
 }
 
 func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {

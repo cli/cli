@@ -59,7 +59,12 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to liveshare: %v", err)
 	}
 
-	tunnelPort, connClosed, err := codespaces.StartPortForwarding(ctx, lsclient, "sshd", 0)
+	port, err := codespaces.UnusedPort()
+	if err != nil {
+		return err
+	}
+
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", port)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -71,23 +76,29 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	dst := fmt.Sprintf("%s@localhost", getSSHUser(codespace))
 	cmd := codespaces.NewRemoteCommand(
-		ctx, tunnelPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+		ctx, port, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 
-	// Channel is buffered to avoid a goroutine leak when connClosed occurs before done.
-	done := make(chan error, 1)
-	go func() { done <- cmd.Run() }()
+	// Error channels are buffered so that neither sending goroutine gets stuck.
+
+	tunnelClosed := make(chan error, 1)
+	go func() {
+		tunnelClosed <- tunnel.Start(ctx) // error is non-nil
+	}()
+
+	cmdDone := make(chan error, 1)
+	go func() {
+		cmdDone <- cmd.Run()
+	}()
 
 	select {
-	case err := <-connClosed:
-		if err != nil {
-			return fmt.Errorf("connection closed: %v", err)
-		}
-	case err := <-done:
+	case err := <-tunnelClosed:
+		return fmt.Errorf("connection closed: %v", err)
+
+	case err := <-cmdDone:
 		if err != nil {
 			return fmt.Errorf("error retrieving logs: %v", err)
 		}
+		return nil // success
 	}
-
-	return nil
 }

@@ -45,10 +45,20 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("connect to liveshare: %v", err)
 	}
 
-	tunnelPort, connClosed, err := StartPortForwarding(ctx, lsclient, "sshd", 0)
+	port, err := UnusedPort()
 	if err != nil {
-		return fmt.Errorf("make ssh tunnel: %v", err)
+		return err
 	}
+
+	fwd, err := NewPortForwarder(ctx, lsclient, "sshd", port)
+	if err != nil {
+		return fmt.Errorf("creating port forwarder: %v", err)
+	}
+
+	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
+	go func() {
+		tunnelClosed <- fwd.Start(ctx) // error is non-nil
+	}()
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
@@ -56,11 +66,13 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case err := <-connClosed:
-			return fmt.Errorf("connection closed: %v", err)
+			return nil // canceled
+
+		case err := <-tunnelClosed:
+			return fmt.Errorf("connection failed: %v", err)
+
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, tunnelPort, codespace)
+			states, err := getPostCreateOutput(ctx, port, codespace)
 			if err != nil {
 				return fmt.Errorf("get post create output: %v", err)
 			}

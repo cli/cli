@@ -3,7 +3,7 @@ package codespaces
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,57 +12,47 @@ import (
 	"github.com/github/go-liveshare"
 )
 
-// StartPortForwarding starts LiveShare port forwarding of traffic
-// between the LiveShare client and the specified local port, or, if
-// zero, a port chosen at random; the effective port number is
-// returned.  Forwarding continues in the background until an error is
-// encountered (including cancellation of the context). Therefore
-// clients must cancel the context.
+// UnusedPort returns the number of a local TCP port that is currently
+// unbound, or an error if none was available.
+//
+// Use of this function carries an inherent risk of a time-of-check to
+// time-of-use race against other processes.
+func UnusedPort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, fmt.Errorf("internal error while choosing port: %v", err)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, fmt.Errorf("choosing available port: %v", err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// NewPortForwarder returns a new port forwarder for traffic between
+// the Live Share client and the specified local port (which must be
+// available).
 //
 // The session name is used (along with the port) to generate
 // names for streams, and may appear in error messages.
-//
-// TODO(adonovan): simplify API concurrency from API. Either:
-// 1) return a stop function so that clients don't forget to stop forwarding.
-// 2) avoid creating a goroutine and returning a channel. Use approach of
-//    http.ListenAndServe, which runs until it encounters an error
-//    (incl. cancellation). But this means we can't return the port.
-//    Can we make the client responsible for supplying it?
-// 3) return a PortForwarding object that encapsulates the port,
-//    and has NewRemoteCommand as a method. It will need a Stop method,
-//    and an Error method for querying whether the session has failed
-//    asynchronously.
-func StartPortForwarding(ctx context.Context, lsclient *liveshare.Client, sessionName string, localPort int) (int, <-chan error, error) {
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return 0, nil, fmt.Errorf("new liveshare server: %v", err)
+func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName string, localPort int) (*liveshare.PortForwarder, error) {
+	if localPort == 0 {
+		return nil, fmt.Errorf("a local port must be provided")
 	}
 
-	if localPort == 0 {
-		localPort = rand.Intn(9999-2000) + 2000
-		// TODO(adonovan): retry if port is taken?
+	server, err := liveshare.NewServer(client)
+	if err != nil {
+		return nil, fmt.Errorf("new liveshare server: %v", err)
 	}
 
 	// TODO(josebalius): This port won't always be 2222
 	if err := server.StartSharing(ctx, sessionName, 2222); err != nil {
-		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
+		return nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
-	tunnelClosed := make(chan error)
-	go func() {
-		// TODO(adonovan): simplify liveshare API to combine NewPortForwarder and Start
-		// methods into a single ForwardPort call, like http.ListenAndServe.
-		// (Start is a misnomer: it runs the complete session.)
-		// Also document that it never returns a nil error.
-		portForwarder := liveshare.NewPortForwarder(lsclient, server, localPort)
-		if err := portForwarder.Start(ctx); err != nil {
-			tunnelClosed <- fmt.Errorf("forwarding port: %v", err)
-			return
-		}
-		tunnelClosed <- nil
-	}()
-
-	return localPort, tunnelClosed, nil
+	return liveshare.NewPortForwarder(client, server, localPort), nil
 }
 
 // Shell runs an interactive secure shell over an existing
@@ -78,8 +68,8 @@ func Shell(ctx context.Context, log logger, port int, destination string, usingC
 	return cmd.Run()
 }
 
-// NewRemoteCommand returns a partially populated exec.Cmd that will
-// securely run a shell command on the remote machine.
+// NewRemoteCommand returns an exec.Cmd that will securely run a shell
+// command on the remote machine.
 func NewRemoteCommand(ctx context.Context, tunnelPort int, destination, command string) *exec.Cmd {
 	cmd, _ := newSSHCommand(ctx, tunnelPort, destination, command)
 	return cmd
@@ -92,7 +82,6 @@ func newSSHCommand(ctx context.Context, port int, dst, command string) (*exec.Cm
 	// TODO(adonovan): eliminate X11 and X11Trust flags where unneeded.
 	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
 
-	// An empty command enables port forwarding but not execution.
 	if command != "" {
 		cmdArgs = append(cmdArgs, command)
 	}
